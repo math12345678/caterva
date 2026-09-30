@@ -646,9 +646,9 @@ in the report (the sides of its triangle), so it adds no information about
 where the groups are: it states the triangle as its shape at one group,
 with a verdict of its own. It cannot tell which side of a group a partner
 is on, since a partner that turns about the line through the other two
-keeps its angle; that would need a signed dihedral, which is not measured.
-Each angle is reported as a distance is: its crystal value, each
-replica's mean, the change, and held or moved (more than 15 degrees, the
+keeps its angle; the next measurement does. Each angle is reported as a
+distance is: its crystal value, each replica's mean, the change, and held
+or moved (more than 15 degrees, the
 turn that moves a group 0.4 nm from the vertex by about the 0.1 nm
 distance threshold) only when the replicas agree. An angle that is not yet
 a result makes the exit code 4, as a distance does, but the other
@@ -660,6 +660,40 @@ frames of a lysozyme replica every one equals `gmx gangle -g1 angle`'s to
 and with the frames translated so that the active site straddles the
 periodic box; both comparisons are tests. The GROMACS route runs
 `gmx gangle`, and CI compares the two routes' angle tables.
+
+For each of those angles it also says which face of the vertex the two
+partners are on: seen from the vertex residue's own Cα, does the first run
+clockwise or anticlockwise to the second about the vertex? No angle or
+distance can see this, since a partner that turns about the line through
+the other two keeps them all. It is measured as the elevation of the arm
+from the vertex's functional-group centre to its Cα out of the plane of the
+angle, signed as the dihedral first partner-vertex-second partner-Cα. That
+dihedral was the obvious choice and was not used: it has no value when the
+Cα is in line with the vertex and the second partner, and on a lysozyme
+replica Asp48 sits almost in line with Asn59 and its Cα (179.3 degrees), so
+the dihedral Asn46-Asn59-Asp48-Cα ranged from -168.9 to +132.4 degrees over
+21 frames while the Cα stayed within 11.3 degrees of the plane of the
+angle. The elevation has the dihedral's sign in every frame, and is
+undefined only when the angle itself is straight. A frame counts on a face
+only when sin(angle) × sin(elevation) is at least sin 7.5°, which puts each
+of the three arms from the vertex at least 7.5 degrees out of the plane of
+the other two; nearer flat the sign is noise. 7.5 degrees is half the
+15-degree angle threshold, so a partner counted on opposite faces in two
+frames has turned at least 15 degrees across the flat arrangement. Without
+that band the faces of lysozyme's 24 angles changed 81 times between
+consecutive frames over two 10 ps replicas; with it, 6 times, each to or
+from a lone frame just past the band. Each angle is reported with how far
+its crystal arms are from flat, the crystal's face (or flat, with no face
+to keep), and per replica the fraction of frames on the crystal's face and
+on the other; it is called kept its face, changed face, went flat, partial
+or replicas disagree, with the thresholds printed, and like the rotamers
+and water it is a result only when the distances are. Because the Cα is the
+vertex's own, a side chain that turns over under its partners changes face
+too, which the rotamer table will show. On 21 frames of a lysozyme replica
+every elevation equals `gmx gangle -g1 plane -g2 vector`'s to 0.001 degree,
+as stored and across the periodic box, and both are tests. The GROMACS
+route runs that `gmx gangle`, and CI checks that the two routes' face
+tables are identical.
 
 And the water at each catalytic residue: in every frame, the number of
 water oxygens within 0.35 nm of any of its functional atoms, reported per
@@ -682,8 +716,8 @@ runs `gmx select`, and CI checks that the two routes' water tables are
 identical.
 
 `--gromacs --no-run` on a run whose `analyze.sh` was written before the
-angle and water tables existed is refused, naming the missing file, rather
-than reporting without them: run `analyze.sh` again first.
+angle, face and water tables existed is refused, naming the missing file,
+rather than reporting without them: run `analyze.sh` again first.
 
 Each catalytic distance now carries the 95% confidence interval of its
 mean across replicas (Student's t, which is 12.7 for two replicas), and
