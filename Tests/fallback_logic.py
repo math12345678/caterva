@@ -124,6 +124,45 @@ class LiteratureCandidate(BaseModel):
     doi: str | None = None
 
 
+class MechanismEvidence(BaseModel):
+    """A row that is evidence against the model's mechanism, for the Ki
+    returned (`caterva.compose.ki_mode.evidence_against`).
+
+    BRENDA ref 739793 gives human LDH and one quinoline sulfonamide 0.00059
+    mM "competitive versus NADH" and 0.00252 mM "noncompetitive versus
+    pyruvate". A competitive model of pyruvate gets the first, correctly:
+    it is the only row stating the model's mode. The second says that,
+    measured against pyruvate, the inhibitor is not competitive. `caterva
+    compose` says so in its report's notes; the API and the TypeScript CLI,
+    which choose the same row by the same ranking, said nothing, so a reader
+    of either was handed the competitive constant with the one row that
+    contradicts the model left out of view.
+
+    The fields are the contradicting row's, as BRENDA gives it, and the
+    model's mode and substrate, which it contradicts, as the caller gave
+    them.
+    Everything a sentence needs, so neither front end has to re-derive any
+    of it (ADR 0027); the decision is made once, in Python.
+    """
+    #: The row's value, in `unit`, as BRENDA lists it.
+    value: float
+    unit: str | None = None
+    organism: str | None = None
+    #: The BRENDA reference the row cites.
+    reference_id: str | None = None
+    #: The mode the row states ("noncompetitive"), read by
+    #: caterva.bind.core, as `rowScope.inhibitionMode` is read.
+    inhibition_mode: str
+    #: What the row was measured versus, in the row's words ("pyruvate").
+    versus: str
+    #: The row's commentary, verbatim, so the reader can check the words.
+    conditions: str | None = None
+    #: The mode of the model the Ki was asked for ("competitive").
+    model_mode: str
+    #: The model's substrate, as the caller named it.
+    model_substrate: str
+
+
 class KineticResult(BaseModel):
     found: bool
     value: float | None = None
@@ -204,6 +243,17 @@ class KineticResult(BaseModel):
     #: tells the caller what does exist, and that the gap is the mechanism,
     #: not the literature.
     modes_available: list[str] = []
+
+    #: A row that is evidence against the mechanism of the model a Ki was
+    #: asked for: it states another inhibition mode, measured versus the
+    #: model's substrate, while the row returned does not state the model's
+    #: mode versus it. Set only on a found Ki asked for with
+    #: `inhibition_mode` and `model_substrate`, and None when no row the
+    #: mode step ranked is one. Found in `_mechanism_evidence` by
+    #: `caterva compose`'s own function (caterva.compose.ki_mode's
+    #: `evidence_against`), so compose's report and the API and CLI say it
+    #: by one rule.
+    mechanism_evidence: "MechanismEvidence | None" = None
 
     #: Cofactors and effectors reported for the row that WON selection,
     #: with presence state and PubChem identity where resolvable.
@@ -1154,6 +1204,67 @@ def _mode_withheld_result(mode, stated, log):
     )
 
 
+def _mechanism_evidence(ranked, carried, mode, substrate, isoform, log):
+    """A row of `ranked` that is evidence against the model's mechanism for
+    `carried`, the row returned, as a MechanismEvidence; or None.
+
+    WHY THIS IS HERE AND NOT IN THE RUNNER
+    --------------------------------------
+    The row the finding names is, by construction, one the mode step does
+    not keep: it states another mode, so `_partition_mode` ranks it None and
+    it is in neither the returned row, the tie, nor `ensemble_candidates`.
+    Only this module holds it, so the finding is made here and carried on
+    the result, and the runner emits it. The rule is not this module's:
+    `caterva.compose.ki_mode.evidence_against` decides, as it decides for
+    `caterva compose`'s report, and its sentence goes in the log.
+
+    WHICH ROWS
+    ----------
+    `ranked` is what `_partition_mode` ranked: the rows the isoform and
+    variant steps kept, and behind them the rows naming no isoform that
+    `_naming_no_isoform` put back. Compose checks the resolver's ranked
+    alternatives in the pick's unit; BRENDA's Ki table is in mM throughout,
+    so the unit restriction removes nothing here, and a row's unit is
+    carried with it regardless. In the cross-species tier the rows can be
+    of several related organisms, as compose's alternatives can, and the
+    organism is carried so the reader sees whose row it is.
+
+    With no model substrate there is nothing to be measured against, and
+    where caterva is not importable `_partition_mode` has already logged
+    that nothing was chosen by mode; both give None.
+    """
+    if not substrate:
+        return None
+    try:
+        ki_mode = _ki_mode()
+    except ImportError:
+        return None
+    readings = [ki_mode.read_row(e.conditions) for e in ranked]
+    reading = next((r for e, r in zip(ranked, readings) if e is carried), None)
+    if reading is None:
+        reading = ki_mode.read_row(carried.conditions)
+    against = ki_mode.evidence_against(reading, readings, mode, substrate, isoform)
+    if against is None:
+        return None
+    row = next(e for e, r in zip(ranked, readings) if r is against)
+    sentence = ki_mode.evidence_against_sentence(
+        against, ki_mode.row_label(row.km_value, row.unit, row.reference_id),
+        reading, ki_mode.row_label(carried.km_value, carried.unit, carried.reference_id),
+        mode, substrate)
+    log.append(sentence[0].upper() + sentence[1:])
+    return MechanismEvidence(
+        value=row.km_value,
+        unit=row.unit,
+        organism=row.organism,
+        reference_id=row.reference_id,
+        inhibition_mode=against.mode,
+        versus=against.versus,
+        conditions=row.conditions,
+        model_mode=mode,
+        model_substrate=substrate,
+    )
+
+
 def _partition_variants(entries, keep_isozymes=False):
     """`(usable, withheld)` — rows measuring the enzyme, and rows measuring
     a variant of it.
@@ -1286,10 +1397,11 @@ def resolve_kinetic_value(
         # A Ki asked for by mode: the rows compose's ranking puts first for
         # that model, before min() takes the lower of two mechanisms'
         # constants.
+        ranked = []
         if mode:
+            ranked = exact + _naming_no_isoform(pool, isoform_matched, allow_variants)
             exact, stated = _partition_mode(
-                exact + _naming_no_isoform(pool, isoform_matched, allow_variants),
-                mode, model_substrate, isoform, isoform_matched, log, "exact-match")
+                ranked, mode, model_substrate, isoform, isoform_matched, log, "exact-match")
             if not exact:
                 return _mode_withheld_result(mode, stated, log)
         # Detect designed contrasts BEFORE reporting a winner. A value
@@ -1332,6 +1444,10 @@ def resolve_kinetic_value(
         best, tie, frontier = _best_evidenced(
             exact, log, "exact match", organism, quantity=quantity
         )
+        # After the choice, because whether a row contradicts the model
+        # depends on what the row returned states (ki_mode.evidence_against).
+        evidence = (_mechanism_evidence(ranked, best, mode, model_substrate, isoform, log)
+                    if mode else None)
         return KineticResult(
             found=True,
             value=best.km_value,
@@ -1340,6 +1456,7 @@ def resolve_kinetic_value(
             source="brenda_exact",
             evidence_only=(_evidence_only(pool, allow_variants, "exact match", organism, quantity)
                            if isoform or mode else []),
+            mechanism_evidence=evidence,
             effector_contrasts=contrasts,
             form_mixtures=mixtures,
             organism_discrepancies=discrepancies,
@@ -1514,10 +1631,11 @@ def resolve_kinetic_value(
             if not usable:
                 return _variant_withheld_result(withheld, log)
             acceptable = usable
+        ranked = []
         if mode:
+            ranked = acceptable + _naming_no_isoform(pool, isoform_matched, allow_variants)
             acceptable, stated = _partition_mode(
-                acceptable + _naming_no_isoform(pool, isoform_matched, allow_variants),
-                mode, model_substrate, isoform, isoform_matched, log, "cross-species")
+                ranked, mode, model_substrate, isoform, isoform_matched, log, "cross-species")
             if not acceptable:
                 return _mode_withheld_result(mode, stated, log)
 
@@ -1570,6 +1688,8 @@ def resolve_kinetic_value(
             {v.candidate_organism: v for v in verdicts},
             quantity=quantity,
         )
+        evidence = (_mechanism_evidence(ranked, best, mode, model_substrate, isoform, log)
+                    if mode else None)
         return KineticResult(
             found=True,
             value=best.km_value,
@@ -1579,6 +1699,7 @@ def resolve_kinetic_value(
             evidence_only=(_evidence_only(pool, allow_variants, "cross-species", organism, quantity,
                                           {v.candidate_organism: v for v in verdicts})
                            if isoform or mode else []),
+            mechanism_evidence=evidence,
             effector_contrasts=contrasts,
             form_mixtures=mixtures,
             organism_discrepancies=discrepancies,

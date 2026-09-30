@@ -246,6 +246,78 @@ class TestAnyMode:
                                    "pyruvate").notes
 
 
+class TestEvidenceAgainstIsOneFunction:
+    """`evidence_against` and its sentence, called directly on BRENDA's own
+    rows. They are public because the literature layer makes the finding
+    for the API and the TypeScript CLI (fallback_logic._mechanism_evidence),
+    and a second copy of the rule there would drift from the note above."""
+
+    @staticmethod
+    def _read(rows):
+        return [ki_mode.read_row(r["conditions"]) for r in rows]
+
+    def test_the_pyruvate_row_contradicts_a_competitive_pyruvate_model(self):
+        nadh, pyruvate = self._read(QUINOLINE_ROWS)
+        assert ki_mode.evidence_against(nadh, [nadh, pyruvate], "competitive", "pyruvate") \
+            is pyruvate
+        # Compared as row_scope compares a versus: case and outer space only.
+        assert ki_mode.evidence_against(nadh, [pyruvate], "competitive", " Pyruvate ") \
+            is pyruvate
+
+    def test_the_sentence_is_the_notes(self):
+        nadh, pyruvate = self._read(QUINOLINE_ROWS)
+        label = lambda r: ki_mode.row_label(r["value"], r["unit"], r["reference_id"])  # noqa: E731
+        sentence = ki_mode.evidence_against_sentence(
+            pyruvate, label(QUINOLINE_ROWS[1]), nadh, label(QUINOLINE_ROWS[0]),
+            "competitive", "pyruvate")
+        note = choose(ki(QUINOLINE_ROWS), "competitive_inhibition", "pyruvate").notes[0]
+        assert note == "`reaction_Ki`: " + sentence
+
+    def test_nothing_contradicts_a_row_of_the_models_own_assay(self):
+        nadh, pyruvate = self._read(QUINOLINE_ROWS)
+        # Noncompetitive versus pyruvate, carried for that model.
+        assert ki_mode.evidence_against(pyruvate, [nadh, pyruvate], "noncompetitive",
+                                        "pyruvate") is None
+        # Competitive versus NADH, carried for a model of NADH.
+        assert ki_mode.evidence_against(nadh, [nadh, pyruvate], "competitive", "NADH") is None
+        # Mixed versus glucose stands in for a noncompetitive glucose model.
+        mgatp, glucose = self._read(MGADP_ROWS)
+        assert ki_mode.evidence_against(glucose, [mgatp, glucose], "noncompetitive",
+                                        "glucose") is None
+
+    def test_nothing_is_measured_against_no_substrate(self):
+        nadh, pyruvate = self._read(QUINOLINE_ROWS)
+        assert ki_mode.evidence_against(nadh, [nadh, pyruvate], "competitive", None) is None
+        assert ki_mode.evidence_against(nadh, [nadh, pyruvate], "competitive", "") is None
+
+    def test_a_row_stating_no_mode_contradicts_nothing(self):
+        # Gossypol's three rows state no mode: none is evidence of any.
+        rows = self._read(GOSSYPOL_ROWS)
+        for want in ki_mode.MODES:
+            assert ki_mode.evidence_against(rows[0], rows, want, "pyruvate") is None
+
+    def test_a_pick_of_another_mode_is_not_evidence_against_itself(self):
+        # --any-mode can keep the pyruvate row for a competitive model; the
+        # row carried is then skipped, and the NADH row is not against
+        # pyruvate, so nothing is found.
+        nadh, pyruvate = self._read(QUINOLINE_ROWS)
+        assert ki_mode.evidence_against(pyruvate, [pyruvate, nadh], "competitive",
+                                        "pyruvate") is None
+
+    def test_a_row_naming_another_isoform_is_not_evidence(self):
+        # No BRENDA row read so far names an isoform and states a mode
+        # versus a substrate (TestWithIsoform's MAO rows name what they
+        # measured, not what they were measured against), so this is the
+        # pyruvate row as it would read naming LDH-B, for an LDH-A model:
+        # another protein's mechanism says nothing about this one's.
+        nadh, pyruvate = self._read(QUINOLINE_ROWS)
+        ldh_b = ki_mode.read_row("LDH-B, " + NONCOMPETITIVE_VS_PYRUVATE)
+        assert ldh_b.isoform == "LDH-B"
+        assert ki_mode.evidence_against(nadh, [nadh, ldh_b], "competitive", "pyruvate",
+                                        isoform="LDH-A") is None
+        assert ki_mode.evidence_against(nadh, [nadh, ldh_b], "competitive", "pyruvate") is ldh_b
+
+
 class TestMixedAndVersus:
     def test_mixed_is_taken_for_a_noncompetitive_model(self):
         out = choose(ki(MGADP_ROWS), "noncompetitive_inhibition", "MgATP2-")
