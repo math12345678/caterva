@@ -86,6 +86,19 @@ SUITES: Dict[str, Dict[str, object]] = {
         "glob": "src/**/*.test.tsx",
         "run": ["npx", "vitest", "run"],
     },
+    # The root TypeScript package (src/, the `scientific` CLI), run by jest
+    # from the repository root -- CI's root-typescript job, `make test-ts`.
+    # Keyed "./" because that is where the suite runs, as every other key
+    # here is. The glob is every test file under src/, not jest's testMatch
+    # (`__tests__/**/*.test.ts`): a file jest would not collect still
+    # counts here, so the figure cannot quietly agree with a runner that
+    # dropped it; check_typescript_suites_discovered names such a file.
+    # `npx jest` prints "Tests: N passed, M total" last, which run_suite's
+    # last-match reading takes.
+    "./": {
+        "glob": "src/**/*.test.ts",
+        "run": ["npx", "jest", "--ci"],
+    },
 }
 
 

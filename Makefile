@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean release-artifacts release-app
+.PHONY: cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow test-ts guards pr demo publish-check evidence cli clean release-artifacts release-app
 
 help:
 	@echo "Caterva"
@@ -30,6 +30,8 @@ help:
 	@echo "  make test-fast  skip the slow property/robustness suites"
 	@echo "  make test-sim   simulation engine only (caterva/)"
 	@echo "  make test-lit   literature layer only (Tests/)"
+	@echo "  make test-ts    the root TypeScript package (src/, the scientific CLI):"
+	@echo "                  type-check and jest suite; needs Node (runs npm ci once)"
 	@echo "  make guards     the guards CI runs (no test suites)"
 	@echo "  make counts-fix update README counts after adding a test/guard/ADR"
 	@echo "  make pr         everything CI runs -- do this before opening a PR"
@@ -215,6 +217,29 @@ test-slow: require-pytest
 	@cd caterva && "$(PY)" -m pytest tests/test_properties.py \
 		tests/test_numerical_robustness.py -v
 
+# The root TypeScript package: src/, the `scientific` CLI and the resolver,
+# engine bridge and exporters behind it, as the `root-typescript` CI job
+# runs it -- type-check first, then every jest suite under src/.
+#
+# Not part of `test` or `pr`, for the reason the api-server suite is not:
+# everything else in this file needs Python and nothing more, and a missing
+# Node must not stop a contributor's guards. `make pr` names it at the end.
+#
+# Run it after `make setup`. The suites spawn the real Python engine and
+# scripts through resolvePythonExecutable(), which prefers this checkout's
+# .venv -- and three of them skip, loudly, when the engine will not import,
+# which CI does not allow. The first run installs node_modules with
+# `npm ci`, the command CI uses; node_modules/ is gitignored.
+test-ts:
+	@if ! command -v npm >/dev/null 2>&1; then \
+		echo "No npm on PATH, so the root TypeScript package cannot be installed"; \
+		echo "or tested. Install Node (CI uses Node 22) and run this again."; \
+		exit 2; \
+	fi
+	@[ -x node_modules/.bin/jest ] || { echo ">> installing the root package: npm ci (exactly package-lock.json)"; npm ci; }
+	npm run type-check
+	npm test -- --ci
+
 # The guards CI runs, in CI's order, minus the test suites -- plus the
 # two that keep this target and the docs honest, which run under pytest
 # rather than in the workflow.
@@ -331,15 +356,17 @@ counts-fix: check-python
 # What CI will run, in CI's order, as far as a laptop can go.
 pr: guards test
 	@echo ""
-	@echo "Local checks passed. Three things CI runs that this did not:"
+	@echo "Local checks passed. Four things CI runs that this did not:"
 	@echo ""
 	@echo "  - scripts/check_codegen_loads.py   (needs Node + pnpm install)"
 	@echo "  - pnpm run typecheck               (does the TypeScript COMPILE)"
 	@echo "  - the api-server TypeScript suite  (see RUN_TESTS.md)"
+	@echo "  - make test-ts                     (the root package, src/)"
 	@echo ""
-	@echo "All three need a pnpm install in Science-Agent-Pipeline. If you"
-	@echo "touched the API server, the landing app or the OpenAPI spec, run"
-	@echo "them; see RUN_TESTS.md."
+	@echo "The first three need a pnpm install in Science-Agent-Pipeline. If"
+	@echo "you touched the API server, the landing app or the OpenAPI spec,"
+	@echo "run them; see RUN_TESTS.md. The fourth needs Node; run it if you"
+	@echo "touched src/ or examples/."
 
 # The first thing to run, and the only one that needs nothing but `make
 # setup`. No network, no BRENDA account, no Node: it drives the same

@@ -1043,7 +1043,20 @@ def run_typescript_tests() -> List[Tuple[str, bool, str]]:
         cwd=API_SERVER_DIR,
         timeout=300
     ))
-    
+
+    # The root package (src/, the `scientific` CLI), under jest. This
+    # function ran only the api-server suite, so "TypeScript Tests" passed
+    # in full mode over a root suite nothing here had run -- the same gap
+    # CI had until its root-typescript job (2026-09-30). The timeout is
+    # the suite's own scale: many cases spawn ts-node or the Python
+    # engine, and a full run measured 321 s on a developer machine.
+    tests.append(run_guard(
+        "TypeScript Tests (root package, jest)",
+        "npm test -- --ci",
+        cwd=REPO_ROOT,
+        timeout=1200
+    ))
+
     return tests
 
 

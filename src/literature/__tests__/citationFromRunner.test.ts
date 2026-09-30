@@ -10,8 +10,6 @@
  * human LDH (EC 1.1.1.27), the quinoline sulfonamide of BRENDA ref 739793,
  * asked for a noncompetitive Ki versus pyruvate: found 0.00252 mM.
  */
-import { describe, expect, it } from 'vitest';
-
 import { mapFoundResult } from '../literatureResolver';
 
 const RUNNER_CITATION = {

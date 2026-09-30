@@ -451,6 +451,92 @@ jobs:
       - name: Dependency licences (installed packages)
         run: python -m pytest Tests/test_dependency_licenses.py -p no:cacheprovider -q
 
+  # The root TypeScript package: src/, which is the `scientific` CLI that
+  # START_HERE.md hands a new user, and the resolver, engine bridge and
+  # exporters behind it. Its tests are jest suites under src/**/__tests__,
+  # and until 2026-09-30 NO job ran them: `test` runs caterva/ and Tests/,
+  # `api-server` runs that workspace's vitest suite and stops, `md-setup`
+  # runs GROMACS. check_typescript_suites_discovered checks, on a laptop,
+  # that jest COLLECTS every file; nothing checked that any of them passed.
+  #
+  # jest, not vitest, because it is this package's runner ("test": "jest")
+  # and all but four files were written for it. Those four were written
+  # for vitest on 2026-09-30, in a sandbox where bunx could fetch vitest
+  # and the root package had no node_modules. Moving them was four files;
+  # moving the package to vitest meant rewriting the twenty-one that call
+  # jest.mock, jest.fn or jest.requireActual. The commit that added this
+  # job says more.
+  root-typescript:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The suites are not TypeScript-only. catervaBridge, inhibitionModels,
+      # the CLI end-to-end tests and the offline resolver spawn the REAL
+      # Python -- caterva_runner.py, science_agent_runner.py, report_lab.py
+      # and the export scripts -- through resolvePythonExecutable(), which
+      # falls back to `python3` on PATH when there is no repository .venv.
+      # setup-python puts its interpreter first on PATH, so that is the one
+      # they get, with the requirements-dev.txt the other jobs install.
+      #
+      # No `cache: pip`, for the reason the `test` job's failure annotation
+      # gives: the restored cache is the first suspect when that job goes
+      # red, and the api-server job, which also spawns Python, runs without.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # `npm ci`, not `npm install`: it installs exactly package-lock.json
+      # and fails if package.json has drifted from it, so the jest, ts-jest
+      # and typescript that run here are the versions the lockfile names.
+      - name: Install root package dependencies
+        run: npm ci
+
+      # The root tree is in no other compile step. The api-server job's
+      # `pnpm run typecheck` covers the pnpm workspace only, and
+      # check_typescript_compiles -- which does cover this tsconfig --
+      # runs inside verify_build, which the `test` job calls with
+      # --no-typescript because it has no node_modules. ts-jest checks
+      # the types of what a suite imports; this checks everything
+      # tsconfig.json includes, examples/ as well, whether a test imports
+      # it or not.
+      - name: Root package type-checks
+        run: npm run type-check
+
+      # --ci: a missing snapshot fails instead of being written. --json:
+      # the counts the next step reads, written to a file so the human
+      # summary still prints to the log as usual.
+      - name: Root package tests (jest)
+        run: npm test -- --ci --json --outputFile=root-jest-results.json
+
+      # jest counts a skipped test as not failed, so a green step cannot say
+      # whether every test ran. Three suites skip on purpose when the Python
+      # engine will not import on the machine running them -- loudly, which
+      # check_no_disabled_tests requires -- and that is right on a laptop
+      # without `make setup`. Here the engine was installed four steps up,
+      # so a skip means it stopped importing and those tests stopped
+      # running: the case check_no_silent_skips exists for on the Python
+      # side, which counts pytest only. Prints the counts, names every test
+      # that did not run, then fails if there was one.
+      - name: Root suite skipped nothing
+        run: |
+          jq -r '"\(.numTotalTestSuites) files, \(.numTotalTests) tests: \(.numPassedTests) passed, \(.numFailedTests) failed, \(.numPendingTests) skipped, \(.numTodoTests) todo"' root-jest-results.json
+          jq -r '.testResults[] | .name as $file | .assertionResults[] | select(.status != "passed" and .status != "failed") | "  did not run (\(.status)): \($file) > \(.fullName)"' root-jest-results.json
+          jq -e '.numPendingTests == 0 and .numTodoTests == 0' root-jest-results.json > /dev/null
+
   # `caterva md` writes a GROMACS setup; this runs it, every stage, with
   # Ubuntu's GROMACS, on hen lysozyme (1AKI, EC 3.2.1.17: small, one chain,
   # the standard GROMACS test protein). Steps are capped so each stage is

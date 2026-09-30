@@ -5,8 +5,6 @@
  * `rowScope`. The API turned it into flags; the CLI dropped it, which
  * `check_both_front_ends_read_it.py` caught on 2026-09-29.
  */
-import { describe, expect, it } from 'vitest';
-
 import { mapFoundResult, rowScopeLines, withheldSentence } from '../literatureResolver';
 
 const GOSSYPOL_ROW =
