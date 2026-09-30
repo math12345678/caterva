@@ -351,9 +351,28 @@ def test_the_mode_and_the_models_substrate_reach_the_resolver(monkeypatch):
     run_main(monkeypatch, spy, base)
     assert (seen["inhibition_mode"], seen["model_substrate"]) == (None, None)
 
-    seen.clear()
-    run_main(monkeypatch, spy, {**base, "inhibitionMode": ["competitive"]})
-    assert seen["inhibition_mode"] is None, "only a string is a mode"
+
+
+@pytest.mark.parametrize("key", ["inhibitionMode", "modelSubstrate"])
+def test_a_mode_or_substrate_that_is_not_a_string_is_an_error(monkeypatch, key):
+    """Read as absent, ["competitive"] would choose the Ki with no mode
+    while the caller believes it was chosen by one. The resolver is never
+    reached."""
+    def unreachable(*a, **k):
+        raise AssertionError("the resolver was called")
+
+    payload = {"enzymeName": "lactate dehydrogenase", "substrate": "gossypol",
+               "organism": "Homo sapiens", "ecNumber": "1.1.1.27", "quantity": "ki",
+               "inhibitionMode": "competitive", key: ["competitive"]}
+    monkeypatch.setattr(fallback_logic, "resolve_kinetic_value", unreachable)
+    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda *a, **k: None)
+    stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+    monkeypatch.setattr(sys, "stdout", stdout)
+    with pytest.raises(SystemExit):
+        science_agent_runner.main()
+    result = json.loads(stdout.getvalue())
+    assert result == {"ok": False, "error": f"{key} must be a string; got ['competitive']"}
 
 
 def test_a_mode_no_model_is_of_is_an_error_not_a_request_dropped(monkeypatch):

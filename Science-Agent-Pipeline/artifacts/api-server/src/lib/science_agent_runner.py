@@ -245,6 +245,17 @@ def resolve_kinetic_value(
 
 
 
+def _string_or_absent(payload: dict, key: str) -> Optional[str]:
+    """`payload[key]` when it is a string, None when it is absent or null,
+    and ValueError for anything else. For keys whose silent absence changes
+    the answer (`inhibitionMode`, `modelSubstrate`): ["competitive"] read as
+    no mode would choose a Ki the caller did not ask for, and say nothing."""
+    value = payload.get(key)
+    if value is None or isinstance(value, str):
+        return value
+    raise ValueError(f"{key} must be a string; got {value!r}")
+
+
 def _parse_physiological(payload: dict):
     """Build a PhysiologicalReference from the caller's payload, or None.
 
@@ -563,11 +574,17 @@ def main() -> None:
         #: inhibitor for a Ki. With a mode the resolver takes a Ki row whose
         #: stated mode fits the model, by `caterva compose`'s ranking, and
         #: refuses, source "mode_withheld", when every row states another.
-        #: A mode no model can be of is an error, not a request dropped.
-        inhibition_mode = (payload.get("inhibitionMode")
-                           if isinstance(payload.get("inhibitionMode"), str) else None)
-        model_substrate = (payload.get("modelSubstrate")
-                           if isinstance(payload.get("modelSubstrate"), str) else None)
+        #:
+        #: Absent is no mode. Anything else that is not a mode a model can be
+        #: of is an error, reported as {"ok": false}, not a request dropped:
+        #: dropped, the Ki is chosen with no mode while the caller believes
+        #: it was chosen by one. A value that is not a string is refused
+        #: here, and a string naming no model's mode ("mixed", "") by the
+        #: resolver, for a Km or kcat lookup as for a Ki (`_mode_asked`).
+        #: The model's substrate is read the same way, since without it a
+        #: row "versus pyruvate" and one "versus NADH" rank alike.
+        inhibition_mode = _string_or_absent(payload, "inhibitionMode")
+        model_substrate = _string_or_absent(payload, "modelSubstrate")
         #: The conditions the model represents. An experimental condition
         #: the caller states, never assumed here (ADR 0012/0013).
         physiological = _parse_physiological(payload)

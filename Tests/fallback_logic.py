@@ -884,22 +884,24 @@ def _mode_asked(inhibition_mode, quantity, log):
     A mode says which Ki row is the model's constant. It has no bearing on a
     Km or a kcat, so for those it is not applied, and the log says so rather
     than letting the caller believe a Km was chosen by it. A mode that is not
-    one a model can be of is refused with ValueError: ranking for "mixed"
-    would silently mean something no model here is.
+    one a model can be of ("mixed", "", "Competitive") is refused with
+    ValueError, whatever the quantity: ranking for "mixed" would silently
+    mean something no model here is, and a caller sending one with a Km has
+    the same mistake in hand, found one lookup later if it is only logged.
     """
     if inhibition_mode is None:
-        return None
-    if quantity != "ki":
-        log.append(f"inhibition mode {inhibition_mode!r} not applied: it chooses among Ki "
-                   f"rows, and this is a {quantity} lookup")
         return None
     try:
         modes = _ki_mode().MODES
     except ImportError:
-        return inhibition_mode  # _partition_mode says it could not rank
-    if inhibition_mode not in modes:
+        modes = None  # for a Ki, _partition_mode says it could not rank
+    if modes is not None and inhibition_mode not in modes:
         raise ValueError(f"inhibition_mode must be one of {', '.join(modes)}; "
                          f"got {inhibition_mode!r}")
+    if quantity != "ki":
+        log.append(f"inhibition mode {inhibition_mode!r} not applied: it chooses among Ki "
+                   f"rows, and this is a {quantity} lookup")
+        return None
     return inhibition_mode
 
 
@@ -913,6 +915,22 @@ def _naming_no_isoform(pool, isoform_matched, allow_variants):
     `_partition_isoform` has already set those rows aside, so they are put
     back here as candidates behind the isoform's own, with variants removed
     exactly as the variant step would have removed them.
+
+    Removed with keep_isozymes=False, where the rows naming the isoform went
+    through the variant step with keep_isozymes=True. That is deliberate.
+    An isozyme row is kept there because it names the isoform asked for, so
+    it is that protein and not a variant of it. A row here names no isoform
+    that `_isoform_of` can read, so if `protein_variant` still calls it an
+    isozyme, it names one in words the isoform reader does not take, and
+    which one is unknown. On BRENDA's IMPDH page (1.1.1.205, fetched
+    2026-09-29, not committed) ref 701583 gives human IMPDH and mizoribine
+    monophosphate 0.0039 mM "type 2 isozyme" and 0.0082 mM "type 1
+    isozyme": `_isoform_of` reads neither, and `protein_variant` calls both
+    isozymes. Kept here, a request for IMPDH2 could take the type 1
+    isozyme's constant as a row "naming no isoform". False is also what the
+    variant step itself uses when the isoform step keeps the rows naming
+    none (isoform_matched False), so these rows are treated the same way
+    whichever route brings them in.
     """
     if not isoform_matched:
         return []
@@ -1008,7 +1026,28 @@ def _partition_mode(entries, mode, substrate, isoform, isoform_matched, log, whe
     best = min(candidates)
     rows = [e for e, k in zip(entries, ranks) if k == best]
     iso, fits, versus, inexact = best
-    kept = f"the {len(rows)} of {len(entries)} {where} row(s)"
+    # WHICH ROWS A SENTENCE SPEAKS OF. When the isoform step kept rows
+    # naming the isoform, `entries` also holds the rows naming none that
+    # `_naming_no_isoform` put back behind them. A sentence about every
+    # `where` row would then count rows the isoform step's own line ("Kept
+    # the K of M rows measuring X") did not, and could deny a row that is
+    # in the pool: the rows measuring the isoform can state no mode while a
+    # row naming none states the model's, and the isoform's rows still rank
+    # first. Gossypol's LDH-A row (0.0019 mM, no mode) and the quinoline
+    # sulfonamide's "competitive versus NADH" row, which names no isoform,
+    # ranked together for a competitive LDH-A model (two real rows from one
+    # page, put in one pool by test_ki_mode_resolution, since no real pool
+    # has this shape), were logged as "No exact-match row states
+    # competitive inhibition". So the count and the denial are
+    # of the rows sharing the kept rows' isoform rank, and a row of the
+    # other group that ranks before them on mode alone is named as passed
+    # over, with why.
+    if isoform_matched:
+        scope = f" measuring {isoform}" if iso == 0 else " naming no isoform"
+        size = sum(1 for r in readings if ki_mode.isoform_rank(r, isoform) == iso)
+    else:
+        scope, size = "", len(entries)
+    kept = f"the {len(rows)} of {size} {where} row(s){scope + ',' if scope else ''}"
     if fits == 0:
         against = {
             0: f" versus {substrate}, the model's substrate",
@@ -1019,16 +1058,26 @@ def _partition_mode(entries, mode, substrate, isoform, isoform_matched, log, whe
         if inexact:
             sentence += " (a mixed row counts for a noncompetitive model)"
     elif fits == 1:
-        sentence = (f"No {where} row states {mode} inhibition; kept {kept} stating no mode, "
-                    f"so whether the value is the {mode} constant is unknown")
+        sentence = (f"No {where} row{scope} states {mode} inhibition; kept {kept} stating no "
+                    f"mode, so whether the value is the {mode} constant is unknown")
     else:
         # Worded as the Kitz-Wilson rows' own commentary words it (ref
         # 702238, "determined from Kitz-Wilson plots"), with what that
         # makes the number.
-        sentence = (f"No {where} row states {mode} inhibition or is a reversible constant "
-                    f"stating no mode; kept {kept} stating no mode and determined from "
-                    f"Kitz-Wilson plots, which give the K_I of an irreversible inactivation, "
-                    f"not a reversible Ki")
+        sentence = (f"No {where} row{scope} states {mode} inhibition or is a reversible "
+                    f"constant stating no mode; kept {kept} stating no mode and determined "
+                    f"from Kitz-Wilson plots, which give the K_I of an irreversible "
+                    f"inactivation, not a reversible Ki")
+    passed = []
+    for reading, k in zip(readings, ranks):
+        if k is not None and k[0] > iso and k[1:] < best[1:] and reading.says() not in passed:
+            passed.append(reading.says())
+    if passed:
+        # Only rows naming no isoform rank below the isoform's own, so
+        # this arises only when the kept rows measured the isoform.
+        sentence += (f"; {where} row(s) naming no isoform and stating {'; '.join(passed)} "
+                     f"were passed over, because a row measuring {isoform} is taken before "
+                     f"one that may not have measured it, as caterva compose takes it")
     if iso == 1 and isoform_matched:
         sentence += (f"; no row measuring {isoform} could be used for a {mode} model, so these "
                      f"name no isoform and whether they measured {isoform} is unknown")

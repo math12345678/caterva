@@ -1194,6 +1194,12 @@ ${colors.bright}Commands:${colors.reset}
                            ranking caterva compose uses. A Ki every row of
                            which states another mode is refused, and the
                            modes BRENDA does hold are named.
+      --model-substrate NAME
+                           With --mode: your model's substrate (--substrate
+                           is the inhibitor for a Ki). A row measured versus
+                           it is taken before one measured versus another
+                           molecule. Without it, as compose without
+                           --substrate, the two rank alike.
       --enzyme-conc VALUE  [E]0, e.g. 0.001mM. Bridges a kcat to a usable
                            Vmax = kcat x [E]0. Never defaulted (ADR 0013).
       --json               machine-readable output
@@ -1725,6 +1731,23 @@ async function main() {
         inhibitionMode = lowered as InhibitionMode;
       }
 
+      // --model-substrate is the model's substrate, which --substrate cannot
+      // be for a Ki (it names the inhibitor). --mode ranks a row measured
+      // versus it first; without --mode nothing reads it, so it is refused
+      // there rather than accepted to no effect.
+      const modelSubstrate = flags['model-substrate'];
+      if (booleans.has('model-substrate')) {
+        error('--model-substrate needs a value: the substrate of the model the Ki is for, e.g. pyruvate.');
+        process.exit(1);
+      }
+      if (modelSubstrate !== undefined && !inhibitionMode) {
+        error(
+          '--model-substrate says which Ki rows were measured versus your model\'s substrate, ' +
+          'and only --mode ranks by that. Use it with --quantity ki --mode.'
+        );
+        process.exit(1);
+      }
+
       let enzymeConc: number | undefined;
       if (flags['enzyme-conc']) {
         const parsed = parseQuantity('e0', flags['enzyme-conc']);
@@ -1770,6 +1793,7 @@ async function main() {
         allowCrossSpecies: booleans.has('allow-cross-species'),
         ...(typeof flags['isoform'] === 'string' ? { isoform: flags['isoform'] } : {}),
         ...(inhibitionMode ? { inhibitionMode } : {}),
+        ...(modelSubstrate ? { modelSubstrate } : {}),
         physiologicalReference: physiological.reference,
       });
       process.exit(code);

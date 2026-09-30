@@ -27,6 +27,7 @@ from pathlib import Path
 
 import pytest
 
+import fallback_logic
 from brenda_client import KI_TABLE_LABEL
 from fallback_logic import (
     _brenda_entries,
@@ -182,7 +183,10 @@ class TestIsoformThenMode:
         r = ki("1.4.3.4", "benzylhydrazine", inhibition_mode="competitive", isoform="MAO-A")
         assert r.found and r.value == 2.096 and "MAO-A" in r.commentary
         assert "Kept the 2 of 4 exact-match row(s) measuring MAO-A" in r.search_log
-        assert "Kept the 1 of 2 exact-match row(s) stating competitive inhibition" in r.search_log
+        # Counted among the rows measuring MAO-A, as the isoform step's own
+        # line counts them.
+        assert ("Kept the 1 of 2 exact-match row(s) measuring MAO-A, stating competitive "
+                "inhibition") in r.search_log
 
     def test_without_the_isoform_either_isoforms_competitive_row(self):
         r = ki("1.4.3.4", "benzylhydrazine", inhibition_mode="competitive")
@@ -244,6 +248,90 @@ class TestRowsNamingNoIsoform:
         assert kept == [mao_a]
 
 
+def _pool_of(monkeypatch, pool, tier):
+    """Serve `pool` as the resolver's BRENDA rows for one tier and none for
+    the other: the exact tier asks `_brenda_entries` for the organism, the
+    cross-species tier for any organism (organism None)."""
+    def entries(ec, organism, substrate, *args, **kwargs):
+        wanted = organism is None if tier == "cross-species" else organism == "Homo sapiens"
+        return list(pool) if wanted else []
+    monkeypatch.setattr(fallback_logic, "_brenda_entries", entries)
+
+
+class TestRowsNamingNoIsoformThroughTheResolver:
+    """The pool above and one more, through `resolve_kinetic_value`, in both
+    tiers, so the `+ _naming_no_isoform(...)` term in each tier is what a
+    test fails on when it is removed, and not only the helpers.
+
+    No real pool has this shape. Besides the 766 Ki rows of the three
+    committed pages, BRENDA's pages for 31 more ECs were fetched and parsed
+    on 2026-09-29 (not committed: 1.1.1.1, 1.1.1.21, 1.1.1.37, 1.1.1.42,
+    1.1.1.49, 1.1.1.62, 1.1.1.146, 1.1.1.205, 1.2.1.3, 1.5.1.3, 1.14.13.39,
+    1.14.14.1, 1.14.99.1, 1.17.3.2, 2.4.1.1, 2.4.2.1, 2.5.1.18, 2.7.1.2,
+    2.7.1.11, 2.7.1.20, 2.7.1.40, 2.7.3.2, 2.7.4.3, 3.1.1.8, 3.1.3.16,
+    3.1.3.48, 3.1.4.17, 3.2.1.20, 3.5.1.98, 3.5.4.4, 4.2.1.1): 6,589 Ki
+    rows, of which none names an isoform (as caterva.bind.core reads one)
+    and states a mode. So each pool here is two real rows of two
+    inhibitors (from two pages for MAO-A, from the LDH page for LDH-A),
+    served as one pool to exercise the wiring, and is not presented as a
+    pool BRENDA holds."""
+
+    MAO_A = ("1.4.3.4", "benzylhydrazine", 2.096)        # ref 702238, MAO-A, competitive
+    NONCOMPETITIVE = ("1.1.1.27", QUINOLINE, 0.00252)    # ref 739793, no isoform
+    LDH_A = ("1.1.1.27", "gossypol", 0.0019)             # ref 711801, LDH-A, no mode
+    COMPETITIVE = ("1.1.1.27", QUINOLINE, 0.00059)       # ref 739793, no isoform
+
+    @staticmethod
+    def row(ec, inhibitor, value):
+        return next(e for e in rows(ec, inhibitor) if e.km_value == value)
+
+    @staticmethod
+    def resolve(tier, ec, inhibitor, **kw):
+        """The isoform's row's EC and inhibitor; asked for mouse in the
+        cross-species tier, as test_the_cross_species_tier_chooses_by_mode_too
+        asks, so the human rows are offered as a related organism's."""
+        where = (dict(organism="Mus musculus", allow_cross_species=True,
+                      lineage_provider=fixture_lineage_provider)
+                 if tier == "cross-species" else {})
+        return ki(ec, inhibitor, **where, **kw)
+
+    @pytest.mark.parametrize("tier, source", [("exact-match", "brenda_exact"),
+                                              ("cross-species", "brenda_cross_species")])
+    def test_a_row_naming_no_isoform_is_taken_when_none_for_the_isoform_can_be(
+            self, monkeypatch, tier, source):
+        _pool_of(monkeypatch, [self.row(*self.MAO_A), self.row(*self.NONCOMPETITIVE)], tier)
+        r = self.resolve(tier, *self.MAO_A[:2], inhibition_mode="noncompetitive", isoform="MAO-A")
+        assert r.found and r.source == source, r.search_log
+        assert r.value == 0.00252 and r.citation.reference_id == "739793"
+        assert (f"Kept the 1 of 1 {tier} row(s) naming no isoform, stating noncompetitive "
+                f"inhibition; no row measuring MAO-A could be used for a noncompetitive model, "
+                f"so these name no isoform and whether they measured MAO-A is unknown"
+                ) in r.search_log
+        # Without the rows put back, the one row measuring MAO-A states
+        # another mode and the constant is refused.
+        monkeypatch.setattr(fallback_logic, "_naming_no_isoform", lambda *a, **k: [])
+        refused = self.resolve(tier, *self.MAO_A[:2], inhibition_mode="noncompetitive",
+                               isoform="MAO-A")
+        assert refused.source == "mode_withheld"
+        assert refused.modes_available == ["competitive inhibition"]
+
+    @pytest.mark.parametrize("tier", ["exact-match", "cross-species"])
+    def test_the_isoforms_row_comes_first_and_the_log_names_the_row_passed_over(
+            self, monkeypatch, tier):
+        """A row measuring the isoform and stating no mode ranks before a
+        row naming no isoform that states the model's mode, as in compose.
+        The log must not then say that no row states the mode."""
+        _pool_of(monkeypatch, [self.row(*self.LDH_A), self.row(*self.COMPETITIVE)], tier)
+        r = self.resolve(tier, *self.LDH_A[:2], inhibition_mode="competitive", isoform="LDH-A")
+        assert r.found and r.value == 0.0019 and r.commentary.startswith("LDH-A")
+        assert (f"No {tier} row measuring LDH-A states competitive inhibition; kept the 1 of 1 "
+                f"{tier} row(s) measuring LDH-A, stating no mode, so whether the value is the "
+                f"competitive constant is unknown; {tier} row(s) naming no isoform and stating "
+                f"competitive inhibition versus NADH were passed over, because a row measuring "
+                f"LDH-A is taken before one that may not have measured it, as caterva compose "
+                f"takes it") in r.search_log
+
+
 class TestKitzWilson:
     def test_they_are_taken_only_when_nothing_else_is_left(self):
         # A noncompetitive model: MAO-A's competitive row is another mode,
@@ -276,17 +364,43 @@ CASES = [
 ]
 
 
+def composed_from(result):
+    """The Measurement `caterva compose` builds from a resolver answer, by
+    the path compose itself takes: caterva.agents.adapters turns the
+    KineticResult into a ParameterSource (its `ensemble_candidates` become
+    `candidates`), and caterva.compose.export.measured_from_search turns
+    that into the Measurement whose `alternatives` select_mode ranks."""
+    from types import SimpleNamespace
+
+    from caterva.agents.adapters import to_parameter_source
+    from caterva.compose.export import measured_from_search
+
+    source, why_not = to_parameter_source("ki", result)
+    assert source is not None, why_not
+    return measured_from_search(
+        SimpleNamespace(resolutions={"reaction_Ki": SimpleNamespace(source=source)}))
+
+
 class TestTheSameRowAsCompose:
     """One ranking, so one answer. For each case, `caterva compose`'s
     selection (select_isoform, then select_mode, over the Measurement the
     resolver's no-mode answer becomes) and the resolver asked for the mode
     must carry the same row, or both refuse.
 
+    WHAT THIS DOES AND DOES NOT CHECK. Both sides rank with the same
+    function, caterva.compose.ki_mode.rank, so agreement here cannot show
+    that the rule is right; the rule is held to BRENDA's own rows by the
+    tests above (0.00252 and 0.00059 mM of ref 739793, the refusals, the
+    mixed and Kitz-Wilson rows). What it checks is everything around the
+    rule, which the two callers do differently: which rows each ranks, the
+    isoform-then-mode order, the tie-break, and when each refuses. A
+    difference would be one of those.
+
     They differ where a row of the model's mode is dominated on evidence:
     compose ranks the frontier, the resolver the whole pool
     (`_partition_mode`, and the Trypanosoma cruzi test below). In every
     case in CASES the rows of one inhibitor are graded alike, so that does
-    not arise, and a difference would be the ranking's."""
+    not arise."""
 
     MOTIF = {"competitive": "competitive_inhibition",
              "noncompetitive": "noncompetitive_inhibition",
@@ -295,17 +409,12 @@ class TestTheSameRowAsCompose:
     @pytest.mark.parametrize("ec, organism, inhibitor, mode, substrate, isoform", CASES)
     def test_compose_and_the_resolver_agree(self, ec, organism, inhibitor, mode, substrate,
                                            isoform):
-        from caterva.compose.export import Measurement
         from caterva.compose.isoform import select_isoform
         from caterva.compose.ki_mode import select_mode
 
         unranked = plain(ec, inhibitor, organism)
         assert unranked.found
-        measured = {"reaction_Ki": Measurement(
-            value=unranked.value, unit=unranked.unit,
-            citation=f"BRENDA ref {unranked.citation.reference_id}",
-            organism=unranked.organism, commentary=unranked.commentary,
-            alternatives=tuple(unranked.ensemble_candidates))}
+        measured = composed_from(unranked)
         resolved = ki(ec, inhibitor, organism=organism, inhibition_mode=mode,
                       model_substrate=substrate, isoform=isoform)
         if isoform:
@@ -348,14 +457,10 @@ class TestWhereComposeCannotSeeTheRow:
         assert (r.value, r.commentary) == (value, commentary)
 
     def test_compose_over_the_frontier_carries_the_row_stating_no_mode(self):
-        from caterva.compose.export import Measurement
         from caterva.compose.ki_mode import select_mode
 
-        r = plain("2.7.1.1", "ADP", "Trypanosoma cruzi")
-        m = Measurement(value=r.value, unit=r.unit, citation=f"BRENDA ref {r.citation.reference_id}",
-                        organism=r.organism, commentary=r.commentary,
-                        alternatives=tuple(r.ensemble_candidates))
-        out = select_mode({"reaction_Ki": m}, {"reaction_Ki": ("competitive_inhibition", "ki")},
+        measured = composed_from(plain("2.7.1.1", "ADP", "Trypanosoma cruzi"))
+        out = select_mode(measured, {"reaction_Ki": ("competitive_inhibition", "ki")},
                           substrate="glucose")
         assert out.measured["reaction_Ki"].value == 1.3
 
@@ -368,7 +473,10 @@ class TestTheArgument:
         assert ("inhibition mode 'competitive' not applied: it chooses among Ki rows, and this "
                 "is a km lookup") in asked.search_log
 
-    @pytest.mark.parametrize("mode", ["mixed", "Competitive", "partial"])
-    def test_a_mode_no_model_is_of_is_refused(self, mode):
+    @pytest.mark.parametrize("mode", ["mixed", "Competitive", "partial", ""])
+    @pytest.mark.parametrize("quantity", ["ki", "km"])
+    def test_a_mode_no_model_is_of_is_refused(self, mode, quantity):
+        """For a Km too: the mode is not applied to one, but a caller
+        sending "mixed" has made the same mistake either way."""
         with pytest.raises(ValueError, match="inhibition_mode must be one of"):
-            ldh(inhibition_mode=mode)
+            ldh(inhibition_mode=mode, quantity=quantity)

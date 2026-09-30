@@ -61,6 +61,9 @@ export interface ResolveOptions {
   /** --mode competitive: take a Ki row that states this mechanism, by the
    *  ranking `caterva compose` uses. Only with quantity "ki". */
   inhibitionMode?: InhibitionMode;
+  /** --model-substrate pyruvate: the model's substrate, which --mode ranks a
+   *  row measured versus first. Only with inhibitionMode. */
+  modelSubstrate?: string;
   /** --physiological "7.4,37" [--physiological-tolerance "0.4,5"] */
   physiologicalReference?: {
     ph: number;
@@ -97,6 +100,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
       allowCrossSpecies: options.allowCrossSpecies === true,
       ...(options.isoform ? { isoform: options.isoform } : {}),
       ...(options.inhibitionMode ? { inhibitionMode: options.inhibitionMode } : {}),
+      ...(options.modelSubstrate ? { modelSubstrate: options.modelSubstrate } : {}),
       physiologicalReference: options.physiologicalReference,
     });
   } catch (err) {
@@ -143,8 +147,12 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
       );
     } else {
       const papers = result.candidates;
+      // "No uncompetitive ki found", with --mode: "No ki found" is false
+      // when the refusal is by mode, since constants of other mechanisms
+      // were found and are named on the next line.
       process.stdout.write(
-        `${c(YELLOW, '○')} No ${quantity} found for ` +
+        `${c(YELLOW, '○')} No ${options.inhibitionMode ? `${options.inhibitionMode} ` : ''}` +
+          `${quantity} found for ` +
           `${c(BOLD, options.enzyme ?? options.ec ?? '?')} / ${substrate} / ${organism}.\n`,
       );
       // THE OLD SENTENCE WAS FALSE EXACTLY WHEN THE FALLBACK WORKED.

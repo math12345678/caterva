@@ -97,12 +97,36 @@ describe('withheldSentence: rows found and withheld are not "nothing"', () => {
       modesAvailable: ['competitive inhibition versus NADH', 'noncompetitive inhibition versus pyruvate'],
     });
     expect(s).toBe(
-      'Every row BRENDA holds for this ki states an inhibition mode other than the one --mode ' +
+      'Every row BRENDA holds for this Ki states an inhibition mode other than the one --mode ' +
         'asked for (competitive inhibition versus NADH; noncompetitive inhibition versus pyruvate). ' +
-        'A Ki belongs to the mechanism it was measured under. Run with the --mode of one of those ' +
-        '(a mixed row counts for noncompetitive), or without --mode to take the resolver\'s pick ' +
+        'A Ki belongs to the mechanism it was measured under. To use one, run with --mode ' +
+        'competitive or --mode noncompetitive; or run without --mode to take the resolver\'s pick ' +
         'with its stated mode printed beside it.',
     );
+  });
+
+  it('sends a mixed row to --mode noncompetitive, once', () => {
+    // What the runner returns for rabbit hexokinase and MgADP- (BRENDA ref
+    // 640206) asked for a competitive model, on the recorded page
+    // (Tests/test_ki_mode_resolution.py, TestMixed).
+    const s = withheldSentence({
+      ...base,
+      source: 'mode_withheld',
+      modesAvailable: ['mixed inhibition versus MgATP2-', 'mixed inhibition versus glucose'],
+    });
+    expect(s).toContain('To use one, run with --mode noncompetitive; or run without --mode');
+  });
+
+  it('names no --mode when no --mode would take any of the rows', () => {
+    // caterva.bind.core reads "partially competitive" as mode "partial",
+    // which fits no model, so a row stating it is refused for every --mode.
+    // No Ki row read so far states it (none of the Ki rows on the three
+    // committed BRENDA pages), so this clause is the one the runner would
+    // write for such a row, not one taken from BRENDA.
+    const s = withheldSentence({ ...base, source: 'mode_withheld', modesAvailable: ['partial inhibition'] });
+    expect(s).toContain('(partial inhibition)');
+    expect(s).toContain('No --mode takes any of them');
+    expect(s).not.toContain('run with --mode');
   });
 
   it('names the isoforms and the flag that reaches them', () => {

@@ -284,3 +284,46 @@ describeSubprocess('reading the runner', () => {
     );
   });
 });
+
+describeSubprocess('what reaches the runner for a Ki asked for by mode', () => {
+  /** A stub runner that saves the payload it was sent and reports nothing
+   *  found, so the payload itself is what is checked. */
+  function sentPayload(query: Parameters<typeof resolveKinetic>[0]): Promise<Record<string, unknown>> {
+    const saved = path.join(stubDirectory, `payload_${Date.now()}_${Math.random()}.json`);
+    const script = path.join(stubDirectory, `recording_${Date.now()}_${Math.random()}.py`);
+    fs.writeFileSync(
+      script,
+      'import sys\n' +
+      `open(${JSON.stringify(saved)}, "w").write(sys.stdin.read())\n` +
+      `sys.stdout.write(${JSON.stringify(JSON.stringify({ ok: true, found: false, logs: [] }))})\n`,
+      'utf-8'
+    );
+    process.env['CATERVA_LITERATURE_RUNNER'] = script;
+    return resolveKinetic(query).then(() => JSON.parse(fs.readFileSync(saved, 'utf-8')));
+  }
+
+  // The quinoline sulfonamide of BRENDA ref 739793 on human LDH, as
+  // `scientific resolve --quantity ki --mode noncompetitive
+  // --model-substrate pyruvate` asks for it.
+  const KI = {
+    ...QUERY,
+    substrate: '3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid',
+    quantity: 'ki' as const,
+  };
+
+  it('sends the mode and the model\'s substrate, and keeps the inhibitor as the substrate', async () => {
+    const sent = await sentPayload({ ...KI, inhibitionMode: 'noncompetitive', modelSubstrate: 'pyruvate' });
+    expect(sent['inhibitionMode']).toBe('noncompetitive');
+    // Without it the runner ranks "versus pyruvate" and "versus NADH" alike.
+    expect(sent['modelSubstrate']).toBe('pyruvate');
+    expect(sent['substrate']).toBe(KI.substrate);
+  });
+
+  it('sends neither for a Km, and no substrate without a mode', async () => {
+    const km = await sentPayload({ ...QUERY, inhibitionMode: 'competitive', modelSubstrate: 'pyruvate' });
+    expect(km).not.toHaveProperty('inhibitionMode');
+    expect(km).not.toHaveProperty('modelSubstrate');
+    const noMode = await sentPayload({ ...KI, modelSubstrate: 'pyruvate' });
+    expect(noMode).not.toHaveProperty('modelSubstrate');
+  });
+});

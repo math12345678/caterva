@@ -466,6 +466,14 @@ named. The API always sends its model's mode. The CLI has no `--any-mode`:
 leaving `--mode` out keeps the resolver's pick, with its stated mode
 printed beside it.
 
+The API sends its model's substrate with the mode; the CLI takes it as
+`--model-substrate`, because `--substrate` names the inhibitor for a Ki.
+Without it a row measured versus the model's substrate and one measured
+versus another molecule rank alike, as they do in `caterva compose` without
+`--substrate`: rabbit hexokinase's two mixed MgADP- rows (BRENDA ref 640206)
+give a noncompetitive model 7.8 mM "versus glucose" with `--model-substrate
+glucose`, and 3.0 mM "versus MgATP2-", the lower, without it.
+
 ### `caterva structure`: which structures exist, and which protein each is
 
 ```bash
