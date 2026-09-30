@@ -164,8 +164,9 @@ def _water_rows(text: str) -> dict:
 def _pca_tables(text: str) -> dict:
     """The principal-motions section as {"eigen": {replica: cells},
     "rmsip": {pair: cells}, "cosine": {replica: cells}, "between": value or
-    None}. Tables are told apart by their header row; the section is cut
-    out first, for the reason _distance_rows gives."""
+    None, "chance_edge": the largest RMSIP^2 called chance, or None}. Tables
+    are told apart by their header row; the section is cut out first, for
+    the reason _distance_rows gives."""
     section = text.split("## Principal motions of the active site", 1)[-1].split("\n## ", 1)[0]
     out: dict = {"eigen": {}, "rmsip": {}, "cosine": {}, "between": None, "chance_edge": None}
     table = None
@@ -201,16 +202,18 @@ def _pca_agree(native: dict, gromacs: dict) -> tuple:
     rounds to:
     - eigenvalues and totals (4 significant digits in the report): gmx
       covar prints 6 and does the same linear algebra in single precision,
-      so the two agree to about 1e-5 relative (2e-5 on the lysozyme
-      fixture, test_pca.py), and their printed values may differ by one
-      unit in the 4th digit, 1e-3 relative, and no more;
+      so the two agree to about 1e-5 relative (6e-6 on the lysozyme
+      fixture, test_pca.py; 8.2e-6 on a smoke run, 2026-09-30), and their
+      printed values may differ by one unit in the 4th digit, 1e-3
+      relative, and no more;
     - shares and the between-replica share (2 decimals): one unit, 0.01;
     - RMSIP (3 decimals): gmx anaeig -over prints RMSIP^2 to 0.001, which
       puts the GROMACS RMSIP within 0.0005 / (2 RMSIP) of the exact one,
       and each printed value adds 0.0005 of rounding;
     - cosine content (3 decimals): gmx analyze works from projections gmx
-      anaeig printed to 1e-5 nm, 2e-5 from the native values on the
-      fixture, so one unit of the printed digit, 0.001, and a little over.
+      anaeig printed to 1e-5 nm, and lands within 2e-5 of the native value
+      on the fixture (4e-6 on a smoke run), so one unit of the printed
+      digit, 0.001, and a little over.
     A verdict may differ only where the value it rests on lies within that
     tolerance of the threshold."""
     worst = {"eigenvalue": 0.0, "share": 0.0, "rmsip": 0.0, "cosine": 0.0}
