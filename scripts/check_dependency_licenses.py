@@ -223,6 +223,31 @@ PERMISSION: dict[str, tuple[str, str]] = {
         "always the same (see `exit`, which declares nothing and ships "
         "LICENSE-MIT).",
     ),
+    # --- Caterva Studio's bundled typefaces ---------------------------------
+    # Declared as "OFL-1.1", which is not in _JS_PERMISSIVE because the OFL
+    # is a font licence with its own conditions, so each is recorded here
+    # from the LICENSE file shipped in its installed package. The same
+    # texts are copied into the page (caterva-studio/public/licenses/).
+    "@fontsource/spectral": (
+        "OFL-1.1",
+        "Copyright 2017 The Spectral Project Authors. The shipped LICENSE is "
+        "the SIL Open Font License 1.1: use, study, modify and redistribute, "
+        "bundled with software, on condition the font is not sold by itself, "
+        "the copyright notice and licence travel with it, and a modified "
+        "version is not given a Reserved Font Name. Bundled unmodified.",
+    ),
+    "@fontsource/atkinson-hyperlegible-next": (
+        "OFL-1.1",
+        "Copyright 2020-2024 The Atkinson Hyperlegible Next Project Authors. "
+        "The shipped LICENSE is the SIL Open Font License 1.1, with the same "
+        "grant and conditions as Spectral's above. Bundled unmodified.",
+    ),
+    "@fontsource/dm-mono": (
+        "OFL-1.1",
+        "Copyright 2020 The DM Mono Project Authors. The shipped LICENSE is "
+        "the SIL Open Font License 1.1, with the same grant and conditions "
+        "as Spectral's above. Bundled unmodified.",
+    ),
 }
 
 _REPLIT_NO_LICENCE = (

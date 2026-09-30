@@ -396,8 +396,8 @@ data: <one line of JSON>
   `events.jsonl` before it is sent, so a stream opened at any time replays
   the run's whole history, then continues live. With `Last-Event-ID: n` only
   events with `seq > n` are sent.
-- The page reads the stream with `fetch` (EventSource cannot send the token
-  header): `src/api/runs.ts`, `followRun`.
+- The page reads the stream with `fetch`, not EventSource, which cannot add
+  a request header (rule 3.4): `src/api/runs.ts`, `followRun`.
 - A comment line `: keep-alive` is sent every 15 s while a run is live.
 - The server closes the stream after sending `end`.
 - Order: `status{queued}`, `status{running}`, then any `stage`/`log`, then
