@@ -765,6 +765,35 @@ export class ResolverUnavailableError extends Error {
 }
 
 /**
+ * The runner's citation, with its reference id under the key this tree reads.
+ *
+ * THE RUNNER WRITES `referenceId`; EVERY READER HERE READ `reference_id`.
+ * `_citation_to_dict` in science_agent_runner.py emits camelCase, which is
+ * what the API reads (`Citation.referenceId` in scienceAgent.ts).
+ * `ResolvedCitation` was written against the runner's docstring example,
+ * which says `reference_id`, and so were the offline stub's Km and Ki
+ * payloads, so every test here passed while the real runner's identifier
+ * was dropped at this boundary. Live, on 2026-09-30, `simulate --resolve`
+ * printed "BRENDA ref ?" beside the 0.00252 mM Ki the runner cited as
+ * BRENDA ref 739793; `resolve` printed "BRENDA" with no ref at all; and the
+ * exports split "?" out of that string as the reference id
+ * (`splitCitation`).
+ *
+ * Read once, here, rather than at each of the readers: the runner's key
+ * first, then the stub's spelling, so both shapes that reach this function
+ * carry their identifier on. Anything that is not an object is no citation.
+ */
+function citationFromRunner(raw: unknown): ResolvedCitation | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const citation = raw as ResolvedCitation;
+  const camel = (raw as Record<string, unknown>)['referenceId'];
+  if (typeof camel === 'string' && camel) {
+    return { ...citation, reference_id: camel };
+  }
+  return citation;
+}
+
+/**
  * The runner's JSON payload -> a `ResolvedKinetic`.
  *
  * EXTRACTED SO IT CAN BE TESTED.
@@ -796,7 +825,7 @@ export function mapFoundResult(
     unit,
     organism: (parsed['organism'] as string) ?? null,
     source: String(parsed['source'] ?? 'unknown'),
-    citation: (parsed['citation'] as ResolvedCitation) ?? null,
+    citation: citationFromRunner(parsed['citation']),
     taxonId: (parsed['taxonId'] as string | null) ?? null,
     requestedTaxonId: (parsed['requestedTaxonId'] as string | null) ?? null,
     reliability: (parsed['reliability'] as ReliabilityAxes) ?? undefined,
