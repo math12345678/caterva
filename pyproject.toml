@@ -170,7 +170,11 @@ exclude = ["caterva.tests", "caterva.tests.*"]
 [tool.setuptools.package-data]
 # Two data files the engine reads at import (docs/data-sources.json and the
 # identifiers.org capture) as packaged copies; see caterva/core/data/README.md.
-caterva = ["core/data/*.json", "core/data/README.md"]
+# Caterva Studio's built page (caterva/studio/static/, written by the Vite
+# build in Science-Agent-Pipeline/artifacts/caterva-studio and not
+# committed). Absent from a wheel built without it; `caterva studio` then
+# serves a page saying how to build it.
+caterva = ["core/data/*.json", "core/data/README.md", "studio/static/*", "studio/static/**/*"]
 
 [tool.setuptools.exclude-package-data]
 caterva = ["conftest.py", "pytest.ini", ".coverage"]

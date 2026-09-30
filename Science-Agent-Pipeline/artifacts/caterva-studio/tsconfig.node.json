@@ -1,0 +1,16 @@
+{
+  // The build-tool configs, which the application tsconfig excludes: they
+  // are type-stripped by their own tool at run time, so without this file
+  // nothing would type-check them.
+  "compilerOptions": {
+    "lib": ["es2022", "dom"],
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["vite.config.ts", "vitest.config.ts"]
+}

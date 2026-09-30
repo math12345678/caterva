@@ -44,6 +44,7 @@ COMMANDS = {
     "fep": ("caterva.fep.__main__", "an absolute binding free energy, run at and judged against a cited Ki"),
     "prepare": ("caterva.prepare.__main__", "audit a PDB entry before simulating it, defects ranked by distance to the active site"),
     "sim": ("caterva.cli", "exact stochastic chemical kinetics (Gillespie SSA)"),
+    "studio": ("caterva.studio.__main__", "a local window onto all of the above, every number with its origin"),
 }
 
 USAGE = """caterva {version} -- mechanistic models whose every number says where it came from.

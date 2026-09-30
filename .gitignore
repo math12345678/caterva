@@ -70,6 +70,14 @@ dist/
 build/
 *.tsbuildinfo
 
+# Caterva Studio's page, built by Vite from
+# Science-Agent-Pipeline/artifacts/caterva-studio into the package so the
+# wheel and the frozen app carry it (pyproject package-data). Built at
+# release time, never committed: a committed build is a second copy of the
+# page's source that goes stale on the next edit. `caterva studio` serves a
+# page saying how to build it when the directory is absent.
+/caterva/studio/static/
+
 # Science-Agent-Pipeline is folded into this repo as regular files (it used
 # to be tracked as a gitlink to its own separate repo, which broke CI --
 # GitHub Actions checkout tried to resolve the gitlink and there was no
