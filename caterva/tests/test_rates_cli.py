@@ -295,6 +295,28 @@ def test_rates_made_at_the_cited_constants_come_back_inside_the_interval(tmp_pat
     assert "rule noncompetitive inhibition out" in evidence
 
 
+def test_the_resolver_is_asked_as_compose_asks_it(tmp_path):
+    """Km under the substrate; Ki under the INHIBITOR, with the mode the data
+    chose, the model's substrate and the isoform -- the arguments
+    compose/narrowed.py relies on the resolver having been given."""
+    calls = []
+
+    def recording(ec, organism, compound, **kw):
+        calls.append((ec, organism, compound, kw))
+        return offline_resolver(ec, organism, compound, **kw)
+
+    path = synthetic_inhibition(tmp_path, "competitive", km_uM=CITED_KM * 1000,
+                                ki_nM=CITED_KI_COMPETITIVE * 1e6)
+    code, _, err = run([str(path), "--isoform", "LDH-A"] + LDH, resolver=recording)
+    assert code == 0, err
+    assert calls == [
+        ("1.1.1.27", "Homo sapiens", "pyruvate", {"quantity": "km", "isoform": "LDH-A"}),
+        ("1.1.1.27", "Homo sapiens", QUINOLINE,
+         {"quantity": "ki", "isoform": "LDH-A", "inhibition_mode": "competitive",
+          "model_substrate": "pyruvate"}),
+    ]
+
+
 def test_rates_made_at_four_times_the_cited_ki_come_back_outside_it(tmp_path):
     path = synthetic_inhibition(tmp_path, "competitive", km_uM=CITED_KM * 1000,
                                 ki_nM=4 * CITED_KI_COMPETITIVE * 1e6)
