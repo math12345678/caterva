@@ -375,9 +375,13 @@ protein's value. The names compare without case, spaces or hyphens ("MAO B",
 "MAO-B" and "MAOB" are one isoform), and are read by the same parser
 `caterva bind --isoform` uses, which reads the ways BRENDA writes them:
 "LDH-A", "isoform MAO B", "monoamine oxidase B", "HK I", "hexokinase II".
-Two numberings of one protein are not taken as one: ask for "HK-I" where
-the rows write "hexokinase I", not "HK1", and a refusal names the isoforms
-BRENDA holds, spelled as it will match them.
+What you ask for is read the same way, and a code alone is that code after
+the enzyme's abbreviation: for potato hexokinase, whose rows write "HK2" and
+"hexokinase 2", `--isoform 2`, `HK2`, `HK-2` and `"hexokinase 2"` all ask for
+those rows, and `--isoform B` on monoamine oxidase asks for MAO-B. Two
+numberings of one protein are not taken as one: ask for "HK-I" where the
+rows write "hexokinase I", not "HK1" or "1", and a refusal names the
+isoforms BRENDA holds, spelled as it will match them.
 
 ### A Ki from a row of the model's own inhibition mode
 

@@ -234,6 +234,15 @@ class TestTheViewTheSelectionsRead:
                                   {"reaction_Ki": ("competitive_inhibition", "ki")},
                                   substrate="glucose", isoform=None, any_mode=False)
         assert chosen.measured["reaction_Ki"].value == 1.5
+        # The report now prints a 1.3 to 1.5 mM spread where it printed none
+        # (1.3 mM was carried alone). Deliberate: the rows a model carries
+        # beside its own are the resolver's unasked frontier, as they were
+        # before 2026-09-30 whenever a selection moved off the resolver's
+        # pick (LDH's competitive and noncompetitive quinoline rows, 0.00059
+        # and 0.00252 mM, have always been one spread), plus the frontier of
+        # the rows it kept for the model. 1.3 mM is a real ADP Ki of the same
+        # enzyme; that a model carries 1.5 does not make it disagree less.
+        assert chosen.measured["reaction_Ki"].disagreement == (1.3, 1.5)
 
     def test_an_answer_with_nothing_unasked_passes_through(self):
         m = Measurement(0.03, "mM", "BRENDA ref 286469", commentary=None)

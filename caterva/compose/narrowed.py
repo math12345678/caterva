@@ -136,7 +136,21 @@ def evidence_view(measured: Mapping[str, Any],
     read it: the unasked pick as the resolver's pick, and the asked row
     first among its alternatives. A constant with no `evidence_only` (the
     resolver was asked nothing, or would have returned nothing unasked) is
-    passed through as the resolver returned it."""
+    passed through as the resolver returned it.
+
+    The alternatives are the asked row, the frontier of the rows the
+    resolver kept for the model, and the frontier it would have chosen from
+    unasked. They are also what `Measurement.spread` spans, so a model's
+    printed spread covers both frontiers. That is the rule compose applied
+    before 2026-09-30 whenever a selection moved off the resolver's pick
+    (`_from_row` keeps the Measurement's alternatives, then the unasked
+    frontier): human LDH and the quinoline sulfonamide, competitive or
+    noncompetitive, has always printed 0.00059 to 0.00252 mM. What is new is
+    the kept rows' frontier, the rows the resolver itself called equally well
+    evidenced for the model, and cases where the carried row changed:
+    Trypanosoma cruzi and ADP, competitive, carried 1.3 mM with no spread and
+    now carries 1.5 mM with a 1.3 to 1.5 mM spread, since 1.3 is still an
+    ADP Ki BRENDA holds for that enzyme."""
     out = Narrowed(measured={})
     for identifier, m in measured.items():
         rows = [r for r in (evidence_only.get(identifier) or ()) if isinstance(r, dict)]

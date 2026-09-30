@@ -340,18 +340,10 @@ export function rowScopeFlags(
       : [];
   }
   const out: string[] = [];
-  // caterva.bind.core.same_isoform, the comparison the runner filtered by:
-  // case, spaces, hyphens and underscores ignored ("MAO B" is "MAO-B"), and
-  // a row naming two isoforms ("I and II") the same as either. The runner's
-  // reading already spells one isoform one way, so nothing more is needed
-  // here, and nothing more is done: a looser rule here than there would
-  // call a row the runner refused the query's isoform, or the reverse.
-  const names = (s: string) => s.split(/\s+and\s+/).map((n) => n.replace(/[\s_-]+/g, "").toLowerCase());
-  const same = (a: string, b: string) => names(a).some((x) => names(b).includes(x));
   if (isoform) {
     if (!scope.isoform) {
       out.push(`${name}: the source row names no isoform, so whether it measured ${isoform}, the one the query names, is unknown.`);
-    } else if (!same(scope.isoform, isoform)) {
+    } else if (!sameIsoform(scope.isoform, isoform)) {
       out.push(`${name} was measured on isoform ${scope.isoform}, not ${isoform}, the one the query names: a different protein's constant.`);
     }
   } else if (scope.isoform) {
@@ -380,6 +372,62 @@ export function rowScopeFlags(
     }
   }
   return out;
+}
+
+/** A full enzyme name BRENDA writes before an isoform code, and its abbreviation. */
+const ISOFORM_FULL_NAME = /^([Hh]exokinases?|[Mm]onoamine oxidase|[Ll]actate dehydrogenase)\s+/;
+const ISOFORM_ABBREVIATION_OF: Record<string, string> = {
+  hexokinase: "HK", hexokinases: "HK", "monoamine oxidase": "MAO", "lactate dehydrogenase": "LDH",
+};
+
+/**
+ * One isoform name as caterva.bind.core `_compared_as` compares it: for each
+ * isoform it names ("I and II" names two), its spelling without case or
+ * separators, and its code when it is an abbreviation and a code ("HK-2")
+ * or a code alone ("2").
+ *
+ * The row's side is the runner's reading, spelled one way already. The
+ * query's side is extractIsoform's, or the LLM's entities.isoform, which can
+ * be "hexokinase 2" or "isoform MAO B"; those are read here as the runner
+ * reads a request: the keyword dropped, a full enzyme name as its
+ * abbreviation, and an abbreviation joined to its code by a hyphen.
+ */
+function isoformParts(name: string): { key: string; code: string | null; abbreviated: boolean }[] {
+  const code = String.raw`(?:P?(?:VI{0,3}|IV|I{1,3})[a-c]?|[A-Z]\d?(?:[A-Z]\d)*|\d{1,2})`;
+  const compact = String.raw`(?:VI{0,3}|IV|I{1,3}|[A-Z]|\d{1,2})`;
+  const stemmed = new RegExp(String.raw`^((?:[A-Z][a-z])?(?:HXK|LDH|MAO|HK))(?:[ -](${code})|(${compact}))$`);
+  const abbreviated = /^(?:[A-Z][a-z])?[A-Z]{2,5}-([A-Za-z0-9]{1,4})$/;
+  const alone = new RegExp(`^${code}$`, "i");
+  const key = (s: string) => s.replace(/[\s_-]+/g, "").toLowerCase();
+  let text = name.trim().replace(/^(?:isozyme|isoenzyme|isoform)s?\s+/i, "");
+  const full = text.match(ISOFORM_FULL_NAME);
+  if (full) text = `${ISOFORM_ABBREVIATION_OF[full[1].toLowerCase()]} ${text.slice(full[0].length)}`;
+  return text.split(/\s+and\s+/).filter(Boolean).map((raw) => {
+    const s = raw.match(stemmed);
+    const part = s ? `${s[1]}-${s[2] ?? s[3]}` : raw;
+    const a = part.match(abbreviated);
+    if (a) return { key: key(part), code: key(a[1]), abbreviated: true };
+    if (alone.test(part)) return { key: key(part), code: key(part), abbreviated: false };
+    return { key: key(part), code: null, abbreviated: false };
+  });
+}
+
+/**
+ * caterva.bind.core.same_isoform, the comparison the runner filtered by, so
+ * a row the runner kept for the query's isoform is not called another
+ * protein's here, nor the reverse. Case, spaces, hyphens and underscores are
+ * ignored ("MAO B" is "MAO-B"); a row naming two isoforms ("I and II") is
+ * either; and a code alone is that code after an abbreviation ("2" is
+ * "HK-2", "B" is "MAO-B"): the rows are one EC number's, so the abbreviation
+ * says nothing the code does not. Two abbreviations with one code ("HK-1",
+ * "HXK-1") and two numberings ("HK-II", "HK-2") stay two isoforms.
+ */
+function sameIsoform(a: string, b: string): boolean {
+  const left = isoformParts(a);
+  const right = isoformParts(b);
+  return left.some((x) =>
+    right.some((y) => x.key === y.key || (x.code !== null && x.code === y.code && x.abbreviated !== y.abbreviated)),
+  );
 }
 
 function preparationFlags(
@@ -2043,7 +2091,11 @@ const NOT_AN_INHIBITOR = new Set([
  * BRENDA writes codes after (LDH, MAO, HK, HXK) and its code, joined by a
  * hyphen whatever joined them ("MAO B" is "MAO-B"). Until 2026-09-30 this
  * took one token after the keyword, so "isoform MAO B" was sent as "MAO",
- * which names no row; the row reader had the same defect.
+ * which names no row; the row reader had the same defect. A code the keyword
+ * leaves alone ("hexokinase isozyme 2" sends "2") is sent as it is: the
+ * runner (caterva.bind.core.same_isoform) and rowScopeFlags (sameIsoform)
+ * take a code alone as that code after the enzyme's abbreviation, so "2"
+ * finds the rows written "HK2".
  *
  * It reads fewer forms than the row reader, which also takes a full enzyme
  * name and a code ("hexokinase II") and codes run together ("HK1"): in a
@@ -2053,13 +2105,44 @@ const NOT_AN_INHIBITOR = new Set([
  */
 const ISOFORM_STEM = String.raw`(?:HXK|LDH|MAO|HK)`;
 const ISOFORM_CODE = String.raw`(?:P?(?:VI{0,3}|IV|I{1,3})[a-c]?|[A-Z]\d?(?:[A-Z]\d)*|\d{1,2})`;
-const STEM_AND_CODE = new RegExp(String.raw`(?<![\w-])(${ISOFORM_STEM})[ -](${ISOFORM_CODE})(?![\w-])`);
+const STEM_AND_CODE = new RegExp(String.raw`(?<![\w-])(${ISOFORM_STEM})[ -](${ISOFORM_CODE})(?![\w-])`, "g");
 const ISOFORM_KEYWORD = /\b(?:isozyme|isoenzyme|isoform)s?\s+/i;
-/** Words after a keyword that are not a name ("the isoform of LDH"), as the row reader skips them. */
-const NOT_AN_ISOFORM_NAME = new Set([
-  "a", "an", "and", "as", "at", "by", "for", "from", "in", "is", "not", "of", "or", "the",
+/** A code right after these words is a strain ("E. coli XL-1 Blue", "strain HK-1"). */
+const STRAIN_CONTEXT = /(?:\bcoli|\bstrains?)\s+$/i;
+/**
+ * Upper-case prefixes of hyphenated codes that name no protein: cofactors,
+ * nucleotides, "EC-" and nucleic acids ("inhibition by NAD-H"). The row
+ * reader's `_NOT_A_STEM`.
+ */
+const NOT_A_STEM = new Set([
+  "EC", "NAD", "NADH", "NADP", "FAD", "FMN", "ATP", "ADP", "AMP", "GTP", "GDP", "CTP",
+  "UTP", "ITP", "DNA", "RNA", "PEG", "SDS",
+]);
+/** Greek letters written out: the one lower-case form an isoform's name takes ("isoform alpha"). */
+const GREEK_NAMES = new Set([
+  "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "kappa",
+  "lambda", "mu", "nu", "xi", "omicron", "pi", "rho", "sigma", "tau", "upsilon", "phi", "chi",
+  "psi", "omega",
+]);
+/** Capitalised words that open a sentence and are not a name ("Isoform The"). */
+const FUNCTION_WORDS = new Set([
+  "an", "and", "as", "at", "by", "for", "from", "in", "is", "not", "of", "or", "the",
   "to", "was", "were", "with",
 ]);
+
+/**
+ * Whether the token after "isoform", "isozyme" or "isoenzyme" names one, by
+ * the row reader's rule (caterva.bind.core `_is_a_name`): it holds a capital
+ * or a digit ("A", "H4", "II", "2") or is a Greek letter's name. A
+ * lower-case word is the sentence going on ("the isoform of LDH", "all
+ * isozymes tested"). This compared the lower-cased token with a list that
+ * held "a", so "LDH isoform A" named no isoform while "isoform B" named B.
+ */
+function isAnIsoformName(token: string): boolean {
+  if (GREEK_NAMES.has(token.toLowerCase())) return true;
+  if (!/[A-Z0-9]/.test(token)) return false;
+  return token.length === 1 || !FUNCTION_WORDS.has(token.toLowerCase());
+}
 
 export function extractIsoform(query: string): string | undefined {
   const keyword = query.match(ISOFORM_KEYWORD);
@@ -2068,15 +2151,16 @@ export function extractIsoform(query: string): string | undefined {
     const named = rest.match(new RegExp(`^${STEM_AND_CODE.source}`));
     if (named) return `${named[1]}-${named[2]}`;
     const token = rest.match(/^[A-Za-z0-9][A-Za-z0-9-]*/);
-    if (token && !NOT_AN_ISOFORM_NAME.has(token[0].toLowerCase())) return token[0];
+    if (token && isAnIsoformName(token[0])) return token[0];
   }
-  const named = query.match(STEM_AND_CODE);
-  if (named) return `${named[1]}-${named[2]}`;
-  // Any other upper-case code joined by a hyphen, unless it is part of a
-  // longer name ("RO-28-1675") or a strain ("E. coli XL-1 Blue"), as the row
-  // reader excludes them.
-  for (const code of query.matchAll(/(?<![\w-])([A-Z]{2,5}-[A-Z0-9]{1,2})(?![\w-]|\.\d)/g)) {
-    if (!/(?:\bcoli|\bstrains?)\s+$/i.test(query.slice(0, code.index))) return code[1];
+  // Excluded as the row reader excludes them: a strain ("coli HK1"), a
+  // longer hyphenated name ("RO-28-1675"), a cofactor ("NAD-H").
+  for (const named of query.matchAll(STEM_AND_CODE)) {
+    if (!STRAIN_CONTEXT.test(query.slice(0, named.index))) return `${named[1]}-${named[2]}`;
+  }
+  for (const code of query.matchAll(/(?<![\w-])([A-Z]{2,5})-([A-Z0-9]{1,2})(?![\w-]|\.\d)/g)) {
+    if (NOT_A_STEM.has(code[1]) || STRAIN_CONTEXT.test(query.slice(0, code.index))) continue;
+    return code[0];
   }
   return undefined;
 }

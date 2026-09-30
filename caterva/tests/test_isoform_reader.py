@@ -41,6 +41,7 @@ two numberings of one protein ("HK-I" and "HK-1", "glucokinase" and "HK-IV",
 from __future__ import annotations
 
 import gzip
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -314,13 +315,29 @@ class TestTheWholeCorpus:
         assert set(EXPECTED) <= commentaries
         assert {c for c, _ in NOT_ISOFORMS} <= commentaries
 
+    def test_every_expected_reading_is_in_the_rows_own_words(self):
+        """A check on EXPECTED that does not run the reader. The table was
+        made by printing the reader's output and checking it by hand, so the
+        whole-corpus test above pins it; this asks something the reader's
+        output cannot answer for itself: that each isoform code in a reading
+        is written in its row, as a word of its own or right after the
+        abbreviation it is run into ("LDHB", "HK2", "TbHK1"). An invented
+        code, or one taken from the wrong place, fails here."""
+        attached = r"(?:(?<![A-Za-z0-9])|(?<=HK)|(?<=HXK)|(?<=LDH)|(?<=MAO))"
+        missing = {}
+        for commentary, reading in EXPECTED.items():
+            for name in isoform_names(reading):
+                code = name.rsplit("-", 1)[-1] if "-" in name else name.split()[-1]
+                if not re.search(attached + re.escape(code) + r"(?![A-Za-z0-9])", commentary):
+                    missing[commentary] = (reading, code)
+        assert missing == {}
+
     def test_what_changed_from_the_old_reader(self, corpus):
         """On the three full pages (LDH and monoamine oxidase in
         Tests/fixtures/ki_mode/, hexokinase in Tests/fixtures/recorded/), the
         old reader missed the isoform of 192 rows, cut 45 short or misread
         them, read one as a strain's and one as a compound's, and spelled 4
         differently (the same isoform: "LDHB" now reads "LDH-B")."""
-        import re
         old = re.compile(OLD_PATTERN)
 
         def before(text):
@@ -385,7 +402,6 @@ class TestThePhrases:
          "publication", "LDH-B", "LDH-B"),
     ])
     def test_reads(self, commentary, before, now):
-        import re
         m = re.search(OLD_PATTERN, commentary)
         assert ((m.group(1) or m.group(2)) if m else None) == before
         assert read_isoform(commentary) == now
@@ -399,9 +415,32 @@ class TestThePhrases:
         # Not in the corpus; the shapes a looser reader would take.
         "treated with an MAOI", "in presence of NAD-H", "EC-3 class", "strain XL-1 Blue",
         "isoform of the enzyme", "hexokinase activity", "type II collagen", "pH-7",
+        # A plural keyword followed by the sentence going on: before the
+        # token had to be shaped like a name, these read "tested",
+        # "present" and "specific".
+        "all isozymes tested", "isozymes present in extract", "isoform specific inhibitor",
+        # A strain spelled like an abbreviation and its code: the strain
+        # rule held only for the generic hyphen code, so these read "HK-1".
+        "enzyme from strain HK-1", "expressed in Escherichia coli HK1",
     ])
     def test_invents_no_isoform(self, text):
         assert read_isoform(text) is None
+
+    @pytest.mark.parametrize("text, reading", [
+        # Not in the corpus, so the whole-corpus table cannot hold them. A
+        # capital A is a code: the keyword's token was lower-cased and
+        # checked against a list of function words that held "a", so
+        # "isoform A" read as none while "isoform B" read "B", and a row so
+        # written became the fallback for a request for any isoform.
+        ("isoform A", "A"), ("isozyme A, pH 7.5", "A"), ("isoform B", "B"),
+        ("isoenzyme A and B", "A and B"), ("isoforms I and II", "I and II"),
+        # Greek letters written out, which the old reader read too.
+        ("isoform alpha", "alpha"),
+        # A lower-case article after the keyword is still not a name.
+        ("an isoform a novel inhibitor binds", None),
+    ])
+    def test_reads_a_name_after_a_keyword_by_its_shape(self, text, reading):
+        assert read_isoform(text) == reading
 
 
 class TestTheComparison:
@@ -414,10 +453,35 @@ class TestTheComparison:
     def test_one_isoform(self, a, b):
         assert same_isoform(a, b) and same_isoform(b, a)
 
+    @pytest.mark.parametrize("row, request_", [
+        # A request is read as a row is read, and a code alone is that code
+        # after an abbreviation. Potato's rows on the recorded hexokinase
+        # page read "HK-1", "HK-2", "HK-3" ("HK2", ref 640239); a request
+        # for "2" or "hexokinase 2" was compared as typed and missed them
+        # (Tests/test_isoform_resolution.py has the resolver's side).
+        ("HK-2", "2"), ("HK-2", "hexokinase 2"), ("HK-2", "isozyme 2"), ("HK-2", "HK2"),
+        ("HK-II", "hexokinase II"), ("HK-II", "II"),
+        ("MAO-B", "B"), ("MAO-B", "b"), ("MAO-B", "monoamine oxidase isoform B"),
+        ("MAO-B", "isoform MAO B"), ("MAO-A", "monoamine oxidase A"),
+        ("HK-Ib and HK-Ic", "Ic"), ("TbHK-1", "1"),
+        # And a row whose keyword left the code alone ("isoenzyme II",
+        # "isoform 2 (HK-2)") is the request spelled with an abbreviation.
+        ("II", "HK-II"), ("2", "HK-2"),
+    ])
+    def test_a_request_is_read_as_the_rows_are(self, row, request_):
+        assert same_isoform(row, request_) and same_isoform(request_, row)
+
     @pytest.mark.parametrize("a, b", [
         ("MAO-A", "MAO-B"), ("I and II", "III"), (None, "LDH-A"), (None, None),
         # Two numberings are not one spelling (caterva/bind/core.py).
         ("HK-I", "HK-1"), ("glucokinase", "HK-IV"), ("H4", "LDH-B4"),
+        # A code alone is not another numbering's code either, nor another
+        # letter's.
+        ("HK-2", "II"), ("HK-II", "2"), ("MAO-A", "B"),
+        # Two abbreviations with one code stay two names.
+        ("HK-1", "HXK-1"),
+        # An enzyme name with no code names no isoform.
+        ("HK-2", "hexokinase"),
     ])
     def test_different(self, a, b):
         assert not same_isoform(a, b)
@@ -428,7 +492,8 @@ class TestTheComparison:
 
         assert isoform.same_isoform is same_isoform
         fallback_logic = literature_module("fallback_logic")
-        for a, b in [("MAO B", "MAO-B"), ("I and II", "II"), ("HK-I", "HK-1")]:
+        for a, b in [("MAO B", "MAO-B"), ("I and II", "II"), ("HK-I", "HK-1"), ("HK-2", "2"),
+                     ("HK-2", "hexokinase 2"), ("HK-2", "II")]:
             assert fallback_logic._same_isoform(a, b) == same_isoform(a, b)
 
     def test_names(self):
@@ -453,6 +518,13 @@ class TestCatervaBind:
     def test_a_row_naming_two_is_kept_for_either(self):
         t = target([self._row("pH 7.3, isoenzyme I and isoenzyme II")], "free", "II")
         assert t.excluded == []
+
+    def test_a_code_alone_keeps_the_row_it_names(self):
+        # Potato HK2's ADP row (recorded hexokinase page, ref 640239), asked
+        # for as "2" and as "hexokinase 2".
+        for asked in ("2", "hexokinase 2"):
+            t = target([self._row("HK2")], "free", asked)
+            assert t.excluded == [] and len(t.used) == 1
 
     def test_another_isoform_is_still_excluded(self):
         t = target([self._row("LDH-B, pH not specified in the publication")], "free", "LDH-A")

@@ -38,6 +38,12 @@ describe("extractIsoform", () => {
     ["competitive inhibition of human monoamine oxidase isoform MAO B by isatin", "MAO-B"],
     ["competitive inhibition of human MAO A by clorgyline with kynuramine", "MAO-A"],
     ["rat HK I inhibited by glucose 6-phosphate", "HK-I"],
+    // A capital A is a code, not the article. The keyword's token was
+    // compared lower-cased with a list of function words that held "a", so
+    // this read as no isoform while "isoform B" read "B".
+    ["hexokinase isozyme A with glucose", "A"],
+    ["LDH isoform A with gossypol", "A"],
+    ["competitive inhibition of GST isoform alpha by ethacrynic acid", "alpha"],
   ])("reads %j", (query, isoform) => {
     expect(extractIsoform(query)).toBe(isoform);
   });
@@ -49,6 +55,12 @@ describe("extractIsoform", () => {
     "hexokinase activated by RO-28-1675 with glucose",
     // A keyword followed by an ordinary word names nothing.
     "the isoform of lactate dehydrogenase inhibited by gossypol",
+    "Km of glucose for all isozymes tested",
+    "isoform specific inhibition of lactate dehydrogenase by gossypol",
+    // A strain spelled like an isoform, and a cofactor's hyphenated code,
+    // excluded as the row reader excludes them.
+    "hexokinase from strain HK-1 with glucose",
+    "lactate dehydrogenase inhibition by NAD-H",
   ])("returns undefined when no isoform is named: %j", (query) => {
     expect(extractIsoform(query)).toBeUndefined();
   });
@@ -101,5 +113,25 @@ describe("rowScopeFlags with an isoform named in the query", () => {
     expect(rowScopeFlags("ki", { isoform: "I and II", ...unstated }, "II")).toEqual(kiOnly);
     expect(rowScopeFlags("ki", { isoform: "I and II", ...unstated }, "III")[0])
       .toContain("not III, the one the query names");
+  });
+
+  it("calls a code alone the same isoform as that code after an abbreviation, as the runner does", () => {
+    // "hexokinase isozyme 2 with glucose" sends "2"; potato's rows read
+    // "HK-2" (Tests/fixtures/recorded/brenda_2.7.1.1.html.gz, ref 640239
+    // "HK2"). The runner keeps that row for "2" (same_isoform); calling it
+    // another protein's here would contradict the runner's own choice. The
+    // LLM's isoform can be a full name ("hexokinase 2"), read the same way.
+    const unstated = { inhibitionMode: "unstated", versus: null };
+    const kiOnly = ["KI: the source row states no inhibition mode, so which binding event it measured is unknown."];
+    for (const asked of ["2", "HK2", "hexokinase 2", "isozyme 2"]) {
+      expect(rowScopeFlags("ki", { isoform: "HK-2", ...unstated }, asked)).toEqual(kiOnly);
+    }
+    expect(rowScopeFlags("ki", { isoform: "MAO-B", ...unstated }, "B")).toEqual(kiOnly);
+    expect(rowScopeFlags("ki", { isoform: "MAO-B", ...unstated }, "monoamine oxidase B")).toEqual(kiOnly);
+    expect(rowScopeFlags("ki", { isoform: "HK-Ib and HK-Ic", ...unstated }, "Ic")).toEqual(kiOnly);
+    // Two numberings, and two abbreviations with one code, stay two isoforms.
+    expect(rowScopeFlags("ki", { isoform: "HK-2", ...unstated }, "II")[0]).toContain("not II, the one the query names");
+    expect(rowScopeFlags("ki", { isoform: "HXK-1", ...unstated }, "HK-1")[0]).toContain("not HK-1, the one the query names");
+    expect(rowScopeFlags("ki", { isoform: "MAO-A", ...unstated }, "B")[0]).toContain("not B, the one the query names");
   });
 });

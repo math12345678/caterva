@@ -133,3 +133,51 @@ def test_names_compare_as_caterva_compares_them():
     """One function: caterva.bind.core.same_isoform."""
     assert _same_isoform("MAO B", "MAO-B") and _same_isoform("MAOB", "mao-b")
     assert _same_isoform("I and II", "II") and not _same_isoform("I and II", "III")
+
+
+# -- A request is read as the rows are read ------------------------------------
+#
+# Potato (Solanum tuberosum) hexokinase on the recorded page
+# (Tests/fixtures/recorded/brenda_2.7.1.1.html.gz, unmodified): ref 640239
+# writes its three isoforms "HK1", "HK2", "HK3", and the reader spells them
+# "HK-1", "HK-2", "HK-3". A request was compared as typed, so "2" (what the
+# API sends for "hexokinase isozyme 2") and "hexokinase 2" named none of
+# them: the Km for glucose was refused as measured only on other isoforms,
+# and the Ki of ADP came from a row naming no isoform (0.04 mM) while HK2's
+# own row (0.108 mM) was in the pool.
+
+HK_PAGE = Path(__file__).parent / "fixtures" / "recorded" / "brenda_2.7.1.1.html.gz"
+
+
+def potato(quantity, compound, isoform):
+    import gzip
+    page = gzip.decompress(HK_PAGE.read_bytes()).decode("utf-8", errors="replace")
+    return resolve_kinetic_value(
+        "2.7.1.1", "Solanum tuberosum", compound, enzyme_name="hexokinase", quantity=quantity,
+        html_provider=lambda ec: page,
+        uniprot_provider=lambda ec, org: None,
+        taxon_id_provider={"Solanum tuberosum": "4113"}.get,
+        search_literature=False,
+        isoform=isoform,
+    )
+
+
+@pytest.mark.parametrize("asked", ["2", "HK2", "HK-2", "hexokinase 2", "isozyme 2"])
+def test_every_way_of_asking_for_potato_hk2_finds_its_rows(asked):
+    """ADP's six potato Ki rows: 0.04 mM ("HK1"; "hexokinase 1"; none) and
+    0.108 / 0.11 mM ("HK2"; "hexokinase 2"; none). Two name HK2."""
+    ki = potato("ki", "ADP", asked)
+    assert ki.found and ki.value == pytest.approx(0.108) and ki.commentary == "HK2"
+    assert ki.citation.reference_id == "640239"
+    assert f"Kept the 2 of 6 exact-match row(s) measuring {asked}" in ki.search_log
+    km = potato("km", "D-glucose", asked)
+    assert km.found and km.value == pytest.approx(0.13) and km.commentary == "HK2"
+
+
+def test_another_numbering_of_potato_hk2_is_still_refused():
+    """"II" is hexokinase II's numbering, which these rows do not use; which
+    one a paper meant is not the reader's to assert (caterva/bind/core.py),
+    so the refusal names the three BRENDA holds."""
+    r = potato("km", "D-glucose", "II")
+    assert not r.found and r.source == "isoform_withheld"
+    assert r.isoforms_available == ["HK-1", "HK-2", "HK-3"]
