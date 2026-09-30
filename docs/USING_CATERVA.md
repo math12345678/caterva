@@ -834,9 +834,53 @@ translated across the periodic box, and both are tests. The GROMACS route
 runs `gmx select`, and CI checks that the two routes' water tables are
 identical.
 
+It also measures how much of each catalytic residue solvent can reach:
+its solvent-accessible surface area (Lee & Richards' surface, measured
+with Shrake & Rupley's points: 2,000 per atom, a 0.14 nm probe, and
+Bondi's radii exactly as GROMACS's `vdwradii.dat` lists them, hydrogens
+included). The surface is the whole protein in every frame, because a
+residue's exposure is set by its neighbours; water and ions are not part
+of it, and `caterva md` simulates no ligand. The protein is made whole
+first and its periodic images are not counted. Each residue is reported
+in `em.gro` (the structure every replica began from; the crystal's
+`protein.pdb` has no hydrogens, so set against an all-atom surface a
+change would be only the hydrogens) and per replica as the mean ± SD over
+every frame, with the range the middle 95% of frames fall in. An area
+alone does not say buried or exposed, since a fully exposed glycine has
+less surface than a buried tryptophan, so each is also given as a share
+of the largest area its residue type can have (Tien et al. 2013, PLoS ONE
+8:e80635, Table 1). Those maxima are DSSP's heavy-atom areas with other
+radii, so the share is a guide rather than a value on their scale; on
+the minimised structures of hen lysozyme and T4 lysozyme no residue's
+all-atom area exceeds its maximum (chain ends aside; the largest share is
+0.96). A residue
+is called buried below 20% of it, exposed at 40% or above, and partly
+exposed in between (chosen thresholds, printed with the table), at the
+start and in each replica: "buried throughout", "buried at the start,
+exposed in every replica", or which replicas left the starting state when
+they disagree. A residue at either end of the chain has no maximum and no
+verdict. Like the water, it is a result only when the distances are.
+2,000 points hold every residue's area to 0.011 nm² of the same area with
+20,000, and the report prints 0.01. The GROMACS route runs `gmx sasa`,
+which places its points differently (Eisenhaber et al.'s double cubic
+lattice), with the same probe, radii, number of points and surface
+(`-surface Protein -nopbc`); its `-or` file has every residue's mean area,
+for the rest of the protein. The two converge on the same surface: on T4
+lysozyme, `gmx sasa -ndots 10000` and Caterva at 10,000 points agree to
+0.0044 nm² on all 162 residues, and at 2,000 points each the two routes
+differed by at most 0.0145 nm² on any residue in any of 11 lysozyme
+structures. Both comparisons are tests, as are an isolated atom and two
+overlapping atoms against the areas worked out by hand, the six catalytic
+residues of 21 real lysozyme frames against `gmx sasa` frame by frame,
+and the same frames moved so that the active site straddles the periodic
+box, which give the same areas. CI compares the two
+routes' tables on every run, to 0.03 nm² (their measured difference,
+rounded up to 0.02, plus the rounding of two printed values).
+
 `--gromacs --no-run` on a run whose `analyze.sh` was written before the
-angle, face and water tables existed is refused, naming the missing file,
-rather than reporting without them: run `analyze.sh` again first.
+angle, face, water and solvent-exposure tables existed is refused, naming
+the missing file, rather than reporting without them: run `analyze.sh`
+again first.
 
 Each catalytic distance now carries the 95% confidence interval of its
 mean across replicas (Student's t, which is 12.7 for two replicas), and

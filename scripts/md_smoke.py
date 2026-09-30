@@ -21,6 +21,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "md-smoke"
+if str(ROOT) not in sys.path:  # run as scripts/md_smoke.py, the checkout is not on the path
+    sys.path.insert(0, str(ROOT))
+
+from caterva.analyze.sasa import ROUTES_AGREE_NM2  # noqa: E402
 
 
 def _distance_rows(text: str) -> dict:
@@ -156,6 +160,49 @@ def _water_rows(text: str) -> dict:
     return _table_rows(text, "## Water at the catalytic residues")
 
 
+#: How far apart two printed areas (nm^2) of the same residue may be: the
+#: routes' own difference for one residue in one frame (ROUTES_AGREE_NM2,
+#: 0.02, measured rather than picked: caterva/analyze/sasa.py), plus 0.01,
+#: because the table prints each area to 0.01 and the two roundings can add
+#: that much to a difference.
+SASA_PRINTED_NM2 = ROUTES_AGREE_NM2 + 0.01
+
+
+def _sasa_rows(text: str) -> dict:
+    """residue -> (area at start, then per replica its mean and the two
+    ends of its middle-95% range), nm^2, from the solvent-exposure table.
+
+    Those are the numbers a single frame bounds: a mean or a percentile of
+    frames moves no further than the largest frame does. The SD is not
+    read; it is not bounded that way. A cell that is not an area (n/a)
+    ends the row, so the two routes' rows then differ in length."""
+    out = {}
+    for label, cells in _table_rows(text, "## Solvent exposure of the catalytic residues").items():
+        numbers = []
+        start = re.match(r"(\d+\.\d+)", cells[1]) if len(cells) > 2 else None
+        if start:
+            numbers.append(float(start.group(1)))
+            for c in cells[2:-1]:
+                m = re.match(r"(\d+\.\d+) ± (?:\d+\.\d+|n/a) \[(\d+\.\d+), (\d+\.\d+)\]", c)
+                if not m:
+                    break
+                numbers += [float(v) for v in m.groups()]
+        out[label] = tuple(numbers)
+    return out
+
+
+def _sasa_agree(native: dict, gromacs: dict) -> tuple:
+    """(agree, largest difference) between two routes' solvent-exposure rows:
+    the same residues, rows of the same shape, and every area within
+    SASA_PRINTED_NM2. An empty table is not agreement."""
+    if not native or native.keys() != gromacs.keys():
+        return False, float("nan")
+    if any(len(native[k]) != len(gromacs[k]) or not native[k] for k in native):
+        return False, float("nan")
+    worst = max(abs(a - b) for k in native for a, b in zip(native[k], gromacs[k]))
+    return worst <= SASA_PRINTED_NM2 + 1e-9, worst
+
+
 def main() -> int:
     gmx = os.environ.get("GMX", "gmx")
     if shutil.which(gmx) is None and not Path(gmx).exists():
@@ -192,11 +239,11 @@ def main() -> int:
         return 1
     # And the enzyme analysis, which fetches lysozyme's catalytic residues
     # (M-CSA via `caterva prepare`), twice: measured by Caterva from the
-    # trajectories it reads itself, and by gmx distance, rmsf, angle, gangle
-    # and select. The distance, flexibility, rotamer, angle, face and water
-    # tables must agree, so this job checks the native reader and geometry
-    # against GROMACS on every run.
-    tables, flex, rot, ang, wet, face = {}, {}, {}, {}, {}, {}
+    # trajectories it reads itself, and by gmx distance, rmsf, angle, gangle,
+    # select and sasa. The distance, flexibility, rotamer, angle, face, water
+    # and solvent-exposure tables must agree, so this job checks the native
+    # reader and geometry against GROMACS on every run.
+    tables, flex, rot, ang, wet, face, area = {}, {}, {}, {}, {}, {}, {}
     for route, extra in (("native", []), ("gromacs", ["--gromacs"])):
         code = subprocess.run([sys.executable, "-m", "caterva.app", "analyze", str(OUT), *extra],
                               cwd=ROOT, env={**os.environ, "GMX": gmx}).returncode
@@ -210,6 +257,7 @@ def main() -> int:
         ang[route] = _angle_rows(text)
         wet[route] = _water_rows(text)
         face[route] = _face_rows(text)
+        area[route] = _sasa_rows(text)
     if not (OUT / "rep2" / "catalytic.xvg").exists():
         print("FAIL: caterva analyze --gromacs wrote no catalytic.xvg")
         return 1
@@ -271,6 +319,20 @@ def main() -> int:
         return 1
     print(f"OK: native and GROMACS agree on the water at {len(wet['native'])} catalytic residues, "
           "count for count.")
+    # Solvent-accessible area of each catalytic residue: gmx sasa (double
+    # cubic lattice) against Caterva's Shrake-Rupley points. The two point
+    # sets differ, so the areas agree to a tolerance, not exactly.
+    if not (OUT / "rep2" / "sasa.xvg").exists():
+        print("FAIL: caterva analyze --gromacs wrote no rep2/sasa.xvg")
+        return 1
+    areas_ok, worst_s = _sasa_agree(area["native"], area["gromacs"])
+    if not areas_ok:
+        print(f"FAIL: native and GROMACS solvent-accessible areas differ (largest {worst_s:.2f} nm², allowed "
+              f"{SASA_PRINTED_NM2:g}): {area['native']} vs {area['gromacs']}")
+        return 1
+    print(f"OK: native and GROMACS agree on the solvent-accessible area of {len(area['native'])} catalytic "
+          f"residues, at the start and per replica (largest difference in the printed areas {worst_s:.2f} "
+          f"nm²; allowed {SASA_PRINTED_NM2:g}).")
     print("OK: minimisation, then NVT, NPT, production and RMSD for two replicas, the summary, "
           "and the enzyme analysis.")
     return 0

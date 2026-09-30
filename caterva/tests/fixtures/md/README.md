@@ -130,3 +130,27 @@ and not this dihedral is thresholded. Asp48 sits almost in line with Asn59
 and its CA (179.3 degrees at most), and there the dihedral
 Asn46-Asn59-Asp48-CA runs from -168.9 to +132.4 degrees while the CA stays
 within 11.3 degrees of the plane of the angle.
+
+`t4l_bnz_first6000_gmx_sasa.txt`: the solvent-accessible area (nm^2) of
+every residue of the T4 lysozyme protein in `t4l_bnz_first6000.gro.gz`
+(its first 2,603 atoms, residues 1-162; `gmx sasa`'s Protein group leaves
+out the benzene and the water), one line per residue: number, name, area.
+From `gmx sasa -s t4l.gro -f t4l.gro -surface Protein -probe 0.14 -ndots
+10000 -nopbc -or` on the decompressed .gro (GROMACS 2026.1, 2026-09-30),
+the -or column as printed. -ndots 10000 makes it a converged reference: on
+lysozyme's em.gro, gmx sasa at 10,000 was within 0.0035 nm^2 of Caterva at
+50,000 points on every residue (caterva/analyze/sasa.py). The same run
+gave a total of 87.130 nm^2.
+
+`lyso_1aki_rep1_gmx_sasa.txt`: for each of the six catalytic residues of
+hen lysozyme, its number, name, its area in `lyso_1aki_res1-59.gro.gz`,
+then its 21 per-frame areas (nm^2) in `lyso_1aki_res1-59.xtc`; and first a
+line `total Protein` with the whole surface's area, in the same order. The
+-o columns of `gmx sasa -s lyso_1aki_res1-59.gro -f lyso_1aki_res1-59.xtc
+-surface Protein -probe 0.14 -ndots 2000 -nopbc -output 'group Protein and
+resnr 35' ... 'group Protein and resnr 59' -o` (and `-f` the .gro for the
+first number), GROMACS 2026.1, 2026-09-30: the options analyze.sh runs.
+The surface is the fixture's protein, residues 1-59, not the whole enzyme,
+so these are not lysozyme's areas; they are what `gmx sasa` measures on
+the same atoms and frames Caterva is given. The fragment is whole in every
+frame as stored.

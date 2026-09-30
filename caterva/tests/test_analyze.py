@@ -146,7 +146,11 @@ def _fake_run(tmp_path, means, n=4000, phi=0.5, sd=0.005, seed=0):
         (d / "rmsf.xvg").write_text("# rmsf\n10 0.05\n20 0.05\n30 0.06\n90 0.20\n")
         # gmx select -os: water oxygens at His10 and Asp20, per frame.
         (d / "water.xvg").write_text("@ title\n0.000 2.000 0.000\n0.001 3.000 1.000\n")
+        # gmx sasa -o: the protein's total area, then His10's and Asp20's
+        # (made-up areas; these tests are about the distances).
+        (d / "sasa.xvg").write_text("@ title\n0.000 12.000 0.400 0.100\n0.001 12.100 0.500 0.100\n")
     (tmp_path / "water_start.xvg").write_text("0.000 2.000 1.000\n")
+    (tmp_path / "sasa_start.xvg").write_text("0.000 12.000 0.400 0.100\n")
     return tmp_path
 
 
