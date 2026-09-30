@@ -57,14 +57,31 @@ settles that the one way that keeps the front ends agreeing: the resolver's
 row is carried, the report says the resolver ranked every row for the model
 and chose it, and its `chosen_because` says so in every export.
 
-With `--any-mode` the resolver is asked for the isoform alone, and the note
-saying what the default would carry is ki_mode's, over the rows that answer
-holds, exactly as before 2026-09-30. It can therefore be wrong where the
-default is now right: for Trypanosoma cruzi and ADP above, `--any-mode`
-carries 1.3 mM and says nothing, because 1.5 mM is not among its rows, where
-the default carries 1.5 mM. Stated rather than fixed: fixing it costs a
-second fetch and parse of BRENDA's page for every constant, on a flag that
-exists to turn the choice off.
+WITH --any-mode
+---------------
+The resolver is asked for the isoform and no mode, which is the question
+the API and the TypeScript CLI ask when no mode is sent, so the row carried
+is theirs: for Trypanosoma cruzi and ADP above, 1.3 mM. The request also
+carries the model's mode as one to compare with (`compare_mode`), and the
+resolver says what it would have returned asked for it (`KineticResult.
+mode_default`), from the same rows by the same steps. The note saying what
+the default would carry names that row, and why the two differ:
+
+    `reaction_Ki`: --any-mode kept the resolver's pick (1.3 mM, BRENDA ref
+    640265), which states no inhibition mode; without it the row stating
+    competitive inhibition (1.5 mM, BRENDA ref 640216), this model's
+    mechanism, would be used; the resolver, asked for a competitive model
+    of glucose, ranks every row BRENDA holds by the mode before choosing on
+    evidence, and returns it
+
+Until 2026-09-30 that note was ki_mode's over the rows the answer held, the
+frontier of the rows the evidence kept, which lacks 1.5 mM, so it carried
+1.3 mM and said nothing. The default's row is also put among the carried
+constant's alternatives, so the printed spread is the default's (1.3 to 1.5
+mM) whichever way the model is built. The resolver computes it without a
+second fetch or parse of the page; a resolver that does not return one (a
+stand-in, or one that predates the field) leaves the note to the rows, as
+before.
 """
 from __future__ import annotations
 
@@ -220,6 +237,23 @@ def carry(measured: Mapping[str, Any], refused: Mapping[str, str], narrowed: Nar
     return out, still_refused, notes
 
 
+def with_default_rows(measured: Mapping[str, Any],
+                      defaults: Mapping[str, Mapping[str, Any]]) -> Dict[str, Any]:
+    """Each Measurement with the row its default carries (the resolver's
+    `mode_default` row, for `--any-mode`) among its alternatives, unless it
+    is the Measurement's own row or already there. A default that refuses
+    adds nothing, and so does a constant with no default."""
+    out = dict(measured)
+    for identifier, default in defaults.items():
+        m = out.get(identifier)
+        row = (default or {}).get("row")
+        if m is None or not row or same_row(row, _row_of(m)):
+            continue
+        out[identifier] = replace(m, alternatives=_merged(getattr(m, "alternatives", ()) or (),
+                                                          [row]))
+    return out
+
+
 @dataclass
 class Selection:
     """What `caterva compose` carries for each constant the search returned."""
@@ -249,16 +283,16 @@ def select_for_model(search: Any, constants: Mapping[str, tuple], *,
     try:
         from caterva.agents.adapters import NOT_FOUND_REASONS
         from caterva.compose.export import (
-            evidence_only_from_search, measured_from_search, unresolved_from_search,
-            withheld_by_resolver,
+            evidence_only_from_search, measured_from_search, mode_defaults_from_search,
+            unresolved_from_search, withheld_by_resolver,
         )
         from caterva.compose.ki_mode import ANY_MODE_FLAG, select_mode
         from caterva.compose.row_scope import INHIBITION_TABLES, MODE_OF_MOTIF
     except ImportError:  # pragma: no cover - flat layout
         from agents.adapters import NOT_FOUND_REASONS  # type: ignore[no-redef]
         from compose.export import (  # type: ignore[no-redef]
-            evidence_only_from_search, measured_from_search, unresolved_from_search,
-            withheld_by_resolver,
+            evidence_only_from_search, measured_from_search, mode_defaults_from_search,
+            unresolved_from_search, withheld_by_resolver,
         )
         from compose.ki_mode import ANY_MODE_FLAG, select_mode  # type: ignore[no-redef]
         from compose.row_scope import INHIBITION_TABLES, MODE_OF_MOTIF  # type: ignore[no-redef]
@@ -275,6 +309,11 @@ def select_for_model(search: Any, constants: Mapping[str, tuple], *,
         out.withheld[identifier] = reason
 
     narrowed = evidence_view(measured_from_search(search), evidence_only_from_search(search))
+    # --any-mode: the row the default carries, from the resolver, among
+    # each constant's alternatives, so the selections can name it and the
+    # printed spread is the default's (module docstring).
+    defaults = mode_defaults_from_search(search) if any_mode else {}
+    narrowed = replace(narrowed, measured=with_default_rows(narrowed.measured, defaults))
     measured = narrowed.measured
     refused: Dict[str, str] = {}
     if isoform:
@@ -289,7 +328,7 @@ def select_for_model(search: Any, constants: Mapping[str, tuple], *,
     # The isoform first, then the mode, over the same ranked rows; ki_mode's
     # docstring says why in that order.
     by_mode = select_mode(measured, constants, substrate=substrate, isoform=isoform,
-                          any_mode=any_mode)
+                          any_mode=any_mode, defaults=defaults)
     refused.update(by_mode.refused)
     out.notes.extend(by_mode.notes)
     asked_modes = {
@@ -304,4 +343,5 @@ def select_for_model(search: Any, constants: Mapping[str, tuple], *,
     return out
 
 
-__all__ = ["Narrowed", "Selection", "evidence_view", "carry", "same_row", "select_for_model"]
+__all__ = ["Narrowed", "Selection", "evidence_view", "carry", "same_row", "select_for_model",
+           "with_default_rows"]

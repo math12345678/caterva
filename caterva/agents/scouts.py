@@ -371,9 +371,11 @@ def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
         # substrate, over every row BRENDA holds, before it chooses one.
         # `caterva compose` fills these (ComposedModel.parameter_requests);
         # a request without them is ranked on evidence alone, as before.
+        # `compare_mode` ranks nothing: the resolver answers as with no mode
+        # and says what the mode would have returned (compose --any-mode).
         asked = {
             name: getattr(request, name, None)
-            for name in ("isoform", "inhibition_mode", "model_substrate")
+            for name in ("isoform", "inhibition_mode", "model_substrate", "compare_mode")
             if getattr(request, name, None)
         }
         return resolve_kinetic_value(

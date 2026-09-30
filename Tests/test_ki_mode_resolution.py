@@ -6,7 +6,10 @@ sulfonamide, from one paper: 0.00059 mM "competitive versus NADH" and
 returns the lower, whatever model the caller is building. With the model's
 mode it must return the row `caterva compose` would carry for that model,
 by the same ranking (caterva.compose.ki_mode.rank), and refuse, naming the
-modes, when every row states another.
+modes, when every row states another. Asked for no mode with the model's as
+`compare_mode`, which `caterva compose --any-mode` sends, it must return
+exactly its no-mode answer and name the row the call with the mode returns
+(`TestAnyMode`).
 
 Every page is a committed, unmodified BRENDA page, so this runs offline:
 
@@ -77,6 +80,31 @@ def plain(ec, inhibitor, organism):
     monoamine oxidase page takes about two seconds, and the comparison
     below asks for one inhibitor's answer up to nine times."""
     return ki(ec, inhibitor, organism=organism)
+
+
+@functools.lru_cache(maxsize=None)
+def no_mode(ec, inhibitor, organism, isoform):
+    """The question the API and the TypeScript CLI ask when no mode is sent:
+    `resolve_kinetic_value` with `inhibition_mode=None`."""
+    if isoform is None:
+        return plain(ec, inhibitor, organism)
+    return ki(ec, inhibitor, organism=organism, isoform=isoform)
+
+
+@functools.lru_cache(maxsize=None)
+def asked_for(ec, inhibitor, organism, mode, substrate, isoform):
+    """The default's question: the model's mode, substrate and isoform."""
+    return ki(ec, inhibitor, organism=organism, inhibition_mode=mode, model_substrate=substrate,
+              isoform=isoform)
+
+
+@functools.lru_cache(maxsize=None)
+def any_mode_asks(ec, inhibitor, organism, mode, substrate, isoform):
+    """`caterva compose --any-mode`'s question (ComposedModel.
+    parameter_requests(any_mode=True)): no mode, the model's as the one to
+    compare with."""
+    return ki(ec, inhibitor, organism=organism, compare_mode=mode, model_substrate=substrate,
+              isoform=isoform)
 
 
 def ldh(**kw):
@@ -498,8 +526,7 @@ class TestTheSameRowAsCompose:
                                                isoform):
         from caterva.compose.ki_mode import ANY_MODE_FLAG
 
-        resolved = ki(ec, inhibitor, organism=organism, inhibition_mode=mode,
-                      model_substrate=substrate, isoform=isoform)
+        resolved = asked_for(ec, inhibitor, organism, mode, substrate, isoform)
         chosen = compose_selects(resolved, mode, substrate, isoform)
         if not resolved.found:
             reason = chosen.withheld["reaction_Ki"]
@@ -527,8 +554,7 @@ class TestTheSameRowAsCompose:
         unranked = plain(ec, inhibitor, organism)
         assert unranked.found
         measured = composed_from(unranked)
-        resolved = ki(ec, inhibitor, organism=organism, inhibition_mode=mode,
-                      model_substrate=substrate, isoform=isoform)
+        resolved = asked_for(ec, inhibitor, organism, mode, substrate, isoform)
         if isoform:
             by_isoform = select_isoform(measured, isoform)
             if "reaction_Ki" in by_isoform.refused:
@@ -609,14 +635,211 @@ class TestWhereComposeCouldNotSeeTheRow:
                           substrate="glucose")
         assert out.measured["reaction_Ki"].value == 1.3
 
-    def test_any_mode_still_reads_only_the_unasked_rows(self):
-        """A limit, not a virtue (caterva/compose/narrowed.py): with
-        `--any-mode` compose asks for no mode and says what the default would
-        carry over the rows that answer holds, which lack 1.5, so it keeps 1.3
-        and says nothing, where the default carries 1.5."""
+    def test_an_answer_with_no_mode_alone_cannot_name_the_defaults_row(self):
+        """Why `--any-mode` sends `compare_mode`: over the rows the no-mode
+        answer holds, which lack 1.5, the selection keeps 1.3 and says
+        nothing, where the default carries 1.5. Until 2026-09-30 this was
+        what `--any-mode` printed; TestAnyMode below is what it prints now."""
         unasked = ki("2.7.1.1", "ADP", **self.CRUZI)
         chosen = compose_selects(unasked, "competitive", "glucose", any_mode=True)
         assert chosen.measured["reaction_Ki"].value == 1.3 and chosen.notes == []
+
+
+#: Every case above, and Trypanosoma cruzi's ADP, whose competitive and
+#: noncompetitive rows the no-mode answer's frontier drops.
+ANY_MODE_CASES = [
+    *CASES,
+    *[("2.7.1.1", "Trypanosoma cruzi", "ADP", m, "glucose", None)
+      for m in ("competitive", "noncompetitive", "uncompetitive")],
+]
+
+
+class TestAnyMode:
+    """`caterva compose --any-mode` asks the resolver what the API and the
+    TypeScript CLI ask when no mode is sent, and carries its answer; and it
+    names the row its default would carry from the resolver's own answer to
+    the default's question (`compare_mode`, `KineticResult.mode_default`).
+
+    Until 2026-09-30 the second half was worked out from the rows the no-mode
+    answer held, the frontier of the rows the evidence kept. For
+    Trypanosoma cruzi and ADP that frontier is 1.3 mM alone, so the note said
+    nothing while the default carried 1.5 mM (the class above keeps the
+    reason). Every row here is a committed page's."""
+
+    @pytest.mark.parametrize("ec, organism, inhibitor, mode, substrate, isoform", ANY_MODE_CASES)
+    def test_the_answer_is_the_no_mode_answer_field_for_field(self, ec, organism, inhibitor,
+                                                              mode, substrate, isoform):
+        """Parity with the API and the CLI sent no mode: every field of the
+        result but `mode_default`, the search log included, is what
+        `inhibition_mode=None` returns."""
+        got = any_mode_asks(ec, inhibitor, organism, mode, substrate, isoform)
+        bare = no_mode(ec, inhibitor, organism, isoform)
+        assert got.model_dump(exclude={"mode_default"}) == bare.model_dump(exclude={"mode_default"})
+        assert bare.mode_default is None
+
+    @pytest.mark.parametrize("ec, organism, inhibitor, mode, substrate, isoform", ANY_MODE_CASES)
+    def test_the_default_it_names_is_the_defaults_own_answer(self, ec, organism, inhibitor, mode,
+                                                            substrate, isoform):
+        got = any_mode_asks(ec, inhibitor, organism, mode, substrate, isoform)
+        default = asked_for(ec, inhibitor, organism, mode, substrate, isoform)
+        if not got.found:
+            # Refused before the mode step (LDH-X), so the default refuses
+            # the same way and there is nothing to compare.
+            assert got.mode_default is None and default.source == got.source
+            return
+        said = got.mode_default
+        assert (said.mode, said.model_substrate) == (mode, substrate)
+        if default.found:
+            assert said.modes_available == []
+            assert (said.row["value"], said.row["conditions"], said.row["reference_id"],
+                    said.row["organism"]) == (default.value, default.commentary,
+                                              default.citation.reference_id, default.organism)
+        else:
+            assert default.source == "mode_withheld"
+            assert said.row is None and said.modes_available == default.modes_available
+
+    @pytest.mark.parametrize("ec, organism, inhibitor, mode, substrate, isoform", ANY_MODE_CASES)
+    def test_compose_carries_the_no_mode_row_and_names_the_defaults(
+            self, ec, organism, inhibitor, mode, substrate, isoform):
+        from caterva.compose.ki_mode import ANY_MODE_FLAG, read_row, row_label
+
+        chosen = compose_selects(any_mode_asks(ec, inhibitor, organism, mode, substrate, isoform),
+                                 mode, substrate, isoform, any_mode=True)
+        bare = no_mode(ec, inhibitor, organism, isoform)
+        if not bare.found:
+            assert "reaction_Ki" not in chosen.measured
+            return
+        carried = chosen.measured["reaction_Ki"]
+        assert (carried.value, carried.commentary) == (bare.value, bare.commentary)
+        assert not any(CARRIED in note for note in chosen.notes), chosen.notes
+        default = asked_for(ec, inhibitor, organism, mode, substrate, isoform)
+        said = [n for n in chosen.notes if n.startswith(f"`reaction_Ki`: {ANY_MODE_FLAG} kept")]
+        if default.found and (default.value, default.commentary) == (bare.value, bare.commentary):
+            assert said == [], said
+            return
+        assert len(said) == 1, chosen.notes
+        assert ANY_MODE_FLAG in carried.chosen_because
+        if not default.found:
+            assert "without it the constant would be refused" in said[0]
+            assert f"({'; '.join(default.modes_available)})" in said[0]
+            return
+        # The default's row by value and reference, and the mode it states.
+        reading = read_row(default.commentary)
+        states = reading.says() if reading.mode != "unstated" else "no inhibition mode"
+        label = row_label(default.value, default.unit, default.citation.reference_id)
+        assert f"row stating {states} ({label})" in said[0]
+        assert "ranks every row BRENDA holds by the mode before choosing on evidence, and returns it" in said[0]
+
+    def test_trypanosoma_cruzi_names_the_row_its_answer_dropped(self):
+        got = any_mode_asks("2.7.1.1", "ADP", "Trypanosoma cruzi", "competitive", "glucose", None)
+        assert got.value == 1.3 and [c["value"] for c in got.ensemble_candidates] == [1.3]
+        chosen = compose_selects(got, "competitive", "glucose", any_mode=True)
+        carried = chosen.measured["reaction_Ki"]
+        assert carried.value == 1.3
+        assert chosen.notes == [
+            "`reaction_Ki`: --any-mode kept the resolver's pick (1.3 mM, BRENDA ref 640265), "
+            "which states no inhibition mode; without it the row stating competitive inhibition "
+            "(1.5 mM, BRENDA ref 640216), this model's mechanism, would be used; the resolver, "
+            "asked for a competitive model of glucose, ranks every row BRENDA holds by the mode "
+            "before choosing on evidence, and returns it"]
+        # The spread is the default's: 1.3 is carried, 1.5 is among its rows.
+        assert carried.disagreement == (1.3, 1.5)
+
+    def test_the_quinoline_sulfonamide_names_the_other_mechanisms_row(self):
+        got = any_mode_asks("1.1.1.27", QUINOLINE, "Homo sapiens", "noncompetitive", "pyruvate",
+                            None)
+        chosen = compose_selects(got, "noncompetitive", "pyruvate", any_mode=True)
+        assert (chosen.measured["reaction_Ki"].value, chosen.notes[0]) == (0.00059, (
+            "`reaction_Ki`: --any-mode kept the resolver's pick (0.00059 mM, BRENDA ref 739793), "
+            "which measured competitive inhibition versus NADH, and this model is noncompetitive; "
+            "without it the row stating noncompetitive inhibition versus pyruvate (0.00252 mM, "
+            "BRENDA ref 739793), this model's mechanism and substrate, would be used; the "
+            "resolver, asked for a noncompetitive model of pyruvate, ranks every row BRENDA holds "
+            "by the mode before choosing on evidence, and returns it"))
+
+    def test_the_quinoline_sulfonamide_for_a_mode_no_row_states(self):
+        got = any_mode_asks("1.1.1.27", QUINOLINE, "Homo sapiens", "uncompetitive", "pyruvate",
+                            None)
+        chosen = compose_selects(got, "uncompetitive", "pyruvate", any_mode=True)
+        assert chosen.measured["reaction_Ki"].value == 0.00059 and chosen.withheld == {}
+        assert chosen.notes[0].endswith(
+            "without it the constant would be refused; the resolver, asked for an uncompetitive "
+            "model of pyruvate, finds that every row it holds states another mode (competitive "
+            "inhibition versus NADH; noncompetitive inhibition versus pyruvate)")
+
+    @pytest.mark.parametrize("mode", ["competitive", "noncompetitive", "uncompetitive"])
+    def test_the_cross_species_tier_names_the_defaults_row_too(self, mode):
+        """Asked for mouse with the opt-in, the human rows are the tier's
+        (test_the_cross_species_tier_chooses_by_mode_too): the answer is the
+        no-mode one, and the default named is the call with the mode's."""
+        kw = dict(organism="Mus musculus", allow_cross_species=True,
+                  lineage_provider=fixture_lineage_provider, model_substrate="pyruvate")
+        got = ki("1.1.1.27", QUINOLINE, compare_mode=mode, **kw)
+        bare = ki("1.1.1.27", QUINOLINE, organism="Mus musculus", allow_cross_species=True,
+                  lineage_provider=fixture_lineage_provider)
+        default = ki("1.1.1.27", QUINOLINE, inhibition_mode=mode, **kw)
+        assert got.source == bare.source == "brenda_cross_species"
+        assert got.model_dump(exclude={"mode_default"}) == bare.model_dump(exclude={"mode_default"})
+        if default.found:
+            assert (got.mode_default.row["value"], got.mode_default.row["conditions"]) == (
+                default.value, default.commentary)
+        else:
+            assert got.mode_default.row is None
+            assert got.mode_default.modes_available == default.modes_available
+
+    def test_compare_mode_is_refused_beside_a_mode_and_checked_as_one(self):
+        with pytest.raises(ValueError, match="compare_mode is for a call asked for no inhibition"):
+            ldh(inhibition_mode="competitive", compare_mode="noncompetitive")
+        with pytest.raises(ValueError, match="inhibition_mode must be one of"):
+            ldh(compare_mode="mixed")
+        # A Km has no mode to compare: nothing is said.
+        assert ki("2.7.1.1", "glucose", quantity="km", compare_mode="competitive").mode_default is None
+
+
+class TestTheCommand:
+    """`caterva compose` itself, through the agents' scout and the real
+    resolver, over the committed hexokinase page: the scout's resolver is
+    given the page and the stubbed identifier lookups these tests use
+    everywhere (`brenda_resolver`'s keyword arguments reach
+    `resolve_kinetic_value`), and nothing else is replaced."""
+
+    ARGS = ["Michaelis-Menten with a competitive inhibitor", "--subject", "2.7.1.1",
+            "--organism", "Trypanosoma cruzi", "--substrate", "glucose", "--inhibitor", "ADP",
+            "--no-analysis", "--no-simulate", "--no-ranking"]
+
+    @pytest.fixture
+    def compose(self, monkeypatch, capsys):
+        from caterva.agents import scouts
+        from caterva.compose.__main__ import main
+
+        real = scouts.brenda_resolver
+        monkeypatch.setattr(scouts, "brenda_resolver", lambda **kw: real(
+            html_provider=PAGES.__getitem__, uniprot_provider=lambda ec_, org: None,
+            taxon_id_provider=TAXA.get, search_literature=False))
+
+        def run(*flags):
+            code = main([*self.ARGS, *flags])
+            return code, capsys.readouterr().out
+        return run
+
+    def test_any_mode_carries_the_no_mode_row_and_says_what_the_default_carries(self, compose):
+        code, out = compose("--any-mode")
+        assert code == 0
+        bare = no_mode("2.7.1.1", "ADP", "Trypanosoma cruzi", None)
+        assert bare.value == 1.3 and bare.citation.reference_id == "640265"
+        assert "| `reaction_Ki` | 1.3 mM | literature (Trypanosoma cruzi) | BRENDA ref 640265 |" in out
+        assert ("`reaction_Ki`: --any-mode kept the resolver's pick (1.3 mM, BRENDA ref 640265), "
+                "which states no inhibition mode; without it the row stating competitive "
+                "inhibition (1.5 mM, BRENDA ref 640216)") in out
+        assert "spanning **1.3 to 1.5 mM**" in out
+
+    def test_the_default_carries_the_row_the_note_named(self, compose):
+        code, out = compose()
+        assert code == 0
+        default = asked_for("2.7.1.1", "ADP", "Trypanosoma cruzi", "competitive", "glucose", None)
+        assert default.value == 1.5 and default.citation.reference_id == "640216"
+        assert "| `reaction_Ki` | 1.5 mM | literature (Trypanosoma cruzi) | BRENDA ref 640216 |" in out
+        assert "spanning **1.3 to 1.5 mM**" in out
 
 
 class TestTheArgument:

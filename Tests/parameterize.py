@@ -106,6 +106,14 @@ class ParameterRequest:
     isoform: Optional[str] = None
     inhibition_mode: Optional[str] = None
     model_substrate: Optional[str] = None
+    #: The model's inhibition mode, sent WITHOUT ranking by it
+    #: (`resolve_kinetic_value`'s `compare_mode`), with `model_substrate`:
+    #: the resolver answers as if asked for no mode and says what it would
+    #: have returned for this one. `caterva compose --any-mode` sends it in
+    #: place of `inhibition_mode`, so it carries the row the API and the
+    #: TypeScript CLI return when no mode is sent, and its report can still
+    #: name the row the default would carry.
+    compare_mode: Optional[str] = None
 
 
 @dataclass(frozen=True)

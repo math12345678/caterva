@@ -606,6 +606,26 @@ def _about_the_carried_row(identifier: str, carried: _Row, best: Optional[_Row],
     return notes
 
 
+def _the_defaults_row(default: Mapping[str, Any], rows: Sequence[_Row],
+                      m: Any) -> Tuple[Optional[_Row], Tuple[str, ...]]:
+    """`(row, modes)`: the row the default carries, as one of `rows` when it
+    is among them, and, when the default refuses the constant, the modes the
+    resolver found the rows state. `default` is the resolver's `mode_default`
+    (`narrowed.select_for_model` passes it): its row, or None with
+    `modes_available`. A row not among `rows` is read here as they were."""
+    row = default.get("row")
+    if not row:
+        return None, tuple(default.get("modes_available") or ())
+    found = next((r for r in rows if _same(row, r)), None)
+    if found is not None:
+        return found, ()
+    read = read_row(row.get("conditions"))
+    ref = row.get("reference_id")
+    return _Row(read.mode, read.versus, read.isoform, read.conditions,
+                value=float(row["value"]), unit=str(row.get("unit") or m.unit),
+                reference=str(ref) if ref else None, source=row, order=len(rows)), ()
+
+
 def select_mode(
     measured: Mapping[str, Any],
     constants: Mapping[str, Tuple[Optional[str], Optional[str]]],
@@ -613,6 +633,7 @@ def select_mode(
     substrate: Optional[str] = None,
     isoform: Optional[str] = None,
     any_mode: bool = False,
+    defaults: Optional[Mapping[str, Mapping[str, Any]]] = None,
 ) -> ModeSelection:
     """Each inhibition constant, taken from a row whose stated mode fits the
     model where the resolver ranked one. See the module docstring.
@@ -623,6 +644,16 @@ def select_mode(
     `substrate` is the model's substrate; `isoform` is what `--isoform`
     asked for, when it did, and must be the same value `select_isoform` was
     given, because this ranks by it first.
+
+    `defaults` is for `any_mode`: per constant, what the resolver asked for
+    the model's mode would return (`narrowed.select_for_model` passes the
+    resolver's `mode_default`). The note then names that row as the one the
+    default carries, or says the default refuses and what the rows state,
+    rather than the best of the rows this is shown. The two can differ: the
+    resolver ranks every row BRENDA holds, and a row it would return for the
+    mode can be one the evidence alone dropped before any row reached here
+    (Trypanosoma cruzi hexokinase and ADP, narrowed.py). Without it, as for
+    a resolver that does not say, the note is over the rows this is shown.
     """
     out = ModeSelection(measured={})
     for identifier in sorted(measured):
@@ -642,6 +673,13 @@ def select_mode(
         context = (best, rows, other_unit, want, substrate, isoform)
 
         if any_mode:
+            default = (defaults or {}).get(identifier)
+            modes: Tuple[str, ...] = ()
+            if default is not None:
+                # The resolver's answer to the default's question, not the
+                # best of what is shown here: see `defaults` above.
+                best, modes = _the_defaults_row(default, rows, m)
+                context = (best, rows, other_unit, want, substrate, isoform)
             out.measured[identifier] = m
             if best is not pick:
                 kept = (f"{m.chosen_because}; kept by {ANY_MODE_FLAG}"
@@ -655,6 +693,20 @@ def select_mode(
                     instead = f"{b.head} ({best.label()}){b.why}, would be used{b.tail()}"
                 else:
                     instead = "the constant would be refused"
+                if default is not None:
+                    # Where the default's row came from, which is also why
+                    # the two differ: this answer chose on evidence alone,
+                    # the default ranks by the mode first.
+                    asked = ((f"{isoform} and " if isoform else "")
+                             + f"{'an' if want[0] in 'aeiou' else 'a'} {want} model"
+                             + (f" of {substrate}" if substrate else ""))
+                    if best is not None:
+                        instead += (f"; the resolver, asked for {asked}, ranks every row BRENDA "
+                                    f"holds by the mode before choosing on evidence, and returns it")
+                    else:
+                        instead += (f"; the resolver, asked for {asked}, finds that every row it "
+                                    f"holds states another mode"
+                                    + (f" ({'; '.join(modes)})" if modes else ""))
                 out.notes.append(
                     f"`{identifier}`: {ANY_MODE_FLAG} kept {_carried(m)} ({pick.label()}), "
                     f"which {_pick_says(pick, best, want, substrate, isoform)}; without it "

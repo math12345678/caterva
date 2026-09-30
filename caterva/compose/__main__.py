@@ -160,11 +160,13 @@ def build_parser(prog: str = "python -m caterva.compose") -> argparse.ArgumentPa
                              "isoform is used and the report says so, and a constant only "
                              "measured on other isoforms is refused")
     parser.add_argument("--any-mode", action="store_true",
-                        help="take an inhibition constant from the row the resolver ranked first, "
-                             "whatever inhibition mode it states. By default a Ki comes from a row "
+                        help="take an inhibition constant from the row the resolver returns when "
+                             "asked for no inhibition mode, as the API and the CLI do when no mode "
+                             "is sent, whatever mode it states. By default a Ki comes from a row "
                              "stating this model's mode (mixed counts for noncompetitive), else from "
                              "one stating none, and a Ki only measured for another mode is refused. "
-                             "The report flags a mismatch either way")
+                             "The report flags a mismatch either way, and names the row the default "
+                             "would carry")
     parser.add_argument("--product",
                         help="the product, for constants measured on it: a reverse Km, a "
                              "product-inhibition Kp")
@@ -914,7 +916,9 @@ def _search_the_literature(
     tell LDH-A's row from LDH-B's, or a competitive Ki from a noncompetitive
     one, so each request carries the isoform `--isoform` asked for and, for
     an inhibition constant, the motif's mode and the model's substrate
-    (unless `--any-mode`). The resolver ranks every row by them before it
+    (with `--any-mode`, the mode only as one to compare with, so the row
+    carried is the one asked for no mode, and the report names the row the
+    mode would have given). The resolver ranks every row by them before it
     chooses, as it does for the API and the TypeScript CLI, and the row it
     returns is the row carried (narrowed.py). The two selections then say
     what that choice did, against the row the evidence alone would have
@@ -988,7 +992,8 @@ def _search_the_literature(
     # constant is carried; the selections say what that choice did
     # (narrowed.py). On by default: a noncompetitive model carrying a
     # competitive constant is wrong whether or not the report admits it.
-    # --any-mode keeps the resolver's pick.
+    # --any-mode keeps the resolver's pick asked for no mode, and the notes
+    # name the row its mode would have given (fallback_logic.ModeDefault).
     from caterva.compose.ki_mode import constants_of
     from caterva.compose.narrowed import select_for_model
 

@@ -472,12 +472,23 @@ Trypanosoma cruzi hexokinase has four Ki rows for ADP: 0.13 mM, 1.3 mM ("at
 pH 7.5"), 1.5 mM ("competitive to ATP") and 7.0 mM ("noncompetitive to
 glucose"). The evidence alone keeps 1.3 mM, the one row reporting a pH,
 which states no mode; a competitive model now carries 1.5 mM in compose as
-in the API, and the report says it replaced 1.3 mM and why. With
-`--any-mode` compose still chooses as it did, so there it carries 1.3 mM
-without saying that the default would carry 1.5 mM. A Ki every row of which
-states another mode is refused there too, with the modes named. The API
-always sends its model's mode. The CLI has no `--any-mode`: leaving `--mode`
-out keeps the resolver's pick, with its stated mode printed beside it.
+in the API, and the report says it replaced 1.3 mM and why. A Ki every row
+of which states another mode is refused there too, with the modes named.
+The API always sends its model's mode. The CLI has no `--any-mode`: leaving
+`--mode` out keeps the resolver's pick, with its stated mode printed beside
+it.
+
+`--any-mode` asks the resolver the question the CLI asks with no `--mode`,
+and carries its answer: 1.3 mM for Trypanosoma cruzi and ADP, the row the
+CLI returns. It also sends the model's mode as one to compare with, and the
+resolver, from the same rows and without fetching the page again, says what
+it would have returned asked for it. The report names that row and why the
+two differ: "--any-mode kept the resolver's pick (1.3 mM, BRENDA ref
+640265), which states no inhibition mode; without it the row stating
+competitive inhibition (1.5 mM, BRENDA ref 640216), this model's mechanism,
+would be used", and the spread printed is 1.3 to 1.5 mM either way. Until
+2026-09-30 `--any-mode` worked out the default's row from the rows its
+answer held, which lack 1.5 mM, so it said nothing there.
 
 The API sends its model's substrate with the mode; the CLI takes it as
 `--model-substrate`, because `--substrate` names the inhibitor for a Ki.
