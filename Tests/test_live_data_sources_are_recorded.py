@@ -45,6 +45,12 @@ LIVE_HOSTS: dict[str, str] = {
     "eutils.ncbi.nlm.nih.gov": "NCBI",
     "pubchem.ncbi.nlm.nih.gov": "PubChem",
     "api.core.ac.uk": "CORE",
+    # Queried for accessions and EC numbers since the resolver was written,
+    # and absent from this table until its responses were committed as test
+    # recordings (Tests/fixtures/recorded/http/), which made the missing
+    # CC BY 4.0 attribution a redistribution question rather than a
+    # usage one.
+    "rest.uniprot.org": "UniProt",
 }
 
 #: Hosts that are infrastructure rather than a licensed data source.

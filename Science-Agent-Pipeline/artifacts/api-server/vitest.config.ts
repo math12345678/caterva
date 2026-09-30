@@ -33,8 +33,20 @@ export default defineConfig({
     // Recorded real BRENDA pages replace live fetches for the ECs they
     // cover (Tests/fixtures/recorded/README.md): five hexokinase tests
     // failed three CI runs on BRENDA returning 500, not on a defect.
+    //
+    // CATERVA_HTTP_RECORDED does the same for every other GET the runner
+    // makes through Tests/http_retry.py: NCBI Taxonomy, UniProt and
+    // PubChem, which one hexokinase Km lookup asks 15 times and which timed
+    // these tests out in CI whenever one of them was slow. A request with
+    // no recording still goes live. scripts/record_http_fixtures.py lists
+    // the payloads these tests send and re-records them.
+    //
+    // Test configuration only. The product must never set either variable
+    // (Tests/test_recorded_env_is_test_only.py): a recorded answer served
+    // to a user would be presented as the database's current one.
     env: {
       CATERVA_BRENDA_RECORDED: path.resolve(__dirname, "../../../Tests/fixtures/recorded"),
+      CATERVA_HTTP_RECORDED: path.resolve(__dirname, "../../../Tests/fixtures/recorded/http"),
     },
     clearMocks: true,
     restoreMocks: true,

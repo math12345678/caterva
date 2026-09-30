@@ -1,0 +1,432 @@
+{
+  "recorded": "2026-09-30",
+  "runner": "Science-Agent-Pipeline/artifacts/api-server/src/lib/science_agent_runner.py",
+  "payloads": [
+    {
+      "needed_by": [
+        "gapClassification.test.ts",
+        "frontDoorCoverage.test.ts",
+        "frontDoorRouteCoverage.test.ts",
+        "literatureHitRate.test.ts",
+        "organismFromQuery.test.ts",
+        "scenarioDefaults.test.ts",
+        "responseParameterCompleteness.test.ts"
+      ],
+      "payload": {
+        "enzymeName": "hexokinase",
+        "substrate": "glucose",
+        "organism": "Homo sapiens",
+        "ecNumber": "2.7.1.1",
+        "parameterType": "",
+        "quantity": "km",
+        "allowCrossSpecies": false,
+        "allowVariants": false
+      },
+      "answer": {
+        "ok": true,
+        "found": true,
+        "source": "brenda_exact",
+        "km": 6.0,
+        "unit": "mM",
+        "organism": "Homo sapiens",
+        "taxonId": "9606",
+        "requestedTaxonId": "9606",
+        "citation": {
+          "source": "BRENDA",
+          "referenceId": "641068",
+          "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+          "title": null,
+          "organism": "Homo sapiens",
+          "notes": null
+        }
+      },
+      "recordings": [
+        "033fed8e6310929c7a3a21270d023a61e53b8b46639bb02a29d5f677d7feb8b1.json.gz",
+        "362f833b5b1cf79adc2105087c751046cc6990cd110ead3f54ff6b74fc0b5787.json.gz",
+        "373150e72f85d453548a38d00316b3e4d4cae8ee2a9739c1da6455fedbd88d64.json.gz",
+        "4236b13ab87f5f4d8d3796a2fcdf4a1a4ee9ece1ac2aa7f972e53c103c10680f.json.gz",
+        "6cc129f0e8de55f6bffd5167d20038652ee6ae1b473cc324aa198e00dedce353.json.gz",
+        "77f7c12761ff0150fccc7bcb26c63c72fb5490a2fc6ee0ed6c8ec0fdc8898afb.json.gz",
+        "82704d4caafe644f54d039c42d73455b3dd8df2b72be2bed2d68aa216f85ac41.json.gz",
+        "834ebff61952a2879dafc60bde6fbc473eccc294e8ca054e1bd5c0573110583c.json.gz",
+        "8e074cac30e8684b9f718b17c246819a2c70faba764f79b56cfa38dd4acc1c22.json.gz",
+        "a4a5b5da3442dc508929808ceb3ca3eb024cbff98f4c70676af1160f170b7405.json.gz",
+        "ccd56094c04a2d68b4d11fd72130f84b6f633af5b2bb290d4d1e0d86bce9a33c.json.gz",
+        "d0596b970b84d9b9985440fef055094254f16e48899f95e84ed0a02de34da6bf.json.gz",
+        "de14bed63aee970d88258ee052682788a51af1ca9ab473a29ed531e68d2d08d9.json.gz",
+        "dfdd87f2f76c9020bc65bfcfc0f78efd60c168854b16bb9ee90bcfb3ca899cb3.json.gz",
+        "f69a13bcc5265abf54f2869da359fcf4025f6ac0a567c6b3111443b537b8d8e1.json.gz"
+      ]
+    },
+    {
+      "needed_by": [
+        "responseParameterCompleteness.test.ts"
+      ],
+      "payload": {
+        "enzymeName": "hexokinase",
+        "substrate": "glucose",
+        "organism": "Homo sapiens",
+        "ecNumber": "2.7.1.1",
+        "parameterType": "",
+        "quantity": "kcat",
+        "allowCrossSpecies": false,
+        "allowVariants": false,
+        "enzymeConc": 4.9999999999999996e-05
+      },
+      "answer": {
+        "ok": true,
+        "found": true,
+        "source": "brenda_exact",
+        "kcat": 40.1,
+        "vmax": 0.002005,
+        "unit": "1/s",
+        "organism": "Homo sapiens",
+        "taxonId": "9606",
+        "requestedTaxonId": "9606",
+        "citation": {
+          "source": "BRENDA",
+          "referenceId": "739603",
+          "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+          "title": null,
+          "organism": "Homo sapiens",
+          "notes": null
+        }
+      },
+      "recordings": [
+        "09109f8f36bb7364f48627a30cf2fe0a42eecf1508425f31e4f8e9c1c1a1df1a.json.gz",
+        "0fc275bbcfa3bdcb66fe4b3c958256dbf3c02127e1865e401b684151c8d26024.json.gz",
+        "4236b13ab87f5f4d8d3796a2fcdf4a1a4ee9ece1ac2aa7f972e53c103c10680f.json.gz",
+        "52966332c66dbc9eb5df2437237da8b5c0a0e95f4a4a9daaa3458ae5d05942a6.json.gz",
+        "8e074cac30e8684b9f718b17c246819a2c70faba764f79b56cfa38dd4acc1c22.json.gz",
+        "a4a5b5da3442dc508929808ceb3ca3eb024cbff98f4c70676af1160f170b7405.json.gz",
+        "d0596b970b84d9b9985440fef055094254f16e48899f95e84ed0a02de34da6bf.json.gz",
+        "d86399f7b30fea1084946639b473d8e3f00be69d3b9d6e6ff253eac2ed3d2595.json.gz",
+        "dbcbe45c9db04029cf5f2c2b2c8be55cc3a95cae6297e07df457dbda45a2b0ea.json.gz",
+        "de14bed63aee970d88258ee052682788a51af1ca9ab473a29ed531e68d2d08d9.json.gz",
+        "f95d6140d515535f07cfa6dc07be2467d55d9c705ea0978c86fc85833b1aeb45.json.gz"
+      ]
+    },
+    {
+      "needed_by": [
+        "organismFromQuery.test.ts"
+      ],
+      "payload": {
+        "enzymeName": "hexokinase",
+        "substrate": "glucose",
+        "organism": "Escherichia coli",
+        "ecNumber": "2.7.1.1",
+        "parameterType": "",
+        "quantity": "km",
+        "allowCrossSpecies": false,
+        "allowVariants": false
+      },
+      "answer": {
+        "ok": true,
+        "found": true,
+        "source": "brenda_exact",
+        "km": 0.06,
+        "unit": "mM",
+        "organism": "Escherichia coli",
+        "taxonId": "562",
+        "requestedTaxonId": "562",
+        "citation": {
+          "source": "BRENDA",
+          "referenceId": "640265",
+          "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+          "title": null,
+          "organism": "Escherichia coli",
+          "notes": null
+        }
+      },
+      "recordings": [
+        "2cd39491fb36167dfdf9434cfff354629ef20caec3a3af985df169ff343c0418.json.gz",
+        "ea21af384e4b9608bd73f34203ce9d9ab7ac6d798128c0c2dc54fee72f0e82a3.json.gz"
+      ]
+    },
+    {
+      "needed_by": [
+        "organismFromQuery.test.ts"
+      ],
+      "payload": {
+        "enzymeName": "hexokinase",
+        "substrate": "glucose",
+        "organism": "Saccharomyces cerevisiae",
+        "ecNumber": "2.7.1.1",
+        "parameterType": "",
+        "quantity": "km",
+        "allowCrossSpecies": false,
+        "allowVariants": false
+      },
+      "answer": {
+        "ok": true,
+        "found": true,
+        "source": "brenda_exact",
+        "km": 0.13,
+        "unit": "mM",
+        "organism": "Saccharomyces cerevisiae",
+        "taxonId": "4932",
+        "requestedTaxonId": "4932",
+        "citation": {
+          "source": "BRENDA",
+          "referenceId": "661952",
+          "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+          "title": null,
+          "organism": "Saccharomyces cerevisiae",
+          "notes": null
+        }
+      },
+      "recordings": [
+        "37b3a3cafc287a1ec6e02b7a4bee25ef48c596bcb35dea5ff12515559ea4b24f.json.gz",
+        "bf04bcc9d54b87b418f9e146df42582c4d8c2735e960e11f43a2ebc63aa4fb29.json.gz"
+      ]
+    },
+    {
+      "needed_by": [
+        "customModelRoute.test.ts"
+      ],
+      "payload": {
+        "enzymeName": "hexokinase",
+        "substrate": "glucose",
+        "organism": "Homo sapiens",
+        "parameterType": "",
+        "quantity": "km",
+        "allowCrossSpecies": false,
+        "allowVariants": false
+      },
+      "answer": {
+        "ok": true,
+        "found": true,
+        "source": "brenda_exact",
+        "km": 6.0,
+        "unit": "mM",
+        "organism": "Homo sapiens",
+        "taxonId": "9606",
+        "requestedTaxonId": "9606",
+        "citation": {
+          "source": "BRENDA",
+          "referenceId": "641068",
+          "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+          "title": null,
+          "organism": "Homo sapiens",
+          "notes": null
+        }
+      },
+      "recordings": [
+        "033fed8e6310929c7a3a21270d023a61e53b8b46639bb02a29d5f677d7feb8b1.json.gz",
+        "362f833b5b1cf79adc2105087c751046cc6990cd110ead3f54ff6b74fc0b5787.json.gz",
+        "373150e72f85d453548a38d00316b3e4d4cae8ee2a9739c1da6455fedbd88d64.json.gz",
+        "4236b13ab87f5f4d8d3796a2fcdf4a1a4ee9ece1ac2aa7f972e53c103c10680f.json.gz",
+        "6cc129f0e8de55f6bffd5167d20038652ee6ae1b473cc324aa198e00dedce353.json.gz",
+        "77f7c12761ff0150fccc7bcb26c63c72fb5490a2fc6ee0ed6c8ec0fdc8898afb.json.gz",
+        "82704d4caafe644f54d039c42d73455b3dd8df2b72be2bed2d68aa216f85ac41.json.gz",
+        "834ebff61952a2879dafc60bde6fbc473eccc294e8ca054e1bd5c0573110583c.json.gz",
+        "8e074cac30e8684b9f718b17c246819a2c70faba764f79b56cfa38dd4acc1c22.json.gz",
+        "a4a5b5da3442dc508929808ceb3ca3eb024cbff98f4c70676af1160f170b7405.json.gz",
+        "ad21f32b47cf35d547ab422ba2191c73a385746ffa38e4cb2697086334cd7936.json.gz",
+        "ccd56094c04a2d68b4d11fd72130f84b6f633af5b2bb290d4d1e0d86bce9a33c.json.gz",
+        "d0596b970b84d9b9985440fef055094254f16e48899f95e84ed0a02de34da6bf.json.gz",
+        "de14bed63aee970d88258ee052682788a51af1ca9ab473a29ed531e68d2d08d9.json.gz",
+        "dfdd87f2f76c9020bc65bfcfc0f78efd60c168854b16bb9ee90bcfb3ca899cb3.json.gz",
+        "f69a13bcc5265abf54f2869da359fcf4025f6ac0a567c6b3111443b537b8d8e1.json.gz"
+      ]
+    },
+    {
+      "needed_by": [
+        "customModelRoute.test.ts"
+      ],
+      "payload": {
+        "enzymeName": "not a real enzyme at all",
+        "substrate": "",
+        "organism": "Homo sapiens",
+        "parameterType": "",
+        "quantity": "km",
+        "allowCrossSpecies": false,
+        "allowVariants": false
+      },
+      "answer": {
+        "ok": true,
+        "found": false,
+        "source": "ec_not_resolved"
+      },
+      "recordings": [
+        "8db217aaed964235271bda817b7f6440ccc357737924e93b22e12d3d9aaf6b77.json.gz",
+        "de14bed63aee970d88258ee052682788a51af1ca9ab473a29ed531e68d2d08d9.json.gz",
+        "e544d5486f9cd0ebae37967d5c8b6b5c0b93d5c095a7c0ff604ad9efb783e332.json.gz"
+      ]
+    },
+    {
+      "needed_by": [
+        "gapClassification.test.ts"
+      ],
+      "payload": {
+        "enzymeName": "menten map cascade",
+        "substrate": "",
+        "organism": "Homo sapiens",
+        "parameterType": "",
+        "quantity": "km",
+        "allowCrossSpecies": false,
+        "allowVariants": false
+      },
+      "answer": {
+        "ok": true,
+        "found": false,
+        "source": "ec_not_resolved"
+      },
+      "recordings": [
+        "54236d46c5042d3b826bebb8ed9387444f89d0ab0407150eef1fd2dde21d993e.json.gz",
+        "a539d13430274de17a756dca176f2d389409e8ea288e2cccf591daf8b5b245f5.json.gz",
+        "de14bed63aee970d88258ee052682788a51af1ca9ab473a29ed531e68d2d08d9.json.gz"
+      ]
+    },
+    {
+      "needed_by": [
+        "frontDoorCoverage.test.ts",
+        "frontDoorRouteCoverage.test.ts"
+      ],
+      "payload": {
+        "enzymeName": "map cascade negative feedback",
+        "substrate": "",
+        "organism": "Homo sapiens",
+        "parameterType": "",
+        "quantity": "km",
+        "allowCrossSpecies": false,
+        "allowVariants": false
+      },
+      "answer": {
+        "ok": true,
+        "found": false,
+        "source": "ec_not_resolved"
+      },
+      "recordings": [
+        "1aec99a6756eb8d695823832e02b7186d7a5a18cbb02703553fcb228bf9a6dff.json.gz",
+        "4f04db5dd33e6dd2c4e5e73f98e9403eef98ae92674cb991b480a21608bd575a.json.gz",
+        "de14bed63aee970d88258ee052682788a51af1ca9ab473a29ed531e68d2d08d9.json.gz"
+      ]
+    },
+    {
+      "needed_by": [
+        "frontDoorCoverage.test.ts",
+        "frontDoorRouteCoverage.test.ts"
+      ],
+      "payload": {
+        "enzymeName": "at high concentration",
+        "substrate": "",
+        "organism": "Homo sapiens",
+        "parameterType": "",
+        "quantity": "km",
+        "allowCrossSpecies": false,
+        "allowVariants": false
+      },
+      "answer": {
+        "ok": true,
+        "found": false,
+        "source": "ec_not_resolved"
+      },
+      "recordings": [
+        "3e7d771e3b737b3dad1293d120ec25bad196c59d85170a3cc63fbcba3bb51a82.json.gz",
+        "8d28dd15d7440a979fc9eb49ad1596c38fbcc9941578722e7877872d65adcd7c.json.gz",
+        "de14bed63aee970d88258ee052682788a51af1ca9ab473a29ed531e68d2d08d9.json.gz"
+      ]
+    },
+    {
+      "needed_by": [
+        "frontDoorCoverage.test.ts",
+        "frontDoorRouteCoverage.test.ts"
+      ],
+      "payload": {
+        "enzymeName": "enzymes competing same",
+        "substrate": "",
+        "organism": "Homo sapiens",
+        "parameterType": "",
+        "quantity": "km",
+        "allowCrossSpecies": false,
+        "allowVariants": false
+      },
+      "answer": {
+        "ok": true,
+        "found": false,
+        "source": "ec_not_resolved"
+      },
+      "recordings": [
+        "bf9253688c2e086f1c5e5c7920d082766337d97b7a2a989fc64f10eb4a860cc6.json.gz",
+        "de14bed63aee970d88258ee052682788a51af1ca9ab473a29ed531e68d2d08d9.json.gz",
+        "e608ed6fb13bb1627141101f6886adf15c6378548c819f9b4d2a571113759b22.json.gz"
+      ]
+    },
+    {
+      "needed_by": [
+        "frontDoorCoverage.test.ts",
+        "frontDoorRouteCoverage.test.ts"
+      ],
+      "payload": {
+        "enzymeName": "sequential feedback amino acid synthesis",
+        "substrate": "",
+        "organism": "Homo sapiens",
+        "parameterType": "",
+        "quantity": "km",
+        "allowCrossSpecies": false,
+        "allowVariants": false
+      },
+      "answer": {
+        "ok": true,
+        "found": false,
+        "source": "ec_not_resolved"
+      },
+      "recordings": [
+        "0d4c5203762af7c22641362f4272d576baaa671a3310d72400c24a4b62e78554.json.gz",
+        "a97e59394e890b9fa8319ac21c7cac08d4e5552688ce432ef7668bb3d11d728d.json.gz",
+        "de14bed63aee970d88258ee052682788a51af1ca9ab473a29ed531e68d2d08d9.json.gz"
+      ]
+    },
+    {
+      "needed_by": [
+        "frontDoorCoverage.test.ts",
+        "frontDoorRouteCoverage.test.ts"
+      ],
+      "payload": {
+        "enzymeName": "open constant inflow",
+        "substrate": "",
+        "organism": "Homo sapiens",
+        "parameterType": "",
+        "quantity": "km",
+        "allowCrossSpecies": false,
+        "allowVariants": false
+      },
+      "answer": {
+        "ok": true,
+        "found": false,
+        "source": "ec_not_resolved"
+      },
+      "recordings": [
+        "01258cc17e4e3feef65578471409f5f9770f4c9dc3e44ee1be55e3a5f7fc4f6f.json.gz",
+        "8ffb23066544af7f020aac44ddd0ea8110938f2591aa3ed46c39ffa86c31056d.json.gz",
+        "de14bed63aee970d88258ee052682788a51af1ca9ab473a29ed531e68d2d08d9.json.gz"
+      ]
+    },
+    {
+      "needed_by": [
+        "frontDoorCoverage.test.ts",
+        "frontDoorRouteCoverage.test.ts"
+      ],
+      "payload": {
+        "enzymeName": "allosteric activation by its product",
+        "substrate": "",
+        "organism": "Homo sapiens",
+        "parameterType": "",
+        "quantity": "km",
+        "allowCrossSpecies": false,
+        "allowVariants": false
+      },
+      "answer": {
+        "ok": true,
+        "found": false,
+        "source": "ec_not_resolved"
+      },
+      "recordings": [
+        "214c2c49e16198dc6355e145bf4e91a5d49ad5862b5193af1076b6444929506b.json.gz",
+        "435fd7b836d89a67ae7f5410455cc10f5743f5d09002e04b9b76aafce8f1c003.json.gz",
+        "de14bed63aee970d88258ee052682788a51af1ca9ab473a29ed531e68d2d08d9.json.gz"
+      ]
+    }
+  ]
+}
