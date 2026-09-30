@@ -325,11 +325,28 @@ function selectionTieFlags(
 export function rowScopeFlags(
   key: string,
   scope: ScienceAgentResult["rowScope"],
+  isoform?: string,
 ): string[] {
-  if (!scope) return [];
-  const out: string[] = [];
   const name = key.toUpperCase();
-  if (scope.isoform) {
+  // With an isoform named, the runner already chose among rows for it
+  // (fallback_logic, isoform=...). What is left to say is whether the chosen
+  // row confirms it, names none, or (where the runner could not filter)
+  // names another. A row with no commentary at all names none.
+  if (!scope) {
+    return isoform
+      ? [`${name}: the source row names no isoform, so whether it measured ${isoform}, the one the query names, is unknown.`]
+      : [];
+  }
+  const out: string[] = [];
+  const same = (a: string, b: string) =>
+    a.replace(/[\s_-]+/g, "").toLowerCase() === b.replace(/[\s_-]+/g, "").toLowerCase();
+  if (isoform) {
+    if (!scope.isoform) {
+      out.push(`${name}: the source row names no isoform, so whether it measured ${isoform}, the one the query names, is unknown.`);
+    } else if (!same(scope.isoform, isoform)) {
+      out.push(`${name} was measured on isoform ${scope.isoform}, not ${isoform}, the one the query names: a different protein's constant.`);
+    }
+  } else if (scope.isoform) {
     out.push(
       `${name} was measured on isoform ${scope.isoform}; for another isoform it is a different protein's constant.`,
     );
@@ -872,7 +889,7 @@ async function applyKineticResolution(
       );
       flags.push(...selectedFormFlags(key, agentResult.selectedForm));
       flags.push(...preparationFlags(key, agentResult.preparation));
-      flags.push(...rowScopeFlags(key, agentResult.rowScope));
+      flags.push(...rowScopeFlags(key, agentResult.rowScope, entities.isoform));
     } else {
       provenanceUpdates[key] = buildUnresolvedKineticProvenance(key, "not_found");
     }

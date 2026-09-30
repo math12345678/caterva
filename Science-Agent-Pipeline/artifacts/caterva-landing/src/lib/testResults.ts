@@ -249,7 +249,8 @@ export const TEST_SUITES: TestSuite[] = [
         // locally 2026-09-29, with kiProvenance.test.ts's 4 after its query
         // was made to name the inhibitor): 776. CI run 36614528701 agreed
         // (776 passed). Plus the 6 tests of isoformFromQuery.test.ts (6
-        // passed locally 2026-09-29): 782.
+        // passed locally 2026-09-29): 782. Plus 3 tests of isoform-aware
+        // row-scope flags in the same file: 785.
         //
         // Earlier, 2026-09-17: `81 passed (81) / 854 passed (854)`, run
         // alone with the repo's .venv/bin first on PATH.
@@ -274,7 +275,7 @@ export const TEST_SUITES: TestSuite[] = [
         // total in the passed column turns any failure into an invisible
         // one, which is the specific dishonesty this panel exists to
         // avoid.
-        passed: 782,
+        passed: 785,
         skipped: 0,
         failed: 0,
       },

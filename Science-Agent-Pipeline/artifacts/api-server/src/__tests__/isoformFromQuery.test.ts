@@ -10,7 +10,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { extractIsoform, resolveQuery } from "../lib/queryResolver";
+import { extractIsoform, resolveQuery, rowScopeFlags } from "../lib/queryResolver";
 import { resolveKineticValue } from "../lib/scienceAgent";
 
 vi.mock("../lib/scienceAgent", async (importOriginal) => {
@@ -56,5 +56,24 @@ describe("the isoform reaches the resolver and the refusal comes back", () => {
   it("names the isoforms BRENDA does hold", async () => {
     const refusal = await settle(resolveQuery("competitive inhibition of human LDH-X by gossypol with pyruvate"));
     expect(refusal).toContain("measured on another (LDH-A, LDH-B, LDH-C)");
+  });
+});
+
+describe("rowScopeFlags with an isoform named in the query", () => {
+  it("says nothing more when the row confirms it", () => {
+    expect(rowScopeFlags("ki", { isoform: "LDH-A", inhibitionMode: "competitive", versus: null }, "ldh a"))
+      .toEqual(["KI: the source row measured competitive inhibition; a Ki is specific to that mode and assay."]);
+  });
+
+  it("calls a row naming none, or with no commentary at all, unknown for that isoform", () => {
+    const unnamed = rowScopeFlags("km", { isoform: null, inhibitionMode: "unstated", versus: null }, "LDH-A");
+    expect(unnamed).toEqual(["KM: the source row names no isoform, so whether it measured LDH-A, the one the query names, is unknown."]);
+    expect(rowScopeFlags("km", null, "LDH-A")).toEqual(unnamed);
+    expect(rowScopeFlags("km", null)).toEqual([]);
+  });
+
+  it("names a different isoform as a different protein", () => {
+    expect(rowScopeFlags("ki", { isoform: "LDH-B", inhibitionMode: "unstated", versus: null }, "LDH-A")[0])
+      .toContain("not LDH-A, the one the query names");
   });
 });
