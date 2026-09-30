@@ -256,3 +256,63 @@ class TestOnRealMarkup:
         compatibility = first.compatibility
         assert not any(f.kind == "ph_mismatch" for f in compatibility.findings)
         assert "assay_window [kcat] must be pH 8" in first.summary()
+
+    def test_the_re_selected_row_is_carried_with_its_own_commentary(self) -> None:
+        """The row carried is the row re-selected, in every field that is a
+        row's.
+
+        Until 2026-09-30 the scout replaced the value, pH, temperature,
+        buffer, reference and organism and kept the resolver's commentary,
+        so the 32.0 1/s row measured at pH 8 was carried with the 21.1 1/s
+        row's words, "pH 6.0, 25°C, recombinant wild-type enzyme in presence
+        of fructose 1,6-bisphosphate". `row_scope` reads what a row measured
+        from those words, and every export prints them as the source row.
+
+        The expected text is read off the committed page here, by its own
+        markup (the row whose value cell is 32 and whose reference cell is
+        670748), not through the resolver's parser.
+        """
+        kcat_request = ParameterRequest(
+            quantity="kcat", subject="L-lactate dehydrogenase",
+            substrate="", ec_number=LDH, table="kcat",
+        )
+        search = search_model(
+            network=NETWORK, requests=[REQUESTS[0], kcat_request], resolve=resolve,
+        )
+        kcat = search.first_pass.resolutions["kcat"].source
+
+        page = (FIXTURES / FIXTURE_FOR_TABLE["kcat"]).read_text(encoding="utf-8")
+        on_page = [cells for cells in _page_rows(page)
+                   if cells.get(0) == "32" and cells.get(5) == "670748"]
+        assert len(on_page) == 1, on_page
+        (row,) = on_page
+        assert row[4] == "25°C, pH 8, wild-type enzyme, activated by fructose 1,6-diphosphate"
+
+        assert (kcat.value, kcat.unit, kcat.ph) == (32.0, "1/s", 8.0)
+        assert kcat.commentary == row[4]
+        assert kcat.organism == row[2] == "Geobacillus stearothermophilus"
+        # Cited as the resolver's own row is cited ("BRENDA ref 684519"
+        # before the window), without that row's title.
+        assert kcat.citation == "BRENDA ref 670748"
+
+        # And the Measurement compose builds from it, whose commentary every
+        # export prints as the source row, says the same.
+        from caterva.compose.export import measured_from_search
+
+        measured = measured_from_search(search.first_pass)["kcat"]
+        assert (measured.value, measured.commentary) == (32.0, row[4])
+        # The frontier the spread is taken over is the resolver's, and the
+        # carried row is one of its members, now recognisable as itself.
+        assert sum(1 for c in measured.alternatives
+                   if c["value"] == 32.0 and c["conditions"] == measured.commentary) == 1
+
+
+def _page_rows(page: str):
+    """Every row of every table on a committed BRENDA page, as {column:
+    text}, read from the page's own cell ids (`tab44r12sr7c4` is row sr7 of
+    table 44's twelfth block, column 4). Tags are stripped and whitespace
+    trimmed; nothing else is interpreted."""
+    for row_id, body in re.findall(r'<div class="[^"]*" id="(tab\d+r\d+sr\d+)">(.*?)</div></div>',
+                                   page, re.S):
+        cells = re.findall(r'id="%sc(\d+)"><span[^>]*>(.*?)</span>' % re.escape(row_id), body, re.S)
+        yield {int(k): re.sub(r"<[^>]+>", "", v).strip() for k, v in cells}

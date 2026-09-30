@@ -427,8 +427,10 @@ def _reference(m: Any) -> Optional[str]:
     ref = getattr(m, "reference_id", None)
     if ref:
         return str(ref)
-    # "BRENDA ref 739793", as the adapter cites a row; "reference_id:703627",
-    # as the agents' assay-window re-selection cites the row it moved to.
+    # "BRENDA ref 739793", as the adapter cites a row, and since 2026-09-30
+    # the agents' assay-window re-selection too; "reference_id:703627" is
+    # how that re-selection cited the row it moved to before then, still
+    # read so a caller that builds a citation that way is not misread.
     found = re.search(r"\bref\s+(\S+)|\breference_id:(\S+)",
                       str(getattr(m, "citation", "") or ""))
     return (found.group(1) or found.group(2)) if found else None

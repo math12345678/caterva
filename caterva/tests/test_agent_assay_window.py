@@ -414,7 +414,9 @@ class TestTheScoutReSelects:
         assert source.value == 32.0
         assert source.ph == 8.0
         assert source.temperature_c == 25.0
-        assert "reference_id:R" in source.citation
+        # Cited as the adapter cites the resolver's own row, so the path that
+        # produced a citation cannot be read off it (adapters.citation_text).
+        assert source.citation == "BRENDA ref R"
 
         note = next(
             n for r in report.rounds for ar in r.ran if ar.agent == "scout:kcat"
@@ -557,7 +559,7 @@ class TestTheScoutReSelects:
         source = report.blackboard.get(param_key("kcat")).source
         assert source.value == 32.0
         assert source.buffer is None          # this row states no buffer
-        assert "reference_id:D" in source.citation
+        assert source.citation == "BRENDA ref D"
         assert source.organism == "Escherichia coli"
         assert source.cross_species is True   # a different organism was chosen
         assert source.ph == 8.0
