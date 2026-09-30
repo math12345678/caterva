@@ -206,6 +206,8 @@ def resolve_kinetic_value(
     allow_cross_species: bool = False,
     allow_variants: bool = False,
     isoform: Optional[str] = None,
+    inhibition_mode: Optional[str] = None,
+    model_substrate: Optional[str] = None,
 ) -> KineticResult:
     """Thin wrapper around the real fallback logic in Tests/fallback_logic.py.
 
@@ -237,8 +239,21 @@ def resolve_kinetic_value(
         allow_cross_species=allow_cross_species,
         allow_variants=allow_variants,
         isoform=isoform,
+        inhibition_mode=inhibition_mode,
+        model_substrate=model_substrate,
     )
 
+
+
+def _string_or_absent(payload: dict, key: str) -> Optional[str]:
+    """`payload[key]` when it is a string, None when it is absent or null,
+    and ValueError for anything else. For keys whose silent absence changes
+    the answer (`inhibitionMode`, `modelSubstrate`): ["competitive"] read as
+    no mode would choose a Ki the caller did not ask for, and say nothing."""
+    value = payload.get(key)
+    if value is None or isinstance(value, str):
+        return value
+    raise ValueError(f"{key} must be a string; got {value!r}")
 
 
 def _parse_physiological(payload: dict):
@@ -298,17 +313,29 @@ def _resolved_effectors_dict(effectors):
 
 
 def _row_scope(commentary):
-    """{isoform, inhibitionMode, versus} from a BRENDA row's commentary, or
-    None when there is no commentary. Parsed by caterva.bind.core, the one
-    implementation of this reading."""
+    """{isoform, inhibitionMode, versus, kitzWilson} from a BRENDA row's
+    commentary, or None when there is no commentary.
+
+    Read by caterva.compose.ki_mode.read_row, which reads with
+    caterva.bind.core (the one implementation of this reading) and is what
+    the resolver ranked the row by when a Ki was asked for by mode, so the
+    flags describe the row by the reading that chose it.
+
+    `kitzWilson` is True for a row "determined from Kitz-Wilson plots" (ref
+    702238): the K_I of an irreversible inactivation, filed in BRENDA's Ki
+    table and stating no mode. Without it the row reads only as "states no
+    inhibition mode", which is true of its words and hides what it is. A
+    mode-aware lookup takes one only when nothing else is left, and says so
+    here when it does."""
     if not commentary:
         return None
     try:
-        from caterva.bind.core import read_isoform, read_mode
+        from caterva.compose.ki_mode import read_row
     except ImportError:
         return None
-    mode, versus = read_mode(commentary)
-    return {"isoform": read_isoform(commentary), "inhibitionMode": mode, "versus": versus}
+    row = read_row(commentary)
+    return {"isoform": row.isoform, "inhibitionMode": row.mode, "versus": row.versus,
+            "kitzWilson": row.kitz_wilson}
 
 
 def _buffer_identity_dict(raw_buffer):
@@ -541,6 +568,23 @@ def main() -> None:
         #: measuring it are used; a constant only measured on other isoforms
         #: is refused, source "isoform_withheld" (fallback_logic).
         isoform = payload.get("isoform") if isinstance(payload.get("isoform"), str) else None
+        #: The inhibition mode of the model a Ki is for ("competitive" for
+        #: the API's mm_competitive_inhibition, `scientific resolve --mode`),
+        #: and that model's substrate; the payload's `substrate` is the
+        #: inhibitor for a Ki. With a mode the resolver takes a Ki row whose
+        #: stated mode fits the model, by `caterva compose`'s ranking, and
+        #: refuses, source "mode_withheld", when every row states another.
+        #:
+        #: Absent is no mode. Anything else that is not a mode a model can be
+        #: of is an error, reported as {"ok": false}, not a request dropped:
+        #: dropped, the Ki is chosen with no mode while the caller believes
+        #: it was chosen by one. A value that is not a string is refused
+        #: here, and a string naming no model's mode ("mixed", "") by the
+        #: resolver, for a Km or kcat lookup as for a Ki (`_mode_asked`).
+        #: The model's substrate is read the same way, since without it a
+        #: row "versus pyruvate" and one "versus NADH" rank alike.
+        inhibition_mode = _string_or_absent(payload, "inhibitionMode")
+        model_substrate = _string_or_absent(payload, "modelSubstrate")
         #: The conditions the model represents. An experimental condition
         #: the caller states, never assumed here (ADR 0012/0013).
         physiological = _parse_physiological(payload)
@@ -746,6 +790,8 @@ def main() -> None:
             allow_cross_species=allow_cross_species,
             allow_variants=allow_variants,
             isoform=isoform,
+            inhibition_mode=inhibition_mode,
+            model_substrate=model_substrate,
         )
         result.search_log = resolution_log + result.search_log
 
@@ -975,6 +1021,11 @@ def main() -> None:
                         # Which isoforms the rows measured, when the one
                         # asked for is not among them.
                         "isoformsAvailable": result.isoforms_available,
+                        # What the rows state, when a Ki was asked for by
+                        # the model's mode and every row states another
+                        # (source "mode_withheld"): the mechanisms whose
+                        # constants exist, so the refusal can name them.
+                        "modesAvailable": result.modes_available,
                         # The same courtesy for the field a student is far
                         # MORE likely to get wrong. An organism has one
                         # binomial name; a metabolite has a dozen aliases,

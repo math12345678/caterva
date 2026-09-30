@@ -450,6 +450,30 @@ states none, the report says it was passed over and why.
 mode it states. The report still flags a mismatch, and says which row the
 default would have used, or that it would have refused the constant.
 
+The API's competitive-inhibition model and the TypeScript CLI's
+`scientific resolve --quantity ki --mode competitive|uncompetitive|noncompetitive`
+choose with the same ranking, one function in `caterva/compose/ki_mode.py`.
+They apply it in the literature layer, before a row is chosen, to every row
+the isoform and variant steps kept, where `caterva compose` applies it to
+the rows the resolver returned, which are the best-evidenced ones. That can
+differ. Trypanosoma cruzi hexokinase has four Ki rows for ADP: 0.13 mM, 1.3
+mM ("at pH 7.5"), 1.5 mM ("competitive to ATP") and 7.0 mM
+("noncompetitive to glucose"). The resolver keeps 1.3 mM alone, the one row
+reporting a pH, so compose's choice for a competitive model has only that
+row, which states no mode; `--mode competitive` returns 1.5 mM. A Ki every
+row of which states another mode is refused there too, with the modes
+named. The API always sends its model's mode. The CLI has no `--any-mode`:
+leaving `--mode` out keeps the resolver's pick, with its stated mode
+printed beside it.
+
+The API sends its model's substrate with the mode; the CLI takes it as
+`--model-substrate`, because `--substrate` names the inhibitor for a Ki.
+Without it a row measured versus the model's substrate and one measured
+versus another molecule rank alike, as they do in `caterva compose` without
+`--substrate`: rabbit hexokinase's two mixed MgADP- rows (BRENDA ref 640206)
+give a noncompetitive model 7.8 mM "versus glucose" with `--model-substrate
+glucose`, and 3.0 mM "versus MgATP2-", the lower, without it.
+
 ### `caterva structure`: which structures exist, and which protein each is
 
 ```bash

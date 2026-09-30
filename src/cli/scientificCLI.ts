@@ -51,6 +51,7 @@ import {
   searchPubMedForEnzymeKinetics,
 } from '../integrations/crossref-pubmed-real';
 import type { Literature } from '../literature/literatureService';
+import { INHIBITION_MODES, type InhibitionMode } from '../literature/literatureResolver';
 
 // ============================================================================
 // CLI COLORS & FORMATTING
@@ -1186,6 +1187,19 @@ ${colors.bright}Commands:${colors.reset}
       --isoform NAME       Use rows that measured this isoform, e.g. LDH-A. A
                            value BRENDA holds only for other isoforms is
                            refused and the isoforms it does hold are named.
+      --mode competitive|uncompetitive|noncompetitive
+                           With --quantity ki: take a row that states this
+                           inhibition mode (a mixed row counts for
+                           noncompetitive), else a row stating none, the
+                           ranking caterva compose uses. A Ki every row of
+                           which states another mode is refused, and the
+                           modes BRENDA does hold are named.
+      --model-substrate NAME
+                           With --mode: your model's substrate (--substrate
+                           is the inhibitor for a Ki). A row measured versus
+                           it is taken before one measured versus another
+                           molecule. Without it, as compose without
+                           --substrate, the two rank alike.
       --enzyme-conc VALUE  [E]0, e.g. 0.001mM. Bridges a kcat to a usable
                            Vmax = kcat x [E]0. Never defaulted (ADR 0013).
       --json               machine-readable output
@@ -1689,6 +1703,51 @@ async function main() {
         process.exit(1);
       }
 
+      // --mode chooses among Ki rows by the mechanism they state. It is
+      // refused, not dropped, for a Km or a kcat: a user who typed it
+      // believes the value was chosen by it, and it was not.
+      const modeRaw = flags['mode'];
+      let inhibitionMode: InhibitionMode | undefined;
+      if (booleans.has('mode')) {
+        // `--mode` with nothing after it, or followed by another flag.
+        // Read as absent, the Ki would be chosen with no mode while the
+        // user believes it was chosen by one.
+        error(`--mode needs a value: ${INHIBITION_MODES.join(', ')}.`);
+        process.exit(1);
+      }
+      if (modeRaw !== undefined) {
+        const lowered = modeRaw.toLowerCase();
+        if (!(INHIBITION_MODES as readonly string[]).includes(lowered)) {
+          error(`--mode must be ${INHIBITION_MODES.join(', ')} (got '${modeRaw}')`);
+          process.exit(1);
+        }
+        if (quantityRaw !== 'ki') {
+          error(
+            `--mode chooses among Ki rows by inhibition mode; it means nothing for a ` +
+            `${quantityRaw}. Use it with --quantity ki.`
+          );
+          process.exit(1);
+        }
+        inhibitionMode = lowered as InhibitionMode;
+      }
+
+      // --model-substrate is the model's substrate, which --substrate cannot
+      // be for a Ki (it names the inhibitor). --mode ranks a row measured
+      // versus it first; without --mode nothing reads it, so it is refused
+      // there rather than accepted to no effect.
+      const modelSubstrate = flags['model-substrate'];
+      if (booleans.has('model-substrate')) {
+        error('--model-substrate needs a value: the substrate of the model the Ki is for, e.g. pyruvate.');
+        process.exit(1);
+      }
+      if (modelSubstrate !== undefined && !inhibitionMode) {
+        error(
+          '--model-substrate says which Ki rows were measured versus your model\'s substrate, ' +
+          'and only --mode ranks by that. Use it with --quantity ki --mode.'
+        );
+        process.exit(1);
+      }
+
       let enzymeConc: number | undefined;
       if (flags['enzyme-conc']) {
         const parsed = parseQuantity('e0', flags['enzyme-conc']);
@@ -1733,6 +1792,8 @@ async function main() {
         json: booleans.has('json'),
         allowCrossSpecies: booleans.has('allow-cross-species'),
         ...(typeof flags['isoform'] === 'string' ? { isoform: flags['isoform'] } : {}),
+        ...(inhibitionMode ? { inhibitionMode } : {}),
+        ...(modelSubstrate ? { modelSubstrate } : {}),
         physiologicalReference: physiological.reference,
       });
       process.exit(code);

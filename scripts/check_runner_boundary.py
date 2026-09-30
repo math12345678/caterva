@@ -132,6 +132,9 @@ EMITTED_AS: dict[str, str | None] = {
     # The isoforms the rows measured, when the one asked for is not among
     # them (source "isoform_withheld").
     "isoforms_available": "isoformsAvailable",
+    # What the rows state, when a Ki was asked for by the model's inhibition
+    # mode and every row states another (source "mode_withheld").
+    "modes_available": "modesAvailable",
     "relatedness": "relatedness",
     "effectors": "effectors",
     "selection_tie": "selectionTie",

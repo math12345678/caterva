@@ -9,7 +9,7 @@ import type {
   PhysiologicalReference,
   ReliabilityScore,
 } from "./reliabilityScore";
-import type { BufferIdentity, Effector } from "./provenance";
+import type { BufferIdentity, Effector, InhibitionMode } from "./provenance";
 
 export interface Citation {
   source: string;
@@ -140,6 +140,11 @@ export interface ScienceAgentResult {
   /** The isoforms BRENDA's rows measured, when the one asked for is not
    * among them. Populated only when `source === "isoform_withheld"`. */
   isoformsAvailable?: string[];
+  /** What BRENDA's Ki rows state ("competitive inhibition versus NADH"), one
+   * clause per distinct statement, when a Ki was asked for by the model's
+   * inhibition mode and every row states another. Populated only when
+   * `source === "mode_withheld"`. */
+  modesAvailable?: string[];
   /** Which protein the winning row measured. Present on FOUND results too:
    * `unstated` is the majority case in BRENDA and it is NOT wild-type, so a
    * reader must be able to tell "the row did not say" from "the row said
@@ -172,6 +177,13 @@ export interface ScienceAgentResult {
     isoform: string | null;
     inhibitionMode: string;
     versus: string | null;
+    /**
+     * The row was "determined from Kitz-Wilson plots" (BRENDA ref 702238):
+     * the K_I of an irreversible inactivation, filed in the Ki table and
+     * stating no mode. Read by caterva.compose.ki_mode, the reading the
+     * resolver ranks Ki rows by; absent from runners older than it.
+     */
+    kitzWilson?: boolean;
   } | null;
   preparation?: {
     status: string;
@@ -434,6 +446,22 @@ export interface EntityExtraction {
   /** The isoform asked for ("LDH-A"); the runner keeps rows measuring it. */
   isoform?: string;
   /**
+   * The inhibition mode of the model a Ki is for. With it the runner takes a
+   * Ki row whose stated mode fits the model, by the ranking `caterva
+   * compose` uses (caterva.compose.ki_mode), and refuses a Ki every row of
+   * which states another mode (source "mode_withheld", `modesAvailable`).
+   * Sent only with `quantity: "ki"`: a mode says nothing about a Km.
+   */
+  inhibitionMode?: InhibitionMode;
+  /**
+   * The substrate of the model the Ki is for. Sent beside `inhibitionMode`
+   * because a Ki lookup's `substrate` is the INHIBITOR (BRENDA files a Ki
+   * under it), and the ranking prefers a row measured versus the model's
+   * substrate: "competitive versus NADH" is not the constant of a model in
+   * which the inhibitor competes with pyruvate.
+   */
+  modelSubstrate?: string;
+  /**
    * The conditions the model is meant to represent (ADR 0024, Decision 3).
    *
    * Forwarded verbatim to the runner, which grades `conditionProximity`
@@ -645,6 +673,11 @@ export async function resolveKineticValue(
     allowCrossSpecies: entities.allowCrossSpecies === true,
     allowVariants: entities.allowVariants === true,
     ...(entities.isoform ? { isoform: entities.isoform } : {}),
+    // Omitted when absent, so a Km or kcat payload is exactly the one sent
+    // before modes existed, which is what scripts/record_http_fixtures.py
+    // lists and replays.
+    ...(entities.inhibitionMode ? { inhibitionMode: entities.inhibitionMode } : {}),
+    ...(entities.modelSubstrate ? { modelSubstrate: entities.modelSubstrate } : {}),
     // Omitted rather than sent as undefined: the runner's
     // _parse_physiological refuses a partial reference, and an explicit
     // `undefined` in the JSON payload is indistinguishable from a partial
