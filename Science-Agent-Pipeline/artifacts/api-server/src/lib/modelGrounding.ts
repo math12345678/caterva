@@ -33,7 +33,7 @@
  */
 import { matchEnzyme } from "./enzymes";
 import type { CitationLocator } from "./citeVerify";
-import { locatableCitation } from "./queryResolver";
+import { locatableCitation, rowScopeFlags } from "./queryResolver";
 import { resolveKineticValue } from "./scienceAgent";
 import { CONCENTRATION_TO_MM } from "./statedQuantities";
 import {
@@ -60,6 +60,11 @@ export interface GroundedParameter {
   quantity: ModelAnnotation["quantity"];
   mode: ModelAnnotation["mode"];
   line: number;
+  /** For a Ki: the inhibitor it was looked up under and the mechanism asked
+   *  for, as the caller declared them, so the report says whose constant it
+   *  is. Absent on a Km or kcat. */
+  inhibitor?: string;
+  inhibitionMode?: ModelAnnotation["inhibitionMode"];
   /** What the caller wrote, in the caller's unit. */
   yourValue?: number;
   yourUnit?: string;
@@ -186,9 +191,36 @@ async function groundOne(
     quantity: annotation.quantity,
     mode: annotation.mode,
     line: annotation.line,
+    ...(annotation.inhibitor !== undefined ? { inhibitor: annotation.inhibitor } : {}),
+    ...(annotation.inhibitionMode !== undefined
+      ? { inhibitionMode: annotation.inhibitionMode }
+      : {}),
     ...(annotation.value !== undefined ? { yourValue: annotation.value } : {}),
     ...(annotation.unit !== undefined ? { yourUnit: annotation.unit } : {}),
   };
+
+  // A Ki is the constant of one inhibitor, and BRENDA files it under that
+  // inhibitor's name. This lookup used to send the annotation's `substrate=`
+  // for a Ki too, which asked for a Ki "of" the substrate: the defect
+  // `caterva compose` and the query path both stopped making on 2026-09-29.
+  // With no inhibitor named, nothing is looked up, as on the query path
+  // ("No Ki was looked up"), and in `resolve` mode the run refuses: a Ki
+  // under the substrate's name is not a fallback, it is another constant.
+  if (annotation.quantity === "ki" && !annotation.inhibitor) {
+    return {
+      ...base,
+      status: "not_found",
+      note:
+        "No Ki was looked up: a Ki belongs to its inhibitor, and BRENDA files it under " +
+        "the inhibitor's name, which this annotation does not give. Add " +
+        'inhibitor="..." (and inhibition="competitive", "noncompetitive" or ' +
+        '"uncompetitive" for the mechanism your rate law is).' +
+        (annotation.substrate
+          ? ` substrate="${annotation.substrate}" on a ki annotation names the model's ` +
+            "substrate, the one the Ki was measured versus; it is not the inhibitor."
+          : ""),
+    };
+  }
 
   const organism =
     annotation.organism ??
@@ -204,25 +236,53 @@ async function groundOne(
     };
   }
 
+  // For a Ki: the inhibitor is the compound looked up under, the mechanism
+  // goes with it when the caller stated one, and the model's substrate goes
+  // with the mechanism -- the same three the query path sends
+  // (queryResolver's applyKineticResolution), for the same reason.
+  const isKi = annotation.quantity === "ki";
+  const compound = isKi ? annotation.inhibitor : annotation.substrate;
   const result = await resolveKineticValue({
     organism,
     quantity: annotation.quantity,
     ...(annotation.enzymeName ? { enzymeName: annotation.enzymeName } : {}),
     ...(annotation.ecNumber ? { ecNumber: annotation.ecNumber } : {}),
-    ...(annotation.substrate ? { substrate: annotation.substrate } : {}),
+    ...(compound ? { substrate: compound } : {}),
+    ...(isKi && annotation.inhibitionMode
+      ? {
+          inhibitionMode: annotation.inhibitionMode,
+          ...(annotation.substrate ? { modelSubstrate: annotation.substrate } : {}),
+        }
+      : {}),
     allowCrossSpecies: options.allowCrossSpecies,
     allowVariants: options.allowVariants,
   });
 
   const value = result[annotation.quantity];
   if (!result.found || typeof value !== "number") {
+    // Rows of other mechanisms are not "no Ki". They exist, each belongs to
+    // a mechanism this rate law is not, and so none was used; the note names
+    // them, in the words the query path's refusal uses.
+    if (result.source === "mode_withheld") {
+      const modes = result.modesAvailable?.length ? result.modesAvailable.join("; ") : "other modes";
+      return {
+        ...base,
+        status: "not_found",
+        note:
+          `inhibition="${annotation.inhibitionMode}" was asked for, and every KI BRENDA holds ` +
+          `for ${annotation.inhibitor} with ${annotation.enzymeName ?? annotation.ecNumber} in ` +
+          `${organism} states another inhibition mode (${modes}). A KI belongs to the ` +
+          "mechanism it was measured under, so none of these is this model's KI, and none " +
+          "was used.",
+      };
+    }
     return {
       ...base,
       status: "not_found",
       note:
         `BRENDA, KEGG and PubMed hold no ${annotation.quantity.toUpperCase()} ` +
         `for ${annotation.enzymeName ?? annotation.ecNumber}` +
-        `${annotation.substrate ? ` with ${annotation.substrate}` : ""} ` +
+        `${compound ? ` with ${isKi ? "inhibitor " : ""}${compound}` : ""} ` +
         `in ${organism}.`,
     };
   }
@@ -251,9 +311,17 @@ async function groundOne(
     citationLocators: located.locators,
     organism: result.organism ?? organism,
     ...(result.crossSpecies === true ? { crossSpecies: true } : {}),
-    note: `${annotation.quantity.toUpperCase()} = ${value} ${
-      LITERATURE_UNIT[annotation.quantity]
-    } (${result.organism ?? organism}), ${located.display}.`,
+    note:
+      `${annotation.quantity.toUpperCase()} = ${value} ${
+        LITERATURE_UNIT[annotation.quantity]
+      } (${result.organism ?? organism}), ${located.display}.` +
+      // What the Ki's own row says it measured -- its mode, and what it was
+      // measured versus -- in the query path's words (rowScopeFlags). With a
+      // mechanism asked for, the lookup falls back to a row stating none when
+      // no row states it, and this is where the caller learns that.
+      (isKi
+        ? rowScopeFlags("ki", result.rowScope).map((flag) => ` ${flag}`).join("")
+        : ""),
   };
 
   const converted = intoCallerUnit(

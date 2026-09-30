@@ -513,32 +513,82 @@ function modeTaking(clause: string): InhibitionMode | null {
 }
 
 /**
+ * How the command that looked a Ki up lets its reader ask for a mode, for
+ * the advice a "mode_withheld" sentence ends with.
+ *
+ * WHY THIS IS A PARAMETER. `scientific resolve` takes the mode as `--mode`,
+ * any of the three. `scientific simulate --resolve` takes it from `--model`:
+ * the Ki is looked up by the mode of the model being run, so the way to
+ * reach a row of another mode is to run a model of that mode, and there is
+ * no uncompetitive model to run. Printing resolve's advice under a simulate
+ * refusal would send the reader to a `--mode` flag that command does not
+ * have. The sentence stays in this one function; only the flag vocabulary
+ * comes from the caller, which is the part that differs.
+ */
+export interface ModeAdvice {
+  /** The flag that chose the mode. */
+  flag: string;
+  /** That flag's value for each mode it can ask for. A mode with no entry
+   *  cannot be asked for through it, and is not offered. */
+  values: Partial<Record<InhibitionMode, string>>;
+  /** The other way forward, ending the sentence ("run without --mode ..."). */
+  otherwise: string;
+  /**
+   * Why no flag value is offered, when none of the modes BRENDA holds can be
+   * asked for through `flag`. Absent: "none states a mechanism a model here
+   * is of", which is true for `resolve` (its --mode takes all three) and for
+   * a command whose flag values cover every mechanism it models.
+   *
+   * A caller that deliberately offers fewer values than it has models needs
+   * its own sentence, or the default is false. `simulate --model product`
+   * offers no other model, because switching a product model to a fixed-[I]
+   * one changes the model rather than using the row; the default would then
+   * tell its reader that no model here is competitive, over a `--model
+   * competitive` that exists.
+   */
+  unreachable?: string;
+}
+
+/** `scientific resolve --quantity ki --mode ...`: every mode, and a lookup
+ *  without one. The default, so resolve's sentence is unchanged. */
+export const RESOLVE_MODE_ADVICE: ModeAdvice = {
+  flag: '--mode',
+  values: { competitive: 'competitive', noncompetitive: 'noncompetitive', uncompetitive: 'uncompetitive' },
+  otherwise: "run without --mode to take the resolver's pick with its stated mode printed beside it",
+};
+
+/**
  * What to tell a reader when rows WERE found and a policy withheld them, or
  * null when nothing was withheld. Each case is reversible, so each names the
- * way to reverse it.
+ * way to reverse it, in the flags of the command that asked (`advice`).
  */
-export function withheldSentence(result: UnresolvedKinetic): string | null {
+export function withheldSentence(
+  result: UnresolvedKinetic,
+  advice: ModeAdvice = RESOLVE_MODE_ADVICE,
+): string | null {
   const list = (xs: string[], fallback: string) => (xs.length ? xs.join(', ') : fallback);
   switch (result.source) {
     case 'mode_withheld': {
       // Constants exist, of other mechanisms. Naming them says the gap is
       // the mechanism, not the literature; each is still not the constant
       // of the one asked for, so none was used. The advice names only a
-      // --mode that would take one of them: a row stating partial
+      // flag value that would take one of them: a row stating partial
       // inhibition fits none of the three, and "run with the --mode of one
-      // of those" would send the reader to a flag that does not exist.
-      const reaching = [...new Set(result.modesAvailable.map(modeTaking))].filter(
-        (m): m is InhibitionMode => m !== null,
-      );
+      // of those" would send the reader to a flag value that does not exist.
+      const reaching = [...new Set(result.modesAvailable.map(modeTaking))]
+        .filter((m): m is InhibitionMode => m !== null)
+        .map((m) => advice.values[m])
+        .filter((v): v is string => v !== undefined);
+      const otherwise = advice.otherwise;
       const how = reaching.length
-        ? `To use one, run with ${reaching.map(m => `--mode ${m}`).join(' or ')}; or run`
-        : 'No --mode takes any of them, since none states a mechanism a model here is of. Run';
+        ? `To use one, run with ${reaching.map(v => `${advice.flag} ${v}`).join(' or ')}; or ${otherwise}.`
+        : `${advice.unreachable ?? `No ${advice.flag} takes any of them, since none states a mechanism a model here is of.`} ` +
+          `${otherwise.charAt(0).toUpperCase()}${otherwise.slice(1)}.`;
       return `Every row BRENDA holds for this Ki states an inhibition mode ` +
         // Joined with "; ", as the runner's log and the API's note join
         // them, so the three read the list alike.
-        `other than the one --mode asked for (${result.modesAvailable.join('; ') || 'unnamed'}). ` +
-        `A Ki belongs to the mechanism it was measured under. ${how} without --mode to take ` +
-        `the resolver's pick with its stated mode printed beside it.`;
+        `other than the one ${advice.flag} asked for (${result.modesAvailable.join('; ') || 'unnamed'}). ` +
+        `A Ki belongs to the mechanism it was measured under. ${how}`;
     }
     case 'isoform_withheld':
       return `BRENDA holds this ${result.quantity} only for other isoforms ` +
@@ -729,6 +779,35 @@ export class ResolverUnavailableError extends Error {
 }
 
 /**
+ * The runner's citation, with its reference id under the key this tree reads.
+ *
+ * THE RUNNER WRITES `referenceId`; EVERY READER HERE READ `reference_id`.
+ * `_citation_to_dict` in science_agent_runner.py emits camelCase, which is
+ * what the API reads (`Citation.referenceId` in scienceAgent.ts).
+ * `ResolvedCitation` was written against the runner's docstring example,
+ * which says `reference_id`, and so were the offline stub's Km and Ki
+ * payloads, so every test here passed while the real runner's identifier
+ * was dropped at this boundary. Live, on 2026-09-30, `simulate --resolve`
+ * printed "BRENDA ref ?" beside the 0.00252 mM Ki the runner cited as
+ * BRENDA ref 739793; `resolve` printed "BRENDA" with no ref at all; and the
+ * exports split "?" out of that string as the reference id
+ * (`splitCitation`).
+ *
+ * Read once, here, rather than at each of the readers: the runner's key
+ * first, then the stub's spelling, so both shapes that reach this function
+ * carry their identifier on. Anything that is not an object is no citation.
+ */
+function citationFromRunner(raw: unknown): ResolvedCitation | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const citation = raw as ResolvedCitation;
+  const camel = (raw as Record<string, unknown>)['referenceId'];
+  if (typeof camel === 'string' && camel) {
+    return { ...citation, reference_id: camel };
+  }
+  return citation;
+}
+
+/**
  * The runner's JSON payload -> a `ResolvedKinetic`.
  *
  * EXTRACTED SO IT CAN BE TESTED.
@@ -760,7 +839,7 @@ export function mapFoundResult(
     unit,
     organism: (parsed['organism'] as string) ?? null,
     source: String(parsed['source'] ?? 'unknown'),
-    citation: (parsed['citation'] as ResolvedCitation) ?? null,
+    citation: citationFromRunner(parsed['citation']),
     taxonId: (parsed['taxonId'] as string | null) ?? null,
     requestedTaxonId: (parsed['requestedTaxonId'] as string | null) ?? null,
     reliability: (parsed['reliability'] as ReliabilityAxes) ?? undefined,

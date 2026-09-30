@@ -189,4 +189,98 @@ describe("parseModelAnnotations", () => {
     expect(annotations.map((a) => a.parameter)).toEqual(["Km", "Ki"]);
     expect(annotations.map((a) => a.quantity)).toEqual(["km", "ki"]);
   });
+
+  describe("a ki declaration names its inhibitor and its mechanism", () => {
+    // BRENDA files a Ki under its inhibitor. The grammar had no way to say
+    // which one, so a ki annotation was looked up under its substrate=.
+
+    it("reads inhibitor= and inhibition= on a ki", () => {
+      const a = only(
+        `// caterva: ki ec="2.7.1.1" organism="Oryctolagus cuniculus" ` +
+          `inhibitor="MgADP-" inhibition="Noncompetitive" substrate="glucose" unit="mM"\n` +
+          `Ki_adp = 7.8;`,
+      );
+      expect(a.quantity).toBe("ki");
+      expect(a.inhibitor).toBe("MgADP-");
+      // Normalised, so the lookup is sent one of the three it knows.
+      expect(a.inhibitionMode).toBe("noncompetitive");
+      // On a ki, substrate= is the model's substrate, kept as written.
+      expect(a.substrate).toBe("glucose");
+    });
+
+    it("carries both in an SBML declaration, as in Antimony", () => {
+      const { annotations, problems } = parse(
+        [
+          "<sbml><model><listOfParameters>",
+          '  <parameter id="Ki_adp" value="7.8" constant="true"/>',
+          "</listOfParameters>",
+          '<!-- caterva: ki parameter="Ki_adp" ec="2.7.1.1" inhibitor="MgADP-" inhibition="noncompetitive" unit="mM" -->',
+          "</model></sbml>",
+        ].join("\n"),
+        "sbml",
+      );
+      expect(problems).toEqual([]);
+      expect(annotations[0]).toMatchObject({ inhibitor: "MgADP-", inhibitionMode: "noncompetitive" });
+    });
+
+    it("refuses inhibitor= on a km, which is filed under its substrate", () => {
+      const { annotations, problems } = parse(
+        `// caterva: km enzyme="hexokinase" substrate="glucose" inhibitor="MgADP-" unit="mM"\nKm_hex = 0.15;`,
+      );
+      expect(annotations).toEqual([]);
+      expect(problems[0]!.message).toMatch(/inhibitor= describes an inhibition constant/);
+    });
+
+    it("refuses inhibition= on a kcat", () => {
+      const { problems } = parse(
+        `// caterva: kcat enzyme="catalase" inhibition="competitive" unit="1/s"\nkcat_cat = 4.1e4;`,
+      );
+      expect(problems[0]!.message).toMatch(/inhibition= describes an inhibition constant/);
+    });
+
+    it("refuses a mechanism it cannot look a Ki up by", () => {
+      const { problems } = parse(
+        `// caterva: ki ec="2.7.1.1" inhibitor="MgADP-" inhibition="mixed" unit="mM"\nKi = 7.8;`,
+      );
+      expect(problems[0]!.message).toMatch(/competitive, noncompetitive, uncompetitive/);
+      expect(problems[0]!.message).toMatch(/mixed-type Ki counts as noncompetitive/);
+    });
+
+    it("refuses the hyphenated spelling, listing the three it takes", () => {
+      // "non-competitive" is how `simulate`'s help spelled it until
+      // 2026-09-30, and `scientific resolve --mode` refuses it the same way.
+      const { annotations, problems } = parse(
+        `// caterva: ki ec="2.7.1.1" inhibitor="MgADP-" inhibition="non-competitive" unit="mM"\nKi = 7.8;`,
+      );
+      expect(annotations).toEqual([]);
+      expect(problems[0]!.message).toMatch(/inhibition="non-competitive" is not a mechanism/);
+      expect(problems[0]!.message).toMatch(/competitive, noncompetitive, uncompetitive/);
+    });
+
+    it("refuses substrate= beside inhibitor= when no mechanism is stated", () => {
+      // Only a stated mechanism ranks Ki rows by what they were measured
+      // versus, so without inhibition= the field would be read by nothing.
+      const { annotations, problems } = parse(
+        `// caterva: ki ec="2.7.1.1" inhibitor="MgADP-" substrate="glucose" unit="mM"\nKi = 7.8;`,
+      );
+      expect(annotations).toEqual([]);
+      expect(problems[0]!.message).toMatch(/substrate="glucose" on a ki names the model's substrate/);
+    });
+
+    it("still parses the older ki shape, substrate= with no inhibitor", () => {
+      // Grounding says why nothing is looked up for it (modelGrounding);
+      // refusing it at parse would turn a working declaration into an error.
+      const a = only(`// caterva: ki enzyme="hexokinase" substrate="glucose" unit="mM"\nKi = 0.02;`);
+      expect(a.substrate).toBe("glucose");
+      expect(a.inhibitor).toBeUndefined();
+    });
+
+    it("points mode= at inhibition=, since mode means check or resolve here", () => {
+      const { problems } = parse(
+        `// caterva: ki ec="2.7.1.1" inhibitor="MgADP-" mode="competitive" unit="mM"\nKi = 7.8;`,
+      );
+      expect(problems[0]!.message).toMatch(/'mode' is not a field/);
+      expect(problems[0]!.message).toMatch(/inhibition="competitive"/);
+    });
+  });
 });

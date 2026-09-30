@@ -289,6 +289,38 @@ def test_the_script_runs_end_to_end():
     assert "@misc{brenda740253," in result["document"]
 
 
+def test_a_ki_entry_names_its_inhibitor_through_the_script():
+    """A Ki's entry says whose constant it is.
+
+    BRENDA files a Ki under its inhibitor, and `scientific simulate
+    --resolve` looks it up under one since 2026-09-30. The entry it exported
+    read "Resolved by Caterva as the KI = 0.0019 mM", naming no compound, so
+    the bibliography recorded an inhibition constant of nothing. The values
+    are gossypol's LDH-A row on BRENDA's human LDH page (ref 711801,
+    Tests/fixtures/ki_mode/brenda_1.1.1.27.html.gz). Through the script, the
+    door the CLI uses, in both formats.
+    """
+    entry = {
+        "parameter": "ki",
+        "citationSource": "BRENDA",
+        "referenceId": "711801",
+        "value": 0.0019,
+        "unit": "mM",
+        "organism": "Homo sapiens",
+        "inhibitor": "gossypol",
+    }
+    bib = _run_the_script({"format": "bibtex", "cited": [entry]})
+    assert bib["ok"] is True
+    assert "Resolved by Caterva as the KI of the inhibitor gossypol = 0.0019 mM" in bib["document"]
+    ris = _run_the_script({"format": "ris", "cited": [entry]})
+    assert "N1  - Resolved by Caterva as the KI of the inhibitor gossypol = 0.0019 mM" in ris["document"]
+    # A Km, which has no inhibitor, reads as it always did.
+    km = dict(entry, parameter="km", inhibitor=None)
+    assert "Resolved by Caterva as the KM = 0.0019 mM" in _run_the_script(
+        {"format": "bibtex", "cited": [km]}
+    )["document"]
+
+
 def test_the_script_survives_many_parameters_from_one_reference():
     """The collision fix through the door a user actually uses.
 

@@ -30,6 +30,11 @@ import { ScientificPipeline } from '../integration/scientificPipeline';
 import {
   ResolverUnavailableError,
   resolveKinetic,
+  rowScopeLines,
+  withheldSentence,
+  type ModeAdvice,
+  type ResolvedKinetic,
+  type UnresolvedKinetic,
 } from '../literature/literatureResolver';
 import { convertConcentration } from '../units';
 import {
@@ -45,6 +50,7 @@ import { commandSensitivity } from './commandSensitivity';
 import { JobManager } from '../execution/job-manager';
 import {
   INHIBITION_MODELS,
+  KI_MODE_OF_MODEL,
   runInhibitionModel,
   suggestModel,
   PRODUCT_INHIBITION_CAVEAT,
@@ -98,6 +104,22 @@ export interface ParameterProvenance {
     buffer?: string;
     unreported?: string[];
   };
+  /**
+   * For a Ki: the inhibitor it was looked up under, and the mode it was asked
+   * for by. BRENDA files a Ki under its inhibitor, so a Ki row that does not
+   * say whose constant it is cannot be checked against anything, and the
+   * table printed its Ki row with no compound on it at all.
+   */
+  inhibitor?: string;
+  askedMode?: string;
+  /**
+   * What the source row says it measured, in the sentences `scientific
+   * resolve` prints (`rowScopeLines`): the isoform, and for a Ki the mode and
+   * what it was measured versus. The mode-aware lookup falls back to a row
+   * stating NO mode when none states the model's, and without this line the
+   * table would present that constant as the model's mechanism.
+   */
+  rowScope?: string[];
 }
 
 /**
@@ -131,6 +153,143 @@ function assayConditionsFor(
   };
   const anything = Object.values(normalised).some((v) => v !== undefined);
   return anything ? normalised : undefined;
+}
+
+/**
+ * How this command asks for a Ki's inhibition mode, for the resolver's
+ * "mode_withheld" sentence (see `ModeAdvice` in literatureResolver.ts), given
+ * the model that was refused.
+ *
+ * The mode comes from `--model`, so the way to a Ki row of another mode is a
+ * model of that mode. Offered: the models named after the mode they ask for
+ * (competitive, noncompetitive), derived from KI_MODE_OF_MODEL rather than
+ * listed a second time. `product` also asks for noncompetitive but is not
+ * offered as the way to a noncompetitive row: it models inhibition by the
+ * reaction's own product, which the inhibitor in hand need not be. No model
+ * here is uncompetitive, so a row stating that mode is named and not
+ * offered, and the other way forward is the reader's own cited constant.
+ *
+ * A REFUSED PRODUCT MODEL IS OFFERED NO OTHER MODEL. The table above, applied
+ * whatever the model, told a `--model product` run whose product's rows all
+ * state competitive inhibition to "run with --model competitive". That is not
+ * a way to use the row in this model; it is a different model, of a fixed
+ * inhibitor concentration (`--i0`) rather than a product that accumulates as
+ * the reaction runs, and its result would answer another question. A reader
+ * who wants that model can choose it; this refusal does not choose it for
+ * them. The sentence says why nothing is offered, since the resolver's
+ * default ("none states a mechanism a model here is of") would be false with
+ * a competitive model one flag away.
+ */
+function simulateModeAdvice(model: InhibitionModel): ModeAdvice {
+  const otherwise =
+    "supply --ki with a constant of this model's mechanism, and --cite ki=\"...\" with its source";
+  if (model === 'product') {
+    return {
+      flag: '--model',
+      values: {},
+      otherwise,
+      unreachable:
+        "This product model's rate law is noncompetitive in form, so none of those rows is its " +
+        'Kp, and no other --model is offered: a competitive or noncompetitive model holds the ' +
+        'inhibitor at a fixed --i0 instead of letting the product accumulate, which is a ' +
+        'different model, not a way to use the row in this one.',
+    };
+  }
+  return {
+    flag: '--model',
+    values: Object.fromEntries(
+      Object.entries(KI_MODE_OF_MODEL)
+        .filter(([name, mode]) => name === mode)
+        .map(([name, mode]) => [mode, name]),
+    ),
+    otherwise,
+  };
+}
+
+/**
+ * The "what to do next" line for a constant whose rows were found and
+ * withheld. The sentence saying which rows, and why, is already in the
+ * refusal list above it (and in the `--json` document's `unresolved`, where a
+ * script reads it); printing it twice would bury the one flag it names.
+ */
+const WITHHELD_WHY =
+  'BRENDA holds rows for this, withheld for the reason given above. Supply ' +
+  'the value yourself only from a source you can cite.';
+
+/**
+ * Why `--export-model` writes no file after an inhibition model has run.
+ *
+ * The model exporter (scripts/export_annotated_model.py, its BUILDERS table)
+ * builds two models: plain Michaelis-Menten and competitive inhibition.
+ * Checked on 2026-09-30 by sending it this command's payloads:
+ *
+ *   - noncompetitive and product run as SBML this command builds itself
+ *     (src/engine/sbml-builder.ts), and the exporter answers "No model
+ *     builder for domain 'sbml'. Known: mm, mm_competitive_inhibition."
+ *     Writing them as plain Michaelis-Menten instead -- what the domain
+ *     choice `options.model === 'competitive' ? ... : 'mm'` would have done,
+ *     had this path ever reached it -- is a file with the inhibitor missing,
+ *     presenting a run nobody made as the one that was.
+ *   - competitive: the exporter's builder takes the inhibitor concentration
+ *     as `i` and this command names it `i0`, so it answers "Cannot build a
+ *     mm_competitive_inhibition model: i was not supplied."
+ *
+ * Renaming parameters across that boundary here would be a second statement
+ * of the builders' signatures, which the exporter deliberately checks
+ * against the real ones; the missing models belong in the exporter. Until
+ * they exist the file is withheld with this reason, and the citations, which
+ * need no model, are written.
+ */
+const INHIBITION_MODEL_NOT_EXPORTED =
+  'No model file is written for an inhibition model yet. The exporter builds ' +
+  'plain Michaelis-Menten and competitive inhibition only: it has no ' +
+  'noncompetitive or product model, and its competitive model names the ' +
+  'inhibitor concentration i where this command has i0. A file written as ' +
+  'plain Michaelis-Menten would be a model without the inhibitor in it.';
+
+/**
+ * Why a lookup came back empty when the reason is not the literature: rows
+ * found and withheld, or an enzyme that was never identified, so nothing was
+ * searched. Null when the literature genuinely yielded nothing, which is the
+ * one case the plain "no Km / no inhibition constant for X" sentence is true
+ * of.
+ *
+ * THE ENZYME CASE. The runner answers "ec_ambiguous" when a name such as
+ * "lactate dehydrogenase" matches more than one enzyme (live, 2026-09-30:
+ * 1.1.98.- and 1.1.1.27), and "ec_not_resolved" when it matches none, with
+ * the sentence saying so in `logs`. This command read neither, and printed
+ * "no inhibition constant for gossypol in the literature for this system"
+ * about human LDH, whose BRENDA page files three gossypol Ki rows (ref
+ * 711801): the search that sentence reports on never ran. The runner's own
+ * sentence is printed instead, and the next step names `--ec`.
+ */
+function notFoundBecause(
+  result: UnresolvedKinetic,
+  advice: ModeAdvice,
+): { sentence: string; why: string } | null {
+  const withheld = withheldSentence(result, advice);
+  if (withheld) return { sentence: withheld, why: WITHHELD_WHY };
+  if (result.source === 'ec_ambiguous' || result.source === 'ec_not_resolved') {
+    return {
+      sentence:
+        result.logs[0] ??
+        'the enzyme was not identified, so no database was searched',
+      why:
+        'Nothing was looked up, because the enzyme was not identified (said above). ' +
+        'Name it by EC number with --ec and the lookup runs.',
+    };
+  }
+  return null;
+}
+
+/**
+ * What a resolved row says it measured, in `resolve`'s sentences, or
+ * undefined when the row says nothing worth a line. Read from the runner's
+ * `rowScope` (parsed in Python by caterva.bind.core), never re-derived.
+ */
+function rowScopeOf(result: ResolvedKinetic): string[] | undefined {
+  const lines = rowScopeLines(result.quantity, result.rowScope);
+  return lines.length > 0 ? lines : undefined;
 }
 
 /**
@@ -246,15 +405,65 @@ function renderNextStep(
   // from `options`, which is what the run actually used -- not from the
   // argv this process was handed, which may have been reordered or come
   // from a script.
+  //
+  // EVERY FLAG THE RUN WAS GIVEN TRAVELS WITH IT, then the blockers' example
+  // values. The command is headed "in full", and a copied command that
+  // dropped one of the reader's flags is a different run presented as the
+  // same one:
+  //
+  //   - `--model`, or the command re-ran plain Michaelis-Menten and the
+  //     `--inhibitor` it asked for was refused as meaningless there;
+  //   - `--ec`, or a run named by EC number came back as
+  //     `--enzyme "<enzyme>"`, a placeholder where a working identifier was;
+  //   - `--allow-cross-species`, or the substitution the reader had opted
+  //     into was silently undone, and the lookup it had rescued refused
+  //     again;
+  //   - the reader's own values (`--km 0.1mM`, `--s0 10mM`, `--cite`,
+  //     `--enzyme-conc`, `--physiological`), or the copied command looked up
+  //     what they had typed, or refused on a condition they had already
+  //     stated.
+  const physiological = options.physiologicalReference;
   const parts = [
     'scientific simulate "michaelis menten" --resolve',
-    `  --enzyme ${JSON.stringify(options.enzyme ?? '<enzyme>')}`,
+    ...(options.enzyme !== undefined || options.ec === undefined
+      ? [`  --enzyme ${JSON.stringify(options.enzyme ?? '<enzyme>')}`]
+      : []),
+    ...(options.ec !== undefined ? [`  --ec ${JSON.stringify(options.ec)}`] : []),
     `  --substrate ${JSON.stringify(options.substrate)}`,
     `  --organism ${JSON.stringify(options.organism)}`,
+    ...(options.model && options.model !== 'mm' ? [`  --model ${options.model}`] : []),
+    ...(options.inhibitor ? [`  --inhibitor ${JSON.stringify(options.inhibitor)}`] : []),
+    ...(options.isoform ? [`  --isoform ${JSON.stringify(options.isoform)}`] : []),
+    ...Object.entries(options.overrides).map(([name, raw]) => `  --${name} ${raw}`),
+    ...(options.enzymeConc !== undefined ? [`  --enzyme-conc ${options.enzymeConc}`] : []),
+    ...[...(options.userCitations ?? new Map<string, string>())].map(
+      ([name, text]) => `  --cite ${name}=${JSON.stringify(text)}`,
+    ),
+    ...(physiological
+      ? [
+          `  --physiological "${physiological.ph},${physiological.temperatureC}"`,
+          `  --physiological-basis ${JSON.stringify(physiological.basis)}`,
+          `  --physiological-tolerance "${physiological.phTolerance},${physiological.temperatureToleranceC}"`,
+        ]
+      : []),
+    ...(options.allowCrossSpecies === true ? ['  --allow-cross-species'] : []),
     ...blockers.map((b) => `  ${b.suggestion ?? `--${b.parameter} <value>`}`),
   ];
+  // A placeholder is not an example value, and the heading must not call it
+  // one. `--inhibitor "<inhibitor>"` copied as printed looks the Ki up under
+  // the literal name "<inhibitor>" and is refused as a miss, which reads as
+  // BRENDA having nothing. No example compound is printed in its place:
+  // an inhibitor of LDH is not an inhibitor of whatever enzyme this run is
+  // about, and a real name here would be a wrong one presented as a
+  // suggestion. So the heading names what has to be replaced.
+  const placeholders = parts.join(' ').match(/<[a-z]+>/g) ?? [];
+  const heading =
+    placeholders.length > 0
+      ? `  In full, with the example values above; replace ${[...new Set(placeholders)].join(' and ')} ` +
+        'with your own before running it:'
+      : '  In full, with the example values above:';
   emit(
-    `\n${c(DIM, '  In full, with the example values above:')}\n\n` +
+    `\n${c(DIM, heading)}\n\n` +
       parts.map((p) => `    ${p}`).join(' \\\n') +
       '\n',
   );
@@ -298,6 +507,43 @@ export interface SimulateResolvedOptions {
     phTolerance: number;
     temperatureToleranceC: number;
   };
+  /**
+   * `--inhibitor NAME`: the compound an inhibition model's Ki is looked up
+   * under. BRENDA files a Ki under its inhibitor; `substrate` is the model's
+   * substrate and is sent beside it as the model's (`modelSubstrate`).
+   *
+   * Required for a Ki lookup and never defaulted to the substrate: that was
+   * the defect. The lookup sent `substrate: options.substrate` with
+   * `quantity: 'ki'`, asking BRENDA for a Ki "of" pyruvate. `caterva compose`
+   * and the API stopped doing so on 2026-09-29; without an inhibitor the run
+   * now refuses and names this flag, as the API reports "No Ki was looked
+   * up" when its query names none. For `--model product` it is the
+   * reaction's product, which is the inhibitor there.
+   */
+  inhibitor?: string;
+  /**
+   * `--isoform NAME`, as on `resolve`: every constant comes from a row that
+   * measured this isoform, and one BRENDA holds only for other isoforms is
+   * refused with those named. Sent with the Km and kcat lookups as well as
+   * the Ki: a model of LDH-A is a model of one protein, so every constant in
+   * it must be that protein's (as `caterva compose --isoform` does).
+   */
+  isoform?: string;
+  /**
+   * `--allow-cross-species`: accept a value measured in a related organism
+   * when the one asked about has none (ADR 0024), for every lookup this
+   * command makes.
+   *
+   * THIS FLAG WAS DOCUMENTED, SUGGESTED, AND IGNORED. `help` listed it for
+   * `simulate --resolve` ("as in `resolve`"), the argv parser swept it out
+   * of the parameter overrides, and every literature refusal this command
+   * prints ended "Or widen the search ... --allow-cross-species". Nothing
+   * passed it on: this options object had no field for it, so each lookup
+   * sent `allowCrossSpecies: false` and a student who took the advice got
+   * the same refusal back with no sign that the flag had done nothing.
+   * `resolve` has passed it since ADR 0024; this is the other front door.
+   */
+  allowCrossSpecies?: boolean;
   /**
    * `--cite km="Smith 2019"` — sources for values the user supplied.
    *
@@ -455,6 +701,14 @@ async function writeExports(
    */
   experiment?: { endTime?: number; points: number },
   /**
+   * Why the model file is not written although the run succeeded, or
+   * undefined when it is written. Set for the inhibition models
+   * (INHIBITION_MODEL_NOT_EXPORTED): the model stays `null`, as on the
+   * refusal path, because withholding it is a decision this command made and
+   * explained, not a write that failed. The citations are written either way.
+   */
+  modelWithheld?: string,
+  /**
    * Reports, per requested file, whether the write actually happened.
    *
    * `null` means "not requested" and is deliberately distinct from
@@ -518,6 +772,11 @@ async function writeExports(
         `${c(DIM, '  An Antimony file with a hole in it is not a model — it would load')}\n` +
         `${c(DIM, '  and fail in whatever opened it, instead of here where the reason is.')}\n` +
         `${c(DIM, '  Supply the missing value and re-run, and the model will be written.')}\n`,
+    );
+  } else if (options.exportModel && modelWithheld) {
+    say(
+      `\n${c(YELLOW, '⚠')} ${c(BOLD, 'Model not written')} ${c(DIM, options.exportModel)}\n` +
+        wrap(modelWithheld, 68).map((line) => `${c(DIM, `  ${line}`)}\n`).join(''),
     );
   } else if (options.exportModel) {
     const provenance: Record<string, ExportProvenance> = {};
@@ -675,6 +934,11 @@ async function writeExports(
         value: row.value,
         unit: row.unit,
         organism: row.organism,
+        // Whose constant a Ki is. A bibliography entry reading "the KI =
+        // 0.0019 mM" with no compound on it records a constant of nothing a
+        // reader can name, and on the refusal path it was the only record
+        // of the Ki the run had found.
+        ...(row.inhibitor ? { inhibitor: row.inhibitor } : {}),
       }));
 
     const outcome = await exportCitations(cited, options.exportCitations);
@@ -779,6 +1043,9 @@ export async function commandSimulateResolved(
 
   // ---- resolve what is missing ----------------------------------------
   const needed: Array<'km' | 'vmax'> = ['km', 'vmax'];
+  // How a "mode_withheld" refusal names the way forward, in this command's
+  // flags and for the model being run (see simulateModeAdvice).
+  const modeAdvice = simulateModeAdvice(options.model ?? 'mm');
 
   for (const name of needed) {
     if (userValues[name]) continue;
@@ -791,15 +1058,22 @@ export async function commandSimulateResolved(
           substrate: options.substrate,
           organism: options.organism,
           quantity: 'km',
+          ...(options.isoform ? { isoform: options.isoform } : {}),
+          allowCrossSpecies: options.allowCrossSpecies === true,
           physiologicalReference: options.physiologicalReference,
         });
         if (!result.found) {
-          unresolved.push('km');
+          // Rows found and withheld (another isoform, now that --isoform
+          // reaches this lookup) are not "returned no Km": that sentence is
+          // false exactly when the reader has a flag that would change it.
+          // Nor is an enzyme that was never identified (notFoundBecause).
+          const because = notFoundBecause(result, modeAdvice);
+          unresolved.push(because ? `km (${because.sentence})` : 'km');
           blockers.push({
             parameter: 'km',
             kind: 'literature',
             suggestion: '--km 10.7mM',
-            why: 'BRENDA and PubMed returned no Km for this system.',
+            why: because ? because.why : 'BRENDA and PubMed returned no Km for this system.',
           });
           continue;
         }
@@ -819,6 +1093,7 @@ export async function commandSimulateResolved(
           reliability: reliabilityGrades(result),
           reliabilityReasons: reliabilityReasons(result),
           assayConditions: assayConditionsFor(result),
+          rowScope: rowScopeOf(result),
         });
       } else {
         // Vmax is not a BRENDA table. It is kcat x [E]0, and [E]0 is a
@@ -848,17 +1123,25 @@ export async function commandSimulateResolved(
           organism: options.organism,
           quantity: 'kcat',
           enzymeConc: enzymeConcMM,
+          ...(options.isoform ? { isoform: options.isoform } : {}),
+          allowCrossSpecies: options.allowCrossSpecies === true,
           physiologicalReference: options.physiologicalReference,
         });
         if (!result.found || result.bridgedVmax === undefined) {
-          unresolved.push('vmax (no kcat found to bridge)');
+          const because = result.found ? null : notFoundBecause(result, modeAdvice);
+          unresolved.push(
+            because
+              ? `vmax (no kcat to bridge: ${because.sentence})`
+              : 'vmax (no kcat found to bridge)',
+          );
           blockers.push({
             parameter: 'vmax',
             kind: 'literature',
             suggestion: '--vmax 1.2mM/s',
-            why:
-              'No kcat was found for this system, so there is nothing to ' +
-              'multiply by [E]0 to obtain Vmax.',
+            why: because
+              ? because.why
+              : 'No kcat was found for this system, so there is nothing to ' +
+                'multiply by [E]0 to obtain Vmax.',
           });
           continue;
         }
@@ -882,6 +1165,7 @@ export async function commandSimulateResolved(
           reliability: reliabilityGrades(result),
           reliabilityReasons: reliabilityReasons(result),
           assayConditions: assayConditionsFor(result),
+          rowScope: rowScopeOf(result),
         });
       }
     } catch (err) {
@@ -910,15 +1194,63 @@ export async function commandSimulateResolved(
   // Ki, for inhibition models. A BRENDA table exactly like Km, resolved by
   // its OWN call so a cross-species Ki can never inherit a verified Km's
   // provenance (ADR 0008).
+  //
+  // UNDER THE INHIBITOR, BY THE MODEL'S MODE. This call sent
+  // `substrate: options.substrate` with `quantity: 'ki'` and nothing else,
+  // so an inhibition model of LDH on pyruvate asked BRENDA for a Ki "of"
+  // pyruvate. BRENDA files a Ki under its inhibitor, so what could come back
+  // was pyruvate's constant AS an inhibitor, or nothing, and never the
+  // constant of the inhibitor being modelled. BRENDA's human LDH page
+  // (Tests/fixtures/ki_mode/brenda_1.1.1.27.html.gz, read with
+  // parse_brenda_ki_html) files no Ki under pyruvate at all, and three under
+  // gossypol: the run said "no inhibition constant in the literature for
+  // this system" about a system that has them. `caterva compose` and the API
+  // stopped asking this way on 2026-09-29.
+  //
+  // Now: the inhibitor is `substrate` (the compound BRENDA files it under),
+  // the model's mode goes with it so the runner takes a row stating that
+  // mechanism (KI_MODE_OF_MODEL, whose docstring says why `product` asks for
+  // noncompetitive), and the model's substrate goes as `modelSubstrate` so a
+  // row measured versus it is preferred to one measured versus another
+  // molecule. BRENDA 739793 is the case: one quinoline sulfonamide, human
+  // LDH, 0.00059 mM "competitive versus NADH" and 0.00252 mM
+  // "noncompetitive versus pyruvate". A noncompetitive model asked with no
+  // mode could carry the first.
+  //
+  // With no inhibitor named, nothing is looked up. The substrate's name is
+  // not a stand-in for it: that was the defect.
   const model: InhibitionModel = options.model ?? 'mm';
-  if (model !== 'mm' && !userValues['ki']) {
+  const inhibitor = options.inhibitor;
+  if (model !== 'mm' && !userValues['ki'] && !inhibitor) {
+    unresolved.push(
+      'ki (not looked up: BRENDA files a Ki under its inhibitor, and no --inhibitor was given)',
+    );
+    blockers.push({
+      parameter: 'inhibitor',
+      // The inhibitor is part of the experiment being modelled, not a
+      // measured quantity the databases failed to yield: which compound is
+      // in the tube is the student's to state, like [S]0.
+      kind: 'condition',
+      suggestion: '--inhibitor "<inhibitor>"',
+      why:
+        'A Ki is the constant of one inhibitor, and BRENDA files it under that ' +
+        "inhibitor's name, not the substrate's. Name the one in your experiment " +
+        (model === 'product' ? "(for --model product, the reaction's own product) " : '') +
+        'and its Ki is looked up; or give --ki yourself.',
+    });
+  } else if (model !== 'mm' && !userValues['ki'] && inhibitor) {
+    const mode = KI_MODE_OF_MODEL[model];
     try {
       const result = await resolveKinetic({
         enzymeName: options.enzyme,
         ecNumber: options.ec,
-        substrate: options.substrate,
+        substrate: inhibitor,
         organism: options.organism,
         quantity: 'ki',
+        inhibitionMode: mode,
+        modelSubstrate: options.substrate,
+        ...(options.isoform ? { isoform: options.isoform } : {}),
+        allowCrossSpecies: options.allowCrossSpecies === true,
       });
       if (result.found) {
         userValues['ki'] = { value: result.value, unit: result.unit };
@@ -934,14 +1266,29 @@ export async function commandSimulateResolved(
           crossSpecies: result.crossSpecies,
           taxonId: result.taxonId ?? undefined,
           requestedTaxonId: result.requestedTaxonId ?? undefined,
+          inhibitor,
+          askedMode: mode,
+          rowScope: rowScopeOf(result),
         });
       } else {
-        unresolved.push('ki (no inhibition constant in the literature for this system)');
+        // "mode_withheld" is not "no Ki": BRENDA holds constants for this
+        // inhibitor, of other mechanisms, and the sentence names them and the
+        // --model that would take one. Said in this command's flags, not
+        // `resolve`'s --mode, which simulate does not have. Nor is an
+        // enzyme name that matched two enzymes, where nothing was searched.
+        const because = notFoundBecause(result, modeAdvice);
+        unresolved.push(
+          because
+            ? `ki (${because.sentence})`
+            : `ki (no inhibition constant for ${inhibitor} in the literature for this system)`,
+        );
         blockers.push({
           parameter: 'ki',
           kind: 'literature',
           suggestion: '--ki 5mM',
-          why: 'No inhibition constant in the literature for this system.',
+          why: because
+            ? because.why
+            : `No inhibition constant for ${inhibitor} in the literature for this system.`,
         });
       }
     } catch (err) {
@@ -953,6 +1300,19 @@ export async function commandSimulateResolved(
       }
       throw err;
     }
+  } else if (model !== 'mm' && userValues['ki'] && inhibitor) {
+    // A Ki the student typed, with the inhibitor it belongs to. Nothing is
+    // looked up (their value wins, as every typed value does), but the name
+    // is not dropped: `--inhibitor` was accepted here and then read by
+    // nothing, so the table's Ki row said whose constant it was only when
+    // the lookup had supplied it, and never for the student's own. Put on
+    // the row it describes, it reaches the table and the `--json`
+    // provenance, and the citation export when `--cite ki="..."` gave the
+    // value a source. No `askedMode`: no mode chose this
+    // value, and saying one did would be a claim about a lookup that did
+    // not happen.
+    const row = provenance.find((r) => r.name === 'ki');
+    if (row) row.inhibitor = inhibitor;
   }
 
   // Requirements differ per model, so check the model's own list.
@@ -1171,15 +1531,40 @@ export async function commandSimulateResolved(
   // Inhibition models run through the engine directly (competitive) or as
   // SBML (non-competitive, product) -- the same solver either way, never a
   // second simulator in TypeScript.
+  //
+  // UNDER --json THIS PATH WROTE PROSE, AND THE EXPORTS WERE NEVER WRITTEN.
+  // It called `printProvenance` (which writes straight to stdout), printed the
+  // result through `say`, and returned 0 before either the JSON document or
+  // `writeExports` below it was reached. So `--json` on a successful
+  // inhibition run printed the human table and no document, and
+  // `--export-model` and `--export-citations` exited 0 having written no file
+  // and said nothing -- ADR 0049's defect and ADR 0077's, both still open on
+  // the one path that runs a model with a Ki in it. Reproduced on 2026-09-30
+  // against the committed rabbit hexokinase page
+  // (Tests/fixtures/recorded/brenda_2.7.1.1.html.gz): `simulate mm --resolve
+  // --model noncompetitive --ec 2.7.1.1 --substrate glucose --organism
+  // "Oryctolagus cuniculus" --inhibitor MgADP- ... --json --export-model
+  // m.xml --export-citations r.bib` exited 0, printed "Parameters and where
+  // they came from ... ki 7.8 mM" as text that no JSON parser reads, and
+  // wrote neither file. The Ki's inhibitor, the mode it was asked for and
+  // what its row measured therefore reached a machine-readable surface only
+  // when the run refused.
+  //
+  // Now the table is prose only for a person; under --json the same rows are
+  // in the one document, beside the result, and the exports are written and
+  // reported either way (see INHIBITION_MODEL_NOT_EXPORTED for the model
+  // file, which is withheld with its reason rather than written wrong).
   if (model !== 'mm') {
-    printProvenance(provenance);
-
-    if (model === 'product') {
-      say(`\n${c(YELLOW, '⚠')} ${PRODUCT_INHIBITION_CAVEAT}\n`);
+    if (!options.json) {
+      printProvenance(provenance);
+      if (model === 'product') {
+        say(`\n${c(YELLOW, '⚠')} ${PRODUCT_INHIBITION_CAVEAT}\n`);
+      }
     }
 
+    let run: Awaited<ReturnType<typeof runInhibitionModel>>;
     try {
-      const run = await runInhibitionModel(model, {
+      run = await runInhibitionModel(model, {
         km: userValues['km']!.value,
         vmax: userValues['vmax']!.value,
         s0: userValues['s0']!.value,
@@ -1188,12 +1573,27 @@ export async function commandSimulateResolved(
         end: 10,
         points: 101,
       });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`${c(RED, '✗')} ${message}\n`);
+      if (options.json) {
+        // The refusal and the validation failure each leave a document; an
+        // engine failure left an empty stdout, which a script cannot tell
+        // from a crash of its own.
+        process.stdout.write(
+          JSON.stringify({ ok: false, status: 'engine_failed', error: message, provenance }, null, 2) +
+            '\n',
+        );
+      }
+      return 2;
+    }
 
-      const series = run.trajectory;
-      const first = series[0] ?? {};
-      const last = series[series.length - 1] ?? {};
-      const substrateKey = Object.keys(first).find((k) => k.includes('S')) ?? '';
+    const series = run.trajectory;
+    const first = series[0] ?? {};
+    const last = series[series.length - 1] ?? {};
+    const substrateKey = Object.keys(first).find((k) => k.includes('S')) ?? '';
 
+    if (!options.json) {
       say(
         `\n${c(BOLD, 'Result')}  ${c(DIM, INHIBITION_MODELS[model].description)}\n`,
       );
@@ -1208,14 +1608,60 @@ export async function commandSimulateResolved(
           `  ${c(DIM, 'final     ')} ${Number(last[substrateKey]).toFixed(4)}\n`,
         );
       }
-      say(`  ${c(DIM, 'points    ')} ${series.length}\n\n`);
-      return 0;
-    } catch (err) {
-      process.stderr.write(
-        `${c(RED, '✗')} ${err instanceof Error ? err.message : String(err)}\n`,
-      );
-      return 2;
+      say(`  ${c(DIM, 'points    ')} ${series.length}\n`);
     }
+
+    // After the result, as on the Michaelis-Menten path: an export that
+    // fails is a separate fact and never changes the exit code of a run
+    // that succeeded.
+    const exportOutcomes = await writeExports(
+      options,
+      INHIBITION_MODELS[model].engineDomain,
+      Object.fromEntries(provenance.map((row) => [row.name, row.value] as const)),
+      provenance,
+      true,
+      undefined,
+      INHIBITION_MODEL_NOT_EXPORTED,
+    );
+    say('\n');
+
+    if (options.json) {
+      process.stdout.write(
+        JSON.stringify(
+          {
+            ok: true,
+            status: 'ran',
+            model,
+            provenance,
+            result: {
+              description: INHIBITION_MODELS[model].description,
+              engine: run.domain,
+              viaSbml: run.viaSbml,
+              // The species the initial and final values are of, read off the
+              // trajectory as the prose above reads it; null when none is.
+              species: substrateKey || null,
+              initial: substrateKey ? Number(first[substrateKey]) : null,
+              final: substrateKey ? Number(last[substrateKey]) : null,
+              points: series.length,
+              trajectory: series,
+            },
+            caveats: model === 'product' ? [PRODUCT_INHIBITION_CAVEAT] : [],
+            exports: {
+              // null, as on the refusal path: no model file is written for
+              // an inhibition model, and naming the requested path here would
+              // imply a file that does not exist.
+              model: null,
+              citations: options.exportCitations ?? null,
+              written: exportOutcomes,
+              modelWithheld: options.exportModel ? INHIBITION_MODEL_NOT_EXPORTED : null,
+            },
+          },
+          null,
+          2,
+        ) + '\n',
+      );
+    }
+    return 0;
   }
 
   // Sensitivity runs on the SAME resolved parameters, with the SAME
@@ -1465,6 +1911,25 @@ function printProvenance(rows: ParameterProvenance[]): void {
       process.stdout.write(
         `  ${' '.repeat(nameWidth)}  ${c(YELLOW, `⚠ unit not given; ${row.unit} assumed`)}\n`,
       );
+    }
+    // Whose constant a Ki is, and the mode it was asked for by. Then what
+    // its row says it measured: when no row states the model's mode the
+    // lookup falls back to one stating none, and this is the only place the
+    // reader learns that the mechanism of the number is unknown.
+    if (row.inhibitor) {
+      // The name on a line of its own and never wrapped: a chemical name
+      // broken at a hyphen or a space reads as two compounds.
+      process.stdout.write(`  ${' '.repeat(nameWidth)}  ${c(DIM, `Ki of ${row.inhibitor}`)}\n`);
+      if (row.askedMode) {
+        process.stdout.write(
+          `  ${' '.repeat(nameWidth)}  ${c(DIM, `asked for by this model's mode: ${row.askedMode}`)}\n`,
+        );
+      }
+    }
+    for (const sentence of row.rowScope ?? []) {
+      for (const line of wrap(sentence, 66)) {
+        process.stdout.write(`  ${' '.repeat(nameWidth)}  ${c(YELLOW, line)}\n`);
+      }
     }
     // The axes were computed, carried, and written into the exported model
     // file -- and never shown to the person at the terminal, who is the

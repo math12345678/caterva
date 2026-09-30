@@ -1241,9 +1241,23 @@ ${colors.bright}Commands:${colors.reset}
                            you choose, so it cannot be looked up
       --enzyme-conc VALUE  [E]0, needed for Vmax = kcat x [E]0
       --km / --vmax        supply either yourself; user values win
-      --model NAME         michaelis-menten (default) or a competitive /
-                           uncompetitive / non-competitive inhibition model,
-                           which additionally resolves a Ki
+      --model NAME         mm (Michaelis-Menten, the default), or competitive,
+                           noncompetitive or product inhibition, which also
+                           resolve a Ki. There is no uncompetitive model here
+      --inhibitor NAME     with an inhibition model, the inhibitor whose Ki it
+                           uses (for product, the reaction's own product).
+                           BRENDA files a Ki under its inhibitor, so it is
+                           looked up under this name, never the substrate's,
+                           and by the model's mode: competitive, or
+                           noncompetitive for noncompetitive and product
+                           (whose rate law here is noncompetitive in form).
+                           --substrate goes with it as the model's substrate,
+                           so a row measured versus it comes first. With
+                           --ki, nothing is looked up and it names whose
+                           constant your Ki is. With neither, the run refuses
+      --isoform NAME       as in \`resolve\`, for every constant looked up: each
+                           must come from a row that measured this isoform,
+                           and one BRENDA holds only for others is refused
       --sensitivity FRAC   report each parameter's influence at ±FRAC instead
                            of running a single trajectory, e.g. 0.1 for ±10%
       --allow-cross-species
@@ -1475,6 +1489,7 @@ async function main() {
           if (['substrate', 'organism', 'enzyme', 'ec', 'enzyme-conc', 'sensitivity', 'model',
              'allow-cross-species', 'export-model', 'export-citations', 'cite',
              'physiological', 'physiological-basis', 'physiological-tolerance',
+             'inhibitor', 'isoform',
             ].includes(k)) continue;
           overrides[k] = v;
         }
@@ -1493,9 +1508,51 @@ async function main() {
           sensitivity = parsed;
         }
 
+        // Read the same way `resolve` reads it, and refused the same way when
+        // it swallowed the next token: `--allow-cross-species pyruvate` is the
+        // flag taking a value, and the opt-in silently not happening is the
+        // one outcome worse than an error here. See `resolve` below.
+        if (flags['allow-cross-species'] !== undefined) {
+          error(
+            `--allow-cross-species takes no value (got '${flags['allow-cross-species']}'). ` +
+            'It was probably written before a positional argument. Move it to the ' +
+            'end, or after another flag, so it is not read as taking one.'
+          );
+          process.exit(1);
+        }
+
         const modelRaw = (flags['model'] ?? 'mm').toLowerCase();
         if (!['mm', 'competitive', 'noncompetitive', 'product'].includes(modelRaw)) {
           error(`--model must be mm, competitive, noncompetitive or product (got '${modelRaw}')`);
+          process.exit(1);
+        }
+
+        // --inhibitor names the compound an inhibition model's Ki is looked
+        // up under, because BRENDA files a Ki under its inhibitor; beside a
+        // --ki of the user's own it names whose constant that is, on the Ki's
+        // row and in the --json provenance (and in its exported citation,
+        // when --cite ki="..." gives one). It is refused,
+        // not dropped, where nothing reads it: with --model mm there is no
+        // Ki, and a user who typed it would believe the run modelled that
+        // inhibitor. With no value it is refused rather than read as absent,
+        // which would send the run to the "no --inhibitor" refusal while the
+        // user believes they gave one.
+        const inhibitor = flags['inhibitor'];
+        if (booleans.has('inhibitor')) {
+          error('--inhibitor needs a value: the compound whose Ki the model uses, e.g. --inhibitor gossypol.');
+          process.exit(1);
+        }
+        if (inhibitor !== undefined && modelRaw === 'mm') {
+          error(
+            '--inhibitor names the compound an inhibition model\'s Ki is looked up under; ' +
+            'plain Michaelis-Menten has no Ki. Add --model competitive, noncompetitive or product.'
+          );
+          process.exit(1);
+        }
+        // --isoform, as on `resolve`, for every constant the run looks up.
+        const isoform = flags['isoform'];
+        if (booleans.has('isoform')) {
+          error('--isoform needs a value: the isoform every constant must have measured, e.g. --isoform LDH-A.');
           process.exit(1);
         }
 
@@ -1540,6 +1597,9 @@ async function main() {
           exportCitations: flags['export-citations'],
           userCitations: citationResult.citations,
           physiologicalReference: simPhysiological.reference,
+          allowCrossSpecies: booleans.has('allow-cross-species'),
+          ...(inhibitor !== undefined ? { inhibitor } : {}),
+          ...(isoform !== undefined ? { isoform } : {}),
         });
         process.exit(code);
       }

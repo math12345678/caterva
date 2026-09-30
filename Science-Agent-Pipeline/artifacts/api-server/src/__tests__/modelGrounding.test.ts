@@ -330,4 +330,143 @@ describe("grounding a caller's own model", () => {
     expect(report.groundedSource).toContain('<parameter id="Km_hex_long" value="777"');
     expect(report.groundedSource).toContain('<parameter id="Km_hex" value="0.12"');
   });
+
+  describe("a Ki is looked up under its inhibitor, by the stated mechanism", () => {
+    // What the runner answers on the recorded rabbit hexokinase page
+    // (Tests/fixtures/recorded/brenda_2.7.1.1.html.gz, CATERVA_BRENDA_RECORDED
+    // and CATERVA_HTTP_RECORDED as vitest.config.ts sets them), run
+    // 2026-09-30 for MgADP- with modelSubstrate "glucose": both Ki rows (ref
+    // 640206) state mixed inhibition, so a noncompetitive rate law takes the
+    // one measured versus glucose and a competitive one is refused.
+    const MGADP_NONCOMPETITIVE = {
+      found: true,
+      ki: 7.8,
+      unit: "mM",
+      organism: "Oryctolagus cuniculus",
+      source: "brenda_exact",
+      crossSpecies: false,
+      citation: {
+        source: "BRENDA",
+        referenceId: "640206",
+        url: "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+      },
+      rowScope: { isoform: null, inhibitionMode: "mixed", versus: "glucose", kitzWilson: false },
+      literatureCandidates: [],
+      logs: [],
+    };
+    const MGADP_COMPETITIVE = {
+      found: false,
+      source: "mode_withheld",
+      modesAvailable: ["mixed inhibition versus MgATP2-", "mixed inhibition versus glucose"],
+      literatureCandidates: [],
+      logs: [],
+    };
+    const kiModel = (annotation: string, assignment: string) =>
+      [
+        "model hexokinase_adp",
+        "  S -> P; Vmax * S / (Km + S) / (1 + I / Ki_adp);",
+        `  ${annotation}`,
+        `  ${assignment}`,
+        "  Km = 0.1; Vmax = 0.5; S = 10; I = 1;",
+        "end",
+      ].join("\n");
+    const IDENTITY = 'ec="2.7.1.1" organism="Oryctolagus cuniculus" unit="mM"';
+
+    it("looks nothing up without an inhibitor, and resolve then refuses", async () => {
+      vi.mocked(resolveKineticValue).mockClear();
+      const report = await groundAnnotatedModel(
+        kiModel(`// caterva: ki ${IDENTITY} substrate="glucose" resolve`, "Ki_adp = ?;"),
+      );
+      // The defect was this lookup, under substrate "glucose".
+      expect(resolveKineticValue).not.toHaveBeenCalled();
+      const entry = report.entries[0]!;
+      expect(entry.status).toBe("not_found");
+      expect(entry.note).toMatch(/^No Ki was looked up: a Ki belongs to its inhibitor/);
+      expect(entry.note).toContain('substrate="glucose" on a ki annotation names the model\'s substrate');
+      expect(report.blocking).toHaveLength(1);
+      expect(report.groundedSource).toBeUndefined();
+    });
+
+    it("sends the inhibitor as the compound, with the mechanism and the model substrate", async () => {
+      vi.mocked(resolveKineticValue).mockResolvedValue(MGADP_NONCOMPETITIVE as never);
+      const report = await groundAnnotatedModel(
+        kiModel(
+          `// caterva: ki ${IDENTITY} inhibitor="MgADP-" inhibition="noncompetitive" substrate="glucose" resolve`,
+          "Ki_adp = ?;",
+        ),
+      );
+
+      expect(vi.mocked(resolveKineticValue).mock.calls[0]![0]).toMatchObject({
+        quantity: "ki",
+        ecNumber: "2.7.1.1",
+        organism: "Oryctolagus cuniculus",
+        substrate: "MgADP-",
+        inhibitionMode: "noncompetitive",
+        modelSubstrate: "glucose",
+      });
+      expect(report.blocking).toEqual([]);
+      expect(report.groundedSource).toContain("Ki_adp = 7.8;");
+      const entry = report.entries[0]!;
+      expect(entry).toMatchObject({ inhibitor: "MgADP-", inhibitionMode: "noncompetitive" });
+      // The row's own mode reaches the note, in the query path's words.
+      expect(entry.note).toContain("BRENDA (ref 640206)");
+      expect(entry.note).toContain(
+        "KI: the source row measured mixed inhibition versus glucose; a Ki is specific to that mode and assay.",
+      );
+    });
+
+    it("sends no mechanism when none was stated", async () => {
+      vi.mocked(resolveKineticValue).mockClear();
+      vi.mocked(resolveKineticValue).mockResolvedValue(MGADP_NONCOMPETITIVE as never);
+      await groundAnnotatedModel(
+        kiModel(`// caterva: ki ${IDENTITY} inhibitor="MgADP-"`, "Ki_adp = 7.8;"),
+      );
+      const sent = vi.mocked(resolveKineticValue).mock.calls[0]![0];
+      expect(sent.substrate).toBe("MgADP-");
+      expect(sent).not.toHaveProperty("inhibitionMode");
+      expect(sent).not.toHaveProperty("modelSubstrate");
+    });
+
+    it("refuses substrate= beside an inhibitor with no mechanism, and looks nothing up", async () => {
+      // substrate= on a ki is the model's substrate, which only a stated
+      // mechanism ranks rows by. This annotation used to be accepted and its
+      // substrate= sent nowhere, pinned by the test above in its old form.
+      vi.mocked(resolveKineticValue).mockClear();
+      const report = await groundAnnotatedModel(
+        kiModel(`// caterva: ki ${IDENTITY} inhibitor="MgADP-" substrate="glucose"`, "Ki_adp = 7.8;"),
+      );
+      expect(resolveKineticValue).not.toHaveBeenCalled();
+      expect(report.entries).toEqual([]);
+      expect(report.problems[0]!.message).toMatch(/substrate="glucose" on a ki names the model's substrate/);
+      expect(report.problems[0]!.message).toMatch(/Add inhibition="competitive"/);
+    });
+
+    it("refuses a Ki of another mechanism, naming what BRENDA holds", async () => {
+      vi.mocked(resolveKineticValue).mockResolvedValue(MGADP_COMPETITIVE as never);
+      const report = await groundAnnotatedModel(
+        kiModel(
+          `// caterva: ki ${IDENTITY} inhibitor="MgADP-" inhibition="competitive" substrate="glucose" resolve`,
+          "Ki_adp = ?;",
+        ),
+      );
+      expect(report.groundedSource).toBeUndefined();
+      expect(report.blocking).toHaveLength(1);
+      expect(report.blocking[0]).toContain(
+        "(mixed inhibition versus MgATP2-; mixed inhibition versus glucose)",
+      );
+      expect(report.blocking[0]).toContain("none was used");
+      // Not the literature-has-nothing sentence: constants exist.
+      expect(report.blocking[0]).not.toMatch(/hold no KI/);
+    });
+
+    it("leaves a Km's lookup as it was: under its substrate, with no mode", async () => {
+      vi.mocked(resolveKineticValue).mockResolvedValue(CITED as never);
+      await groundAnnotatedModel(
+        model('// caterva: km enzyme="hexokinase" substrate="glucose" unit="mM"', "Km_hex = 0.15;"),
+      );
+      const sent = vi.mocked(resolveKineticValue).mock.calls[0]![0];
+      expect(sent.substrate).toBe("glucose");
+      expect(sent).not.toHaveProperty("inhibitionMode");
+    });
+  });
 });

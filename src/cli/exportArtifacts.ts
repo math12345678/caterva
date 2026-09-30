@@ -310,6 +310,13 @@ export interface CitedValue {
   value?: number;
   unit?: string;
   organism?: string;
+  /**
+   * For a Ki: the inhibitor it is the constant of. BRENDA files a Ki under
+   * its inhibitor, and an entry without it records an inhibition constant of
+   * no named compound. Written into the entry's note by
+   * Tests/citation_export.py (`_note_for`).
+   */
+  inhibitor?: string;
 }
 
 /**

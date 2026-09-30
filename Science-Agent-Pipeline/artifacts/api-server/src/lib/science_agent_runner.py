@@ -50,12 +50,16 @@ Output JSON shape (success, quantity="km"):
       "unit": "mM",
       "organism": "Homo sapiens",
       "source": "brenda_exact",
-      "citation": { "source": "BRENDA", "reference_id": "...", "url": "..." },
+      "citation": { "source": "BRENDA", "referenceId": "...", "url": "..." },
       "literatureCandidates": [],
       "logs": []
     }
 
 With quantity="ki" the value is emitted under "ki" instead of "km".
+
+The citation's keys are camelCase, as `_citation_to_dict` writes them. This
+example said "reference_id" until 2026-09-30, and the TypeScript CLI, written
+against it, dropped every reference id the runner sent.
 
 Output JSON shape (not found):
     {
