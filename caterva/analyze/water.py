@@ -16,6 +16,14 @@ the starting structure (em.gro, the minimised, solvated system: the
 crystal's own waters are not in it, because run.sh drops every HETATM
 record before pdb2gmx, and gmx solvate fills the box afresh).
 
+A residue with no functional atoms defined (glycine, which where it is
+catalytic acts through its backbone amide, as in chymotrypsin's oxyanion
+hole) or missing them stands in with its CA, as it does for the distances. Water within WATER_NM of a CA
+says how exposed the backbone is there, not how hydrated a catalytic group
+is: on lysozyme's em.gro the twelve glycine CAs have 0 to 3. The count is
+still taken, on both routes, but the report marks the row as a stand-in
+and gives it no verdict (STAND_IN).
+
 Water is recognised as `caterva md` writes it: residue SOL, oxygen OW
 (pdb2gmx -water tip3p, then gmx solvate; checked in the em.gro of a real
 lysozyme run). Ions (NA, CL) are not water and are not counted.
@@ -23,10 +31,15 @@ lysozyme run). Ions (NA, CL) are not water and are not counted.
 Checked against `gmx select -select 'resname SOL and name OW and within
 0.35 of (resnr N and name ...)' -os`, frame by frame, on a real lysozyme
 trajectory with its active-site water (fixtures/md/README.md): every count
-equal, for six catalytic residues over 21 frames.
+equal, for six catalytic residues over 21 frames. The count is checked
+twice: on the frames as the run stored them, where no water-site pair
+happens to cross the periodic box, and on the same frames translated so
+that the active site straddles it, where a count without nearest images
+is wrong in 103 of the 126 residue-frames.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import List, Sequence, Tuple
 
@@ -36,11 +49,22 @@ import numpy as np
 #: A choice with two reasons behind it. It is gmx hbond's donor-acceptor
 #: limit (the one caterva/analyze/hbonds.py uses), so a counted water is one
 #: close enough to hydrogen-bond to the group. And it is where the first
-#: hydration shell ends: on replica 1 of a 10 ps lysozyme run (TIP3P, `gmx
-#: rdf` of OW about OW, 0.002 nm bins, 2026-09-29) the water O-O g(r) peaks
-#: at 0.278 nm (2.83), and from 0.34 nm out to 1.0 nm it stays between 0.985
-#: and 1.077. TIP3P has almost no structure beyond that first shell, so
-#: there is no sharper minimum to take instead.
+#: hydration shell ends. All of the following is `gmx rdf` on replica 1 of a
+#: 10 ps lysozyme run (TIP3P, 21 frames, GROMACS 2026.1, 2026-09-29):
+#: - Bulk water, OW about OW (0.002 nm bins): g(r) peaks at 0.278 nm (2.83)
+#:   and has its first minimum at 0.354 nm (0.985), a shallow one; from
+#:   0.34 nm out to 1.0 nm it stays between 0.985 and 1.077.
+#: - Water about the atoms this module counts at, which is what the cutoff
+#:   is for (0.01 nm bins, because only 18 carboxylate and 20 hydroxyl
+#:   oxygens feed each curve): about the Asp and Glu carboxylate oxygens it
+#:   peaks at 0.27 nm (1.81) and is lowest at 0.32 nm (0.20), still low (0.24
+#:   to 0.30) at 0.35-0.37 nm; about the Ser, Thr and Tyr hydroxyl oxygens it
+#:   peaks at 0.28 nm (0.91) and is lowest at 0.32 nm (0.25).
+#: - About the 34 Asn and Gln amide atoms the curve peaks at 0.29 nm (0.89)
+#:   but is too noisy on 21 frames to place a minimum.
+#: So 0.35 nm takes the first shell and stops short of the second for the
+#: carboxylates and hydroxyls. Those protein curves are normalised by the
+#: whole box, so they sit below 1 at long range, and they are one short run.
 WATER_NM = 0.35
 
 #: How `caterva md` names water: pdb2gmx and gmx solvate write SOL, OW.
@@ -104,8 +128,18 @@ def summarise_counts(name: str, series: Sequence[int]) -> Tuple[str, float, floa
 WET, DRY, SPLIT = 0.8, 0.2, 0.5
 
 
+#: The verdict cell of a residue that stands in with its CA (see the module
+#: docstring): its count is backbone exposure, so it is not named.
+STAND_IN = "Cα stand-in, no verdict"
+
+
 def hydration_verdict(h: Hydration) -> str:
     fr = h.fractions
+    # A replica with no frames has no fraction (summarise_counts gives NaN).
+    # Every comparison with NaN is False, so without this it would fall
+    # through all the tests below and be called intermittent.
+    if any(math.isnan(f) for f in fr):
+        return "no frames"
     if len(fr) < 2:
         return "one replica"
     if max(fr) - min(fr) > SPLIT:
@@ -118,4 +152,4 @@ def hydration_verdict(h: Hydration) -> str:
 
 
 __all__ = ["WATER_NM", "WATER_RESNAME", "WATER_OXYGEN", "Hydration", "water_oxygens", "count_frame",
-           "counts", "selection", "summarise_counts", "hydration_verdict", "WET", "DRY", "SPLIT"]
+           "counts", "selection", "summarise_counts", "hydration_verdict", "WET", "DRY", "SPLIT", "STAND_IN"]

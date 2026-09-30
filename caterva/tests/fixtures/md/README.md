@@ -63,3 +63,37 @@ on `lyso_1aki_res1-59_water.xtc` (and on the .gro for the count at the
 start). The same selections on the full 23,873-atom trajectory and em.gro
 printed the same counts in every frame, which is what shows the cut kept
 every water that matters.
+
+`lyso_1aki_res1-59_water_wrapped.xtc` and
+`lyso_1aki_res1-59_water_wrapped.gro.gz`: the atoms and frames of
+`lyso_1aki_res1-59_water.*` (1,716 atoms, 21 frames), moved so that the
+active site straddles the periodic box. Neither fixture above does: on them every catalytic group is whole and no arm or
+water-site pair crosses the box, so the angles and water counts come out
+the same with the periodic handling taken out, and a broken
+`nearest_image` or `make_whole` would pass. Made on the full 23,873-atom
+replica 1 and em.gro with `gmx trjconv -trans -4.304 -5.831 -1.931 -pbc
+atom -ur tric` (the translation puts the centroid of the six catalytic
+groups at the corner of the triclinic cell; each atom is then put in the
+cell), then cut to the fixture's atoms with `gmx trjconv -n` (GROMACS
+2026.1, 2026-09-29; 140,472 and 22,607 bytes). The cut is exact: its
+coordinates equal the wrapped full system's for those atoms in every
+frame. In it Glu35, Asn46 and Asp48 have their two atoms on opposite sides
+of the cell in all 21 frames, Asp52 in 20 and Asn59 in 16; 16 of the 18
+arms of the 24 angles cross the box in at least one frame. Taken without
+periodic handling, 494 of the 504 angle-frames are more than 1 degree off
+(the worst 143.7 degrees), and 103 of the 126 residue-frame water counts
+are wrong.
+
+`lyso_1aki_rep1_gmx_angles_wrapped.txt`: in the format of
+`lyso_1aki_rep1_gmx_angles.txt`, the `-oav` output of the same `gmx gangle`
+command on the wrapped full trajectory with rep1/md.tpr, which lets gangle
+make the molecules whole (`-rmpbc`). It differs from the unwrapped file by
+up to 0.164 degrees because putting atoms back in a box that changes size
+every frame (NPT) re-rounds them to the .xtc's 0.001 nm. Without the tpr,
+`gmx gangle -s` on the wrapped .gro cannot make the split groups whole,
+and its angles are off by up to 124.7 degrees (the error Caterva makes if
+it takes nearest-image arms from centres of groups not made whole first),
+so the reference had to come from the full system. `gmx select` with the
+water selections on the wrapped full trajectory and wrapped em.gro printed
+exactly `lyso_1aki_rep1_gmx_water.txt` again (compared with diff), so that
+file is the water reference for the wrapped fixture too.

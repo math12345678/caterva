@@ -1,12 +1,24 @@
 """Angles between catalytic groups: a-v-b at a vertex group v, frame by frame.
 
-A distance between two catalytic groups says how far apart they are, not
-from which side one meets the other. When two groups both act on a third
-(the histidine of a Ser-His-Asp triad takes the serine's proton on one side
-and is held by the aspartate on the other), the chemistry needs them on
-particular sides of it, and both distances to the vertex can hold while one
-group swings around it to the other face. The angle a-v-b at the vertex sees that; the distances in
-the report cannot.
+What an angle adds, stated exactly, because an earlier version of this
+docstring (and of the report) claimed more. The report measures the
+distance between every pair of catalytic groups, so for every angle here
+the three sides of the triangle, v-a, v-b and a-b, are already in the
+distance table, between the same centres and through the same nearest
+images. The angle follows from them by the law of cosines in every frame:
+on the 24 angles of 21 lysozyme frames the two agree to 6e-14 degrees as
+the run stored the frames and to 3e-13 with the active site across the
+periodic box, and a test holds them to 1e-9. So an angle is not new
+information about where the groups are. It is the same triangle stated as
+its shape at one group, with a threshold and a replica verdict of its own;
+and its per-replica mean, which the means of the three distances do not
+give, because the angle is not linear in them.
+
+Nor can an angle tell which side of the vertex a partner is on. It lies in
+[0, 180] and does not change when a turns about the line through v and b,
+so a partner can swing round to the vertex's other face at fixed arms and
+a fixed angle. Telling the faces apart needs a fourth point (a signed
+dihedral); that is not measured, and the report says so.
 
 Each group is reduced to its functional-group centre of geometry, the same
 centre the pair distances use (caterva/analyze/plan.py), and the angle is
@@ -15,8 +27,12 @@ periodic image. The angle is atan2(|u x w|, u . w), which stays exact near 0
 and 180 degrees where arccos of the dot product loses precision; GROMACS's
 own gmx_angle() (gromacs/utility/vec.h in the 2026.1 headers) is the same
 formula, and its comment gives the same reason. Checked against `gmx gangle
--g1 angle` on 24 angles between six catalytic groups of hen lysozyme over
-21 frames, to the 0.001 degree that tool prints.
+-g1 angle` over 21 frames of hen lysozyme, to the 0.001 degree that tool
+prints, on 24 angles among five of its six catalytic groups (Glu35 has no
+partner within CONTACT_NM, so it is in none): once on the frames as the
+run stored them, where no group happens to straddle the periodic box, and
+once on the same frames translated so that four of those five groups are
+split across it and 16 of the 18 arms cross it (fixtures/md/README.md).
 
 Which triples: only those whose two arms are both in contact in the
 starting structure (CONTACT_NM, in caterva/analyze/plan.py). An angle

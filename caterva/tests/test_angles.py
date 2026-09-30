@@ -4,7 +4,11 @@ The anchor is real: `gmx gangle -g1 angle -group1 'cog of (A) plus cog of
 (V) plus cog of (B)'` (GROMACS 2026.1) on the 24 angles lysozyme's six
 catalytic groups make under the contact cutoff, all 21 frames of a `caterva
 md` replica (fixtures/md/lyso_1aki_rep1_gmx_angles.txt, made on
-lyso_1aki_res1-59.xtc with lyso_1aki_res1-59.gro.gz as the structure). The
+lyso_1aki_res1-59.xtc with lyso_1aki_res1-59.gro.gz as the structure). No
+group straddles the periodic box in those frames, so the same comparison
+is made again on them translated so that the active site does
+(lyso_1aki_rep1_gmx_angles_wrapped.txt, gangle with the run's md.tpr); that
+is what checks make_whole and the nearest-image arms on real frames. The
 rest is constructed geometry whose answer can be worked by hand.
 """
 from __future__ import annotations
@@ -57,6 +61,74 @@ def test_every_angle_equals_gmx_gangle_on_every_frame(lysozyme):
         worst = max(abs(g - e) for g, e in zip(got, expected))
         # gmx prints three decimals; 0.001 is one unit of the last digit.
         assert worst < 0.001, f"{a}-{v}-{b}: {worst:.4f} degrees from gmx gangle"
+
+
+def _wrapped():
+    """The water fixture's atoms and frames translated so that the active
+    site straddles the periodic box (fixtures/md/README.md), its structure,
+    and what gmx gangle printed for it with the full system's md.tpr."""
+    import tempfile
+    gro = Path(tempfile.mkdtemp()) / "wrapped.gro"
+    gro.write_bytes(gzip.decompress((MD / "lyso_1aki_res1-59_water_wrapped.gro.gz").read_bytes()))
+    reference = {}
+    for line in (MD / "lyso_1aki_rep1_gmx_angles_wrapped.txt").read_text().splitlines():
+        parts = line.split()
+        reference[tuple(int(v) for v in parts[:3])] = [float(v) for v in parts[3:]]
+    return _gro_index(gro), xtc.read(MD / "lyso_1aki_res1-59_water_wrapped.xtc"), reference
+
+
+@pytest.fixture(scope="module")
+def wrapped():
+    return _wrapped()
+
+
+def test_every_angle_equals_gmx_gangle_across_the_periodic_boundary(wrapped):
+    """The fixture above never crosses the box, so it would pass with the
+    periodic handling broken. Here four of the five groups in angles are
+    split across it and most arms cross it, and every angle still equals
+    gmx gangle's; the same angles taken without periodic handling are far
+    off, which is what makes this a test of that handling."""
+    index, traj, reference = wrapped
+    assert len(reference) == 24 and all(len(v) == 21 for v in reference.values())
+    g = {r: [index[(r, n)] for n in LYSOZYME[r]] for r in LYSOZYME}
+    # Asn46 and Asp48 have their two atoms on opposite sides of the cell in every frame.
+    for r in (46, 48):
+        assert all(np.ptp(f.x[g[r]], 0).max() > f.box[2, 2] / 2 for f in traj)
+    off = 0
+    for (a, v, b), expected in reference.items():
+        got = angle_series(traj, g[a], g[v], g[b])
+        worst = max(abs(x - e) for x, e in zip(got, expected))
+        assert worst < 0.001, f"{a}-{v}-{b}: {worst:.4f} degrees from gmx gangle"
+        off += sum(1 for f, e in zip(traj, expected)
+                   if abs(angle_deg(*(f.x[g[r]].mean(0) for r in (a, v, b))) - e) > 1.0)
+    # 494 of the 504 angle-frames, when this fixture was made.
+    assert off > 400
+
+
+def test_an_angle_is_fixed_by_the_three_distances_the_report_already_has(wrapped):
+    """Why an angle adds no information about where the groups are: the
+    report measures every pair of catalytic groups, so the three sides of
+    each angle's triangle are in its distance table, and the angle follows
+    from them by the law of cosines, frame by frame, through the periodic
+    box as well (caterva/analyze/angles.py says what the angle is for)."""
+    from caterva.analyze.__main__ import distance_series
+    index, traj, reference = wrapped
+    g = {r: [index[(r, n)] for n in LYSOZYME[r]] for r in LYSOZYME}
+    for a, v, b in reference:
+        va, vb = distance_series(traj, g[v], g[a]), distance_series(traj, g[v], g[b])
+        ab = distance_series(traj, g[a], g[b])
+        from_distances = [math.degrees(math.acos((x * x + y * y - z * z) / (2 * x * y)))
+                          for x, y, z in zip(va, vb, ab)]
+        assert angle_series(traj, g[a], g[v], g[b]) == pytest.approx(from_distances, abs=1e-9)
+
+
+def test_an_angle_cannot_tell_which_side_of_the_vertex_a_partner_is_on():
+    # a turned half a circle about the line through v and b: the other face
+    # of the vertex, the same arms, the same angle.
+    v, b, a = np.zeros(3), np.array([0.5, 0.0, 0.0]), np.array([0.2, 0.3, 0.1])
+    turned = np.array([a[0], -a[1], -a[2]])
+    assert angle_deg(turned, v, b) == pytest.approx(angle_deg(a, v, b), abs=1e-12)
+    assert np.linalg.norm(turned - b) == pytest.approx(np.linalg.norm(a - b))
 
 
 def test_the_angle_is_at_the_middle_group(lysozyme):
@@ -293,6 +365,29 @@ def test_an_unconverged_angle_is_not_a_result_even_when_every_distance_is(tmp_pa
     assert "not yet a result" in out.split("## Angles between catalytic groups")[1].split("## Water")[0]
     assert all(l.endswith("| consistent |") for l in out.split("## Catalytic geometry")[1]
                .split("\n## ")[0].splitlines() if l.startswith("| His10"))
+
+
+def test_an_unconverged_angle_leaves_the_other_sections_to_the_distances(tmp_path, capsys):
+    """The angle still makes the exit code 4, but it does not mark the other
+    sections as not a result: they rest on the distances, which the angle
+    is a function of. An earlier version gated them on the angles too."""
+    d = _fake_run(tmp_path, [80.0, 100.0], angle_phi=0.995, n=400)
+    assert main([str(d), "--no-run"], catalytic=_catalytic) == EXIT_NOT_A_RESULT
+    water = capsys.readouterr().out.split("## Water at the catalytic residues")[1].split("\n## ")[0]
+    rows = [l for l in water.splitlines() if l.startswith("| His10") or l.startswith("| Asp20")]
+    assert rows and not any("not yet a result" in l for l in rows)
+    assert rows[0].endswith("| hydrated |") and rows[1].endswith("| intermittent |")
+
+
+def test_the_report_says_what_an_angle_adds_and_what_it_cannot_see(tmp_path, capsys):
+    d = _fake_run(tmp_path, [90.0, 90.0, 90.0])
+    main([str(d), "--no-run"], catalytic=_catalytic)
+    out = capsys.readouterr().out
+    section = out.split("## Angles between catalytic groups")[1].split("\n## ")[0]
+    assert "fixed, frame by frame, by three distances in the table above" in section
+    assert "swings round" not in out and "this sees that" not in out
+    assert "It is an upper bound, not a test for a bond" in section
+    assert "a signed dihedral" in out.split("## Not measured")[1]
 
 
 def test_no_angle_is_said_rather_than_left_blank(tmp_path, capsys):

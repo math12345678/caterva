@@ -240,13 +240,33 @@ class Analysis:
     water: Optional[List["Hydration"]] = None
 
     @property
+    def distances_consistent(self) -> bool:
+        """Every catalytic distance is a consistent result: the evidence the
+        other sections' verdicts rest on (the flexibility ratio, and the
+        hydrogen bonds, rotamers and water, which have no block-averaged
+        error of their own). A section says "not yet a result" when this is
+        False.
+
+        The angles are left out of this gate on purpose. Each angle is fixed
+        by three of these distances (the law of cosines, frame by frame), so
+        it says nothing about whether the runs sampled enough that the
+        distances do not; counting it here only made the gate stricter with
+        quantities it already had. An earlier version did count them, and
+        one unconverged angle then marked every other section as not a
+        result while every distance was consistent.
+
+        With no distance at all (fewer than two catalytic groups) nothing
+        shows the runs converged, so this is False, and the report says why.
+        """
+        return bool(self.distances) and all(d.summary.verdict == "consistent" for d in self.distances)
+
+    @property
     def all_consistent(self) -> bool:
-        """Every distance and every angle is a consistent result. Angles are
-        quantities with the same verdict as distances, and the exit code
-        promises 0 only when every quantity is one."""
-        return (bool(self.distances)
-                and all(d.summary.verdict == "consistent" for d in self.distances)
-                and all(t.summary.verdict == "consistent" for t in self.angles))
+        """For the exit code: every distance and every angle is a consistent
+        result. The angles count here although they do not gate the other
+        sections: each carries a replica verdict in the report, and exit 0
+        promises that every quantity printed with one reads consistent."""
+        return self.distances_consistent and all(t.summary.verdict == "consistent" for t in self.angles)
 
 
 def measure(directory: Path, p: Plan, reps: Sequence[Path],
@@ -301,7 +321,15 @@ def _gromacs_rotamers(directory: Path, reps: Sequence[Path], chi1: Sequence) -> 
 def _gromacs_output(path: Path, what: str, columns: int) -> List[List[float]]:
     """An .xvg analyze.sh wrote, with the columns this plan expects. An older
     analyze.sh, or one written for another plan, is refused by name rather
-    than read into the wrong rows."""
+    than read into the wrong rows.
+
+    A missing file is refused too, where the rotamer route above skips a
+    missing chi1 file. Skipping here would leave the angles out of
+    Analysis.all_consistent, so `--gromacs --no-run` on the .xvg files of
+    an analyze.sh older than the angle table could exit 0 without having
+    measured one. So a run analysed before the angle and water tables
+    existed has to run analyze.sh again (the message says so); the
+    --no-run help and docs/USING_CATERVA.md say it too."""
     if not path.exists():
         raise AnalyzeError(f"{path} does not exist: run analyze.sh again (it measures {what})")
     cols = read_columns(path)
@@ -539,6 +567,12 @@ def report(a: Analysis) -> List[str]:
         ci = "n/a" if math.isnan(s.ci95) else f"± {s.ci95:.3f}"
         L.append(f"| {d.label} | {cr} | {sim} | {ci} | {ch} | {s.verdict} |")
     L.append("")
+    if not a.distances:
+        # The verdicts of every later section rest on the distances
+        # (Analysis.distances_consistent). Without one, each of them reads
+        # "not yet a result", and this is the reason, said once.
+        L += ["- No catalytic distance: fewer than two catalytic groups, so no pair to measure. The distances "
+              "are what shows the runs converged, so no verdict below can be a result.", ""]
     L += replica_sufficiency(a)
     grouped: Dict[str, List[str]] = {}
     for d in a.distances:
@@ -564,12 +598,12 @@ def report(a: Analysis) -> List[str]:
         if len(rs) > 1:
             m = sum(rs) / len(rs)
             sd = math.sqrt(sum((x - m) ** 2 for x in rs) / (len(rs) - 1))
-            if a.all_consistent:
+            if a.distances_consistent:
                 L += ["", f"Pocket / rest: {m:.2f} ± {sd:.2f} across {len(rs)} replicas "
                           "(below 1: the active site is more rigid than the protein around it)."]
             else:
                 L += ["", f"Not yet a result: pocket / rest {m:.2f} ± {sd:.2f}, from runs the catalytic "
-                          "distances and angles above show are unconverged. RMSF from unconverged runs "
+                          "distances above do not show to be converged. RMSF from unconverged runs "
                           "measures how far each residue got, not how mobile it is."]
         else:
             L += ["", "One usable replica: the ratio has no spread."]
@@ -577,7 +611,9 @@ def report(a: Analysis) -> List[str]:
         L += ["Not measurable: RMSF needs more than one frame per replica, and these runs are too short."]
     L += ["", "## Not measured", "",
           "- ligand pose and contacts: `caterva md` strips ligands until they can be parameterised "
-          "(MD roadmap M4)", "",
+          "(MD roadmap M4)",
+          "- which side of a catalytic group its partners are on: the angles above cannot tell, and it "
+          "would take a signed dihedral, which needs a fourth point", "",
           f"`{MOVED_NM:g} nm` is the chosen threshold for calling a distance changed. The measuring commands "
           "are in analyze.sh. Errors: Flyvbjerg & Petersen (1989) J. Chem. Phys. 91:461, "
           "doi:10.1063/1.457480. Catalytic residues: Ribeiro et al. (2018) Nucleic Acids Res. "
@@ -640,7 +676,7 @@ def hbond_section(a: Analysis) -> List[str]:
           "|---|---|" + "---|" * len(names) + "---|"]
     for o in bonded:
         v = hbond_verdict(o)
-        if not a.all_consistent and v not in ("one replica",):
+        if not a.distances_consistent and v not in ("one replica",):
             v = f"({v}, not yet a result)"
         L.append(f"| {o.label} | {o.at_start} | " + " | ".join(f"{f:.2f}" for f in o.fractions) + f" | {v} |")
     never = len(a.hbonds) - len(bonded)
@@ -670,7 +706,7 @@ def rotamer_section(a: Analysis) -> List[str]:
           "|---|---|" + "---|" * len(names) + "---|"]
     for r in a.rotamers:
         v = rotamer_verdict(r)
-        if not a.all_consistent and v != "one replica":
+        if not a.distances_consistent and v != "one replica":
             v = f"({v}, not yet a result)"
         L.append(f"| {r.label} | {r.at_start:.0f} ({r.start_well}) | "
                  + " | ".join(f"{k:.2f}" for k in r.kept) + f" | {v} |")
@@ -692,10 +728,15 @@ def angle_section(a: Analysis) -> List[str]:
                     f"others within {CONTACT_NM:g} nm of it in the crystal (functional-group centres)."]
     L += [f"The angle at one catalytic group (the middle one of each three) between two others, for every "
           f"group with two partners within {CONTACT_NM:g} nm of it in the crystal (the functional-group "
-          "centres the distances use), frame by frame, each arm to its nearest periodic image. Two distances "
-          "to a group can hold while one partner swings round to its other side; this sees that. Per "
-          f"replica, the mean over the second half of the run (the first {DISCARD:.0%} is discarded as "
-          "relaxation, as for the distances).", ""]
+          "centres the distances use), frame by frame, each arm to its nearest periodic image. Per replica, "
+          f"the mean over the second half of the run (the first {DISCARD:.0%} is discarded as relaxation, as "
+          "for the distances).", "",
+          "Each angle is fixed, frame by frame, by three distances in the table above (the sides of its "
+          "triangle), so it adds no information about where the groups are: it states that triangle as its "
+          "shape at one group, with a verdict of its own. Nor can it tell which side of the group a partner "
+          "is on, since a partner that turns about the line through the other two keeps the same angle. "
+          "An angle that is not yet a result makes the exit code 4, but the sections below and above are "
+          "judged by the distances alone.", ""]
     names = [r.name for r in a.angles[0].summary.replicas]
     L += ["| angle (vertex in the middle) | crystal (°) | " + " | ".join(names)
           + " | simulated (°, mean ± SD of replicas) | 95% CI of the mean | change | verdict |",
@@ -722,36 +763,55 @@ def angle_section(a: Analysis) -> List[str]:
         L.append(f"- {who}: {reason}")
     L += ["", f"`{MOVED_DEG:g}°` is the chosen threshold for calling an angle changed: a group 0.4 nm from the "
               f"vertex that turns that far moves about {MOVED_NM:g} nm, the distance threshold. "
-              f"`{CONTACT_NM:g} nm` between centres is a hydrogen bond or salt bridge (0.35 nm between two "
-              "atoms) plus the 0.10-0.14 nm from each group's centre to its atoms."]
+              f"`{CONTACT_NM:g} nm` between centres is as far apart as two groups can be and still have two of "
+              "their atoms within a hydrogen bond or salt bridge of each other (0.35 nm), given the 0.10-0.14 "
+              "nm from each group's centre to its atoms. It is an upper bound, not a test for a bond: two "
+              "groups within it need not be bonded (the native route's hydrogen-bond table says which are)."]
     return L
 
 
 def water_section(a: Analysis) -> List[str]:
-    from caterva.analyze.water import DRY, SPLIT, WATER_NM, WET, hydration_verdict
+    from caterva.analyze.water import DRY, SPLIT, STAND_IN, WATER_NM, WET, hydration_verdict
     L = ["", "## Water at the catalytic residues", ""]
     if a.water is None:
         return L + ["Not measured."]
     if not a.water:
         return L + ["No catalytic residue to count water at."]
     L += [f"Water oxygens within {WATER_NM:g} nm of any of each catalytic residue's functional atoms (nearest "
-          "periodic image), counted in every frame. Per replica: the mean number of waters, and in brackets "
-          "the fraction of frames with at least one. At start: the count in em.gro, the minimised, solvated "
-          "structure every replica began from.", ""]
+          "periodic image). Every frame is counted, as for the hydrogen bonds and rotamers: unlike the "
+          "distances and angles, nothing is discarded as relaxation, so these fractions include the start "
+          "of each run. Per replica: the mean number of waters, and in brackets the fraction of frames with "
+          "at least one. At start: the count in em.gro, the minimised, solvated structure every replica "
+          "began from.", ""]
     names = [n for n, _, _ in a.water[0].per_replica]
     L += ["| residue | atoms | at start | " + " | ".join(names) + " | verdict |",
           "|---|---|---|" + "---|" * len(names) + "---|"]
+    stand_ins = []
     for h, site in zip(a.water, a.plan.sites):
-        v = hydration_verdict(h)
-        if not a.all_consistent and v != "one replica":
-            v = f"({v}, not yet a result)"
-        L.append(f"| {h.label} | {' '.join(site.atoms)} | {h.at_start} | "
-                 + " | ".join(f"{m:.2f} ({f:.2f})" for _, m, f in h.per_replica) + f" | {v} |")
+        atoms = " ".join(site.atoms)
+        if not site.functional:
+            # Water at a CA is backbone exposure, not the hydration of a
+            # catalytic group; the angles leave stand-ins out for the same
+            # reason (caterva/analyze/plan.py, contact_angles).
+            v, atoms = STAND_IN, f"{atoms} (stand-in)"
+            stand_ins.append(h.label)
+        else:
+            v = hydration_verdict(h)
+            if not a.distances_consistent and v not in ("one replica", "no frames"):
+                v = f"({v}, not yet a result)"
+        L.append(f"| {h.label} | {atoms} | {h.at_start} | "
+                 + " | ".join("n/a" if math.isnan(f) else f"{m:.2f} ({f:.2f})" for _, m, f in h.per_replica)
+                 + f" | {v} |")
+    if stand_ins:
+        L += ["", f"{', '.join(stand_ins)}: no functional atoms defined for the residue, or missing from the "
+                  "structure, so the count is of water at its Cα. That says how exposed its backbone is, not "
+                  "how hydrated a catalytic group is, and it is given no verdict."]
     L += ["", f"Verdicts (chosen thresholds): hydrated, at least one water in at least {WET:.0%} of frames in "
               f"every replica; dry, in at most {DRY:.0%}; intermittent, in between; replicas disagree, when "
               f"their fractions differ by more than {SPLIT:.0%}. `{WATER_NM:g} nm` is the donor-acceptor limit "
-              "of `gmx hbond`, so a counted water is close enough to hydrogen-bond to the group, and it is "
-              "where water's first hydration shell ends."]
+              "of `gmx hbond`, so a counted water is close enough to hydrogen-bond to the group; in a lysozyme "
+              "run it takes in the first shell of water around carboxylate and hydroxyl oxygens and stops short "
+              "of the second (the g(r) is in caterva/analyze/water.py)."]
     return L
 
 
@@ -766,7 +826,8 @@ def build_parser(prog: str = "caterva analyze") -> argparse.ArgumentParser:
     p.add_argument("--script-only", action="store_true",
                    help="write analyze.sh and stop; run it, then rerun without this flag")
     p.add_argument("--no-run", action="store_true",
-                   help="use the .xvg files analyze.sh already wrote; do not call GROMACS")
+                   help="use the .xvg files analyze.sh already wrote; do not call GROMACS (a run whose "
+                        "analyze.sh predates the angle and water tables is refused by name: run it again)")
     p.add_argument("--gromacs", action="store_true",
                    help="measure with gmx distance, rmsf, angle, gangle and select (analyze.sh) instead "
                         "of Caterva's own reader")
