@@ -1043,7 +1043,40 @@ def run_typescript_tests() -> List[Tuple[str, bool, str]]:
         cwd=API_SERVER_DIR,
         timeout=300
     ))
-    
+
+    # The root package (src/, the `scientific` CLI), under jest. This
+    # function ran only the api-server suite, so "TypeScript Tests" passed
+    # in full mode over a root suite nothing here had run -- the same gap
+    # CI had until its root-typescript job (2026-09-30). The timeout is
+    # the suite's own scale: many cases spawn ts-node or the Python
+    # engine, and a full run measured 321 s on a developer machine.
+    #
+    # The root package has its own node_modules, separate from the pnpm
+    # workspace's, and a developer who ran `pnpm install` for api-server
+    # has not necessarily installed it. Without this check that case is
+    # red with the shell's "sh: jest: command not found" and nothing about
+    # the fix. Still a FAILURE, not a skip: full mode claims the root suite
+    # ran, and a suite that could not start did not.
+    name = "TypeScript Tests (root package, jest)"
+    if not (REPO_ROOT / "node_modules" / ".bin" / "jest").exists():
+        print(f"  Running {name}... ❌", flush=True)
+        tests.append((
+            name,
+            False,
+            "the root package is not installed (no node_modules/.bin/jest "
+            "at the repository root), so its jest suite could not run. "
+            "`make test-ts` installs it with `npm ci` and runs the suite the "
+            "way CI's root-typescript job does; `npm ci` at the repository "
+            "root installs it alone.",
+        ))
+        return tests
+    tests.append(run_guard(
+        name,
+        "npm test -- --ci",
+        cwd=REPO_ROOT,
+        timeout=1200
+    ))
+
     return tests
 
 

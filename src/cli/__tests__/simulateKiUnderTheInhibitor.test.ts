@@ -33,38 +33,41 @@ import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
 import type { ResolverQuery, ResolverResult } from '../../literature/literatureResolver';
 import {
   buildNonCompetitiveInhibition,
   buildProductInhibition,
 } from '../../engine/sbml-builder';
 
-vi.mock('../../literature/literatureResolver', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../../literature/literatureResolver')>();
-  return { ...original, resolveKinetic: vi.fn() };
-});
+// This package runs under jest (package.json), so describe/it/expect/jest are
+// globals and each jest.mock below is hoisted above the imports, as vi.mock
+// is under vitest. jest.requireActual is synchronous where vitest's
+// importOriginal is not; the module each factory returns is the same.
+jest.mock('../../literature/literatureResolver', () => ({
+  ...jest.requireActual('../../literature/literatureResolver'),
+  resolveKinetic: jest.fn(),
+}));
 
 // For the runs that get past the refusal: the pipeline's validation gate, the
 // engine and the exporters are replaced at their module boundaries, so these
 // tests need no Python and assert what the command SENDS and PRINTS. The
 // engine's answer used below is a real one (see ENGINE_NONCOMPETITIVE).
-vi.mock('../../integration/scientificPipeline', () => ({
+jest.mock('../../integration/scientificPipeline', () => ({
   ScientificPipeline: class {
     async execute() {
       return { validated: true, validationErrors: [] };
     }
   },
 }));
-vi.mock('../inhibitionModels', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../inhibitionModels')>();
-  return { ...original, runInhibitionModel: vi.fn() };
-});
-vi.mock('../exportArtifacts', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../exportArtifacts')>();
-  return { ...original, exportCitations: vi.fn(), exportModel: vi.fn() };
-});
+jest.mock('../inhibitionModels', () => ({
+  ...jest.requireActual('../inhibitionModels'),
+  runInhibitionModel: jest.fn(),
+}));
+jest.mock('../exportArtifacts', () => ({
+  ...jest.requireActual('../exportArtifacts'),
+  exportCitations: jest.fn(),
+  exportModel: jest.fn(),
+}));
 
 import { resolveKinetic } from '../../literature/literatureResolver';
 import { commandSimulateResolved, type SimulateResolvedOptions } from '../commandSimulateResolved';
@@ -100,27 +103,27 @@ let out: string[];
 
 beforeEach(() => {
   out = [];
-  vi.mocked(resolveKinetic).mockReset();
-  vi.mocked(runInhibitionModel).mockReset();
-  vi.mocked(exportCitations).mockReset();
-  vi.mocked(exportModel).mockReset();
-  vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: string) => {
+  jest.mocked(resolveKinetic).mockReset();
+  jest.mocked(runInhibitionModel).mockReset();
+  jest.mocked(exportCitations).mockReset();
+  jest.mocked(exportModel).mockReset();
+  jest.spyOn(process.stdout, 'write').mockImplementation(((chunk: string) => {
     out.push(String(chunk));
     return true;
   }) as typeof process.stdout.write);
-  vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: string) => {
+  jest.spyOn(process.stderr, 'write').mockImplementation(((chunk: string) => {
     out.push(String(chunk));
     return true;
   }) as typeof process.stderr.write);
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  jest.restoreAllMocks();
 });
 
 /** Every query the command sent the resolver, in order. */
 const sent = (): ResolverQuery[] =>
-  vi.mocked(resolveKinetic).mock.calls.map((call) => call[0]);
+  jest.mocked(resolveKinetic).mock.calls.map((call) => call[0]);
 
 /** The one `--json` document the run wrote. */
 const document = (): {
@@ -135,7 +138,7 @@ const kiQueries = (): ResolverQuery[] => sent().filter((q) => q.quantity === 'ki
 
 describe('--allow-cross-species reaches every lookup', () => {
   it('is sent with the Km and the kcat lookup when given', async () => {
-    vi.mocked(resolveKinetic).mockImplementation(async (q) => NOTHING(q.quantity ?? 'km'));
+    jest.mocked(resolveKinetic).mockImplementation(async (q) => NOTHING(q.quantity ?? 'km'));
     await commandSimulateResolved({
       ...LDH,
       overrides: {},
@@ -148,7 +151,7 @@ describe('--allow-cross-species reaches every lookup', () => {
   });
 
   it('is sent as false when not given, never left to a default', async () => {
-    vi.mocked(resolveKinetic).mockImplementation(async (q) => NOTHING(q.quantity ?? 'km'));
+    jest.mocked(resolveKinetic).mockImplementation(async (q) => NOTHING(q.quantity ?? 'km'));
     await commandSimulateResolved({ ...LDH, overrides: {}, enzymeConc: '0.001mM' });
     for (const q of sent()) expect(q.allowCrossSpecies).toBe(false);
   });
@@ -170,7 +173,7 @@ describe('a Ki is looked up under the inhibitor, by the model mode', () => {
   });
 
   it('sends the inhibitor as the compound, with the mode and the model substrate', async () => {
-    vi.mocked(resolveKinetic).mockResolvedValue(NOTHING('ki'));
+    jest.mocked(resolveKinetic).mockResolvedValue(NOTHING('ki'));
     await commandSimulateResolved({ ...LDH, model: 'noncompetitive', inhibitor: QUINOLINE });
 
     const [ki, ...others] = kiQueries();
@@ -196,7 +199,7 @@ describe('a Ki is looked up under the inhibitor, by the model mode', () => {
     // equation. See the rate-law test below and KI_MODE_OF_MODEL.
     ['product', 'noncompetitive'],
   ] as const)('--model %s asks for a %s row', async (model, mode) => {
-    vi.mocked(resolveKinetic).mockResolvedValue(NOTHING('ki'));
+    jest.mocked(resolveKinetic).mockResolvedValue(NOTHING('ki'));
     await commandSimulateResolved({ ...LDH, model, inhibitor: 'oxamate' });
     expect(kiQueries().map((q) => q.inhibitionMode)).toEqual([mode]);
   });
@@ -213,7 +216,7 @@ describe('a Ki is looked up under the inhibitor, by the model mode', () => {
   });
 
   it('sends --isoform with every lookup, the Ki included', async () => {
-    vi.mocked(resolveKinetic).mockImplementation(async (q) => NOTHING(q.quantity ?? 'km'));
+    jest.mocked(resolveKinetic).mockImplementation(async (q) => NOTHING(q.quantity ?? 'km'));
     await commandSimulateResolved({
       ...LDH,
       overrides: {},
@@ -231,7 +234,7 @@ describe('a Ki is looked up under the inhibitor, by the model mode', () => {
     // BRENDA 739793's noncompetitive row for human LDH: 0.00252 mM,
     // "noncompetitive versus pyruvate" (Tests/fixtures/ki_mode/README.md).
     // The runner's rowScope for it, as caterva.bind.core reads the row.
-    vi.mocked(resolveKinetic).mockResolvedValue({
+    jest.mocked(resolveKinetic).mockResolvedValue({
       found: true,
       quantity: 'ki',
       value: 0.00252,
@@ -265,7 +268,7 @@ describe('a Ki withheld by mode or isoform says so, in this command\'s flags', (
     // What the runner answers for rabbit hexokinase and MgADP- asked for a
     // competitive Ki: both rows (BRENDA ref 640206) state mixed inhibition
     // (Tests/test_ki_mode_resolution.py, TestMixed, on the recorded page).
-    vi.mocked(resolveKinetic).mockResolvedValue(
+    jest.mocked(resolveKinetic).mockResolvedValue(
       withheld({
         source: 'mode_withheld',
         modesAvailable: ['mixed inhibition versus MgATP2-', 'mixed inhibition versus glucose'],
@@ -299,7 +302,7 @@ describe('a Ki withheld by mode or isoform says so, in this command\'s flags', (
     // inhibition. Constructed to reach this branch, not read from BRENDA:
     // there is no uncompetitive model in `simulate`, so the row is named and
     // no flag is offered for it.
-    vi.mocked(resolveKinetic).mockResolvedValue(
+    jest.mocked(resolveKinetic).mockResolvedValue(
       withheld({ source: 'mode_withheld', modesAvailable: ['uncompetitive inhibition versus NADH'] }),
     );
     await commandSimulateResolved({ ...LDH, model: 'noncompetitive', inhibitor: 'oxamate' });
@@ -314,7 +317,7 @@ describe('a Ki withheld by mode or isoform says so, in this command\'s flags', (
   it('names the isoforms BRENDA holds, and --isoform', async () => {
     // Gossypol's three human LDH isoforms in BRENDA 711801. The runner
     // answers isoform_withheld when the one asked for is none of them.
-    vi.mocked(resolveKinetic).mockResolvedValue(
+    jest.mocked(resolveKinetic).mockResolvedValue(
       withheld({ source: 'isoform_withheld', isoformsAvailable: ['LDH-A', 'LDH-B', 'LDH-C'] }),
     );
     await commandSimulateResolved({
@@ -330,7 +333,7 @@ describe('a Ki withheld by mode or isoform says so, in this command\'s flags', (
   });
 
   it('keeps the plain miss as a miss, naming the inhibitor', async () => {
-    vi.mocked(resolveKinetic).mockResolvedValue(NOTHING('ki'));
+    jest.mocked(resolveKinetic).mockResolvedValue(NOTHING('ki'));
     await commandSimulateResolved({ ...LDH, model: 'competitive', inhibitor: 'oxamate' });
     expect(document().unresolved).toContain(
       'ki (no inhibition constant for oxamate in the literature for this system)',
@@ -484,9 +487,9 @@ describe('a successful inhibition run reports through --json and the exports', (
   // page: `--json` gave text no parser reads, and neither file was written.
 
   it('writes one document carrying the Ki under its inhibitor, and the result', async () => {
-    vi.mocked(resolveKinetic).mockResolvedValue(MGADP_NONCOMPETITIVE);
-    vi.mocked(runInhibitionModel).mockResolvedValue(ENGINE_NONCOMPETITIVE);
-    vi.mocked(exportCitations).mockResolvedValue({ ok: true, path: 'hexokinase.bib' });
+    jest.mocked(resolveKinetic).mockResolvedValue(MGADP_NONCOMPETITIVE);
+    jest.mocked(runInhibitionModel).mockResolvedValue(ENGINE_NONCOMPETITIVE);
+    jest.mocked(exportCitations).mockResolvedValue({ ok: true, path: 'hexokinase.bib' });
 
     const code = await commandSimulateResolved(HEXOKINASE_RUN);
 
@@ -511,20 +514,20 @@ describe('a successful inhibition run reports through --json and the exports', (
     });
     expect(doc.result.trajectory).toEqual(ENGINE_NONCOMPETITIVE.trajectory);
     // The run the engine was given is the one the table describes.
-    expect(vi.mocked(runInhibitionModel).mock.calls[0]).toEqual([
+    expect(jest.mocked(runInhibitionModel).mock.calls[0]).toEqual([
       'noncompetitive',
       { km: 0.1, vmax: 0.01, s0: 10, ki: 7.8, i0: 1, end: 10, points: 101 },
     ]);
   });
 
   it('writes the citations with the inhibitor, and withholds the model with its reason', async () => {
-    vi.mocked(resolveKinetic).mockResolvedValue(MGADP_NONCOMPETITIVE);
-    vi.mocked(runInhibitionModel).mockResolvedValue(ENGINE_NONCOMPETITIVE);
-    vi.mocked(exportCitations).mockResolvedValue({ ok: true, path: 'hexokinase.bib' });
+    jest.mocked(resolveKinetic).mockResolvedValue(MGADP_NONCOMPETITIVE);
+    jest.mocked(runInhibitionModel).mockResolvedValue(ENGINE_NONCOMPETITIVE);
+    jest.mocked(exportCitations).mockResolvedValue({ ok: true, path: 'hexokinase.bib' });
 
     await commandSimulateResolved(HEXOKINASE_RUN);
 
-    const [cited, destination] = vi.mocked(exportCitations).mock.calls[0]!;
+    const [cited, destination] = jest.mocked(exportCitations).mock.calls[0]!;
     expect(destination).toBe('hexokinase.bib');
     expect(cited).toEqual([
       expect.objectContaining({
@@ -547,9 +550,9 @@ describe('a successful inhibition run reports through --json and the exports', (
   });
 
   it('says the same to a person, after the result', async () => {
-    vi.mocked(resolveKinetic).mockResolvedValue(MGADP_NONCOMPETITIVE);
-    vi.mocked(runInhibitionModel).mockResolvedValue(ENGINE_NONCOMPETITIVE);
-    vi.mocked(exportCitations).mockResolvedValue({ ok: true, path: 'hexokinase.bib' });
+    jest.mocked(resolveKinetic).mockResolvedValue(MGADP_NONCOMPETITIVE);
+    jest.mocked(runInhibitionModel).mockResolvedValue(ENGINE_NONCOMPETITIVE);
+    jest.mocked(exportCitations).mockResolvedValue({ ok: true, path: 'hexokinase.bib' });
 
     const code = await commandSimulateResolved({ ...HEXOKINASE_RUN, json: false });
 
@@ -562,10 +565,10 @@ describe('a successful inhibition run reports through --json and the exports', (
   });
 
   it('leaves a document when the engine fails', async () => {
-    vi.mocked(resolveKinetic).mockResolvedValue(MGADP_NONCOMPETITIVE);
-    vi.mocked(runInhibitionModel).mockRejectedValue(new Error('engine exited 1'));
+    jest.mocked(resolveKinetic).mockResolvedValue(MGADP_NONCOMPETITIVE);
+    jest.mocked(runInhibitionModel).mockRejectedValue(new Error('engine exited 1'));
     const stdout: string[] = [];
-    vi.mocked(process.stdout.write).mockImplementation(((chunk: string) => {
+    jest.mocked(process.stdout.write).mockImplementation(((chunk: string) => {
       stdout.push(String(chunk));
       return true;
     }) as typeof process.stdout.write);
@@ -637,7 +640,7 @@ describe('the command printed "in full" is the run that was asked for', () => {
   });
 
   it('keeps the plain heading when every value in it is one', async () => {
-    vi.mocked(resolveKinetic).mockResolvedValue(NOTHING('ki'));
+    jest.mocked(resolveKinetic).mockResolvedValue(NOTHING('ki'));
     await commandSimulateResolved({ ...LDH, json: false, model: 'competitive', inhibitor: 'oxamate' });
     expect(fullCommand().heading).toBe('In full, with the example values above:');
   });
@@ -663,14 +666,14 @@ describe('a refused product model is not switched to another model', () => {
     });
 
   it('offers a noncompetitive model the competitive one', async () => {
-    vi.mocked(resolveKinetic).mockResolvedValue(COMPETITIVE_ONLY);
+    jest.mocked(resolveKinetic).mockResolvedValue(COMPETITIVE_ONLY);
     await run('noncompetitive');
     const ki = document().unresolved.find((u) => u.startsWith('ki '))!;
     expect(ki).toContain('To use one, run with --model competitive');
   });
 
   it('offers a product model none, and says why', async () => {
-    vi.mocked(resolveKinetic).mockResolvedValue(COMPETITIVE_ONLY);
+    jest.mocked(resolveKinetic).mockResolvedValue(COMPETITIVE_ONLY);
     await run('product');
     const ki = document().unresolved.find((u) => u.startsWith('ki '))!;
     expect(ki).toContain('(competitive inhibition)');
@@ -686,7 +689,7 @@ describe('an enzyme that was never identified is not "no Ki in the literature"',
   it('prints the runner\'s own sentence, and names --ec', async () => {
     // The runner's live answer for "lactate dehydrogenase" (2026-09-30):
     // it names two enzymes, so no EC number was chosen and nothing searched.
-    vi.mocked(resolveKinetic).mockResolvedValue({
+    jest.mocked(resolveKinetic).mockResolvedValue({
       ...NOTHING('ki'),
       source: 'ec_ambiguous',
       logs: [

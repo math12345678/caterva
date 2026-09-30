@@ -12,12 +12,11 @@
  * it as `mechanismEvidence`, found in Python by the function compose uses,
  * and this side reads it and prints it.
  *
- * Imports from 'vitest', like rowScope.test.ts beside the resolver, and
- * asserts on RENDERED OUTPUT for the reason resolveOutput.test.ts gives: a
- * field parsed and never printed passes a shape test and reaches no one.
+ * Asserts on RENDERED OUTPUT for the reason resolveOutput.test.ts gives: a
+ * field parsed and never printed passes a shape test and reaches no one, and
+ * mocks the resolver the way that file does. This package runs under jest
+ * (package.json), so describe/it/expect/jest are its globals.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
-
 import { commandResolve } from '../commandResolve';
 import {
   mapFoundResult,
@@ -26,10 +25,10 @@ import {
   type ResolvedKinetic,
 } from '../../literature/literatureResolver';
 
-vi.mock('../../literature/literatureResolver', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../../literature/literatureResolver')>();
-  return { ...original, resolveKinetic: vi.fn() };
-});
+jest.mock('../../literature/literatureResolver', () => ({
+  ...jest.requireActual('../../literature/literatureResolver'),
+  resolveKinetic: jest.fn(),
+}));
 
 const QUINOLINE =
   '3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid';
@@ -105,7 +104,7 @@ describe('mechanismEvidenceLines', () => {
 });
 
 describe('scientific resolve prints it', () => {
-  const mocked = vi.mocked(resolveKinetic);
+  const mocked = jest.mocked(resolveKinetic);
   const chunks: string[] = [];
   const original = process.stdout.write.bind(process.stdout);
 
