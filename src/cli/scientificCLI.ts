@@ -1253,7 +1253,8 @@ ${colors.bright}Commands:${colors.reset}
                            (whose rate law here is noncompetitive in form).
                            --substrate goes with it as the model's substrate,
                            so a row measured versus it comes first. With
-                           neither this nor --ki the run refuses
+                           --ki, nothing is looked up and it names whose
+                           constant your Ki is. With neither, the run refuses
       --isoform NAME       as in \`resolve\`, for every constant looked up: each
                            must come from a row that measured this isoform,
                            and one BRENDA holds only for others is refused
@@ -1527,12 +1528,15 @@ async function main() {
         }
 
         // --inhibitor names the compound an inhibition model's Ki is looked
-        // up under, because BRENDA files a Ki under its inhibitor. It is
-        // refused, not dropped, where nothing reads it: with --model mm there
-        // is no Ki, and a user who typed it would believe the run modelled
-        // that inhibitor. With no value it is refused rather than read as
-        // absent, which would send the run to the "no --inhibitor" refusal
-        // while the user believes they gave one.
+        // up under, because BRENDA files a Ki under its inhibitor; beside a
+        // --ki of the user's own it names whose constant that is, on the Ki's
+        // row and in the --json provenance (and in its exported citation,
+        // when --cite ki="..." gives one). It is refused,
+        // not dropped, where nothing reads it: with --model mm there is no
+        // Ki, and a user who typed it would believe the run modelled that
+        // inhibitor. With no value it is refused rather than read as absent,
+        // which would send the run to the "no --inhibitor" refusal while the
+        // user believes they gave one.
         const inhibitor = flags['inhibitor'];
         if (booleans.has('inhibitor')) {
           error('--inhibitor needs a value: the compound whose Ki the model uses, e.g. --inhibitor gossypol.');

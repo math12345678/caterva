@@ -533,6 +533,20 @@ export interface ModeAdvice {
   values: Partial<Record<InhibitionMode, string>>;
   /** The other way forward, ending the sentence ("run without --mode ..."). */
   otherwise: string;
+  /**
+   * Why no flag value is offered, when none of the modes BRENDA holds can be
+   * asked for through `flag`. Absent: "none states a mechanism a model here
+   * is of", which is true for `resolve` (its --mode takes all three) and for
+   * a command whose flag values cover every mechanism it models.
+   *
+   * A caller that deliberately offers fewer values than it has models needs
+   * its own sentence, or the default is false. `simulate --model product`
+   * offers no other model, because switching a product model to a fixed-[I]
+   * one changes the model rather than using the row; the default would then
+   * tell its reader that no model here is competitive, over a `--model
+   * competitive` that exists.
+   */
+  unreachable?: string;
 }
 
 /** `scientific resolve --quantity ki --mode ...`: every mode, and a lookup
@@ -568,7 +582,7 @@ export function withheldSentence(
       const otherwise = advice.otherwise;
       const how = reaching.length
         ? `To use one, run with ${reaching.map(v => `${advice.flag} ${v}`).join(' or ')}; or ${otherwise}.`
-        : `No ${advice.flag} takes any of them, since none states a mechanism a model here is of. ` +
+        : `${advice.unreachable ?? `No ${advice.flag} takes any of them, since none states a mechanism a model here is of.`} ` +
           `${otherwise.charAt(0).toUpperCase()}${otherwise.slice(1)}.`;
       return `Every row BRENDA holds for this Ki states an inhibition mode ` +
         // Joined with "; ", as the runner's log and the API's note join

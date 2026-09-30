@@ -115,6 +115,18 @@ function combinations(): Array<{ what: string; args: string[] }> {
       ],
     },
     {
+      // The branch this list did not enter, and the one that leaked: an
+      // inhibition model that RUNS returned before the document was written,
+      // having printed the provenance table as prose (2026-09-30).
+      what: 'a successful inhibition run writing both exports',
+      args: [
+        ...SYSTEM, '--model', 'noncompetitive', '--inhibitor', 'oxamate',
+        '--s0', '10mM', '--vmax', '1.2mM/s', '--ki', '5mM', '--i0', '1mM',
+        '--export-citations', path.join(tmpDir, 'c.bib'),
+        '--export-model', path.join(tmpDir, 'c.txt'),
+      ],
+    },
+    {
       what: 'a refusal that was asked for exports',
       args: [
         ...SYSTEM, '--enzyme-conc', '0.01mM', '--s0', '10mM',

@@ -246,6 +246,35 @@ describe("parseModelAnnotations", () => {
       expect(problems[0]!.message).toMatch(/mixed-type Ki counts as noncompetitive/);
     });
 
+    it("refuses the hyphenated spelling, listing the three it takes", () => {
+      // "non-competitive" is how `simulate`'s help spelled it until
+      // 2026-09-30, and `scientific resolve --mode` refuses it the same way.
+      const { annotations, problems } = parse(
+        `// caterva: ki ec="2.7.1.1" inhibitor="MgADP-" inhibition="non-competitive" unit="mM"\nKi = 7.8;`,
+      );
+      expect(annotations).toEqual([]);
+      expect(problems[0]!.message).toMatch(/inhibition="non-competitive" is not a mechanism/);
+      expect(problems[0]!.message).toMatch(/competitive, noncompetitive, uncompetitive/);
+    });
+
+    it("refuses substrate= beside inhibitor= when no mechanism is stated", () => {
+      // Only a stated mechanism ranks Ki rows by what they were measured
+      // versus, so without inhibition= the field would be read by nothing.
+      const { annotations, problems } = parse(
+        `// caterva: ki ec="2.7.1.1" inhibitor="MgADP-" substrate="glucose" unit="mM"\nKi = 7.8;`,
+      );
+      expect(annotations).toEqual([]);
+      expect(problems[0]!.message).toMatch(/substrate="glucose" on a ki names the model's substrate/);
+    });
+
+    it("still parses the older ki shape, substrate= with no inhibitor", () => {
+      // Grounding says why nothing is looked up for it (modelGrounding);
+      // refusing it at parse would turn a working declaration into an error.
+      const a = only(`// caterva: ki enzyme="hexokinase" substrate="glucose" unit="mM"\nKi = 0.02;`);
+      expect(a.substrate).toBe("glucose");
+      expect(a.inhibitor).toBeUndefined();
+    });
+
     it("points mode= at inhibition=, since mode means check or resolve here", () => {
       const { problems } = parse(
         `// caterva: ki ec="2.7.1.1" inhibitor="MgADP-" mode="competitive" unit="mM"\nKi = 7.8;`,

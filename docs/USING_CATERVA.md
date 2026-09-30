@@ -506,10 +506,38 @@ uncompetitive model in `simulate`.
 
 A Ki every row of which states another mode is refused. The refusal names
 the modes BRENDA holds and the `--model` that would take one, since
-`simulate` has no `--mode`. `--isoform` works as on `resolve`, and applies to
-the Km, the kcat and the Ki alike: a model of LDH-A is a model of one
-protein. `--allow-cross-species`, documented for `simulate` from the start,
-reached none of its lookups until the same day; it now reaches all three.
+`simulate` has no `--mode`; a refused `--model product` is offered no other
+model, because a competitive or noncompetitive model holds the inhibitor at a
+fixed `--i0` rather than letting the product accumulate. `--isoform` works as
+on `resolve`, and applies to the Km, the kcat and the Ki alike: a model of
+LDH-A is a model of one protein. `--allow-cross-species`, listed in
+`simulate`'s help since 2026-08-18 and suggested by every one of its
+literature refusals, reached none of its lookups until the same day; it now
+reaches all three. With a `--ki` of your own nothing is looked up, and
+`--inhibitor` names whose constant it is.
+
+A successful inhibition run under `--json` prints one document (the
+provenance, with the Ki's `inhibitor`, `askedMode` and `rowScope`, and the
+result), as the Michaelis-Menten run does; until 2026-09-30 it printed
+the human table instead. `--export-citations` is written, and a Ki's entry
+names its inhibitor. `--export-model` is not written for an inhibition model,
+and the run says why: the model exporter builds plain Michaelis-Menten and
+competitive inhibition only, and its competitive model names the inhibitor
+concentration `i` where this command has `i0`.
+
+The catalogue entry `scientific domains` prints for competitive inhibition
+runs end to end:
+
+```bash
+scientific simulate mm --resolve --model competitive --ec 1.1.1.27 \
+    --substrate pyruvate --organism "Homo sapiens" --inhibitor gossypol \
+    --isoform LDH-A --s0 10mM --i0 1mM --enzyme-conc 0.001mM --allow-cross-species
+```
+
+Run against BRENDA on 2026-09-30 it used Km 0.03 mM (ref 286469, a row
+naming no isoform), Vmax from rabbit's kcat (ref 741355, marked as measured
+in another organism: BRENDA holds no human LDH kcat) and gossypol's LDH-A Ki
+of 0.0019 mM (ref 711801, which states no mode, and the run says so).
 
 A model you write yourself (`POST /api/simulate/model`) declares a Ki the same
 way, in its annotation:
@@ -524,8 +552,12 @@ mechanism of your rate law (`competitive`, `noncompetitive` or
 `uncompetitive`), and is optional: without it the resolver's pick is used,
 and the note says what mode that row states. On a `ki` annotation,
 `substrate=` names the model's substrate, the one the Ki should have been
-measured against. A `ki` annotation with no `inhibitor=` is not looked up at
-all, and in `resolve` mode the run refuses. `inhibitor=` and `inhibition=`
+measured against, and is read only with `inhibition=`: the resolver ranks Ki
+rows by what they were measured versus only when it chooses by mechanism, so
+`substrate=` beside `inhibitor=` with no `inhibition=` is refused rather than
+ignored (as `scientific resolve` refuses `--model-substrate` without
+`--mode`). A `ki` annotation with no `inhibitor=` is not looked up at all,
+and in `resolve` mode the run refuses. `inhibitor=` and `inhibition=`
 are refused on a `km` or `kcat`. On the recorded rabbit hexokinase page the
 annotation above fills 7.8 mM (BRENDA ref 640206, mixed inhibition versus
 glucose). With `inhibition="competitive"` it refuses and names both mixed

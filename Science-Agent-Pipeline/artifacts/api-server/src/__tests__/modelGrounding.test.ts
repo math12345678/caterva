@@ -415,15 +415,30 @@ describe("grounding a caller's own model", () => {
       );
     });
 
-    it("sends no mechanism when none was stated, and no model substrate either", async () => {
+    it("sends no mechanism when none was stated", async () => {
+      vi.mocked(resolveKineticValue).mockClear();
       vi.mocked(resolveKineticValue).mockResolvedValue(MGADP_NONCOMPETITIVE as never);
       await groundAnnotatedModel(
-        kiModel(`// caterva: ki ${IDENTITY} inhibitor="MgADP-" substrate="glucose"`, "Ki_adp = 7.8;"),
+        kiModel(`// caterva: ki ${IDENTITY} inhibitor="MgADP-"`, "Ki_adp = 7.8;"),
       );
       const sent = vi.mocked(resolveKineticValue).mock.calls[0]![0];
       expect(sent.substrate).toBe("MgADP-");
       expect(sent).not.toHaveProperty("inhibitionMode");
       expect(sent).not.toHaveProperty("modelSubstrate");
+    });
+
+    it("refuses substrate= beside an inhibitor with no mechanism, and looks nothing up", async () => {
+      // substrate= on a ki is the model's substrate, which only a stated
+      // mechanism ranks rows by. This annotation used to be accepted and its
+      // substrate= sent nowhere, pinned by the test above in its old form.
+      vi.mocked(resolveKineticValue).mockClear();
+      const report = await groundAnnotatedModel(
+        kiModel(`// caterva: ki ${IDENTITY} inhibitor="MgADP-" substrate="glucose"`, "Ki_adp = 7.8;"),
+      );
+      expect(resolveKineticValue).not.toHaveBeenCalled();
+      expect(report.entries).toEqual([]);
+      expect(report.problems[0]!.message).toMatch(/substrate="glucose" on a ki names the model's substrate/);
+      expect(report.problems[0]!.message).toMatch(/Add inhibition="competitive"/);
     });
 
     it("refuses a Ki of another mechanism, naming what BRENDA holds", async () => {

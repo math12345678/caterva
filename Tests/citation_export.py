@@ -78,6 +78,12 @@ class CitedParameter:
     value: float | None = None
     unit: str | None = None
     organism: str | None = None
+    #: For a Ki, the inhibitor it is the constant of. BRENDA files a Ki under
+    #: its inhibitor, and the note "Resolved by Caterva as the KI = 0.0019 mM"
+    #: names no compound: the entry records an inhibition constant of nothing
+    #: a reader can identify. `scientific simulate --resolve` sends it since
+    #: 2026-09-30, when that command began looking a Ki up under the inhibitor.
+    inhibitor: str | None = None
 
 
 def _escape_bibtex(text: str) -> str:
@@ -209,6 +215,8 @@ def _known_and_missing(citation: Citation) -> tuple[list[str], list[str]]:
 def _note_for(cited: CitedParameter) -> str:
     """What was and was not known, stated on the entry itself."""
     parts = [f"Resolved by Caterva as the {cited.parameter.upper()}"]
+    if cited.inhibitor:
+        parts[0] += f" of the inhibitor {cited.inhibitor}"
     if cited.value is not None:
         parts[0] += f" = {cited.value}{(' ' + cited.unit) if cited.unit else ''}"
     if cited.organism:

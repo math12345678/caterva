@@ -74,11 +74,29 @@ export const DOMAIN_CATALOGUE: DomainEntry[] = [
     title: 'Competitive inhibition',
     summary: 'The same, with an inhibitor competing for the active site.',
     example:
-      // --inhibitor since 2026-09-30: the Ki is looked up under the inhibitor
-      // BRENDA files it under, and without one the run refuses. Gossypol has
-      // three human Ki rows on BRENDA's LDH page (ref 711801, one per
-      // isoform); none states a mode, and the run prints that it does not.
-      'simulate mm --resolve --model competitive --enzyme "lactate dehydrogenase" \\\n      --substrate pyruvate --organism "Homo sapiens" --inhibitor gossypol \\\n      --s0 10mM --i0 1mM --enzyme-conc 0.001mM',
+      // Run live against BRENDA on 2026-09-30, as written: exit 0, a
+      // competitive-inhibition trajectory, every constant sourced and every
+      // caveat printed. Each flag is there because the run needs it:
+      //
+      //   --ec 1.1.1.27  `--enzyme "lactate dehydrogenase"`, which this
+      //     example used to say, names two enzymes (1.1.98.- and 1.1.1.27),
+      //     so the runner looked nothing up and the example never ran.
+      //   --inhibitor gossypol  the Ki is looked up under the inhibitor
+      //     BRENDA files it under; without one the run refuses. Gossypol has
+      //     three human rows on the LDH page, one per isoform (ref 711801:
+      //     LDH-B 0.0014, LDH-A 0.0019, LDH-C 0.0042 mM,
+      //     Tests/fixtures/ki_mode/brenda_1.1.1.27.html.gz). None states a
+      //     mode, and the run prints that the mechanism of the one it uses is
+      //     unknown.
+      //   --isoform LDH-A  without it the lowest row, LDH-B's, went into a
+      //     model whose Km names no isoform. With it the Ki is LDH-A's
+      //     (0.0019 mM); the Km row (0.03 mM, ref 286469) still names none,
+      //     which is as much as BRENDA says.
+      //   --allow-cross-species  BRENDA holds no human LDH kcat, so Vmax
+      //     cannot be bridged from a human one. The run takes rabbit's
+      //     (Oryctolagus cuniculus, ref 741355) and marks it on its row as
+      //     measured in another organism.
+      'simulate mm --resolve --model competitive --ec 1.1.1.27 \\\n      --substrate pyruvate --organism "Homo sapiens" --inhibitor gossypol \\\n      --isoform LDH-A --s0 10mM --i0 1mM --enzyme-conc 0.001mM --allow-cross-species',
     literatureBacked: true,
   },
   {

@@ -46,9 +46,30 @@ vi.mock('../../literature/literatureResolver', async (importOriginal) => {
   return { ...original, resolveKinetic: vi.fn() };
 });
 
+// For the runs that get past the refusal: the pipeline's validation gate, the
+// engine and the exporters are replaced at their module boundaries, so these
+// tests need no Python and assert what the command SENDS and PRINTS. The
+// engine's answer used below is a real one (see ENGINE_NONCOMPETITIVE).
+vi.mock('../../integration/scientificPipeline', () => ({
+  ScientificPipeline: class {
+    async execute() {
+      return { validated: true, validationErrors: [] };
+    }
+  },
+}));
+vi.mock('../inhibitionModels', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../inhibitionModels')>();
+  return { ...original, runInhibitionModel: vi.fn() };
+});
+vi.mock('../exportArtifacts', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../exportArtifacts')>();
+  return { ...original, exportCitations: vi.fn(), exportModel: vi.fn() };
+});
+
 import { resolveKinetic } from '../../literature/literatureResolver';
 import { commandSimulateResolved, type SimulateResolvedOptions } from '../commandSimulateResolved';
-import { KI_MODE_OF_MODEL } from '../inhibitionModels';
+import { exportCitations, exportModel } from '../exportArtifacts';
+import { KI_MODE_OF_MODEL, runInhibitionModel } from '../inhibitionModels';
 
 /** BRENDA 739793's inhibitor of human LDH (docs/USING_CATERVA.md). */
 const QUINOLINE =
@@ -80,6 +101,9 @@ let out: string[];
 beforeEach(() => {
   out = [];
   vi.mocked(resolveKinetic).mockReset();
+  vi.mocked(runInhibitionModel).mockReset();
+  vi.mocked(exportCitations).mockReset();
+  vi.mocked(exportModel).mockReset();
   vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: string) => {
     out.push(String(chunk));
     return true;
@@ -398,4 +422,303 @@ describe('the argv parser', () => {
     expect(code).toBe(1);
     expect(stderr).toContain('--inhibitor needs a value');
   }, 150_000);
+
+  it('refuses --isoform with no value rather than reading it as absent', () => {
+    // Read as absent, every constant would be looked up with no isoform
+    // while the user believes one was asked for.
+    const { code, stderr } = run([...SYSTEM, '--model', 'competitive', '--inhibitor', 'gossypol', '--isoform', '--s0', '10mM']);
+    expect(code).toBe(1);
+    expect(stderr).toContain('--isoform needs a value');
+  }, 150_000);
+});
+
+/**
+ * Rabbit hexokinase and MgADP-, asked for a noncompetitive Ki: what the real
+ * runner answers on the committed page (Tests/fixtures/recorded/
+ * brenda_2.7.1.1.html.gz, 2026-09-30), mapped as literatureResolver maps it:
+ * 7.8 mM, BRENDA ref 640206, a row stating mixed inhibition versus glucose.
+ */
+const MGADP_NONCOMPETITIVE = {
+  found: true,
+  quantity: 'ki',
+  value: 7.8,
+  unit: 'mM',
+  source: 'brenda_exact',
+  organism: 'Oryctolagus cuniculus',
+  citation: { source: 'BRENDA', reference_id: '640206' },
+  rowScope: { isoform: null, inhibitionMode: 'mixed', versus: 'glucose', kitzWilson: false },
+  logs: [],
+} as unknown as ResolverResult;
+
+/**
+ * The engine's answer for exactly the run below (noncompetitive; Km 0.1 mM,
+ * Vmax 0.01 mM/s, [S]0 10 mM, Ki 7.8 mM, [I]0 1 mM, t = 0..10, 101 points),
+ * computed by the real `runInhibitionModel` on 2026-09-30. Its first and last
+ * points only: the document reports what it is handed, and the test says so
+ * by counting what it handed.
+ */
+const ENGINE_NONCOMPETITIVE = {
+  domain: 'sbml',
+  viaSbml: true,
+  trajectory: [
+    { time: 0, '[S]': 10, '[I]': 1, '[P]': 0, '[E]': 1 },
+    { time: 10, '[S]': 9.912245058919646, '[I]': 1, '[P]': 0.08775494108035671, '[E]': 1 },
+  ],
+};
+
+const HEXOKINASE_RUN: SimulateResolvedOptions = {
+  ec: '2.7.1.1',
+  substrate: 'glucose',
+  organism: 'Oryctolagus cuniculus',
+  overrides: { km: '0.1mM', vmax: '0.01mM/s', i0: '1mM', s0: '10mM' },
+  model: 'noncompetitive',
+  inhibitor: 'MgADP-',
+  json: true,
+  exportModel: 'hexokinase.xml',
+  exportCitations: 'hexokinase.bib',
+};
+
+describe('a successful inhibition run reports through --json and the exports', () => {
+  // The defect: this path printed the human table and returned 0 before the
+  // JSON document or writeExports was reached. Reproduced on the committed
+  // page: `--json` gave text no parser reads, and neither file was written.
+
+  it('writes one document carrying the Ki under its inhibitor, and the result', async () => {
+    vi.mocked(resolveKinetic).mockResolvedValue(MGADP_NONCOMPETITIVE);
+    vi.mocked(runInhibitionModel).mockResolvedValue(ENGINE_NONCOMPETITIVE);
+    vi.mocked(exportCitations).mockResolvedValue({ ok: true, path: 'hexokinase.bib' });
+
+    const code = await commandSimulateResolved(HEXOKINASE_RUN);
+
+    expect(code).toBe(0);
+    const doc = JSON.parse(out.join('')) as Record<string, any>;
+    expect(doc).toMatchObject({ ok: true, status: 'ran', model: 'noncompetitive' });
+    const ki = (doc.provenance as Array<Record<string, unknown>>).find((row) => row['name'] === 'ki')!;
+    expect(ki).toMatchObject({
+      value: 7.8,
+      citation: 'BRENDA ref 640206',
+      inhibitor: 'MgADP-',
+      askedMode: 'noncompetitive',
+    });
+    expect((ki['rowScope'] as string[]).join(' ')).toContain('mixed inhibition versus glucose');
+    expect(doc.result).toMatchObject({
+      engine: 'sbml',
+      viaSbml: true,
+      species: '[S]',
+      initial: 10,
+      final: 9.912245058919646,
+      points: ENGINE_NONCOMPETITIVE.trajectory.length,
+    });
+    expect(doc.result.trajectory).toEqual(ENGINE_NONCOMPETITIVE.trajectory);
+    // The run the engine was given is the one the table describes.
+    expect(vi.mocked(runInhibitionModel).mock.calls[0]).toEqual([
+      'noncompetitive',
+      { km: 0.1, vmax: 0.01, s0: 10, ki: 7.8, i0: 1, end: 10, points: 101 },
+    ]);
+  });
+
+  it('writes the citations with the inhibitor, and withholds the model with its reason', async () => {
+    vi.mocked(resolveKinetic).mockResolvedValue(MGADP_NONCOMPETITIVE);
+    vi.mocked(runInhibitionModel).mockResolvedValue(ENGINE_NONCOMPETITIVE);
+    vi.mocked(exportCitations).mockResolvedValue({ ok: true, path: 'hexokinase.bib' });
+
+    await commandSimulateResolved(HEXOKINASE_RUN);
+
+    const [cited, destination] = vi.mocked(exportCitations).mock.calls[0]!;
+    expect(destination).toBe('hexokinase.bib');
+    expect(cited).toEqual([
+      expect.objectContaining({
+        parameter: 'ki',
+        citationSource: 'BRENDA',
+        referenceId: '640206',
+        inhibitor: 'MgADP-',
+      }),
+    ]);
+    // No exporter here writes a noncompetitive model; writing it as plain
+    // Michaelis-Menten would be a file without the inhibitor in it.
+    expect(exportModel).not.toHaveBeenCalled();
+    const doc = JSON.parse(out.join('')) as Record<string, any>;
+    expect(doc.exports).toMatchObject({
+      model: null,
+      citations: 'hexokinase.bib',
+      written: { model: null, citations: true },
+    });
+    expect(doc.exports.modelWithheld).toMatch(/^No model file is written for an inhibition model yet/);
+  });
+
+  it('says the same to a person, after the result', async () => {
+    vi.mocked(resolveKinetic).mockResolvedValue(MGADP_NONCOMPETITIVE);
+    vi.mocked(runInhibitionModel).mockResolvedValue(ENGINE_NONCOMPETITIVE);
+    vi.mocked(exportCitations).mockResolvedValue({ ok: true, path: 'hexokinase.bib' });
+
+    const code = await commandSimulateResolved({ ...HEXOKINASE_RUN, json: false });
+
+    expect(code).toBe(0);
+    const text = out.join('').replace(/\x1b\[[0-9;]*m/g, '');
+    expect(text).toContain('Ki of MgADP-');
+    expect(text.indexOf('Result')).toBeLessThan(text.indexOf('Model not written'));
+    expect(text).toContain('No model file is written for an inhibition model yet.');
+    expect(text).toContain('Citations written hexokinase.bib');
+  });
+
+  it('leaves a document when the engine fails', async () => {
+    vi.mocked(resolveKinetic).mockResolvedValue(MGADP_NONCOMPETITIVE);
+    vi.mocked(runInhibitionModel).mockRejectedValue(new Error('engine exited 1'));
+    const stdout: string[] = [];
+    vi.mocked(process.stdout.write).mockImplementation(((chunk: string) => {
+      stdout.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write);
+
+    const code = await commandSimulateResolved(HEXOKINASE_RUN);
+
+    expect(code).toBe(2);
+    expect(JSON.parse(stdout.join(''))).toMatchObject({
+      ok: false,
+      status: 'engine_failed',
+      error: 'engine exited 1',
+    });
+  });
+});
+
+describe('a Ki you type, with --inhibitor, says whose it is', () => {
+  it('puts the inhibitor on the typed Ki row, and looks nothing up', async () => {
+    // --inhibitor beside --ki was accepted and read by nothing.
+    const code = await commandSimulateResolved({
+      ...LDH,
+      model: 'competitive',
+      overrides: { ...LDH.overrides, ki: '0.0019mM' },
+      inhibitor: 'gossypol',
+    });
+    expect(code).toBe(2); // s0 and i0 are still the student's to give
+    expect(sent()).toEqual([]);
+    const ki = document().provenance.find((row) => row['name'] === 'ki')!;
+    expect(ki).toMatchObject({ value: 0.0019, origin: 'user', inhibitor: 'gossypol' });
+    // No mode chose a typed value, and the row does not say one did.
+    expect(ki).not.toHaveProperty('askedMode');
+  });
+});
+
+describe('the command printed "in full" is the run that was asked for', () => {
+  const fullCommand = (): { heading: string; command: string } => {
+    const text = out.join('').replace(/\x1b\[[0-9;]*m/g, '');
+    const after = text.split('What to do next')[1] ?? '';
+    const heading = after.split('\n').find((line) => line.includes('In full')) ?? '';
+    return { heading: heading.trim(), command: after.split(heading)[1] ?? '' };
+  };
+
+  it('carries --ec, --allow-cross-species, --isoform and the values typed', async () => {
+    await commandSimulateResolved({
+      ...LDH,
+      json: false,
+      model: 'noncompetitive',
+      isoform: 'LDH-A',
+      allowCrossSpecies: true,
+      userCitations: new Map([['km', 'Smith 2019, PMID 12345']]),
+    });
+    const { command } = fullCommand();
+    expect(command).toContain('--ec "1.1.1.27"');
+    // A placeholder where a working identifier was, before.
+    expect(command).not.toContain('--enzyme');
+    expect(command).toContain('--allow-cross-species');
+    expect(command).toContain('--isoform "LDH-A"');
+    expect(command).toContain('--km 0.1mM');
+    expect(command).toContain('--vmax 0.01mM/s');
+    expect(command).toContain('--cite km="Smith 2019, PMID 12345"');
+  });
+
+  it('names the placeholder it prints, rather than calling it an example value', async () => {
+    await commandSimulateResolved({ ...LDH, json: false, model: 'noncompetitive' });
+    const { heading, command } = fullCommand();
+    expect(command).toContain('--inhibitor "<inhibitor>"');
+    expect(heading).toBe(
+      'In full, with the example values above; replace <inhibitor> with your own before running it:',
+    );
+  });
+
+  it('keeps the plain heading when every value in it is one', async () => {
+    vi.mocked(resolveKinetic).mockResolvedValue(NOTHING('ki'));
+    await commandSimulateResolved({ ...LDH, json: false, model: 'competitive', inhibitor: 'oxamate' });
+    expect(fullCommand().heading).toBe('In full, with the example values above:');
+  });
+});
+
+describe('a refused product model is not switched to another model', () => {
+  // Rabbit hexokinase and N-acetyl-D-glucosamine, asked for a noncompetitive
+  // Ki: the real runner's answer on the committed page (2026-09-30). BRENDA's
+  // one rabbit row (ref 640206, 0.7 mM) says "competitive to glucose".
+  const COMPETITIVE_ONLY = {
+    ...NOTHING('ki'),
+    source: 'mode_withheld',
+    modesAvailable: ['competitive inhibition'],
+  } as ResolverResult;
+  const run = (model: 'product' | 'noncompetitive') =>
+    commandSimulateResolved({
+      ...LDH,
+      ec: '2.7.1.1',
+      substrate: 'glucose',
+      organism: 'Oryctolagus cuniculus',
+      model,
+      inhibitor: 'N-acetyl-D-glucosamine',
+    });
+
+  it('offers a noncompetitive model the competitive one', async () => {
+    vi.mocked(resolveKinetic).mockResolvedValue(COMPETITIVE_ONLY);
+    await run('noncompetitive');
+    const ki = document().unresolved.find((u) => u.startsWith('ki '))!;
+    expect(ki).toContain('To use one, run with --model competitive');
+  });
+
+  it('offers a product model none, and says why', async () => {
+    vi.mocked(resolveKinetic).mockResolvedValue(COMPETITIVE_ONLY);
+    await run('product');
+    const ki = document().unresolved.find((u) => u.startsWith('ki '))!;
+    expect(ki).toContain('(competitive inhibition)');
+    expect(ki).not.toContain('run with --model');
+    expect(ki).toContain('no other --model is offered');
+    // Not the default, which would deny that a competitive model exists.
+    expect(ki).not.toContain('none states a mechanism a model here is of');
+    expect(ki).toContain('Supply --ki with a constant');
+  });
+});
+
+describe('an enzyme that was never identified is not "no Ki in the literature"', () => {
+  it('prints the runner\'s own sentence, and names --ec', async () => {
+    // The runner's live answer for "lactate dehydrogenase" (2026-09-30):
+    // it names two enzymes, so no EC number was chosen and nothing searched.
+    vi.mocked(resolveKinetic).mockResolvedValue({
+      ...NOTHING('ki'),
+      source: 'ec_ambiguous',
+      logs: [
+        "'lactate dehydrogenase' names more than one enzyme: 1.1.98.-, 1.1.1.27. These are " +
+          'different proteins, so no EC number was chosen — a wrong one is a citation for ' +
+          'the wrong enzyme, not merely a wrong value. Re-run with the EC number you meant.',
+      ],
+    } as ResolverResult);
+    await commandSimulateResolved({
+      ...LDH,
+      ec: undefined,
+      enzyme: 'lactate dehydrogenase',
+      model: 'competitive',
+      inhibitor: 'gossypol',
+    });
+    const ki = document().unresolved.find((u) => u.startsWith('ki '))!;
+    expect(ki).toContain("'lactate dehydrogenase' names more than one enzyme: 1.1.98.-, 1.1.1.27.");
+    // BRENDA's human LDH page files three gossypol Ki rows (ref 711801); the
+    // search this sentence reported on never ran.
+    expect(ki).not.toContain('no inhibition constant for gossypol');
+
+    // And the next step, printed for a person, is the EC number.
+    out = [];
+    await commandSimulateResolved({
+      ...LDH,
+      json: false,
+      ec: undefined,
+      enzyme: 'lactate dehydrogenase',
+      model: 'competitive',
+      inhibitor: 'gossypol',
+    });
+    const next = out.join('').replace(/\x1b\[[0-9;]*m/g, '').split('What to do next')[1] ?? '';
+    expect(next).toContain('Name it by EC number with --ec and the lookup runs.');
+  });
 });

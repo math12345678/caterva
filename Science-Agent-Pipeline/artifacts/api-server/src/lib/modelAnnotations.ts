@@ -322,6 +322,34 @@ function parseDirectiveBody(
     inhibitionMode = lowered as InhibitionMode;
   }
 
+  // On a ki that names its inhibitor, `substrate=` is the MODEL's substrate,
+  // and only a stated mechanism reads it: the resolver ranks Ki rows by what
+  // they were measured versus when it chooses by mode, and at no other time
+  // (Tests/fallback_logic.py passes model_substrate to `_partition_mode`
+  // only). Without `inhibition=` it was accepted, documented as naming the
+  // model's substrate, and sent nowhere -- a field ignored while looking as
+  // though it was used, which is why `inhibitor=` on a km is refused above,
+  // and why `scientific resolve` refuses --model-substrate without --mode.
+  //
+  // Only with `inhibitor=`: a ki annotation without one is the older shape,
+  // whose `substrate=` was the compound looked up under. It still parses,
+  // and grounding says why nothing was looked up (modelGrounding.ts).
+  if (
+    quantity === "ki" &&
+    fields["inhibitor"] !== undefined &&
+    fields["substrate"] !== undefined &&
+    inhibitionMode === undefined
+  ) {
+    return {
+      error:
+        `substrate="${fields["substrate"]}" on a ki names the model's substrate, which ranks ` +
+        "Ki rows by what they were measured versus only when the mechanism is stated. Add " +
+        'inhibition="competitive", "noncompetitive" or "uncompetitive" for your rate law, or ' +
+        "remove substrate=; without inhibition= it would be ignored while looking as though " +
+        "it was used.",
+    };
+  }
+
   // Identity is mandatory. This is the whole reason the declaration
   // exists: without an enzyme or an EC number there is nothing to look
   // up, and picking one from the parameter's NAME is exactly the guess

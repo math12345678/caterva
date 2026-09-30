@@ -9,7 +9,8 @@ Tests/citation_export.py -- which was built and then callable from nowhere.
     {"format": "bibtex" | "ris",
      "cited": [{"parameter": "km", "citationSource": "BRENDA",
                 "referenceId": "740253", "url": "...", "title": "...",
-                "value": 2.5, "unit": "mM", "organism": "Homo sapiens"}]}
+                "value": 2.5, "unit": "mM", "organism": "Homo sapiens",
+                "inhibitor": "..."  (a Ki's inhibitor; optional)}]}
 
 An empty `cited` list is NOT an error. "This run had no literature-backed
 values" is a fact, and the exporters say so in the document rather than
@@ -89,6 +90,9 @@ def main() -> int:
                 value=entry.get("value"),
                 unit=entry.get("unit"),
                 organism=entry.get("organism"),
+                # A Ki's inhibitor, when the caller sent one (see
+                # CitedParameter.inhibitor).
+                inhibitor=entry.get("inhibitor") or None,
             )
         )
 
