@@ -104,7 +104,11 @@ def _angle_rows(text: str) -> dict:
 def _face_rows(text: str) -> dict:
     """angle -> every cell of its row in the face table: how far the crystal
     is from flat, the crystal's face, each replica's fractions on it and on
-    the other face, and the verdict. The two routes measure the same
+    the other face (for an angle in plane in the crystal, on the clockwise
+    face, the anticlockwise face and flat), and the verdict. Both routes
+    render a row through caterva.analyze.faces.face_cells and face_verdict,
+    so a row is the same string on both whenever the frames are judged
+    alike. The two routes measure the same
     elevation (gmx gangle -g1 plane -g2 vector against the native one, to
     0.00061 degrees per frame on both 10 ps lysozyme replicas, 2026-09-29)
     and decide each frame's face the same way, so the rows must be
@@ -131,22 +135,37 @@ def _faces_agree(native: dict, gromacs: dict) -> tuple:
     of this check, 2026-09-30). So: every row identical, except at most one
     row in which the fractions differ by one frame and no more. A real
     disagreement between the routes moves more than one frame or more than
-    one row."""
+    one row.
+
+    The fractions are read out of each cell, since a replica's cell holds
+    two or three of them ("1.00 (0.00)", or "clockwise 0.29, anticlockwise
+    0.00, flat 0.71" in plane in the crystal) and is not one number. Until
+    2026-09-30 a cell was compared only when it parsed as a single float,
+    so in the one row allowed to differ no replica's fractions were compared
+    at all. Only the verdict, the last cell, may differ in its words, since
+    one frame can move it across a threshold."""
     if not native or native.keys() != gromacs.keys():
         return False, 0
     differing = [k for k in native if native[k] != gromacs[k]]
     if len(differing) > 1:
         return False, len(differing)
     for k in differing:
-        for x, y in zip(native[k], gromacs[k]):
-            if x == y:
-                continue
-            try:
-                if abs(float(x) - float(y)) > 1 / SMOKE_FRAMES + 0.006:
-                    return False, 1
-            except ValueError:
+        if len(native[k]) != len(gromacs[k]):
+            return False, 1
+        for i, (x, y) in enumerate(zip(native[k], gromacs[k])):
+            if x == y or i == len(native[k]) - 1:
                 continue  # the verdict may follow the one frame
+            xs, ys = _FRACTION.findall(x), _FRACTION.findall(y)
+            if _FRACTION.sub("#", x) != _FRACTION.sub("#", y) or len(xs) != len(ys):
+                return False, 1
+            if any(abs(float(a) - float(b)) > 1 / SMOKE_FRAMES + 0.006 for a, b in zip(xs, ys)):
+                return False, 1
     return True, len(differing)
+
+
+#: A number as the face table prints one: a fraction ("0.29") or the
+#: crystal's distance from flat ("+2.1").
+_FRACTION = re.compile(r"[-+]?\d+\.\d+")
 
 
 def _water_rows(text: str) -> dict:

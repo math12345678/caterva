@@ -28,7 +28,8 @@ from caterva.analyze.__main__ import (EXIT_NOT_A_RESULT, AnalyzeError, Analysis,
                                       commands, face_section, gromacs_faces, main, measure_native)
 from caterva.analyze.angles import MOVED_DEG, RESOLVE_DEG, angle_deg
 from caterva.analyze.faces import (FLAT, FLAT_DEG, FLAT_IN_CRYSTAL, Face, elevation_deg, elevation_series,
-                                   face_fractions, face_name, face_verdict, from_gangle, polar_sine, side)
+                                   face_cells, face_fractions, face_name, face_verdict, from_gangle, polar_sine,
+                                   side)
 from caterva.analyze.plan import Atom, plan, read_pdb
 from caterva.analyze.rotamers import dihedral
 from caterva.md import xtc
@@ -281,13 +282,29 @@ def test_fractions_count_every_frame_and_the_flat_ones_as_neither():
     assert math.isnan(face_fractions("rep2", [], [], -1)[1])
 
 
+def test_with_the_crystal_in_plane_the_fractions_are_clockwise_and_anticlockwise():
+    # Positive elevation is the clockwise face (test_clockwise_seen_from_the_ca_is_positive).
+    assert face_fractions("rep1", [90.0] * 5, [-40.0, -40.0, 0.0, 3.0, 40.0], crystal_side=0) == (
+        "rep1", 0.2, 0.4)
+
+
 def _face(*replicas, crystal=-0.5):
     return Face("Asp20–His10–Ser30", -30.0, crystal,
                 [(f"rep{i + 1}", k, o) for i, (k, o) in enumerate(replicas)])
 
 
+IN_PLANE = 0.05  # a crystal polar sine inside the band: in plane
+
+
 @pytest.mark.parametrize("face,verdict", [
-    (_face((1.0, 0.0), crystal=0.05), FLAT_IN_CRYSTAL),
+    (_face((1.0, 0.0), crystal=IN_PLANE), f"{FLAT_IN_CRYSTAL}; one replica"),
+    (_face((0.05, 0.0), (0.0, 0.1), crystal=IN_PLANE), f"{FLAT_IN_CRYSTAL}; stayed in plane"),
+    (_face((0.9, 0.0), (0.85, 0.05), crystal=IN_PLANE), f"{FLAT_IN_CRYSTAL}; left it for the clockwise face"),
+    (_face((0.0, 0.95), (0.1, 0.85), crystal=IN_PLANE),
+     f"{FLAT_IN_CRYSTAL}; left it for the anticlockwise face"),
+    (_face((0.9, 0.0), (0.1, 0.0), crystal=IN_PLANE), f"{FLAT_IN_CRYSTAL}; replicas disagree"),
+    (_face((0.3, 0.2), (0.4, 0.1), crystal=IN_PLANE), f"{FLAT_IN_CRYSTAL}; partial"),
+    (_face((float("nan"), float("nan")), (0.0, 0.0), crystal=IN_PLANE), f"{FLAT_IN_CRYSTAL}; no frames"),
     (_face((1.0, 0.0)), "one replica"),
     (_face((1.0, 0.0), (float("nan"), float("nan"))), "no frames"),
     (_face((0.95, 0.0), (0.85, 0.05)), "kept its face"),
@@ -435,6 +452,88 @@ def test_both_routes_give_the_same_faces_on_real_frames(tmp_path, which):
     assert len([line for line in face_section(one) if line.startswith("| ") and "–" in line]) == 24
 
 
+#: The angles of the lysozyme fixture whose four points are within FLAT_DEG
+#: of flat in its em.gro, the structure the route test above takes as the
+#: crystal, with how far out of flat each is there (degrees).
+IN_PLANE_IN_EM_GRO = {"Ser50–Asp48–Asn59": 2.1, "Ser50–Asn46–Asn59": -0.3, "Asp48–Asn59–Ser50": 2.6,
+                      "Asp48–Asn59–Asn46": 5.8, "Asp48–Asn59–Asp52": 5.5}
+
+
+def test_an_angle_in_plane_in_the_crystal_reports_what_the_replica_did(tmp_path):
+    """Constructed from real coordinates: the atoms of the lysozyme run's
+    em.gro taken as the crystal, as the route test above takes them, and the
+    run's own 21 frames of replica 1. Five of the 24 angles are in plane
+    there. For each, the fractions on the clockwise and on the anticlockwise
+    face are counted here from what gmx gangle printed for those frames (its
+    elevations and its angles, not Caterva's), and the native route must
+    report the same. Until 2026-09-30 both fractions were zero for every
+    such angle and the report printed n/a: Ser50-Asn46-Asn59 is on the
+    anticlockwise face in 8 of the 21 frames, and Asp48-Asn59-Asn46 on the
+    clockwise face in 6."""
+    (tmp_path / "em.gro").write_bytes(gzip.decompress((MD / "lyso_1aki_res1-59.gro.gz").read_bytes()))
+    protein = [Atom("A", r, n, name, tuple(float(c) * 10 for c in xyz))
+               for r, n, name, xyz in _gro_atoms(tmp_path / "em.gro") if n != "SOL"]
+    rep = tmp_path / "rep1"
+    rep.mkdir()
+    (rep / "md.xtc").write_bytes((MD / "lyso_1aki_res1-59.xtc").read_bytes())
+    p = plan(protein, [(r, next(a.resname for a in protein if a.resnr == r)) for r in MCSA_ORDER])
+    native = measure_native(tmp_path, p, [rep])[6]
+    in_plane = {f.label: f for f in native if f.crystal_side == 0}
+    assert {k: round(f.crystal_out_of_flat_deg, 1) for k, f in in_plane.items()} == IN_PLANE_IN_EM_GRO
+
+    faces, angles = _printed("lyso_1aki_rep1_gmx_faces.txt"), _printed("lyso_1aki_rep1_gmx_angles.txt")
+    for t, f in zip(p.faces, native):
+        if f.crystal_side:
+            continue
+        key = (t.a.resnr, t.v.resnr, t.b.resnr)
+        sides = [side(polar_sine(theta, from_gangle(alpha))) for theta, alpha in zip(angles[key], faces[key])]
+        assert f.per_replica == [("rep1", sides.count(1) / 21, sides.count(-1) / 21)], f.label
+    assert in_plane["Ser50–Asn46–Asn59"].per_replica == [("rep1", 0.0, 8 / 21)]
+    assert in_plane["Asp48–Asn59–Asn46"].per_replica == [("rep1", 6 / 21, 0.0)]
+    # Some stay in plane throughout, which the row says as plainly.
+    assert in_plane["Ser50–Asp48–Asn59"].per_replica == [("rep1", 0.0, 0.0)]
+
+    rows = face_section(Analysis("1AKI", None, "test", p, [], None, None, None, [], None, native))
+    assert ("| Ser50–Asn46–Asn59 | -0.3 | flat | clockwise 0.00, anticlockwise 0.38, flat 0.62 | "
+            f"{FLAT_IN_CRYSTAL}; one replica |") in rows
+    assert ("| Ser50–Asp48–Asn59 | +2.1 | flat | clockwise 0.00, anticlockwise 0.00, flat 1.00 | "
+            f"{FLAT_IN_CRYSTAL}; one replica |") in rows
+    assert not any("n/a" in row for row in rows if row.startswith("| ") and "–" in row)
+
+
+def _md_smoke():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "md_smoke", Path(__file__).resolve().parents[2] / "scripts" / "md_smoke.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.parametrize("native_cell, gromacs_cell, agree", [
+    # One frame of five apart, on a face row and on an in-plane row.
+    ("0.80 (0.00)", "1.00 (0.00)", True),
+    ("clockwise 0.20, anticlockwise 0.00, flat 0.80", "clockwise 0.00, anticlockwise 0.00, flat 1.00", True),
+    # Two frames apart: a disagreement, which a cell that is not one float
+    # used to let through.
+    ("0.60 (0.00)", "1.00 (0.00)", False),
+    ("clockwise 0.40, anticlockwise 0.00, flat 0.60", "clockwise 0.00, anticlockwise 0.00, flat 1.00", False),
+    # Different words: not the same rendering.
+    ("0.80 (0.00)", "clockwise 0.80, anticlockwise 0.00, flat 0.20", False),
+])
+def test_md_smoke_compares_the_fractions_inside_each_cell(native_cell, gromacs_cell, agree):
+    """scripts/md_smoke.py's comparison of the two routes' face tables, on
+    rows shaped as face_cells renders them. One row may differ by one frame
+    (of the smoke run's five), and its verdict with it; no more."""
+    faces_agree = _md_smoke()._faces_agree
+    native = {"Ser50–Asn46–Asn59": ["-0.3", "flat", native_cell, "partial"],
+              "Asp48–Asn59–Asn46": ["+5.8", "flat", "0.00 (0.00)", "partial"]}
+    gromacs = {**native, "Ser50–Asn46–Asn59": ["-0.3", "flat", gromacs_cell, "stayed in plane"]}
+    assert faces_agree(native, gromacs) == (agree, 1)
+    assert faces_agree(native, dict(native)) == (True, 0)
+
+
 # --- the report and the exit code -----------------------------------------------------------
 
 def _ar1(rng, n, mu, sd, phi=0.5):
@@ -511,12 +610,18 @@ def test_the_verdict_waits_for_the_distances(tmp_path, capsys):
     assert "| (kept its face, not yet a result) |" in _section(capsys.readouterr().out)
 
 
-def test_a_flat_crystal_has_no_face_to_keep(tmp_path, capsys):
+def test_a_crystal_in_plane_has_no_face_to_keep_and_its_replicas_are_still_reported(tmp_path, capsys):
+    """The triad's CA laid in the plane of its angle, and every frame of
+    both replicas 45 degrees out of it on the anticlockwise side (this
+    file's constructed run, as the rows above use). Until 2026-09-30 the row
+    printed n/a for each replica, although every frame had left the plane."""
     d = _fake_run(tmp_path, [[-45.0], [-45.0]])
     (d / "protein.pdb").write_text(_triad(his_ca_z=0.0))
     main([str(d), "--no-run"], catalytic=_catalytic)
     row = next(line for line in _section(capsys.readouterr().out).splitlines() if line.startswith("| Asp20"))
-    assert row == f"| Asp20–His10–Ser30 | +0.0 | flat | n/a | n/a | {FLAT_IN_CRYSTAL} |"
+    assert row == ("| Asp20–His10–Ser30 | +0.0 | flat | clockwise 0.00, anticlockwise 1.00, flat 0.00 | "
+                   f"clockwise 0.00, anticlockwise 1.00, flat 0.00 | {FLAT_IN_CRYSTAL}; left it for the "
+                   "anticlockwise face |")
 
 
 def test_a_run_analysed_before_the_faces_existed_is_refused_by_name(tmp_path, capsys):

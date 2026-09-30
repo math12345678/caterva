@@ -813,11 +813,19 @@ frames that are on a face and skipping the flat frames between them, the
 face changed 6 times, each to or from a lone frame just past the band; the
 two counts are of different things, and only 2 of the 6 fall on strictly
 consecutive frames. Each angle is reported with how far
-its crystal arms are from flat, the crystal's face (or flat, with no face
-to keep), and per replica the fraction of frames on the crystal's face and
-on the other; it is called kept its face, changed face, went flat, partial
-or replicas disagree, with the thresholds printed, and like the rotamers
-and water it is a result only when the distances are. Because the Cα is the
+its crystal arms are from flat, the crystal's face, and per replica the
+fraction of frames on the crystal's face and on the other; it is called
+kept its face, changed face, went flat, partial or replicas disagree, with
+the thresholds printed, and like the rotamers and water it is a result only
+when the distances are. When the crystal's own arms are within 7.5 degrees
+of flat there is no face to keep, and the row says "in plane in the
+crystal"; each replica's cell then gives the fractions of frames on the
+clockwise face, on the anticlockwise face and flat, and the verdict says
+whether the replicas stayed in plane or left it for one face, by the same
+thresholds. Until 2026-09-30 those rows printed n/a for every replica. On
+the 21-frame lysozyme replica, taking its minimised starting structure as
+the crystal, 5 of the 24 angles are in plane there, and Ser50-Asn46-Asn59
+is on the anticlockwise face in 8 of the 21 frames. Because the Cα is the
 vertex's own, a side chain that turns over under its partners changes face
 too, which the rotamer table will show. On 21 frames of a lysozyme replica
 every elevation equals `gmx gangle -g1 plane -g2 vector`'s to 0.001 degree,
