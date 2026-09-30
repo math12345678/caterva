@@ -95,6 +95,23 @@ cross_species_candidates  # arrived 2026-08-20. Computed by the resolver and
                           # can see it. Their call whether it should be.
 
 # ---------------------------------------------------------------------------
+# READ IN-PROCESS BY CATERVA COMPOSE, NOT A FINDING FOR THE API
+# ---------------------------------------------------------------------------
+evidence_only  # Added 2026-09-30. What the resolver would have returned had
+               # it not been asked for an isoform or an inhibition mode, its
+               # choice first. `caterva compose` calls the resolver in-process
+               # (caterva/agents/scouts.py) and reads this through
+               # ParameterSource.evidence_only, so its report can say which row
+               # the model's isoform or mode replaced and why
+               # (caterva/compose/narrowed.py). The runner does not emit it.
+               # The API and the TypeScript CLI say what the returned row
+               # measured (`rowScopeFlags` in queryResolver.ts, `rowScopeLines`
+               # in literatureResolver.ts, both read for this entry) and never
+               # show an answer the resolver was not asked for, so there is no
+               # replaced row for them to name. If either comes to say "the
+               # mode moved the value from X", this is where X is.
+
+# ---------------------------------------------------------------------------
 selected_form.value  # Prose-carried, verified by reading `selectedFormFlags`:
                      # it renders `form.reason` and nothing else. The value is
                      # named inside that sentence. Not machine-readable, same

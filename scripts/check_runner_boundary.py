@@ -162,6 +162,13 @@ EMITTED_AS: dict[str, str | None] = {
     # because "nobody emits it" and "nobody has decided" look identical in
     # an absent entry, and the second is what ADR 0039 cost.
     "cross_species_candidates": None,
+    # What the resolver would have returned unasked for an isoform or an
+    # inhibition mode, its choice first. Read in-process by `caterva
+    # compose` (caterva/compose/narrowed.py), through ParameterSource, to
+    # say which row the model's isoform or mode replaced. The runner never
+    # names it: the API shows the row returned and never an answer it did
+    # not ask for (docs/undelivered-fields-baseline.txt says the same).
+    "evidence_only": None,
     "literature_candidates": "literatureCandidates",
     "search_log": "logs",
 }

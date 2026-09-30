@@ -178,7 +178,10 @@ class ParameterScout:
         return AgentResult(
             writes={
                 param_key(quantity): Resolution(
-                    request=self.request, source=source, reason=reason
+                    request=self.request, source=source, reason=reason,
+                    # The resolver's word for a refusal, so compose can tell
+                    # "found and withheld for this model" from "not found".
+                    outcome=None if source is not None else getattr(result, "source", None),
                 )
             },
             notes=tuple(notes),
@@ -363,6 +366,16 @@ def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
                 f"{request.quantity} needs an EC number to resolve through "
                 f"BRENDA; none was identified for {request.subject!r}"
             )
+        # What the model is of, when the request says: the resolver ranks
+        # by the isoform, and a Ki by the model's inhibition mode and
+        # substrate, over every row BRENDA holds, before it chooses one.
+        # `caterva compose` fills these (ComposedModel.parameter_requests);
+        # a request without them is ranked on evidence alone, as before.
+        asked = {
+            name: getattr(request, name, None)
+            for name in ("isoform", "inhibition_mode", "model_substrate")
+            if getattr(request, name, None)
+        }
         return resolve_kinetic_value(
             enzyme_ec=request.ec_number,
             organism=organism or "",
@@ -370,7 +383,7 @@ def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
             enzyme_name=request.subject,
             quantity=request.table or "km",
             allow_cross_species=allow_cross_species,
-            **resolver_kwargs,
+            **{**asked, **resolver_kwargs},
         )
 
     return resolve

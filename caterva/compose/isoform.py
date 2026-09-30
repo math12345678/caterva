@@ -7,8 +7,11 @@ evidenced and returns the first, LDH-B's. A model of LDH-A, the isoform
 cancer glycolysis runs through, then carries LDH-B's constant; the report says
 so (row_scope), and until now there was nothing the user could do about it.
 
-`caterva compose --isoform LDH-A` asks for the isoform. For each measured
-constant, among the rows the resolver already ranked:
+`caterva compose --isoform LDH-A` asks for the isoform. The resolver is told
+it with every constant's request and ranks every row it holds by it before it
+chooses (narrowed.py); its row is carried. This then says, for each measured
+constant, what that did, against the row the evidence alone would take, by
+these three cases:
 
 1. a row that names the isoform asked for is used;
 2. failing that, a row that names no isoform is used, and the report says
@@ -17,8 +20,14 @@ constant, among the rows the resolver already ranked:
    refused rather than filled with a different protein's value.
 
 A row is read by `caterva.bind.core.read_isoform`, the reader `caterva bind
---isoform` uses, so the two commands agree about what a row measured. Names
-compare without case, spaces or hyphens: "LDH-A", "ldha" and "LDH A" are one.
+--isoform` uses, so the two commands agree about what a row measured, and
+names are compared by `caterva.bind.core.same_isoform`, which the literature
+layer's resolver uses too (Tests/fallback_logic.py, `_same_isoform`). Names
+compare without case, spaces or hyphens: "LDH-A", "ldha" and "LDH A" are one,
+as are "MAO B", "MAO-B" and "MAOB"; a row naming two isoforms ("isoenzyme I
+and isoenzyme II") is the same as either. There was a second copy of that
+comparison here and a third in the resolver; one function now, so the two
+cannot disagree about whether a row measured the isoform asked for.
 """
 from __future__ import annotations
 
@@ -26,13 +35,10 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, List, Mapping, Optional
 
-
-def _key(name: Optional[str]) -> Optional[str]:
-    return re.sub(r"[\s_-]+", "", name).lower() if name else None
-
-
-def same_isoform(a: Optional[str], b: Optional[str]) -> bool:
-    return a is not None and b is not None and _key(a) == _key(b)
+try:
+    from caterva.bind.core import same_isoform
+except ImportError:  # pragma: no cover - flat layout
+    from bind.core import same_isoform  # type: ignore[no-redef]
 
 
 def _read_isoform(text: Optional[str]) -> Optional[str]:

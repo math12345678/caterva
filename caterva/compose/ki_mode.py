@@ -21,7 +21,10 @@ below. The report was right and the model was still wrong.
 
 For an inhibition constant (a row from `row_scope.INHIBITION_TABLES`) of an
 inhibition motif (one in `row_scope.MODE_OF_MOTIF`), this chooses among the
-rows the resolver already ranked, in this order:
+rows the resolver ranked, in the order below. The resolver is asked by the
+same order first, over every row it holds, and its row is the one carried
+(narrowed.py); this says what that choice did, and is what `--any-mode`
+reports against.
 
 1. rows whose stated mode is the model's. A mixed row counts for a
    noncompetitive model (`row_scope.mode_fits`, the definition the report
@@ -154,14 +157,18 @@ whether it measured the isoform is unknown.
 
 THE SAME RANKING BEFORE A ROW IS CHOSEN
 ---------------------------------------
-`rank` is also what the literature layer ranks BRENDA's rows with when the
-API or the TypeScript CLI asks for a Ki by mode
-(`fallback_logic.resolve_kinetic_value(inhibition_mode=...)`, reached from
-the API's inhibition domains and `scientific resolve --mode`). There it
-runs before a row is chosen, over every row the isoform and variant steps
-kept, where `select_mode` runs after, over the rows the resolver returned;
-`fallback_logic._partition_mode` says what that changes. The rule itself
-is here once.
+`rank` is also what the literature layer ranks BRENDA's rows with when a Ki
+is asked for by mode (`fallback_logic.resolve_kinetic_value(inhibition_mode=
+...)`, reached from the API's inhibition domains, `scientific resolve --mode`
+and, since 2026-09-30, `caterva compose` itself). There it runs before a row
+is chosen, over every row the isoform and variant steps kept, and the row it
+returns is the row compose carries (narrowed.py). `select_mode` still ranks,
+over the resolver's answer shown beside the row the evidence alone would take
+(`narrowed.evidence_view`), and so says in compose's words which row the
+mode replaced and why. Before that date compose asked the resolver for no
+mode and chose here among the few rows its evidence frontier kept, and could
+carry another row than the API: `fallback_logic._partition_mode` gives the
+Trypanosoma cruzi case. The rule itself is here once.
 
 A row is read by `caterva.bind.core.read_mode`, the reader `row_scope` and
 `caterva bind` use, so the three agree about what a row states. That reader
@@ -333,8 +340,11 @@ def _reference(m: Any) -> Optional[str]:
     ref = getattr(m, "reference_id", None)
     if ref:
         return str(ref)
-    found = re.search(r"\bref\s+(\S+)", str(getattr(m, "citation", "") or ""))
-    return found.group(1) if found else None
+    # "BRENDA ref 739793", as the adapter cites a row; "reference_id:703627",
+    # as the agents' assay-window re-selection cites the row it moved to.
+    found = re.search(r"\bref\s+(\S+)|\breference_id:(\S+)",
+                      str(getattr(m, "citation", "") or ""))
+    return (found.group(1) or found.group(2)) if found else None
 
 
 def _same(row: Mapping[str, Any], pick: _Row) -> bool:

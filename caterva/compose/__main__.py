@@ -910,14 +910,17 @@ def _search_the_literature(
     because a wrong EC number is a citation for the wrong protein rather
     than merely a wrong value.
 
-    THE RESOLVER RANKS ROWS BY EVIDENCE; THE MODEL KNOWS WHAT IT NEEDS.
-    The resolver cannot tell LDH-A's row from LDH-B's, or a competitive Ki
-    from a noncompetitive one, because nothing in its grades is about the
-    model. Two selections then choose among the rows it ranked: the isoform
-    `--isoform` asked for (isoform.py), and for an inhibition constant, a
-    row whose stated mode fits the motif (ki_mode.py, on unless
-    `--any-mode`). A constant either refuses is a placeholder whose reason
-    says so, never one described as not found.
+    THE RESOLVER IS TOLD WHAT THE MODEL IS OF. Its evidence grades cannot
+    tell LDH-A's row from LDH-B's, or a competitive Ki from a noncompetitive
+    one, so each request carries the isoform `--isoform` asked for and, for
+    an inhibition constant, the motif's mode and the model's substrate
+    (unless `--any-mode`). The resolver ranks every row by them before it
+    chooses, as it does for the API and the TypeScript CLI, and the row it
+    returns is the row carried (narrowed.py). The two selections then say
+    what that choice did, against the row the evidence alone would have
+    taken: the isoform (isoform.py), then the mode (ki_mode.py). A constant
+    the resolver or a selection refuses is a placeholder whose reason says
+    so, never one described as not found.
     """
     from caterva.checkout import LiteratureLayerUnavailable, literature_module
 
@@ -960,13 +963,13 @@ def _search_the_literature(
         ), True
 
     try:
-        from caterva.compose.export import (
-            measured_from_search, unresolved_from_search,
-        )
+        from caterva.compose.export import unresolved_from_search
         from caterva.compose.pipeline import compose_and_parameterise
         _, search = compose_and_parameterise(
             model.query, subject=ec, organism=args.organism,
             substrate=args.substrate, compounds=compounds_from(args),
+            isoform=getattr(args, "isoform", None) or None,
+            any_mode=bool(getattr(args, "any_mode", False)),
         )
     except LiteratureLayerUnavailable as exc:
         return model, str(exc), True
@@ -981,34 +984,28 @@ def _search_the_literature(
                 "compound that was not named. " + "; ".join(sorted(set(skipped.values())))), False
         return model, "No search was run: this model has nothing a database could supply.", False
 
-    measured = measured_from_search(search)
+    # The resolver was told what the model is of, and its row for each
+    # constant is carried; the selections say what that choice did
+    # (narrowed.py). On by default: a noncompetitive model carrying a
+    # competitive constant is wrong whether or not the report admits it.
+    # --any-mode keeps the resolver's pick.
+    from caterva.compose.ki_mode import constants_of
+    from caterva.compose.narrowed import select_for_model
+
     not_found = {**skipped, **unresolved_from_search(search)}
-    isoform_notes: List[str] = []
-    # Constants the search returned a value for and the selections below
-    # refused. They end up placeholders like the ones the search found
-    # nothing for, and must not be described as found-nothing.
-    withheld: Dict[str, str] = {}
-    if getattr(args, "isoform", None):
-        from caterva.compose.isoform import select_isoform
-        by_isoform = select_isoform(measured, args.isoform)
-        measured = by_isoform.measured
-        withheld.update(by_isoform.refused)
-        isoform_notes = by_isoform.notes
-    # The isoform first, then the mode, over the same ranked rows; ki_mode's
-    # docstring says why in that order. On by default: a noncompetitive model
-    # carrying a competitive constant is wrong whether or not the report
-    # admits it. --any-mode keeps the resolver's pick.
-    from caterva.compose.ki_mode import constants_of, select_mode
-    by_mode = select_mode(
-        measured, constants_of(model),
+    chosen = select_for_model(
+        search, constants_of(model),
         substrate=getattr(model, "substrate", None) or getattr(args, "substrate", None),
-        isoform=getattr(args, "isoform", None),
+        isoform=getattr(args, "isoform", None) or None,
         any_mode=bool(getattr(args, "any_mode", False)),
     )
-    measured = by_mode.measured
-    withheld.update(by_mode.refused)
+    measured = chosen.measured
+    # Constants the search returned a value for, or found rows for, and did
+    # not use. They end up placeholders like the ones the search found
+    # nothing for, and must not be described as found-nothing.
+    withheld: Dict[str, str] = chosen.withheld
     not_found.update(withheld)
-    selection_notes = isoform_notes + by_mode.notes
+    selection_notes = chosen.notes
     failures = [
         run for branch in getattr(search, "branches", ())
         for record in getattr(branch.build.run, "rounds", ())

@@ -129,6 +129,12 @@ class ParameterSource:
     candidates: Tuple[Any, ...] = ()
     #: The source row's own commentary (isoform, inhibition mode, assay).
     commentary: Optional[str] = None
+    #: `KineticResult.evidence_only`: when the resolver was asked for an
+    #: isoform or an inhibition mode, the rows it would have chosen among
+    #: without them, its choice first. Empty otherwise. Read by `caterva
+    #: compose` to say which row the request replaced and why; not a
+    #: candidate for this value, which `candidates` holds.
+    evidence_only: Tuple[Any, ...] = ()
 
     @property
     def conditions_stated(self) -> bool:

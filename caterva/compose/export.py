@@ -945,6 +945,40 @@ def unresolved_from_search(search: Any) -> Dict[str, str]:
     return out
 
 
+def evidence_only_from_search(search: Any) -> Dict[str, Tuple[Any, ...]]:
+    """Per quantity, the rows the resolver would have chosen among had it not
+    been asked for the model's isoform or inhibition mode, its choice first
+    (`ParameterSource.evidence_only`, from `KineticResult.evidence_only`).
+    Only quantities that carry any. Read by `narrowed.evidence_view`, so the
+    report can say which row the model's isoform or mode replaced."""
+    build = search if hasattr(search, "resolutions") else getattr(search, "build", None)
+    out: Dict[str, Tuple[Any, ...]] = {}
+    for quantity, resolution in getattr(build, "resolutions", {}).items():
+        rows = tuple(getattr(getattr(resolution, "source", None), "evidence_only", ()) or ())
+        if rows:
+            out[quantity] = rows
+    return out
+
+
+def withheld_by_resolver(search: Any) -> Dict[str, str]:
+    """Per quantity the resolver found rows for and refused every one of for
+    the model's isoform or inhibition mode, its word for it
+    ("isoform_withheld", "mode_withheld"). Those are values returned and not
+    used, a third fact beside found and not found, and the report must not
+    call them either of the others (`adapters.WITHHELD_SOURCES`)."""
+    try:
+        from caterva.agents.adapters import WITHHELD_SOURCES
+    except ImportError:  # pragma: no cover - flat layout
+        from agents.adapters import WITHHELD_SOURCES  # type: ignore[no-redef]
+    build = search if hasattr(search, "resolutions") else getattr(search, "build", None)
+    return {
+        quantity: resolution.outcome
+        for quantity, resolution in getattr(build, "resolutions", {}).items()
+        if getattr(resolution, "source", None) is None
+        and getattr(resolution, "outcome", None) in WITHHELD_SOURCES
+    }
+
+
 def _unpack(source: Any) -> Tuple[Any, Any, Optional[str], Optional[str]]:
     """(composition, network, query, subject) from whatever was passed."""
     composition = getattr(getattr(source, "recognition", None), "composition", None)

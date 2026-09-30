@@ -93,6 +93,19 @@ class ParameterRequest:
     #: Checked at substitution; nothing is converted. Absent means no unit
     #: check is possible, and the report says so rather than implying one.
     expected_unit: Optional[str] = None
+    #: What the model is OF, for the resolver to rank rows by before it
+    #: chooses one (fallback_logic.resolve_kinetic_value's `isoform`,
+    #: `inhibition_mode` and `model_substrate`): the isoform the model is
+    #: about, the inhibition mode of the motif this constant belongs to (a Ki
+    #: only), and the model's substrate, which for a Ki is not `substrate`
+    #: (BRENDA files a Ki under the inhibitor). Absent means the resolver
+    #: ranks on evidence alone, as it did for every request before
+    #: 2026-09-30, when `caterva compose` ranked afterwards, among the rows
+    #: the evidence had already narrowed to, and could carry another row than
+    #: the API for the same model (caterva/compose/narrowed.py).
+    isoform: Optional[str] = None
+    inhibition_mode: Optional[str] = None
+    model_substrate: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -106,6 +119,12 @@ class Resolution:
     #: in a rabbit, and you did not ask for rabbit data" are different
     #: facts and a summary of both would be neither.
     reason: Optional[str] = None
+    #: The resolver's word for what happened when nothing is used
+    #: (`KineticResult.source`: "isoform_withheld", "mode_withheld", ...),
+    #: so a caller can tell values found and refused from values not found
+    #: without reading `reason`. None when a value was used, or when the
+    #: resolver gave no word.
+    outcome: Optional[str] = None
 
     @property
     def found(self) -> bool:
