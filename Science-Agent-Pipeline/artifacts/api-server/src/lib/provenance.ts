@@ -281,6 +281,33 @@ export const RESOLVABLE_FIELDS: Record<string, string[]> = {
   wright_fisher: ["mutation_rate"],
 };
 
+/** The mechanisms a model can be of, and so the modes a Ki can be asked for
+ * by (caterva.compose.ki_mode.MODES). */
+export type InhibitionMode = "competitive" | "noncompetitive" | "uncompetitive";
+
+/**
+ * The inhibition mode of each domain that resolves a Ki, which the Ki lookup
+ * sends so the runner takes a row whose stated mode fits the model
+ * (caterva.compose.ki_mode's ranking, the one `caterva compose` uses).
+ *
+ * WHY. BRENDA ref 739793 gives human LDH two Ki values for one quinoline
+ * sulfonamide from one paper: 0.00059 mM "competitive versus NADH" and
+ * 0.00252 mM "noncompetitive versus pyruvate". They are constants of two
+ * mechanisms, and the lookup used to take the lower whatever the model was.
+ * On the recorded rabbit hexokinase page, MgADP-'s only Ki rows are mixed
+ * (3 mM versus MgATP2-, 7.8 mM versus glucose, ref 640206): the runner asked
+ * without a mode returns 3 mM, and asked for competitive refuses and names
+ * both (run on Tests/fixtures/recorded/brenda_2.7.1.1.html.gz, 2026-09-29).
+ *
+ * Every domain in RESOLVABLE_FIELDS that resolves "ki" must appear here; a
+ * test holds the two together, so a noncompetitive domain added later
+ * cannot resolve a competitive constant by forgetting a line.
+ * mm_competitive_inhibition is the only one today.
+ */
+export const KI_MODE_OF_DOMAIN: Readonly<Record<string, InhibitionMode>> = {
+  mm_competitive_inhibition: "competitive",
+};
+
 /**
  * Domains whose (beta, gamma) resolve from a literature (R0, infectious
  * period) pair — ADR 0017 / ADR 0020.
@@ -541,6 +568,12 @@ export interface ParameterProvenance {
     | "variant_withheld"
     /** An isoform was asked for and every row measured another one. */
     | "isoform_withheld"
+    /**
+     * The model's inhibition mode was asked for and every Ki row states
+     * another: the constants that exist belong to other mechanisms. Not "not
+     * found", and not a reason to use one of them either.
+     */
+    | "mode_withheld"
     /**
      * The run stopped at the ENZYME NAME, before any database was asked
      * for a value.

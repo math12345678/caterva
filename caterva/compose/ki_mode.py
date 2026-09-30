@@ -152,6 +152,17 @@ the two steps gives 0.791 there. When every row for the isoform states
 another mode, a row naming no isoform that fits is used, and the note says
 whether it measured the isoform is unknown.
 
+THE SAME RANKING BEFORE A ROW IS CHOSEN
+---------------------------------------
+`rank` is also what the literature layer ranks BRENDA's rows with when the
+API or the TypeScript CLI asks for a Ki by mode
+(`fallback_logic.resolve_kinetic_value(inhibition_mode=...)`, reached from
+the API's inhibition domains and `scientific resolve --mode`). There it
+runs before a row is chosen, over every row the isoform and variant steps
+kept, where `select_mode` runs after, over the rows the resolver returned;
+`fallback_logic._partition_mode` says what that changes. The rule itself
+is here once.
+
 A row is read by `caterva.bind.core.read_mode`, the reader `row_scope` and
 `caterva bind` use, so the three agree about what a row states. That reader
 takes the first mode a commentary names. BRENDA's hexokinase Inhibitors
@@ -212,20 +223,33 @@ class ModeSelection:
     notes: List[str] = field(default_factory=list)
 
 
+# -- The ranking ------------------------------------------------------------
+#
+# ONE RANKING, TWO CALLERS. `select_mode` below ranks a Measurement's
+# alternatives with these functions, and the literature layer ranks BRENDA's
+# rows with the same functions before it chooses one
+# (Tests/fallback_logic.py, `resolve_kinetic_value(inhibition_mode=...)`),
+# which is how the API and the TypeScript CLI ask for a Ki by mode. A
+# second copy of the rule would drift from this one the way ADR 0027's two
+# graders drifted, so there is none; the callers differ only in which rows
+# they rank and how they break a tie between rows ranked alike.
+
+#: The modes a model can be of, and so the modes a caller may rank for:
+#: the values of `row_scope.MODE_OF_MOTIF`, derived rather than listed again.
+#: No motif is a mixed or a partial inhibitor. A mixed row stands in for a
+#: noncompetitive model (`mode_fits`); a partial row stands in for none.
+MODES = tuple(sorted(set(MODE_OF_MOTIF.values())))
+
+
 @dataclass(frozen=True)
-class _Row:
-    """One ranked row, read once."""
-    value: float
-    unit: Optional[str]
-    reference: Optional[str]
-    conditions: Optional[str]
+class Reading:
+    """What one row's commentary states, read once, by the reader `row_scope`
+    and `caterva bind` use. Every rank below is a function of this and of
+    the model, and of nothing else about the row."""
     mode: str
     versus: Optional[str]
     isoform: Optional[str]
-    #: The dict the resolver ranked; None for the pick itself.
-    source: Optional[Mapping[str, Any]]
-    #: Position in the resolver's order, the pick at 0.
-    order: int
+    conditions: Optional[str]
 
     @property
     def kitz_wilson(self) -> bool:
@@ -238,6 +262,67 @@ class _Row:
             return ("no inhibition mode (a Kitz-Wilson inactivation constant)"
                     if self.kitz_wilson else "no inhibition mode")
         return f"{self.mode} inhibition" + (f" versus {self.versus}" if self.versus else "")
+
+
+def read_row(conditions: Optional[str]) -> Reading:
+    """The Reading of one row's commentary (BRENDA's conditions cell)."""
+    mode, versus, isoform = _read(conditions)
+    return Reading(mode, versus, isoform, conditions or None)
+
+
+def isoform_rank(row: Reading, wanted: Optional[str]) -> Optional[int]:
+    """0 names the isoform asked for (or none was asked for), 1 names none,
+    None names another: never a candidate."""
+    if not wanted or same_isoform(row.isoform, wanted):
+        return 0
+    return 1 if row.isoform is None else None
+
+
+def mode_rank(row: Reading, want: str, substrate: Optional[str]) -> Optional[Tuple[int, int, int]]:
+    """(fits, versus, exactness), lower is better; None for another mode.
+
+    fits: 0 the row states the model's mode, 1 it states none, 2 it states
+    none and is a Kitz-Wilson inactivation constant.
+    versus: 0 measured versus the model's substrate, 1 names nothing (or the
+    model names no substrate to judge it by), 2 versus another molecule.
+    exactness: 0 the model's own mode, 1 mixed standing in for noncompetitive.
+    """
+    if row.mode == "unstated":
+        return (2 if row.kitz_wilson else 1, 1, 0)
+    if not mode_fits(row.mode, want):
+        return None
+    if row.versus is None or not substrate:
+        versus = 1
+    elif versus_is(row.versus, substrate):
+        versus = 0
+    else:
+        versus = 2
+    return (0, versus, 0 if row.mode == want else 1)
+
+
+def rank(row: Reading, want: str, substrate: Optional[str] = None,
+         isoform: Optional[str] = None) -> Optional[Tuple[int, int, int, int]]:
+    """(isoform, fits, versus, exactness): the isoform first, then the mode,
+    lower is better. None for a row that is never a candidate, because it
+    names another isoform or states another mode. Rows with equal ranks are
+    equally good for the model; the caller breaks the tie by its own order."""
+    iso = isoform_rank(row, isoform)
+    mode = mode_rank(row, want, substrate)
+    if iso is None or mode is None:
+        return None
+    return (iso, *mode)
+
+
+@dataclass(frozen=True)
+class _Row(Reading):
+    """One ranked row, read once, with its value and its place."""
+    value: float = 0.0
+    unit: Optional[str] = None
+    reference: Optional[str] = None
+    #: The dict the resolver ranked; None for the pick itself.
+    source: Optional[Mapping[str, Any]] = None
+    #: Position in the resolver's order, the pick at 0.
+    order: int = 0
 
     def label(self) -> str:
         ref = f", BRENDA ref {self.reference}" if self.reference else ""
@@ -268,9 +353,9 @@ def _same(row: Mapping[str, Any], pick: _Row) -> bool:
 def _rows(m: Any) -> Tuple[List[_Row], List[_Row]]:
     """The pick and every other ranked row in its unit, in the resolver's
     order; and, apart, the rows skipped for being in another unit."""
-    mode, versus, isoform = _read(getattr(m, "commentary", None))
-    pick = _Row(float(m.value), m.unit, _reference(m), getattr(m, "commentary", None) or None,
-                mode, versus, isoform, None, 0)
+    read = read_row(getattr(m, "commentary", None))
+    pick = _Row(read.mode, read.versus, read.isoform, read.conditions,
+                value=float(m.value), unit=m.unit, reference=_reference(m), source=None, order=0)
     rows, other_unit = [pick], []
     for r in getattr(m, "alternatives", ()) or ():
         if not isinstance(r, dict) or r.get("value") is None or _same(r, pick):
@@ -279,54 +364,27 @@ def _rows(m: Any) -> Tuple[List[_Row], List[_Row]]:
             value = float(r["value"])
         except (TypeError, ValueError):
             continue
-        mode, versus, isoform = _read(r.get("conditions"))
+        read = read_row(r.get("conditions"))
         ref = r.get("reference_id")
         elsewhere = r.get("unit") not in (None, m.unit)
-        row = _Row(value, str(r.get("unit")) if elsewhere else m.unit, str(ref) if ref else None,
-                   r.get("conditions") or None, mode, versus, isoform, r,
-                   len(other_unit) if elsewhere else len(rows))
+        row = _Row(read.mode, read.versus, read.isoform, read.conditions,
+                   value=value, unit=str(r.get("unit")) if elsewhere else m.unit,
+                   reference=str(ref) if ref else None, source=r,
+                   order=len(other_unit) if elsewhere else len(rows))
         (other_unit if elsewhere else rows).append(row)
     return rows, other_unit
 
 
-def _isoform_rank(row: _Row, wanted: Optional[str]) -> Optional[int]:
-    """0 names the isoform asked for (or none was asked for), 1 names none,
-    None names another: never a candidate."""
-    if not wanted or same_isoform(row.isoform, wanted):
-        return 0
-    return 1 if row.isoform is None else None
-
-
-def _mode_rank(row: _Row, want: str, substrate: Optional[str]) -> Optional[Tuple[int, int, int]]:
-    """(fits, versus, exactness), lower is better; None for another mode.
-
-    fits: 0 the row states the model's mode, 1 it states none, 2 it states
-    none and is a Kitz-Wilson inactivation constant.
-    versus: 0 measured versus the model's substrate, 1 names nothing (or the
-    model names no substrate to judge it by), 2 versus another molecule.
-    exactness: 0 the model's own mode, 1 mixed standing in for noncompetitive.
-    """
-    if row.mode == "unstated":
-        return (2 if row.kitz_wilson else 1, 1, 0)
-    if not mode_fits(row.mode, want):
-        return None
-    if row.versus is None or not substrate:
-        versus = 1
-    elif versus_is(row.versus, substrate):
-        versus = 0
-    else:
-        versus = 2
-    return (0, versus, 0 if row.mode == want else 1)
+#: The names the rest of this module (and its tests) rank with.
+_isoform_rank = isoform_rank
+_mode_rank = mode_rank
 
 
 def _rank(row: _Row, want: str, substrate: Optional[str], isoform: Optional[str]):
-    """The whole ranking key: the isoform first, then the mode, then the
-    resolver's order. None for a row that is never a candidate."""
-    iso = _isoform_rank(row, isoform)
-    mode = _mode_rank(row, want, substrate)
-    if iso is None or mode is None:
-        return None
-    return (iso, *mode, row.order)
+    """The whole ranking key: `rank`, then the resolver's order. None for a
+    row that is never a candidate."""
+    key = rank(row, want, substrate, isoform)
+    return None if key is None else (*key, row.order)
 
 
 @dataclass(frozen=True)
@@ -566,4 +624,5 @@ def constants_of(model: Any) -> Dict[str, Tuple[Optional[str], Optional[str]]]:
 
 
 __all__ = ["ANY_MODE_FLAG", "KITZ_WILSON_MEANING", "ModeSelection", "select_mode",
-           "constants_of"]
+           "constants_of", "MODES", "Reading", "read_row", "isoform_rank", "mode_rank",
+           "rank"]

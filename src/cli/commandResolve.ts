@@ -30,6 +30,7 @@ import {
   resolveKinetic,
   rowScopeLines,
   withheldSentence,
+  type InhibitionMode,
   type KineticQuantity,
 } from '../literature/literatureResolver';
 
@@ -57,6 +58,9 @@ export interface ResolveOptions {
   allowCrossSpecies?: boolean;
   /** --isoform LDH-A: use rows that measured this isoform. */
   isoform?: string;
+  /** --mode competitive: take a Ki row that states this mechanism, by the
+   *  ranking `caterva compose` uses. Only with quantity "ki". */
+  inhibitionMode?: InhibitionMode;
   /** --physiological "7.4,37" [--physiological-tolerance "0.4,5"] */
   physiologicalReference?: {
     ph: number;
@@ -92,6 +96,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
       enzymeConc: options.enzymeConc,
       allowCrossSpecies: options.allowCrossSpecies === true,
       ...(options.isoform ? { isoform: options.isoform } : {}),
+      ...(options.inhibitionMode ? { inhibitionMode: options.inhibitionMode } : {}),
       physiologicalReference: options.physiologicalReference,
     });
   } catch (err) {

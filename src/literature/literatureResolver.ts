@@ -34,6 +34,15 @@ import { REPO_ROOT, resolvePythonExecutable } from '../engine/catervaBridge';
  *  cross-species Ki can never borrow a verified Km's provenance (ADR 0008). */
 export type KineticQuantity = 'km' | 'ki' | 'kcat';
 
+/** The mechanisms a model can be of, and so the modes a Ki can be asked for
+ *  by (caterva.compose.ki_mode.MODES). */
+export type InhibitionMode = 'competitive' | 'noncompetitive' | 'uncompetitive';
+export const INHIBITION_MODES: readonly InhibitionMode[] = [
+  'competitive',
+  'noncompetitive',
+  'uncompetitive',
+];
+
 export interface ResolverQuery {
   enzymeName?: string;
   substrate: string;
@@ -68,6 +77,14 @@ export interface ResolverQuery {
   /** The isoform asked for ("LDH-A"): rows measuring it are used, and a
    * constant only measured on other isoforms is refused. */
   isoform?: string;
+  /**
+   * The inhibition mode of the model a Ki is for (`--mode`). The runner then
+   * takes a Ki row whose stated mode fits it, by the ranking `caterva
+   * compose` uses, and refuses a Ki every row of which states another
+   * (source "mode_withheld", `modesAvailable`). Only sent with quantity
+   * "ki": a mode says nothing about a Km.
+   */
+  inhibitionMode?: InhibitionMode;
   /**
    * The conditions the model is meant to represent, for Bakker's
    * condition-proximity axis.
@@ -306,6 +323,12 @@ export interface RowScope {
   /** "competitive", "noncompetitive", ..., or "unstated". */
   inhibitionMode: string | null;
   versus: string | null;
+  /**
+   * The row was "determined from Kitz-Wilson plots" (BRENDA ref 702238):
+   * the K_I of an irreversible inactivation, filed in BRENDA's Ki table and
+   * stating no mode. Present, and true, only for such a row.
+   */
+  kitzWilson?: boolean;
 }
 
 /**
@@ -321,7 +344,14 @@ export function rowScopeLines(quantity: string, scope: RowScope | null | undefin
       `The row measured isoform ${scope.isoform}. If the enzyme you mean is another isoform, this is a different protein's constant.`,
     );
   }
-  if (quantity.toLowerCase() === 'ki' && scope.inhibitionMode) {
+  if (quantity.toLowerCase() === 'ki' && scope.kitzWilson) {
+    // "States no inhibition mode" is true of the row's words and hides what
+    // it is. The API says the same in rowScopeFlags.
+    lines.push(
+      'The row was determined from Kitz-Wilson plots, which give the K_I of an irreversible ' +
+        'inactivation, not a reversible Ki. It states no inhibition mode.',
+    );
+  } else if (quantity.toLowerCase() === 'ki' && scope.inhibitionMode) {
     if (scope.inhibitionMode === 'unstated') {
       lines.push(
         'The row states no inhibition mode, so which mechanism this Ki belongs to is unknown.',
@@ -341,10 +371,11 @@ function parseRowScope(raw: unknown): RowScope | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null);
-  const scope = {
+  const scope: RowScope = {
     isoform: text(r['isoform']),
     inhibitionMode: text(r['inhibitionMode']),
     versus: text(r['versus']),
+    ...(r['kitzWilson'] === true ? { kitzWilson: true } : {}),
   };
   return scope.isoform || scope.inhibitionMode || scope.versus ? scope : null;
 }
@@ -445,6 +476,10 @@ export interface UnresolvedKinetic {
   isoformsAvailable: string[];
   variantCandidatesAvailable: string[];
   crossSpeciesOrganismsAvailable: string[];
+  /** What the Ki rows state ("competitive inhibition versus NADH"), when
+   * `--mode` asked for another mechanism and every row states one. Empty
+   * unless `source` is "mode_withheld". */
+  modesAvailable: string[];
 }
 
 export type ResolverResult = ResolvedKinetic | UnresolvedKinetic;
@@ -457,6 +492,17 @@ export type ResolverResult = ResolvedKinetic | UnresolvedKinetic;
 export function withheldSentence(result: UnresolvedKinetic): string | null {
   const list = (xs: string[], fallback: string) => (xs.length ? xs.join(', ') : fallback);
   switch (result.source) {
+    case 'mode_withheld':
+      // Constants exist, of other mechanisms. Naming them says the gap is
+      // the mechanism, not the literature; each is still not the constant
+      // of the one asked for, so none was used.
+      return `Every row BRENDA holds for this ${result.quantity} states an inhibition mode ` +
+        // Joined with "; ", as the runner's log and the API's note join
+        // them, so the three read the list alike.
+        `other than the one --mode asked for (${result.modesAvailable.join('; ') || 'unnamed'}). ` +
+        `A Ki belongs to the mechanism it was measured under. Run with the --mode of one of ` +
+        `those (a mixed row counts for noncompetitive), or without --mode to take the ` +
+        `resolver's pick with its stated mode printed beside it.`;
     case 'isoform_withheld':
       return `BRENDA holds this ${result.quantity} only for other isoforms ` +
         `(${list(result.isoformsAvailable, 'unnamed')}). An isoform is a different gene product; ` +
@@ -868,6 +914,9 @@ export async function resolveKinetic(
         enzymeConc: query.enzymeConc,
         allowCrossSpecies: query.allowCrossSpecies === true,
         ...(query.isoform ? { isoform: query.isoform } : {}),
+        ...(query.inhibitionMode && quantity === 'ki'
+          ? { inhibitionMode: query.inhibitionMode }
+          : {}),
         physiologicalReference: query.physiologicalReference
       })
     );
@@ -911,6 +960,7 @@ export async function resolveKinetic(
       isoformsAvailable: names(parsed['isoformsAvailable']),
       variantCandidatesAvailable: names(parsed['variantCandidatesAvailable']),
       crossSpeciesOrganismsAvailable: names(parsed['crossSpeciesOrganismsAvailable']),
+      modesAvailable: names(parsed['modesAvailable']),
     };
   }
 

@@ -131,7 +131,8 @@ class KineticResult(BaseModel):
     unit: str | None = None
     organism: str | None = None
     source: str  # "brenda_exact" | "brenda_cross_species" | "cross_species_withheld"
-                 # | "cross_species_too_distant" | "literature_candidates" | "not_found"
+                 # | "cross_species_too_distant" | "variant_withheld" | "isoform_withheld"
+                 # | "mode_withheld" | "literature_candidates" | "not_found"
     citation: Citation | None = None
     cross_species_flag: bool = False
 
@@ -195,6 +196,15 @@ class KineticResult(BaseModel):
     #: protein's, so it is refused rather than returned; the refusal names
     #: what exists so the caller can ask for one of those instead.
     isoforms_available: list[str] = []
+
+    #: What BRENDA's rows state, one clause per distinct statement
+    #: ("competitive inhibition versus NADH"), when a Ki was asked for by
+    #: the model's inhibition mode and every row states another. Populated
+    #: only for source="mode_withheld". Each is a constant of a different
+    #: mechanism, so none is returned in place of the model's; naming them
+    #: tells the caller what does exist, and that the gap is the mechanism,
+    #: not the literature.
+    modes_available: list[str] = []
 
     #: Cofactors and effectors reported for the row that WON selection,
     #: with presence state and PubChem identity where resolvable.
@@ -859,6 +869,185 @@ def _isoform_withheld_result(isoform, available, log):
     )
 
 
+def _ki_mode():
+    """caterva.compose.ki_mode, where the one ranking of Ki rows by inhibition
+    mode lives (`caterva compose` chooses with it too). Imported lazily, as
+    `_isoform_of` imports caterva.bind.core. Raises ImportError where the
+    caterva package is not importable."""
+    from caterva.compose import ki_mode
+    return ki_mode
+
+
+def _mode_asked(inhibition_mode, quantity, log):
+    """The inhibition mode to rank Ki rows for, or None when there is none.
+
+    A mode says which Ki row is the model's constant. It has no bearing on a
+    Km or a kcat, so for those it is not applied, and the log says so rather
+    than letting the caller believe a Km was chosen by it. A mode that is not
+    one a model can be of is refused with ValueError: ranking for "mixed"
+    would silently mean something no model here is.
+    """
+    if inhibition_mode is None:
+        return None
+    if quantity != "ki":
+        log.append(f"inhibition mode {inhibition_mode!r} not applied: it chooses among Ki "
+                   f"rows, and this is a {quantity} lookup")
+        return None
+    try:
+        modes = _ki_mode().MODES
+    except ImportError:
+        return inhibition_mode  # _partition_mode says it could not rank
+    if inhibition_mode not in modes:
+        raise ValueError(f"inhibition_mode must be one of {', '.join(modes)}; "
+                         f"got {inhibition_mode!r}")
+    return inhibition_mode
+
+
+def _naming_no_isoform(pool, isoform_matched, allow_variants):
+    """Rows of `pool` that name no isoform, when the isoform step kept only
+    rows naming the one asked for; else none.
+
+    Compose, told the isoform, ranks a row naming it before a row naming
+    none, and still takes a row naming none when every row naming the
+    isoform states another mode (ki_mode's docstring, "With --isoform").
+    `_partition_isoform` has already set those rows aside, so they are put
+    back here as candidates behind the isoform's own, with variants removed
+    exactly as the variant step would have removed them.
+    """
+    if not isoform_matched:
+        return []
+    try:
+        unnamed = [e for e in pool if _isoform_of(e.conditions) is None]
+    except ImportError:
+        return []
+    if not allow_variants:
+        unnamed, _ = _partition_variants(unnamed)
+    return unnamed
+
+
+def _partition_mode(entries, mode, substrate, isoform, isoform_matched, log, where):
+    """`(rows, stated)` for a Ki asked for by the model's inhibition mode.
+
+    WHY THE POOL IS NARROWED
+    ------------------------
+    BRENDA ref 739793 gives human LDH two Ki values for one quinoline
+    sulfonamide, from one paper, under one set of conditions: 0.00059 mM
+    "competitive versus NADH" and 0.00252 mM "noncompetitive versus
+    pyruvate". They are constants of two mechanisms, the evidence grades
+    them alike, and selection takes the lower. Every caller got the
+    competitive constant, a noncompetitive model's included, and was told
+    only which mode the row measured (the runner's `rowScope`).
+
+    WHOSE RULE
+    ----------
+    `caterva compose`'s. Each row is ranked by `caterva.compose.ki_mode.rank`,
+    told the isoform: a row naming the isoform before one naming none; then a
+    row of the model's mode (a mixed row counts for noncompetitive), measured
+    versus the model's substrate first, then naming nothing, then versus
+    another molecule; then a row stating no mode; a Kitz-Wilson row
+    (an irreversible inactivation constant filed as a Ki) last; a row of
+    another mode or naming another isoform never. The rows sharing the best
+    rank are kept and the ordinary choice among them follows. When no row is
+    a candidate, `rows` is empty and `stated` lists what the rows state.
+
+    WHAT DIFFERS FROM COMPOSE, AND WHY
+    ----------------------------------
+    The rule is compose's; the rows it is applied to and the tie-break are
+    not, because this runs BEFORE a row is chosen and compose runs after.
+
+    - Compose ranks `Measurement.alternatives`, which are this module's
+      `ensemble_candidates`: the evidence frontier of what the variant step
+      left. This ranks every row the isoform and variant steps left. A row of
+      the model's mode that another row dominates on evidence is therefore a
+      candidate here and not in compose. Trypanosoma cruzi hexokinase and
+      ADP, on the recorded page (Tests/fixtures/recorded/brenda_2.7.1.1.html.gz),
+      is such a case: 0.13 mM (no commentary), 1.3 mM ("natural hexokinase
+      from epimastigotes, at pH 7.5"), 1.5 mM ("competitive to ATP") and
+      7.0 mM ("noncompetitive to glucose"). The frontier keeps 1.3 alone,
+      the one row with a pH, so compose, building a competitive model, can
+      only carry 1.3, which states no mode; asked for competitive, this
+      returns 1.5. That is compose's own ranking applied to rows compose
+      never saw: the mode ranks before the evidence there too, and the
+      frontier dropping 1.5 happened before any mode was asked about.
+    - Rows ranked alike are chosen among by the evidence frontier and then
+      the lowest value here, and by the resolver's order (its pick first) in
+      compose.
+    - Variant rows are removed before this, not after. Compose chooses among
+      rows the resolver already cleared of variants; and a mode step run
+      first could keep only variant rows of the model's mode and have the
+      variant step refuse the constant while wild-type rows stating no mode
+      sat in the pool, which is a worse answer than asking for no mode at
+      all. None of the 766 Ki rows parsed from the three committed BRENDA
+      pages (LDH and monoamine oxidase in Tests/fixtures/ki_mode/, hexokinase
+      in Tests/fixtures/recorded/) is a variant row stating a mode, so no
+      real case has decided the order; it is the one that cannot make the
+      answer worse than no mode.
+    - The isoform step kept only rows naming the isoform, when any did. The
+      rows naming none come back here from `_naming_no_isoform`, behind the
+      isoform's own, so the isoform-then-mode order is compose's.
+    """
+    try:
+        ki_mode = _ki_mode()
+    except ImportError:
+        log.append(f"inhibition mode {mode!r} asked for, but caterva's Ki ranking is not "
+                   f"importable here, so {where} rows were NOT chosen by mode")
+        return entries, []
+    readings = [ki_mode.read_row(e.conditions) for e in entries]
+    ranks = [ki_mode.rank(r, mode, substrate, isoform) for r in readings]
+    candidates = [k for k in ranks if k is not None]
+    if not candidates:
+        # What the rows that could have been taken state. A row naming
+        # another isoform is not among them: it was never a candidate, and
+        # the isoform step has already said what it measured.
+        stated = []
+        for reading in readings:
+            said = reading.says()
+            if ki_mode.isoform_rank(reading, isoform) is not None and said not in stated:
+                stated.append(said)
+        return [], stated
+    best = min(candidates)
+    rows = [e for e, k in zip(entries, ranks) if k == best]
+    iso, fits, versus, inexact = best
+    kept = f"the {len(rows)} of {len(entries)} {where} row(s)"
+    if fits == 0:
+        against = {
+            0: f" versus {substrate}, the model's substrate",
+            1: "",
+            2: f", measured versus another molecule than {substrate}, the model's substrate",
+        }[versus]
+        sentence = f"Kept {kept} stating {'mixed' if inexact else mode} inhibition{against}"
+        if inexact:
+            sentence += " (a mixed row counts for a noncompetitive model)"
+    elif fits == 1:
+        sentence = (f"No {where} row states {mode} inhibition; kept {kept} stating no mode, "
+                    f"so whether the value is the {mode} constant is unknown")
+    else:
+        # Worded as the Kitz-Wilson rows' own commentary words it (ref
+        # 702238, "determined from Kitz-Wilson plots"), with what that
+        # makes the number.
+        sentence = (f"No {where} row states {mode} inhibition or is a reversible constant "
+                    f"stating no mode; kept {kept} stating no mode and determined from "
+                    f"Kitz-Wilson plots, which give the K_I of an irreversible inactivation, "
+                    f"not a reversible Ki")
+    if iso == 1 and isoform_matched:
+        sentence += (f"; no row measuring {isoform} could be used for a {mode} model, so these "
+                     f"name no isoform and whether they measured {isoform} is unknown")
+    log.append(sentence)
+    return rows, []
+
+
+def _mode_withheld_result(mode, stated, log):
+    log.append(f"Every candidate row states an inhibition mode other than {mode} "
+               f"({'; '.join(stated)}): each is a constant of another mechanism than the "
+               f"{mode} one asked for, so none is returned")
+    return KineticResult(
+        found=False,
+        source="mode_withheld",
+        modes_available=stated,
+        search_log=log,
+    )
+
+
 def _partition_variants(entries, keep_isozymes=False):
     """`(usable, withheld)` — rows measuring the enzyme, and rows measuring
     a variant of it.
@@ -921,6 +1110,8 @@ def resolve_kinetic_value(
     allow_variants: bool = False,
     lineage_provider: LineageProvider | None = None,
     isoform: str | None = None,
+    inhibition_mode: str | None = None,
+    model_substrate: str | None = None,
 ) -> KineticResult:
     """Resolve a kinetic value for (enzyme, organism, substrate) by trying
     BRENDA exact match, then BRENDA cross-species, then PubMed literature
@@ -936,10 +1127,21 @@ def resolve_kinetic_value(
     html_provider, uniprot_provider, and taxon_id_provider are injectable
     so this can be tested offline: pass functions that return fixture
     data instead of hitting the network.
+
+    ``inhibition_mode`` ("competitive", "noncompetitive", "uncompetitive")
+    is the mechanism of the model a Ki is for, and ``model_substrate`` that
+    model's substrate (``substrate`` is the inhibitor, for a Ki: BRENDA files
+    a Ki under it). With a mode, the Ki rows are narrowed before a row is
+    chosen, by the ranking `caterva compose` uses
+    (caterva.compose.ki_mode.rank), and a Ki every row of which states
+    another mode is refused, source "mode_withheld", naming what they state
+    (`_partition_mode`). Order: isoform, then variants, then mode.
     """
     table_label = QUANTITY_TABLE_LABELS.get(quantity, KM_TABLE_LABEL)
     quantity_upper = {"ki": "Ki", "kcat": "kcat"}.get(quantity, "Km")
     log = []
+    mode = _mode_asked(inhibition_mode, quantity, log)
+    model_substrate = model_substrate or None
 
     log.append(f"BRENDA exact: {enzyme_ec}, {organism}, {substrate} ({quantity})")
     exact = _brenda_entries(
@@ -950,6 +1152,7 @@ def resolve_kinetic_value(
         # An isoform asked for narrows the pool first, for the same reason
         # variants are removed before selection: min() over three isoforms'
         # rows picks a protein, not a value.
+        pool = exact
         isoform_matched = False
         if isoform:
             exact, isoform_matched, other_isoforms = _partition_isoform(exact, isoform, log, "exact-match")
@@ -974,6 +1177,15 @@ def resolve_kinetic_value(
             if not usable:
                 return _variant_withheld_result(withheld, log)
             exact = usable
+        # A Ki asked for by mode: the rows compose's ranking puts first for
+        # that model, before min() takes the lower of two mechanisms'
+        # constants.
+        if mode:
+            exact, stated = _partition_mode(
+                exact + _naming_no_isoform(pool, isoform_matched, allow_variants),
+                mode, model_substrate, isoform, isoform_matched, log, "exact-match")
+            if not exact:
+                return _mode_withheld_result(mode, stated, log)
         # Detect designed contrasts BEFORE reporting a winner. A value
         # returned while the other arm of its own experiment sits unmentioned
         # in the same pool is half an answer, and the reader cannot ask for
@@ -1177,6 +1389,7 @@ def resolve_kinetic_value(
                 search_log=log,
             )
 
+        pool = acceptable
         isoform_matched = False
         if isoform:
             acceptable, isoform_matched, other_isoforms = _partition_isoform(
@@ -1193,6 +1406,12 @@ def resolve_kinetic_value(
             if not usable:
                 return _variant_withheld_result(withheld, log)
             acceptable = usable
+        if mode:
+            acceptable, stated = _partition_mode(
+                acceptable + _naming_no_isoform(pool, isoform_matched, allow_variants),
+                mode, model_substrate, isoform, isoform_matched, log, "cross-species")
+            if not acceptable:
+                return _mode_withheld_result(mode, stated, log)
 
         # Detect designed contrasts BEFORE reporting a winner. A value
         # returned while the other arm of its own experiment sits unmentioned

@@ -281,7 +281,97 @@ def test_row_scope_crosses_the_boundary(monkeypatch):
          "organism": "Homo sapiens", "ecNumber": "1.1.1.27", "quantity": "ki"},
     )
     assert result["commentary"] == row.commentary
-    assert result["rowScope"] == {"isoform": "LDH-B", "inhibitionMode": "unstated", "versus": None}
+    assert result["rowScope"] == {"isoform": "LDH-B", "inhibitionMode": "unstated", "versus": None,
+                                  "kitzWilson": False}
+
+
+def test_a_kitz_wilson_row_says_what_it_is(monkeypatch):
+    """BRENDA ref 702238's MAO-B phenylhydrazine row, as the committed page
+    (Tests/fixtures/ki_mode/brenda_1.4.3.4.html.gz) serves it. It states no
+    mode, and it is not a reversible Ki: the K_I of an irreversible
+    inactivation. `inhibitionMode` alone would call it only unstated."""
+    row = golden_result()
+    row.commentary = ("pH 7.5, MAO-B, determined from Kitz-Wilson plots of the hydrazine "
+                      "concentration dependence on rates in enzyme inhibition at 15°C")
+    result = run_main(
+        monkeypatch,
+        lambda *a, **k: row,
+        {"enzymeName": "monoamine oxidase", "substrate": "phenylhydrazine",
+         "organism": "Homo sapiens", "ecNumber": "1.4.3.4", "quantity": "ki"},
+    )
+    assert result["rowScope"] == {"isoform": "MAO-B", "inhibitionMode": "unstated",
+                                  "versus": None, "kitzWilson": True}
+
+
+def test_mode_withheld_output_shape(monkeypatch):
+    """A refusal by mode must name what the rows state.
+
+    The rows are BRENDA ref 739793's for human LDH and the quinoline
+    sulfonamide, as the resolver refuses them for an uncompetitive model
+    (Tests/test_ki_mode_resolution.py, on the committed page)."""
+    stated = ["competitive inhibition versus NADH", "noncompetitive inhibition versus pyruvate"]
+
+    def withheld(*a, **k):
+        return KineticResult(found=False, source="mode_withheld", modes_available=stated,
+                             search_log=["Every candidate row states an inhibition mode other "
+                                         "than uncompetitive"])
+
+    result = run_main(
+        monkeypatch,
+        withheld,
+        {"enzymeName": "lactate dehydrogenase", "organism": "Homo sapiens",
+         "ecNumber": "1.1.1.27", "quantity": "ki", "inhibitionMode": "uncompetitive",
+         "substrate": "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]"
+                      "aminobenzoic acid", "modelSubstrate": "pyruvate"},
+    )
+    assert result["found"] is False
+    assert result["source"] == "mode_withheld"
+    assert result["modesAvailable"] == stated
+
+
+def test_the_mode_and_the_models_substrate_reach_the_resolver(monkeypatch):
+    """Payload -> runner -> resolver, the two new keys. A mode accepted and
+    never applied would carry the lower of two mechanisms' constants under a
+    model that asked for one."""
+    seen = {}
+
+    def spy(*a, **k):
+        seen.update(k)
+        return KineticResult(found=False, source="not_found", search_log=[])
+
+    base = {"enzymeName": "lactate dehydrogenase", "substrate": "gossypol",
+            "organism": "Homo sapiens", "ecNumber": "1.1.1.27", "quantity": "ki"}
+    run_main(monkeypatch, spy, {**base, "inhibitionMode": "competitive",
+                                "modelSubstrate": "pyruvate"})
+    assert (seen["inhibition_mode"], seen["model_substrate"]) == ("competitive", "pyruvate")
+    # The inhibitor is still what the Ki is looked up under.
+    assert seen["substrate"] == "gossypol"
+
+    seen.clear()
+    run_main(monkeypatch, spy, base)
+    assert (seen["inhibition_mode"], seen["model_substrate"]) == (None, None)
+
+    seen.clear()
+    run_main(monkeypatch, spy, {**base, "inhibitionMode": ["competitive"]})
+    assert seen["inhibition_mode"] is None, "only a string is a mode"
+
+
+def test_a_mode_no_model_is_of_is_an_error_not_a_request_dropped(monkeypatch):
+    """The real resolver, unstubbed: it refuses the mode before it fetches
+    anything, and the runner reports the refusal as an error."""
+    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda *a, **k: None)
+    stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(
+        {"enzymeName": "lactate dehydrogenase", "substrate": "gossypol",
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27", "quantity": "ki",
+         "inhibitionMode": "mixed"})))
+    monkeypatch.setattr(sys, "stdout", stdout)
+    with pytest.raises(SystemExit):
+        science_agent_runner.main()
+    result = json.loads(stdout.getvalue())
+    assert result["ok"] is False
+    assert "inhibition_mode must be one of competitive, noncompetitive, uncompetitive" in \
+        result["error"]
 
 
 def test_assay_conditions_cross_the_boundary(monkeypatch):
@@ -452,6 +542,9 @@ def test_not_found_output_shape(monkeypatch):
         # The isoforms the rows measured, when an isoform was asked for and
         # none of them is it (source "isoform_withheld"). Empty otherwise.
         "isoformsAvailable": [],
+        # What the Ki rows state, when the model's inhibition mode was asked
+        # for and every row states another (source "mode_withheld").
+        "modesAvailable": [],
         "substratesAvailable": [],
         "relatedness": [],
         "literatureCandidates": [
@@ -509,6 +602,9 @@ def test_core_candidate_output_shape(monkeypatch):
         # The isoforms the rows measured, when an isoform was asked for and
         # none of them is it (source "isoform_withheld"). Empty otherwise.
         "isoformsAvailable": [],
+        # What the Ki rows state, when the model's inhibition mode was asked
+        # for and every row states another (source "mode_withheld").
+        "modesAvailable": [],
         "substratesAvailable": [],
         "relatedness": [],
         "literatureCandidates": [
@@ -671,6 +767,9 @@ def test_cross_species_withheld_output_shape(monkeypatch):
         # The isoforms the rows measured, when an isoform was asked for and
         # none of them is it (source "isoform_withheld"). Empty otherwise.
         "isoformsAvailable": [],
+        # What the Ki rows state, when the model's inhibition mode was asked
+        # for and every row states another (source "mode_withheld").
+        "modesAvailable": [],
         "substratesAvailable": [],
         # Empty here because the opt-in was never given, so no relatedness
         # check ran. Populated on the too_distant path, where it carries the

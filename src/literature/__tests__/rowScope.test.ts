@@ -37,6 +37,29 @@ describe('mapFoundResult reads the row scope', () => {
   });
 });
 
+describe('a Kitz-Wilson row is named for what it is', () => {
+  // BRENDA ref 702238's MAO-B phenylhydrazine row: "determined from
+  // Kitz-Wilson plots", the K_I of an irreversible inactivation.
+  const KITZ_WILSON = { isoform: 'MAO-B', inhibitionMode: 'unstated', versus: null, kitzWilson: true };
+
+  it('is read from the runner only when it says so', () => {
+    const r = mapFoundResult({ rowScope: KITZ_WILSON }, 'ki', 0.791, 'mM', []);
+    expect(r.rowScope).toEqual(KITZ_WILSON);
+    const plain = mapFoundResult(
+      { rowScope: { ...KITZ_WILSON, kitzWilson: false } }, 'ki', 0.791, 'mM', []);
+    expect(plain.rowScope).toEqual({ isoform: 'MAO-B', inhibitionMode: 'unstated', versus: null });
+  });
+
+  it('is said instead of "states no inhibition mode"', () => {
+    const lines = rowScopeLines('ki', KITZ_WILSON);
+    expect(lines).toContain(
+      'The row was determined from Kitz-Wilson plots, which give the K_I of an irreversible ' +
+        'inactivation, not a reversible Ki. It states no inhibition mode.',
+    );
+    expect(lines.join(' ')).not.toContain('which mechanism this Ki belongs to is unknown');
+  });
+});
+
 describe('rowScopeLines', () => {
   it('names the isoform and a missing mode for a Ki', () => {
     const lines = rowScopeLines('ki', { isoform: 'LDH-B', inhibitionMode: 'unstated', versus: null });
@@ -61,7 +84,26 @@ describe('withheldSentence: rows found and withheld are not "nothing"', () => {
   const base = {
     found: false as const, quantity: 'ki' as const, logs: [], candidates: [],
     isoformsAvailable: [], variantCandidatesAvailable: [], crossSpeciesOrganismsAvailable: [],
+    modesAvailable: [],
   };
+
+  it('names the modes BRENDA holds, and how to reach them', () => {
+    // What the runner returns for `resolve --quantity ki --mode uncompetitive`
+    // on human LDH and the quinoline sulfonamide of BRENDA ref 739793
+    // (Tests/test_ki_mode_resolution.py, on the committed page).
+    const s = withheldSentence({
+      ...base,
+      source: 'mode_withheld',
+      modesAvailable: ['competitive inhibition versus NADH', 'noncompetitive inhibition versus pyruvate'],
+    });
+    expect(s).toBe(
+      'Every row BRENDA holds for this ki states an inhibition mode other than the one --mode ' +
+        'asked for (competitive inhibition versus NADH; noncompetitive inhibition versus pyruvate). ' +
+        'A Ki belongs to the mechanism it was measured under. Run with the --mode of one of those ' +
+        '(a mixed row counts for noncompetitive), or without --mode to take the resolver\'s pick ' +
+        'with its stated mode printed beside it.',
+    );
+  });
 
   it('names the isoforms and the flag that reaches them', () => {
     const s = withheldSentence({ ...base, source: 'isoform_withheld', isoformsAvailable: ['LDH-A', 'LDH-B'] });

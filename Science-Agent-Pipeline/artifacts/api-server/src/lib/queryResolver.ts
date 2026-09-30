@@ -13,6 +13,7 @@ import { matchDisease } from "./diseases";
 import { extractStatedQuantities } from "./statedQuantities";
 import {
   RESOLVABLE_FIELDS,
+  KI_MODE_OF_DOMAIN,
   DOMAINS_WITH_LITERATURE_RESOLUTION,
   EPIDEMIOLOGY_BRIDGE_DOMAINS,
   RequiredParametersMissingError,
@@ -23,6 +24,7 @@ import {
   isAllDefaults,
   validateParameterProvenance,
   type AssayConditions,
+  type InhibitionMode,
   type ParameterProvenance,
 } from "./provenance";
 import type { ScienceAgentResult } from "./scienceAgent";
@@ -352,7 +354,16 @@ export function rowScopeFlags(
     );
   }
   if (key === "ki") {
-    if (scope.inhibitionMode === "unstated") {
+    if (scope.kitzWilson) {
+      // A mode-aware lookup takes one only when no row states the model's
+      // mode and no reversible row states none; without a mode it can be
+      // the lowest value like any other. Either way the reader is told what
+      // the number is, in the words caterva compose's report uses.
+      out.push(
+        `${name}: the source row was determined from Kitz-Wilson plots, which give the K_I of ` +
+          "an irreversible inactivation, not a reversible Ki; it states no inhibition mode.",
+      );
+    } else if (scope.inhibitionMode === "unstated") {
       out.push(`${name}: the source row states no inhibition mode, so which binding event it measured is unknown.`);
     } else {
       out.push(
@@ -488,12 +499,14 @@ function buildUnresolvedKineticProvenance(
     | "cross_species_too_distant"
     | "variant_withheld"
     | "isoform_withheld"
+    | "mode_withheld"
     | "ec_not_resolved"
     | "ec_ambiguous",
   organismsAvailable?: string[],
   relatedness?: RelatednessVerdict[],
   substratesAvailable?: string[],
   ecCandidates?: string[],
+  modelMode?: InhibitionMode,
 ): ParameterProvenance {
   const K = key.toUpperCase();
 
@@ -552,6 +565,36 @@ function buildUnresolvedKineticProvenance(
         `The query names an isoform, and every ${K} BRENDA holds for this system ` +
         `was measured on another (${named}). An isoform is a different gene ` +
         `product, so its ${K} is a different protein's; name one of those to use it.`,
+    };
+  }
+
+  // Every Ki row states a mode other than the model's. Not "not found":
+  // constants exist, of other mechanisms (BRENDA ref 739793: the one
+  // quinoline sulfonamide is competitive versus NADH and noncompetitive
+  // versus pyruvate). Not a value to fall back on either: a competitive
+  // model run on a mixed-type constant simulates a mechanism the constant
+  // was not measured under. The API has no model of those mechanisms to
+  // offer instead, so the note says what exists and what the reader can
+  // supply, and does not pretend a switch exists.
+  if (reason === "mode_withheld") {
+    const named =
+      organismsAvailable && organismsAvailable.length > 0
+        ? organismsAvailable.join("; ")
+        : "other modes";
+    // The runner only refuses by mode when it was sent one, so modelMode is
+    // always known here; the fallback wording keeps the sentence true if a
+    // caller ever reaches this without it.
+    const head = modelMode
+      ? `This model is ${modelMode} inhibition, and every`
+      : "Every";
+    return {
+      origin: "default",
+      unresolvedReason: "mode_withheld",
+      note:
+        `${head} ${K} BRENDA holds for this system states another inhibition ` +
+        `mode (${named}). A ${K} belongs to the mechanism it was measured under, ` +
+        `so none of these is this model's ${K}, and none was used. Supply ` +
+        `${key}= with a ${modelMode ?? "fitting"} constant to run the model.`,
     };
   }
 
@@ -720,9 +763,16 @@ async function applyKineticResolution(
       };
       continue;
     }
+    // A Ki is also the constant of ONE mechanism. The domain's mode goes
+    // with the lookup, with the model's own substrate (the lookup's
+    // `substrate` is the inhibitor), so the runner takes a row stating that
+    // mechanism rather than the lowest value of any (KI_MODE_OF_DOMAIN).
+    const inhibitionMode = key === "ki" ? KI_MODE_OF_DOMAIN[domain] : undefined;
     const agentResult = await resolveKineticValue({
       ...entities,
       ...(key === "ki" ? { substrate: entities.inhibitor } : {}),
+      ...(inhibitionMode ? { inhibitionMode } : {}),
+      ...(inhibitionMode && entities.substrate ? { modelSubstrate: entities.substrate } : {}),
       quantity: key as "km" | "ki",
       allowVariants,
       physiologicalReference,
@@ -730,7 +780,17 @@ async function applyKineticResolution(
     });
 
     if (!agentResult.found) {
-      if (agentResult.source === "isoform_withheld") {
+      if (agentResult.source === "mode_withheld") {
+        provenanceUpdates[key] = buildUnresolvedKineticProvenance(
+          key,
+          "mode_withheld",
+          agentResult.modesAvailable,
+          undefined,
+          undefined,
+          undefined,
+          inhibitionMode,
+        );
+      } else if (agentResult.source === "isoform_withheld") {
         provenanceUpdates[key] = buildUnresolvedKineticProvenance(
           key,
           "isoform_withheld",
