@@ -53,7 +53,7 @@ full trajectory or in em.gro. The waters were chosen by `gmx select
 -select 'same residue as (resname SOL and name OW and within 1.0 of (...))'
 -on` on rep1/md.xtc and on em.gro, the per-frame index groups merged, and
 the 1,716 atoms cut with `gmx trjconv -n` (GROMACS 2026.1, 2026-09-29); the
-.gro.gz is the same atoms of em.gro. 134 KB and 22 KB.
+.gro.gz is the same atoms of em.gro (133,676 and 22,312 bytes).
 
 `lyso_1aki_rep1_gmx_water.txt`: for each of the six catalytic residues, its
 number, name, the count in em.gro, then the 21 per-frame counts of water

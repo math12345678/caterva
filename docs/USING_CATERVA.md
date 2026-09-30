@@ -558,8 +558,8 @@ water, beside the count in `em.gro`, and called hydrated, dry,
 intermittent or replicas disagree with the thresholds printed. 0.35 nm is
 the donor-acceptor limit of `gmx hbond`, so a counted water can
 hydrogen-bond to the group, and it is where the first hydration shell
-ends: on the lysozyme run TIP3P's O-O g(r) peaks at 0.278 nm and is back
-to 1.0 by 0.350 nm. On 21 frames of a lysozyme replica, cut down to
+ends: on the lysozyme run TIP3P's O-O g(r) peaks at 0.278 nm, and from
+0.34 nm out to 1.0 nm stays between 0.985 and 1.077. On 21 frames of a lysozyme replica, cut down to
 residues 1-59 and the 272 waters that come near the active site, every
 count equals `gmx select`'s, and that is a test. The GROMACS route runs
 `gmx select`, and CI checks that the two routes' water tables are

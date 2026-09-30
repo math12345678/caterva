@@ -2,10 +2,10 @@
 
 A distance between two catalytic groups says how far apart they are, not
 from which side one meets the other. When two groups both act on a third
-(a general base and an acid both holding the same carboxylate, the relay of
-a catalytic triad), the chemistry needs them on particular sides of it, and
-both distances to the vertex can hold while one group swings around it to
-the other face. The angle a-v-b at the vertex sees that; the distances in
+(the histidine of a Ser-His-Asp triad takes the serine's proton on one side
+and is held by the aspartate on the other), the chemistry needs them on
+particular sides of it, and both distances to the vertex can hold while one
+group swings around it to the other face. The angle a-v-b at the vertex sees that; the distances in
 the report cannot.
 
 Each group is reduced to its functional-group centre of geometry, the same
@@ -15,9 +15,8 @@ periodic image. The angle is atan2(|u x w|, u . w), which stays exact near 0
 and 180 degrees where arccos of the dot product loses precision; GROMACS's
 own gmx_angle() (gromacs/utility/vec.h in the 2026.1 headers) is the same
 formula, and its comment gives the same reason. Checked against `gmx gangle
--g1 angle` on
-24 angles between six catalytic groups of hen lysozyme over 21 frames, to
-the 0.001 degree that tool prints.
+-g1 angle` on 24 angles between six catalytic groups of hen lysozyme over
+21 frames, to the 0.001 degree that tool prints.
 
 Which triples: only those whose two arms are both in contact in the
 starting structure (CONTACT_NM, in caterva/analyze/plan.py). An angle

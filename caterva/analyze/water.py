@@ -12,8 +12,9 @@ distances and angles reduce to a centre, here used one by one, because a
 water at either oxygen of a carboxylate is at the carboxylate). Distances
 are to the nearest periodic image. Reported per replica as the mean count
 and the fraction of frames with at least one water, beside the count in
-the starting structure (em.gro, the minimised, solvated system; the crystal
-file `caterva md` starts from has had its waters removed).
+the starting structure (em.gro, the minimised, solvated system: the
+crystal's own waters are not in it, because run.sh drops every HETATM
+record before pdb2gmx, and gmx solvate fills the box afresh).
 
 Water is recognised as `caterva md` writes it: residue SOL, oxygen OW
 (pdb2gmx -water tip3p, then gmx solvate; checked in the em.gro of a real
@@ -37,9 +38,9 @@ import numpy as np
 #: close enough to hydrogen-bond to the group. And it is where the first
 #: hydration shell ends: on replica 1 of a 10 ps lysozyme run (TIP3P, `gmx
 #: rdf` of OW about OW, 0.002 nm bins, 2026-09-29) the water O-O g(r) peaks
-#: at 0.278 nm (2.83) and has fallen to 1.0 by 0.350 nm. TIP3P has almost
-#: no structure beyond that first shell, so there is no sharper minimum to
-#: take instead.
+#: at 0.278 nm (2.83), and from 0.34 nm out to 1.0 nm it stays between 0.985
+#: and 1.077. TIP3P has almost no structure beyond that first shell, so
+#: there is no sharper minimum to take instead.
 WATER_NM = 0.35
 
 #: How `caterva md` names water: pdb2gmx and gmx solvate write SOL, OW.
