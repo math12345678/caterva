@@ -20,8 +20,23 @@ for that to be worth anything:
    the real runner shows that: a unit test of retry_get cannot see a
    request some module makes that nobody recorded.
 
-Every body used below is a real response from the committed recordings,
-not a hand-written stand-in.
+The response bodies below come from the committed recordings, with four
+exceptions, each marked SYNTHETIC where it is built and none of them read
+by any assertion about content:
+
+- the CORE answer in test_the_core_bearer_token_is_excluded. CORE needs a
+  key, so nothing of CORE's can ever be recorded; the test checks only what
+  was sent and what was written to disk.
+- the empty-bodied 429 and 5xx responses in
+  test_a_throttle_or_server_error_is_never_recorded, where only the status
+  matters.
+- the Thermus aquaticus esearch in test_a_request_with_no_recording_goes_live
+  and the Mus musculus one in test_a_file_whose_key_disagrees_is_not_trusted,
+  answered with the recorded Homo sapiens body. Those tests check that the
+  request went live, not what it said.
+- the redirect to a signed URL in
+  test_a_redirect_to_a_signed_url_is_not_recorded, which checks only that
+  nothing was written.
 """
 from __future__ import annotations
 
@@ -29,7 +44,9 @@ import gzip
 import io
 import json
 import os
+import re
 import sys
+import types
 from pathlib import Path
 
 import httpx
@@ -143,6 +160,7 @@ def test_a_request_with_no_recording_goes_live(network, monkeypatch):
     sent, answers = network
     monkeypatch.setenv(http_retry.RECORDED_ENV, str(HTTP_RECORDED))
     params = {"db": "taxonomy", "term": "Thermus aquaticus[Scientific Name]", "retmode": "json"}
+    # SYNTHETIC: the Homo sapiens body stands in; only `r is live` is checked.
     live = _live_response(ESEARCH, params, _recording(ESEARCH, HUMAN_ESEARCH_PARAMS))
     answers[ESEARCH] = live
 
@@ -163,11 +181,61 @@ def test_a_file_whose_key_disagrees_is_not_trusted(network, monkeypatch, tmp_pat
         http_retry.replay_key(ESEARCH, {"params": params})
     )).write_bytes(real.read_bytes())
     monkeypatch.setenv(http_retry.RECORDED_ENV, str(tmp_path))
+    # SYNTHETIC: the Homo sapiens body stands in; only the live call is checked.
     answers[ESEARCH] = _live_response(ESEARCH, params, _recording(ESEARCH, HUMAN_ESEARCH_PARAMS))
 
     http_retry.retry_get(ESEARCH, params=params, timeout=15)
 
     assert len(sent) == 1, "a recording of Homo sapiens answered a question about Mus musculus"
+
+
+def _gz_json(value) -> bytes:
+    return gzip.compress(json.dumps(value).encode("utf-8"), mtime=0)
+
+
+def _human_record_without(field: str) -> dict:
+    record = _recording(ESEARCH, HUMAN_ESEARCH_PARAMS)
+    del record[field]
+    return record
+
+
+@pytest.mark.parametrize(
+    "contents",
+    [
+        pytest.param(b"", id="empty"),
+        pytest.param(b"version https://git-lfs.github.com/spec/v1\n", id="lfs-pointer"),
+        pytest.param(
+            (HTTP_RECORDED / http_retry.recording_name(
+                http_retry.replay_key(ESEARCH, {"params": HUMAN_ESEARCH_PARAMS})
+            )).read_bytes()[:40],
+            id="truncated-gzip",
+        ),
+        pytest.param(gzip.compress(b"<<<<<<< HEAD\n{", mtime=0), id="gzip-of-a-merge-conflict"),
+        pytest.param(_gz_json(["not", "a", "record"]), id="json-not-an-object"),
+        pytest.param(_gz_json(_human_record_without("status")), id="no-status"),
+        pytest.param(_gz_json(_human_record_without("body")), id="no-body"),
+        pytest.param(
+            _gz_json({**_recording(ESEARCH, HUMAN_ESEARCH_PARAMS), "status": "200"}),
+            id="status-not-an-integer",
+        ),
+    ],
+)
+def test_an_unreadable_recording_goes_live_with_a_warning(network, monkeypatch, tmp_path, contents):
+    """A file under a recording's name that is not a readable recording is
+    treated as absent, and says so, rather than raising out of retry_get and
+    being reported as the lookup's own failure."""
+    sent, answers = network
+    name = http_retry.recording_name(http_retry.replay_key(ESEARCH, {"params": HUMAN_ESEARCH_PARAMS}))
+    (tmp_path / name).write_bytes(contents)
+    monkeypatch.setenv(http_retry.RECORDED_ENV, str(tmp_path))
+    live = _live_response(ESEARCH, HUMAN_ESEARCH_PARAMS, _recording(ESEARCH, HUMAN_ESEARCH_PARAMS))
+    answers[ESEARCH] = live
+
+    with pytest.warns(RuntimeWarning, match=name):
+        r = http_retry.retry_get(ESEARCH, params=dict(HUMAN_ESEARCH_PARAMS), timeout=15)
+
+    assert r is live
+    assert len(sent) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +302,7 @@ def test_a_not_found_is_recorded(network, monkeypatch, tmp_path):
 def test_a_throttle_or_server_error_is_never_recorded(network, monkeypatch, tmp_path, status):
     """The next recording run must ask again, not inherit an outage."""
     _, answers = network
+    # SYNTHETIC: an empty body; the status is the whole point.
     answers[ESEARCH] = httpx.Response(status, request=httpx.Request("GET", ESEARCH))
     monkeypatch.setenv(http_retry.RECORD_ENV, str(tmp_path))
     try:
@@ -324,6 +393,8 @@ def test_the_core_bearer_token_is_excluded(network, monkeypatch, tmp_path):
 
     sent, answers = network
     monkeypatch.setattr(core_fulltext, "CORE_API_KEY", "not-a-real-token-0123456789")
+    # SYNTHETIC: CORE requires a key, so no real CORE answer can be recorded
+    # (that is what this test pins). Nothing below reads this body.
     answers[core_fulltext.CORE_SEARCH_URL] = httpx.Response(
         200, json={"totalHits": 0, "results": []},
         request=httpx.Request("GET", core_fulltext.CORE_SEARCH_URL),
@@ -337,35 +408,140 @@ def test_the_core_bearer_token_is_excluded(network, monkeypatch, tmp_path):
     assert list(tmp_path.glob("*")) == []
 
 
+EXAMPLE = "https://api.example.org/v1/search"
+
+
 @pytest.mark.parametrize(
     "url, kwargs",
     [
-        ("https://api.example.org/v1/search", {"headers": {"X-API-Key": "k"}}),
-        ("https://api.example.org/v1/search", {"headers": {"Cookie": "session=k"}}),
-        ("https://api.example.org/v1/search", {"headers": {"Proxy-Authorization": "Basic k"}}),
-        ("https://api.example.org/v1/search", {"auth": ("user", "password")}),
-        ("https://api.example.org/v1/search", {"cookies": {"session": "k"}}),
-        ("https://api.example.org/v1/search", {"params": {"token": "k"}}),
-        ("https://api.example.org/v1/search", {"params": {"apikey": "k"}}),
-        ("https://api.example.org/v1/search?api_key=k", {}),
+        # Headers are an allowlist: every one of these is refused because it
+        # is not Accept, Accept-Language or Range, not because it is named
+        # anywhere in http_retry. The last is a header nobody has vetted.
+        (EXAMPLE, {"headers": {"Authorization": "Bearer k"}}),
+        (EXAMPLE, {"headers": {"X-API-Key": "k"}}),
+        (EXAMPLE, {"headers": {"Cookie": "session=k"}}),
+        (EXAMPLE, {"headers": {"Proxy-Authorization": "Basic k"}}),
+        (EXAMPLE, {"headers": {"X-Auth-Token": "k"}}),
+        (EXAMPLE, {"headers": {"X-API-Token": "k"}}),
+        (EXAMPLE, {"headers": {"Ocp-Apim-Subscription-Key": "k"}}),
+        (EXAMPLE, {"headers": {"X-Goog-Api-Key": "k"}}),
+        (EXAMPLE, {"headers": {"X-Custom-Thing": "k"}}),
+        (EXAMPLE, {"headers": {"Accept": "application/json", "X-Auth-Token": "k"}}),
+        # Credentials httpx carries outside headers and parameters.
+        (EXAMPLE, {"auth": ("user", "password")}),
+        (EXAMPLE, {"cookies": {"session": "k"}}),
         ("https://user:password@api.example.org/v1/search", {}),
+        # Parameter names, however they are spelled or joined.
+        (EXAMPLE, {"params": {"token": "k"}}),
+        (EXAMPLE, {"params": {"apikey": "k"}}),
+        (EXAMPLE, {"params": {"apiKey": "k"}}),
+        (EXAMPLE, {"params": {"api_token": "k"}}),
+        (EXAMPLE, {"params": {"client_secret": "k"}}),
+        (EXAMPLE, {"params": {"access-token": "k"}}),
+        (EXAMPLE, {"params": {"accesstoken": "k"}}),
+        (EXAMPLE, {"params": {"subscription-key": "k"}}),
+        (EXAMPLE, {"params": {"sig": "k"}}),
+        (EXAMPLE, {"params": {"X-Amz-Signature": "k"}}),
+        (EXAMPLE, {"params": {"email": "someone@example.org"}}),
+        (EXAMPLE, {"params": {"query": "hexokinase", "key": "k"}}),
+        (EXAMPLE + "?api_key=k", {}),
+        (EXAMPLE + "?access_token=k", {}),
     ],
 )
-def test_every_other_credential_spelling_is_excluded(url, kwargs):
+def test_a_request_that_may_carry_a_credential_is_excluded(url, kwargs):
     assert http_retry.replay_key(url, kwargs) is None
 
 
+@pytest.mark.parametrize(
+    "name",
+    # Every parameter name the literature layer sends through retry_get
+    # (enzyme_lookup, fallback_logic, brenda_client, brenda_structured,
+    # core_fulltext, source_context, taxonomy, buffer_identity), and words
+    # that contain a credential word's letters without being one.
+    ["db", "term", "retmode", "retmax", "id", "query", "fields", "format", "size",
+     "q", "limit", "ecno", "cids_type", "keyword", "keywords", "author", "monkey"],
+)
+def test_the_questions_the_literature_layer_asks_are_still_recordable(name):
+    assert http_retry.replay_key(EXAMPLE, {"params": {name: "x"}}) is not None
+
+
+def test_a_redirect_to_a_signed_url_is_not_recorded(network, monkeypatch, tmp_path):
+    """The request is vetted before it is sent, but where a redirect ends up
+    is the server's choice. A signed download URL must not reach a file."""
+    _, answers = network
+    url = "https://www.brenda-enzymes.org/literature.php"
+    signed = "https://files.example.org/paper.pdf?X-Amz-Signature=0123456789abcdef"
+    # SYNTHETIC: a stand-in redirect target; only what reaches disk is checked.
+    answers[url] = httpx.Response(200, content=b"%PDF-", request=httpx.Request("GET", signed))
+    monkeypatch.setenv(http_retry.RECORD_ENV, str(tmp_path))
+
+    http_retry.retry_get(url, params={"r": "641068"}, follow_redirects=True)
+
+    assert list(tmp_path.glob("*")) == []
+
+
+# What a secret looks like, written down HERE rather than taken from
+# http_retry, so the check of the committed files below does not test the
+# rules against themselves: a run of 20 or more letters and digits that has
+# both (NCBI's keys are 36 hex characters, CORE's 32 alphanumerics, Google's
+# 39), a UUID, or a JSON Web Token.
+_SECRET_SHAPES = (
+    re.compile(r"(?=[A-Za-z0-9]*[0-9])(?=[A-Za-z0-9]*[A-Za-z])[A-Za-z0-9]{20,}"),
+    re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"),
+    re.compile(r"eyJ[A-Za-z0-9_-]{10,}"),
+)
+
+
+def _secret_shaped(text: str) -> list[str]:
+    return [m.group(0) for shape in _SECRET_SHAPES for m in shape.finditer(text)]
+
+
+def test_the_secret_shapes_find_a_planted_key():
+    """So that finding none in the recordings means something."""
+    assert _secret_shaped("https://x.org/v1/search?api_key=0f3c9a1b2d4e5f60718293a4b5c6d7e8f901")
+    assert _secret_shaped("/v1/9b2f4c1e-8d3a-4f6b-9c2d-1e3f5a7b9c0d/search")
+    assert _secret_shaped("Bearer eyJhbGciOiJIUzI1NiJ9.e30")
+    assert _secret_shaped("Xk29dL3mQ8vN5pR7tW1yZ4") != []
+    assert _secret_shaped("hexokinase") == []
+
+
+def _credential_values_in_this_environment() -> dict[str, str]:
+    """Every credential-looking variable actually set where this runs (in CI,
+    whatever keys the workflow exports), so a leak of a REAL key is caught
+    by value, whatever its name or position in the file."""
+    words = ("KEY", "TOKEN", "SECRET", "PASSWORD")
+    return {
+        name: value for name, value in os.environ.items()
+        if any(word in name.upper() for word in words) and len(value) >= 8
+    }
+
+
 def test_no_committed_recording_holds_a_credential():
-    """The other direction: whatever the code says, check the files."""
+    """The other direction: whatever the code says, read the files.
+
+    Nothing here consults http_retry's rules. Each recording's request side
+    (URL, parameter names and values, stored headers, final URL) must hold
+    nothing shaped like a key, and no file may contain the value of any
+    credential variable set in this environment.
+    """
     names = sorted(HTTP_RECORDED.glob("*.json.gz"))
     assert names, "no recordings found; this test would pass without reading any"
+    secrets = _credential_values_in_this_environment()
     for path in names:
-        record = json.loads(gzip.decompress(path.read_bytes()).decode("utf-8"))
+        raw = gzip.decompress(path.read_bytes()).decode("utf-8")
+        record = json.loads(raw)
         key = record["key"]
         assert http_retry.recording_name(key) == path.name, f"{path.name} is filed under the wrong key"
-        assert {k.lower() for k, _ in key["params"]}.isdisjoint(http_retry.CREDENTIAL_PARAMS), path.name
-        assert {k.lower() for k, _ in key["headers"]}.isdisjoint(http_retry.CREDENTIAL_HEADERS), path.name
-        assert "api_key=" not in record["response_url"], path.name
+        # The literature layer sends no header that is part of a key today
+        # (CORE's Authorization is the only header it sends at all). A
+        # recording that stores one is new, and worth a look before commit.
+        assert key["headers"] == [], f"{path.name} stores request headers: {key['headers']}"
+        request_side = [key["url"], record.get("response_url") or ""]
+        request_side += [part for pair in key["params"] for part in pair]
+        found = [hit for text in request_side for hit in _secret_shaped(text)]
+        assert found == [], f"{path.name}: something shaped like a key in the request: {found}"
+        leaked = sorted(name for name, value in secrets.items() if value in raw)
+        assert leaked == [], f"{path.name} contains the value of {leaked}"
 
 
 # ---------------------------------------------------------------------------
@@ -378,18 +554,34 @@ def offline(monkeypatch):
 
     httpx.HTTPTransport.handle_request is where every httpx.get ends up;
     replacing it means a request nobody recorded raises instead of reaching
-    the service, and `attempts` says which one it was. The keys are cleared
-    because a request carrying one is never replayed (see above), and the
-    import-time NCBI_API_KEY of a developer's shell would otherwise send
-    this test to the network.
+    the service, and `.attempts` says which one it was. `.read` is the set
+    of recordings that answered, held to the manifest's list. The keys are
+    cleared because a request carrying one is never replayed (see above),
+    and the import-time NCBI_API_KEY of a developer's shell would otherwise
+    send this test to the network.
+
+    Nothing may carry over from an earlier test in the same process, or a
+    payload could be answered from what another one fetched and look
+    complete when its own recordings are not: http_retry's memo and
+    buffer_identity's PubChem caches are emptied, and sys.path (which the
+    runner itself also extends) is restored afterwards.
     """
-    attempts: list[str] = []
+    seen = types.SimpleNamespace(attempts=[], read=set())
 
     def no_network(self, request):
-        attempts.append(str(request.url))
+        seen.attempts.append(str(request.url))
         raise httpx.ConnectError("network disabled in this test", request=request)
 
+    replayed = http_retry._replayed
+
+    def counted(key):
+        response = replayed(key)
+        if response is not None:
+            seen.read.add(http_retry.recording_name(key))
+        return response
+
     monkeypatch.setattr(httpx.HTTPTransport, "handle_request", no_network)
+    monkeypatch.setattr(http_retry, "_replayed", counted)
     # A missing recording then fails in milliseconds rather than after
     # retry_get's 1 s / 2 s / 4 s backoff on the connection error.
     monkeypatch.setattr(http_retry.time, "sleep", lambda s: None)
@@ -398,8 +590,8 @@ def offline(monkeypatch):
     for name in (http_retry.RECORD_ENV, "CATERVA_ENABLE_KEGG"):
         monkeypatch.delenv(name, raising=False)
 
-    if str(LIB_DIR) not in sys.path:
-        sys.path.insert(0, str(LIB_DIR))
+    monkeypatch.syspath_prepend(str(LIB_DIR))
+    import buffer_identity
     import core_fulltext
     import enzyme_lookup
     import fallback_logic
@@ -407,8 +599,10 @@ def offline(monkeypatch):
     monkeypatch.setattr(enzyme_lookup, "NCBI_API_KEY", None)
     monkeypatch.setattr(fallback_logic, "NCBI_API_KEY", None)
     monkeypatch.setattr(core_fulltext, "CORE_API_KEY", None)
+    monkeypatch.setattr(buffer_identity, "_CID_CACHE", {})
+    monkeypatch.setattr(buffer_identity, "_PARENT_CACHE", {})
     http_retry.clear_memo()
-    yield attempts
+    yield seen
     http_retry.clear_memo()
 
 
@@ -440,7 +634,8 @@ def test_the_hexokinase_km_lookup_gives_its_live_answer_offline(offline, monkeyp
     output = _run_runner(monkeypatch, HEXOKINASE_KM["payload"])
     recorded = HEXOKINASE_KM["answer"]
 
-    assert offline == [], f"these requests were not recorded: {offline}"
+    assert offline.attempts == [], f"these requests were not recorded: {offline.attempts}"
+    assert offline.read == set(HEXOKINASE_KM["recordings"])
     assert output["ok"] is True and output["found"] is True
     assert output["km"] == recorded["km"]
     assert output["unit"] == recorded["unit"]
@@ -458,9 +653,15 @@ def test_the_hexokinase_km_lookup_gives_its_live_answer_offline(offline, monkeyp
 )
 def test_every_payload_the_api_tests_send_replays_offline(offline, monkeypatch, entry):
     """If an API test's lookup needed a request that was not recorded, it
-    would go live in CI; here it raises instead, and says which."""
+    would go live in CI; here it raises instead, and says which. And the
+    recordings it reads are exactly the ones the manifest lists for it, so
+    the manifest is a true account of what each payload needs."""
     output = _run_runner(monkeypatch, entry["payload"])
-    assert offline == [], f"these requests were not recorded: {offline}"
+    assert offline.attempts == [], f"these requests were not recorded: {offline.attempts}"
+    assert offline.read == set(entry["recordings"]), (
+        f"read but not listed: {sorted(offline.read - set(entry['recordings']))}; "
+        f"listed but not read: {sorted(set(entry['recordings']) - offline.read)}"
+    )
     assert _answer(output, entry["answer"]) == entry["answer"]
 
 

@@ -45,7 +45,7 @@ NCBI or PubChem was slow.
 | service | host | what is recorded | licence |
 |---|---|---|---|
 | NCBI Taxonomy | eutils.ncbi.nlm.nih.gov | esearch for Homo sapiens, Escherichia coli, Saccharomyces cerevisiae (`[Scientific Name]`) and "lymphocytes" | US Government work, public domain within the US |
-| UniProt | rest.uniprot.org | the reviewed accession for EC 2.7.1.1 in taxa 9606, 562 and 4932; name searches for "hexokinase" and for the eight non-enzyme names the tests send, each answered with no results | CC BY 4.0 (https://www.uniprot.org/help/license); cite The UniProt Consortium, Nucleic Acids Res. 53:D609 (2025), doi:10.1093/nar/gkae1010 |
+| UniProt | rest.uniprot.org | the reviewed-accession search for EC 2.7.1.1 in taxa 9606, 562 and 4932. Only 9606 returns one (P19367). The other two return `{"results":[]}`: the reviewed yeast hexokinases (P04806, P04807) are filed under the strain taxon 559292, not 4932, and no reviewed E. coli entry carries EC 2.7.1.1 under any E. coli taxon (both checked 2026-09-30 with `taxonomy_id:`, which includes strains); name searches for "hexokinase" (reviewed, taxon 9606) and for the eight non-enzyme names the tests send, which return no results | CC BY 4.0 (https://www.uniprot.org/help/license); cite The UniProt Consortium, Nucleic Acids Res. 53:D609 (2025), doi:10.1093/nar/gkae1010 |
 | PubChem | pubchem.ncbi.nlm.nih.gov | name-to-CID for 13 names (eight of them 404, "No CID found") and parent-CID for 5 CIDs (one 404) | public domain within the US; NOTICE |
 
 42 files, 15,672 bytes, all fetched 2026-09-30 (UTC); UniProt release
@@ -60,15 +60,38 @@ body. On replay the stored key must equal the computed one, or the file is
 ignored. gzip's timestamp is zeroed, so re-recording an unchanged answer
 changes no bytes.
 
-**What is never recorded.** A request that carries a credential is neither
-written here nor answered from here: an NCBI `api_key` parameter (attached
-when `NCBI_API_KEY` is set), CORE's `Authorization: Bearer` header, or any
-other key, token, cookie or password (`CREDENTIAL_PARAMS` and
-`CREDENTIAL_HEADERS` in `http_retry.py`). So a developer who runs the API
-tests with `NCBI_API_KEY` set gets live NCBI calls, by design: a request
-that carries a key is a different request, and the key must not reach a
-file in a public repository. Throttles (429) and server errors (5xx) are
-never recorded either, so a refresh cannot commit an outage.
+**What is never recorded.** A request that may carry a credential is
+neither written here nor answered from here. The two the literature layer
+really sends are an NCBI `api_key` parameter (attached when `NCBI_API_KEY`
+is set) and CORE's `Authorization: Bearer` header. The rule is not a list
+of those two spellings:
+
+- Request headers are an allowlist. Only `Accept`, `Accept-Language` and
+  `Range` are stored in a key (`KEYED_HEADERS`); `User-Agent`,
+  `Accept-Encoding` and `Connection` are dropped; a request with any other
+  header (`Authorization`, `Cookie`, `X-Auth-Token`,
+  `Ocp-Apim-Subscription-Key`, or one nobody has thought of) goes live.
+- A query parameter is refused when a word of its name is a credential
+  word, however it is spelled or joined (`api_key`, `apiKey`, `api_token`,
+  `accesstoken`, `client_secret`, `X-Amz-Signature`, `sig`), and so is an
+  `email` parameter. `CREDENTIAL_WORDS` and `CREDENTIAL_FRAGMENTS` in
+  `http_retry.py` hold the words.
+- So is `auth=`, `cookies=`, a user:password in the URL, and a response
+  whose final URL, after redirects, carries a credential parameter.
+
+`Tests/test_http_replay.py` also reads every committed recording without
+consulting those rules: nothing on the request side may be shaped like a
+key, and no file may contain the value of any credential variable set in
+the environment the test runs in. So a developer who runs the API tests
+with `NCBI_API_KEY` set gets live NCBI calls, by design: a request that
+carries a key is a different request, and the key must not reach a file in
+a public repository. Throttles (429) and server errors (5xx) are never
+recorded either, so a refresh cannot commit an outage.
+
+**A damaged file.** A file under a recording's name that cannot be read as
+one (not gzip, truncated, not JSON, no status or body) is treated as
+absent: the request goes live and a `RuntimeWarning` names the file. Re-run
+the recorder to replace it.
 
 **Which requests, and why.** `MANIFEST.json` lists the 13 runner payloads
 the API tests send, the test files that send each one, the recordings each
@@ -89,15 +112,24 @@ impossible and holds it to the recorded answer.
        python scripts/record_http_fixtures.py
 
    It unsets `NCBI_API_KEY`, `CORE_API_KEY` and `CATERVA_ENABLE_KEGG` for
-   the runs, records each payload live into its own directory, then runs
-   every payload again from the recordings with every proxy variable
-   pointed at a closed port, and requires the same answer as the live run.
-   Only then does it replace `http/` with exactly that set and rewrite
-   `MANIFEST.json`.
+   the runs and records each payload live into its own directory. Then it
+   runs every payload again from the recordings with httpx's transport
+   replaced by one that logs and refuses every request (and every proxy
+   variable pointed at a closed port), and requires three things of each
+   run: no request tried the network, it read exactly the recordings it
+   made, and it gave the live run's answer. Only then does it replace
+   `http/` with exactly that set and rewrite `MANIFEST.json`. The answer
+   alone would not do: the runner absorbs a failed PubChem lookup, so with
+   a PubChem recording deleted the hexokinase payloads still give their
+   recorded answers.
 3. If it stops because a payload fetched a BRENDA page live, record that
    page as `brenda_<ec>.html.gz` (above), add its row, and run it again.
 4. Update the counts and dates in this file, and commit `http/` together
    with it.
 
-`python scripts/record_http_fixtures.py --check` fetches nothing and
-verifies the committed recordings the same way.
+`python scripts/record_http_fixtures.py --check` fetches nothing. It runs
+the same offline step on the committed recordings, holding each payload to
+the answer and the recordings `MANIFEST.json` lists for it, and checks that
+`MANIFEST.json` lists exactly the files in `http/`. Re-recording on
+2026-09-30 with the network available produced files byte-identical to the
+committed ones.

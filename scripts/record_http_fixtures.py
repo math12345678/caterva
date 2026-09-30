@@ -24,15 +24,31 @@ WHAT IT DOES
    recordings throughout; any BRENDA page fetched live instead is an error,
    because it belongs in brenda_<ec>.html.gz with its hash in the README,
    not in a hashed file nobody can find.
-2. Runs every payload again from the recordings with every proxy variable
-   pointed at a closed port, so a request that was not recorded cannot
-   reach the network and fails instead, and requires the same answer as
-   the live run. A recording set that only works while the network is up
-   would prove nothing.
+2. Runs every payload again from the recordings with the network made
+   impossible, and requires three things of each run: no request tried to
+   reach the network, the recordings it read are exactly the ones it
+   recorded, and its answer is the live run's answer. A recording set that
+   only works while the network is up would prove nothing.
+
+   The first requirement is the one that matters, and the answer cannot
+   stand in for it. The runner absorbs a failed PubChem lookup: with
+   PubChem's recorded answer for "LY-2121260" deleted, the three hexokinase
+   payloads that need it each tried PubChem four times, failed, and still
+   gave their recorded answers. The first version of this check compared
+   answers alone, and passed that recording set, which would have sent the
+   request live in CI. Each offline run therefore goes through
+   _OFFLINE_RUNNER below, which replaces httpx's transport with one that
+   logs the URL and raises, and logs every recording that answers; every
+   proxy variable also points at a closed port, for any client that does
+   not go through httpx.
 3. Replaces Tests/fixtures/recorded/http/ with exactly that set, and writes
    MANIFEST.json: each payload, the tests that send it, the files it needs
    and the answer the live run gave, which Tests/test_http_replay.py holds
    the offline replay to.
+
+`--check` fetches nothing. It runs step 2 on the committed recordings,
+holding each payload to the answer and the recordings MANIFEST.json lists
+for it, and checks that MANIFEST.json lists exactly the files present.
 
 WHERE PAYLOADS COMES FROM
 -------------------------
@@ -76,9 +92,70 @@ MANIFEST = HTTP_RECORDED / "MANIFEST.json"
 BRENDA_ENZYME_URL = "https://www.brenda-enzymes.org/enzyme.php"
 
 #: A port nothing listens on. Every proxy variable points here during the
-#: offline check, so any request that is not answered from a recording
-#: fails with a connection error instead of quietly going live.
+#: offline check, so a request from a client other than httpx (which
+#: _OFFLINE_RUNNER stops itself) fails with a connection error instead of
+#: quietly going live.
 CLOSED_PROXY = "http://127.0.0.1:9"
+
+#: The runner, run offline and watched. Started as
+#: `python -c _OFFLINE_RUNNER <report.json> <runner.py>` with stdin and the
+#: environment exactly as for the runner itself; the runner's stdout is
+#: untouched, and what was attempted and read goes to <report.json>.
+#:
+#: - httpx.HTTPTransport.handle_request, where every httpx.get ends up, is
+#:   replaced with one that logs the URL and raises httpx.ConnectError, the
+#:   error a real outage gives, so the runner takes the path it would take in
+#:   CI if the recording were missing. That log is the verdict: an answer
+#:   that matches is not enough, because the runner absorbs a failed lookup.
+#: - http_retry._replayed is wrapped to log each recording that answers,
+#:   which is held to the payload's list in MANIFEST.json.
+#: - http_retry's backoff sleeps are skipped, so a missing recording costs
+#:   milliseconds rather than retry_get's 1 s + 2 s + 4 s.
+#:
+#: The report is written at exit, whatever the runner does (it calls
+#: sys.exit(1) on an error).
+_OFFLINE_RUNNER = r"""
+import atexit, json, os, runpy, sys, time
+import httpx
+import http_retry
+
+report, runner = sys.argv[1], sys.argv[2]
+attempts, read = [], set()
+
+def no_network(self, request):
+    attempts.append(str(request.url))
+    raise httpx.ConnectError("network disabled by record_http_fixtures.py", request=request)
+
+httpx.HTTPTransport.handle_request = no_network
+
+replayed = http_retry._replayed
+
+def counted(key):
+    response = replayed(key)
+    if response is not None:
+        read.add(http_retry.recording_name(key))
+    return response
+
+http_retry._replayed = counted
+
+class _NoSleep:
+    def __getattr__(self, name):
+        return getattr(time, name)
+    @staticmethod
+    def sleep(seconds):
+        pass
+
+http_retry.time = _NoSleep()
+
+def write_report():
+    with open(report, "w", encoding="utf-8") as out:
+        json.dump({"attempts": attempts, "read": sorted(read)}, out)
+
+atexit.register(write_report)
+sys.argv = [runner]
+sys.path[0] = os.path.dirname(runner)
+runpy.run_path(runner, run_name="__main__")
+"""
 
 #: Variables removed from the runner's environment while recording. The two
 #: keys would change the requests (NCBI's is a query parameter, CORE's a
@@ -222,10 +299,11 @@ def _offline_env(recorded: pathlib.Path) -> dict:
     return env
 
 
-def run_runner(payload: dict, env: dict) -> dict:
-    """One real runner process, exactly as spawnScienceAgent starts it."""
+def run_runner(payload: dict, env: dict, command: list[str] | None = None) -> dict:
+    """One real runner process, exactly as spawnScienceAgent starts it
+    (or through `command`, which must run the same script)."""
     proc = subprocess.run(
-        [sys.executable, str(RUNNER)],
+        command or [sys.executable, str(RUNNER)],
         input=json.dumps(payload), capture_output=True, text=True,
         cwd=ROOT, env=env, timeout=600, check=False,
     )
@@ -238,6 +316,19 @@ def run_runner(payload: dict, env: dict) -> dict:
         ) from None
 
 
+def run_runner_offline(payload: dict, recorded: pathlib.Path) -> tuple[dict, list[str], set[str]]:
+    """The runner from the recordings alone: its answer, every URL it tried
+    to fetch (which must be none), and the recordings that answered."""
+    with tempfile.TemporaryDirectory(prefix="caterva-http-offline-") as scratch:
+        report = pathlib.Path(scratch) / "report.json"
+        output = run_runner(
+            payload, _offline_env(recorded),
+            [sys.executable, "-c", _OFFLINE_RUNNER, str(report), str(RUNNER)],
+        )
+        seen = json.loads(report.read_text(encoding="utf-8"))
+    return output, seen["attempts"], set(seen["read"])
+
+
 def answer_of(output: dict) -> dict:
     return {field: output[field] for field in ANSWER_FIELDS if field in output}
 
@@ -247,11 +338,22 @@ def _key_of(path: pathlib.Path) -> dict:
 
 
 def _check_offline(entries: list[dict], recorded: pathlib.Path) -> list[str]:
-    """Every payload, from the recordings alone, gives its recorded answer."""
+    """Every payload, from the recordings alone, tries no request, reads
+    exactly its own recordings, and gives its recorded answer."""
     failures = []
-    env = _offline_env(recorded)
     for entry in entries:
-        output = run_runner(entry["payload"], env)
+        output, attempts, read = run_runner_offline(entry["payload"], recorded)
+        if attempts:
+            failures.append(
+                f"{entry['payload']}: tried the network for {len(attempts)} request(s) "
+                f"with no recording: {sorted(set(attempts))}"
+            )
+        listed = set(entry["recordings"])
+        if read != listed:
+            failures.append(
+                f"{entry['payload']}: read recordings not listed for it: {sorted(read - listed)}; "
+                f"listed but not read: {sorted(listed - read)}"
+            )
         expected = entry.get("_live_output")
         if expected is not None and output != expected:
             differing = sorted(
@@ -306,7 +408,7 @@ def record() -> int:
 
         failures = _check_offline(entries, staging)
         if failures:
-            print("FAILED: the recordings do not reproduce the live answers offline:",
+            print("FAILED: the recordings do not replay the live runs offline:",
                   file=sys.stderr)
             for failure in failures:
                 print(f"  {failure}", file=sys.stderr)
@@ -328,18 +430,32 @@ def record() -> int:
     total = sum(p.stat().st_size for p in HTTP_RECORDED.glob("*.json.gz"))
     count = len(list(HTTP_RECORDED.glob("*.json.gz")))
     print(f"\n{count} recordings, {total} bytes, in {HTTP_RECORDED.relative_to(ROOT)}; "
-          f"all {len(entries)} payloads reproduce their live answers offline.")
+          f"all {len(entries)} payloads {_REPLAYED}.")
     return 0
+
+
+_REPLAYED = (
+    "replay offline: none tried the network, each read exactly the recordings "
+    "listed for it, and each gave its live answer"
+)
 
 
 def check() -> int:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    failures = _check_offline(manifest["payloads"], HTTP_RECORDED)
+    failures = []
+    listed = {name for entry in manifest["payloads"] for name in entry["recordings"]}
+    present = {p.name for p in HTTP_RECORDED.glob("*.json.gz")}
+    if listed != present:
+        failures.append(
+            f"MANIFEST.json and {HTTP_RECORDED.relative_to(ROOT)} disagree: listed but "
+            f"missing {sorted(listed - present)}; present but unlisted {sorted(present - listed)}"
+        )
+    failures += _check_offline(manifest["payloads"], HTTP_RECORDED)
     for failure in failures:
         print(f"FAILED: {failure}", file=sys.stderr)
     if not failures:
-        print(f"all {len(manifest['payloads'])} payloads reproduce their recorded "
-              f"answers with the network unreachable (recorded {manifest['recorded']}).")
+        print(f"all {len(manifest['payloads'])} payloads {_REPLAYED} "
+              f"(recorded {manifest['recorded']}).")
     return 1 if failures else 0
 
 

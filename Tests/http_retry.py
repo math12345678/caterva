@@ -45,8 +45,11 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import tempfile
 import time
+import warnings
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -130,62 +133,120 @@ def clear_memo() -> None:
 RECORDED_ENV = "CATERVA_HTTP_RECORDED"
 RECORD_ENV = "CATERVA_HTTP_RECORD"
 
-#: Query parameters that carry a credential. A request with any of these is
-#: never written to disk and never answered from a recording, so a key can
-#: neither leak into a committed file nor be silently dropped from a request
-#: that was supposed to carry it.
-#:
-#: `api_key` is the one the literature layer really sends: NCBI's, attached by
-#: enzyme_lookup._ncbi_params (Taxonomy esearch/efetch, and source_context's
-#: and taxonomy.py's lookups through it) and by fallback_logic's PubMed
-#: esearch/esummary whenever NCBI_API_KEY is set. The rest are the other
-#: common spellings, listed so that the next API added to the literature
-#: layer is excluded by default rather than by someone remembering.
-CREDENTIAL_PARAMS = frozenset({
-    "api_key", "apikey", "api-key", "key", "token", "access_token",
-    "auth", "password", "secret",
-})
+# A request that carries a credential is never written to disk and never
+# answered from a recording, so a key can neither leak into a committed file
+# (the repository is public) nor be silently dropped from a request that was
+# supposed to carry it. The literature layer really sends two:
+#
+#   - NCBI's `api_key` query parameter, attached by enzyme_lookup._ncbi_params
+#     (Taxonomy esearch/efetch, and source_context's and taxonomy.py's
+#     lookups through it) and by fallback_logic's PubMed esearch/esummary
+#     whenever NCBI_API_KEY is set.
+#   - CORE's `Authorization: Bearer <CORE_API_KEY>` header
+#     (core_fulltext.fetch_core_search).
+#
+# The Groq and other LLM keys never pass through this module (the API
+# server's llmResolver.ts calls those providers itself, and the exploratory
+# Tests/big_test*.py scripts use the openai client).
+#
+# A list of credential spellings is not enough on its own. Every header NOT
+# on such a list would be written, name and value, into the key, and the key
+# is stored in the committed file. A future source whose requests carry an
+# X-Auth-Token or Ocp-Apim-Subscription-Key header, or an `api_token`
+# parameter, would put its secret in a public repository, and a test that
+# checked the committed files against the same list would pass. A list of
+# what to refuse is only as good as the imagination of whoever wrote it. So
+# each half is built the other way round wherever it can be:
+#
+#   - Headers are an ALLOWLIST. Only the headers in KEYED_HEADERS, which
+#     change what a server answers and never carry a secret, are recorded;
+#     IGNORED_HEADERS are dropped as describing the client; a request with
+#     ANY other header is neither recorded nor replayed. It goes live, which
+#     costs one network call and leaks nothing.
+#   - Parameter names cannot be allowlisted (they are the question), so a
+#     name is refused when any word in it is a credential word, however it
+#     is spelled or joined: `api_key`, `apiKey`, `x-api-key`,
+#     `subscription-key`, `access_token`, `accesstoken`, `client_secret`,
+#     `X-Amz-Signature`, `sig`. An e-mail address is refused the same way:
+#     NCBI asks clients to send one as `email`, and a personal address does
+#     not belong in a public fixture either.
+#
+# What no name rule can see is a secret in the URL PATH (an API that puts
+# its key in /v1/<key>/search). Nothing in the literature layer does that;
+# Tests/test_http_replay.py scans every committed recording for anything
+# shaped like a key, independently of these rules, to catch it if one ever
+# does.
 
-#: Request headers that carry a credential, excluded for the same reason.
-#:
-#: `authorization` is the one really sent: CORE's `Authorization: Bearer
-#: <CORE_API_KEY>` (core_fulltext.fetch_core_search). The Groq and other LLM
-#: keys never pass through this module (the API server's llmResolver.ts
-#: calls those providers itself, and the exploratory Tests/big_test*.py
-#: scripts use the openai client), but any bearer token that ever does is
-#: caught by the same header.
-CREDENTIAL_HEADERS = frozenset({
-    "authorization", "proxy-authorization", "x-api-key", "api-key", "cookie",
-})
+#: Request headers that are part of a recording's key. Each changes the
+#: answer (a JSON body and an XML body are different answers to one URL) and
+#: none carries a secret. A header outside this set and IGNORED_HEADERS makes
+#: the request unrecordable (see above).
+KEYED_HEADERS = frozenset({"accept", "accept-language", "range"})
 
 #: Request headers that describe the client or the connection rather than
-#: the question, and so are left out of the key. Every OTHER header a caller
-#: passes (Accept, Accept-Language, Range, ...) is part of the key: a header
-#: nobody anticipated then makes a recording miss and the request go live,
-#: which is the safe way to be wrong. The reverse (ignoring a header that
-#: did change the answer) would replay a JSON body to a caller that asked
-#: for XML.
+#: the question, and so are left out of the key and never stored.
 IGNORED_HEADERS = frozenset({"user-agent", "accept-encoding", "connection"})
 
+#: Words that mark a query parameter as carrying a credential or a personal
+#: address when they appear as a whole word of its name (split on
+#: punctuation and camelCase), e.g. `api_key`, `sig`, `authToken`.
+CREDENTIAL_WORDS = frozenset({
+    "key", "apikey", "token", "secret", "password", "passwd", "pwd", "pass",
+    "auth", "authorization", "bearer", "credential", "credentials",
+    "sig", "signature", "session", "sessionid", "cookie", "jwt",
+    "email",
+})
 
-def _carries_a_credential(url: str, kwargs: dict) -> bool:
-    """Whether this request holds a key, a token or a password anywhere."""
-    if kwargs.get("auth") is not None or kwargs.get("cookies"):
+#: Fragments that mark a parameter the same way when found ANYWHERE in its
+#: name with the punctuation removed, for names run together without a
+#: separator (`accesstoken`, `clientsecret`, `xapikey`). Only fragments long
+#: and specific enough not to occur inside ordinary words are here: `key`
+#: is not, or `keyword` would be refused.
+CREDENTIAL_FRAGMENTS = (
+    "apikey", "token", "secret", "passw", "authoriz", "credential",
+    "signature", "session", "cookie", "bearer", "email",
+)
+
+
+def _is_credential_name(name: str) -> bool:
+    """Whether a query parameter's name says it carries a credential."""
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name).lower()
+    words = [w for w in re.split(r"[^a-z0-9]+", spaced) if w]
+    if any(word in CREDENTIAL_WORDS for word in words):
         return True
+    joined = "".join(words)
+    return any(fragment in joined for fragment in CREDENTIAL_FRAGMENTS)
+
+
+def _url_carries_a_credential(url: str) -> bool:
+    """A user:password or a credential-named parameter inside the URL."""
     parsed = httpx.URL(url)
     if parsed.userinfo:
         return True
-    names = {k.lower() for k, _ in parsed.params.multi_items()}
-    names |= {k.lower() for k, _ in httpx.QueryParams(kwargs.get("params")).multi_items()}
-    if names & CREDENTIAL_PARAMS:
+    return any(_is_credential_name(name) for name, _ in parsed.params.multi_items())
+
+
+def _unrecordable(url: str, kwargs: dict) -> bool:
+    """Whether this request may hold a key, a token, a password or a
+    personal address anywhere, or a header nobody has vetted."""
+    if kwargs.get("auth") is not None or kwargs.get("cookies"):
+        return True
+    if _url_carries_a_credential(url):
+        return True
+    params = httpx.QueryParams(kwargs.get("params"))
+    if any(_is_credential_name(name) for name, _ in params.multi_items()):
         return True
     headers = httpx.Headers(kwargs.get("headers") or {})
-    return any(name.lower() in CREDENTIAL_HEADERS for name in headers.keys())
+    return any(
+        name.lower() not in KEYED_HEADERS and name.lower() not in IGNORED_HEADERS
+        for name in headers.keys()
+    )
 
 
 def replay_key(url: str, kwargs: dict, method: str = "GET") -> dict | None:
     """The fields that decide the answer to a request, or None when the
-    request carries a credential and so may be neither recorded nor replayed.
+    request may carry a credential (or a header outside KEYED_HEADERS and
+    IGNORED_HEADERS) and so may be neither recorded nor replayed.
 
     Parameters are taken as httpx will send them (httpx.QueryParams, so 15
     and "15" are the same question, as they are on the wire) and sorted, so
@@ -193,13 +254,13 @@ def replay_key(url: str, kwargs: dict, method: str = "GET") -> dict | None:
     recording. `follow_redirects` is part of it because a 301 and the page
     it points to are different answers to the same URL.
     """
-    if _carries_a_credential(url, kwargs):
+    if _unrecordable(url, kwargs):
         return None
     params = sorted(httpx.QueryParams(kwargs.get("params")).multi_items())
     headers = sorted(
         (name.lower(), value)
         for name, value in httpx.Headers(kwargs.get("headers") or {}).items()
-        if name.lower() not in IGNORED_HEADERS
+        if name.lower() in KEYED_HEADERS
     )
     return {
         "method": method.upper(),
@@ -222,6 +283,16 @@ def _replayed(key: dict) -> httpx.Response | None:
     The stored key is compared with the computed one before anything is
     returned, so a renamed or hand-edited file cannot answer a question it
     was not recorded for; it is ignored and the request goes live.
+
+    A file that cannot be read as a recording at all is treated the same
+    way, with a warning on stderr naming it. The recorder writes atomically,
+    so it cannot leave half a file, but a bad merge, a Git LFS pointer or a
+    sync client's conflicted copy can put something else under a recording's
+    name. Before this, that raised gzip.BadGzipFile or KeyError out of
+    retry_get, and the runner reported it as the lookup's own failure: an
+    error about BRENDA or UniProt that was really about a file in Tests/.
+    Going live instead is the same policy as a missing recording, and the
+    warning says which file to re-record.
     """
     directory = os.environ.get(RECORDED_ENV)
     if not directory:
@@ -229,16 +300,33 @@ def _replayed(key: dict) -> httpx.Response | None:
     path = Path(directory) / recording_name(key)
     if not path.is_file():
         return None
-    record = json.loads(gzip.decompress(path.read_bytes()).decode("utf-8"))
-    if record.get("key") != key:
+    try:
+        record = json.loads(gzip.decompress(path.read_bytes()).decode("utf-8"))
+        if record.get("key") != key:
+            return None
+        if "body_base64" in record:
+            body = base64.b64decode(record["body_base64"], validate=True)
+        else:
+            body = record["body"].encode("utf-8")
+        status = record["status"]
+        if not isinstance(status, int):
+            raise TypeError(f"status is {status!r}, not an integer")
+        content_type = record.get("content_type")
+        headers = {"content-type": content_type} if content_type else {}
+        request = httpx.Request(key["method"], record.get("response_url") or key["url"])
+        return httpx.Response(status, headers=headers, content=body, request=request)
+    except (OSError, EOFError, zlib.error, ValueError, KeyError, TypeError,
+            AttributeError) as exc:
+        # OSError covers gzip.BadGzipFile; ValueError covers
+        # json.JSONDecodeError, UnicodeDecodeError and binascii.Error.
+        warnings.warn(
+            f"{path} is not a readable recording ({type(exc).__name__}: {exc}); "
+            f"asking {key['url']} live instead. Re-record it with "
+            "scripts/record_http_fixtures.py.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
         return None
-    if "body_base64" in record:
-        body = base64.b64decode(record["body_base64"])
-    else:
-        body = record["body"].encode("utf-8")
-    headers = {"content-type": record["content_type"]} if record.get("content_type") else {}
-    request = httpx.Request(key["method"], record.get("response_url") or key["url"])
-    return httpx.Response(record["status"], headers=headers, content=body, request=request)
 
 
 def _record(key: dict, response: httpx.Response) -> None:
@@ -251,6 +339,11 @@ def _record(key: dict, response: httpx.Response) -> None:
     """
     directory = os.environ.get(RECORD_ENV)
     if not directory:
+        return
+    # The request was vetted by replay_key, but with follow_redirects the
+    # final URL is the server's choice, and a redirect to a signed download
+    # (`...?X-Amz-Signature=...`) would put that signature in the file.
+    if _url_carries_a_credential(str(response.url)):
         return
     content = response.content
     record: dict[str, Any] = {
@@ -299,7 +392,8 @@ def retry_get(
     Under CATERVA_HTTP_RECORDED a request with a recording is answered from
     it without touching the network; under CATERVA_HTTP_RECORD a definitive
     live answer is written down. Neither ever applies to a request that
-    carries a credential (see CREDENTIAL_PARAMS / CREDENTIAL_HEADERS).
+    may carry a credential (see replay_key: CREDENTIAL_WORDS,
+    CREDENTIAL_FRAGMENTS and the KEYED_HEADERS allowlist).
     """
     key = _memo_key(url, kwargs)
     if key in _MEMO:
