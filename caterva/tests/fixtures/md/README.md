@@ -34,3 +34,32 @@ residues, one line each (residue number, name, then the 21 per-frame angles
 in degrees), from `gmx angle -type dihedral` (GROMACS 2026.1, 2026-09-29) on
 `lyso_1aki_res1-59.xtc` with an index of the four atoms per residue taken
 from `lyso_1aki_res1-59.gro.gz`.
+
+`lyso_1aki_rep1_gmx_angles.txt`: the 24 angles between catalytic groups
+that `caterva analyze` plans for lysozyme (both arms within 0.6 nm between
+functional-group centres in 1AKI's protein.pdb), one line each: residue
+numbers a, v, b (the vertex in the middle), then the 21 per-frame angles in
+degrees, the `-oav` output of `gmx gangle -g1 angle -group1 'cog of (resnr
+a and name ...) plus cog of (resnr v and name ...) plus cog of (resnr b and
+name ...)'` (GROMACS 2026.1, 2026-09-29) on `lyso_1aki_res1-59.xtc` with
+`lyso_1aki_res1-59.gro.gz` as the structure.
+
+`lyso_1aki_res1-59_water.xtc` and `lyso_1aki_res1-59_water.gro.gz`: the
+same 21 frames of replica 1 with the water at the active site: residues
+1-59 (900 atoms) and every water (272, whole: OW, HW1, HW2) whose oxygen came
+within 1.0 nm of a catalytic functional atom (Glu35 OE1 OE2, Asn46 OD1 ND2,
+Asp48 OD1 OD2, Ser50 OG, Asp52 OD1 OD2, Asn59 OD1 ND2) in any frame of the
+full trajectory or in em.gro. The waters were chosen by `gmx select
+-select 'same residue as (resname SOL and name OW and within 1.0 of (...))'
+-on` on rep1/md.xtc and on em.gro, the per-frame index groups merged, and
+the 1,716 atoms cut with `gmx trjconv -n` (GROMACS 2026.1, 2026-09-29); the
+.gro.gz is the same atoms of em.gro. 134 KB and 22 KB.
+
+`lyso_1aki_rep1_gmx_water.txt`: for each of the six catalytic residues, its
+number, name, the count in em.gro, then the 21 per-frame counts of water
+oxygens within 0.35 nm of its functional atoms: `gmx select -select
+'resname SOL and name OW and within 0.35 of (resnr N and name ...)' -os`
+on `lyso_1aki_res1-59_water.xtc` (and on the .gro for the count at the
+start). The same selections on the full 23,873-atom trajectory and em.gro
+printed the same counts in every frame, which is what shows the cut kept
+every water that matters.

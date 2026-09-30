@@ -68,6 +68,46 @@ def _rotamer_rows(text: str) -> dict:
     return rows
 
 
+def _table_rows(text: str, heading: str) -> dict:
+    """First cell -> the other cells, for every body row of the table under
+    one heading. Only that section is read, for the reason _distance_rows
+    gives: tables further down have rows of the same shape."""
+    section = text.split(heading, 1)[-1].split("\n## ", 1)[0]
+    rows = {}
+    for line in section.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if line.startswith("|") and cells and re.match(r"[A-Z][a-z]{2}\d+", cells[0]):
+            rows[cells[0]] = cells[1:]
+    return rows
+
+
+def _angle_rows(text: str) -> dict:
+    """angle -> (crystal, each replica's mean, mean across replicas), degrees.
+
+    Compared across the routes since angles were added (2026-09-29): gmx
+    gangle and the native reader agreed to 0.0006 degrees per frame on both
+    10 ps lysozyme replicas, so the printed means (0.1 degree) may differ by
+    one unit of their last digit and no more.
+    """
+    out = {}
+    for label, cells in _table_rows(text, "## Angles between catalytic groups").items():
+        numbers = []
+        for c in cells:
+            m = re.match(r"-?\d+\.\d", c)
+            if not m:  # the confidence interval ("± 35.0") ends the numbers compared
+                break
+            numbers.append(float(m.group(0)))
+        out[label] = tuple(numbers)
+    return out
+
+
+def _water_rows(text: str) -> dict:
+    """residue -> every cell of its row: atoms, count at start, per replica
+    mean and fraction, verdict. Water counts are integers on both routes, so
+    the rows must be identical, not close."""
+    return _table_rows(text, "## Water at the catalytic residues")
+
+
 def main() -> int:
     gmx = os.environ.get("GMX", "gmx")
     if shutil.which(gmx) is None and not Path(gmx).exists():
@@ -104,10 +144,11 @@ def main() -> int:
         return 1
     # And the enzyme analysis, which fetches lysozyme's catalytic residues
     # (M-CSA via `caterva prepare`), twice: measured by Caterva from the
-    # trajectories it reads itself, and by gmx distance / gmx rmsf. The two
-    # distance tables must agree, so this job checks the native reader and
-    # geometry against GROMACS on every run.
-    tables, flex, rot = {}, {}, {}
+    # trajectories it reads itself, and by gmx distance, rmsf, angle, gangle
+    # and select. The distance, flexibility, rotamer, angle and water tables
+    # must agree, so this job checks the native reader and geometry against
+    # GROMACS on every run.
+    tables, flex, rot, ang, wet = {}, {}, {}, {}, {}
     for route, extra in (("native", []), ("gromacs", ["--gromacs"])):
         code = subprocess.run([sys.executable, "-m", "caterva.app", "analyze", str(OUT), *extra],
                               cwd=ROOT, env={**os.environ, "GMX": gmx}).returncode
@@ -118,6 +159,8 @@ def main() -> int:
         tables[route] = _distance_rows(text)
         flex[route] = _flexibility_rows(text)
         rot[route] = _rotamer_rows(text)
+        ang[route] = _angle_rows(text)
+        wet[route] = _water_rows(text)
     if not (OUT / "rep2" / "catalytic.xvg").exists():
         print("FAIL: caterva analyze --gromacs wrote no catalytic.xvg")
         return 1
@@ -146,6 +189,28 @@ def main() -> int:
         print(f"FAIL: native and GROMACS chi1 rotamer tables differ: {rot['native']} vs {rot['gromacs']}")
         return 1
     print(f"OK: native and GROMACS agree on the chi1 rotamers of {len(rot['native'])} catalytic residues.")
+    # Angles between catalytic groups: gmx gangle against the native
+    # centres and nearest-image arms. Lysozyme's six catalytic groups give
+    # 24 angles under the contact cutoff, so an empty table is a failure.
+    if not ang["native"] or ang["native"].keys() != ang["gromacs"].keys():
+        print(f"FAIL: native and GROMACS angle tables list different angles: "
+              f"{sorted(ang['native'])} vs {sorted(ang['gromacs'])}")
+        return 1
+    if any(len(ang["native"][k]) != len(ang["gromacs"][k]) for k in ang["native"]):
+        print(f"FAIL: native and GROMACS angle rows have different shapes: {ang['native']} vs {ang['gromacs']}")
+        return 1
+    worst_a = max(abs(a - b) for k in ang["native"] for a, b in zip(ang["native"][k], ang["gromacs"][k]))
+    if worst_a > 0.1 + 1e-9:
+        print(f"FAIL: native and GROMACS angles between catalytic groups differ by up to {worst_a:.1f} degrees")
+        return 1
+    print(f"OK: native and GROMACS agree on {len(ang['native'])} angles between catalytic groups "
+          f"(largest difference in the printed means {worst_a:.1f} degrees; the table prints 0.1).")
+    # Water at each catalytic residue: gmx select against the native count.
+    if not wet["native"] or wet["native"] != wet["gromacs"]:
+        print(f"FAIL: native and GROMACS water tables differ: {wet['native']} vs {wet['gromacs']}")
+        return 1
+    print(f"OK: native and GROMACS agree on the water at {len(wet['native'])} catalytic residues, "
+          "count for count.")
     print("OK: minimisation, then NVT, NPT, production and RMSD for two replicas, the summary, "
           "and the enzyme analysis.")
     return 0

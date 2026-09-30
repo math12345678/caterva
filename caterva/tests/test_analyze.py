@@ -144,6 +144,9 @@ def _fake_run(tmp_path, means, n=4000, phi=0.5, sd=0.005, seed=0):
         (d / "catalytic.xvg").write_text(
             "@ title\n" + "".join(f"{i * 0.001:.3f} {v:.5f}\n" for i, v in enumerate(series)))
         (d / "rmsf.xvg").write_text("# rmsf\n10 0.05\n20 0.05\n30 0.06\n90 0.20\n")
+        # gmx select -os: water oxygens at His10 and Asp20, per frame.
+        (d / "water.xvg").write_text("@ title\n0.000 2.000 0.000\n0.001 3.000 1.000\n")
+    (tmp_path / "water_start.xvg").write_text("0.000 2.000 1.000\n")
     return tmp_path
 
 

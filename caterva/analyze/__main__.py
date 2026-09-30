@@ -7,9 +7,13 @@
 For every pair of catalytic residues (M-CSA, mapped by `caterva prepare`),
 the distance between their functional groups in each replica, against the
 same distance in the starting crystal structure; and the flexibility (RMSF)
-of the active-site pocket against the rest of the protein. Each quantity is
-reported as a spread across replicas with block-averaged errors, and called
-a result only when the replicas agree (see `caterva md --summarise`).
+of the active-site pocket against the rest of the protein. Where two
+catalytic groups are both in contact with a third, the angle between them at
+the third (caterva/analyze/angles.py); and at every catalytic residue, the
+water that reaches its functional atoms (caterva/analyze/water.py). Each
+distance and angle is reported as a spread across replicas with
+block-averaged errors, and called a result only when the replicas agree
+(see `caterva md --summarise`).
 
 Caterva does the measuring itself, from the .xtc files it reads natively
 (caterva/md/xtc.py), so this runs where GROMACS is not installed. The
@@ -34,9 +38,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from caterva.analyze.plan import POCKET_RADIUS, Plan, plan, read_pdb
+from caterva.analyze.plan import CONTACT_NM, POCKET_RADIUS, Plan, plan, read_pdb
+from caterva.analyze.angles import AngleResult
 from caterva.analyze.hbonds import Occupancy
 from caterva.analyze.rotamers import Rotamer
+from caterva.analyze.water import Hydration
 from caterva.md.convergence import CONFIDENCE, Summary, summarise
 
 CONFIDENCE_PCT = CONFIDENCE * 100
@@ -127,8 +133,16 @@ def write_chi1_index(directory: Path, groups) -> None:
     (directory / "chi1.ndx").write_text("\n".join(lines) + "\n")
 
 
+def water_selections(p: Plan) -> str:
+    """One `gmx select` selection per catalytic residue, quoted for the shell."""
+    from caterva.analyze.water import selection
+    return " ".join(f"'{selection(s.resnr, s.atoms)}'" for s in p.sites)
+
+
 def commands(p: Plan, reps: Sequence[str], gmx: str = "$GMX", chi1: Sequence = ()) -> List[str]:
     sel = " ".join(f"'{q.selection()}'" for q in p.pairs)
+    angle_sel = " ".join(f"'{t.selection()}'" for t in p.angles)
+    water_sel = water_selections(p)
     lines = []
     for r in reps:
         if p.pairs:
@@ -152,6 +166,26 @@ def commands(p: Plan, reps: Sequence[str], gmx: str = "$GMX", chi1: Sequence = (
         for g, (resnr, _, _) in enumerate(chi1):
             lines.append(f"printf '{g}\\n' | {gmx} angle -f {r}/md_whole.xtc -n chi1.ndx -type dihedral "
                          f"-ov {r}/chi1_{resnr}.xvg")
+        # Angles between catalytic groups: one -oav column per selection of
+        # three centres (vertex in the middle). gangle makes molecules whole
+        # from the tpr (-rmpbc, its default) before it takes the centres,
+        # and its arms are periodic (-pbc, also default); the native route
+        # makes each group whole and takes nearest images. On both 10 ps
+        # lysozyme replicas (2026-09-29) the two agreed to 0.0006 degrees in
+        # every frame, and gmx select's water counts to the native ones
+        # exactly.
+        if p.angles:
+            lines.append(f"{gmx} gangle -s {r}/md.tpr -f {r}/md.xtc -g1 angle -group1 {angle_sel} "
+                         f"-oav {r}/angles.xvg")
+        # Water at each catalytic residue: -os prints how many water oxygens
+        # each selection holds, frame by frame.
+        if p.sites:
+            lines.append(f"{gmx} select -s {r}/md.tpr -f {r}/md.xtc -select {water_sel} -os {r}/water.xvg")
+    if p.sites and reps:
+        # The water at the start, from em.gro (the structure every replica
+        # began from), counted once. The tpr supplies residue names and
+        # numbers; em.gro has the same atoms in the same order.
+        lines.append(f"{gmx} select -s {reps[0]}/md.tpr -f em.gro -select {water_sel} -os water_start.xvg")
     return lines
 
 
@@ -199,10 +233,20 @@ class Analysis:
     hbonds: Optional[List["Occupancy"]] = None
     #: chi1 rotamers of the catalytic residues; None on the GROMACS route.
     rotamers: Optional[List["Rotamer"]] = None
+    #: Angles between catalytic groups in contact; empty when no group has
+    #: two partners within CONTACT_NM in the crystal.
+    angles: List["AngleResult"] = field(default_factory=list)
+    #: Water at each catalytic residue; None when it was not measured.
+    water: Optional[List["Hydration"]] = None
 
     @property
     def all_consistent(self) -> bool:
-        return bool(self.distances) and all(d.summary.verdict == "consistent" for d in self.distances)
+        """Every distance and every angle is a consistent result. Angles are
+        quantities with the same verdict as distances, and the exit code
+        promises 0 only when every quantity is one."""
+        return (bool(self.distances)
+                and all(d.summary.verdict == "consistent" for d in self.distances)
+                and all(t.summary.verdict == "consistent" for t in self.angles))
 
 
 def measure(directory: Path, p: Plan, reps: Sequence[Path],
@@ -254,6 +298,49 @@ def _gromacs_rotamers(directory: Path, reps: Sequence[Path], chi1: Sequence) -> 
     return out
 
 
+def _gromacs_output(path: Path, what: str, columns: int) -> List[List[float]]:
+    """An .xvg analyze.sh wrote, with the columns this plan expects. An older
+    analyze.sh, or one written for another plan, is refused by name rather
+    than read into the wrong rows."""
+    if not path.exists():
+        raise AnalyzeError(f"{path} does not exist: run analyze.sh again (it measures {what})")
+    cols = read_columns(path)
+    if len(cols) != columns + 1:
+        raise AnalyzeError(f"{path} has {max(len(cols) - 1, 0)} columns of {what}, the plan has {columns}: "
+                           "run analyze.sh again")
+    return cols
+
+
+def gromacs_angles(p: Plan, reps: Sequence[Path]) -> List[AngleResult]:
+    """Angles from gmx gangle's angles.xvg (-oav: one column per planned
+    angle, in the plan's order), summarised as the native route does."""
+    if not p.angles:
+        return []
+    per: Dict[int, List[Tuple[str, List[float]]]] = {i: [] for i in range(len(p.angles))}
+    for r in reps:
+        cols = _gromacs_output(r / "angles.xvg", "angles between catalytic groups", len(p.angles))
+        for i in range(len(p.angles)):
+            per[i].append((r.name, cols[i + 1]))
+    return [AngleResult(t.label, t.crystal_deg, summarise(per[i], t.label, "degrees"))
+            for i, t in enumerate(p.angles)]
+
+
+def gromacs_water(directory: Path, p: Plan, reps: Sequence[Path]) -> List[Hydration]:
+    """Water counts from gmx select's water.xvg (-os: one column per
+    catalytic residue) and, for the start, water_start.xvg from em.gro."""
+    from caterva.analyze.water import summarise_counts
+    if not p.sites:
+        return []
+    what = "water at the catalytic residues"
+    start = _gromacs_output(directory / "water_start.xvg", what, len(p.sites))
+    per: Dict[int, List[Tuple[str, float, float]]] = {i: [] for i in range(len(p.sites))}
+    for r in reps:
+        cols = _gromacs_output(r / "water.xvg", what, len(p.sites))
+        for i in range(len(p.sites)):
+            per[i].append(summarise_counts(r.name, [int(round(v)) for v in cols[i + 1]]))
+    return [Hydration(s.label, int(round(start[i + 1][0])), per[i]) for i, s in enumerate(p.sites)]
+
+
 def _gro_index(path: Path) -> Dict[Tuple[int, str], int]:
     """(residue number, atom name) -> 0-based index in the simulated system,
     first occurrence; the numbering pdb2gmx keeps."""
@@ -301,9 +388,12 @@ def _gro_atoms(path: Path):
 
 
 def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
-                   ) -> Tuple[List[DistanceResult], Flexibility, List["Occupancy"], List["Rotamer"]]:
-    """The same distances and RMSF as analyze.sh, computed by Caterva from the
-    trajectories it reads itself (caterva/md/xtc.py), with no GROMACS."""
+                   ) -> Tuple[List[DistanceResult], Flexibility, List["Occupancy"], List["Rotamer"],
+                              List[AngleResult], List[Hydration]]:
+    """The same distances, RMSF, chi1, angles and water counts as analyze.sh,
+    and the hydrogen bonds it does not count, computed by Caterva from the
+    trajectories it reads itself (caterva/md/xtc.py), with no GROMACS. Each
+    trajectory is read once and every quantity taken from it."""
     import numpy as np
     from caterva.md import xtc
     ref_gro = directory / "em.gro"
@@ -345,8 +435,19 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
             chi_sites.append((site, idx))
     chi_pops: Dict[int, List[Tuple[str, Dict[str, float]]]] = {site.resnr: [] for site, _ in chi_sites}
     hb: Dict[int, List[Tuple[str, float, float]]] = {i: [] for i in range(len(p.pairs))}
+    from caterva.analyze.angles import angle_series
+    from caterva.analyze import water as wat
+    angle_atoms = [(atoms_of(t.a), atoms_of(t.v), atoms_of(t.b)) for t in p.angles]
+    per_angle: Dict[int, List[Tuple[str, List[float]]]] = {i: [] for i in range(len(p.angles))}
+    site_atoms = [atoms_of(s) for s in p.sites]
+    oxygens = np.array(wat.water_oxygens(atoms), dtype=int)
+    per_water: Dict[int, List[Tuple[str, float, float]]] = {i: [] for i in range(len(p.sites))}
     for r in reps:
         traj = xtc.read(r / "md.xtc")
+        for i, (ia, iv, ib) in enumerate(angle_atoms):
+            per_angle[i].append((r.name, angle_series(traj, ia, iv, ib)))
+        for i, idx in enumerate(site_atoms):
+            per_water[i].append(wat.summarise_counts(r.name, wat.counts(traj, idx, oxygens)))
         for i, q in enumerate(p.pairs):
             ga, gb = groups[q.a.resnr], groups[q.b.resnr]
             if ga is not None and gb is not None:
@@ -374,7 +475,11 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
         occupancies.append(Occupancy(q.label, hb[i], count_frame(start_x, start_box, ga, gb)))
     rotamers = [Rotamer(site.label, dihedral(*(start_x[i] for i in idx), start_box), chi_pops[site.resnr])
                 for site, idx in chi_sites]
-    return results, Flexibility(flex), occupancies, rotamers
+    angles = [AngleResult(t.label, t.crystal_deg, summarise(per_angle[i], t.label, "degrees"))
+              for i, t in enumerate(p.angles)]
+    water = [Hydration(s.label, wat.count_frame(start_x, start_box, site_atoms[i], oxygens), per_water[i])
+             for i, s in enumerate(p.sites)]
+    return results, Flexibility(flex), occupancies, rotamers, angles, water
 
 
 #: Occupancy thresholds for naming what happened to a hydrogen bond. Chosen,
@@ -444,6 +549,8 @@ def report(a: Analysis) -> List[str]:
         L.append(f"- {who}: {reason}")
     L += hbond_section(a)
     L += rotamer_section(a)
+    L += angle_section(a)
+    L += water_section(a)
     f = a.flexibility
     L += ["", "## Active-site flexibility", "",
           f"Mean Cα RMSF of the {len(a.plan.pocket)} residues within {POCKET_RADIUS:g} Å of a catalytic "
@@ -462,16 +569,15 @@ def report(a: Analysis) -> List[str]:
                           "(below 1: the active site is more rigid than the protein around it)."]
             else:
                 L += ["", f"Not yet a result: pocket / rest {m:.2f} ± {sd:.2f}, from runs the catalytic "
-                          "distances above show are unconverged. RMSF from unconverged runs measures "
-                          "how far each residue got, not how mobile it is."]
+                          "distances and angles above show are unconverged. RMSF from unconverged runs "
+                          "measures how far each residue got, not how mobile it is."]
         else:
             L += ["", "One usable replica: the ratio has no spread."]
     else:
         L += ["Not measurable: RMSF needs more than one frame per replica, and these runs are too short."]
     L += ["", "## Not measured", "",
           "- ligand pose and contacts: `caterva md` strips ligands until they can be parameterised "
-          "(MD roadmap M4)",
-          "- angles between catalytic groups (next)", "",
+          "(MD roadmap M4)", "",
           f"`{MOVED_NM:g} nm` is the chosen threshold for calling a distance changed. The measuring commands "
           "are in analyze.sh. Errors: Flyvbjerg & Petersen (1989) J. Chem. Phys. 91:461, "
           "doi:10.1063/1.457480. Catalytic residues: Ribeiro et al. (2018) Nucleic Acids Res. "
@@ -488,24 +594,33 @@ RESOLVE_NM = MOVED_NM / 2
 def replica_sufficiency(a: Analysis) -> List[str]:
     """Are there enough replicas to decide held or moved? From the spread the
     replicas actually show, not a rule of thumb."""
-    measured = [d for d in a.distances if d.summary.spread is not None and not math.isnan(d.summary.ci95)]
+    return _sufficiency([(d.label, d.summary) for d in a.distances], RESOLVE_NM, MOVED_NM, " nm", 3,
+                        "distance")
+
+
+def _sufficiency(items: Sequence[Tuple[str, Summary]], resolve: float, moved: float, unit: str,
+                 digits: int, noun: str, explain: bool = True) -> List[str]:
+    """replica_sufficiency for any quantity with a moved threshold: the
+    distances, and the angles with theirs. `items` is (label, Summary)."""
+    measured = [(label, s) for label, s in items if s.spread is not None and not math.isnan(s.ci95)]
     if not measured:
         return []
-    n = len(measured[0].summary.replicas)
-    short = [(d, d.summary.replicas_for(RESOLVE_NM)) for d in measured if d.summary.ci95 > RESOLVE_NM]
+    n = len(measured[0][1].replicas)
+    short = [(label, s, s.replicas_for(resolve)) for label, s in measured if s.ci95 > resolve]
     if not short:
-        return [f"- Replicas: {n} are enough; every distance's {int(CONFIDENCE_PCT)}% confidence interval is "
-                f"within ± {RESOLVE_NM:g} nm, half the {MOVED_NM:g} nm moved threshold.", ""]
-    worst = max(short, key=lambda x: x[0].summary.ci95)
-    needs = [k for _, k in short if k is not None]
+        return [f"- Replicas: {n} are enough; every {noun}'s {int(CONFIDENCE_PCT)}% confidence interval is "
+                f"within ± {resolve:g}{unit}, half the {moved:g}{unit} moved threshold.", ""]
+    worst = max(short, key=lambda x: x[1].ci95)
+    needs = [k for _, _, k in short if k is not None]
     most = max(needs) if needs else None
     return [f"- Replicas: {n} are not enough to decide held or moved for {len(short)} of {len(measured)} "
-            f"distances: their {int(CONFIDENCE_PCT)}% confidence intervals are wider than ± {RESOLVE_NM:g} nm "
-            f"(worst: {worst[0].label}, ± {worst[0].summary.ci95:.3f} nm). "
+            f"{noun}s: their {int(CONFIDENCE_PCT)}% confidence intervals are wider than ± {resolve:g}{unit} "
+            f"(worst: {worst[0]}, ± {worst[1].ci95:.{digits}f}{unit}). "
             + (f"If the spread between runs stays as it is, {most} replicas would resolve all of them."
                if most else "Even many more replicas would not, at the spread seen: the runs are too short.")
-            + " (With few replicas the interval is wide by construction: Student's t for 2 replicas is 12.7; "
-              "and two runs estimate the spread itself poorly, so treat that count as a first guess.)",
+            + (" (With few replicas the interval is wide by construction: Student's t for 2 replicas is 12.7; "
+               "and two runs estimate the spread itself poorly, so treat that count as a first guess.)"
+               if explain else ""),
             ""]
 
 
@@ -567,6 +682,79 @@ def rotamer_section(a: Analysis) -> List[str]:
     return L
 
 
+def angle_section(a: Analysis) -> List[str]:
+    from caterva.analyze.angles import MOVED_DEG, RESOLVE_DEG
+    from caterva.md.convergence import DISCARD
+    L = ["", "## Angles between catalytic groups", ""]
+    if not a.angles:
+        n = sum(1 for s in a.plan.sites if s.functional)
+        return L + [f"None measured: of the {n} catalytic groups with their functional atoms, none has two "
+                    f"others within {CONTACT_NM:g} nm of it in the crystal (functional-group centres)."]
+    L += [f"The angle at one catalytic group (the middle one of each three) between two others, for every "
+          f"group with two partners within {CONTACT_NM:g} nm of it in the crystal (the functional-group "
+          "centres the distances use), frame by frame, each arm to its nearest periodic image. Two distances "
+          "to a group can hold while one partner swings round to its other side; this sees that. Per "
+          f"replica, the mean over the second half of the run (the first {DISCARD:.0%} is discarded as "
+          "relaxation, as for the distances).", ""]
+    names = [r.name for r in a.angles[0].summary.replicas]
+    L += ["| angle (vertex in the middle) | crystal (°) | " + " | ".join(names)
+          + " | simulated (°, mean ± SD of replicas) | 95% CI of the mean | change | verdict |",
+          "|---|---|" + "---|" * len(names) + "---|---|---|---|"]
+    for t in a.angles:
+        s = t.summary
+        sim = f"{s.mean:.1f}" + (f" ± {s.spread:.1f}" if s.spread is not None else "")
+        ci = "n/a" if math.isnan(s.ci95) else f"± {s.ci95:.1f}"
+        if s.verdict != "consistent":
+            ch = f"({t.change_deg:+.1f}, not yet a result)"
+        else:
+            ch = f"**{t.change_deg:+.1f}, moved**" if t.moved else f"{t.change_deg:+.1f}, held"
+        L.append(f"| {t.label} | {t.crystal_deg:.1f} | " + " | ".join(f"{r.result.mean:.1f}" for r in s.replicas)
+                 + f" | {sim} | {ci} | {ch} | {s.verdict} |")
+    L.append("")
+    L += _sufficiency([(t.label, t.summary) for t in a.angles], RESOLVE_DEG, MOVED_DEG, "°", 1, "angle",
+                      explain=False)
+    grouped: Dict[str, List[str]] = {}
+    for t in a.angles:
+        if t.summary.verdict != "consistent" and t.summary.reasons:
+            grouped.setdefault(t.summary.reasons[0], []).append(t.label)
+    for reason, labels in grouped.items():
+        who = "every angle" if len(labels) == len(a.angles) and len(labels) > 1 else ", ".join(labels)
+        L.append(f"- {who}: {reason}")
+    L += ["", f"`{MOVED_DEG:g}°` is the chosen threshold for calling an angle changed: a group 0.4 nm from the "
+              f"vertex that turns that far moves about {MOVED_NM:g} nm, the distance threshold. "
+              f"`{CONTACT_NM:g} nm` between centres is a hydrogen bond or salt bridge (0.35 nm between two "
+              "atoms) plus the 0.10-0.14 nm from each group's centre to its atoms."]
+    return L
+
+
+def water_section(a: Analysis) -> List[str]:
+    from caterva.analyze.water import DRY, SPLIT, WATER_NM, WET, hydration_verdict
+    L = ["", "## Water at the catalytic residues", ""]
+    if a.water is None:
+        return L + ["Not measured."]
+    if not a.water:
+        return L + ["No catalytic residue to count water at."]
+    L += [f"Water oxygens within {WATER_NM:g} nm of any of each catalytic residue's functional atoms (nearest "
+          "periodic image), counted in every frame. Per replica: the mean number of waters, and in brackets "
+          "the fraction of frames with at least one. At start: the count in em.gro, the minimised, solvated "
+          "structure every replica began from.", ""]
+    names = [n for n, _, _ in a.water[0].per_replica]
+    L += ["| residue | atoms | at start | " + " | ".join(names) + " | verdict |",
+          "|---|---|---|" + "---|" * len(names) + "---|"]
+    for h, site in zip(a.water, a.plan.sites):
+        v = hydration_verdict(h)
+        if not a.all_consistent and v != "one replica":
+            v = f"({v}, not yet a result)"
+        L.append(f"| {h.label} | {' '.join(site.atoms)} | {h.at_start} | "
+                 + " | ".join(f"{m:.2f} ({f:.2f})" for _, m, f in h.per_replica) + f" | {v} |")
+    L += ["", f"Verdicts (chosen thresholds): hydrated, at least one water in at least {WET:.0%} of frames in "
+              f"every replica; dry, in at most {DRY:.0%}; intermittent, in between; replicas disagree, when "
+              f"their fractions differ by more than {SPLIT:.0%}. `{WATER_NM:g} nm` is the donor-acceptor limit "
+              "of `gmx hbond`, so a counted water is close enough to hydrogen-bond to the group, and it is "
+              "where water's first hydration shell ends."]
+    return L
+
+
 def build_parser(prog: str = "caterva analyze") -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog=prog, description=__doc__.splitlines()[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -580,7 +768,8 @@ def build_parser(prog: str = "caterva analyze") -> argparse.ArgumentParser:
     p.add_argument("--no-run", action="store_true",
                    help="use the .xvg files analyze.sh already wrote; do not call GROMACS")
     p.add_argument("--gromacs", action="store_true",
-                   help="measure with gmx distance and gmx rmsf (analyze.sh) instead of Caterva's own reader")
+                   help="measure with gmx distance, rmsf, angle, gangle and select (analyze.sh) instead "
+                        "of Caterva's own reader")
     return p
 
 
@@ -603,7 +792,8 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
             write_chi1_index(d, chi1)
         (d / "analyze.sh").write_text(script(p, [r.name for r in reps] or ["rep1"], chi1))
         if args.script_only:
-            print(f"Wrote {d}/analyze.sh ({len(p.pairs)} catalytic distances, pocket of {len(p.pocket)} residues).")
+            print(f"Wrote {d}/analyze.sh ({len(p.pairs)} catalytic distances, {len(p.angles)} angles, "
+                  f"water at {len(p.sites)} residues, pocket of {len(p.pocket)} residues).")
             return 0
         if not reps:
             raise AnalyzeError(f"no finished replicas (rep*/md.xtc) under {d}: run {d}/run.sh first")
@@ -615,13 +805,14 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
                                        "elsewhere and rerun with --no-run")
                 run_gromacs(d, p, reps, gmx, chi1)
             distances, flex, rotamers = measure(d, p, reps, chi1)
+            angles, water = gromacs_angles(p, reps), gromacs_water(d, p, reps)
             hbonds = None
         else:
-            distances, flex, hbonds, rotamers = measure_native(d, p, reps)
+            distances, flex, hbonds, rotamers, angles, water = measure_native(d, p, reps)
     except AnalyzeError as e:
         print(f"caterva analyze: {e}", file=sys.stderr)
         return 3
-    a = Analysis(pdb, chain, source, p, distances, flex, hbonds, rotamers)
+    a = Analysis(pdb, chain, source, p, distances, flex, hbonds, rotamers, angles, water)
     text = "\n".join(report(a)) + "\n"
     print(text, end="")
     (d / "ANALYSIS.md").write_text(text, encoding="utf-8")
