@@ -282,8 +282,11 @@ export const RESOLVABLE_FIELDS: Record<string, string[]> = {
 };
 
 /** The mechanisms a model can be of, and so the modes a Ki can be asked for
- * by (caterva.compose.ki_mode.MODES). */
-export type InhibitionMode = "competitive" | "noncompetitive" | "uncompetitive";
+ * by (caterva.compose.ki_mode.MODES). The type is read off the list, so a
+ * caller validating a mode it was given (a model annotation's
+ * `inhibition=`) checks against the same three the type allows. */
+export const INHIBITION_MODES = ["competitive", "noncompetitive", "uncompetitive"] as const;
+export type InhibitionMode = (typeof INHIBITION_MODES)[number];
 
 /**
  * The inhibition mode of each domain that resolves a Ki, which the Ki lookup

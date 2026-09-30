@@ -513,32 +513,68 @@ function modeTaking(clause: string): InhibitionMode | null {
 }
 
 /**
+ * How the command that looked a Ki up lets its reader ask for a mode, for
+ * the advice a "mode_withheld" sentence ends with.
+ *
+ * WHY THIS IS A PARAMETER. `scientific resolve` takes the mode as `--mode`,
+ * any of the three. `scientific simulate --resolve` takes it from `--model`:
+ * the Ki is looked up by the mode of the model being run, so the way to
+ * reach a row of another mode is to run a model of that mode, and there is
+ * no uncompetitive model to run. Printing resolve's advice under a simulate
+ * refusal would send the reader to a `--mode` flag that command does not
+ * have. The sentence stays in this one function; only the flag vocabulary
+ * comes from the caller, which is the part that differs.
+ */
+export interface ModeAdvice {
+  /** The flag that chose the mode. */
+  flag: string;
+  /** That flag's value for each mode it can ask for. A mode with no entry
+   *  cannot be asked for through it, and is not offered. */
+  values: Partial<Record<InhibitionMode, string>>;
+  /** The other way forward, ending the sentence ("run without --mode ..."). */
+  otherwise: string;
+}
+
+/** `scientific resolve --quantity ki --mode ...`: every mode, and a lookup
+ *  without one. The default, so resolve's sentence is unchanged. */
+export const RESOLVE_MODE_ADVICE: ModeAdvice = {
+  flag: '--mode',
+  values: { competitive: 'competitive', noncompetitive: 'noncompetitive', uncompetitive: 'uncompetitive' },
+  otherwise: "run without --mode to take the resolver's pick with its stated mode printed beside it",
+};
+
+/**
  * What to tell a reader when rows WERE found and a policy withheld them, or
  * null when nothing was withheld. Each case is reversible, so each names the
- * way to reverse it.
+ * way to reverse it, in the flags of the command that asked (`advice`).
  */
-export function withheldSentence(result: UnresolvedKinetic): string | null {
+export function withheldSentence(
+  result: UnresolvedKinetic,
+  advice: ModeAdvice = RESOLVE_MODE_ADVICE,
+): string | null {
   const list = (xs: string[], fallback: string) => (xs.length ? xs.join(', ') : fallback);
   switch (result.source) {
     case 'mode_withheld': {
       // Constants exist, of other mechanisms. Naming them says the gap is
       // the mechanism, not the literature; each is still not the constant
       // of the one asked for, so none was used. The advice names only a
-      // --mode that would take one of them: a row stating partial
+      // flag value that would take one of them: a row stating partial
       // inhibition fits none of the three, and "run with the --mode of one
-      // of those" would send the reader to a flag that does not exist.
-      const reaching = [...new Set(result.modesAvailable.map(modeTaking))].filter(
-        (m): m is InhibitionMode => m !== null,
-      );
+      // of those" would send the reader to a flag value that does not exist.
+      const reaching = [...new Set(result.modesAvailable.map(modeTaking))]
+        .filter((m): m is InhibitionMode => m !== null)
+        .map((m) => advice.values[m])
+        .filter((v): v is string => v !== undefined);
+      const otherwise = advice.otherwise;
       const how = reaching.length
-        ? `To use one, run with ${reaching.map(m => `--mode ${m}`).join(' or ')}; or run`
-        : 'No --mode takes any of them, since none states a mechanism a model here is of. Run';
+        ? `To use one, run with ${reaching.map(v => `${advice.flag} ${v}`).join(' or ')}; or ${otherwise}.`
+        : `No ${advice.flag} takes any of them, since none states a mechanism a model here is of. ` +
+          `${otherwise.charAt(0).toUpperCase()}${otherwise.slice(1)}.`;
       return `Every row BRENDA holds for this Ki states an inhibition mode ` +
         // Joined with "; ", as the runner's log and the API's note join
         // them, so the three read the list alike.
-        `other than the one --mode asked for (${result.modesAvailable.join('; ') || 'unnamed'}). ` +
-        `A Ki belongs to the mechanism it was measured under. ${how} without --mode to take ` +
-        `the resolver's pick with its stated mode printed beside it.`;
+        `other than the one ${advice.flag} asked for (${result.modesAvailable.join('; ') || 'unnamed'}). ` +
+        `A Ki belongs to the mechanism it was measured under. ${how}`;
     }
     case 'isoform_withheld':
       return `BRENDA holds this ${result.quantity} only for other isoforms ` +

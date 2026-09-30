@@ -30,6 +30,10 @@ import { ScientificPipeline } from '../integration/scientificPipeline';
 import {
   ResolverUnavailableError,
   resolveKinetic,
+  rowScopeLines,
+  withheldSentence,
+  type ModeAdvice,
+  type ResolvedKinetic,
 } from '../literature/literatureResolver';
 import { convertConcentration } from '../units';
 import {
@@ -45,6 +49,7 @@ import { commandSensitivity } from './commandSensitivity';
 import { JobManager } from '../execution/job-manager';
 import {
   INHIBITION_MODELS,
+  KI_MODE_OF_MODEL,
   runInhibitionModel,
   suggestModel,
   PRODUCT_INHIBITION_CAVEAT,
@@ -98,6 +103,22 @@ export interface ParameterProvenance {
     buffer?: string;
     unreported?: string[];
   };
+  /**
+   * For a Ki: the inhibitor it was looked up under, and the mode it was asked
+   * for by. BRENDA files a Ki under its inhibitor, so a Ki row that does not
+   * say whose constant it is cannot be checked against anything, and the
+   * table printed its Ki row with no compound on it at all.
+   */
+  inhibitor?: string;
+  askedMode?: string;
+  /**
+   * What the source row says it measured, in the sentences `scientific
+   * resolve` prints (`rowScopeLines`): the isoform, and for a Ki the mode and
+   * what it was measured versus. The mode-aware lookup falls back to a row
+   * stating NO mode when none states the model's, and without this line the
+   * table would present that constant as the model's mechanism.
+   */
+  rowScope?: string[];
 }
 
 /**
@@ -131,6 +152,50 @@ function assayConditionsFor(
   };
   const anything = Object.values(normalised).some((v) => v !== undefined);
   return anything ? normalised : undefined;
+}
+
+/**
+ * How this command asks for a Ki's inhibition mode, for the resolver's
+ * "mode_withheld" sentence (see `ModeAdvice` in literatureResolver.ts).
+ *
+ * The mode comes from `--model`, so the way to a Ki row of another mode is a
+ * model of that mode. Offered: the models named after the mode they ask for
+ * (competitive, noncompetitive), derived from KI_MODE_OF_MODEL rather than
+ * listed a second time. `product` also asks for noncompetitive but is not
+ * offered as the way to a noncompetitive row: it models inhibition by the
+ * reaction's own product, which the inhibitor in hand need not be. No model
+ * here is uncompetitive, so a row stating that mode is named and not
+ * offered, and the other way forward is the reader's own cited constant.
+ */
+const SIMULATE_MODE_ADVICE: ModeAdvice = {
+  flag: '--model',
+  values: Object.fromEntries(
+    Object.entries(KI_MODE_OF_MODEL)
+      .filter(([model, mode]) => model === mode)
+      .map(([model, mode]) => [mode, model]),
+  ),
+  otherwise:
+    "supply --ki with a constant of this model's mechanism, and --cite ki=\"...\" with its source",
+};
+
+/**
+ * The "what to do next" line for a constant whose rows were found and
+ * withheld. The sentence saying which rows, and why, is already in the
+ * refusal list above it (and in the `--json` document's `unresolved`, where a
+ * script reads it); printing it twice would bury the one flag it names.
+ */
+const WITHHELD_WHY =
+  'BRENDA holds rows for this, withheld for the reason given above. Supply ' +
+  'the value yourself only from a source you can cite.';
+
+/**
+ * What a resolved row says it measured, in `resolve`'s sentences, or
+ * undefined when the row says nothing worth a line. Read from the runner's
+ * `rowScope` (parsed in Python by caterva.bind.core), never re-derived.
+ */
+function rowScopeOf(result: ResolvedKinetic): string[] | undefined {
+  const lines = rowScopeLines(result.quantity, result.rowScope);
+  return lines.length > 0 ? lines : undefined;
 }
 
 /**
@@ -246,11 +311,19 @@ function renderNextStep(
   // from `options`, which is what the run actually used -- not from the
   // argv this process was handed, which may have been reordered or come
   // from a script.
+  //
+  // The model and the flags that say whose constants are looked up travel
+  // with it. Without `--model` the command printed after an inhibition
+  // model's refusal re-ran plain Michaelis-Menten, and the `--inhibitor` it
+  // asked for would then be refused as meaningless there.
   const parts = [
     'scientific simulate "michaelis menten" --resolve',
     `  --enzyme ${JSON.stringify(options.enzyme ?? '<enzyme>')}`,
     `  --substrate ${JSON.stringify(options.substrate)}`,
     `  --organism ${JSON.stringify(options.organism)}`,
+    ...(options.model && options.model !== 'mm' ? [`  --model ${options.model}`] : []),
+    ...(options.inhibitor ? [`  --inhibitor ${JSON.stringify(options.inhibitor)}`] : []),
+    ...(options.isoform ? [`  --isoform ${JSON.stringify(options.isoform)}`] : []),
     ...blockers.map((b) => `  ${b.suggestion ?? `--${b.parameter} <value>`}`),
   ];
   emit(
@@ -298,6 +371,28 @@ export interface SimulateResolvedOptions {
     phTolerance: number;
     temperatureToleranceC: number;
   };
+  /**
+   * `--inhibitor NAME`: the compound an inhibition model's Ki is looked up
+   * under. BRENDA files a Ki under its inhibitor; `substrate` is the model's
+   * substrate and is sent beside it as the model's (`modelSubstrate`).
+   *
+   * Required for a Ki lookup and never defaulted to the substrate: that was
+   * the defect. The lookup sent `substrate: options.substrate` with
+   * `quantity: 'ki'`, asking BRENDA for a Ki "of" pyruvate. `caterva compose`
+   * and the API stopped doing so on 2026-09-29; without an inhibitor the run
+   * now refuses and names this flag, as the API reports "No Ki was looked
+   * up" when its query names none. For `--model product` it is the
+   * reaction's product, which is the inhibitor there.
+   */
+  inhibitor?: string;
+  /**
+   * `--isoform NAME`, as on `resolve`: every constant comes from a row that
+   * measured this isoform, and one BRENDA holds only for other isoforms is
+   * refused with those named. Sent with the Km and kcat lookups as well as
+   * the Ki: a model of LDH-A is a model of one protein, so every constant in
+   * it must be that protein's (as `caterva compose --isoform` does).
+   */
+  isoform?: string;
   /**
    * `--allow-cross-species`: accept a value measured in a related organism
    * when the one asked about has none (ADR 0024), for every lookup this
@@ -806,16 +901,21 @@ export async function commandSimulateResolved(
           substrate: options.substrate,
           organism: options.organism,
           quantity: 'km',
+          ...(options.isoform ? { isoform: options.isoform } : {}),
           allowCrossSpecies: options.allowCrossSpecies === true,
           physiologicalReference: options.physiologicalReference,
         });
         if (!result.found) {
-          unresolved.push('km');
+          // Rows found and withheld (another isoform, now that --isoform
+          // reaches this lookup) are not "returned no Km": that sentence is
+          // false exactly when the reader has a flag that would change it.
+          const withheld = withheldSentence(result, SIMULATE_MODE_ADVICE);
+          unresolved.push(withheld ? `km (${withheld})` : 'km');
           blockers.push({
             parameter: 'km',
             kind: 'literature',
             suggestion: '--km 10.7mM',
-            why: 'BRENDA and PubMed returned no Km for this system.',
+            why: withheld ? WITHHELD_WHY : 'BRENDA and PubMed returned no Km for this system.',
           });
           continue;
         }
@@ -835,6 +935,7 @@ export async function commandSimulateResolved(
           reliability: reliabilityGrades(result),
           reliabilityReasons: reliabilityReasons(result),
           assayConditions: assayConditionsFor(result),
+          rowScope: rowScopeOf(result),
         });
       } else {
         // Vmax is not a BRENDA table. It is kcat x [E]0, and [E]0 is a
@@ -864,18 +965,23 @@ export async function commandSimulateResolved(
           organism: options.organism,
           quantity: 'kcat',
           enzymeConc: enzymeConcMM,
+          ...(options.isoform ? { isoform: options.isoform } : {}),
           allowCrossSpecies: options.allowCrossSpecies === true,
           physiologicalReference: options.physiologicalReference,
         });
         if (!result.found || result.bridgedVmax === undefined) {
-          unresolved.push('vmax (no kcat found to bridge)');
+          const withheld = result.found ? null : withheldSentence(result, SIMULATE_MODE_ADVICE);
+          unresolved.push(
+            withheld ? `vmax (no kcat to bridge: ${withheld})` : 'vmax (no kcat found to bridge)',
+          );
           blockers.push({
             parameter: 'vmax',
             kind: 'literature',
             suggestion: '--vmax 1.2mM/s',
-            why:
-              'No kcat was found for this system, so there is nothing to ' +
-              'multiply by [E]0 to obtain Vmax.',
+            why: withheld
+              ? WITHHELD_WHY
+              : 'No kcat was found for this system, so there is nothing to ' +
+                'multiply by [E]0 to obtain Vmax.',
           });
           continue;
         }
@@ -899,6 +1005,7 @@ export async function commandSimulateResolved(
           reliability: reliabilityGrades(result),
           reliabilityReasons: reliabilityReasons(result),
           assayConditions: assayConditionsFor(result),
+          rowScope: rowScopeOf(result),
         });
       }
     } catch (err) {
@@ -927,15 +1034,62 @@ export async function commandSimulateResolved(
   // Ki, for inhibition models. A BRENDA table exactly like Km, resolved by
   // its OWN call so a cross-species Ki can never inherit a verified Km's
   // provenance (ADR 0008).
+  //
+  // UNDER THE INHIBITOR, BY THE MODEL'S MODE. This call sent
+  // `substrate: options.substrate` with `quantity: 'ki'` and nothing else,
+  // so an inhibition model of LDH on pyruvate asked BRENDA for a Ki "of"
+  // pyruvate. BRENDA files a Ki under its inhibitor, so what could come back
+  // was pyruvate's constant AS an inhibitor, or nothing, and never the
+  // constant of the inhibitor being modelled. BRENDA's human LDH page
+  // (Tests/fixtures/ki_mode/brenda_1.1.1.27.html.gz, read with
+  // parse_brenda_ki_html) files no Ki under pyruvate at all, and three under
+  // gossypol: the run said "no inhibition constant in the literature for
+  // this system" about a system that has them. `caterva compose` and the API
+  // stopped asking this way on 2026-09-29.
+  //
+  // Now: the inhibitor is `substrate` (the compound BRENDA files it under),
+  // the model's mode goes with it so the runner takes a row stating that
+  // mechanism (KI_MODE_OF_MODEL, whose docstring says why `product` asks for
+  // noncompetitive), and the model's substrate goes as `modelSubstrate` so a
+  // row measured versus it is preferred to one measured versus another
+  // molecule. BRENDA 739793 is the case: one quinoline sulfonamide, human
+  // LDH, 0.00059 mM "competitive versus NADH" and 0.00252 mM
+  // "noncompetitive versus pyruvate". A noncompetitive model asked with no
+  // mode could carry the first.
+  //
+  // With no inhibitor named, nothing is looked up. The substrate's name is
+  // not a stand-in for it: that was the defect.
   const model: InhibitionModel = options.model ?? 'mm';
-  if (model !== 'mm' && !userValues['ki']) {
+  const inhibitor = options.inhibitor;
+  if (model !== 'mm' && !userValues['ki'] && !inhibitor) {
+    unresolved.push(
+      'ki (not looked up: BRENDA files a Ki under its inhibitor, and no --inhibitor was given)',
+    );
+    blockers.push({
+      parameter: 'inhibitor',
+      // The inhibitor is part of the experiment being modelled, not a
+      // measured quantity the databases failed to yield: which compound is
+      // in the tube is the student's to state, like [S]0.
+      kind: 'condition',
+      suggestion: '--inhibitor "<inhibitor>"',
+      why:
+        'A Ki is the constant of one inhibitor, and BRENDA files it under that ' +
+        "inhibitor's name, not the substrate's. Name the one in your experiment " +
+        (model === 'product' ? "(for --model product, the reaction's own product) " : '') +
+        'and its Ki is looked up; or give --ki yourself.',
+    });
+  } else if (model !== 'mm' && !userValues['ki'] && inhibitor) {
+    const mode = KI_MODE_OF_MODEL[model];
     try {
       const result = await resolveKinetic({
         enzymeName: options.enzyme,
         ecNumber: options.ec,
-        substrate: options.substrate,
+        substrate: inhibitor,
         organism: options.organism,
         quantity: 'ki',
+        inhibitionMode: mode,
+        modelSubstrate: options.substrate,
+        ...(options.isoform ? { isoform: options.isoform } : {}),
         allowCrossSpecies: options.allowCrossSpecies === true,
       });
       if (result.found) {
@@ -952,14 +1106,28 @@ export async function commandSimulateResolved(
           crossSpecies: result.crossSpecies,
           taxonId: result.taxonId ?? undefined,
           requestedTaxonId: result.requestedTaxonId ?? undefined,
+          inhibitor,
+          askedMode: mode,
+          rowScope: rowScopeOf(result),
         });
       } else {
-        unresolved.push('ki (no inhibition constant in the literature for this system)');
+        // "mode_withheld" is not "no Ki": BRENDA holds constants for this
+        // inhibitor, of other mechanisms, and the sentence names them and the
+        // --model that would take one. Said in this command's flags, not
+        // `resolve`'s --mode, which simulate does not have.
+        const withheld = withheldSentence(result, SIMULATE_MODE_ADVICE);
+        unresolved.push(
+          withheld
+            ? `ki (${withheld})`
+            : `ki (no inhibition constant for ${inhibitor} in the literature for this system)`,
+        );
         blockers.push({
           parameter: 'ki',
           kind: 'literature',
           suggestion: '--ki 5mM',
-          why: 'No inhibition constant in the literature for this system.',
+          why: withheld
+            ? WITHHELD_WHY
+            : `No inhibition constant for ${inhibitor} in the literature for this system.`,
         });
       }
     } catch (err) {
@@ -1483,6 +1651,25 @@ function printProvenance(rows: ParameterProvenance[]): void {
       process.stdout.write(
         `  ${' '.repeat(nameWidth)}  ${c(YELLOW, `⚠ unit not given; ${row.unit} assumed`)}\n`,
       );
+    }
+    // Whose constant a Ki is, and the mode it was asked for by. Then what
+    // its row says it measured: when no row states the model's mode the
+    // lookup falls back to one stating none, and this is the only place the
+    // reader learns that the mechanism of the number is unknown.
+    if (row.inhibitor) {
+      // The name on a line of its own and never wrapped: a chemical name
+      // broken at a hyphen or a space reads as two compounds.
+      process.stdout.write(`  ${' '.repeat(nameWidth)}  ${c(DIM, `Ki of ${row.inhibitor}`)}\n`);
+      if (row.askedMode) {
+        process.stdout.write(
+          `  ${' '.repeat(nameWidth)}  ${c(DIM, `asked for by this model's mode: ${row.askedMode}`)}\n`,
+        );
+      }
+    }
+    for (const sentence of row.rowScope ?? []) {
+      for (const line of wrap(sentence, 66)) {
+        process.stdout.write(`  ${' '.repeat(nameWidth)}  ${c(YELLOW, line)}\n`);
+      }
     }
     // The axes were computed, carried, and written into the exported model
     // file -- and never shown to the person at the terminal, who is the

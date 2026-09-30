@@ -74,7 +74,11 @@ export const DOMAIN_CATALOGUE: DomainEntry[] = [
     title: 'Competitive inhibition',
     summary: 'The same, with an inhibitor competing for the active site.',
     example:
-      'simulate mm --resolve --model competitive --enzyme "lactate dehydrogenase" \\\n      --substrate pyruvate --organism "Homo sapiens" --s0 10mM --i0 1mM --enzyme-conc 0.001mM',
+      // --inhibitor since 2026-09-30: the Ki is looked up under the inhibitor
+      // BRENDA files it under, and without one the run refuses. Gossypol has
+      // three human Ki rows on BRENDA's LDH page (ref 711801, one per
+      // isoform); none states a mode, and the run prints that it does not.
+      'simulate mm --resolve --model competitive --enzyme "lactate dehydrogenase" \\\n      --substrate pyruvate --organism "Homo sapiens" --inhibitor gossypol \\\n      --s0 10mM --i0 1mM --enzyme-conc 0.001mM',
     literatureBacked: true,
   },
   {

@@ -37,6 +37,7 @@ import {
   buildProductInhibition,
 } from '../engine/sbml-builder';
 import { runCaterva } from '../engine/catervaBridge';
+import type { InhibitionMode } from '../literature/literatureResolver';
 
 /**
  * BRENDA's Ki table records an inhibition constant for a NAMED inhibitor,
@@ -90,6 +91,61 @@ export const INHIBITION_MODELS: Record<
     requires: ['km', 'vmax', 'ki', 's0'],
     engineDomain: 'sbml',
   },
+};
+
+/**
+ * The inhibition mode each model's Ki belongs to, sent with the Ki lookup so
+ * the literature layer takes a row whose stated mode fits the model (the
+ * ranking `caterva compose` uses, caterva/compose/ki_mode.py) and refuses a
+ * Ki every row of which states another mode ("mode_withheld").
+ *
+ * WHY. BRENDA ref 739793 gives human LDH two Ki values for one quinoline
+ * sulfonamide from one paper: 0.00059 mM "competitive versus NADH" and
+ * 0.00252 mM "noncompetitive versus pyruvate". They are constants of two
+ * mechanisms, and `simulate --resolve --model noncompetitive` asked for a Ki
+ * with no mode at all, so it could carry the competitive one into a
+ * noncompetitive rate law and print it as that model's constant. The API
+ * sends its model's mode the same way (KI_MODE_OF_DOMAIN in the API's
+ * lib/provenance.ts).
+ *
+ * THE MODE IS THE EQUATION'S, NOT THE NAME'S -- which is why `product` is
+ * noncompetitive here although `row_scope.MODE_OF_MOTIF` says competitive.
+ *
+ * `caterva compose`'s product_inhibition motif (caterva/compose/library.py)
+ * is the product competing for the free enzyme,
+ *
+ *     kcat * E * S / (Km * (1 + P/Kp) + S)
+ *
+ * and MODE_OF_MOTIF maps it to competitive because that is the equation its
+ * Kp enters. This CLI's product model is a different equation under the same
+ * name: `buildProductInhibition` (src/engine/sbml-builder.ts) integrates
+ *
+ *     Vmax * S / ((Km + S) * (1 + P/Kp))
+ *
+ * which its own docstring calls the "simplified mixed-type form (product
+ * treated as a non-competitive-style inhibitor of Vmax)". It is term for
+ * term `buildNonCompetitiveInhibition`'s rate law with P in place of I and
+ * Kp in place of Ki; src/cli/__tests__/simulateKiUnderTheInhibitor.test.ts
+ * compares the two built rate laws, so this line and that equation cannot
+ * drift apart unnoticed. A Ki belongs to
+ * the mechanism it was measured under, and the rule the ranking applies
+ * (`row_scope.mode_fits`) is about the equation a constant is put into: a
+ * competitive product Ki in this model's (Km + S)(1 + P/Kp) would be a
+ * constant of one mechanism simulated as another, which is the defect the
+ * mode exists to prevent. So a product model asks for a noncompetitive
+ * (or mixed) row, and a product whose every Ki row states competitive
+ * inhibition is refused with the modes named, rather than filled.
+ *
+ * `mm` has no Ki and no entry. There is no uncompetitive model here, so no
+ * model sends "uncompetitive"; `scientific resolve --mode uncompetitive`
+ * still can.
+ */
+export const KI_MODE_OF_MODEL: Readonly<
+  Record<Exclude<InhibitionModel, 'mm'>, InhibitionMode>
+> = {
+  competitive: 'competitive',
+  noncompetitive: 'noncompetitive',
+  product: 'noncompetitive',
 };
 
 export interface InhibitionRunParameters {

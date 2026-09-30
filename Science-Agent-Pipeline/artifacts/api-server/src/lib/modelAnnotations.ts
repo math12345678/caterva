@@ -56,6 +56,8 @@
  * happen.
  */
 
+import { INHIBITION_MODES, type InhibitionMode } from "./provenance";
+
 /** What the caller says a parameter is. Matches `resolveKineticValue`. */
 export type AnnotatedQuantity = "km" | "ki" | "kcat";
 
@@ -73,7 +75,38 @@ export interface ModelAnnotation {
   value?: number;
   enzymeName?: string;
   ecNumber?: string;
+  /**
+   * The substrate a Km or kcat is looked up under. On a `ki` annotation it is
+   * the MODEL's substrate instead -- what the Ki should have been measured
+   * versus -- and is sent beside `inhibitionMode` as the lookup's
+   * `modelSubstrate`; the Ki itself is looked up under `inhibitor`.
+   */
   substrate?: string;
+  /**
+   * `inhibitor="..."`, on a `ki` annotation only: the compound BRENDA files
+   * the Ki under.
+   *
+   * WHY IT EXISTS. The grammar had no way to say whose Ki a parameter is, so
+   * a `ki` annotation was looked up under its `substrate=`, and a Ki "of"
+   * glucose is not the constant of any inhibitor in the caller's model. That
+   * was the defect `caterva compose` fixed on 2026-09-29 (each constant under
+   * its own compound) and the query path the same day (a Ki under the
+   * inhibitor the query names, none looked up when it names none). A `ki`
+   * annotation without it is now looked up under nothing, and says so.
+   */
+  inhibitor?: string;
+  /**
+   * `inhibition="competitive|noncompetitive|uncompetitive"`, on a `ki`
+   * annotation only: the mechanism of the caller's rate law, so the lookup
+   * takes a Ki row stating it (the ranking `caterva compose` uses) and
+   * refuses a Ki every row of which states another ("mode_withheld").
+   *
+   * Optional, unlike the inhibitor. The query path knows its model's mode
+   * from its domain; here the model is the caller's own, and nothing but the
+   * caller can say which mechanism its rate law is. Without it the lookup
+   * takes the resolver's pick, and the note says what mode that row states.
+   */
+  inhibitionMode?: InhibitionMode;
   organism?: string;
   /**
    * The unit the caller's value is in.
@@ -177,7 +210,17 @@ const KNOWN_FIELDS = new Set([
   "substrate",
   "organism",
   "unit",
+  // A `ki` annotation's identity: whose Ki it is, and of which mechanism.
+  "inhibitor",
+  "inhibition",
 ]);
+
+/**
+ * The fields that name a Ki's identity. Refused on any other quantity: a Km
+ * is filed under its substrate and states no inhibition mode, so a caller
+ * who wrote `inhibitor=` on one believes the lookup used it, and it did not.
+ */
+const KI_ONLY_FIELDS = ["inhibitor", "inhibition"] as const;
 
 /**
  * Read `caterva:` declarations out of an Antimony source.
@@ -208,7 +251,14 @@ export function parseModelAnnotations(
  */
 function parseDirectiveBody(
   body: string,
-): { fields: Record<string, string>; quantity: AnnotatedQuantity; mode: AnnotationMode } | { error: string } {
+):
+  | {
+      fields: Record<string, string>;
+      quantity: AnnotatedQuantity;
+      mode: AnnotationMode;
+      inhibitionMode?: InhibitionMode;
+    }
+  | { error: string } {
   // The quantity is the first bare word: "km", "kcat", "ki".
   const quantityMatch = /^([A-Za-z_]+)/.exec(body);
   const quantity = quantityMatch?.[1]?.toLowerCase();
@@ -234,12 +284,42 @@ function parseDirectiveBody(
     fields[key] = (m[2] ?? m[3] ?? "").trim();
   }
   if (unknownField !== undefined) {
+    // `mode=` is the likeliest wrong spelling of `inhibition=`, and the one
+    // most easily misread: in this grammar "mode" is check-or-resolve.
+    const hint =
+      unknownField.toLowerCase() === "mode"
+        ? ' An inhibition mechanism is written inhibition="competitive"; ' +
+          "check or resolve is the bare word 'resolve' or nothing."
+        : " To have Caterva supply the value from literature, add the bare word 'resolve'.";
     return {
       error:
         `'${unknownField}' is not a field Caterva understands. ` +
-        `Use: ${[...KNOWN_FIELDS].join(", ")}. To have Caterva supply ` +
-        "the value from literature, add the bare word 'resolve'.",
+        `Use: ${[...KNOWN_FIELDS].join(", ")}.${hint}`,
     };
+  }
+
+  for (const field of KI_ONLY_FIELDS) {
+    if (fields[field] !== undefined && quantity !== "ki") {
+      return {
+        error:
+          `${field}= describes an inhibition constant, and this annotation is a ${quantity}. ` +
+          `A ${quantity} is looked up under its substrate and states no inhibition mode, ` +
+          "so the field would be ignored while looking as though it was used.",
+      };
+    }
+  }
+
+  let inhibitionMode: InhibitionMode | undefined;
+  if (fields["inhibition"] !== undefined) {
+    const lowered = fields["inhibition"].toLowerCase();
+    if (!(INHIBITION_MODES as readonly string[]).includes(lowered)) {
+      return {
+        error:
+          `inhibition="${fields["inhibition"]}" is not a mechanism Caterva can look a Ki up by. ` +
+          `Use one of: ${INHIBITION_MODES.join(", ")} (a mixed-type Ki counts as noncompetitive).`,
+      };
+    }
+    inhibitionMode = lowered as InhibitionMode;
   }
 
   // Identity is mandatory. This is the whole reason the declaration
@@ -259,6 +339,32 @@ function parseDirectiveBody(
     fields,
     quantity: quantity as AnnotatedQuantity,
     mode: /\bresolve\b/i.test(body) ? "resolve" : "check",
+    ...(inhibitionMode ? { inhibitionMode } : {}),
+  };
+}
+
+/**
+ * What a declaration says the parameter IS, as annotation fields. One
+ * function for both formats, for the reason `parseDirectiveBody` is shared:
+ * an SBML declaration must not carry less of its identity than an Antimony
+ * one, and two copies of this list would drift the first time a field is
+ * added -- as `inhibitor` and `inhibition` just were.
+ */
+function declaredIdentity(
+  fields: Record<string, string>,
+  inhibitionMode: InhibitionMode | undefined,
+): Pick<
+  ModelAnnotation,
+  "enzymeName" | "ecNumber" | "substrate" | "organism" | "unit" | "inhibitor" | "inhibitionMode"
+> {
+  return {
+    ...(fields["enzyme"] ? { enzymeName: fields["enzyme"] } : {}),
+    ...(fields["ec"] ? { ecNumber: fields["ec"] } : {}),
+    ...(fields["substrate"] ? { substrate: fields["substrate"] } : {}),
+    ...(fields["organism"] ? { organism: fields["organism"] } : {}),
+    ...(fields["unit"] ? { unit: fields["unit"] } : {}),
+    ...(fields["inhibitor"] ? { inhibitor: fields["inhibitor"] } : {}),
+    ...(inhibitionMode ? { inhibitionMode } : {}),
   };
 }
 
@@ -283,7 +389,7 @@ function parseAntimonyAnnotations(source: string): ParsedAnnotations {
       fail(parsed.error);
       continue;
     }
-    const { fields, quantity, mode } = parsed;
+    const { fields, quantity, mode, inhibitionMode } = parsed;
 
     // Bind to a parameter: the assignment on THIS line if the directive
     // trails one, otherwise the next assignment below it.
@@ -333,11 +439,7 @@ function parseAntimonyAnnotations(source: string): ParsedAnnotations {
       quantity: quantity as AnnotatedQuantity,
       mode,
       ...(value !== undefined ? { value } : {}),
-      ...(fields["enzyme"] ? { enzymeName: fields["enzyme"] } : {}),
-      ...(fields["ec"] ? { ecNumber: fields["ec"] } : {}),
-      ...(fields["substrate"] ? { substrate: fields["substrate"] } : {}),
-      ...(fields["organism"] ? { organism: fields["organism"] } : {}),
-      ...(fields["unit"] ? { unit: fields["unit"] } : {}),
+      ...declaredIdentity(fields, inhibitionMode),
       line: boundLine,
     });
   }
@@ -430,7 +532,7 @@ function parseSbmlAnnotations(source: string): ParsedAnnotations {
       fail(parsed.error);
       continue;
     }
-    const { fields, quantity, mode } = parsed;
+    const { fields, quantity, mode, inhibitionMode } = parsed;
 
     const name = fields["parameter"];
     if (!name) {
@@ -462,11 +564,7 @@ function parseSbmlAnnotations(source: string): ParsedAnnotations {
       quantity,
       mode,
       ...(target.value !== undefined ? { value: target.value } : {}),
-      ...(fields["enzyme"] ? { enzymeName: fields["enzyme"] } : {}),
-      ...(fields["ec"] ? { ecNumber: fields["ec"] } : {}),
-      ...(fields["substrate"] ? { substrate: fields["substrate"] } : {}),
-      ...(fields["organism"] ? { organism: fields["organism"] } : {}),
-      ...(fields["unit"] ? { unit: fields["unit"] } : {}),
+      ...declaredIdentity(fields, inhibitionMode),
       line: target.line,
     });
   }
