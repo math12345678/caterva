@@ -9,20 +9,23 @@ Measurement's own `alternatives`, and the report said the carried value
 
 Every row string below is BRENDA's own, as the compose resolver returned it
 (`measured_from_search(...).alternatives`, in the resolver's order, the pick
-first) on 2026-09-29:
+first) on 2026-09-29, and TestTheRowsAreBRENDAs checks each against a
+committed copy of the page it came from:
 
-- LDH (EC 1.1.1.27), Homo sapiens, the quinoline sulfonamide, ref 739793;
-- LDH, Homo sapiens, gossypol, ref 711801 (also in
-  Tests/fixtures/brenda_ldh_ki_fixture.html);
+- LDH (EC 1.1.1.27), Homo sapiens, the quinoline sulfonamide, ref 739793,
+  and gossypol, ref 711801: Tests/fixtures/ki_mode/brenda_1.1.1.27.html.gz;
 - hexokinase (EC 2.7.1.1), Oryctolagus cuniculus, MgADP-, ref 640206: the
   only Ki rows stating "mixed" in the repository's BRENDA fixtures, in
-  Tests/fixtures/recorded/brenda_2.7.1.1.html.gz (checked below);
+  Tests/fixtures/recorded/brenda_2.7.1.1.html.gz;
 - monoamine oxidase (EC 1.4.3.4), Homo sapiens, benzylhydrazine and
-  phenylhydrazine, ref 702238: the rows that name an isoform AND a mode.
+  phenylhydrazine, ref 702238 (Binda et al. 2008, Biochemistry 47:5616):
+  the rows that name an isoform AND a mode, in
+  Tests/fixtures/ki_mode/brenda_1.4.3.4.html.gz.
 
-The one value not read from BRENDA is the unit test's 2.52 uM, which is
-the 0.00252 mM row written in micromolar (x 1000) to show that a row in
-another unit is never moved across.
+Two values are not read from BRENDA as written: 2.52 uM, the 0.00252 mM
+row written in micromolar (x 1000), and 2096 uM, the 2.096 mM row written
+the same way. They show what happens to a row in another unit, which
+BRENDA's Ki table (all mM) never serves.
 """
 from __future__ import annotations
 
@@ -34,9 +37,10 @@ from types import SimpleNamespace
 
 import pytest
 
+from caterva.compose import ki_mode
 from caterva.compose.export import Measurement
 from caterva.compose.isoform import select_isoform
-from caterva.compose.ki_mode import ANY_MODE_FLAG, constants_of, select_mode
+from caterva.compose.ki_mode import ANY_MODE_FLAG, KITZ_WILSON_MEANING, constants_of, select_mode
 from caterva.compose.row_scope import MODE_MISMATCH, MODE_UNSTATED, VERSUS, read_scope
 
 REPO = Path(__file__).resolve().parents[2]
@@ -141,12 +145,32 @@ class TestAMatchingModeIsChosen:
         out = choose(ki(QUINOLINE_ROWS), "competitive_inhibition", "pyruvate")
         carried = out.measured["reaction_Ki"]
         assert carried.value == 0.00059 and carried.chosen_because is None
-        assert out.notes == [] and out.refused == {}
+        assert out.refused == {}
         # Measured versus NADH, not pyruvate: no better row exists, and the
         # report still says so.
         scope = read_scope(carried.commentary, motif="competitive_inhibition", table="ki",
                            substrate="pyruvate")
         assert VERSUS in [c.kind for c in scope.concerns]
+
+    def test_a_row_of_another_mode_against_the_substrate_is_said_to_contradict_the_model(self):
+        # Against pyruvate, this model's substrate, the paper found the
+        # inhibitor noncompetitive. The competitive row is a constant of the
+        # NADH site; the model makes the inhibitor compete with pyruvate.
+        # No row fixes that, so it is a note, not a change of row.
+        out = choose(ki(QUINOLINE_ROWS), "competitive_inhibition", "pyruvate")
+        assert out.notes == [
+            "`reaction_Ki`: a ranked row states noncompetitive inhibition versus pyruvate "
+            "(0.00252 mM, BRENDA ref 739793), measured against pyruvate, this model's substrate, "
+            "and the row carried (0.00059 mM, BRENDA ref 739793) states competitive inhibition "
+            "versus NADH. Measured against pyruvate this inhibitor is not competitive, which is "
+            "evidence against this model's mechanism for it; no choice of row fixes that"]
+
+    def test_no_contradiction_is_claimed_when_the_carried_row_is_against_the_substrate(self):
+        out = choose(ki(QUINOLINE_ROWS), "noncompetitive_inhibition", "pyruvate")
+        assert not any("evidence against" in note for note in out.notes)
+        # Nor for a model of NADH: the row against NADH is this model's.
+        out = choose(ki(QUINOLINE_ROWS), "competitive_inhibition", "NADH")
+        assert out.notes == [] and out.measured["reaction_Ki"].value == 0.00059
 
 
 class TestNoStatedMode:
@@ -166,8 +190,11 @@ class TestNoStatedMode:
         carried = out.measured["reaction_Ki"]
         assert carried.value == 0.523
         assert carried.chosen_because == (
-            "a row stating no inhibition mode, used because none states noncompetitive inhibition")
+            "a row stating no inhibition mode, used because none states noncompetitive "
+            f"inhibition; {KITZ_WILSON_MEANING}")
         assert "measured competitive inhibition, and this model is noncompetitive" in out.notes[0]
+        assert out.notes[0].endswith(f"is used instead; {KITZ_WILSON_MEANING}")
+        assert len(out.notes) == 1, "the caveat is said once, in the note that makes the change"
         scope = read_scope(carried.commentary, motif="noncompetitive_inhibition", table="ki")
         assert MODE_UNSTATED in [c.kind for c in scope.concerns]
 
@@ -209,9 +236,14 @@ class TestAnyMode:
         assert out.measured["reaction_Ki"].value == 0.00059 and out.refused == {}
         assert out.notes[0].endswith("without it the constant would be refused")
 
-    def test_says_nothing_when_the_default_would_do_the_same(self):
+    def test_adds_nothing_of_its_own_when_the_default_would_do_the_same(self):
         out = choose(ki(QUINOLINE_ROWS), "competitive_inhibition", "pyruvate", any_mode=True)
-        assert out.notes == [] and out.measured["reaction_Ki"].chosen_because is None
+        assert out.measured["reaction_Ki"].chosen_because is None
+        assert not any(ANY_MODE_FLAG in note for note in out.notes)
+        # What the rows say against the model is said whichever way the
+        # row was chosen.
+        assert out.notes == choose(ki(QUINOLINE_ROWS), "competitive_inhibition",
+                                   "pyruvate").notes
 
 
 class TestMixedAndVersus:
@@ -235,16 +267,23 @@ class TestMixedAndVersus:
         assert [c.kind for c in scope.concerns if c.kind in (MODE_MISMATCH, VERSUS)] == []
 
     def test_a_row_measured_against_another_molecule_is_still_taken_over_another_mode(self):
-        # The competitive LDH row was measured versus NADH, not pyruvate; it
-        # is still this mechanism's constant, and nothing better exists. The
-        # pick is set to the other row (the resolver returned 0.00059 first)
-        # to show the switch goes this way too.
+        # The competitive LDH row was measured versus NADH, not pyruvate. It
+        # is NOT known to be the constant of a model in which the inhibitor
+        # competes with pyruvate: the same paper found it noncompetitive
+        # versus pyruvate, which is evidence that it does not. It is taken
+        # because it states the mechanism the model names and the other
+        # row states a different one (ki_mode's docstring, "A mode stated
+        # against another molecule"), and the notes say what the pyruvate
+        # row means for the model. The pick is set to the other row (the
+        # resolver returned 0.00059 first) to show the switch goes this way.
         out = choose(ki(QUINOLINE_ROWS, pick=1), "competitive_inhibition", "pyruvate")
         carried = out.measured["reaction_Ki"]
         assert carried.value == 0.00059
         assert carried.chosen_because == (
             "the row stating competitive inhibition versus NADH, this model's mechanism "
             "though not its substrate (pyruvate)")
+        assert "is used instead" in out.notes[0]
+        assert "evidence against this model's mechanism" in out.notes[1]
 
 
 class TestWithIsoform:
@@ -267,17 +306,63 @@ class TestWithIsoform:
             "the row stating competitive inhibition, this model's mechanism; it names MAO-A, "
             "as --isoform asked")
         assert by_mode.notes == [
-            "`reaction_Ki`: the row --isoform chose (1.95 mM, BRENDA ref 702238) states no "
-            "inhibition mode; the row stating competitive inhibition (2.096 mM, BRENDA ref "
-            "702238), this model's mechanism, is used instead; it names MAO-A, as --isoform asked"]
+            "`reaction_Ki`: the row --isoform chose (1.95 mM, BRENDA ref 702238) was determined "
+            "from Kitz-Wilson plots, the K_I of an irreversible inactivation; the row stating "
+            "competitive inhibition (2.096 mM, BRENDA ref 702238), this model's mechanism, is "
+            "used instead; it names MAO-A, as --isoform asked"]
 
-    def test_the_isoform_outranks_the_mode(self):
-        # The only MAO-B row states no mode; MAO-A's competitive row is a
-        # constant of the other protein and is not taken.
+    def test_the_two_steps_in_any_other_order_carry_another_row(self):
+        """The case the module docstring gives for running the isoform step
+        first and telling the mode step the isoform. Both other ways round
+        carry a row the shipped order does not."""
+        motif = {"reaction_Ki": ("competitive_inhibition", "ki")}
+        mode_first = select_mode({"reaction_Ki": ki(BENZYLHYDRAZINE_ROWS)}, motif,
+                                 substrate="kynuramine")
+        then_isoform = select_isoform(mode_first.measured, "MAO-A")
+        # The mode step keeps MAO-B's competitive pick; select_isoform does
+        # not read modes, and takes MAO-A's first row, a Kitz-Wilson one.
+        assert then_isoform.measured["reaction_Ki"].value == 1.95
+        # Told nothing of the isoform, the mode step undoes --isoform.
+        by_isoform = select_isoform({"reaction_Ki": ki(BENZYLHYDRAZINE_ROWS)}, "MAO-A")
+        blind = select_mode(by_isoform.measured, motif, substrate="kynuramine")
+        assert blind.measured["reaction_Ki"].value == 0.026
+        assert "MAO-B" in blind.measured["reaction_Ki"].commentary
+        # The shipped order.
+        assert self._both(BENZYLHYDRAZINE_ROWS, "MAO-A", "competitive_inhibition")[1] \
+            .measured["reaction_Ki"].value == 2.096
+
+    def test_a_row_naming_the_isoform_outranks_a_row_stating_the_mode(self):
+        """Inside the ranking, the isoform comes before the mode. No ranked
+        set in the 1,247 Ki rows parsed on 2026-09-29 has a row naming the
+        isoform with no mode beside a row naming none with the model's
+        mode, so this compares the ranks of two real LDH rows directly
+        rather than inventing a ranking that puts them side by side:
+        gossypol's LDH-A row (ref 711801, no mode) and the quinoline
+        sulfonamide's competitive row (ref 739793, no isoform)."""
+        ldh_a = ki_mode._rows(ki(GOSSYPOL_ROWS, pick=1))[0][0]
+        competitive = ki_mode._rows(ki(QUINOLINE_ROWS))[0][0]
+        assert (ldh_a.isoform, ldh_a.mode) == ("LDH-A", "unstated")
+        assert (competitive.isoform, competitive.mode) == (None, "competitive")
+
+        def key(row):
+            return ki_mode._rank(row, "competitive", "pyruvate", "LDH-A")[:-1]
+        assert key(ldh_a) < key(competitive)
+        # With the mode first the order would reverse, so this is the
+        # comparison the order decides.
+        assert (key(ldh_a)[1:], key(ldh_a)[0]) > (key(competitive)[1:], key(competitive)[0])
+
+    def test_another_isoforms_row_of_the_models_mode_is_never_taken(self):
+        # The only MAO-B row states no mode (a Kitz-Wilson row); MAO-A's
+        # competitive 0.205 mM is a constant of the other protein and is not
+        # taken. Either order of the two steps gives 0.791 here.
         by_isoform, by_mode = self._both(PHENYLHYDRAZINE_ROWS, "MAO-B", "competitive_inhibition")
         assert by_isoform.measured["reaction_Ki"].value == 0.791
         assert by_mode.measured["reaction_Ki"].value == 0.791
-        assert by_mode.notes == [] and by_mode.refused == {}
+        assert by_mode.refused == {}
+        assert by_mode.notes == [
+            "`reaction_Ki`: the row carried (0.791 mM, BRENDA ref 702238) states no inhibition "
+            f"mode, and {KITZ_WILSON_MEANING}; no other row this model could take states "
+            "competitive inhibition or is a reversible constant stating no mode"]
 
     def test_no_isoform_asked_takes_the_competitive_row_of_either(self):
         out = choose(ki(BENZYLHYDRAZINE_ROWS), "competitive_inhibition", "kynuramine")
@@ -287,7 +372,9 @@ class TestWithIsoform:
         # MAO-A's rows state competitive (another mode for this model) and
         # nothing; MAO-B's are never candidates.
         by_isoform, by_mode = self._both(BENZYLHYDRAZINE_ROWS, "MAO-A", "uncompetitive_inhibition")
-        assert by_mode.measured["reaction_Ki"].value == 1.95 and by_mode.notes == []
+        assert by_mode.measured["reaction_Ki"].value == 1.95
+        assert [n for n in by_mode.notes if "is used instead" in n] == []
+        assert KITZ_WILSON_MEANING in by_mode.notes[0]
 
     def test_a_refusal_under_isoform_says_which_rows_it_read(self):
         by_isoform, by_mode = self._both(QUINOLINE_ROWS, "LDH-A", "uncompetitive_inhibition",
@@ -298,6 +385,44 @@ class TestWithIsoform:
         assert "among those for LDH-A or naming no isoform" in by_mode.refused["reaction_Ki"]
 
 
+class TestKitzWilson:
+    """Ref 702238's "determined from Kitz-Wilson plots" rows are the K_I of
+    an irreversible inactivation (the paper shows the hydrazines alkylate
+    MAO's flavin), filed in BRENDA's Ki table and stating no mode."""
+
+    def test_the_row_is_read_as_one(self):
+        rows = ki_mode._rows(ki(PHENYLHYDRAZINE_ROWS))[0]
+        assert [r.kitz_wilson for r in rows] == [False, True, True]
+        assert rows[1].says() == "no inhibition mode (a Kitz-Wilson inactivation constant)"
+
+    def test_it_ranks_after_a_reversible_row_stating_no_mode(self):
+        # Gossypol's LDH-B row states no mode and is a reversible Ki. No
+        # ranked set parsed has both kinds, so the ranks are compared.
+        kitz_wilson = ki_mode._rows(ki(PHENYLHYDRAZINE_ROWS, pick=1))[0][0]
+        reversible = ki_mode._rows(ki(GOSSYPOL_ROWS))[0][0]
+        for want in ("competitive", "noncompetitive", "uncompetitive"):
+            assert (ki_mode._mode_rank(reversible, want, None)
+                    < ki_mode._mode_rank(kitz_wilson, want, None))
+
+    def test_it_is_still_carried_where_nothing_else_is_and_says_so(self):
+        # An uncompetitive model: the competitive row is another mode, and
+        # the Kitz-Wilson rows are all that is left. A placeholder would say
+        # less than the row does, so the row is carried with what it is.
+        out = choose(ki(PHENYLHYDRAZINE_ROWS), "uncompetitive_inhibition", "kynuramine")
+        assert out.refused == {} and out.measured["reaction_Ki"].value == 0.523
+        assert out.measured["reaction_Ki"].chosen_because.endswith(KITZ_WILSON_MEANING)
+
+    def test_any_mode_keeping_one_says_what_it_is_without_claiming_it_was_the_best(self):
+        # --any-mode keeps MAO-B's Kitz-Wilson row for a competitive model
+        # although MAO-B's competitive row exists. The pick is set to the
+        # Kitz-Wilson row (the resolver returned 0.026 first).
+        out = choose(ki(BENZYLHYDRAZINE_ROWS, pick=1), "competitive_inhibition", "kynuramine",
+                     any_mode=True)
+        assert out.measured["reaction_Ki"].value == 0.048
+        assert "without it the row stating competitive inhibition (0.026 mM" in out.notes[0]
+        assert out.notes[1].endswith(KITZ_WILSON_MEANING)
+
+
 class TestScope:
     def test_a_row_in_another_unit_is_never_substituted(self):
         in_um = ({**QUINOLINE_ROWS[1], "unit": "uM", "value": 2.52},)
@@ -305,6 +430,21 @@ class TestScope:
         why = out.refused["reaction_Ki"]
         assert "reaction_Ki" not in out.measured
         assert "or no mode exists in uM, and a row in another unit is never substituted" in why
+
+    def test_a_fitting_row_passed_over_for_its_unit_is_named(self):
+        # MAO-A's competitive row written in uM; the MAO-A row in mM states
+        # no mode. The mM row is carried, and the note says what was
+        # passed over and why.
+        in_um = tuple({**r, "unit": "uM", "value": 2096.0} if r["value"] == 2.096 else r
+                      for r in BENZYLHYDRAZINE_ROWS)
+        by_isoform = select_isoform({"reaction_Ki": ki(in_um)}, "MAO-A")
+        out = select_mode(by_isoform.measured, {"reaction_Ki": ("competitive_inhibition", "ki")},
+                          substrate="kynuramine", isoform="MAO-A")
+        assert out.measured["reaction_Ki"].value == 1.95
+        assert out.notes[-1] == (
+            "`reaction_Ki`: a row stating competitive inhibition (2096 uM, BRENDA ref 702238) "
+            "was passed over for the row carried (1.95 mM, BRENDA ref 702238), because it is in "
+            "uM, not mM, and a row in another unit is never substituted")
 
     def test_only_inhibition_constants_of_inhibition_motifs_are_touched(self):
         km = Measurement(0.03, "mM", "BRENDA ref 286469", organism="Homo sapiens",
@@ -333,51 +473,92 @@ class TestScope:
 
 
 class TestTheRowsAreBRENDAs:
-    def test_the_mixed_rows_are_in_the_recorded_hexokinase_page(self):
+    """Each row set above, read back from a committed copy of the BRENDA page
+    it came from, in the order BRENDA lists it (the resolver's order)."""
+
+    @staticmethod
+    def _parsed(page, ec, inhibitor, organism):
         from caterva.checkout import LiteratureLayerUnavailable, literature_module
 
         try:
             brenda_client = literature_module("brenda_client")
         except LiteratureLayerUnavailable:  # pragma: no cover - the wheel
             pytest.skip("the literature layer is not installed")
-        page = REPO / "Tests" / "fixtures" / "recorded" / "brenda_2.7.1.1.html.gz"
+        # errors="replace", as `requests` decodes the live page: the LDH
+        # page carries six bytes that are not UTF-8 (the README says which).
         html = gzip.decompress(page.read_bytes()).decode("utf-8", errors="replace")
-        rows = brenda_client.parse_brenda_ki_html(
-            html, "2.7.1.1", ["MgADP-"], target_organism="Oryctolagus cuniculus")
-        got = sorted((r.km_value, r.conditions, r.reference_id) for r in rows
-                     if r.substrate == "MgADP-")
-        assert got == [(3.0, MIXED_VS_MGATP, "640206"), (7.8, MIXED_VS_GLUCOSE, "640206")]
+        rows = brenda_client.parse_brenda_ki_html(html, ec, [inhibitor], target_organism=organism)
+        return [(r.km_value, r.conditions, r.reference_id, r.organism) for r in rows
+                if r.substrate == inhibitor]
+
+    @staticmethod
+    def _as_written(rows):
+        return [(r["value"], r["conditions"], r["reference_id"], r["organism"]) for r in rows]
+
+    def test_the_mixed_rows_are_in_the_recorded_hexokinase_page(self):
+        page = REPO / "Tests" / "fixtures" / "recorded" / "brenda_2.7.1.1.html.gz"
+        got = self._parsed(page, "2.7.1.1", "MgADP-", "Oryctolagus cuniculus")
+        assert sorted(got) == self._as_written(MGADP_ROWS)
+
+    @pytest.mark.parametrize("ec, inhibitor, rows", [
+        ("1.1.1.27", QUINOLINE, QUINOLINE_ROWS),
+        ("1.1.1.27", "gossypol", GOSSYPOL_ROWS),
+        ("1.4.3.4", "benzylhydrazine", BENZYLHYDRAZINE_ROWS),
+        ("1.4.3.4", "phenylhydrazine", PHENYLHYDRAZINE_ROWS),
+    ], ids=["ldh-quinoline", "ldh-gossypol", "mao-benzylhydrazine", "mao-phenylhydrazine"])
+    def test_the_rows_are_in_the_committed_page(self, ec, inhibitor, rows):
+        page = REPO / "Tests" / "fixtures" / "ki_mode" / f"brenda_{ec}.html.gz"
+        assert self._parsed(page, ec, inhibitor, "Homo sapiens") == self._as_written(rows)
 
 
 class TestThroughTheCommand:
     """`_search_the_literature`, with the resolver's answer replaced by the
     rows it returned live, so the wiring is tested offline."""
 
+    LDH = dict(subject="1.1.1.27", substrate="pyruvate", inhibitor=QUINOLINE)
+    MAO = dict(subject="1.4.3.4", substrate="kynuramine", inhibitor="benzylhydrazine")
+    #: Human LDH's pyruvate Km rows, as BRENDA's page lists them (the
+    #: committed brenda_1.1.1.27.html.gz holds both).
+    KM_ROWS = (_row(0.03, None, "286469", "Homo sapiens"),
+               _row(0.398, None, "286442", "Homo sapiens"))
+
     @staticmethod
-    def _search(monkeypatch, query, rows, **flags):
+    def _source(rows):
+        first = rows[0]
+        return SimpleNamespace(value=first["value"], unit=first["unit"],
+                               citation=f"BRENDA ref {first['reference_id']}",
+                               organism=first["organism"], origin="literature",
+                               cross_species=False, ph=first["ph"],
+                               temperature_c=first["temperature_c"], buffer=None,
+                               explicitly_unreported=(), candidates=list(rows),
+                               commentary=first["conditions"])
+
+    @classmethod
+    def _search(cls, monkeypatch, query, rows, *, enzyme=None, km=True, branches=(),
+                **flags):
         import caterva.compose.pipeline as pipeline
+        from caterva.agents.adapters import NOT_FOUND_REASONS
         from caterva.compose.__main__ import _search_the_literature
         from caterva.compose.pipeline import compose
 
-        def source(value, rows, commentary, ph=None, temperature_c=None):
-            return SimpleNamespace(value=value, unit="mM", citation=f"BRENDA ref {rows[0]['reference_id']}",
-                                   organism="Homo sapiens", origin="literature", cross_species=False,
-                                   ph=ph, temperature_c=temperature_c, buffer=None,
-                                   explicitly_unreported=(), candidates=list(rows),
-                                   commentary=commentary)
-
-        km_rows = (_row(0.03, None, "286469", "Homo sapiens"), _row(0.398, None, "286442", "Homo sapiens"))
-        search = SimpleNamespace(resolutions={
-            "reaction_Ki": SimpleNamespace(source=source(rows[0]["value"], rows, rows[0]["conditions"],
-                                                         rows[0]["ph"], rows[0]["temperature_c"])),
-            "reaction_Km": SimpleNamespace(source=source(0.03, km_rows, None)),
-            "reaction_kcat": SimpleNamespace(source=None, reason="no value in the organism requested"),
+        enzyme = enzyme or cls.LDH
+        nothing = NOT_FOUND_REASONS["not_found"]
+        search = SimpleNamespace(branches=tuple(branches), resolutions={
+            "reaction_Ki": SimpleNamespace(source=cls._source(rows)),
+            # The LDH Km rows; any model here is only ever asked for the
+            # Ki's selection, and the Km is what makes the search non-empty.
+            "reaction_Km": (SimpleNamespace(source=cls._source(cls.KM_ROWS)) if km
+                            else SimpleNamespace(source=None, reason=nothing)),
+            "reaction_kcat": SimpleNamespace(source=None, reason=nothing),
         })
         monkeypatch.setattr(pipeline, "compose_and_parameterise", lambda *a, **k: (None, search))
-        args = SimpleNamespace(subject="1.1.1.27", organism="Homo sapiens", substrate="pyruvate",
-                               inhibitor=QUINOLINE, product=None, compound=[], **flags)
-        model = compose(query, subject="1.1.1.27", organism="Homo sapiens", substrate="pyruvate",
-                        compounds={"@inhibitor": QUINOLINE})
+        flags.setdefault("isoform", None)
+        args = SimpleNamespace(subject=enzyme["subject"], organism="Homo sapiens",
+                               substrate=enzyme["substrate"], inhibitor=enzyme["inhibitor"],
+                               product=None, compound=[], **flags)
+        model = compose(query, subject=enzyme["subject"], organism="Homo sapiens",
+                        substrate=enzyme["substrate"],
+                        compounds={"@inhibitor": enzyme["inhibitor"]})
         return _search_the_literature(model, args)
 
     def test_the_report_and_the_export_carry_the_chosen_row(self, monkeypatch):
@@ -393,12 +574,31 @@ class TestThroughTheCommand:
         assert float(row["value"]) == 0.00252
         assert "the row stating noncompetitive inhibition versus pyruvate" in row["provenance"]
 
+    def test_the_evidence_against_the_mechanism_reaches_the_report(self, monkeypatch):
+        model, note, _ = self._search(
+            monkeypatch, "Michaelis-Menten with a competitive inhibitor", QUINOLINE_ROWS)
+        assert model.measured["reaction_Ki"].value == 0.00059
+        assert ("Measured against pyruvate this inhibitor is not competitive, which is evidence "
+                "against this model's mechanism for it") in note
+
     def test_any_mode_reaches_the_selection(self, monkeypatch):
         model, note, _ = self._search(
             monkeypatch, "Michaelis-Menten with a noncompetitive inhibitor", QUINOLINE_ROWS,
             any_mode=True)
         assert model.measured["reaction_Ki"].value == 0.00059
         assert f"{ANY_MODE_FLAG} kept the resolver's pick" in note
+
+    def test_the_command_runs_the_isoform_step_first_and_tells_the_mode_step(self, monkeypatch):
+        # The benzylhydrazine case: 2.096 only in the shipped order; mode
+        # first carries 1.95, and a mode step not told the isoform, 0.026.
+        model, note, refused = self._search(
+            monkeypatch, "Michaelis-Menten with a competitive inhibitor", BENZYLHYDRAZINE_ROWS,
+            enzyme=self.MAO, isoform="MAO-A")
+        assert refused is False
+        carried = model.measured["reaction_Ki"]
+        assert carried.value == 2.096 and "MAO-A" in carried.commentary
+        assert "the row for MAO-A (1.95 mM, BRENDA ref 702238) is used instead" in note
+        assert "the row --isoform chose (1.95 mM, BRENDA ref 702238) was determined" in note
 
     def test_a_refused_constant_is_not_described_as_not_found(self, monkeypatch):
         model, note, refused = self._search(
@@ -409,6 +609,36 @@ class TestThroughTheCommand:
         assert "1 returned by the search and not used (reaction_Ki)" in note
         # kcat was genuinely not found; the Ki was found and refused.
         assert "1 still the motif library's placeholder (reaction_kcat)" in note
+
+    def test_when_every_value_is_refused_the_rest_is_still_said(self, monkeypatch):
+        """Nothing measured is left, so the note takes the other branch; it
+        used to return before reading what else the search did."""
+        model, note, refused = self._search(
+            monkeypatch, "Michaelis-Menten with an uncompetitive inhibitor", QUINOLINE_ROWS,
+            km=False)
+        assert refused is False and not model.measured
+        assert note.startswith("No measured value was used: the search returned values for "
+                               "reaction_Ki and each was withheld")
+        assert ("2 still the motif library's placeholder (reaction_kcat, reaction_Km): the "
+                "search ran and returned nothing for them") in note
+        assert "every table was searched" not in note
+
+    def test_when_every_value_is_refused_a_failed_search_is_still_said(self, monkeypatch):
+        from caterva.agents.protocol import FunctionAgent
+        from caterva.agents.scheduler import Scheduler
+
+        def unreachable(view):
+            raise ConnectionError("this test's kcat scout reaches nothing")
+
+        run = Scheduler([FunctionAgent(name="kcat", reads=(), writes=(), fn=unreachable)]).run()
+        assert run.failures, "the scheduler records the raise as a failure"
+        model, note, refused = self._search(
+            monkeypatch, "Michaelis-Menten with an uncompetitive inhibitor", QUINOLINE_ROWS,
+            km=False, branches=[SimpleNamespace(build=SimpleNamespace(run=run))])
+        assert refused is False
+        assert "each was withheld" in note
+        assert ("part of the search failed: ConnectionError: this test's kcat scout reaches "
+                "nothing") in note
 
     def test_the_flag_is_on_the_command(self):
         from caterva.compose.__main__ import build_parser

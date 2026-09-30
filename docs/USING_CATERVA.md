@@ -400,9 +400,16 @@ stays a labelled placeholder, and the reason names each row's mode. The run
 above carries 0.00252 mM. The report says which row it replaced and why,
 and every export says why the carried row was carried, in its sentence
 about the spread of values. The competitive model keeps 0.00059 mM, and its
-report still says that row was measured against NADH. The gossypol example
-is unchanged: none of its rows states a mode, so the resolver's pick stays
-and the report says the mode is unknown.
+report still says that row was measured against NADH. It also says more: the
+other row found this inhibitor noncompetitive against pyruvate, the
+competitive model's own substrate, which is evidence that a competitive
+model of this inhibitor and substrate is the wrong mechanism, and no choice
+of row can fix that. A row of the model's mode measured against another
+molecule is still preferred to a row stating no mode, because it names the
+mechanism the model uses and its report says what it was measured against;
+it is not known to be the constant against the model's substrate. The
+gossypol example is unchanged: none of its rows states a mode, so the
+resolver's pick stays and the report says the mode is unknown.
 
 ```bash
 caterva compose "Michaelis-Menten with a noncompetitive inhibitor" \
@@ -414,12 +421,30 @@ Both of rabbit hexokinase's MgADP- rows (BRENDA 640206) state mixed
 inhibition, one versus MgATP2- (3 mM, the resolver's pick) and one versus
 glucose (7.8 mM). A model with glucose as its substrate carries 7.8 mM.
 
-With `--isoform`, the isoform is chosen first and the mode second, so the
-mode never moves a constant onto another isoform's row. For human monoamine
-oxidase and benzylhydrazine (BRENDA 702238), `--isoform MAO-A` alone takes
-MAO-A's first ranked row, 1.95 mM from a Kitz-Wilson plot, which states no
-mode; a competitive model then moves to MAO-A's 2.096 mM row, "determined
-from competitive inhibition data", and not to MAO-B's 0.026 mM one.
+With `--isoform`, the isoform is chosen first and the mode second, and the
+mode step is told the isoform, so it never moves a constant onto another
+isoform's row. For human monoamine oxidase and benzylhydrazine (BRENDA
+702238), `--isoform MAO-A` alone takes MAO-A's first ranked row, 1.95 mM; a
+competitive model then moves to MAO-A's 2.096 mM row, "determined from
+competitive inhibition data". Choosing the mode first would keep MAO-B's
+competitive 0.026 mM, and the isoform step, which does not read modes,
+would then take 1.95 mM; a mode step not told the isoform would move 1.95 mM
+to MAO-B's 0.026 mM. Within the choice, a row naming the isoform you asked
+for beats a row naming none, whatever either says about mode.
+
+The 1.95 mM row was "determined from Kitz-Wilson plots". That is not a
+reversible Ki: it is the K_I of an irreversible inactivation (the paper,
+Binda et al. 2008, shows these hydrazines alkylate the enzyme's flavin).
+BRENDA files it in the Ki table and states no mode, so it is ranked after
+every other row stating no mode. When one is carried the report says what
+it is, and when the choice moved to one, so does the reason every export
+prints for it. It is not refused, because the alternative is a placeholder
+that says less than the row does. Only the words "Kitz-Wilson" are
+recognised.
+
+A row in another unit is never substituted, because the constant keeps the
+resolver's unit. When one states the model's mode and the row carried
+states none, the report says it was passed over and why.
 
 `--any-mode` turns the choice off and keeps the resolver's pick whatever
 mode it states. The report still flags a mismatch, and says which row the

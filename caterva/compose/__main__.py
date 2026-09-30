@@ -1031,21 +1031,38 @@ def _search_the_literature(
             why = f"the literature search could not run: {text}"
         return replace(model, search_refused=why), why, True
     if not measured:
-        if withheld:
-            # "Every table was searched and none held a value" would be
-            # false here: values came back and were refused, each for a
-            # reason the provenance table prints beside it.
-            return sourced, (
-                f"No measured value was used: the search returned values for "
-                f"{', '.join(sorted(withheld))} and each was withheld, for the "
-                f"reason the provenance table gives"
-                + ("; " + "; ".join(selection_notes) if selection_notes else "")
-            ), False
         why = "; ".join(sorted({r.failure for r in failures})) if failures else (
             "every table was searched and none held a value for this "
             "enzyme, organism and substrate"
         )
-        return sourced, f"The search returned no measured value: {why}", False
+        if not withheld:
+            return sourced, f"The search returned no measured value: {why}", False
+        # "Every table was searched and none held a value" would be false
+        # here: values came back and were refused, each for a reason the
+        # provenance table prints beside it. The rest of what the search
+        # did is still said. An earlier version returned before `why` was
+        # built, so a refused Ki beside a failed kcat search read as if
+        # the Ki were the only thing that had happened.
+        note = (
+            f"No measured value was used: the search returned values for "
+            f"{', '.join(sorted(withheld))} and each was withheld, for the "
+            f"reason the provenance table gives"
+        )
+        rest = [q for q in sourced.unmeasured if q not in withheld]
+        if rest and failures:
+            note += (f". {len(rest)} still the motif library's placeholder "
+                     f"({', '.join(rest)}), and part of the search failed: {why}")
+        elif rest:
+            note += (
+                f". {len(rest)} still the motif library's placeholder "
+                f"({', '.join(rest)}): the search ran and returned nothing for "
+                f"them, which is different from their not having been looked for"
+            )
+        elif failures:
+            note += f". Part of the search failed: {why}"
+        if selection_notes:
+            note += ". " + "; ".join(selection_notes)
+        return sourced, note, False
 
     note = (
         f"{len(measured)} constant(s) resolved from the literature: "

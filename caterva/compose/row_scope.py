@@ -218,6 +218,7 @@ def read_scope(
 
 
 __all__ = [
-    "Concern", "RowScope", "read_scope", "mode_fits", "versus_is", "MODE_OF_MOTIF", "INHIBITION_TABLES",
+    "Concern", "RowScope", "read_scope", "mode_fits", "versus_is",
+    "MODE_OF_MOTIF", "INHIBITION_TABLES",
     "ISOFORM", "MODE_UNSTATED", "MODE_MISMATCH", "VERSUS", "PREPARATION",
 ]
