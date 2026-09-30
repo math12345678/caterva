@@ -386,6 +386,15 @@ WHERE BRENDA DATA APPEARS IN THIS REPOSITORY
       Eleven HTML fixtures containing rows captured live from BRENDA enzyme
       pages, used to test the parser without hitting the network.
 
+  Tests/fixtures/recorded/brenda_*.html.gz
+      Whole BRENDA enzyme pages, stored unmodified and gzipped. Whenever the
+      API server's tests run, each recorded page is served in place of
+      BRENDA's live page for that EC number, whether or not BRENDA is
+      reachable; an EC number with no recorded page is fetched live. Only
+      the API server's test configuration turns this on; the product always
+      fetches live. Each page is listed with its URL, fetch date and hash in
+      Tests/fixtures/recorded/README.md.
+
   docs/literature-inventory.toml
       Golden-tuple entries recording BRENDA values and reference ids, e.g.
       the LDH/lactate Km (ref 740253) and the LDH/gossypol Ki (ref 711801).
@@ -403,8 +412,9 @@ does modify the data it extracts:
   * values whose source does not report assay pH and temperature are
     FLAGGED as incomplete under the STRENDA Guidelines rather than
     presented as verified
-  * the HTML fixtures are trimmed excerpts of full BRENDA pages, not
-    complete copies
+  * the HTML fixtures in Tests/fixtures/ are trimmed excerpts of full
+    BRENDA pages, not complete copies (the recorded pages in
+    Tests/fixtures/recorded/ are complete and unmodified)
 
 The underlying measurements are unaltered. Caterva never edits a value.
 
@@ -472,6 +482,45 @@ public domain within the United States and carries no licence condition.
 NCBI asks that PUG REST clients stay under 5 requests per second and
 identify themselves; that is a usage policy rather than a licence term, and
 it is recorded here because exceeding it gets a client blocked.
+
+Recorded PubChem responses (name-to-CID and parent-CID lookups, unmodified)
+are stored under `Tests/fixtures/recorded/http/`, so the API server's tests
+run without the network. Tests/fixtures/recorded/README.md lists them.
+
+
+UniProt — queried live, and recorded for tests
+----------------------------------------------
+
+Three parts of Caterva query `https://rest.uniprot.org/uniprotkb/`:
+
+  Tests/enzyme_lookup.py
+      search, to find the reviewed accession for an EC number in an
+      organism, and to resolve an enzyme name to its EC numbers.
+  caterva/structure/search.py
+      search, to list the proteins (accessions) an EC number covers in an
+      organism before their structures are looked up in the PDB.
+  caterva/prepare/__main__.py
+      <accession>.fasta, the reference sequence a structure's chain is
+      aligned against.
+
+Recorded UniProt responses are stored in two places:
+
+  Tests/fixtures/recorded/http/
+      search responses, unmodified, replayed to the API server's tests so
+      they run without the network (Tests/fixtures/recorded/README.md
+      lists them).
+  caterva/tests/fixtures/structure/ldh_human.json
+      one search response, stored as its parsed JSON (EC 1.1.1.27, Homo
+      sapiens, recorded 2026-09-27), beside the RCSB responses the
+      structure-search tests replay.
+
+UniProt applies the Creative Commons Attribution 4.0 International licence
+(CC BY 4.0) to all copyrightable parts of its databases
+(https://www.uniprot.org/help/license, read 2026-09-30 UTC). The recorded
+responses above are redistribution, and this paragraph is the attribution
+it requires. Cite UniProt as: The UniProt Consortium, "UniProt: the Universal
+Protein Knowledgebase in 2025", Nucleic Acids Res. 53(D1):D609-D617 (2025),
+doi:10.1093/nar/gkae1010.
 
 
 KEGG — queried live, and UNRESOLVED
@@ -553,6 +602,10 @@ measured in one organism may stand in for another (ADR 0024). The XML
 wrapper around each fixture is reconstructed to match NCBI's eFetch shape;
 the lineage content is captured. Each fixture says which is which in its
 own header.
+
+Recorded Taxonomy esearch responses (organism name to taxon id, unmodified)
+are stored under `Tests/fixtures/recorded/http/` for the API server's
+tests; Tests/fixtures/recorded/README.md lists them.
 
 
 PubMed / NCBI
