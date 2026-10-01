@@ -444,7 +444,27 @@ def main() -> int:
         payload = json.loads(sys.stdin.read() or "{}")
     except json.JSONDecodeError as exc:
         return _fail(f"Invalid JSON payload: {exc}")
+    result = run_payload(payload)
+    print(json.dumps(result))
+    return 0 if result.get("ok") else 1
 
+
+def _failure(message: str) -> dict:
+    return {"ok": False, "error": message}
+
+
+def run_payload(payload: dict) -> dict:
+    """The JSON object `main` prints for `payload`: {"ok": False, "error"}
+    for a refusal, else the document and the facts it was built from.
+
+    In-process callers (Caterva Studio's `constants` kind, through
+    scripts/cite.py's `run_report_lab`) call this rather than spawning
+    Python: in a frozen app `sys.executable` is the app, not an
+    interpreter. `resolved` carries each KineticResult the document was
+    built from (`model_dump(mode="json")`), so a reader of the JSON reads
+    the resolver's own value, citation and conditions rather than parsing
+    them back out of the markdown.
+    """
     ec = payload.get("ec")
     organism = payload.get("organism")
 
@@ -467,10 +487,10 @@ def main() -> int:
         try:
             ec = ec_number_for_name(str(payload["enzyme"]))
         except EnzymeNameNotResolved as exc:
-            return _fail(str(exc))
+            return _failure(str(exc))
 
     if not ec or not organism:
-        return _fail(
+        return _failure(
             "A report needs an enzyme and an organism. Give the enzyme as an "
             "EC number ('ec') or as a name ('enzyme') — a name is looked up "
             "in UniProt, and refused if it matches more than one enzyme. The "
@@ -485,13 +505,13 @@ def main() -> int:
     try:
         supplied = supplied_values(payload)
     except MalformedSuppliedValue as exc:
-        return _fail(str(exc))
+        return _failure(str(exc))
 
     # One fetch per page, not one per quantity. See `one_page_per_run`.
     try:
         fetch = fixture_reader(payload.get("fixture"), str(ec))
     except FixtureUnusable as exc:
-        return _fail(str(exc))
+        return _failure(str(exc))
     page = one_page_per_run(fetch)
 
     # A SAVED PAGE MEANS THE WHOLE RUN IS OFFLINE, AND THE DOCUMENT SAYS SO.
@@ -539,7 +559,7 @@ def main() -> int:
         name = entry.get("name")
         substrate = entry.get("substrate")
         if not name or not substrate:
-            return _fail(
+            return _failure(
                 "Every parameter needs a 'name' and a 'substrate'. BRENDA's "
                 "tables are keyed on the substrate, so a lookup without one "
                 "is answered by every compound ever tested against the enzyme."
@@ -553,7 +573,7 @@ def main() -> int:
                 allow_cross_species=bool(entry.get("allowCrossSpecies", False)),
             )
         except Exception as exc:  # noqa: BLE001 - reported, never a traceback
-            return _fail(f"Could not resolve {name!r}: {exc}")
+            return _failure(f"Could not resolve {name!r}: {exc}")
 
         resolved[str(name)] = result
         quantities[str(name)] = str(entry.get("quantity", "km"))
@@ -561,7 +581,7 @@ def main() -> int:
     try:
         inputs = model_inputs(resolved, quantities, supplied, payload)
     except ConflictingValue as exc:
-        return _fail(str(exc))
+        return _failure(str(exc))
 
     # ---- Vmax from kcat, when the student gave [E]0 instead ---------------
     #
@@ -592,7 +612,7 @@ def main() -> int:
                 ),
             )
         except Exception as exc:  # noqa: BLE001 - reported, never a traceback
-            return _fail(f"Could not resolve kcat: {exc}")
+            return _failure(f"Could not resolve kcat: {exc}")
 
         value, detail = bridge_vmax(kcat_result, float(enzyme_conc), inputs.get("km"))
         if value is None:
@@ -696,21 +716,17 @@ def main() -> int:
         also_refused=also_refused + band_refusals + derive_refusals,
     )
 
-    print(
-        json.dumps(
-            {
-                "ok": True,
-                "markdown": report.markdown,
-                "sourced": report.sourced,
-                "supplied": report.supplied,
-                "derived": report.derived,
-                "refusals": report.refusals,
-                "disagreements": report.disagreements,
-                "defensible": report.is_defensible,
-            }
-        )
-    )
-    return 0
+    return {
+        "ok": True,
+        "markdown": report.markdown,
+        "sourced": report.sourced,
+        "supplied": report.supplied,
+        "derived": report.derived,
+        "refusals": report.refusals,
+        "disagreements": report.disagreements,
+        "defensible": report.is_defensible,
+        "resolved": {name: result.model_dump(mode="json") for name, result in resolved.items()},
+    }
 
 
 if __name__ == "__main__":

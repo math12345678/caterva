@@ -1,0 +1,9 @@
+{
+ "status": 400,
+ "body": {
+  "error": {
+   "code": "malformed",
+   "message": "caterva compose: error: --robustness needs at least one sample; got 0. A fraction over zero draws is not a small number, it is no number."
+  }
+ }
+}

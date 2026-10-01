@@ -1,0 +1,347 @@
+/*
+ * The kinetics screens (Compose, Constants, Stochastic, Binding): the
+ * form | result split and the pieces of a result. Built from the tokens in
+ * src/index.css only; no colour is defined here.
+ */
+
+.k-split {
+  display: grid;
+  grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr);
+  gap: 2.5rem;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .k-split {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
+}
+
+.k-form {
+  display: grid;
+  gap: 1rem;
+  position: sticky;
+  top: 1.5rem;
+}
+@media (max-width: 1100px) {
+  .k-form {
+    position: static;
+  }
+}
+.k-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.k-legend {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0;
+  margin-bottom: 0.25rem;
+}
+.k-field {
+  display: grid;
+  gap: 0.25rem;
+}
+.k-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+.k-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+.k-input {
+  font: inherit;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.4rem 0.55rem;
+  min-width: 0;
+  transition: border-color 150ms var(--ease-out-expo);
+}
+.k-input:hover {
+  border-color: color-mix(in oklch, var(--fg) 30%, transparent);
+}
+.k-input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+.k-input.font-mono {
+  font-family: var(--font-mono);
+}
+.k-field-error {
+  font-size: 12px;
+  color: var(--danger);
+}
+.k-check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 14px;
+}
+.k-check input {
+  margin-top: 0.3rem;
+  accent-color: var(--signal-deep);
+}
+.k-row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.k-segmented {
+  display: inline-flex;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.k-segmented button {
+  font: inherit;
+  font-size: 13px;
+  background: none;
+  border: 0;
+  color: var(--fg);
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+}
+.k-segmented button + button {
+  border-left: 1px solid var(--rule);
+}
+.k-segmented button[data-state="on"] {
+  background: var(--surface-raised);
+  font-weight: 700;
+}
+
+.k-button {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 150ms var(--ease-out-expo);
+}
+.k-button-primary {
+  background: var(--signal-deep);
+  color: var(--surface);
+}
+.k-button-quiet {
+  background: none;
+  border-color: var(--rule);
+  color: var(--fg);
+  font-weight: 400;
+}
+.k-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.k-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.k-kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* A result: a column of sections, each with a quiet heading. */
+.k-result {
+  display: grid;
+  gap: 2.25rem;
+  min-width: 0;
+}
+.k-section {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.k-section-title {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  margin: 0;
+  line-height: 1.25;
+}
+.k-section-sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+.k-prose {
+  max-width: 68ch;
+  margin: 0;
+}
+
+/* The verdict: the first thing a result says. */
+.k-verdict {
+  display: grid;
+  gap: 0.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+.k-verdict-word {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 300;
+  line-height: 1.1;
+  margin: 0;
+  text-transform: lowercase;
+}
+.k-verdict-word[data-tone="caution"] {
+  color: var(--caution);
+}
+.k-verdict-word[data-tone="danger"] {
+  color: var(--danger);
+}
+
+/* Tables of numbers. */
+.k-table-wrap {
+  overflow-x: auto;
+}
+.k-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 14px;
+}
+.k-table th {
+  text-align: left;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 0.35rem 0.75rem 0.35rem 0;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+.k-table td {
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+.k-table td.k-num {
+  white-space: nowrap;
+}
+.k-muted {
+  color: var(--muted);
+}
+.k-small {
+  font-size: 13px;
+}
+.k-code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.k-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+/* The command that reproduces a run. */
+.k-command {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: var(--surface-raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.6rem 0.75rem;
+  overflow-x: auto;
+  white-space: pre;
+  margin: 0;
+}
+
+/* The CLI's own report, as it prints. */
+.k-details > summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+}
+.k-markdown {
+  max-width: 76ch;
+  font-size: 14px;
+}
+.k-markdown table {
+  border-collapse: collapse;
+  font-size: 13px;
+  display: block;
+  overflow-x: auto;
+}
+.k-markdown th,
+.k-markdown td {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.3rem 0.6rem 0.3rem 0;
+  text-align: left;
+}
+.k-markdown code,
+.k-markdown pre {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+.k-markdown pre {
+  white-space: pre-wrap;
+  background: var(--surface-raised);
+  padding: 0.6rem 0.75rem;
+  border-radius: 4px;
+}
+.k-pre {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  white-space: pre;
+  overflow-x: auto;
+  margin: 0;
+}
+
+/* Section status, a word with a shape: answered, refused, partly refused. */
+.k-status {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.k-status[data-status="refused"],
+.k-status[data-status="partly_refused"] {
+  color: var(--caution);
+}
+
+/* The band figure for bind: each row's ΔG, the band, the computed value. */
+.k-band svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.k-band text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  fill: var(--muted);
+}
+
+.k-chart {
+  width: 100%;
+  height: 18rem;
+}
+.k-chart text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.k-legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 13px;
+}
+.k-swatch {
+  display: inline-block;
+  width: 0.9rem;
+  height: 2px;
+  vertical-align: middle;
+  margin-right: 0.35rem;
+}
