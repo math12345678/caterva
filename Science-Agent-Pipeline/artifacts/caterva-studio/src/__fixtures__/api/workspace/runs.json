@@ -1,0 +1,75 @@
+{
+ "runs": [
+  {
+   "id": "20261001-093929-bind-e37ed557",
+   "kind": "bind",
+   "title": "EC 1.1.1.27, 3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid, human",
+   "status": "done",
+   "created_at": "2026-10-01T09:39:29.694Z",
+   "finished_at": "2026-10-01T09:39:29.706Z",
+   "outcome": {
+    "exit_code": 4,
+    "meaning": "negative",
+    "summary": "VERDICT  DISAGREES: computed -10.50 ± 0.30 kcal/mol. the simulation binds too tightly: 1.06 kcal/mol beyond the band even at 2σ, a 5.58-fold error in Ki.",
+    "reason": "the computed value disagrees with the measured band"
+   }
+  },
+  {
+   "id": "20261001-093929-compose-ce524f03",
+   "kind": "compose",
+   "title": "glycolysis",
+   "status": "done",
+   "created_at": "2026-10-01T09:39:29.425Z",
+   "finished_at": "2026-10-01T09:39:29.430Z",
+   "outcome": {
+    "exit_code": 3,
+    "meaning": "refused",
+    "summary": "'glycolysis' is a named pathway, not a shape. Building it means its actual enzymes and stoichiometry, which needs a pathway database (KEGG or Reactome) that Caterva does not yet read. Guessing a plausible pathway would be worse than saying so. You can describe the steps you want, or supply SBML.",
+    "reason": "Not built.\n\n'glycolysis' is a named pathway, not a shape. Building it means its actual enzymes and stoichiometry, which needs a pathway database (KEGG or Reactome) that Caterva does not yet read. Guessing a plausible pathway would be worse than saying so. You can describe the steps you want, or supply SBML."
+   }
+  },
+  {
+   "id": "20261001-093929-sim-5d26a91e",
+   "kind": "sim",
+   "title": "Gillespie SSA, A -> B, seed 42",
+   "status": "done",
+   "created_at": "2026-10-01T09:39:29.166Z",
+   "finished_at": "2026-10-01T09:39:29.173Z",
+   "outcome": {
+    "exit_code": 0,
+    "meaning": "produced",
+    "summary": "192 events, seed 42; expected B(end) (ODE) 190.0",
+    "reason": null
+   }
+  },
+  {
+   "id": "20261001-093920-compose-90bc4dd5",
+   "kind": "compose",
+   "title": "Michaelis-Menten with a competitive inhibitor, EC 1.1.1.27, human, pyruvate, inhibitor gossypol",
+   "status": "done",
+   "created_at": "2026-10-01T09:39:20.943Z",
+   "finished_at": "2026-10-01T09:39:29.139Z",
+   "outcome": {
+    "exit_code": 0,
+    "meaning": "produced",
+    "summary": "VERDICT: STRUCTURAL",
+    "reason": null
+   }
+  },
+  {
+   "id": "20261001-093917-compose-9c63c25f",
+   "kind": "compose",
+   "title": "reversible binding of a ligand to a receptor",
+   "status": "done",
+   "created_at": "2026-10-01T09:39:17.915Z",
+   "finished_at": "2026-10-01T09:39:20.540Z",
+   "outcome": {
+    "exit_code": 0,
+    "meaning": "produced",
+    "summary": "VERDICT: STRUCTURAL",
+    "reason": null
+   }
+  }
+ ],
+ "next_cursor": null
+}

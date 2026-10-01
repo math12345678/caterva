@@ -53,3 +53,21 @@ its contract amendment), create
 calls above inside the matching `studio_kinetics_offline` context manager.
 Once core is merged this needs no scratch tree. The JSON must not be edited
 by hand.
+
+## Added on studio/kin (2026-10-01)
+
+`compose-binding-charts.json` was captured on branch `studio/kin` (from
+`studio/integrate` at f8c7cc9, core merged, so no scratch tree) through
+`caterva.studio.dispatch.App(workspace=Workspace(<empty dir>), port=18720,
+token=...)`, with the same calls as above (`POST /api/runs`, polling
+`GET /api/runs/{id}`, then the record, `/result`, and `events.jsonl` as
+written to the run's folder). Request, which needs no literature:
+
+    caterva compose "reversible binding of a ligand to a receptor" \
+      --sweep complex_kon --predictions --identifiability --design --screen \
+      --robustness 30 --stochastic 1e-18 --stochastic-seed 11 --knockout complex_A
+
+It is the one fixture whose sections carry a figure each (robustness draws,
+the knockout screen, the measurement design, the identifiability spectrum,
+a stochastic trajectory) and a sweep. Only the data directory's path was
+replaced by `<data dir>`.
