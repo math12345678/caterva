@@ -1,0 +1,6041 @@
+{
+ "kind": "prepare",
+ "request": {
+  "entry": "1I10",
+  "ph": 7.4
+ },
+ "cli": [
+  "caterva",
+  "prepare",
+  "1I10",
+  "--ph",
+  "7.4"
+ ],
+ "outcome": {
+  "exit_code": 0,
+  "meaning": "produced",
+  "summary": "1I10: 8 chains, clean: A; 29 blocking findings",
+  "reason": null
+ },
+ "result": {
+  "pdb_id": "1I10",
+  "title": "HUMAN MUSCLE L-LACTATE DEHYDROGENASE M CHAIN, TERNARY COMPLEX WITH NADH AND OXAMATE",
+  "method": "X-RAY DIFFRACTION",
+  "resolution": {
+   "value": 2.3,
+   "unit": "Å",
+   "provenance": {
+    "kind": "measured",
+    "citation": {
+     "text": "PDB 1I10, doi:10.2210/pdb1i10/pdb",
+     "registry": "PDB",
+     "reference_id": "1I10",
+     "url": "https://www.rcsb.org/structure/1I10",
+     "doi": "10.2210/pdb1i10/pdb"
+    },
+    "organism": null,
+    "cross_species": false,
+    "conditions": {
+     "ph": null,
+     "temperature_c": null,
+     "buffer": null,
+     "unreported": []
+    },
+    "commentary": null,
+    "scope": [],
+    "note": "refine.ls_d_res_high of the entry's mmCIF"
+   },
+   "label": "resolution"
+  },
+  "r_free": {
+   "value": 0.25713,
+   "unit": "",
+   "provenance": {
+    "kind": "measured",
+    "citation": {
+     "text": "PDB 1I10, doi:10.2210/pdb1i10/pdb",
+     "registry": "PDB",
+     "reference_id": "1I10",
+     "url": "https://www.rcsb.org/structure/1I10",
+     "doi": "10.2210/pdb1i10/pdb"
+    },
+    "organism": null,
+    "cross_species": false,
+    "conditions": {
+     "ph": null,
+     "temperature_c": null,
+     "buffer": null,
+     "unreported": []
+    },
+    "commentary": null,
+    "scope": [],
+    "note": "refine.ls_R_factor_R_free of the entry's mmCIF"
+   },
+   "label": "R-free"
+  },
+  "chains": [
+   "A",
+   "B",
+   "C",
+   "D",
+   "E",
+   "F",
+   "G",
+   "H"
+  ],
+  "clean": true,
+  "chain_summary": [
+   {
+    "chain": "A",
+    "blocks": 0,
+    "near_site": 0,
+    "catalytic_intact": true
+   },
+   {
+    "chain": "B",
+    "blocks": 5,
+    "near_site": 4,
+    "catalytic_intact": false
+   },
+   {
+    "chain": "C",
+    "blocks": 4,
+    "near_site": 4,
+    "catalytic_intact": false
+   },
+   {
+    "chain": "D",
+    "blocks": 2,
+    "near_site": 3,
+    "catalytic_intact": false
+   },
+   {
+    "chain": "E",
+    "blocks": 6,
+    "near_site": 4,
+    "catalytic_intact": false
+   },
+   {
+    "chain": "F",
+    "blocks": 5,
+    "near_site": 4,
+    "catalytic_intact": false
+   },
+   {
+    "chain": "G",
+    "blocks": 2,
+    "near_site": 2,
+    "catalytic_intact": false
+   },
+   {
+    "chain": "H",
+    "blocks": 5,
+    "near_site": 4,
+    "catalytic_intact": false
+   }
+  ],
+  "findings": [
+   {
+    "severity": "decide",
+    "chain": null,
+    "residues": [],
+    "distance": null,
+    "what": "the deposited coordinates hold 8 copies of the enzyme; assembly 1 is tetrameric (4 chains). Simulating one chain, or the asymmetric unit, is a choice about the protein's state, and should be recorded as one",
+    "source": "pdbx_struct_assembly",
+    "check": "biological assembly",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "blocks",
+    "chain": "B",
+    "residues": [
+     "15"
+    ],
+    "distance": null,
+    "what": "1 residue missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+    "source": "pdbx_unobs_or_zero_occ_residues",
+    "check": "unmodelled residues",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "blocks",
+    "chain": "D",
+    "residues": [
+     "100-104"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "D"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "5 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+    "source": "pdbx_unobs_or_zero_occ_residues",
+    "check": "unmodelled residues",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "E",
+    "residues": [
+     "97-101"
+    ],
+    "distance": null,
+    "what": "5 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+    "source": "pdbx_unobs_or_zero_occ_residues",
+    "check": "unmodelled residues",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "blocks",
+    "chain": "E",
+    "residues": [
+     "107-108"
+    ],
+    "distance": null,
+    "what": "2 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+    "source": "pdbx_unobs_or_zero_occ_residues",
+    "check": "unmodelled residues",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "blocks",
+    "chain": "F",
+    "residues": [
+     "13-16"
+    ],
+    "distance": null,
+    "what": "4 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+    "source": "pdbx_unobs_or_zero_occ_residues",
+    "check": "unmodelled residues",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "blocks",
+    "chain": "G",
+    "residues": [
+     "101-106"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "G"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "CATALYTIC RESIDUE Arg105 (Arg107 of P00341; electrostatic stabiliser). 6 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+    "source": "pdbx_unobs_or_zero_occ_residues",
+    "check": "unmodelled residues",
+    "catalytic": true,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "H",
+    "residues": [
+     "13-16"
+    ],
+    "distance": null,
+    "what": "4 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+    "source": "pdbx_unobs_or_zero_occ_residues",
+    "check": "unmodelled residues",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "A",
+    "residues": [
+     "13"
+    ],
+    "distance": {
+     "value": 42.98446011060276,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Lys13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "A",
+    "residues": [
+     "14"
+    ],
+    "distance": {
+     "value": 40.67925221780754,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Glu14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "A",
+    "residues": [
+     "16"
+    ],
+    "distance": {
+     "value": 33.956803471469456,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Gln16 lacks CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "B",
+    "residues": [
+     "13"
+    ],
+    "distance": null,
+    "what": "13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "B",
+    "residues": [
+     "14"
+    ],
+    "distance": null,
+    "what": "14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "B",
+    "residues": [
+     "16"
+    ],
+    "distance": null,
+    "what": "16 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "C",
+    "residues": [
+     "14"
+    ],
+    "distance": null,
+    "what": "14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "C",
+    "residues": [
+     "15"
+    ],
+    "distance": null,
+    "what": "15 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "C",
+    "residues": [
+     "16"
+    ],
+    "distance": null,
+    "what": "16 lacks CG; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "D",
+    "residues": [
+     "13"
+    ],
+    "distance": {
+     "value": 45.07969123674208,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "D"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Lys13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "D",
+    "residues": [
+     "15"
+    ],
+    "distance": {
+     "value": 38.84545915547917,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "D"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Glu15 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "D",
+    "residues": [
+     "16"
+    ],
+    "distance": {
+     "value": 36.61000422015818,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "D"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Gln16 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "blocks",
+    "chain": "D",
+    "residues": [
+     "105"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "D"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "CATALYTIC RESIDUE Arg105 (Arg107 of P00341; electrostatic stabiliser). Arg105 lacks CG, CD, NE, CZ, NH1, NH2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": true,
+    "near_active_site": true
+   },
+   {
+    "severity": "decide",
+    "chain": "D",
+    "residues": [
+     "231"
+    ],
+    "distance": {
+     "value": 8.689565063914307,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "D"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Lys231 lacks C, CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "decide",
+    "chain": "E",
+    "residues": [
+     "13"
+    ],
+    "distance": null,
+    "what": "13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "E",
+    "residues": [
+     "14"
+    ],
+    "distance": null,
+    "what": "14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "E",
+    "residues": [
+     "15"
+    ],
+    "distance": null,
+    "what": "15 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "E",
+    "residues": [
+     "16"
+    ],
+    "distance": null,
+    "what": "16 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "G",
+    "residues": [
+     "12"
+    ],
+    "distance": {
+     "value": 45.179170532447806,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "G"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Leu12 lacks CG, CD1, CD2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "G",
+    "residues": [
+     "13"
+    ],
+    "distance": {
+     "value": 45.56059825112045,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "G"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Lys13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "G",
+    "residues": [
+     "14"
+    ],
+    "distance": {
+     "value": 42.500794651394465,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "G"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Glu14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "G",
+    "residues": [
+     "15"
+    ],
+    "distance": {
+     "value": 40.012220558224456,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "G"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Glu15 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "G",
+    "residues": [
+     "16"
+    ],
+    "distance": {
+     "value": 36.301228891044445,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "G"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Gln16 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "G",
+    "residues": [
+     "98"
+    ],
+    "distance": {
+     "value": 15.48554044907701,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "G"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Arg98 lacks CG, CD, NE, CZ, NH1, NH2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "G",
+    "residues": [
+     "99"
+    ],
+    "distance": {
+     "value": 14.171842117381916,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "G"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Gln99 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "G",
+    "residues": [
+     "100"
+    ],
+    "distance": {
+     "value": 14.54731549118256,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "G"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Gln100 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "G",
+    "residues": [
+     "217"
+    ],
+    "distance": {
+     "value": 15.149490882534632,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "G"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Leu217 lacks CG, CD1, CD2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "decide",
+    "chain": "G",
+    "residues": [
+     "226"
+    ],
+    "distance": {
+     "value": 10.015519806779864,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "G"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Trp226 lacks CG, CD1, CD2, NE1, CE2, CE3, CZ2, CZ3, CH2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+    "source": "pdbx_unobs_or_zero_occ_atoms",
+    "check": "incomplete side chain",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "blocks",
+    "chain": "B",
+    "residues": [
+     "192"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "B"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain B",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "B",
+    "residues": [
+     "105"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "B"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain B",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "B",
+    "residues": [
+     "168"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "B"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain B",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "B",
+    "residues": [
+     "165"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "B"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain B",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "C",
+    "residues": [
+     "192"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "C"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain C",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "C",
+    "residues": [
+     "105"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "C"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain C",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "C",
+    "residues": [
+     "168"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "C"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain C",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "C",
+    "residues": [
+     "165"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "C"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain C",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "E",
+    "residues": [
+     "192"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "E"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain E",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "E",
+    "residues": [
+     "105"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "E"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain E",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "E",
+    "residues": [
+     "168"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "E"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain E",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "E",
+    "residues": [
+     "165"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "E"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain E",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "F",
+    "residues": [
+     "192"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "F"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain F",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "F",
+    "residues": [
+     "105"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "F"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain F",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "F",
+    "residues": [
+     "168"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "F"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain F",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "F",
+    "residues": [
+     "165"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "F"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain F",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "G",
+    "residues": [
+     "105"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "G"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain G",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "H",
+    "residues": [
+     "192"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "H"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain H",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "H",
+    "residues": [
+     "105"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "H"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain H",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "H",
+    "residues": [
+     "168"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "H"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain H",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   },
+   {
+    "severity": "blocks",
+    "chain": "H",
+    "residues": [
+     "165"
+    ],
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "H"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain H",
+    "source": "M-CSA + pdbx_poly_seq_scheme",
+    "check": "catalytic residue",
+    "catalytic": false,
+    "near_active_site": true
+   }
+  ],
+  "catalytic": [
+   {
+    "chain": "A",
+    "resseq": "192",
+    "expected": "HIS",
+    "found": "HIS",
+    "conserved": true,
+    "roles": "proton acceptor, proton donor",
+    "reference": "His194 of P00341",
+    "seq_id": 192
+   },
+   {
+    "chain": "A",
+    "resseq": "105",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg107 of P00341",
+    "seq_id": 105
+   },
+   {
+    "chain": "A",
+    "resseq": "168",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg170 of P00341",
+    "seq_id": 168
+   },
+   {
+    "chain": "A",
+    "resseq": "165",
+    "expected": "ASP",
+    "found": "ASP",
+    "conserved": true,
+    "roles": "enhance reactivity",
+    "reference": "Asp167 of P00341",
+    "seq_id": 165
+   },
+   {
+    "chain": "B",
+    "resseq": "192",
+    "expected": "HIS",
+    "found": "HIS",
+    "conserved": true,
+    "roles": "proton acceptor, proton donor",
+    "reference": "His194 of P00341",
+    "seq_id": 192
+   },
+   {
+    "chain": "B",
+    "resseq": "105",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg107 of P00341",
+    "seq_id": 105
+   },
+   {
+    "chain": "B",
+    "resseq": "168",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg170 of P00341",
+    "seq_id": 168
+   },
+   {
+    "chain": "B",
+    "resseq": "165",
+    "expected": "ASP",
+    "found": "ASP",
+    "conserved": true,
+    "roles": "enhance reactivity",
+    "reference": "Asp167 of P00341",
+    "seq_id": 165
+   },
+   {
+    "chain": "C",
+    "resseq": "192",
+    "expected": "HIS",
+    "found": "HIS",
+    "conserved": true,
+    "roles": "proton acceptor, proton donor",
+    "reference": "His194 of P00341",
+    "seq_id": 192
+   },
+   {
+    "chain": "C",
+    "resseq": "105",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg107 of P00341",
+    "seq_id": 105
+   },
+   {
+    "chain": "C",
+    "resseq": "168",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg170 of P00341",
+    "seq_id": 168
+   },
+   {
+    "chain": "C",
+    "resseq": "165",
+    "expected": "ASP",
+    "found": "ASP",
+    "conserved": true,
+    "roles": "enhance reactivity",
+    "reference": "Asp167 of P00341",
+    "seq_id": 165
+   },
+   {
+    "chain": "D",
+    "resseq": "192",
+    "expected": "HIS",
+    "found": "HIS",
+    "conserved": true,
+    "roles": "proton acceptor, proton donor",
+    "reference": "His194 of P00341",
+    "seq_id": 192
+   },
+   {
+    "chain": "D",
+    "resseq": "105",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg107 of P00341",
+    "seq_id": 105
+   },
+   {
+    "chain": "D",
+    "resseq": "168",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg170 of P00341",
+    "seq_id": 168
+   },
+   {
+    "chain": "D",
+    "resseq": "165",
+    "expected": "ASP",
+    "found": "ASP",
+    "conserved": true,
+    "roles": "enhance reactivity",
+    "reference": "Asp167 of P00341",
+    "seq_id": 165
+   },
+   {
+    "chain": "E",
+    "resseq": "192",
+    "expected": "HIS",
+    "found": "HIS",
+    "conserved": true,
+    "roles": "proton acceptor, proton donor",
+    "reference": "His194 of P00341",
+    "seq_id": 192
+   },
+   {
+    "chain": "E",
+    "resseq": "105",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg107 of P00341",
+    "seq_id": 105
+   },
+   {
+    "chain": "E",
+    "resseq": "168",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg170 of P00341",
+    "seq_id": 168
+   },
+   {
+    "chain": "E",
+    "resseq": "165",
+    "expected": "ASP",
+    "found": "ASP",
+    "conserved": true,
+    "roles": "enhance reactivity",
+    "reference": "Asp167 of P00341",
+    "seq_id": 165
+   },
+   {
+    "chain": "F",
+    "resseq": "192",
+    "expected": "HIS",
+    "found": "HIS",
+    "conserved": true,
+    "roles": "proton acceptor, proton donor",
+    "reference": "His194 of P00341",
+    "seq_id": 192
+   },
+   {
+    "chain": "F",
+    "resseq": "105",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg107 of P00341",
+    "seq_id": 105
+   },
+   {
+    "chain": "F",
+    "resseq": "168",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg170 of P00341",
+    "seq_id": 168
+   },
+   {
+    "chain": "F",
+    "resseq": "165",
+    "expected": "ASP",
+    "found": "ASP",
+    "conserved": true,
+    "roles": "enhance reactivity",
+    "reference": "Asp167 of P00341",
+    "seq_id": 165
+   },
+   {
+    "chain": "G",
+    "resseq": "192",
+    "expected": "HIS",
+    "found": "HIS",
+    "conserved": true,
+    "roles": "proton acceptor, proton donor",
+    "reference": "His194 of P00341",
+    "seq_id": 192
+   },
+   {
+    "chain": "G",
+    "resseq": "105",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg107 of P00341",
+    "seq_id": 105
+   },
+   {
+    "chain": "G",
+    "resseq": "168",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg170 of P00341",
+    "seq_id": 168
+   },
+   {
+    "chain": "G",
+    "resseq": "165",
+    "expected": "ASP",
+    "found": "ASP",
+    "conserved": true,
+    "roles": "enhance reactivity",
+    "reference": "Asp167 of P00341",
+    "seq_id": 165
+   },
+   {
+    "chain": "H",
+    "resseq": "192",
+    "expected": "HIS",
+    "found": "HIS",
+    "conserved": true,
+    "roles": "proton acceptor, proton donor",
+    "reference": "His194 of P00341",
+    "seq_id": 192
+   },
+   {
+    "chain": "H",
+    "resseq": "105",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg107 of P00341",
+    "seq_id": 105
+   },
+   {
+    "chain": "H",
+    "resseq": "168",
+    "expected": "ARG",
+    "found": "ARG",
+    "conserved": true,
+    "roles": "electrostatic stabiliser",
+    "reference": "Arg170 of P00341",
+    "seq_id": 168
+   },
+   {
+    "chain": "H",
+    "resseq": "165",
+    "expected": "ASP",
+    "found": "ASP",
+    "conserved": true,
+    "roles": "enhance reactivity",
+    "reference": "Asp167 of P00341",
+    "seq_id": 165
+   }
+  ],
+  "reference": {
+   "mcsa_id": 584,
+   "enzyme": "L-lactate dehydrogenase",
+   "uniprot": "P00341",
+   "how": "best of 1 for EC 1.1.1.27 by alignment",
+   "identity": {
+    "value": 0.8006042296072508,
+    "unit": "",
+    "provenance": {
+     "kind": "computed",
+     "method": "global alignment (Needleman-Wunsch, BLOSUM62) of the M-CSA reference sequence against chain A: identical positions over aligned positions",
+     "inputs": [
+      "P00341",
+      "chain A"
+     ]
+    },
+    "label": "sequence identity"
+   },
+   "citation": {
+    "text": "Ribeiro et al. (2018) Nucleic Acids Res. 46:D618, doi:10.1093/nar/gkx1012",
+    "registry": "M-CSA",
+    "doi": "10.1093/nar/gkx1012",
+    "url": "https://doi.org/10.1093/nar/gkx1012",
+    "title": "Mechanism and Catalytic Site Atlas (M-CSA)",
+    "reference_id": "584"
+   },
+   "rejected": []
+  },
+  "protonation": [
+   {
+    "residue": "Arg105 (catalytic)",
+    "chain": "A",
+    "resseq": "105",
+    "resname": "ARG",
+    "catalytic": true,
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "not assessed",
+    "state": "Arg is not in the survey; taken as charged below pH 12",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": null,
+    "pka_sd": null,
+    "protonated": null,
+    "band": null,
+    "default_protonated": null
+   },
+   {
+    "residue": "Asp165 (catalytic)",
+    "chain": "A",
+    "resseq": "165",
+    "resname": "ASP",
+    "catalytic": true,
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 3.5 +/- 1.2: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated",
+    "state": "settled, deprotonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 3.5,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 139 measured ASP pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of ASP"
+    },
+    "pka_sd": {
+     "value": 1.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 139 measured ASP pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.00012587669424250317,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of ASP",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 7.94321925200954e-06,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of ASP",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.001991289170728319,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of ASP",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": false
+   },
+   {
+    "residue": "Arg168 (catalytic)",
+    "chain": "A",
+    "resseq": "168",
+    "resname": "ARG",
+    "catalytic": true,
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "not assessed",
+    "state": "Arg is not in the survey; taken as charged below pH 12",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": null,
+    "pka_sd": null,
+    "protonated": null,
+    "band": null,
+    "default_protonated": null
+   },
+   {
+    "residue": "His192 (catalytic)",
+    "chain": "A",
+    "resseq": "192",
+    "resname": "HIS",
+    "catalytic": true,
+    "distance": {
+     "value": 0.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 6.6 +/- 1.0: 14% protonated at pH 7.4 (2%-61% across one SD); uncertain; pdb2gmx sets it from the hydrogen-bond network, not the pH",
+    "state": "uncertain",
+    "emphasised": true,
+    "contradicted": false,
+    "uncertain": true,
+    "pka": {
+     "value": 6.6,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 131 measured HIS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of HIS"
+    },
+    "pka_sd": {
+     "value": 1.0,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 131 measured HIS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.1368068886032098,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of HIS",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 0.015601662241829576,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of HIS",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.6131368201531427,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of HIS",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": null
+   },
+   {
+    "residue": "Glu191",
+    "chain": "A",
+    "resseq": "191",
+    "resname": "GLU",
+    "catalytic": false,
+    "distance": {
+     "value": 1.327377489638873,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated",
+    "state": "settled, deprotonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 4.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of GLU"
+    },
+    "pka_sd": {
+     "value": 0.9,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.0006305594883398933,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of GLU",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 7.942651440013084e-05,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.004986878736687972,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": false
+   },
+   {
+    "residue": "Asp140",
+    "chain": "A",
+    "resseq": "140",
+    "resname": "ASP",
+    "catalytic": false,
+    "distance": {
+     "value": 2.9018466534260576,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 3.5 +/- 1.2: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated",
+    "state": "settled, deprotonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 3.5,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 139 measured ASP pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of ASP"
+    },
+    "pka_sd": {
+     "value": 1.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 139 measured ASP pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.00012587669424250317,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of ASP",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 7.94321925200954e-06,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of ASP",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.001991289170728319,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of ASP",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": false
+   },
+   {
+    "residue": "Tyr171",
+    "chain": "A",
+    "resseq": "171",
+    "resname": "TYR",
+    "catalytic": false,
+    "distance": {
+     "value": 3.28293984105712,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 10.3 +/- 1.2: 100% protonated at pH 7.4 (98%-100% across one SD); protonated",
+    "state": "settled, protonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 10.3,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 20 measured TYR pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of TYR"
+    },
+    "pka_sd": {
+     "value": 1.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 20 measured TYR pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.9987426574886448,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of TYR",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 0.9804376961274206,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of TYR",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.9999205734855999,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of TYR",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": true
+   },
+   {
+    "residue": "Arg170",
+    "chain": "A",
+    "resseq": "170",
+    "resname": "ARG",
+    "catalytic": false,
+    "distance": {
+     "value": 3.2915253302990117,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "not assessed",
+    "state": "Arg is not in the survey; taken as charged below pH 12",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": null,
+    "pka_sd": null,
+    "protonated": null,
+    "band": null,
+    "default_protonated": null
+   },
+   {
+    "residue": "Cys162",
+    "chain": "A",
+    "resseq": "162",
+    "resname": "CYS",
+    "catalytic": false,
+    "distance": {
+     "value": 3.460297964048767,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 6.8 +/- 2.7: 20% protonated at pH 7.4 (0%-99% across one SD); uncertain; pdb2gmx would make it protonated without checking",
+    "state": "uncertain",
+    "emphasised": true,
+    "contradicted": false,
+    "uncertain": true,
+    "pka": {
+     "value": 6.8,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 25 measured CYS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of CYS"
+    },
+    "pka_sd": {
+     "value": 2.7,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 25 measured CYS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.20076000891310153,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of CYS",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 0.0005009361708135975,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of CYS",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.9921193161496697,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of CYS",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": true
+   },
+   {
+    "residue": "Glu103",
+    "chain": "A",
+    "resseq": "103",
+    "resname": "GLU",
+    "catalytic": false,
+    "distance": {
+     "value": 3.632448898470564,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated",
+    "state": "settled, deprotonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 4.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of GLU"
+    },
+    "pka_sd": {
+     "value": 0.9,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.0006305594883398933,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of GLU",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 7.942651440013084e-05,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.004986878736687972,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": false
+   },
+   {
+    "residue": "Tyr238",
+    "chain": "A",
+    "resseq": "238",
+    "resname": "TYR",
+    "catalytic": false,
+    "distance": {
+     "value": 4.081638029027065,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 10.3 +/- 1.2: 100% protonated at pH 7.4 (98%-100% across one SD); protonated",
+    "state": "settled, protonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 10.3,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 20 measured TYR pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of TYR"
+    },
+    "pka_sd": {
+     "value": 1.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 20 measured TYR pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.9987426574886448,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of TYR",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 0.9804376961274206,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of TYR",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.9999205734855999,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of TYR",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": true
+   },
+   {
+    "residue": "Asp194",
+    "chain": "A",
+    "resseq": "194",
+    "resname": "ASP",
+    "catalytic": false,
+    "distance": {
+     "value": 4.524103447093133,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 3.5 +/- 1.2: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated",
+    "state": "settled, deprotonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 3.5,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 139 measured ASP pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of ASP"
+    },
+    "pka_sd": {
+     "value": 1.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 139 measured ASP pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.00012587669424250317,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of ASP",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 7.94321925200954e-06,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of ASP",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.001991289170728319,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of ASP",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": false
+   },
+   {
+    "residue": "Glu235",
+    "chain": "A",
+    "resseq": "235",
+    "resname": "GLU",
+    "catalytic": false,
+    "distance": {
+     "value": 6.6422425429970575,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated",
+    "state": "settled, deprotonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 4.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of GLU"
+    },
+    "pka_sd": {
+     "value": 0.9,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.0006305594883398933,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of GLU",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 7.942651440013084e-05,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.004986878736687972,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": false
+   },
+   {
+    "residue": "Arg111",
+    "chain": "A",
+    "resseq": "111",
+    "resname": "ARG",
+    "catalytic": false,
+    "distance": {
+     "value": 6.815417962238255,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "not assessed",
+    "state": "Arg is not in the survey; taken as charged below pH 12",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": null,
+    "pka_sd": null,
+    "protonated": null,
+    "band": null,
+    "default_protonated": null
+   },
+   {
+    "residue": "His230",
+    "chain": "A",
+    "resseq": "230",
+    "resname": "HIS",
+    "catalytic": false,
+    "distance": {
+     "value": 6.859157674233767,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 6.6 +/- 1.0: 14% protonated at pH 7.4 (2%-61% across one SD); uncertain; pdb2gmx sets it from the hydrogen-bond network, not the pH",
+    "state": "uncertain",
+    "emphasised": true,
+    "contradicted": false,
+    "uncertain": true,
+    "pka": {
+     "value": 6.6,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 131 measured HIS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of HIS"
+    },
+    "pka_sd": {
+     "value": 1.0,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 131 measured HIS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.1368068886032098,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of HIS",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 0.015601662241829576,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of HIS",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.6131368201531427,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of HIS",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": null
+   },
+   {
+    "residue": "Arg98",
+    "chain": "A",
+    "resseq": "98",
+    "resname": "ARG",
+    "catalytic": false,
+    "distance": {
+     "value": 7.145701225212261,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "not assessed",
+    "state": "Arg is not in the survey; taken as charged below pH 12",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": null,
+    "pka_sd": null,
+    "protonated": null,
+    "band": null,
+    "default_protonated": null
+   },
+   {
+    "residue": "Tyr246",
+    "chain": "A",
+    "resseq": "246",
+    "resname": "TYR",
+    "catalytic": false,
+    "distance": {
+     "value": 7.634132301709205,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 10.3 +/- 1.2: 100% protonated at pH 7.4 (98%-100% across one SD); protonated",
+    "state": "settled, protonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 10.3,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 20 measured TYR pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of TYR"
+    },
+    "pka_sd": {
+     "value": 1.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 20 measured TYR pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.9987426574886448,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of TYR",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 0.9804376961274206,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of TYR",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.9999205734855999,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of TYR",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": true
+   },
+   {
+    "residue": "Glu175",
+    "chain": "A",
+    "resseq": "175",
+    "resname": "GLU",
+    "catalytic": false,
+    "distance": {
+     "value": 7.757827079794966,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated",
+    "state": "settled, deprotonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 4.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of GLU"
+    },
+    "pka_sd": {
+     "value": 0.9,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.0006305594883398933,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of GLU",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 7.942651440013084e-05,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.004986878736687972,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": false
+   },
+   {
+    "residue": "Glu239",
+    "chain": "A",
+    "resseq": "239",
+    "resname": "GLU",
+    "catalytic": false,
+    "distance": {
+     "value": 8.108659630296481,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated",
+    "state": "settled, deprotonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 4.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of GLU"
+    },
+    "pka_sd": {
+     "value": 0.9,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.0006305594883398933,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of GLU",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 7.942651440013084e-05,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.004986878736687972,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": false
+   },
+   {
+    "residue": "Cys184",
+    "chain": "A",
+    "resseq": "184",
+    "resname": "CYS",
+    "catalytic": false,
+    "distance": {
+     "value": 8.747788863478606,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 6.8 +/- 2.7: 20% protonated at pH 7.4 (0%-99% across one SD); uncertain; pdb2gmx would make it protonated without checking",
+    "state": "uncertain",
+    "emphasised": true,
+    "contradicted": false,
+    "uncertain": true,
+    "pka": {
+     "value": 6.8,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 25 measured CYS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of CYS"
+    },
+    "pka_sd": {
+     "value": 2.7,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 25 measured CYS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.20076000891310153,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of CYS",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 0.0005009361708135975,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of CYS",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.9921193161496697,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of CYS",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": true
+   },
+   {
+    "residue": "Lys231",
+    "chain": "A",
+    "resseq": "231",
+    "resname": "LYS",
+    "catalytic": false,
+    "distance": {
+     "value": 8.86861691584432,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 10.5 +/- 1.1: 100% protonated at pH 7.4 (99%-100% across one SD); protonated",
+    "state": "settled, protonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 10.5,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 35 measured LYS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of LYS"
+    },
+    "pka_sd": {
+     "value": 1.1,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 35 measured LYS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.9992063022218308,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of LYS",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 0.9900990099009901,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of LYS",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.9999369082463725,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of LYS",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": true
+   },
+   {
+    "residue": "Arg176",
+    "chain": "A",
+    "resseq": "176",
+    "resname": "ARG",
+    "catalytic": false,
+    "distance": {
+     "value": 9.146864271432046,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "not assessed",
+    "state": "Arg is not in the survey; taken as charged below pH 12",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": null,
+    "pka_sd": null,
+    "protonated": null,
+    "band": null,
+    "default_protonated": null
+   },
+   {
+    "residue": "Lys244",
+    "chain": "A",
+    "resseq": "244",
+    "resname": "LYS",
+    "catalytic": false,
+    "distance": {
+     "value": 9.15281399352134,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 10.5 +/- 1.1: 100% protonated at pH 7.4 (99%-100% across one SD); protonated",
+    "state": "settled, protonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 10.5,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 35 measured LYS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of LYS"
+    },
+    "pka_sd": {
+     "value": 1.1,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 35 measured LYS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.9992063022218308,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of LYS",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 0.9900990099009901,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of LYS",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.9999369082463725,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of LYS",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": true
+   },
+   {
+    "residue": "Glu101",
+    "chain": "A",
+    "resseq": "101",
+    "resname": "GLU",
+    "catalytic": false,
+    "distance": {
+     "value": 9.350826113237268,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated",
+    "state": "settled, deprotonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 4.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of GLU"
+    },
+    "pka_sd": {
+     "value": 0.9,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.0006305594883398933,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of GLU",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 7.942651440013084e-05,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.004986878736687972,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": false
+   },
+   {
+    "residue": "Glu228",
+    "chain": "A",
+    "resseq": "228",
+    "resname": "GLU",
+    "catalytic": false,
+    "distance": {
+     "value": 9.363105788145296,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated",
+    "state": "settled, deprotonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 4.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of GLU"
+    },
+    "pka_sd": {
+     "value": 0.9,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 153 measured GLU pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.0006305594883398933,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of GLU",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 7.942651440013084e-05,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.004986878736687972,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of GLU",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": false
+   },
+   {
+    "residue": "His185",
+    "chain": "A",
+    "resseq": "185",
+    "resname": "HIS",
+    "catalytic": false,
+    "distance": {
+     "value": 9.949939547555056,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 6.6 +/- 1.0: 14% protonated at pH 7.4 (2%-61% across one SD); uncertain; pdb2gmx sets it from the hydrogen-bond network, not the pH",
+    "state": "uncertain",
+    "emphasised": true,
+    "contradicted": false,
+    "uncertain": true,
+    "pka": {
+     "value": 6.6,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 131 measured HIS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of HIS"
+    },
+    "pka_sd": {
+     "value": 1.0,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 131 measured HIS pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.1368068886032098,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of HIS",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 0.015601662241829576,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of HIS",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.6131368201531427,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of HIS",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": null
+   },
+   {
+    "residue": "Asp257",
+    "chain": "A",
+    "resseq": "257",
+    "resname": "ASP",
+    "catalytic": false,
+    "distance": {
+     "value": 9.999156164397082,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "at_ph": "typical pKa 3.5 +/- 1.2: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated",
+    "state": "settled, deprotonated",
+    "emphasised": false,
+    "contradicted": false,
+    "uncertain": false,
+    "pka": {
+     "value": 3.5,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 139 measured ASP pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "typical pKa of ASP"
+    },
+    "pka_sd": {
+     "value": 1.2,
+     "unit": "",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19",
+       "registry": null,
+       "doi": "10.1002/pro.19",
+       "url": "https://doi.org/10.1002/pro.19"
+      },
+      "organism": null,
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "mean of 139 measured ASP pKa values in folded proteins",
+      "scope": [
+       "a survey average for the residue type, not this residue's pKa in this structure"
+      ]
+     },
+     "label": "standard deviation across the survey"
+    },
+    "protonated": {
+     "value": 0.00012587669424250317,
+     "unit": "",
+     "provenance": {
+      "kind": "computed",
+      "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+      "inputs": [
+       "typical pKa of ASP",
+       "pH"
+      ]
+     },
+     "label": "fraction protonated"
+    },
+    "band": [
+     {
+      "value": 7.94321925200954e-06,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of ASP",
+        "pH"
+       ]
+      },
+      "label": "at pKa - SD"
+     },
+     {
+      "value": 0.001991289170728319,
+      "unit": "",
+      "provenance": {
+       "kind": "computed",
+       "method": "Henderson-Hasselbalch at the assay pH: 1 / (1 + 10^(pH - pKa))",
+       "inputs": [
+        "typical pKa of ASP",
+        "pH"
+       ]
+      },
+      "label": "at pKa + SD"
+     }
+    ],
+    "default_protonated": false
+   }
+  ],
+  "not_checked": [
+   "structure-based pKa values: PROPKA is not run, so the protonation section judges each active-site residue only by how far folded proteins typically move its group's pKa",
+   "ligand and cofactor parameters (caterva md strips ligands; see MD_ROADMAP M4)"
+  ],
+  "report_markdown": "# Preparation audit: 1I10\n\n*HUMAN MUSCLE L-LACTATE DEHYDROGENASE M CHAIN, TERNARY COMPLEX WITH NADH AND OXAMATE*\n\nx-ray diffraction, 2.3 Å, R-free 0.257. Chains of the enzyme: A, B, C, D, E, F, G, H.\n\n## Catalytic residues\n\nFrom M-CSA entry 584 (L-lactate dehydrogenase, reference P00341), chosen by best of 1 for EC 1.1.1.27 by alignment; 80% identical to chain A. Positions are carried onto each chain by global alignment.\n\n| residue | reference | role | conserved |\n|---|---|---|---|\n| His192 | His194 of P00341 | proton acceptor, proton donor | yes |\n| Arg105 | Arg107 of P00341 | electrostatic stabiliser | yes |\n| Arg168 | Arg170 of P00341 | electrostatic stabiliser | yes |\n| Asp165 | Asp167 of P00341 | enhance reactivity | yes |\n\n## Which chain to start from\n\n| chain | blocking defects | findings within 10 Å of the active site | catalytic residues intact |\n|---|---|---|---|\n| A | 0 | 0 | yes |\n| B | 5 | 4 | **no** |\n| C | 4 | 4 | **no** |\n| D | 2 | 3 | **no** |\n| E | 6 | 4 | **no** |\n| F | 5 | 4 | **no** |\n| G | 2 | 2 | **no** |\n| H | 5 | 4 | **no** |\n\nChains with no blocking defect: A.\n\n## Blocks a faithful setup (29)\n\n| chain | where | Å to active site | finding | from |\n|---|---|---|---|---|\n| B | 192 | 0.0 | His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain B | `M-CSA + pdbx_poly_seq_scheme` |\n| B | 105 | 0.0 | Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain B | `M-CSA + pdbx_poly_seq_scheme` |\n| B | 168 | 0.0 | Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain B | `M-CSA + pdbx_poly_seq_scheme` |\n| B | 165 | 0.0 | Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain B | `M-CSA + pdbx_poly_seq_scheme` |\n| C | 192 | 0.0 | His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain C | `M-CSA + pdbx_poly_seq_scheme` |\n| C | 105 | 0.0 | Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain C | `M-CSA + pdbx_poly_seq_scheme` |\n| C | 168 | 0.0 | Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain C | `M-CSA + pdbx_poly_seq_scheme` |\n| C | 165 | 0.0 | Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain C | `M-CSA + pdbx_poly_seq_scheme` |\n| D | 100-104 | 0.0 | 5 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record | `pdbx_unobs_or_zero_occ_residues` |\n| D | 105 | 0.0 | CATALYTIC RESIDUE Arg105 (Arg107 of P00341; electrostatic stabiliser). Arg105 lacks CG, CD, NE, CZ, NH1, NH2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| E | 192 | 0.0 | His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain E | `M-CSA + pdbx_poly_seq_scheme` |\n| E | 105 | 0.0 | Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain E | `M-CSA + pdbx_poly_seq_scheme` |\n| E | 168 | 0.0 | Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain E | `M-CSA + pdbx_poly_seq_scheme` |\n| E | 165 | 0.0 | Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain E | `M-CSA + pdbx_poly_seq_scheme` |\n| F | 192 | 0.0 | His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain F | `M-CSA + pdbx_poly_seq_scheme` |\n| F | 105 | 0.0 | Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain F | `M-CSA + pdbx_poly_seq_scheme` |\n| F | 168 | 0.0 | Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain F | `M-CSA + pdbx_poly_seq_scheme` |\n| F | 165 | 0.0 | Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain F | `M-CSA + pdbx_poly_seq_scheme` |\n| G | 101-106 | 0.0 | CATALYTIC RESIDUE Arg105 (Arg107 of P00341; electrostatic stabiliser). 6 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record | `pdbx_unobs_or_zero_occ_residues` |\n| G | 105 | 0.0 | Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain G | `M-CSA + pdbx_poly_seq_scheme` |\n| H | 192 | 0.0 | His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain H | `M-CSA + pdbx_poly_seq_scheme` |\n| H | 105 | 0.0 | Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain H | `M-CSA + pdbx_poly_seq_scheme` |\n| H | 168 | 0.0 | Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain H | `M-CSA + pdbx_poly_seq_scheme` |\n| H | 165 | 0.0 | Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain H | `M-CSA + pdbx_poly_seq_scheme` |\n| B | 15 | ? | 1 residue missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record | `pdbx_unobs_or_zero_occ_residues` |\n| E | 97-101 | ? | 5 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record | `pdbx_unobs_or_zero_occ_residues` |\n| E | 107-108 | ? | 2 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record | `pdbx_unobs_or_zero_occ_residues` |\n| F | 13-16 | ? | 4 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record | `pdbx_unobs_or_zero_occ_residues` |\n| H | 13-16 | ? | 4 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record | `pdbx_unobs_or_zero_occ_residues` |\n\n## Choices to make and record (28)\n\n| chain | where | Å to active site | finding | from |\n|---|---|---|---|---|\n| D | 231 | 8.7 | Lys231 lacks C, CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| G | 226 | 10.0 | Trp226 lacks CG, CD1, CD2, NE1, CE2, CE3, CZ2, CZ3, CH2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| G | 99 | 14.2 | Gln99 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| G | 100 | 14.5 | Gln100 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| G | 217 | 15.1 | Leu217 lacks CG, CD1, CD2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| G | 98 | 15.5 | Arg98 lacks CG, CD, NE, CZ, NH1, NH2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| A | 16 | 34.0 | Gln16 lacks CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| G | 16 | 36.3 | Gln16 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| D | 16 | 36.6 | Gln16 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| D | 15 | 38.8 | Glu15 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| G | 15 | 40.0 | Glu15 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| A | 14 | 40.7 | Glu14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| G | 14 | 42.5 | Glu14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| A | 13 | 43.0 | Lys13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| D | 13 | 45.1 | Lys13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| G | 12 | 45.2 | Leu12 lacks CG, CD1, CD2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| G | 13 | 45.6 | Lys13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| - | - | ? | the deposited coordinates hold 8 copies of the enzyme; assembly 1 is tetrameric (4 chains). Simulating one chain, or the asymmetric unit, is a choice about the protein's state, and should be recorded as one | `pdbx_struct_assembly` |\n| B | 13 | ? | 13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| B | 14 | ? | 14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| B | 16 | ? | 16 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| C | 14 | ? | 14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| C | 15 | ? | 15 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| C | 16 | ? | 16 lacks CG; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| E | 13 | ? | 13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| E | 14 | ? | 14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| E | 15 | ? | 15 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n| E | 16 | ? | 16 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup | `pdbx_unobs_or_zero_occ_atoms` |\n\n## Protonation at the active site\n\nEach titratable residue within 10 Å of a catalytic atom in chain A, judged at pH 7.4 from how far folded proteins move that group's pKa (Grimsley, Scholtz & Pace (2009) Protein Sci. 18:247, doi:10.1002/pro.19). This is not a pKa prediction: it says where typical behaviour does not settle the charge, so a structure-based estimate (PROPKA) or constant-pH simulation is needed before trusting the state GROMACS assigns.\n\n| residue | Å to active site | at pH | state |\n|---|---|---|---|\n| Arg105 (catalytic) | 0.0 | not assessed | Arg is not in the survey; taken as charged below pH 12 |\n| Asp165 (catalytic) | 0.0 | typical pKa 3.5 +/- 1.2: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated | settled, deprotonated |\n| Arg168 (catalytic) | 0.0 | not assessed | Arg is not in the survey; taken as charged below pH 12 |\n| His192 (catalytic) | 0.0 | typical pKa 6.6 +/- 1.0: 14% protonated at pH 7.4 (2%-61% across one SD); uncertain; pdb2gmx sets it from the hydrogen-bond network, not the pH | **uncertain** |\n| Glu191 | 1.3 | typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated | settled, deprotonated |\n| Asp140 | 2.9 | typical pKa 3.5 +/- 1.2: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated | settled, deprotonated |\n| Tyr171 | 3.3 | typical pKa 10.3 +/- 1.2: 100% protonated at pH 7.4 (98%-100% across one SD); protonated | settled, protonated |\n| Arg170 | 3.3 | not assessed | Arg is not in the survey; taken as charged below pH 12 |\n| Cys162 | 3.5 | typical pKa 6.8 +/- 2.7: 20% protonated at pH 7.4 (0%-99% across one SD); uncertain; pdb2gmx would make it protonated without checking | **uncertain** |\n| Glu103 | 3.6 | typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated | settled, deprotonated |\n| Tyr238 | 4.1 | typical pKa 10.3 +/- 1.2: 100% protonated at pH 7.4 (98%-100% across one SD); protonated | settled, protonated |\n| Asp194 | 4.5 | typical pKa 3.5 +/- 1.2: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated | settled, deprotonated |\n| Glu235 | 6.6 | typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated | settled, deprotonated |\n| Arg111 | 6.8 | not assessed | Arg is not in the survey; taken as charged below pH 12 |\n| His230 | 6.9 | typical pKa 6.6 +/- 1.0: 14% protonated at pH 7.4 (2%-61% across one SD); uncertain; pdb2gmx sets it from the hydrogen-bond network, not the pH | **uncertain** |\n| Arg98 | 7.1 | not assessed | Arg is not in the survey; taken as charged below pH 12 |\n| Tyr246 | 7.6 | typical pKa 10.3 +/- 1.2: 100% protonated at pH 7.4 (98%-100% across one SD); protonated | settled, protonated |\n| Glu175 | 7.8 | typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated | settled, deprotonated |\n| Glu239 | 8.1 | typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated | settled, deprotonated |\n| Cys184 | 8.7 | typical pKa 6.8 +/- 2.7: 20% protonated at pH 7.4 (0%-99% across one SD); uncertain; pdb2gmx would make it protonated without checking | **uncertain** |\n| Lys231 | 8.9 | typical pKa 10.5 +/- 1.1: 100% protonated at pH 7.4 (99%-100% across one SD); protonated | settled, protonated |\n| Arg176 | 9.1 | not assessed | Arg is not in the survey; taken as charged below pH 12 |\n| Lys244 | 9.2 | typical pKa 10.5 +/- 1.1: 100% protonated at pH 7.4 (99%-100% across one SD); protonated | settled, protonated |\n| Glu101 | 9.4 | typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated | settled, deprotonated |\n| Glu228 | 9.4 | typical pKa 4.2 +/- 0.9: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated | settled, deprotonated |\n| His185 | 9.9 | typical pKa 6.6 +/- 1.0: 14% protonated at pH 7.4 (2%-61% across one SD); uncertain; pdb2gmx sets it from the hydrogen-bond network, not the pH | **uncertain** |\n| Asp257 | 10.0 | typical pKa 3.5 +/- 1.2: 0% protonated at pH 7.4 (0%-0% across one SD); deprotonated | settled, deprotonated |\n\n- Charge state not settled by typical behaviour at pH 7.4: His192 (catalytic), Cys162, His230, Cys184, His185. Start with any catalytic one: its pKa is the one the mechanism may depend on.\n- Settled means the protonated fraction is below 10% or above 90% for any pKa within one standard deviation of the survey mean (Henderson-Hasselbalch); a chosen rule.\n\n## Not checked\n\n- structure-based pKa values: PROPKA is not run, so the protonation section judges each active-site residue only by how far folded proteins typically move its group's pKa\n- ligand and cofactor parameters (caterva md strips ligands; see MD_ROADMAP M4)\n\n## Sources\n\n- Protein Data Bank: Berman et al. (2000) Nucleic Acids Res. 28:235, doi:10.1093/nar/28.1.235\n- Mechanism and Catalytic Site Atlas (M-CSA): Ribeiro et al. (2018) Nucleic Acids Res. 46:D618, doi:10.1093/nar/gkx1012\n- global sequence alignment: Needleman & Wunsch (1970) J. Mol. Biol. 48:443, doi:10.1016/0022-2836(70)90057-4\n- BLOSUM62 substitution matrix: Henikoff & Henikoff (1992) Proc. Natl. Acad. Sci. USA 89:10915, doi:10.1073/pnas.89.22.10915\n\nDistances are to the nearest atom of a catalytic residue in the same chain; 10 Å is a chosen cutoff, not a physical boundary. Unmodelled stretches are placed by their observed flanking residues.\n",
+  "audit": {
+   "pdb_id": "1I10",
+   "title": "HUMAN MUSCLE L-LACTATE DEHYDROGENASE M CHAIN, TERNARY COMPLEX WITH NADH AND OXAMATE",
+   "method": "X-RAY DIFFRACTION",
+   "resolution": 2.3,
+   "r_free": 0.25713,
+   "chains": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H"
+   ],
+   "findings": [
+    {
+     "check": "biological assembly",
+     "severity": "decide",
+     "what": "the deposited coordinates hold 8 copies of the enzyme; assembly 1 is tetrameric (4 chains). Simulating one chain, or the asymmetric unit, is a choice about the protein's state, and should be recorded as one",
+     "source": "pdbx_struct_assembly",
+     "chain": null,
+     "residues": [],
+     "distance": null,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "unmodelled residues",
+     "severity": "blocks",
+     "what": "1 residue missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+     "source": "pdbx_unobs_or_zero_occ_residues",
+     "chain": "B",
+     "residues": [
+      "15"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": [
+      15,
+      15
+     ]
+    },
+    {
+     "check": "unmodelled residues",
+     "severity": "blocks",
+     "what": "5 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+     "source": "pdbx_unobs_or_zero_occ_residues",
+     "chain": "D",
+     "residues": [
+      "100-104"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": [
+      100,
+      104
+     ]
+    },
+    {
+     "check": "unmodelled residues",
+     "severity": "blocks",
+     "what": "5 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+     "source": "pdbx_unobs_or_zero_occ_residues",
+     "chain": "E",
+     "residues": [
+      "97-101"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": [
+      97,
+      101
+     ]
+    },
+    {
+     "check": "unmodelled residues",
+     "severity": "blocks",
+     "what": "2 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+     "source": "pdbx_unobs_or_zero_occ_residues",
+     "chain": "E",
+     "residues": [
+      "107-108"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": [
+      107,
+      108
+     ]
+    },
+    {
+     "check": "unmodelled residues",
+     "severity": "blocks",
+     "what": "4 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+     "source": "pdbx_unobs_or_zero_occ_residues",
+     "chain": "F",
+     "residues": [
+      "13-16"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": [
+      13,
+      16
+     ]
+    },
+    {
+     "check": "unmodelled residues",
+     "severity": "blocks",
+     "what": "CATALYTIC RESIDUE Arg105 (Arg107 of P00341; electrostatic stabiliser). 6 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+     "source": "pdbx_unobs_or_zero_occ_residues",
+     "chain": "G",
+     "residues": [
+      "101-106"
+     ],
+     "distance": 0.0,
+     "catalytic": true,
+     "span": [
+      101,
+      106
+     ]
+    },
+    {
+     "check": "unmodelled residues",
+     "severity": "blocks",
+     "what": "4 residues missing inside the chain: a chain break. pdb2gmx will either refuse or join the ends across the gap; the loop must be modelled or the break capped, and either is a choice to record",
+     "source": "pdbx_unobs_or_zero_occ_residues",
+     "chain": "H",
+     "residues": [
+      "13-16"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": [
+      13,
+      16
+     ]
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Lys13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "A",
+     "residues": [
+      "13"
+     ],
+     "distance": 42.98446011060276,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Glu14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "A",
+     "residues": [
+      "14"
+     ],
+     "distance": 40.67925221780754,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Gln16 lacks CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "A",
+     "residues": [
+      "16"
+     ],
+     "distance": 33.956803471469456,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "B",
+     "residues": [
+      "13"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "B",
+     "residues": [
+      "14"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "16 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "B",
+     "residues": [
+      "16"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "C",
+     "residues": [
+      "14"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "15 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "C",
+     "residues": [
+      "15"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "16 lacks CG; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "C",
+     "residues": [
+      "16"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Lys13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "D",
+     "residues": [
+      "13"
+     ],
+     "distance": 45.07969123674208,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Glu15 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "D",
+     "residues": [
+      "15"
+     ],
+     "distance": 38.84545915547917,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Gln16 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "D",
+     "residues": [
+      "16"
+     ],
+     "distance": 36.61000422015818,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "blocks",
+     "what": "CATALYTIC RESIDUE Arg105 (Arg107 of P00341; electrostatic stabiliser). Arg105 lacks CG, CD, NE, CZ, NH1, NH2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "D",
+     "residues": [
+      "105"
+     ],
+     "distance": 0.0,
+     "catalytic": true,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Lys231 lacks C, CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "D",
+     "residues": [
+      "231"
+     ],
+     "distance": 8.689565063914307,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "E",
+     "residues": [
+      "13"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "E",
+     "residues": [
+      "14"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "15 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "E",
+     "residues": [
+      "15"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "16 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "E",
+     "residues": [
+      "16"
+     ],
+     "distance": null,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Leu12 lacks CG, CD1, CD2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "G",
+     "residues": [
+      "12"
+     ],
+     "distance": 45.179170532447806,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Lys13 lacks CG, CD, CE, NZ; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "G",
+     "residues": [
+      "13"
+     ],
+     "distance": 45.56059825112045,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Glu14 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "G",
+     "residues": [
+      "14"
+     ],
+     "distance": 42.500794651394465,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Glu15 lacks CG, CD, OE1, OE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "G",
+     "residues": [
+      "15"
+     ],
+     "distance": 40.012220558224456,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Gln16 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "G",
+     "residues": [
+      "16"
+     ],
+     "distance": 36.301228891044445,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Arg98 lacks CG, CD, NE, CZ, NH1, NH2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "G",
+     "residues": [
+      "98"
+     ],
+     "distance": 15.48554044907701,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Gln99 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "G",
+     "residues": [
+      "99"
+     ],
+     "distance": 14.171842117381916,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Gln100 lacks CG, CD, OE1, NE2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "G",
+     "residues": [
+      "100"
+     ],
+     "distance": 14.54731549118256,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Leu217 lacks CG, CD1, CD2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "G",
+     "residues": [
+      "217"
+     ],
+     "distance": 15.149490882534632,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "incomplete side chain",
+     "severity": "decide",
+     "what": "Trp226 lacks CG, CD1, CD2, NE1, CE2, CE3, CZ2, CZ3, CH2; pdb2gmx rebuilds nothing, so the side chain must be completed (and how, recorded) before setup",
+     "source": "pdbx_unobs_or_zero_occ_atoms",
+     "chain": "G",
+     "residues": [
+      "226"
+     ],
+     "distance": 10.015519806779864,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain B",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "B",
+     "residues": [
+      "192"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain B",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "B",
+     "residues": [
+      "105"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain B",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "B",
+     "residues": [
+      "168"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain B",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "B",
+     "residues": [
+      "165"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain C",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "C",
+     "residues": [
+      "192"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain C",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "C",
+     "residues": [
+      "105"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain C",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "C",
+     "residues": [
+      "168"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain C",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "C",
+     "residues": [
+      "165"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain E",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "E",
+     "residues": [
+      "192"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain E",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "E",
+     "residues": [
+      "105"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain E",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "E",
+     "residues": [
+      "168"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain E",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "E",
+     "residues": [
+      "165"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain F",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "F",
+     "residues": [
+      "192"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain F",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "F",
+     "residues": [
+      "105"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain F",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "F",
+     "residues": [
+      "168"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain F",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "F",
+     "residues": [
+      "165"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain G",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "G",
+     "residues": [
+      "105"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "His192 (His194 of P00341; proton acceptor, proton donor) is not modelled at all in chain H",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "H",
+     "residues": [
+      "192"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Arg105 (Arg107 of P00341; electrostatic stabiliser) is not modelled at all in chain H",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "H",
+     "residues": [
+      "105"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Arg168 (Arg170 of P00341; electrostatic stabiliser) is not modelled at all in chain H",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "H",
+     "residues": [
+      "168"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "catalytic residue",
+     "severity": "blocks",
+     "what": "Asp165 (Asp167 of P00341; enhance reactivity) is not modelled at all in chain H",
+     "source": "M-CSA + pdbx_poly_seq_scheme",
+     "chain": "H",
+     "residues": [
+      "165"
+     ],
+     "distance": 0.0,
+     "catalytic": false,
+     "span": null
+    }
+   ],
+   "catalytic": [
+    {
+     "chain": "A",
+     "auth_seq_id": "192",
+     "expected": "HIS",
+     "found": "HIS",
+     "roles": "proton acceptor, proton donor",
+     "reference": "His194 of P00341",
+     "seq_id": 192
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "105",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg107 of P00341",
+     "seq_id": 105
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "168",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg170 of P00341",
+     "seq_id": 168
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "165",
+     "expected": "ASP",
+     "found": "ASP",
+     "roles": "enhance reactivity",
+     "reference": "Asp167 of P00341",
+     "seq_id": 165
+    },
+    {
+     "chain": "B",
+     "auth_seq_id": "192",
+     "expected": "HIS",
+     "found": "HIS",
+     "roles": "proton acceptor, proton donor",
+     "reference": "His194 of P00341",
+     "seq_id": 192
+    },
+    {
+     "chain": "B",
+     "auth_seq_id": "105",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg107 of P00341",
+     "seq_id": 105
+    },
+    {
+     "chain": "B",
+     "auth_seq_id": "168",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg170 of P00341",
+     "seq_id": 168
+    },
+    {
+     "chain": "B",
+     "auth_seq_id": "165",
+     "expected": "ASP",
+     "found": "ASP",
+     "roles": "enhance reactivity",
+     "reference": "Asp167 of P00341",
+     "seq_id": 165
+    },
+    {
+     "chain": "C",
+     "auth_seq_id": "192",
+     "expected": "HIS",
+     "found": "HIS",
+     "roles": "proton acceptor, proton donor",
+     "reference": "His194 of P00341",
+     "seq_id": 192
+    },
+    {
+     "chain": "C",
+     "auth_seq_id": "105",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg107 of P00341",
+     "seq_id": 105
+    },
+    {
+     "chain": "C",
+     "auth_seq_id": "168",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg170 of P00341",
+     "seq_id": 168
+    },
+    {
+     "chain": "C",
+     "auth_seq_id": "165",
+     "expected": "ASP",
+     "found": "ASP",
+     "roles": "enhance reactivity",
+     "reference": "Asp167 of P00341",
+     "seq_id": 165
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "192",
+     "expected": "HIS",
+     "found": "HIS",
+     "roles": "proton acceptor, proton donor",
+     "reference": "His194 of P00341",
+     "seq_id": 192
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "105",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg107 of P00341",
+     "seq_id": 105
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "168",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg170 of P00341",
+     "seq_id": 168
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "165",
+     "expected": "ASP",
+     "found": "ASP",
+     "roles": "enhance reactivity",
+     "reference": "Asp167 of P00341",
+     "seq_id": 165
+    },
+    {
+     "chain": "E",
+     "auth_seq_id": "192",
+     "expected": "HIS",
+     "found": "HIS",
+     "roles": "proton acceptor, proton donor",
+     "reference": "His194 of P00341",
+     "seq_id": 192
+    },
+    {
+     "chain": "E",
+     "auth_seq_id": "105",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg107 of P00341",
+     "seq_id": 105
+    },
+    {
+     "chain": "E",
+     "auth_seq_id": "168",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg170 of P00341",
+     "seq_id": 168
+    },
+    {
+     "chain": "E",
+     "auth_seq_id": "165",
+     "expected": "ASP",
+     "found": "ASP",
+     "roles": "enhance reactivity",
+     "reference": "Asp167 of P00341",
+     "seq_id": 165
+    },
+    {
+     "chain": "F",
+     "auth_seq_id": "192",
+     "expected": "HIS",
+     "found": "HIS",
+     "roles": "proton acceptor, proton donor",
+     "reference": "His194 of P00341",
+     "seq_id": 192
+    },
+    {
+     "chain": "F",
+     "auth_seq_id": "105",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg107 of P00341",
+     "seq_id": 105
+    },
+    {
+     "chain": "F",
+     "auth_seq_id": "168",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg170 of P00341",
+     "seq_id": 168
+    },
+    {
+     "chain": "F",
+     "auth_seq_id": "165",
+     "expected": "ASP",
+     "found": "ASP",
+     "roles": "enhance reactivity",
+     "reference": "Asp167 of P00341",
+     "seq_id": 165
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "192",
+     "expected": "HIS",
+     "found": "HIS",
+     "roles": "proton acceptor, proton donor",
+     "reference": "His194 of P00341",
+     "seq_id": 192
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "105",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg107 of P00341",
+     "seq_id": 105
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "168",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg170 of P00341",
+     "seq_id": 168
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "165",
+     "expected": "ASP",
+     "found": "ASP",
+     "roles": "enhance reactivity",
+     "reference": "Asp167 of P00341",
+     "seq_id": 165
+    },
+    {
+     "chain": "H",
+     "auth_seq_id": "192",
+     "expected": "HIS",
+     "found": "HIS",
+     "roles": "proton acceptor, proton donor",
+     "reference": "His194 of P00341",
+     "seq_id": 192
+    },
+    {
+     "chain": "H",
+     "auth_seq_id": "105",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg107 of P00341",
+     "seq_id": 105
+    },
+    {
+     "chain": "H",
+     "auth_seq_id": "168",
+     "expected": "ARG",
+     "found": "ARG",
+     "roles": "electrostatic stabiliser",
+     "reference": "Arg170 of P00341",
+     "seq_id": 168
+    },
+    {
+     "chain": "H",
+     "auth_seq_id": "165",
+     "expected": "ASP",
+     "found": "ASP",
+     "roles": "enhance reactivity",
+     "reference": "Asp167 of P00341",
+     "seq_id": 165
+    }
+   ],
+   "reference": {
+    "mcsa_id": 584,
+    "enzyme": "L-lactate dehydrogenase",
+    "uniprot": "P00341",
+    "identity": 0.8006042296072508,
+    "how": "best of 1 for EC 1.1.1.27 by alignment",
+    "rejected": []
+   },
+   "not_checked": [
+    "structure-based pKa values: PROPKA is not run, so the protonation section judges each active-site residue only by how far folded proteins typically move its group's pKa",
+    "ligand and cofactor parameters (caterva md strips ligands; see MD_ROADMAP M4)"
+   ],
+   "chain_summary": [
+    {
+     "chain": "A",
+     "blocks": 0,
+     "near_site": 0,
+     "catalytic_intact": true
+    },
+    {
+     "chain": "B",
+     "blocks": 5,
+     "near_site": 4,
+     "catalytic_intact": false
+    },
+    {
+     "chain": "C",
+     "blocks": 4,
+     "near_site": 4,
+     "catalytic_intact": false
+    },
+    {
+     "chain": "D",
+     "blocks": 2,
+     "near_site": 3,
+     "catalytic_intact": false
+    },
+    {
+     "chain": "E",
+     "blocks": 6,
+     "near_site": 4,
+     "catalytic_intact": false
+    },
+    {
+     "chain": "F",
+     "blocks": 5,
+     "near_site": 4,
+     "catalytic_intact": false
+    },
+    {
+     "chain": "G",
+     "blocks": 2,
+     "near_site": 2,
+     "catalytic_intact": false
+    },
+    {
+     "chain": "H",
+     "blocks": 5,
+     "near_site": 4,
+     "catalytic_intact": false
+    }
+   ],
+   "titratable": [
+    {
+     "chain": "A",
+     "auth_seq_id": "105",
+     "resname": "ARG",
+     "distance": 0.0,
+     "catalytic": true
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "165",
+     "resname": "ASP",
+     "distance": 0.0,
+     "catalytic": true
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "168",
+     "resname": "ARG",
+     "distance": 0.0,
+     "catalytic": true
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "192",
+     "resname": "HIS",
+     "distance": 0.0,
+     "catalytic": true
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "191",
+     "resname": "GLU",
+     "distance": 1.327377489638873,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "140",
+     "resname": "ASP",
+     "distance": 2.9018466534260576,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "171",
+     "resname": "TYR",
+     "distance": 3.28293984105712,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "170",
+     "resname": "ARG",
+     "distance": 3.2915253302990117,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "162",
+     "resname": "CYS",
+     "distance": 3.460297964048767,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "103",
+     "resname": "GLU",
+     "distance": 3.632448898470564,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "238",
+     "resname": "TYR",
+     "distance": 4.081638029027065,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "194",
+     "resname": "ASP",
+     "distance": 4.524103447093133,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "235",
+     "resname": "GLU",
+     "distance": 6.6422425429970575,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "111",
+     "resname": "ARG",
+     "distance": 6.815417962238255,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "230",
+     "resname": "HIS",
+     "distance": 6.859157674233767,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "98",
+     "resname": "ARG",
+     "distance": 7.145701225212261,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "246",
+     "resname": "TYR",
+     "distance": 7.634132301709205,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "175",
+     "resname": "GLU",
+     "distance": 7.757827079794966,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "239",
+     "resname": "GLU",
+     "distance": 8.108659630296481,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "184",
+     "resname": "CYS",
+     "distance": 8.747788863478606,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "231",
+     "resname": "LYS",
+     "distance": 8.86861691584432,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "176",
+     "resname": "ARG",
+     "distance": 9.146864271432046,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "244",
+     "resname": "LYS",
+     "distance": 9.15281399352134,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "101",
+     "resname": "GLU",
+     "distance": 9.350826113237268,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "228",
+     "resname": "GLU",
+     "distance": 9.363105788145296,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "185",
+     "resname": "HIS",
+     "distance": 9.949939547555056,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "257",
+     "resname": "ASP",
+     "distance": 9.999156164397082,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "105",
+     "resname": "ARG",
+     "distance": 0.0,
+     "catalytic": true
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "165",
+     "resname": "ASP",
+     "distance": 0.0,
+     "catalytic": true
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "168",
+     "resname": "ARG",
+     "distance": 0.0,
+     "catalytic": true
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "192",
+     "resname": "HIS",
+     "distance": 0.0,
+     "catalytic": true
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "191",
+     "resname": "GLU",
+     "distance": 1.3295416503442063,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "140",
+     "resname": "ASP",
+     "distance": 2.799762311340019,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "171",
+     "resname": "TYR",
+     "distance": 3.084589762026709,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "162",
+     "resname": "CYS",
+     "distance": 3.120065704436364,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "170",
+     "resname": "ARG",
+     "distance": 3.1768086187241478,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "103",
+     "resname": "GLU",
+     "distance": 3.9612776979151496,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "194",
+     "resname": "ASP",
+     "distance": 4.153220437202916,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "230",
+     "resname": "HIS",
+     "distance": 6.555977577752994,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "238",
+     "resname": "TYR",
+     "distance": 6.761083123287274,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "111",
+     "resname": "ARG",
+     "distance": 6.824850108244136,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "235",
+     "resname": "GLU",
+     "distance": 7.138969183292505,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "246",
+     "resname": "TYR",
+     "distance": 7.5551089998755065,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "175",
+     "resname": "GLU",
+     "distance": 7.588912438551388,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "328",
+     "resname": "GLU",
+     "distance": 7.591723190422579,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "239",
+     "resname": "GLU",
+     "distance": 8.018621390239087,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "101",
+     "resname": "GLU",
+     "distance": 8.510736572118768,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "184",
+     "resname": "CYS",
+     "distance": 8.647932990027156,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "231",
+     "resname": "LYS",
+     "distance": 8.689565063914307,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "244",
+     "resname": "LYS",
+     "distance": 8.909377250964283,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "176",
+     "resname": "ARG",
+     "distance": 9.009291093088287,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "228",
+     "resname": "GLU",
+     "distance": 9.260515374427062,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "314",
+     "resname": "ARG",
+     "distance": 9.810021661545907,
+     "catalytic": false
+    },
+    {
+     "chain": "D",
+     "auth_seq_id": "185",
+     "resname": "HIS",
+     "distance": 9.902268628955694,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "165",
+     "resname": "ASP",
+     "distance": 0.0,
+     "catalytic": true
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "168",
+     "resname": "ARG",
+     "distance": 0.0,
+     "catalytic": true
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "192",
+     "resname": "HIS",
+     "distance": 0.0,
+     "catalytic": true
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "191",
+     "resname": "GLU",
+     "distance": 1.3307851066193934,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "140",
+     "resname": "ASP",
+     "distance": 3.0041180070030573,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "171",
+     "resname": "TYR",
+     "distance": 3.055543159570792,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "170",
+     "resname": "ARG",
+     "distance": 3.076146452950505,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "162",
+     "resname": "CYS",
+     "distance": 3.2881455259766046,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "194",
+     "resname": "ASP",
+     "distance": 4.160148434851816,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "238",
+     "resname": "TYR",
+     "distance": 6.354549000519246,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "230",
+     "resname": "HIS",
+     "distance": 6.69549370845795,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "235",
+     "resname": "GLU",
+     "distance": 7.022131086785551,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "175",
+     "resname": "GLU",
+     "distance": 7.397957353215805,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "246",
+     "resname": "TYR",
+     "distance": 7.420893275071418,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "239",
+     "resname": "GLU",
+     "distance": 7.560248739294233,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "184",
+     "resname": "CYS",
+     "distance": 8.60248278115101,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "244",
+     "resname": "LYS",
+     "distance": 8.670803192323072,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "176",
+     "resname": "ARG",
+     "distance": 8.81798968019355,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "231",
+     "resname": "LYS",
+     "distance": 8.97676812667009,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "228",
+     "resname": "GLU",
+     "distance": 9.186660601110738,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "242",
+     "resname": "LYS",
+     "distance": 9.71330844769175,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "270",
+     "resname": "HIS",
+     "distance": 9.799956632557096,
+     "catalytic": false
+    },
+    {
+     "chain": "G",
+     "auth_seq_id": "180",
+     "resname": "HIS",
+     "distance": 9.977315320265255,
+     "catalytic": false
+    }
+   ]
+  },
+  "entry_citation": {
+   "text": "PDB 1I10, doi:10.2210/pdb1i10/pdb",
+   "registry": "PDB",
+   "reference_id": "1I10",
+   "url": "https://www.rcsb.org/structure/1I10",
+   "doi": "10.2210/pdb1i10/pdb"
+  },
+  "clean_chains": [
+   "A"
+  ],
+  "ph": {
+   "value": 7.4,
+   "unit": "",
+   "provenance": {
+    "kind": "chosen",
+    "by": "user",
+    "reason": "the assay pH, as given"
+   },
+   "label": "assay pH"
+  },
+  "active_site_radius": {
+   "value": 10.0,
+   "unit": "Å",
+   "provenance": {
+    "kind": "chosen",
+    "by": "default",
+    "reason": "a chosen cutoff, not a physical boundary (caterva prepare)"
+   },
+   "label": "active-site radius"
+  }
+ }
+}

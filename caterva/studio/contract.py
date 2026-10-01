@@ -1016,7 +1016,7 @@ class BoundMoleculeView(TypedDict):
     role: str
 
 
-class ProteinRow(TypedDict):
+class _ProteinRowRequired(TypedDict):
     accession: str
     gene: Optional[str]
     name: str
@@ -1025,7 +1025,12 @@ class ProteinRow(TypedDict):
     chosen: bool
 
 
-class StructureRow(TypedDict):
+class ProteinRow(_ProteinRowRequired, total=False):
+    #: The protein's UniProt entry page.
+    url: str
+
+
+class _StructureRowRequired(TypedDict):
     pdb_id: str
     title: str
     method: str
@@ -1037,7 +1042,17 @@ class StructureRow(TypedDict):
     binds_ligand: Optional[bool]
 
 
-class StructureResult(TypedDict):
+class StructureRow(_StructureRowRequired, total=False):
+    #: Every PDB entry's own DOI (10.2210/pdbXXXX/pdb), paper or not.
+    entry_doi: str
+    #: The entry's page at the RCSB.
+    entry_url: str
+    #: False when the primary citation is "To Be Published": `citation`
+    #: then cites the deposition, as `Structure.cite()` does.
+    published: bool
+
+
+class _StructureResultRequired(TypedDict):
     ec: str
     organism: Optional[str]
     ligand: Optional[str]
@@ -1048,6 +1063,16 @@ class StructureResult(TypedDict):
     total: int
     report_markdown: str
     chimerax_artifact: Optional[str]
+
+
+class StructureResult(_StructureResultRequired, total=False):
+    #: normalise_organism's note when the name given was not the Latin one.
+    organism_note: Optional[str]
+    #: How many entries the report lists (the request's `top`); `entries`
+    #: holds every ranked one.
+    top: int
+    #: The databases the search read, cited (the report's "Sources").
+    sources: List[Citation]
 
 
 class AtomColumns(TypedDict):
@@ -1062,7 +1087,40 @@ class AtomColumns(TypedDict):
     hetero: List[bool]
 
 
-class CoordinatesResponse(TypedDict):
+class CatalyticSite(TypedDict):
+    """A catalytic residue as `caterva prepare` places it on one chain:
+    M-CSA's reference residue carried over by global alignment."""
+
+    chain: str
+    #: Author numbering, as atoms.resseq and the audit give it.
+    resseq: str
+    #: The residue found at that position in this chain (three letters),
+    #: None when the reference residue has no counterpart.
+    resname: Optional[str]
+    #: The residue M-CSA's reference has there.
+    expected: str
+    conserved: bool
+    roles: str
+    #: "His194 of P00341": the reference residue it was mapped from.
+    reference: str
+
+
+class CatalyticReference(TypedDict):
+    """Which M-CSA mechanism the catalytic residues come from, and why."""
+
+    mcsa_id: int
+    enzyme: str
+    uniprot: str
+    #: "same UniProt accession", or "best of N for EC ... by alignment".
+    how: str
+    #: Sequence identity between the reference and the first chain.
+    identity: SourcedValue
+    citation: Citation
+    #: Other M-CSA mechanisms for the EC number, not used: "921 T4 lysozyme (31%)".
+    rejected: List[str]
+
+
+class _CoordinatesResponseRequired(TypedDict):
     pdb_id: str
     citation: Citation
     atoms: AtomColumns
@@ -1070,6 +1128,22 @@ class CoordinatesResponse(TypedDict):
     #: True when the entry had more atoms than MAX_VIEWER_ATOMS and the
     #: viewer was sent the first model's protein and ligand atoms only.
     truncated: bool
+
+
+class CoordinatesResponse(_CoordinatesResponseRequired, total=False):
+    title: str
+    method: str
+    resolution: Optional[SourcedValue]
+    #: What was left out when `truncated`, in words.
+    omitted: Optional[str]
+    #: The chains of the enzyme entity, as the audit reads them.
+    chains: List[str]
+    #: The catalytic residues `caterva prepare` places on each chain.
+    catalytic: List[CatalyticSite]
+    catalytic_reference: Optional[CatalyticReference]
+    #: Why no catalytic residue is given, when none is: the audit's own
+    #: words (no M-CSA mechanism, a twilight-zone alignment, no network).
+    catalytic_reason: Optional[str]
 
 
 class _PrepareRequestRequired(TypedDict):
@@ -1089,7 +1163,7 @@ class ChainSummaryRow(TypedDict):
     catalytic_intact: bool
 
 
-class FindingRow(TypedDict):
+class _FindingRowRequired(TypedDict):
     severity: str
     chain: Optional[str]
     residues: List[str]
@@ -1098,7 +1172,15 @@ class FindingRow(TypedDict):
     source: str
 
 
-class PrepareResult(TypedDict):
+class FindingRow(_FindingRowRequired, total=False):
+    #: Which check found it ("chain break" is "unmodelled residues", ...).
+    check: str
+    #: The defect is on a catalytic residue itself.
+    catalytic: bool
+    near_active_site: bool
+
+
+class _PrepareResultRequired(TypedDict):
     pdb_id: str
     title: str
     method: str
@@ -1115,6 +1197,17 @@ class PrepareResult(TypedDict):
     report_markdown: str
     #: The CLI's --json document (dataclasses.asdict of the Audit).
     audit: Dict[str, Any]
+
+
+class PrepareResult(_PrepareResultRequired, total=False):
+    #: The entry the audit read: the PDB entry, or the local file.
+    entry_citation: Citation
+    #: Chains with no blocking defect and their catalytic residues intact.
+    clean_chains: List[str]
+    #: The assay pH the protonation section judged at, when one was given.
+    ph: Optional[SourcedValue]
+    #: The active-site radius findings are placed against (a chosen cutoff).
+    active_site_radius: SourcedValue
 
 
 class _MdSetupRequestRequired(TypedDict):
@@ -1143,7 +1236,7 @@ class MdParameterRow(TypedDict):
     source: str
 
 
-class MdSetupResult(TypedDict):
+class _MdSetupResultRequired(TypedDict):
     out_dir: str
     pdb: str
     chain: Optional[str]
@@ -1155,19 +1248,37 @@ class MdSetupResult(TypedDict):
     report_text: str
 
 
+class MdSetupResult(_MdSetupResultRequired, total=False):
+    ns: SourcedValue
+    ionic_strength: SourcedValue
+    replicas: int
+    #: The velocity seed of each replica, in order.
+    seeds: List[int]
+    #: PROVENANCE.md as written: every parameter with where it came from.
+    provenance_markdown: str
+
+
 class DirectoryRequest(TypedDict):
     #: An absolute path to a directory `caterva md` (or fep, complex) wrote.
     directory: str
 
 
-class ReplicaRow(TypedDict):
+class _ReplicaRowRequired(TypedDict):
     name: str
     mean: SourcedValue
     error: SourcedValue
     verdict: str
 
 
-class ConvergenceResult(TypedDict):
+class ReplicaRow(_ReplicaRowRequired, total=False):
+    frames: int
+    #: Frames averaged, after the first part was discarded as relaxation.
+    kept: int
+    plateaued: bool
+    effective_samples: Optional[SourcedValue]
+
+
+class _ConvergenceResultRequired(TypedDict):
     quantity: str
     unit: str
     verdict: str
@@ -1175,6 +1286,16 @@ class ConvergenceResult(TypedDict):
     report_markdown: str
     #: convergence.Summary through `jsonable`.
     summary: Dict[str, Any]
+
+
+class ConvergenceResult(_ConvergenceResultRequired, total=False):
+    mean: SourcedValue
+    #: SD of the replica means; None for one replica.
+    spread: Optional[SourcedValue]
+    ci95: Optional[SourcedValue]
+    reasons: List[str]
+    #: DIR/CONVERGENCE.md, which the command writes.
+    written: Optional[str]
 
 
 class _AnalyzeRequestRequired(TypedDict):
@@ -1185,7 +1306,7 @@ class AnalyzeRequest(_AnalyzeRequestRequired, total=False):
     mode: Literal["native", "gromacs", "no_run", "script_only"]
 
 
-class DistanceRow(TypedDict):
+class _DistanceRowRequired(TypedDict):
     label: str
     crystal: Optional[SourcedValue]
     mean: SourcedValue
@@ -1194,7 +1315,17 @@ class DistanceRow(TypedDict):
     verdict: str
 
 
-class AnalyzeResult(TypedDict):
+class DistanceRow(_DistanceRowRequired, total=False):
+    spread: Optional[SourcedValue]
+    ci95: Optional[SourcedValue]
+    #: "held" or "moved" once the distance is a consistent result, else None.
+    change: Optional[str]
+    reasons: List[str]
+    #: Each replica's mean and block-averaged error.
+    per_replica: List[Dict[str, Any]]
+
+
+class _AnalyzeResultRequired(TypedDict):
     pdb: str
     chain: Optional[str]
     source: str
@@ -1211,14 +1342,43 @@ class AnalyzeResult(TypedDict):
     report_markdown: str
 
 
-class FepReplicaRow(TypedDict):
+class AnalyzeResult(_AnalyzeResultRequired, total=False):
+    #: The route that measured: native, gromacs, no_run, script_only.
+    mode: str
+    #: False for script_only, which plans and writes analyze.sh only.
+    measured: bool
+    #: Files written into the run's directory, as the command writes them.
+    written: List[str]
+    replicas: List[str]
+    #: The catalytic residues measured, (residue number, name).
+    catalytic: List[Dict[str, Any]]
+    #: The plan's notes (a residue left out, a stand-in atom), verbatim.
+    notes: List[str]
+    #: How many of each quantity the plan measures.
+    counts: Dict[str, int]
+    #: The GROMACS the gromacs route called.
+    gmx: Optional[str]
+    #: Sections an Analysis carries that this adapter does not name
+    #: (added on later branches), through `jsonable`, by field name.
+    extra: Dict[str, Any]
+
+
+class _FepReplicaRowRequired(TypedDict):
     rep: int
     complex_kj: SourcedValue
     solvent_kj: SourcedValue
     dg_kcal: SourcedValue
 
 
-class FepStatusResult(TypedDict):
+class FepReplicaRow(_FepReplicaRowRequired, total=False):
+    #: Each leg's statistical error, from the same estimator as its value.
+    complex_err_kj: SourcedValue
+    solvent_err_kj: SourcedValue
+    complex_estimator: str
+    solvent_estimator: str
+
+
+class _FepStatusResultRequired(TypedDict):
     compound: str
     organism: str
     temperature_k: Optional[SourcedValue]
@@ -1233,6 +1393,20 @@ class FepStatusResult(TypedDict):
     report_text: str
 
 
+class FepStatusResult(_FepStatusResultRequired, total=False):
+    #: How many replicas the setup asked for, and how many finished.
+    replicas_planned: int
+    #: The per-leg lines, as printed (unfinished legs say so).
+    lines: List[str]
+    references: List[str]
+    caveats: List[str]
+    state: str
+    #: The computed value's sigma (the larger of the SEM and the propagated
+    #: BAR error) and the SEM, once two or more replicas finished.
+    sigma: Optional[SourcedValue]
+    sem: Optional[SourcedValue]
+
+
 class ComplexCheckRequest(TypedDict):
     #: `caterva complex --check DIR --ligand RES`. There is no ligand_itp:
     #: the CLI accepts --ligand-itp beside --check and does not pass it to
@@ -1242,10 +1416,18 @@ class ComplexCheckRequest(TypedDict):
     ligand: str
 
 
-class ComplexCheckResult(TypedDict):
+class _ComplexCheckResultRequired(TypedDict):
     kept: bool
     values: Dict[str, SourcedValue]
     report_text: str
+
+
+class ComplexCheckResult(_ComplexCheckResultRequired, total=False):
+    ligand: str
+    #: C-alpha atoms the protein was superposed on.
+    ca_atoms: int
+    #: Frames of npt.xtc read, when it exists.
+    frames: Optional[int]
 
 
 #: The `rates` kind arrives from another branch; its shapes are declared

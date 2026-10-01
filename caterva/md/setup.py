@@ -28,7 +28,7 @@ silently assumed to be 7.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from caterva.methods import METHODS
 
@@ -49,12 +49,23 @@ class Parameter:
 
 @dataclass
 class Conditions:
-    """Temperature and pH, and where each came from."""
+    """Temperature and pH, and where each came from.
+
+    The sentences are what PROVENANCE.md prints. The measurements beside
+    them are the cited constants those sentences name (a compose
+    `export.Measurement`: value, citation, organism, assay conditions), kept
+    so a reader of the setup -- the studio's page -- gets the citation from
+    the object that carried it rather than by parsing it out of prose.
+    """
     temperature_k: float = 298.15
     temperature_source: str = "chosen: 25 C, no measured value supplied"
     ph: Optional[float] = None
     ph_source: str = "not stated; GROMACS assigns standard protonation states"
     measured_temperature: bool = False
+    #: The cited constant whose assay gave the temperature, when measured.
+    temperature_measurement: Optional[Any] = None
+    #: The cited constant whose assay gave the pH, when measured.
+    ph_measurement: Optional[Any] = None
 
 
 @dataclass

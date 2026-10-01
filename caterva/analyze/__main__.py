@@ -41,7 +41,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from caterva.analyze.plan import CONTACT_NM, POCKET_RADIUS, Plan, plan, read_pdb
 from caterva.analyze.angles import AngleResult
-from caterva.analyze.faces import Face
+from caterva.analyze.faces import FLAT_IN_CRYSTAL, Face
 from caterva.analyze.hbonds import Occupancy
 from caterva.analyze.rotamers import Rotamer
 from caterva.analyze.water import Hydration
@@ -231,6 +231,16 @@ class Flexibility:
     def ratios(self) -> List[float]:
         return [p / r for _, p, r in self.per_replica
                 if r > 0 and not math.isnan(p) and not math.isnan(r)]
+
+    @property
+    def spread(self) -> Optional[Tuple[float, float]]:
+        """(mean, SD) of the pocket / rest ratio across replicas; None with
+        fewer than two, where there is no spread to give."""
+        rs = self.ratios
+        if len(rs) < 2:
+            return None
+        m = sum(rs) / len(rs)
+        return m, math.sqrt(sum((x - m) ** 2 for x in rs) / (len(rs) - 1))
 
 
 @dataclass
@@ -607,6 +617,43 @@ def shlex_quote(s: str) -> str:
     return shlex.quote(s)
 
 
+def change_word(verdict: str, moved: bool) -> Optional[str]:
+    """"held" or "moved" for a quantity that is a consistent result; None for
+    one that is not yet a result, which the report calls neither."""
+    if verdict != "consistent":
+        return None
+    return "moved" if moved else "held"
+
+
+#: Verdicts about the replicas themselves rather than the residue: each
+#: section prints these as they are, and marks every other verdict "not yet
+#: a result" while the catalytic distances do not show the runs converged.
+HBOND_STANDS: Tuple[str, ...] = ("one replica",)
+ROTAMER_STANDS: Tuple[str, ...] = ("one replica",)
+FACE_STANDS: Tuple[str, ...] = ("one replica", "no frames", FLAT_IN_CRYSTAL)
+WATER_STANDS: Tuple[str, ...] = ("one replica", "no frames")
+
+
+def as_reported(verdict: str, a: Analysis, stands: Sequence[str]) -> str:
+    """A section's verdict as the report prints it: "(kept, not yet a
+    result)" while the distances do not show the runs converged
+    (Analysis.distances_consistent), unless it is one of `stands`."""
+    if not a.distances_consistent and verdict not in stands:
+        return f"({verdict}, not yet a result)"
+    return verdict
+
+
+def water_reported(h: Hydration, site, a: Analysis) -> str:
+    """The water table's verdict for one catalytic residue. Water at a Cα
+    stand-in is backbone exposure, not the hydration of a catalytic group,
+    and gets no verdict; the angles leave stand-ins out for the same reason
+    (caterva/analyze/plan.py, contact_angles)."""
+    from caterva.analyze.water import STAND_IN, hydration_verdict
+    if not site.functional:
+        return STAND_IN
+    return as_reported(hydration_verdict(h), a, WATER_STANDS)
+
+
 def report(a: Analysis) -> List[str]:
     L = [f"# Enzyme analysis: {a.pdb}" + (f" chain {a.chain}" if a.chain else ""), "",
          f"Catalytic residues from {a.source}.", ""]
@@ -623,7 +670,7 @@ def report(a: Analysis) -> List[str]:
         cr = "?" if d.crystal_nm is None else f"{d.crystal_nm:.3f}"
         if d.drift_nm is None:
             ch = "?"
-        elif s.verdict != "consistent":
+        elif change_word(s.verdict, d.moved) is None:
             ch = f"({d.drift_nm:+.3f}, not yet a result)"
         else:
             ch = f"**{d.drift_nm:+.3f}, moved**" if d.moved else f"{d.drift_nm:+.3f}, held"
@@ -660,8 +707,7 @@ def report(a: Analysis) -> List[str]:
             ratio = f"{pv / rv:.2f}" if rv > 0 else "n/a"
             L.append(f"| {name} | {pv:.4f} | {rv:.4f} | {ratio} |")
         if len(rs) > 1:
-            m = sum(rs) / len(rs)
-            sd = math.sqrt(sum((x - m) ** 2 for x in rs) / (len(rs) - 1))
+            m, sd = f.spread
             if a.distances_consistent:
                 L += ["", f"Pocket / rest: {m:.2f} ± {sd:.2f} across {len(rs)} replicas "
                           "(below 1: the active site is more rigid than the protein around it)."]
@@ -737,9 +783,7 @@ def hbond_section(a: Analysis) -> List[str]:
     L += ["| pair | bonds at start | " + " | ".join(names) + " | verdict |",
           "|---|---|" + "---|" * len(names) + "---|"]
     for o in bonded:
-        v = hbond_verdict(o)
-        if not a.distances_consistent and v not in ("one replica",):
-            v = f"({v}, not yet a result)"
+        v = as_reported(hbond_verdict(o), a, HBOND_STANDS)
         L.append(f"| {o.label} | {o.at_start} | " + " | ".join(f"{f:.2f}" for f in o.fractions) + f" | {v} |")
     never = len(a.hbonds) - len(bonded)
     if never:
@@ -767,9 +811,7 @@ def rotamer_section(a: Analysis) -> List[str]:
     L += ["| residue | chi1 at start | " + " | ".join(names) + " | verdict |",
           "|---|---|" + "---|" * len(names) + "---|"]
     for r in a.rotamers:
-        v = rotamer_verdict(r)
-        if not a.distances_consistent and v != "one replica":
-            v = f"({v}, not yet a result)"
+        v = as_reported(rotamer_verdict(r), a, ROTAMER_STANDS)
         L.append(f"| {r.label} | {r.at_start:.0f} ({r.start_well}) | "
                  + " | ".join(f"{k:.2f}" for k in r.kept) + f" | {v} |")
     L += ["", f"Verdicts (chosen thresholds): kept, in the starting well in at least {KEPT:.0%} of frames in "
@@ -807,7 +849,7 @@ def angle_section(a: Analysis) -> List[str]:
         s = t.summary
         sim = f"{s.mean:.1f}" + (f" ± {s.spread:.1f}" if s.spread is not None else "")
         ci = "n/a" if math.isnan(s.ci95) else f"± {s.ci95:.1f}"
-        if s.verdict != "consistent":
+        if change_word(s.verdict, t.moved) is None:
             ch = f"({t.change_deg:+.1f}, not yet a result)"
         else:
             ch = f"**{t.change_deg:+.1f}, moved**" if t.moved else f"{t.change_deg:+.1f}, held"
@@ -834,7 +876,7 @@ def angle_section(a: Analysis) -> List[str]:
 
 def face_section(a: Analysis) -> List[str]:
     from caterva.analyze.angles import MOVED_DEG
-    from caterva.analyze.faces import FLAT_DEG, FLAT_IN_CRYSTAL, KEPT, SPLIT, face_name, face_verdict
+    from caterva.analyze.faces import FLAT_DEG, KEPT, SPLIT, face_name, face_verdict
     L = ["", "## Which face of the vertex its partners are on", ""]
     if a.faces is None:
         return L + ["Not measured."]
@@ -861,9 +903,7 @@ def face_section(a: Analysis) -> List[str]:
           + " | verdict |",
           "|---|---|---|" + "---|" * len(names) + "---|"]
     for f in a.faces:
-        v = face_verdict(f)
-        if not a.distances_consistent and v not in ("one replica", "no frames", FLAT_IN_CRYSTAL):
-            v = f"({v}, not yet a result)"
+        v = as_reported(face_verdict(f), a, FACE_STANDS)
         cells = " | ".join("n/a" if f.crystal_side == 0 or math.isnan(k) else f"{k:.2f} ({o:.2f})"
                            for _, k, o in f.per_replica)
         L.append(f"| {f.label} | {f.crystal_out_of_flat_deg:+.1f} | {face_name(f.crystal_side)} | {cells} | {v} |")
@@ -879,7 +919,7 @@ def face_section(a: Analysis) -> List[str]:
 
 
 def water_section(a: Analysis) -> List[str]:
-    from caterva.analyze.water import DRY, SPLIT, STAND_IN, WATER_NM, WET, hydration_verdict
+    from caterva.analyze.water import DRY, SPLIT, STAND_IN, WATER_NM, WET
     L = ["", "## Water at the catalytic residues", ""]
     if a.water is None:
         return L + ["Not measured."]
@@ -897,16 +937,10 @@ def water_section(a: Analysis) -> List[str]:
     stand_ins = []
     for h, site in zip(a.water, a.plan.sites):
         atoms = " ".join(site.atoms)
-        if not site.functional:
-            # Water at a CA is backbone exposure, not the hydration of a
-            # catalytic group; the angles leave stand-ins out for the same
-            # reason (caterva/analyze/plan.py, contact_angles).
-            v, atoms = STAND_IN, f"{atoms} (stand-in)"
+        v = water_reported(h, site, a)
+        if v == STAND_IN:
+            atoms = f"{atoms} (stand-in)"
             stand_ins.append(h.label)
-        else:
-            v = hydration_verdict(h)
-            if not a.distances_consistent and v not in ("one replica", "no frames"):
-                v = f"({v}, not yet a result)"
         L.append(f"| {h.label} | {atoms} | {h.at_start} | "
                  + " | ".join("n/a" if math.isnan(f) else f"{m:.2f} ({f:.2f})" for _, m, f in h.per_replica)
                  + f" | {v} |")
@@ -943,52 +977,90 @@ def build_parser(prog: str = "caterva analyze") -> argparse.ArgumentParser:
     return p
 
 
+@dataclass
+class Analysed:
+    """What `analyse` did to a finished run: the Analysis (None when only
+    the script was asked for), the plan it measured, the replicas, and the
+    entry, chain and catalytic-residue source the plan was made from."""
+
+    analysis: Optional[Analysis]
+    plan: Plan
+    replicas: List[Path]
+    pdb: str = ""
+    chain: Optional[str] = None
+    source: str = ""
+
+
+def analyse(d: Path, *, script_only: bool = False, no_run: bool = False, gromacs: bool = False,
+            catalytic=catalytic_residues, gmx: Optional[str] = None) -> Analysed:
+    """Plan the measurements for a finished `caterva md` directory, write
+    analyze.sh (and chi1.ndx) into it, and measure: natively by default,
+    with GROMACS for `gromacs`, from analyze.sh's .xvg files for `no_run`.
+    `gmx` is the GROMACS to call; None reads $GMX as the command line does.
+    Raises AnalyzeError for a refusal."""
+    pdb, chain = setup_info(d)
+    protein = d / "protein.pdb"
+    if not protein.exists():
+        raise AnalyzeError(f"{protein} does not exist: run {d}/run.sh first")
+    residues, source = catalytic(pdb, chain)
+    if not residues:
+        raise AnalyzeError(f"no catalytic residues of {pdb} could be placed in the simulated chain")
+    p = plan(read_pdb(protein.read_text(), chain), residues)
+    reps = replicas(d)
+    chi1 = chi1_groups(d, p)
+    if chi1:
+        write_chi1_index(d, chi1)
+    (d / "analyze.sh").write_text(script(p, [r.name for r in reps] or ["rep1"], chi1))
+    if script_only:
+        return Analysed(None, p, reps, pdb, chain, source)
+    if not reps:
+        raise AnalyzeError(f"no finished replicas (rep*/md.xtc) under {d}: run {d}/run.sh first")
+    if gromacs or no_run:
+        if not no_run:
+            gmx = gmx or os.environ.get("GMX", "gmx")
+            if shutil.which(gmx) is None and not Path(gmx).exists():
+                raise AnalyzeError(f"GROMACS not found ({gmx!r}): set GMX=/path/to/gmx, or run analyze.sh "
+                                   "elsewhere and rerun with --no-run")
+            run_gromacs(d, p, reps, gmx, chi1)
+        distances, flex, rotamers = measure(d, p, reps, chi1)
+        angles, water = gromacs_angles(p, reps), gromacs_water(d, p, reps)
+        faces = gromacs_faces(p, reps)
+        hbonds = None
+    else:
+        distances, flex, hbonds, rotamers, angles, water, faces = measure_native(d, p, reps)
+    return Analysed(Analysis(pdb, chain, source, p, distances, flex, hbonds, rotamers, angles, water, faces),
+                    p, reps, pdb, chain, source)
+
+
+def script_line(d: Path, p: Plan) -> str:
+    """What --script-only prints once analyze.sh is written."""
+    return (f"Wrote {d}/analyze.sh ({len(p.pairs)} catalytic distances, {len(p.angles)} angles, "
+            f"the faces of {len(p.faces)}, water at {len(p.sites)} residues, pocket of {len(p.pocket)} "
+            "residues).")
+
+
+def write_report(d: Path, a: Analysis) -> str:
+    """The report, written to DIR/ANALYSIS.md; returned as printed."""
+    text = "\n".join(report(a)) + "\n"
+    (d / "ANALYSIS.md").write_text(text, encoding="utf-8")
+    return text
+
+
 def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
          catalytic=catalytic_residues) -> int:
     args = build_parser(prog).parse_args(argv)
     d = Path(args.directory)
     try:
-        pdb, chain = setup_info(d)
-        protein = d / "protein.pdb"
-        if not protein.exists():
-            raise AnalyzeError(f"{protein} does not exist: run {d}/run.sh first")
-        residues, source = catalytic(pdb, chain)
-        if not residues:
-            raise AnalyzeError(f"no catalytic residues of {pdb} could be placed in the simulated chain")
-        p = plan(read_pdb(protein.read_text(), chain), residues)
-        reps = replicas(d)
-        chi1 = chi1_groups(d, p)
-        if chi1:
-            write_chi1_index(d, chi1)
-        (d / "analyze.sh").write_text(script(p, [r.name for r in reps] or ["rep1"], chi1))
-        if args.script_only:
-            print(f"Wrote {d}/analyze.sh ({len(p.pairs)} catalytic distances, {len(p.angles)} angles, "
-                  f"the faces of {len(p.faces)}, water at {len(p.sites)} residues, pocket of {len(p.pocket)} "
-                  "residues).")
-            return 0
-        if not reps:
-            raise AnalyzeError(f"no finished replicas (rep*/md.xtc) under {d}: run {d}/run.sh first")
-        if args.gromacs or args.no_run:
-            if not args.no_run:
-                gmx = os.environ.get("GMX", "gmx")
-                if shutil.which(gmx) is None and not Path(gmx).exists():
-                    raise AnalyzeError(f"GROMACS not found ({gmx!r}): set GMX=/path/to/gmx, or run analyze.sh "
-                                       "elsewhere and rerun with --no-run")
-                run_gromacs(d, p, reps, gmx, chi1)
-            distances, flex, rotamers = measure(d, p, reps, chi1)
-            angles, water = gromacs_angles(p, reps), gromacs_water(d, p, reps)
-            faces = gromacs_faces(p, reps)
-            hbonds = None
-        else:
-            distances, flex, hbonds, rotamers, angles, water, faces = measure_native(d, p, reps)
+        done = analyse(d, script_only=args.script_only, no_run=args.no_run, gromacs=args.gromacs,
+                       catalytic=catalytic)
     except AnalyzeError as e:
         print(f"caterva analyze: {e}", file=sys.stderr)
         return 3
-    a = Analysis(pdb, chain, source, p, distances, flex, hbonds, rotamers, angles, water, faces)
-    text = "\n".join(report(a)) + "\n"
-    print(text, end="")
-    (d / "ANALYSIS.md").write_text(text, encoding="utf-8")
-    return 0 if a.all_consistent else EXIT_NOT_A_RESULT
+    if done.analysis is None:
+        print(script_line(d, done.plan))
+        return 0
+    print(write_report(d, done.analysis), end="")
+    return 0 if done.analysis.all_consistent else EXIT_NOT_A_RESULT
 
 
 def console_main() -> int:

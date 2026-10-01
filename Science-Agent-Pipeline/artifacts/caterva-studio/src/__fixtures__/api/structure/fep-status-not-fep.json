@@ -1,0 +1,19 @@
+{
+ "kind": "fep.status",
+ "request": {
+  "directory": "/tmp/claude-501/caterva-fixtures-7kk_bdkk/lyso-md"
+ },
+ "cli": [
+  "caterva",
+  "fep",
+  "--summarise",
+  "/private/tmp/claude-501/caterva-fixtures-7kk_bdkk/lyso-md"
+ ],
+ "outcome": {
+  "exit_code": 3,
+  "meaning": "refused",
+  "summary": "caterva fep: /private/tmp/claude-501/caterva-fixtures-7kk_bdkk/lyso-md has no caterva-fep.json; it was not written by caterva fep",
+  "reason": "caterva fep: /private/tmp/claude-501/caterva-fixtures-7kk_bdkk/lyso-md has no caterva-fep.json; it was not written by caterva fep"
+ },
+ "result": null
+}

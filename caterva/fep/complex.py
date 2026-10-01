@@ -398,7 +398,61 @@ def centroid_shift(directory: Path, resname: str) -> float:
     return float(np.linalg.norm(c1 - c0))
 
 
-def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva complex") -> int:
+@dataclass
+class PoseCheck:
+    """What `--check DIR --ligand RES` measured and decided."""
+
+    ligand: str
+    #: Ligand heavy-atom RMSD from the crystal pose after equilibration
+    #: (symmetry-equivalent poses counted as the same), nm.
+    rmsd_nm: float
+    #: The protein's C-alpha RMSD after superposition, nm, over `ca_atoms`.
+    ca_rmsd_nm: float
+    ca_atoms: int
+    #: How far the ligand's heavy-atom centroid moved, protein superposed, nm.
+    centroid_shift_nm: float
+    #: (time ps, RMSD nm, centroid shift nm) per frame of npt.xtc, when present.
+    series: Optional[List[Tuple[float, float, float]]]
+    kept: bool
+
+    @property
+    def worst(self) -> Optional[Tuple[float, float, float]]:
+        """The frame of npt.xtc with the largest RMSD."""
+        return max(self.series, key=lambda r: r[1]) if self.series else None
+
+
+def check_pose(directory: Path, resname: str) -> PoseCheck:
+    """Did the ligand keep its crystal pose through equilibration? Kept when
+    its RMSD in npt.gro, and in the worst frame of npt.xtc when there is
+    one, is within POSE_KEPT_NM. Raises OSError or ValueError for a
+    directory that is not a finished build."""
+    rmsd, ca, n = check(directory, resname)
+    kept = rmsd <= POSE_KEPT_NM
+    series = None
+    if (directory / "npt.xtc").is_file():
+        series = pose_over_trajectory(directory, resname)
+        kept = kept and max(r[1] for r in series) <= POSE_KEPT_NM
+    return PoseCheck(resname, rmsd, ca, n, centroid_shift(directory, resname), series, kept)
+
+
+def pose_lines(c: PoseCheck) -> List[str]:
+    """What `--check` prints for a PoseCheck."""
+    out = [f"{c.ligand}: heavy atoms {c.rmsd_nm * 10:.2f} A from the crystal pose after equilibration, "
+           f"counting its symmetry-equivalent poses as the same pose; centroid moved "
+           f"{c.centroid_shift_nm * 10:.2f} A (protein superposed on {c.ca_atoms} C-alpha atoms, which moved "
+           f"{c.ca_rmsd_nm * 10:.2f} A)."]
+    worst = c.worst
+    if worst is not None:
+        out.append(f"  over npt.xtc ({len(c.series)} frames, read natively): worst {worst[1] * 10:.2f} A at "
+                   f"{worst[0]:.0f} ps, centroid at most {max(r[2] for r in c.series) * 10:.2f} A from the start")
+    out.append("KEPT its pose: ready for caterva fep." if c.kept else
+               f"LEFT its pose (more than {POSE_KEPT_NM * 10:.0f} A): the restraints caterva fep would "
+               "choose would hold a pose the complex does not have. Check the ligand topology and "
+               "protonation before spending the compute.")
+    return out
+
+
+def build_parser(prog: str = "caterva complex") -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog=prog, description=__doc__.split("\n\n")[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--check", type=Path, metavar="DIR",
@@ -411,6 +465,11 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva complex") ->
                    help="the coordinates your parameterisation tool wrote (.gro or .pdb), same atom names as the itp")
     p.add_argument("--temperature", type=float, default=298.15, help="kelvin (default 298.15, chosen)")
     p.add_argument("--out", type=Path)
+    return p
+
+
+def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva complex") -> int:
+    p = build_parser(prog)
     try:
         a = p.parse_args(argv)
     except SystemExit as e:
@@ -421,29 +480,13 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva complex") ->
             print(f"{prog}: --check needs --ligand (the residue name)", file=sys.stderr)
             return EXIT_USAGE
         try:
-            rmsd, ca, n = check(a.check, a.ligand)
+            c = check_pose(a.check, a.ligand)
         except (OSError, ValueError) as e:
             print(f"{prog}: {e}", file=sys.stderr)
             return EXIT_REFUSED
-        kept = rmsd <= POSE_KEPT_NM
-        over = None
-        if (a.check / "npt.xtc").is_file():
-            series = pose_over_trajectory(a.check, a.ligand)
-            worst = max(series, key=lambda r: r[1])
-            over = (f"  over npt.xtc ({len(series)} frames, read natively): worst {worst[1] * 10:.2f} A at "
-                    f"{worst[0]:.0f} ps, centroid at most {max(r[2] for r in series) * 10:.2f} A from the start")
-            kept = kept and worst[1] <= POSE_KEPT_NM
-        shift = centroid_shift(a.check, a.ligand)
-        print(f"{a.ligand}: heavy atoms {rmsd * 10:.2f} A from the crystal pose after equilibration, "
-              f"counting its symmetry-equivalent poses as the same pose; centroid moved "
-              f"{shift * 10:.2f} A (protein superposed on {n} C-alpha atoms, which moved {ca * 10:.2f} A).")
-        if over:
-            print(over)
-        print("KEPT its pose: ready for caterva fep." if kept else
-              f"LEFT its pose (more than {POSE_KEPT_NM * 10:.0f} A): the restraints caterva fep would "
-              "choose would hold a pose the complex does not have. Check the ligand topology and "
-              "protonation before spending the compute.")
-        return EXIT_OK if kept else 4
+        for line in pose_lines(c):
+            print(line)
+        return EXIT_OK if c.kept else 4
     missing = [f for f in ("pdb", "ligand", "ligand_itp", "ligand_coords", "out") if getattr(a, f) is None]
     if missing:
         print(f"{prog}: missing " + ", ".join("--" + m.replace("_", "-") for m in missing), file=sys.stderr)

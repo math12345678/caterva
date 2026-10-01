@@ -1,0 +1,3363 @@
+{
+ "kind": "structure",
+ "request": {
+  "subject": "1.1.1.27",
+  "organism": "human",
+  "gene": "LDHA",
+  "ligand": "oxamate",
+  "top": 8
+ },
+ "cli": [
+  "caterva",
+  "structure",
+  "--subject",
+  "1.1.1.27",
+  "--organism",
+  "human",
+  "--gene",
+  "LDHA",
+  "--ligand",
+  "oxamate",
+  "--top",
+  "8"
+ ],
+ "outcome": {
+  "exit_code": 0,
+  "meaning": "produced",
+  "summary": "EC 1.1.1.27: LDHA (P00338), 46 entries, best 1I10",
+  "reason": null
+ },
+ "result": {
+  "ec": "1.1.1.27",
+  "organism": "Homo sapiens",
+  "ligand": "oxamate",
+  "proteins": [
+   {
+    "accession": "P00338",
+    "gene": "LDHA",
+    "name": "L-lactate dehydrogenase A chain",
+    "organism": "Homo sapiens",
+    "entries": 46,
+    "chosen": true,
+    "url": "https://www.uniprot.org/uniprotkb/P00338"
+   },
+   {
+    "accession": "P07195",
+    "gene": "LDHB",
+    "name": "L-lactate dehydrogenase B chain",
+    "organism": "Homo sapiens",
+    "entries": 7,
+    "chosen": false,
+    "url": "https://www.uniprot.org/uniprotkb/P07195"
+   },
+   {
+    "accession": "P07864",
+    "gene": "LDHC",
+    "name": "L-lactate dehydrogenase C chain",
+    "organism": "Homo sapiens",
+    "entries": 2,
+    "chosen": false,
+    "url": "https://www.uniprot.org/uniprotkb/P07864"
+   },
+   {
+    "accession": "Q6ZMR3",
+    "gene": "LDHAL6A",
+    "name": "L-lactate dehydrogenase A-like 6A",
+    "organism": "Homo sapiens",
+    "entries": 0,
+    "chosen": false,
+    "url": "https://www.uniprot.org/uniprotkb/Q6ZMR3"
+   },
+   {
+    "accession": "Q9BYZ2",
+    "gene": "LDHAL6B",
+    "name": "L-lactate dehydrogenase A-like 6B",
+    "organism": "Homo sapiens",
+    "entries": 0,
+    "chosen": false,
+    "url": "https://www.uniprot.org/uniprotkb/Q9BYZ2"
+   }
+  ],
+  "chosen": "P00338",
+  "undecided": null,
+  "entries": [
+   {
+    "pdb_id": "1I10",
+    "title": "HUMAN MUSCLE L-LACTATE DEHYDROGENASE M CHAIN, TERNARY COMPLEX WITH NADH AND OXAMATE",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.3,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 1I10, doi:10.2210/pdb1i10/pdb",
+       "registry": "PDB",
+       "reference_id": "1I10",
+       "url": "https://www.rcsb.org/structure/1I10",
+       "doi": "10.2210/pdb1i10/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "ACT",
+      "name": "ACETATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "OXM",
+      "name": "OXAMIC ACID",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Read et al. (2001) Proteins, doi:10.1002/1097-0134(20010501)43:2<175::AID-PROT1029>3.0.CO;2-#",
+     "registry": "PDB",
+     "reference_id": "1I10",
+     "url": "https://doi.org/10.1002/1097-0134(20010501)43:2<175::AID-PROT1029>3.0.CO;2-#",
+     "title": "Structural basis for altered activity of M- and H-isozyme forms of human lactate dehydrogenase.",
+     "journal": "Proteins",
+     "year": 2001,
+     "doi": "10.1002/1097-0134(20010501)43:2<175::AID-PROT1029>3.0.CO;2-#",
+     "pubmed": "11276087"
+    },
+    "binds_ligand": true,
+    "entry_doi": "10.2210/pdb1i10/pdb",
+    "entry_url": "https://www.rcsb.org/structure/1I10",
+    "published": true
+   },
+   {
+    "pdb_id": "5W8J",
+    "title": "Crystal Structure of Lactate Dehydrogenase A in complex with inhibitor compound 29",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 1.55,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 5W8J, doi:10.2210/pdb5w8j/pdb",
+       "registry": "PDB",
+       "reference_id": "5W8J",
+       "url": "https://www.rcsb.org/structure/5W8J",
+       "doi": "10.2210/pdb5w8j/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "DMS",
+      "name": "DIMETHYL SULFOXIDE",
+      "role": "additive"
+     },
+     {
+      "component": "GOL",
+      "name": "GLYCEROL",
+      "role": "additive"
+     },
+     {
+      "component": "MLA",
+      "name": "MALONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "9Y7",
+      "name": "2-{3-(3,4-difluorophenyl)-5-hydroxy-4-[(4-sulfamoylphenyl)methyl]-1H-pyrazol-1-yl}-1,3-thiazole-4-carboxylic acid",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Rai et al. (2017) J. Med. Chem., doi:10.1021/acs.jmedchem.7b00941",
+     "registry": "PDB",
+     "reference_id": "5W8J",
+     "url": "https://doi.org/10.1021/acs.jmedchem.7b00941",
+     "title": "Discovery and Optimization of Potent, Cell-Active Pyrazole-Based Inhibitors of Lactate Dehydrogenase (LDH).",
+     "journal": "J. Med. Chem.",
+     "year": 2017,
+     "doi": "10.1021/acs.jmedchem.7b00941",
+     "pubmed": "29120638"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb5w8j/pdb",
+    "entry_url": "https://www.rcsb.org/structure/5W8J",
+    "published": true
+   },
+   {
+    "pdb_id": "5W8K",
+    "title": "Crystal Structure of Lactate Dehydrogenase A in complex with inhibitor compound 29 and NADH",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 1.6,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 5W8K, doi:10.2210/pdb5w8k/pdb",
+       "registry": "PDB",
+       "reference_id": "5W8K",
+       "url": "https://www.rcsb.org/structure/5W8K",
+       "doi": "10.2210/pdb5w8k/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "GOL",
+      "name": "GLYCEROL",
+      "role": "additive"
+     },
+     {
+      "component": "MLA",
+      "name": "MALONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "9Y7",
+      "name": "2-{3-(3,4-difluorophenyl)-5-hydroxy-4-[(4-sulfamoylphenyl)methyl]-1H-pyrazol-1-yl}-1,3-thiazole-4-carboxylic acid",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Rai et al. (2017) J. Med. Chem., doi:10.1021/acs.jmedchem.7b00941",
+     "registry": "PDB",
+     "reference_id": "5W8K",
+     "url": "https://doi.org/10.1021/acs.jmedchem.7b00941",
+     "title": "Discovery and Optimization of Potent, Cell-Active Pyrazole-Based Inhibitors of Lactate Dehydrogenase (LDH).",
+     "journal": "J. Med. Chem.",
+     "year": 2017,
+     "doi": "10.1021/acs.jmedchem.7b00941",
+     "pubmed": "29120638"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb5w8k/pdb",
+    "entry_url": "https://www.rcsb.org/structure/5W8K",
+    "published": true
+   },
+   {
+    "pdb_id": "5W8H",
+    "title": "Crystal Structure of Lactate Dehydrogenase A in complex with inhibitor compound 11",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 1.8,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 5W8H, doi:10.2210/pdb5w8h/pdb",
+       "registry": "PDB",
+       "reference_id": "5W8H",
+       "url": "https://www.rcsb.org/structure/5W8H",
+       "doi": "10.2210/pdb5w8h/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "ACT",
+      "name": "ACETATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "DMS",
+      "name": "DIMETHYL SULFOXIDE",
+      "role": "additive"
+     },
+     {
+      "component": "GOL",
+      "name": "GLYCEROL",
+      "role": "additive"
+     },
+     {
+      "component": "MLA",
+      "name": "MALONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "9Y1",
+      "name": "2-[3-(4-fluorophenyl)-5-(trifluoromethyl)-1H-pyrazol-1-yl]-1,3-thiazole-4-carboxylic acid",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Rai et al. (2017) J. Med. Chem., doi:10.1021/acs.jmedchem.7b00941",
+     "registry": "PDB",
+     "reference_id": "5W8H",
+     "url": "https://doi.org/10.1021/acs.jmedchem.7b00941",
+     "title": "Discovery and Optimization of Potent, Cell-Active Pyrazole-Based Inhibitors of Lactate Dehydrogenase (LDH).",
+     "journal": "J. Med. Chem.",
+     "year": 2017,
+     "doi": "10.1021/acs.jmedchem.7b00941",
+     "pubmed": "29120638"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb5w8h/pdb",
+    "entry_url": "https://www.rcsb.org/structure/5W8H",
+    "published": true
+   },
+   {
+    "pdb_id": "9BK2",
+    "title": "Crystal structure of Lactate dehydrogenase in complex with 4-((4-(1-methyl-1H-imidazole-2-carbonyl)phenyl)amino)-4-oxo-2-(4-(trifluoromethyl)phenyl)butanoic acid (S-enantiomer, monoclinic P form)",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 1.85,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 9BK2, doi:10.2210/pdb9bk2/pdb",
+       "registry": "PDB",
+       "reference_id": "9BK2",
+       "url": "https://www.rcsb.org/structure/9BK2",
+       "doi": "10.2210/pdb9bk2/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "DMS",
+      "name": "DIMETHYL SULFOXIDE",
+      "role": "additive"
+     },
+     {
+      "component": "MLI",
+      "name": "MALONATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "A1AQ0",
+      "name": "(2S)-4-[4-(1-methyl-1H-imidazole-2-carbonyl)anilino]-4-oxo-2-[4-(trifluoromethyl)phenyl]butanoic acid",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Sharma et al. (2024) Eur.J.Med.Chem., doi:10.1016/j.ejmech.2024.116598",
+     "registry": "PDB",
+     "reference_id": "9BK2",
+     "url": "https://doi.org/10.1016/j.ejmech.2024.116598",
+     "title": "Synthesis and biological characterization of an orally bioavailable lactate dehydrogenase-A inhibitor against pancreatic cancer.",
+     "journal": "Eur.J.Med.Chem.",
+     "year": 2024,
+     "doi": "10.1016/j.ejmech.2024.116598",
+     "pubmed": "38925013"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb9bk2/pdb",
+    "entry_url": "https://www.rcsb.org/structure/9BK2",
+    "published": true
+   },
+   {
+    "pdb_id": "4JNK",
+    "title": "Lactate Dehydrogenase A in complex with inhibitor compound 22",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 1.896,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4JNK, doi:10.2210/pdb4jnk/pdb",
+       "registry": "PDB",
+       "reference_id": "4JNK",
+       "url": "https://www.rcsb.org/structure/4JNK",
+       "doi": "10.2210/pdb4jnk/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "LAC",
+      "name": "LACTIC ACID",
+      "role": "ligand"
+     },
+     {
+      "component": "ZHK",
+      "name": "(2R)-2-{[5-cyano-4-(3,4-dichlorophenyl)-6-oxo-1,6-dihydropyrimidin-2-yl]sulfanyl}-N-(4-sulfamoylphenyl)propanamide",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Dragovich et al. (2013) Bioorg.Med.Chem.Lett., doi:10.1016/j.bmcl.2013.04.001",
+     "registry": "PDB",
+     "reference_id": "4JNK",
+     "url": "https://doi.org/10.1016/j.bmcl.2013.04.001",
+     "title": "Identification of substituted 2-thio-6-oxo-1,6-dihydropyrimidines as inhibitors of human lactate dehydrogenase.",
+     "journal": "Bioorg.Med.Chem.Lett.",
+     "year": 2013,
+     "doi": "10.1016/j.bmcl.2013.04.001",
+     "pubmed": "23628333"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4jnk/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4JNK",
+    "published": true
+   },
+   {
+    "pdb_id": "4RLS",
+    "title": "Lactate Dehydrogenase in complex with inhibitor compound 47",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 1.91,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4RLS, doi:10.2210/pdb4rls/pdb",
+       "registry": "PDB",
+       "reference_id": "4RLS",
+       "url": "https://www.rcsb.org/structure/4RLS",
+       "doi": "10.2210/pdb4rls/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "2OP",
+      "name": "(2S)-2-HYDROXYPROPANOIC ACID",
+      "role": "ligand"
+     },
+     {
+      "component": "49C",
+      "name": "(1R)-5'-[(2-chlorophenyl)sulfanyl]-4'-hydroxy-2,3-dihydrospiro[indene-1,2'-pyran]-6'(3'H)-one",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Fauber et al. (2014) Bioorg.Med.Chem.Lett., doi:10.1016/j.bmcl.2014.10.067",
+     "registry": "PDB",
+     "reference_id": "4RLS",
+     "url": "https://doi.org/10.1016/j.bmcl.2014.10.067",
+     "title": "Identification of 3,6-disubstituted dihydropyrones as inhibitors of human lactate dehydrogenase.",
+     "journal": "Bioorg.Med.Chem.Lett.",
+     "year": 2014,
+     "doi": "10.1016/j.bmcl.2014.10.067",
+     "pubmed": "25467161"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4rls/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4RLS",
+    "published": true
+   },
+   {
+    "pdb_id": "5W8I",
+    "title": "Crystal Structure of Lactate Dehydrogenase A in complex with inhibitor compound 23 and Zinc",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 1.95,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 5W8I, doi:10.2210/pdb5w8i/pdb",
+       "registry": "PDB",
+       "reference_id": "5W8I",
+       "url": "https://www.rcsb.org/structure/5W8I",
+       "doi": "10.2210/pdb5w8i/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "CIT",
+      "name": "CITRIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "DMS",
+      "name": "DIMETHYL SULFOXIDE",
+      "role": "additive"
+     },
+     {
+      "component": "GOL",
+      "name": "GLYCEROL",
+      "role": "additive"
+     },
+     {
+      "component": "MLA",
+      "name": "MALONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "9YD",
+      "name": "2-[3-(3,4-difluorophenyl)-5-hydroxy-1H-pyrazol-1-yl]-1,3-thiazole-4-carboxylic acid",
+      "role": "ligand"
+     },
+     {
+      "component": "ZN",
+      "name": "ZINC ION",
+      "role": "metal"
+     }
+    ],
+    "citation": {
+     "text": "Rai et al. (2017) J. Med. Chem., doi:10.1021/acs.jmedchem.7b00941",
+     "registry": "PDB",
+     "reference_id": "5W8I",
+     "url": "https://doi.org/10.1021/acs.jmedchem.7b00941",
+     "title": "Discovery and Optimization of Potent, Cell-Active Pyrazole-Based Inhibitors of Lactate Dehydrogenase (LDH).",
+     "journal": "J. Med. Chem.",
+     "year": 2017,
+     "doi": "10.1021/acs.jmedchem.7b00941",
+     "pubmed": "29120638"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb5w8i/pdb",
+    "entry_url": "https://www.rcsb.org/structure/5W8I",
+    "published": true
+   },
+   {
+    "pdb_id": "5W8L",
+    "title": "Crystal Structure of Lactate Dehydrogenase A in complex with inhibitor compound 59 and NADH",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 1.95,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 5W8L, doi:10.2210/pdb5w8l/pdb",
+       "registry": "PDB",
+       "reference_id": "5W8L",
+       "url": "https://www.rcsb.org/structure/5W8L",
+       "doi": "10.2210/pdb5w8l/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EDO",
+      "name": "1,2-ETHANEDIOL",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "9YA",
+      "name": "2-{3-([1,1'-biphenyl]-3-yl)-5-(cyclopropylmethyl)-4-[(4-sulfamoylphenyl)methyl]-1H-pyrazol-1-yl}-1,3-thiazole-4-carboxylic acid",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Rai et al. (2017) J. Med. Chem., doi:10.1021/acs.jmedchem.7b00941",
+     "registry": "PDB",
+     "reference_id": "5W8L",
+     "url": "https://doi.org/10.1021/acs.jmedchem.7b00941",
+     "title": "Discovery and Optimization of Potent, Cell-Active Pyrazole-Based Inhibitors of Lactate Dehydrogenase (LDH).",
+     "journal": "J. Med. Chem.",
+     "year": 2017,
+     "doi": "10.1021/acs.jmedchem.7b00941",
+     "pubmed": "29120638"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb5w8l/pdb",
+    "entry_url": "https://www.rcsb.org/structure/5W8L",
+    "published": true
+   },
+   {
+    "pdb_id": "6BB0",
+    "title": "Lactate Dehydrogenase in complex with inhibitor (R)-3-((2-chlorophenyl)thio)-6-(3-((4-fluorophenyl)amino)phenyl)-4-hydroxy-6-(thiophen-3-yl)-5,6-dihydro-2H-pyran-2-one",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 1.95,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6BB0, doi:10.2210/pdb6bb0/pdb",
+       "registry": "PDB",
+       "reference_id": "6BB0",
+       "url": "https://www.rcsb.org/structure/6BB0",
+       "doi": "10.2210/pdb6bb0/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAD",
+      "name": "NICOTINAMIDE-ADENINE-DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "D3S",
+      "name": "(6S)-3-[(2-chlorophenyl)sulfanyl]-4-hydroxy-6-(2-hydroxyphenyl)-6-phenyl-5,6-dihydro-2H-pyran-2-one",
+      "role": "ligand"
+     },
+     {
+      "component": "LAC",
+      "name": "LACTIC ACID",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "unpublished deposition (Wei et al.); entry doi:10.2210/pdb6bb0/pdb",
+     "registry": "PDB",
+     "reference_id": "6BB0",
+     "url": "https://www.rcsb.org/structure/6BB0",
+     "title": "Structure-guided optimization and in vivo activities of hydroxylactone and hydroxylactam Inhibitors of Human Lactate Dehydrogenase",
+     "journal": "To Be Published",
+     "year": null,
+     "doi": "10.2210/pdb6bb0/pdb",
+     "pubmed": null
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6bb0/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6BB0",
+    "published": false
+   },
+   {
+    "pdb_id": "6MV8",
+    "title": "LDHA structure in complex with inhibitor 14",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 1.95,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6MV8, doi:10.2210/pdb6mv8/pdb",
+       "registry": "PDB",
+       "reference_id": "6MV8",
+       "url": "https://www.rcsb.org/structure/6MV8",
+       "doi": "10.2210/pdb6mv8/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "D3S",
+      "name": "(6S)-3-[(2-chlorophenyl)sulfanyl]-4-hydroxy-6-(2-hydroxyphenyl)-6-phenyl-5,6-dihydro-2H-pyran-2-one",
+      "role": "ligand"
+     },
+     {
+      "component": "LAC",
+      "name": "LACTIC ACID",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "unpublished deposition (Wei et al.); entry doi:10.2210/pdb6mv8/pdb",
+     "registry": "PDB",
+     "reference_id": "6MV8",
+     "url": "https://www.rcsb.org/structure/6MV8",
+     "title": "Structure-based Optimization of Potent, Cell-Active\nHydroxylactam Inhibitors of Lactate Dehydrogenase",
+     "journal": "To Be Published",
+     "year": null,
+     "doi": "10.2210/pdb6mv8/pdb",
+     "pubmed": null
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6mv8/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6MV8",
+    "published": false
+   },
+   {
+    "pdb_id": "6Q13",
+    "title": "CRYSTAL STRUCTURE OF LDHA IN COMPLEX WITH COMPOUND NCGC00420737-09 AT 2.00 A RESOLUTION",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6Q13, doi:10.2210/pdb6q13/pdb",
+       "registry": "PDB",
+       "reference_id": "6Q13",
+       "url": "https://www.rcsb.org/structure/6Q13",
+       "doi": "10.2210/pdb6q13/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EDO",
+      "name": "1,2-ETHANEDIOL",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "P8V",
+      "name": "2-[5-(cyclopropylmethyl)-4-[(3-fluoro-4-sulfamoylphenyl)methyl]-3-{3-[(5-methylthiophen-2-yl)ethynyl]phenyl}-1H-pyrazol-1-yl]-1,3-thiazole-4-carboxylic acid",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Rai et al. (2020) J.Med.Chem., doi:10.1021/acs.jmedchem.0c00916",
+     "registry": "PDB",
+     "reference_id": "6Q13",
+     "url": "https://doi.org/10.1021/acs.jmedchem.0c00916",
+     "title": "Pyrazole-Based Lactate Dehydrogenase Inhibitors with Optimized Cell Activity and Pharmacokinetic Properties.",
+     "journal": "J.Med.Chem.",
+     "year": 2020,
+     "doi": "10.1021/acs.jmedchem.0c00916",
+     "pubmed": "32902275"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6q13/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6Q13",
+    "published": true
+   },
+   {
+    "pdb_id": "4QO8",
+    "title": "Lactate Dehydrogenase A in complex with substituted 3-Hydroxy-2-mercaptocyclohex-2-enone compound 104",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.001,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4QO8, doi:10.2210/pdb4qo8/pdb",
+       "registry": "PDB",
+       "reference_id": "4QO8",
+       "url": "https://www.rcsb.org/structure/4QO8",
+       "doi": "10.2210/pdb4qo8/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "36U",
+      "name": "(5S)-2-[(2-chlorophenyl)sulfanyl]-5-(2,6-dichlorophenyl)-3-hydroxycyclohex-2-en-1-one",
+      "role": "ligand"
+     },
+     {
+      "component": "LAC",
+      "name": "LACTIC ACID",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Dragovich et al. (2014) Bioorg.Med.Chem.Lett., doi:10.1016/j.bmcl.2014.06.076",
+     "registry": "PDB",
+     "reference_id": "4QO8",
+     "url": "https://doi.org/10.1016/j.bmcl.2014.06.076",
+     "title": "Identification of substituted 3-hydroxy-2-mercaptocyclohex-2-enones as potent inhibitors of human lactate dehydrogenase.",
+     "journal": "Bioorg.Med.Chem.Lett.",
+     "year": 2014,
+     "doi": "10.1016/j.bmcl.2014.06.076",
+     "pubmed": "25037916"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4qo8/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4QO8",
+    "published": true
+   },
+   {
+    "pdb_id": "6MVA",
+    "title": "LDHA structure in complex with inhibitor 14",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.02,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6MVA, doi:10.2210/pdb6mva/pdb",
+       "registry": "PDB",
+       "reference_id": "6MVA",
+       "url": "https://www.rcsb.org/structure/6MVA",
+       "doi": "10.2210/pdb6mva/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "D4S",
+      "name": "(6R)-6-(3-aminophenyl)-3-[(2-chlorophenyl)sulfanyl]-4-hydroxy-6-(thiophen-3-yl)-5,6-dihydro-2H-pyran-2-one",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "unpublished deposition (Wei et al.); entry doi:10.2210/pdb6mva/pdb",
+     "registry": "PDB",
+     "reference_id": "6MVA",
+     "url": "https://www.rcsb.org/structure/6MVA",
+     "title": "Structure-based Optimization of Potent, Cell-Active\nHydroxylactam Inhibitors of Lactate Dehydrogenase",
+     "journal": "To Be Published",
+     "year": null,
+     "doi": "10.2210/pdb6mva/pdb",
+     "pubmed": null
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6mva/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6MVA",
+    "published": false
+   },
+   {
+    "pdb_id": "5IXS",
+    "title": "Lactate Dehydrogenase in complex with hydroxylactam inhibitor compound 9: (6R)-3-[(2-chlorophenyl)sulfanyl]-4-hydroxy-6-(3-hydroxyphenyl)-6-(thiophen-3-yl)-5,6-dihydropyridin-2(1H)-one",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.05,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 5IXS, doi:10.2210/pdb5ixs/pdb",
+       "registry": "PDB",
+       "reference_id": "5IXS",
+       "url": "https://www.rcsb.org/structure/5IXS",
+       "doi": "10.2210/pdb5ixs/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "6EY",
+      "name": "(6R)-3-[(2-chlorophenyl)sulfanyl]-4-hydroxy-6-(3-hydroxyphenyl)-6-(thiophen-3-yl)-5,6-dihydropyridin-2(1H)-one",
+      "role": "ligand"
+     },
+     {
+      "component": "TXD",
+      "name": "1,4,5,6-TETRAHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Purkey et al. (2016) Acs Med.Chem.Lett., doi:10.1021/acsmedchemlett.6b00190",
+     "registry": "PDB",
+     "reference_id": "5IXS",
+     "url": "https://doi.org/10.1021/acsmedchemlett.6b00190",
+     "title": "Cell Active Hydroxylactam Inhibitors of Human Lactate Dehydrogenase with Oral Bioavailability in Mice.",
+     "journal": "Acs Med.Chem.Lett.",
+     "year": 2016,
+     "doi": "10.1021/acsmedchemlett.6b00190",
+     "pubmed": "27774125"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb5ixs/pdb",
+    "entry_url": "https://www.rcsb.org/structure/5IXS",
+    "published": true
+   },
+   {
+    "pdb_id": "6BAX",
+    "title": "Lactate Dehydrogenase in complex with inhibitor 6-(3-aminophenyl)-3-((2-chlorophenyl)thio)-4-hydroxy-6-(thiophen-3-yl)-5,6-dihydro-2H-pyran-2-one",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.05,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6BAX, doi:10.2210/pdb6bax/pdb",
+       "registry": "PDB",
+       "reference_id": "6BAX",
+       "url": "https://www.rcsb.org/structure/6BAX",
+       "doi": "10.2210/pdb6bax/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAD",
+      "name": "NICOTINAMIDE-ADENINE-DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "D4S",
+      "name": "(6R)-6-(3-aminophenyl)-3-[(2-chlorophenyl)sulfanyl]-4-hydroxy-6-(thiophen-3-yl)-5,6-dihydro-2H-pyran-2-one",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "unpublished deposition (Wei et al.); entry doi:10.2210/pdb6bax/pdb",
+     "registry": "PDB",
+     "reference_id": "6BAX",
+     "url": "https://www.rcsb.org/structure/6BAX",
+     "title": "Structure-guided optimization and in vivo activities of hydroxylactone and hydroxylactam Inhibitors of Human Lactate Dehydrogenase",
+     "journal": "To Be Published",
+     "year": null,
+     "doi": "10.2210/pdb6bax/pdb",
+     "pubmed": null
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6bax/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6BAX",
+    "published": false
+   },
+   {
+    "pdb_id": "6Q0D",
+    "title": "CRYSTAL STRUCTURE OF LDHA IN COMPLEX WITH COMPOUND NCGC00384414-01 AT 2.05 A RESOLUTION",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.05,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6Q0D, doi:10.2210/pdb6q0d/pdb",
+       "registry": "PDB",
+       "reference_id": "6Q0D",
+       "url": "https://www.rcsb.org/structure/6Q0D",
+       "doi": "10.2210/pdb6q0d/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "GOL",
+      "name": "GLYCEROL",
+      "role": "additive"
+     },
+     {
+      "component": "PO4",
+      "name": "PHOSPHATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "P8M",
+      "name": "2-{3-[3-(cyclopentylethynyl)-4-fluorophenyl]-5-(cyclopropylmethyl)-4-[(3-fluoro-4-sulfamoylphenyl)methyl]-1H-pyrazol-1-yl}-1,3-thiazole-4-carboxylic acid",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Rai et al. (2020) J.Med.Chem., doi:10.1021/acs.jmedchem.0c00916",
+     "registry": "PDB",
+     "reference_id": "6Q0D",
+     "url": "https://doi.org/10.1021/acs.jmedchem.0c00916",
+     "title": "Pyrazole-Based Lactate Dehydrogenase Inhibitors with Optimized Cell Activity and Pharmacokinetic Properties.",
+     "journal": "J.Med.Chem.",
+     "year": 2020,
+     "doi": "10.1021/acs.jmedchem.0c00916",
+     "pubmed": "32902275"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6q0d/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6Q0D",
+    "published": true
+   },
+   {
+    "pdb_id": "4M49",
+    "title": "Lactate Dehydrogenase A in complex with a substituted pyrazine inhibitor compound 18",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.052,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4M49, doi:10.2210/pdb4m49/pdb",
+       "registry": "PDB",
+       "reference_id": "4M49",
+       "url": "https://www.rcsb.org/structure/4M49",
+       "doi": "10.2210/pdb4m49/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "22Y",
+      "name": "3-(5-amino-6-{[(1R)-1-phenylethyl]amino}pyrazin-2-yl)-4-chlorobenzoic acid",
+      "role": "ligand"
+     },
+     {
+      "component": "LAC",
+      "name": "LACTIC ACID",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Fauber et al. (2013) Bioorg.Med.Chem.Lett., doi:10.1016/j.bmcl.2013.08.060",
+     "registry": "PDB",
+     "reference_id": "4M49",
+     "url": "https://doi.org/10.1016/j.bmcl.2013.08.060",
+     "title": "Identification of 2-amino-5-aryl-pyrazines as inhibitors of human lactate dehydrogenase.",
+     "journal": "Bioorg.Med.Chem.Lett.",
+     "year": 2013,
+     "doi": "10.1016/j.bmcl.2013.08.060",
+     "pubmed": "24012183"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4m49/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4M49",
+    "published": true
+   },
+   {
+    "pdb_id": "4L4R",
+    "title": "Structural Characterisation of the Apo-form of Human Lactate Dehydrogenase M Isozyme",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.1,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4L4R, doi:10.2210/pdb4l4r/pdb",
+       "registry": "PDB",
+       "reference_id": "4L4R",
+       "url": "https://www.rcsb.org/structure/4L4R",
+       "doi": "10.2210/pdb4l4r/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [],
+    "citation": {
+     "text": "Dempster et al. (2014) Acta Crystallogr.,Sect.D, doi:10.1107/S1399004714005422",
+     "registry": "PDB",
+     "reference_id": "4L4R",
+     "url": "https://doi.org/10.1107/S1399004714005422",
+     "title": "Structural characterization of the apo form and NADH binary complex of human lactate dehydrogenase.",
+     "journal": "Acta Crystallogr.,Sect.D",
+     "year": 2014,
+     "doi": "10.1107/S1399004714005422",
+     "pubmed": "24816116"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4l4r/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4L4R",
+    "published": true
+   },
+   {
+    "pdb_id": "4OKN",
+    "title": "Crystal structure of human muscle L-lactate dehydrogenase, ternary complex with NADH and oxalate",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.1,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4OKN, doi:10.2210/pdb4okn/pdb",
+       "registry": "PDB",
+       "reference_id": "4OKN",
+       "url": "https://www.rcsb.org/structure/4OKN",
+       "doi": "10.2210/pdb4okn/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "KAN",
+      "name": "KANAMYCIN A",
+      "role": "ligand"
+     },
+     {
+      "component": "OXL",
+      "name": "OXALATE ION",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Kolappan et al. (2015) Acta Crystallogr.,Sect.D, doi:10.1107/S1399004714024791",
+     "registry": "PDB",
+     "reference_id": "4OKN",
+     "url": "https://doi.org/10.1107/S1399004714024791",
+     "title": "Structures of lactate dehydrogenase A (LDHA) in apo, ternary and inhibitor-bound forms.",
+     "journal": "Acta Crystallogr.,Sect.D",
+     "year": 2015,
+     "doi": "10.1107/S1399004714024791",
+     "pubmed": "25664730"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4okn/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4OKN",
+    "published": true
+   },
+   {
+    "pdb_id": "6BAD",
+    "title": "Lactate Dehydrogenase in complex with inhibitor (R)-3-((2-chlorophenyl)thio)-6-(3-((4-fluorophenyl)amino)phenyl)-4-hydroxy-6-(thiophen-3-yl)-5,6-dihydro-2H-pyran-2-one",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.1,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6BAD, doi:10.2210/pdb6bad/pdb",
+       "registry": "PDB",
+       "reference_id": "6BAD",
+       "url": "https://www.rcsb.org/structure/6BAD",
+       "doi": "10.2210/pdb6bad/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAD",
+      "name": "NICOTINAMIDE-ADENINE-DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "D0Y",
+      "name": "(6R)-3-[(2-chlorophenyl)sulfanyl]-6-{3-[(4-fluorophenyl)amino]phenyl}-4-hydroxy-6-(thiophen-3-yl)-5,6-dihydro-2H-pyran-2-one",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "unpublished deposition (Wei et al.); entry doi:10.2210/pdb6bad/pdb",
+     "registry": "PDB",
+     "reference_id": "6BAD",
+     "url": "https://www.rcsb.org/structure/6BAD",
+     "title": "Structure-guided optimization and in vivo activities of hydroxylactone and hydroxylactam Inhibitors of Human Lactate Dehydrogenase",
+     "journal": "To Be Published",
+     "year": null,
+     "doi": "10.2210/pdb6bad/pdb",
+     "pubmed": null
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6bad/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6BAD",
+    "published": false
+   },
+   {
+    "pdb_id": "4R68",
+    "title": "Lactate Dehydrogenase in complex with inhibitor compound 31",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.112,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4R68, doi:10.2210/pdb4r68/pdb",
+       "registry": "PDB",
+       "reference_id": "4R68",
+       "url": "https://www.rcsb.org/structure/4R68",
+       "doi": "10.2210/pdb4r68/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "W31",
+      "name": "(1S)-1-phenylethyl (4-chloro-3-{[(4S)-4-(2,6-dichlorophenyl)-2-hydroxy-6-oxocyclohex-1-en-1-yl]sulfanyl}phenyl)acetate",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Labadie et al. (2014) Bioorg.Med.Chem.Lett., doi:10.1016/j.bmcl.2014.11.008",
+     "registry": "PDB",
+     "reference_id": "4R68",
+     "url": "https://doi.org/10.1016/j.bmcl.2014.11.008",
+     "title": "Optimization of 5-(2,6-dichlorophenyl)-3-hydroxy-2-mercaptocyclohex-2-enones as potent inhibitors of human lactate dehydrogenase.",
+     "journal": "Bioorg.Med.Chem.Lett.",
+     "year": 2014,
+     "doi": "10.1016/j.bmcl.2014.11.008",
+     "pubmed": "25466195"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4r68/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4R68",
+    "published": true
+   },
+   {
+    "pdb_id": "4QO7",
+    "title": "Lactate Dehydrogenase A in complex with substituted 3-Hydroxy-2-mercaptocyclohex-2-enone compound 7",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.14,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4QO7, doi:10.2210/pdb4qo7/pdb",
+       "registry": "PDB",
+       "reference_id": "4QO7",
+       "url": "https://www.rcsb.org/structure/4QO7",
+       "doi": "10.2210/pdb4qo7/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "2OP",
+      "name": "(2S)-2-HYDROXYPROPANOIC ACID",
+      "role": "ligand"
+     },
+     {
+      "component": "36V",
+      "name": "trans-2-[(2-nitrophenyl)sulfanyl]-5-phenylcyclohexane-1,3-dione",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Dragovich et al. (2014) Bioorg.Med.Chem.Lett., doi:10.1016/j.bmcl.2014.06.076",
+     "registry": "PDB",
+     "reference_id": "4QO7",
+     "url": "https://doi.org/10.1016/j.bmcl.2014.06.076",
+     "title": "Identification of substituted 3-hydroxy-2-mercaptocyclohex-2-enones as potent inhibitors of human lactate dehydrogenase.",
+     "journal": "Bioorg.Med.Chem.Lett.",
+     "year": 2014,
+     "doi": "10.1016/j.bmcl.2014.06.076",
+     "pubmed": "25037916"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4qo7/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4QO7",
+    "published": true
+   },
+   {
+    "pdb_id": "4ZVV",
+    "title": "Lactate dehydrogenase A in complex with a trisubstituted piperidine-2,4-dione inhibitor GNE-140",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.2,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4ZVV, doi:10.2210/pdb4zvv/pdb",
+       "registry": "PDB",
+       "reference_id": "4ZVV",
+       "url": "https://www.rcsb.org/structure/4ZVV",
+       "doi": "10.2210/pdb4zvv/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAD",
+      "name": "NICOTINAMIDE-ADENINE-DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "GN0",
+      "name": "(2~{R})-5-(2-chlorophenyl)sulfanyl-2-(4-morpholin-4-ylphenyl)-4-oxidanyl-2-thiophen-3-yl-1,3-dihydropyridin-6-one",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Boudreau et al. (2016) Nat.Chem.Biol., doi:10.1038/nchembio.2143",
+     "registry": "PDB",
+     "reference_id": "4ZVV",
+     "url": "https://doi.org/10.1038/nchembio.2143",
+     "title": "Metabolic plasticity underpins innate and acquired resistance to LDHA inhibition.",
+     "journal": "Nat.Chem.Biol.",
+     "year": 2016,
+     "doi": "10.1038/nchembio.2143",
+     "pubmed": "27479743"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4zvv/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4ZVV",
+    "published": true
+   },
+   {
+    "pdb_id": "6BB1",
+    "title": "Lactate Dehydrogenase in complex with inhibitor (R)-5-((2-chlorophenyl)thio)-6'-(4-fluorophenoxy)-4-hydroxy-2-(thiophen-3-yl)-2,3-dihydro-[2,2'-bipyridin]-6(1H)-one",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.3,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6BB1, doi:10.2210/pdb6bb1/pdb",
+       "registry": "PDB",
+       "reference_id": "6BB1",
+       "url": "https://www.rcsb.org/structure/6BB1",
+       "doi": "10.2210/pdb6bb1/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAD",
+      "name": "NICOTINAMIDE-ADENINE-DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "D3J",
+      "name": "(2R)-5-[(2-chlorophenyl)sulfanyl]-6'-(4-fluorophenoxy)-4-hydroxy-2-(thiophen-3-yl)-2,3-dihydro[2,2'-bipyridin]-6(1H)-one",
+      "role": "ligand"
+     },
+     {
+      "component": "LAC",
+      "name": "LACTIC ACID",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "unpublished deposition (Wei et al.); entry doi:10.2210/pdb6bb1/pdb",
+     "registry": "PDB",
+     "reference_id": "6BB1",
+     "url": "https://www.rcsb.org/structure/6BB1",
+     "title": "Structure-guided optimization and in vivo activities of hydroxylactone and hydroxylactam Inhibitors of Human Lactate Dehydrogenase",
+     "journal": "To Be Published",
+     "year": null,
+     "doi": "10.2210/pdb6bb1/pdb",
+     "pubmed": null
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6bb1/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6BB1",
+    "published": false
+   },
+   {
+    "pdb_id": "8FW6",
+    "title": "Human Lactate Dehydrogenase A in Complex with Inhibitor CHK-336",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.34,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 8FW6, doi:10.2210/pdb8fw6/pdb",
+       "registry": "PDB",
+       "reference_id": "8FW6",
+       "url": "https://www.rcsb.org/structure/8FW6",
+       "doi": "10.2210/pdb8fw6/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EDO",
+      "name": "1,2-ETHANEDIOL",
+      "role": "additive"
+     },
+     {
+      "component": "PEG",
+      "name": "DI(HYDROXYETHYL)ETHER",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "YBO",
+      "name": "(2P)-2-{5-(cyclopropylmethyl)-3-(4-fluorophenyl)-4-[(3-fluoro-4-sulfamoylphenyl)methyl]-1H-pyrazol-1-yl}-1,3-thiazole-4-carboxylic acid",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Cox et al. (2025) J Am Soc Nephrol, doi:10.1681/ASN.0000000690",
+     "registry": "PDB",
+     "reference_id": "8FW6",
+     "url": "https://doi.org/10.1681/ASN.0000000690",
+     "title": "Characterization of CHK-336, A First-in-Class, Liver-Targeted, Small-Molecule Lactate Dehydrogenase Inhibitor for Hyperoxaluria Treatment.",
+     "journal": "J Am Soc Nephrol",
+     "year": 2025,
+     "doi": "10.1681/ASN.0000000690",
+     "pubmed": "40193200"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb8fw6/pdb",
+    "entry_url": "https://www.rcsb.org/structure/8FW6",
+    "published": true
+   },
+   {
+    "pdb_id": "4AJP",
+    "title": "Human LDHA in complex with 2-((4-(4-((3-((2-methyl-1,3-benzothiazol- 6yl)amino)-3-oxo-propyl)amino)-4-oxo-butyl)phenyl)methyl)propanedioic acid",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.38,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4AJP, doi:10.2210/pdb4ajp/pdb",
+       "registry": "PDB",
+       "reference_id": "4AJP",
+       "url": "https://www.rcsb.org/structure/4AJP",
+       "doi": "10.2210/pdb4ajp/pdb"
+      },
+      "organism": "HOMO SAPIENS",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "HOMO SAPIENS"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "GOL",
+      "name": "GLYCEROL",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "88N",
+      "name": "{4-[4-({3-[(2-METHYL-1,3-BENZOTHIAZOL-6-YL)AMINO]-3-OXOPROPYL}AMINO)-4-OXOBUTYL]BENZYL}PROPANEDIOIC ACID",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Ward et al. (2012) J.Med.Chem., doi:10.1021/JM201734R",
+     "registry": "PDB",
+     "reference_id": "4AJP",
+     "url": "https://doi.org/10.1021/JM201734R",
+     "title": "The Design and Synthesis of Novel Lactate Dehydrogenase a Inhibitors by Fragment-Based Lead Generation",
+     "journal": "J.Med.Chem.",
+     "year": 2012,
+     "doi": "10.1021/JM201734R",
+     "pubmed": "22417091"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4ajp/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4AJP",
+    "published": true
+   },
+   {
+    "pdb_id": "5ZJD",
+    "title": "Lactate dehydrogenase with NADH and MLA",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.394,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 5ZJD, doi:10.2210/pdb5zjd/pdb",
+       "registry": "PDB",
+       "reference_id": "5ZJD",
+       "url": "https://www.rcsb.org/structure/5ZJD",
+       "doi": "10.2210/pdb5zjd/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "MLI",
+      "name": "MALONATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     }
+    ],
+    "citation": {
+     "text": "Chung et al. (2019) Cancers (Basel), doi:10.3390/cancers11070963",
+     "registry": "PDB",
+     "reference_id": "5ZJD",
+     "url": "https://doi.org/10.3390/cancers11070963",
+     "title": "Machilin A Inhibits Tumor Growth and Macrophage M2 Polarization Through the Reduction of Lactic Acid.",
+     "journal": "Cancers (Basel)",
+     "year": 2019,
+     "doi": "10.3390/cancers11070963",
+     "pubmed": "31324019"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb5zjd/pdb",
+    "entry_url": "https://www.rcsb.org/structure/5ZJD",
+    "published": true
+   },
+   {
+    "pdb_id": "4OJN",
+    "title": "Crystal structure of human muscle L-lactate dehydrogenase",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.4,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4OJN, doi:10.2210/pdb4ojn/pdb",
+       "registry": "PDB",
+       "reference_id": "4OJN",
+       "url": "https://www.rcsb.org/structure/4OJN",
+       "doi": "10.2210/pdb4ojn/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "1PE",
+      "name": "PENTAETHYLENE GLYCOL",
+      "role": "additive"
+     },
+     {
+      "component": "GOL",
+      "name": "GLYCEROL",
+      "role": "additive"
+     }
+    ],
+    "citation": {
+     "text": "Kolappan et al. (2015) Acta Crystallogr.,Sect.D, doi:10.1107/S1399004714024791",
+     "registry": "PDB",
+     "reference_id": "4OJN",
+     "url": "https://doi.org/10.1107/S1399004714024791",
+     "title": "Structures of lactate dehydrogenase A (LDHA) in apo, ternary and inhibitor-bound forms.",
+     "journal": "Acta Crystallogr.,Sect.D",
+     "year": 2015,
+     "doi": "10.1107/S1399004714024791",
+     "pubmed": "25664730"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4ojn/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4OJN",
+    "published": true
+   },
+   {
+    "pdb_id": "6BAG",
+    "title": "Lactate Dehydrogenase in complex with inhibitor (R)-5-((2-chlorophenyl)thio)-6'-((4-fluorophenyl)amino)-4-hydroxy-2-(thiophen-3-yl)-2,3-dihydro-[2,2'-bipyridin]-6(1H)-one",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.4,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6BAG, doi:10.2210/pdb6bag/pdb",
+       "registry": "PDB",
+       "reference_id": "6BAG",
+       "url": "https://www.rcsb.org/structure/6BAG",
+       "doi": "10.2210/pdb6bag/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAD",
+      "name": "NICOTINAMIDE-ADENINE-DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "D0V",
+      "name": "(2R)-5-[(2-chlorophenyl)sulfanyl]-6'-[(4-fluorophenyl)amino]-4-hydroxy-2-(thiophen-3-yl)-2,3-dihydro[2,2'-bipyridin]-6(1H)-one",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "unpublished deposition (Wei et al.); entry doi:10.2210/pdb6bag/pdb",
+     "registry": "PDB",
+     "reference_id": "6BAG",
+     "url": "https://www.rcsb.org/structure/6BAG",
+     "title": "Structure-guided optimization and in vivo activities of hydroxylactone and hydroxylactam Inhibitors of Human Lactate Dehydrogenase",
+     "journal": "To Be Published",
+     "year": null,
+     "doi": "10.2210/pdb6bag/pdb",
+     "pubmed": null
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6bag/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6BAG",
+    "published": false
+   },
+   {
+    "pdb_id": "6BB3",
+    "title": "Lactate Dehydrogenase in complex with inhibitor 3-((2-chlorophenyl)thio)-6-(6-((4-fluorophenyl)amino)pyridin-2-yl)-4-hydroxy-6-(thiophen-3-yl)-5,6-dihydro-2H-pyran-2-one",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.4,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6BB3, doi:10.2210/pdb6bb3/pdb",
+       "registry": "PDB",
+       "reference_id": "6BB3",
+       "url": "https://www.rcsb.org/structure/6BB3",
+       "doi": "10.2210/pdb6bb3/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAD",
+      "name": "NICOTINAMIDE-ADENINE-DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "D4A",
+      "name": "(6R)-3-[(2-chlorophenyl)sulfanyl]-6-{6-[(4-fluorophenyl)amino]pyridin-2-yl}-4-hydroxy-6-(thiophen-3-yl)-5,6-dihydro-2H-pyran-2-one",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "unpublished deposition (Wei et al.); entry doi:10.2210/pdb6bb3/pdb",
+     "registry": "PDB",
+     "reference_id": "6BB3",
+     "url": "https://www.rcsb.org/structure/6BB3",
+     "title": "Structure-guided optimization and in vivo activities of hydroxylactone and hydroxylactam Inhibitors of Human Lactate Dehydrogenase",
+     "journal": "To Be Published",
+     "year": null,
+     "doi": "10.2210/pdb6bb3/pdb",
+     "pubmed": null
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6bb3/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6BB3",
+    "published": false
+   },
+   {
+    "pdb_id": "9BK3",
+    "title": "Crystal structure of Lactate dehydrogenase in complex with 4-((4-(1-methyl-1H-imidazole-2-carbonyl)phenyl)amino)-4-oxo-2-(4-(trifluoromethyl)phenyl)butanoic acid (R-enantiomer, orthorhombic P form)",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.4,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 9BK3, doi:10.2210/pdb9bk3/pdb",
+       "registry": "PDB",
+       "reference_id": "9BK3",
+       "url": "https://www.rcsb.org/structure/9BK3",
+       "doi": "10.2210/pdb9bk3/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "CL",
+      "name": "CHLORIDE ION",
+      "role": "additive"
+     },
+     {
+      "component": "MLI",
+      "name": "MALONATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "A1AR0",
+      "name": "(2R)-4-[4-(1-methyl-1H-imidazole-2-carbonyl)anilino]-4-oxo-2-[4-(trifluoromethyl)phenyl]butanoic acid",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Sharma et al. (2024) Eur.J.Med.Chem., doi:10.1016/j.ejmech.2024.116598",
+     "registry": "PDB",
+     "reference_id": "9BK3",
+     "url": "https://doi.org/10.1016/j.ejmech.2024.116598",
+     "title": "Synthesis and biological characterization of an orally bioavailable lactate dehydrogenase-A inhibitor against pancreatic cancer.",
+     "journal": "Eur.J.Med.Chem.",
+     "year": 2024,
+     "doi": "10.1016/j.ejmech.2024.116598",
+     "pubmed": "38925013"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb9bk3/pdb",
+    "entry_url": "https://www.rcsb.org/structure/9BK3",
+    "published": true
+   },
+   {
+    "pdb_id": "6BB2",
+    "title": "Lactate Dehydrogenase in complex with inhibitor (S)-5-((2-chlorophenyl)thio)-6'-(4-fluorophenoxy)-4-hydroxy-2-(thiophen-3-yl)-2,3-dihydro-[2,2'-bipyridin]-6(1H)-one",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.47,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6BB2, doi:10.2210/pdb6bb2/pdb",
+       "registry": "PDB",
+       "reference_id": "6BB2",
+       "url": "https://www.rcsb.org/structure/6BB2",
+       "doi": "10.2210/pdb6bb2/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAD",
+      "name": "NICOTINAMIDE-ADENINE-DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "D4J",
+      "name": "(2S)-5-[(2-chlorophenyl)sulfanyl]-6'-(4-fluorophenoxy)-4-hydroxy-2-(thiophen-3-yl)-2,3-dihydro[2,2'-bipyridin]-6(1H)-one",
+      "role": "ligand"
+     },
+     {
+      "component": "LAC",
+      "name": "LACTIC ACID",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "unpublished deposition (Wei et al.); entry doi:10.2210/pdb6bb2/pdb",
+     "registry": "PDB",
+     "reference_id": "6BB2",
+     "url": "https://www.rcsb.org/structure/6BB2",
+     "title": "Structure-guided optimization and in vivo activities of hydroxylactone and hydroxylactam Inhibitors of Human Lactate Dehydrogenase",
+     "journal": "To Be Published",
+     "year": null,
+     "doi": "10.2210/pdb6bb2/pdb",
+     "pubmed": null
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6bb2/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6BB2",
+    "published": false
+   },
+   {
+    "pdb_id": "7M2N",
+    "title": "Crystal structure of Human Lactate Dehydrogenase A with Inhibitor Compound 15",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.5,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 7M2N, doi:10.2210/pdb7m2n/pdb",
+       "registry": "PDB",
+       "reference_id": "7M2N",
+       "url": "https://www.rcsb.org/structure/7M2N",
+       "doi": "10.2210/pdb7m2n/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EDO",
+      "name": "1,2-ETHANEDIOL",
+      "role": "additive"
+     },
+     {
+      "component": "GOL",
+      "name": "GLYCEROL",
+      "role": "additive"
+     },
+     {
+      "component": "PEG",
+      "name": "DI(HYDROXYETHYL)ETHER",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "YOJ",
+      "name": "5-[(5'-{1-(4-carboxy-1,3-thiazol-2-yl)-5-(cyclopropylmethyl)-4-[(3-fluoro-4-sulfamoylphenyl)methyl]-1H-pyrazol-3-yl}-2'-fluoro[1,1'-biphenyl]-4-yl)oxy]-1H-1,2,3-triazole-4-carboxylic acid",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Cox et al. (2025) J Am Soc Nephrol, doi:10.1681/ASN.0000000690",
+     "registry": "PDB",
+     "reference_id": "7M2N",
+     "url": "https://doi.org/10.1681/ASN.0000000690",
+     "title": "Characterization of CHK-336, A First-in-Class, Liver-Targeted, Small-Molecule Lactate Dehydrogenase Inhibitor for Hyperoxaluria Treatment.",
+     "journal": "J Am Soc Nephrol",
+     "year": 2025,
+     "doi": "10.1681/ASN.0000000690",
+     "pubmed": "40193200"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb7m2n/pdb",
+    "entry_url": "https://www.rcsb.org/structure/7M2N",
+    "published": true
+   },
+   {
+    "pdb_id": "6SBV",
+    "title": "X-ray Structure of Human LDH-A with an Allosteric Inhibitor (Compound 7)",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.6,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6SBV, doi:10.2210/pdb6sbv/pdb",
+       "registry": "PDB",
+       "reference_id": "6SBV",
+       "url": "https://www.rcsb.org/structure/6SBV",
+       "doi": "10.2210/pdb6sbv/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "L5K",
+      "name": "~{N}-[3-[(7-nitrodibenzofuran-2-yl)sulfonylamino]phenyl]-1-oxidanyl-cyclopropane-1-carboxamide",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Friberg et al. (2020) Acs Omega, doi:10.1021/acsomega.0c00715",
+     "registry": "PDB",
+     "reference_id": "6SBV",
+     "url": "https://doi.org/10.1021/acsomega.0c00715",
+     "title": "Structural Evidence for Isoform-Selective Allosteric Inhibition of Lactate Dehydrogenase A.",
+     "journal": "Acs Omega",
+     "year": 2020,
+     "doi": "10.1021/acsomega.0c00715",
+     "pubmed": "32548488"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6sbv/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6SBV",
+    "published": true
+   },
+   {
+    "pdb_id": "5ZJF",
+    "title": "LDHA-MA",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.602,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 5ZJF, doi:10.2210/pdb5zjf/pdb",
+       "registry": "PDB",
+       "reference_id": "5ZJF",
+       "url": "https://www.rcsb.org/structure/5ZJF",
+       "doi": "10.2210/pdb5zjf/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "9G9",
+      "name": "5,5'-[(2R,3S)-2,3-dimethylbutane-1,4-diyl]bis(2H-1,3-benzodioxole)",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Chung et al. (2019) Cancers (Basel), doi:10.3390/cancers11070963",
+     "registry": "PDB",
+     "reference_id": "5ZJF",
+     "url": "https://doi.org/10.3390/cancers11070963",
+     "title": "Machilin A Inhibits Tumor Growth and Macrophage M2 Polarization Through the Reduction of Lactic Acid.",
+     "journal": "Cancers (Basel)",
+     "year": 2019,
+     "doi": "10.3390/cancers11070963",
+     "pubmed": "31324019"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb5zjf/pdb",
+    "entry_url": "https://www.rcsb.org/structure/5ZJF",
+    "published": true
+   },
+   {
+    "pdb_id": "6ZZR",
+    "title": "The Crystal Structure of human LDHA from Biortus.",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.65,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6ZZR, doi:10.2210/pdb6zzr/pdb",
+       "registry": "PDB",
+       "reference_id": "6ZZR",
+       "url": "https://www.rcsb.org/structure/6ZZR",
+       "doi": "10.2210/pdb6zzr/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EDO",
+      "name": "1,2-ETHANEDIOL",
+      "role": "additive"
+     },
+     {
+      "component": "PEG",
+      "name": "DI(HYDROXYETHYL)ETHER",
+      "role": "additive"
+     }
+    ],
+    "citation": {
+     "text": "unpublished deposition (Wang et al.); entry doi:10.2210/pdb6zzr/pdb",
+     "registry": "PDB",
+     "reference_id": "6ZZR",
+     "url": "https://www.rcsb.org/structure/6ZZR",
+     "title": "The Crystal Structure of human LDHA from Biortus",
+     "journal": "To Be Published",
+     "year": null,
+     "doi": "10.2210/pdb6zzr/pdb",
+     "pubmed": null
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6zzr/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6ZZR",
+    "published": false
+   },
+   {
+    "pdb_id": "6BAZ",
+    "title": "Lactate Dehydrogenase in complex with inhibitor (S)-5-((2-chlorophenyl)thio)-6'-((4-fluorophenyl)amino)-4-hydroxy-2-(thiophen-3-yl)-2,3-dihydro-[2,2'-bipyridin]-6(1H)-one",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.7,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6BAZ, doi:10.2210/pdb6baz/pdb",
+       "registry": "PDB",
+       "reference_id": "6BAZ",
+       "url": "https://www.rcsb.org/structure/6BAZ",
+       "doi": "10.2210/pdb6baz/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAD",
+      "name": "NICOTINAMIDE-ADENINE-DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "D47",
+      "name": "(3S,6S)-3-[(2-chlorophenyl)sulfanyl]-6-{6-[(4-fluorophenyl)amino]pyridin-2-yl}-6-(thiophen-3-yl)piperidine-2,4-dione",
+      "role": "ligand"
+     },
+     {
+      "component": "LAC",
+      "name": "LACTIC ACID",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "unpublished deposition (Wei et al.); entry doi:10.2210/pdb6baz/pdb",
+     "registry": "PDB",
+     "reference_id": "6BAZ",
+     "url": "https://www.rcsb.org/structure/6BAZ",
+     "title": "Structure-guided optimization and in vivo activities of hydroxylactone and hydroxylactam Inhibitors of Human Lactate Dehydrogenase",
+     "journal": "To Be Published",
+     "year": null,
+     "doi": "10.2210/pdb6baz/pdb",
+     "pubmed": null
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6baz/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6BAZ",
+    "published": false
+   },
+   {
+    "pdb_id": "4L4S",
+    "title": "Structural characterisation of the NADH binary complex of human lactate dehydrogenase M isozyme",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.9,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4L4S, doi:10.2210/pdb4l4s/pdb",
+       "registry": "PDB",
+       "reference_id": "4L4S",
+       "url": "https://www.rcsb.org/structure/4L4S",
+       "doi": "10.2210/pdb4l4s/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     }
+    ],
+    "citation": {
+     "text": "Dempster et al. (2014) Acta Crystallogr.,Sect.D, doi:10.1107/S1399004714005422",
+     "registry": "PDB",
+     "reference_id": "4L4S",
+     "url": "https://doi.org/10.1107/S1399004714005422",
+     "title": "Structural characterization of the apo form and NADH binary complex of human lactate dehydrogenase.",
+     "journal": "Acta Crystallogr.,Sect.D",
+     "year": 2014,
+     "doi": "10.1107/S1399004714005422",
+     "pubmed": "24816116"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4l4s/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4L4S",
+    "published": true
+   },
+   {
+    "pdb_id": "6SBU",
+    "title": "X-ray Structure of Human LDHA with an Allosteric Inhibitor (Compound 3)",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.91,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 6SBU, doi:10.2210/pdb6sbu/pdb",
+       "registry": "PDB",
+       "reference_id": "6SBU",
+       "url": "https://www.rcsb.org/structure/6SBU",
+       "doi": "10.2210/pdb6sbu/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "L5N",
+      "name": "4-[[4-[(5-chloranylthiophen-2-yl)carbonylamino]-1,3-bis(oxidanylidene)isoindol-2-yl]methyl]benzoic acid",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Friberg et al. (2020) Acs Omega, doi:10.1021/acsomega.0c00715",
+     "registry": "PDB",
+     "reference_id": "6SBU",
+     "url": "https://doi.org/10.1021/acsomega.0c00715",
+     "title": "Structural Evidence for Isoform-Selective Allosteric Inhibition of Lactate Dehydrogenase A.",
+     "journal": "Acs Omega",
+     "year": 2020,
+     "doi": "10.1021/acsomega.0c00715",
+     "pubmed": "32548488"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb6sbu/pdb",
+    "entry_url": "https://www.rcsb.org/structure/6SBU",
+    "published": true
+   },
+   {
+    "pdb_id": "5ZJE",
+    "title": "LDHA-mla",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 2.929,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 5ZJE, doi:10.2210/pdb5zje/pdb",
+       "registry": "PDB",
+       "reference_id": "5ZJE",
+       "url": "https://www.rcsb.org/structure/5ZJE",
+       "doi": "10.2210/pdb5zje/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "MLI",
+      "name": "MALONATE ION",
+      "role": "additive"
+     }
+    ],
+    "citation": {
+     "text": "Chung et al. (2019) Cancers (Basel), doi:10.3390/cancers11070963",
+     "registry": "PDB",
+     "reference_id": "5ZJE",
+     "url": "https://doi.org/10.3390/cancers11070963",
+     "title": "Machilin A Inhibits Tumor Growth and Macrophage M2 Polarization Through the Reduction of Lactic Acid.",
+     "journal": "Cancers (Basel)",
+     "year": 2019,
+     "doi": "10.3390/cancers11070963",
+     "pubmed": "31324019"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb5zje/pdb",
+    "entry_url": "https://www.rcsb.org/structure/5ZJE",
+    "published": true
+   },
+   {
+    "pdb_id": "4QSM",
+    "title": "Crystal structure of human muscle L-lactate dehydrogenase in complex with inhibitor 2, 3-{[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]amino}benzoic acid",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 3.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4QSM, doi:10.2210/pdb4qsm/pdb",
+       "registry": "PDB",
+       "reference_id": "4QSM",
+       "url": "https://www.rcsb.org/structure/4QSM",
+       "doi": "10.2210/pdb4qsm/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "38K",
+      "name": "3-{[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]amino}benzoic acid",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Kolappan et al. (2015) Acta Crystallogr.,Sect.D, doi:10.1107/S1399004714024791",
+     "registry": "PDB",
+     "reference_id": "4QSM",
+     "url": "https://doi.org/10.1107/S1399004714024791",
+     "title": "Structures of lactate dehydrogenase A (LDHA) in apo, ternary and inhibitor-bound forms.",
+     "journal": "Acta Crystallogr.,Sect.D",
+     "year": 2015,
+     "doi": "10.1107/S1399004714024791",
+     "pubmed": "25664730"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4qsm/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4QSM",
+    "published": true
+   },
+   {
+    "pdb_id": "5IXY",
+    "title": "Lactate Dehydrogenase in complex with hydroxylactam inhibitor compound 31: (2~{S})-5-(2-chlorophenyl)sulfanyl-2-(4-morpholin-4-ylphenyl)-4-oxidanyl-2-thiophen-3-yl-1,3-dihydropyridin-6-one",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 3.0,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 5IXY, doi:10.2210/pdb5ixy/pdb",
+       "registry": "PDB",
+       "reference_id": "5IXY",
+       "url": "https://www.rcsb.org/structure/5IXY",
+       "doi": "10.2210/pdb5ixy/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAD",
+      "name": "NICOTINAMIDE-ADENINE-DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "GN2",
+      "name": "(2~{S})-5-(2-chlorophenyl)sulfanyl-2-(4-morpholin-4-ylphenyl)-4-oxidanyl-2-thiophen-3-yl-1,3-dihydropyridin-6-one",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Purkey et al. (2016) Acs Med.Chem.Lett., doi:10.1021/acsmedchemlett.6b00190",
+     "registry": "PDB",
+     "reference_id": "5IXY",
+     "url": "https://doi.org/10.1021/acsmedchemlett.6b00190",
+     "title": "Cell Active Hydroxylactam Inhibitors of Human Lactate Dehydrogenase with Oral Bioavailability in Mice.",
+     "journal": "Acs Med.Chem.Lett.",
+     "year": 2016,
+     "doi": "10.1021/acsmedchemlett.6b00190",
+     "pubmed": "27774125"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb5ixy/pdb",
+    "entry_url": "https://www.rcsb.org/structure/5IXY",
+    "published": true
+   },
+   {
+    "pdb_id": "4R69",
+    "title": "Lactate Dehydrogenase in complex with inhibitor compound 13",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 3.19,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4R69, doi:10.2210/pdb4r69/pdb",
+       "registry": "PDB",
+       "reference_id": "4R69",
+       "url": "https://www.rcsb.org/structure/4R69",
+       "doi": "10.2210/pdb4r69/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "EPE",
+      "name": "4-(2-HYDROXYETHYL)-1-PIPERAZINE ETHANESULFONIC ACID",
+      "role": "additive"
+     },
+     {
+      "component": "SO4",
+      "name": "SULFATE ION",
+      "role": "additive"
+     },
+     {
+      "component": "NAI",
+      "name": "1,4-DIHYDRONICOTINAMIDE ADENINE DINUCLEOTIDE",
+      "role": "cofactor"
+     },
+     {
+      "component": "W13",
+      "name": "(5R)-2-[(2-chlorophenyl)sulfanyl]-5-[2,6-dichloro-3-(tetrahydro-2H-pyran-4-ylamino)phenyl]-3-hydroxycyclohex-2-en-1-one",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Labadie et al. (2014) Bioorg.Med.Chem.Lett., doi:10.1016/j.bmcl.2014.11.008",
+     "registry": "PDB",
+     "reference_id": "4R69",
+     "url": "https://doi.org/10.1016/j.bmcl.2014.11.008",
+     "title": "Optimization of 5-(2,6-dichlorophenyl)-3-hydroxy-2-mercaptocyclohex-2-enones as potent inhibitors of human lactate dehydrogenase.",
+     "journal": "Bioorg.Med.Chem.Lett.",
+     "year": 2014,
+     "doi": "10.1016/j.bmcl.2014.11.008",
+     "pubmed": "25466195"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4r69/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4R69",
+    "published": true
+   },
+   {
+    "pdb_id": "4QT0",
+    "title": "Crystal structure of human muscle L-lactate dehydrogenase in complex with inhibitor 1, 3-{[3-CARBAMOYL-7-(2,4-DIMETHOXYPYRIMIDIN-5-YL)QUINOLIN-4-YL]AMINO}BENZOIC ACID",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 3.2,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 4QT0, doi:10.2210/pdb4qt0/pdb",
+       "registry": "PDB",
+       "reference_id": "4QT0",
+       "url": "https://www.rcsb.org/structure/4QT0",
+       "doi": "10.2210/pdb4qt0/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "38Q",
+      "name": "3-{[3-carbamoyl-7-(2,4-dimethoxypyrimidin-5-yl)quinolin-4-yl]amino}benzoic acid",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "Kolappan et al. (2015) Acta Crystallogr.,Sect.D, doi:10.1107/S1399004714024791",
+     "registry": "PDB",
+     "reference_id": "4QT0",
+     "url": "https://doi.org/10.1107/S1399004714024791",
+     "title": "Structures of lactate dehydrogenase A (LDHA) in apo, ternary and inhibitor-bound forms.",
+     "journal": "Acta Crystallogr.,Sect.D",
+     "year": 2015,
+     "doi": "10.1107/S1399004714024791",
+     "pubmed": "25664730"
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb4qt0/pdb",
+    "entry_url": "https://www.rcsb.org/structure/4QT0",
+    "published": true
+   },
+   {
+    "pdb_id": "9IOV",
+    "title": "Gossypol bound lactate dehydrogenase A",
+    "method": "X-RAY DIFFRACTION",
+    "resolution": {
+     "value": 3.98,
+     "unit": "Å",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "PDB 9IOV, doi:10.2210/pdb9iov/pdb",
+       "registry": "PDB",
+       "reference_id": "9IOV",
+       "url": "https://www.rcsb.org/structure/9IOV",
+       "doi": "10.2210/pdb9iov/pdb"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": null,
+       "temperature_c": null,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": null,
+      "scope": [],
+      "note": "the entry's resolution_combined, as the RCSB reports it"
+     },
+     "label": "resolution"
+    },
+    "organisms": [
+     "Homo sapiens"
+    ],
+    "uniprot": [
+     "P00338"
+    ],
+    "bound": [
+     {
+      "component": "GO3",
+      "name": "Gossypol",
+      "role": "ligand"
+     }
+    ],
+    "citation": {
+     "text": "unpublished deposition (Ha et al.); entry doi:10.2210/pdb9iov/pdb",
+     "registry": "PDB",
+     "reference_id": "9IOV",
+     "url": "https://www.rcsb.org/structure/9IOV",
+     "title": "Gossypol bound lactate dehydrogenase A",
+     "journal": "To be published",
+     "year": null,
+     "doi": "10.2210/pdb9iov/pdb",
+     "pubmed": null
+    },
+    "binds_ligand": false,
+    "entry_doi": "10.2210/pdb9iov/pdb",
+    "entry_url": "https://www.rcsb.org/structure/9IOV",
+    "published": false
+   }
+  ],
+  "total": 46,
+  "report_markdown": "Read --organism 'human' as Homo sapiens.\n\n# Structures for EC 1.1.1.27 in Homo sapiens\n\n| protein | gene | UniProt | entries |\n|---|---|---|---|\n| L-lactate dehydrogenase A chain **(chosen)** | LDHA | P00338 | 46 |\n| L-lactate dehydrogenase B chain | LDHB | P07195 | 7 |\n| L-lactate dehydrogenase C chain | LDHC | P07864 | 2 |\n| L-lactate dehydrogenase A-like 6A | LDHAL6A | Q6ZMR3 | 0 |\n| L-lactate dehydrogenase A-like 6B | LDHAL6B | Q9BYZ2 | 0 |\n\n## LDHA: 46 entries, best evidence first\n\n1 of 46 entries have 'oxamate' bound; those are listed first.\n\n| PDB | method | resolution | ligands | cofactors | additives | primary citation |\n|---|---|---|---|---|---|---|\n| [1I10](https://www.rcsb.org/structure/1I10) | x-ray diffraction | 2.30 A | OXM | NAI | ACT | Read et al. (2001) Proteins, doi:10.1002/1097-0134(20010501)43:2<175::AID-PROT1029>3.0.CO;2-# |\n| [5W8J](https://www.rcsb.org/structure/5W8J) | x-ray diffraction | 1.55 A | 9Y7 | none | DMS, GOL, MLA | Rai et al. (2017) J. Med. Chem., doi:10.1021/acs.jmedchem.7b00941 |\n| [5W8K](https://www.rcsb.org/structure/5W8K) | x-ray diffraction | 1.60 A | 9Y7 | NAI | GOL, MLA | Rai et al. (2017) J. Med. Chem., doi:10.1021/acs.jmedchem.7b00941 |\n| [5W8H](https://www.rcsb.org/structure/5W8H) | x-ray diffraction | 1.80 A | 9Y1 | none | ACT, DMS, GOL, MLA | Rai et al. (2017) J. Med. Chem., doi:10.1021/acs.jmedchem.7b00941 |\n| [9BK2](https://www.rcsb.org/structure/9BK2) | x-ray diffraction | 1.85 A | A1AQ0 | none | DMS, MLI | Sharma et al. (2024) Eur.J.Med.Chem., doi:10.1016/j.ejmech.2024.116598 |\n| [4JNK](https://www.rcsb.org/structure/4JNK) | x-ray diffraction | 1.90 A | LAC, ZHK | NAI | EPE, SO4 | Dragovich et al. (2013) Bioorg.Med.Chem.Lett., doi:10.1016/j.bmcl.2013.04.001 |\n| [4RLS](https://www.rcsb.org/structure/4RLS) | x-ray diffraction | 1.91 A | 2OP, 49C | NAI | SO4 | Fauber et al. (2014) Bioorg.Med.Chem.Lett., doi:10.1016/j.bmcl.2014.10.067 |\n| [5W8I](https://www.rcsb.org/structure/5W8I) | x-ray diffraction | 1.95 A | 9YD | none; metals ZN | CIT, DMS, GOL, MLA | Rai et al. (2017) J. Med. Chem., doi:10.1021/acs.jmedchem.7b00941 |\n\n38 more; raise --top to see them.\n\nOrdering is by the ligand asked for, then experimental method, then resolution: numbers a reader can check, not a judgement of quality. Additives are there because of how the crystal was grown.\n\nSources: Berman et al. (2000) Nucleic Acids Res. 28:235, doi:10.1093/nar/28.1.235; UniProt for the protein grouping.\n",
+  "chimerax_artifact": null,
+  "organism_note": "Read --organism 'human' as Homo sapiens.",
+  "top": 8,
+  "sources": [
+   {
+    "text": "Berman et al. (2000) Nucleic Acids Res. 28:235, doi:10.1093/nar/28.1.235",
+    "registry": null,
+    "doi": "10.1093/nar/28.1.235",
+    "url": "https://doi.org/10.1093/nar/28.1.235",
+    "title": "Protein Data Bank"
+   },
+   {
+    "text": "UniProt for the protein grouping",
+    "registry": "UniProt",
+    "url": null
+   }
+  ]
+ }
+}

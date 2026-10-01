@@ -25,10 +25,11 @@ import argparse
 import json
 import math
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
-from caterva.bind.core import Target, judge
+from caterva.bind.core import Target, Verdict, judge
 
 EXIT_OK, EXIT_CRASH, EXIT_USAGE, EXIT_REFUSED, EXIT_NOT_A_RESULT = 0, 1, 2, 3, 4
 KJ_PER_KCAL = 4.184
@@ -105,9 +106,10 @@ def setup(a) -> int:
 
 
 def _leg(directory: Path, leg: str, rep: int, n_windows: int, lines: List[str], warnings: List[str]):
-    """(ΔG, σ) kJ/mol for one leg of one replica, from Caterva's own MBAR on
-    the raw dhdl files when every window wrote every state's energy; from
-    `gmx bar`'s log otherwise (runs set up before the estimator existed)."""
+    """(ΔG, σ, estimator) kJ/mol for one leg of one replica, from Caterva's
+    own MBAR on the raw dhdl files when every window wrote every state's
+    energy; from `gmx bar`'s log otherwise (runs set up before the
+    estimator existed). `estimator` says which: ESTIMATOR_MBAR or ESTIMATOR_GMX_BAR."""
     from caterva.fep.core import read_bar
     from caterva.fep.estimators import analyse_leg
     d = directory / leg / f"rep{rep}"
@@ -130,25 +132,69 @@ def _leg(directory: Path, leg: str, rep: int, n_windows: int, lines: List[str], 
                 + f"{gmx}); {sum(a.samples_used)} independent of {sum(a.samples_raw)} samples, "
                 f"min overlap {a.min_overlap:.3f} ({a.min_overlap_pair[0]}-{a.min_overlap_pair[1]})")
             warnings.extend(f"rep{rep} {leg}: {w}" for w in a.warnings)
-            return a.dg_mbar, a.err_mbar
+            return a.dg_mbar, a.err_mbar, ESTIMATOR_MBAR
     log = d / "bar.log"
     if not log.is_file():
         lines.append(f"  rep{rep}: {leg} leg not finished (no prod.xvg for every window, no bar.log)")
         return None
     g, ge = read_bar(log.read_text())
     lines.append(f"  rep{rep} {leg:<7} gmx bar {g:8.2f} ± {ge:.2f} kJ/mol (no all-state energies for MBAR)")
-    return g, ge
+    return g, ge, ESTIMATOR_GMX_BAR
 
 
-def summarise(directory: Path) -> int:
-    from caterva.fep.core import read_bar
+#: How a leg's free energy was estimated, as `_leg` reports it.
+ESTIMATOR_MBAR = "MBAR on the raw dhdl files (Caterva's own estimator)"
+ESTIMATOR_GMX_BAR = "gmx bar (no all-state energies for MBAR)"
+
+
+@dataclass
+class ReplicaDG:
+    """One finished replica: both legs and the binding free energy they close to."""
+
+    rep: int
+    complex_kj: float
+    complex_err_kj: float
+    complex_estimator: str
+    solvent_kj: float
+    solvent_err_kj: float
+    solvent_estimator: str
+    dg_kcal: float
+
+
+@dataclass
+class FepSummary:
+    """What `--summarise DIR` read and decided, before it is printed."""
+
+    #: caterva-fep.json as written by the setup.
+    record: dict
+    #: The per-leg and per-replica lines, as printed.
+    lines: List[str]
+    warnings: List[str]
+    replicas: List[ReplicaDG]
+    #: Per-replica propagated BAR errors, kcal/mol, in replica order.
+    bar_errs: List[float]
+    #: Set once two or more replicas finished; None before.
+    mean: Optional[float] = None
+    sem: Optional[float] = None
+    sigma: Optional[float] = None
+    verdict: Optional[Verdict] = None
+
+    @property
+    def code(self) -> int:
+        """0 agrees; 4 disagrees, or not yet a result (fewer than two replicas)."""
+        return EXIT_OK if self.verdict is not None and self.verdict.word == "agrees" else EXIT_NOT_A_RESULT
+
+
+def read_summary(directory: Path) -> Tuple[Optional[FepSummary], Optional[str]]:
+    """(summary, None), or (None, the refusal `summarise` prints, exit 3):
+    each replica's legs combined, ΔG°bind = ΔG_solvent + ΔG_restraints_on -
+    ΔG_complex, and with two or more replicas the mean, its σ (the larger of
+    the SEM and the propagated BAR error) and the verdict against the band."""
     rec_path = directory / "caterva-fep.json"
     if not rec_path.is_file():
-        print(f"caterva fep: {directory} has no caterva-fep.json; it was not written by caterva fep",
-              file=sys.stderr)
-        return EXIT_REFUSED
+        return None, f"caterva fep: {directory} has no caterva-fep.json; it was not written by caterva fep"
     rec = json.loads(rec_path.read_text())
-    per_rep: List[float] = []
+    reps: List[ReplicaDG] = []
     bar_errs: List[float] = []
     lines: List[str] = []
     warnings: List[str] = []
@@ -162,38 +208,58 @@ def summarise(directory: Path) -> int:
             legs[leg] = got
         if legs is None:
             continue
-        (gc, ec), (gs, es) = legs["complex"], legs["solvent"]
+        (gc, ec, how_c), (gs, es, how_s) = legs["complex"], legs["solvent"]
         dg = gs + rec["restraint"]["correction_kj"] - gc
-        per_rep.append(dg / KJ_PER_KCAL)
+        reps.append(ReplicaDG(rep, gc, ec, how_c, gs, es, how_s, dg / KJ_PER_KCAL))
         bar_errs.append(math.hypot(ec, es) / KJ_PER_KCAL)
         lines.append(f"  rep{rep}: complex {gc:.2f} ± {ec:.2f}, solvent {gs:.2f} ± {es:.2f} kJ/mol "
                      f"-> ΔG°bind {dg / KJ_PER_KCAL:.2f} kcal/mol")
-    t = rec["target"]
-    lo, hi = t["band_kcal"]
-    print(f"{t['compound']} -> {t['organism']} at {rec['temperature_k']:.2f} K; "
-          f"restraint correction +{rec['restraint']['correction_kj'] / KJ_PER_KCAL:.2f} kcal/mol")
-    print("\n".join(lines))
-    print(f"TARGET  {lo:.2f} to {hi:.2f} kcal/mol ({', '.join('BRENDA ref ' + r for r in t['references'])})")
-    for c in t["caveats"]:
-        print(f"  caveat: {c}")
-    for w in warnings:
-        print(f"  WARNING {w}")
+    s = FepSummary(rec, lines, warnings, reps, bar_errs)
+    per_rep = [r.dg_kcal for r in reps]
     if len(per_rep) < 2:
-        print(f"NOT A RESULT: {len(per_rep)} finished replica(s). One run's BAR error is its "
-              f"statistical error, not the spread between independent runs.")
-        return EXIT_NOT_A_RESULT
+        return s, None
+    t = rec["target"]
     n = len(per_rep)
-    mean = sum(per_rep) / n
-    sem = math.sqrt(sum((x - mean) ** 2 for x in per_rep) / (n - 1) / n)
-    sigma = max(sem, math.sqrt(sum(e * e for e in bar_errs)) / n)
+    s.mean = sum(per_rep) / n
+    s.sem = math.sqrt(sum((x - s.mean) ** 2 for x in per_rep) / (n - 1) / n)
+    s.sigma = max(s.sem, math.sqrt(sum(e * e for e in bar_errs)) / n)
+    lo, hi = t["band_kcal"]
     tt = Target(t["compound"], t["organism"], t["state"], [], [], lo, hi, t["references"], t["caveats"])
-    v = judge(tt, mean, sigma, temperature_c=rec["temperature_k"] - 273.15)
-    print(f"COMPUTED  {mean:.2f} ± {sigma:.2f} kcal/mol ({n} replicas; σ = the larger of SEM and "
-          f"propagated BAR error)")
-    print(f"VERDICT   {v.word.upper()}: {v.detail}.")
+    s.verdict = judge(tt, s.mean, s.sigma, temperature_c=rec["temperature_k"] - 273.15)
+    return s, None
+
+
+def summary_lines(s: FepSummary) -> List[str]:
+    """What `--summarise` prints for a summary, one print() per item."""
+    rec, t = s.record, s.record["target"]
+    lo, hi = t["band_kcal"]
+    out = [f"{t['compound']} -> {t['organism']} at {rec['temperature_k']:.2f} K; "
+           f"restraint correction +{rec['restraint']['correction_kj'] / KJ_PER_KCAL:.2f} kcal/mol",
+           "\n".join(s.lines),
+           f"TARGET  {lo:.2f} to {hi:.2f} kcal/mol ({', '.join('BRENDA ref ' + r for r in t['references'])})"]
+    out += [f"  caveat: {c}" for c in t["caveats"]]
+    out += [f"  WARNING {w}" for w in s.warnings]
+    if s.verdict is None:
+        out.append(f"NOT A RESULT: {len(s.replicas)} finished replica(s). One run's BAR error is its "
+                   f"statistical error, not the spread between independent runs.")
+        return out
+    v = s.verdict
+    out.append(f"COMPUTED  {s.mean:.2f} ± {s.sigma:.2f} kcal/mol ({len(s.replicas)} replicas; σ = the larger "
+               f"of SEM and propagated BAR error)")
+    out.append(f"VERDICT   {v.word.upper()}: {v.detail}.")
     if v.word == "agrees" and len(t["references"]) < 2:
-        print("  Agreement with one publication is consistency, not validation.")
-    return EXIT_OK if v.word == "agrees" else EXIT_NOT_A_RESULT
+        out.append("  Agreement with one publication is consistency, not validation.")
+    return out
+
+
+def summarise(directory: Path) -> int:
+    s, refusal = read_summary(directory)
+    if s is None:
+        print(refusal, file=sys.stderr)
+        return EXIT_REFUSED
+    for line in summary_lines(s):
+        print(line)
+    return s.code
 
 
 def optimise(directory: Path, leg: str, rep: int) -> int:
@@ -234,7 +300,7 @@ def optimise(directory: Path, leg: str, rep: int) -> int:
     return EXIT_OK
 
 
-def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva fep") -> int:
+def build_parser(prog: str = "caterva fep") -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog=prog, description=__doc__.split("\n\n")[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--summarise", type=Path, metavar="DIR", help="combine a finished run and judge it")
@@ -256,6 +322,11 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva fep") -> int
     p.add_argument("--replicas", type=int, default=3)
     p.add_argument("--ns", type=float, default=5.0, help="production per window, ns")
     p.add_argument("--out", type=Path)
+    return p
+
+
+def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva fep") -> int:
+    p = build_parser(prog)
     try:
         a = p.parse_args(argv)
     except SystemExit as e:

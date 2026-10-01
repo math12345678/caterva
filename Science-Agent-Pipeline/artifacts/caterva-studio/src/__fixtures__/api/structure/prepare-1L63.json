@@ -1,0 +1,439 @@
+{
+ "kind": "prepare",
+ "request": {
+  "entry": "1L63"
+ },
+ "cli": [
+  "caterva",
+  "prepare",
+  "1L63"
+ ],
+ "outcome": {
+  "exit_code": 4,
+  "meaning": "negative",
+  "summary": "1L63: 1 chain, every chain blocked; 2 blocking findings",
+  "reason": "every chain has a blocking defect"
+ },
+ "result": {
+  "pdb_id": "1L63",
+  "title": "ANALYSIS OF THE INTERACTION BETWEEN CHARGED SIDE CHAINS AND THE ALPHA-HELIX DIPOLE USING DESIGNED THERMOSTABLE MUTANTS OF PHAGE T4 LYSOZYME",
+  "method": "X-RAY DIFFRACTION",
+  "resolution": {
+   "value": 1.75,
+   "unit": "Å",
+   "provenance": {
+    "kind": "measured",
+    "citation": {
+     "text": "PDB 1L63, doi:10.2210/pdb1l63/pdb",
+     "registry": "PDB",
+     "reference_id": "1L63",
+     "url": "https://www.rcsb.org/structure/1L63",
+     "doi": "10.2210/pdb1l63/pdb"
+    },
+    "organism": null,
+    "cross_species": false,
+    "conditions": {
+     "ph": null,
+     "temperature_c": null,
+     "buffer": null,
+     "unreported": []
+    },
+    "commentary": null,
+    "scope": [],
+    "note": "refine.ls_d_res_high of the entry's mmCIF"
+   },
+   "label": "resolution"
+  },
+  "r_free": null,
+  "chains": [
+   "A"
+  ],
+  "clean": false,
+  "chain_summary": [
+   {
+    "chain": "A",
+    "blocks": 2,
+    "near_site": 0,
+    "catalytic_intact": true
+   }
+  ],
+  "findings": [
+   {
+    "severity": "blocks",
+    "chain": "A",
+    "residues": [
+     "54"
+    ],
+    "distance": {
+     "value": 16.29100546313824,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Cys54->Thr at residue 54, which the depositors call 'conflict'. Whatever the label, this chain is not the natural sequence: simulating it as the wild type describes a different protein",
+    "source": "struct_ref_seq_dif",
+    "check": "sequence differs from UniProt",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "blocks",
+    "chain": "A",
+    "residues": [
+     "97"
+    ],
+    "distance": {
+     "value": 10.747886350348148,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "Cys97->Ala at residue 97, which the depositors call 'conflict'. Whatever the label, this chain is not the natural sequence: simulating it as the wild type describes a different protein",
+    "source": "struct_ref_seq_dif",
+    "check": "sequence differs from UniProt",
+    "catalytic": false,
+    "near_active_site": false
+   },
+   {
+    "severity": "note",
+    "chain": "A",
+    "residues": [
+     "163-164"
+    ],
+    "distance": {
+     "value": 13.566085728757578,
+     "unit": "Å",
+     "provenance": {
+      "kind": "computed",
+      "method": "distance to the nearest atom of a catalytic residue in the same chain, from the entry's coordinates (unmodelled stretches placed by their observed flanking residues)",
+      "inputs": [
+       "A"
+      ]
+     },
+     "label": "to the active site"
+    },
+    "what": "2 residues at the C terminus not modelled",
+    "source": "pdbx_unobs_or_zero_occ_residues",
+    "check": "unmodelled residues",
+    "catalytic": false,
+    "near_active_site": false
+   }
+  ],
+  "catalytic": [
+   {
+    "chain": "A",
+    "resseq": "20",
+    "expected": "ASP",
+    "found": "ASP",
+    "conserved": true,
+    "roles": "covalent catalysis",
+    "reference": "Asp20 of P00720",
+    "seq_id": 20
+   },
+   {
+    "chain": "A",
+    "resseq": "11",
+    "expected": "GLU",
+    "found": "GLU",
+    "conserved": true,
+    "roles": "proton shuttle (general acid/base)",
+    "reference": "Glu11 of P00720",
+    "seq_id": 11
+   }
+  ],
+  "reference": {
+   "mcsa_id": 921,
+   "enzyme": "lysozyme (glycosyl hydrolase 24 family)",
+   "uniprot": "P00720",
+   "how": "same UniProt accession",
+   "identity": {
+    "value": 0.975609756097561,
+    "unit": "",
+    "provenance": {
+     "kind": "computed",
+     "method": "global alignment (Needleman-Wunsch, BLOSUM62) of the M-CSA reference sequence against chain A: identical positions over aligned positions",
+     "inputs": [
+      "P00720",
+      "chain A"
+     ]
+    },
+    "label": "sequence identity"
+   },
+   "citation": {
+    "text": "Ribeiro et al. (2018) Nucleic Acids Res. 46:D618, doi:10.1093/nar/gkx1012",
+    "registry": "M-CSA",
+    "doi": "10.1093/nar/gkx1012",
+    "url": "https://doi.org/10.1093/nar/gkx1012",
+    "title": "Mechanism and Catalytic Site Atlas (M-CSA)",
+    "reference_id": "921"
+   },
+   "rejected": []
+  },
+  "protonation": null,
+  "not_checked": [
+   "structure-based pKa values: PROPKA is not run, so the protonation section judges each active-site residue only by how far folded proteins typically move its group's pKa",
+   "ligand and cofactor parameters (caterva md strips ligands; see MD_ROADMAP M4)"
+  ],
+  "report_markdown": "# Preparation audit: 1L63\n\n*ANALYSIS OF THE INTERACTION BETWEEN CHARGED SIDE CHAINS AND THE ALPHA-HELIX DIPOLE USING DESIGNED THERMOSTABLE MUTANTS OF PHAGE T4 LYSOZYME*\n\nx-ray diffraction, 1.75 Å. Chains of the enzyme: A.\n\n## Catalytic residues\n\nFrom M-CSA entry 921 (lysozyme (glycosyl hydrolase 24 family), reference P00720), chosen by same UniProt accession; 98% identical to chain A. Positions are carried onto each chain by global alignment.\n\n| residue | reference | role | conserved |\n|---|---|---|---|\n| Asp20 | Asp20 of P00720 | covalent catalysis | yes |\n| Glu11 | Glu11 of P00720 | proton shuttle (general acid/base) | yes |\n\n## Which chain to start from\n\n| chain | blocking defects | findings within 10 Å of the active site | catalytic residues intact |\n|---|---|---|---|\n| A | 2 | 0 | yes |\n\n**Every chain has at least one blocking defect.**\n\n## Blocks a faithful setup (2)\n\n| chain | where | Å to active site | finding | from |\n|---|---|---|---|---|\n| A | 97 | 10.7 | Cys97->Ala at residue 97, which the depositors call 'conflict'. Whatever the label, this chain is not the natural sequence: simulating it as the wild type describes a different protein | `struct_ref_seq_dif` |\n| A | 54 | 16.3 | Cys54->Thr at residue 54, which the depositors call 'conflict'. Whatever the label, this chain is not the natural sequence: simulating it as the wild type describes a different protein | `struct_ref_seq_dif` |\n\n## Worth knowing (1)\n\n| chain | where | Å to active site | finding | from |\n|---|---|---|---|---|\n| A | 163-164 | 13.6 | 2 residues at the C terminus not modelled | `pdbx_unobs_or_zero_occ_residues` |\n\n## Protonation at the active site\n\n19 titratable residue(s) within 10 Å of a catalytic atom in chain A: Glu11, Asp20, Asp10, Lys19, Tyr24, Arg145, Glu22, Arg8, Tyr18, Tyr25, Arg14, His31, Arg148, Glu5, Lys35, Tyr161, Asp70, Lys16, Arg137. Pass --ph with the assay pH to judge which of their charge states are uncertain there.\n\n## Not checked\n\n- structure-based pKa values: PROPKA is not run, so the protonation section judges each active-site residue only by how far folded proteins typically move its group's pKa\n- ligand and cofactor parameters (caterva md strips ligands; see MD_ROADMAP M4)\n\n## Sources\n\n- Protein Data Bank: Berman et al. (2000) Nucleic Acids Res. 28:235, doi:10.1093/nar/28.1.235\n- Mechanism and Catalytic Site Atlas (M-CSA): Ribeiro et al. (2018) Nucleic Acids Res. 46:D618, doi:10.1093/nar/gkx1012\n- global sequence alignment: Needleman & Wunsch (1970) J. Mol. Biol. 48:443, doi:10.1016/0022-2836(70)90057-4\n- BLOSUM62 substitution matrix: Henikoff & Henikoff (1992) Proc. Natl. Acad. Sci. USA 89:10915, doi:10.1073/pnas.89.22.10915\n\nDistances are to the nearest atom of a catalytic residue in the same chain; 10 Å is a chosen cutoff, not a physical boundary. Unmodelled stretches are placed by their observed flanking residues.\n",
+  "audit": {
+   "pdb_id": "1L63",
+   "title": "ANALYSIS OF THE INTERACTION BETWEEN CHARGED SIDE CHAINS AND THE ALPHA-HELIX DIPOLE USING DESIGNED THERMOSTABLE MUTANTS OF PHAGE T4 LYSOZYME",
+   "method": "X-RAY DIFFRACTION",
+   "resolution": 1.75,
+   "r_free": null,
+   "chains": [
+    "A"
+   ],
+   "findings": [
+    {
+     "check": "sequence differs from UniProt",
+     "severity": "blocks",
+     "what": "Cys54->Thr at residue 54, which the depositors call 'conflict'. Whatever the label, this chain is not the natural sequence: simulating it as the wild type describes a different protein",
+     "source": "struct_ref_seq_dif",
+     "chain": "A",
+     "residues": [
+      "54"
+     ],
+     "distance": 16.29100546313824,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "sequence differs from UniProt",
+     "severity": "blocks",
+     "what": "Cys97->Ala at residue 97, which the depositors call 'conflict'. Whatever the label, this chain is not the natural sequence: simulating it as the wild type describes a different protein",
+     "source": "struct_ref_seq_dif",
+     "chain": "A",
+     "residues": [
+      "97"
+     ],
+     "distance": 10.747886350348148,
+     "catalytic": false,
+     "span": null
+    },
+    {
+     "check": "unmodelled residues",
+     "severity": "note",
+     "what": "2 residues at the C terminus not modelled",
+     "source": "pdbx_unobs_or_zero_occ_residues",
+     "chain": "A",
+     "residues": [
+      "163-164"
+     ],
+     "distance": 13.566085728757578,
+     "catalytic": false,
+     "span": [
+      163,
+      164
+     ]
+    }
+   ],
+   "catalytic": [
+    {
+     "chain": "A",
+     "auth_seq_id": "20",
+     "expected": "ASP",
+     "found": "ASP",
+     "roles": "covalent catalysis",
+     "reference": "Asp20 of P00720",
+     "seq_id": 20
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "11",
+     "expected": "GLU",
+     "found": "GLU",
+     "roles": "proton shuttle (general acid/base)",
+     "reference": "Glu11 of P00720",
+     "seq_id": 11
+    }
+   ],
+   "reference": {
+    "mcsa_id": 921,
+    "enzyme": "lysozyme (glycosyl hydrolase 24 family)",
+    "uniprot": "P00720",
+    "identity": 0.975609756097561,
+    "how": "same UniProt accession",
+    "rejected": []
+   },
+   "not_checked": [
+    "structure-based pKa values: PROPKA is not run, so the protonation section judges each active-site residue only by how far folded proteins typically move its group's pKa",
+    "ligand and cofactor parameters (caterva md strips ligands; see MD_ROADMAP M4)"
+   ],
+   "chain_summary": [
+    {
+     "chain": "A",
+     "blocks": 2,
+     "near_site": 0,
+     "catalytic_intact": true
+    }
+   ],
+   "titratable": [
+    {
+     "chain": "A",
+     "auth_seq_id": "11",
+     "resname": "GLU",
+     "distance": 0.0,
+     "catalytic": true
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "20",
+     "resname": "ASP",
+     "distance": 0.0,
+     "catalytic": true
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "10",
+     "resname": "ASP",
+     "distance": 1.3051593772409553,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "19",
+     "resname": "LYS",
+     "distance": 1.330480364379725,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "24",
+     "resname": "TYR",
+     "distance": 2.6578754673611007,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "145",
+     "resname": "ARG",
+     "distance": 2.67847587258127,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "22",
+     "resname": "GLU",
+     "distance": 2.90052322866065,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "8",
+     "resname": "ARG",
+     "distance": 3.8575034672699924,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "18",
+     "resname": "TYR",
+     "distance": 4.041362888927448,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "25",
+     "resname": "TYR",
+     "distance": 4.875790089821341,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "14",
+     "resname": "ARG",
+     "distance": 5.900952973884814,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "31",
+     "resname": "HIS",
+     "distance": 5.950731971782965,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "148",
+     "resname": "ARG",
+     "distance": 6.298350736502374,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "5",
+     "resname": "GLU",
+     "distance": 7.293848709700525,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "35",
+     "resname": "LYS",
+     "distance": 7.329030768116615,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "161",
+     "resname": "TYR",
+     "distance": 7.6272360655744755,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "70",
+     "resname": "ASP",
+     "distance": 8.763999429484235,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "16",
+     "resname": "LYS",
+     "distance": 8.949495851722599,
+     "catalytic": false
+    },
+    {
+     "chain": "A",
+     "auth_seq_id": "137",
+     "resname": "ARG",
+     "distance": 9.191041834308013,
+     "catalytic": false
+    }
+   ]
+  },
+  "entry_citation": {
+   "text": "PDB 1L63, doi:10.2210/pdb1l63/pdb",
+   "registry": "PDB",
+   "reference_id": "1L63",
+   "url": "https://www.rcsb.org/structure/1L63",
+   "doi": "10.2210/pdb1l63/pdb"
+  },
+  "clean_chains": [],
+  "ph": null,
+  "active_site_radius": {
+   "value": 10.0,
+   "unit": "Å",
+   "provenance": {
+    "kind": "chosen",
+    "by": "default",
+    "reason": "a chosen cutoff, not a physical boundary (caterva prepare)"
+   },
+   "label": "active-site radius"
+  }
+ }
+}
