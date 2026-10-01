@@ -465,8 +465,9 @@ def test_an_angle_in_plane_in_the_crystal_reports_what_the_replica_did(tmp_path)
     run's own 21 frames of replica 1. Five of the 24 angles are in plane
     there. For each, the fractions on the clockwise and on the anticlockwise
     face are counted here from what gmx gangle printed for those frames (its
-    elevations and its angles, not Caterva's), and the native route must
-    report the same. Until 2026-09-30 both fractions were zero for every
+    elevations and its angles, not Caterva's), with the face rule written
+    out in the test rather than called from faces.py, and the native route
+    must report the same. Until 2026-09-30 both fractions were zero for every
     such angle and the report printed n/a: Ser50-Asn46-Asn59 is on the
     anticlockwise face in 8 of the 21 frames, and Asp48-Asn59-Asn46 on the
     clockwise face in 6."""
@@ -486,7 +487,14 @@ def test_an_angle_in_plane_in_the_crystal_reports_what_the_replica_did(tmp_path)
         if f.crystal_side:
             continue
         key = (t.a.resnr, t.v.resnr, t.b.resnr)
-        sides = [side(polar_sine(theta, from_gangle(alpha))) for theta, alpha in zip(angles[key], faces[key])]
+        # The face rule written out here rather than taken from faces.py:
+        # the polar sine is sin(angle) x sin(elevation), the elevation is
+        # 90 degrees less gangle's angle to the plane's normal, so the
+        # product is sin(angle) x cos(alpha); flat within sin(7.5 degrees).
+        bound = math.sin(math.radians(7.5))
+        ps = [math.sin(math.radians(theta)) * math.cos(math.radians(alpha))
+              for theta, alpha in zip(angles[key], faces[key])]
+        sides = [1 if x >= bound else -1 if x <= -bound else 0 for x in ps]
         assert f.per_replica == [("rep1", sides.count(1) / 21, sides.count(-1) / 21)], f.label
     assert in_plane["Ser50–Asn46–Asn59"].per_replica == [("rep1", 0.0, 8 / 21)]
     assert in_plane["Asp48–Asn59–Asn46"].per_replica == [("rep1", 6 / 21, 0.0)]
@@ -521,6 +529,12 @@ def _md_smoke():
     ("clockwise 0.40, anticlockwise 0.00, flat 0.60", "clockwise 0.00, anticlockwise 0.00, flat 1.00", False),
     # Different words: not the same rendering.
     ("0.80 (0.00)", "clockwise 0.80, anticlockwise 0.00, flat 0.20", False),
+    # One frame on the other face on one route and on the crystal's on the
+    # other: a sign flip across the band, not rounding at its edge.
+    ("0.80 (0.20)", "1.00 (0.00)", False),
+    ("clockwise 0.20, anticlockwise 0.00, flat 0.80", "clockwise 0.00, anticlockwise 0.20, flat 0.80", False),
+    # Flat and a face moving the same way is no frame's move at all.
+    ("clockwise 0.20, anticlockwise 0.00, flat 0.80", "clockwise 0.00, anticlockwise 0.00, flat 0.60", False),
 ])
 def test_md_smoke_compares_the_fractions_inside_each_cell(native_cell, gromacs_cell, agree):
     """scripts/md_smoke.py's comparison of the two routes' face tables, on
@@ -532,6 +546,26 @@ def test_md_smoke_compares_the_fractions_inside_each_cell(native_cell, gromacs_c
     gromacs = {**native, "Ser50–Asn46–Asn59": ["-0.3", "flat", gromacs_cell, "stayed in plane"]}
     assert faces_agree(native, gromacs) == (agree, 1)
     assert faces_agree(native, dict(native)) == (True, 0)
+
+
+def test_md_smoke_allows_one_edge_frame_in_one_replica_and_nothing_else():
+    """The contract of scripts/md_smoke.py's face comparison: one frame of
+    one replica, in one row. Both replicas a frame off, or the crystal's own
+    cells differing, are disagreements: the crystal's cells come from one
+    plan on both routes."""
+    faces_agree = _md_smoke()._faces_agree
+    native = {"A": ["+20.0", "clockwise", "0.80 (0.00)", "0.80 (0.00)", "partial"]}
+    assert faces_agree(native, {"A": ["+20.0", "clockwise", "1.00 (0.00)", "0.80 (0.00)",
+                                      "kept its face"]}) == (True, 1)
+    assert faces_agree(native, {"A": ["+20.0", "clockwise", "1.00 (0.00)", "1.00 (0.00)",
+                                      "kept its face"]}) == (False, 1)
+    assert faces_agree(native, {"A": ["+20.2", "clockwise", "0.80 (0.00)", "0.80 (0.00)",
+                                      "partial"]}) == (False, 1)
+    assert faces_agree(native, {"A": ["+20.0", "anticlockwise", "0.80 (0.00)", "0.80 (0.00)",
+                                      "partial"]}) == (False, 1)
+    # The verdict alone differing follows from no frame: a disagreement.
+    assert faces_agree(native, {"A": ["+20.0", "clockwise", "0.80 (0.00)", "0.80 (0.00)",
+                                      "kept its face"]}) == (False, 1)
 
 
 # --- the report and the exit code -----------------------------------------------------------
