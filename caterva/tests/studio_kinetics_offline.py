@@ -31,6 +31,7 @@ import contextlib
 import gzip
 import io
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -106,7 +107,7 @@ def _http_retry_modules() -> List[Any]:
 
 
 @contextlib.contextmanager
-def _patched(env: dict) -> Iterator[None]:
+def _patched(env: dict, remove: Optional[Path] = None) -> Iterator[None]:
     """Recorded answers on, and httpx refusing to send anything else."""
     import httpx
 
@@ -136,6 +137,8 @@ def _patched(env: dict) -> Iterator[None]:
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+        if remove is not None:
+            shutil.rmtree(remove, ignore_errors=True)
 
 
 def _page_directory(name: str, text: str) -> Path:
@@ -160,11 +163,11 @@ def ldh_offline() -> Any:
     text = gzip.decompress((KI_MODE_PAGES / "brenda_1.1.1.27.html.gz").read_bytes()).decode(
         "utf-8", errors="replace")
     pages = _page_directory("brenda_1.1.1.27.html.gz", text)
-    return _patched({"CATERVA_BRENDA_RECORDED": str(pages), "CATERVA_HTTP_RECORDED": str(LDH_HTTP)})
+    return _patched({"CATERVA_BRENDA_RECORDED": str(pages), "CATERVA_HTTP_RECORDED": str(LDH_HTTP)}, pages)
 
 
 def ldh_ki_page_offline() -> Any:
     """BRENDA's LDH Ki page as `caterva bind --html` reads it (test_bind.py's
     page), served to the fetch the studio's bind makes."""
     pages = _page_directory("brenda_1.1.1.27.html.gz", LDH_KI_PAGE.read_text(encoding="utf-8"))
-    return _patched({"CATERVA_BRENDA_RECORDED": str(pages)})
+    return _patched({"CATERVA_BRENDA_RECORDED": str(pages)}, pages)
