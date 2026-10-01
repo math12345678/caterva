@@ -174,16 +174,41 @@ export function RunFailedState({ error, action }: { error: RunError; action?: Re
  */
 export function OutcomeNotice({ outcome, children }: { outcome: Outcome | null; children?: ReactNode }) {
   if (!outcome || outcome.meaning === "produced") return null;
-  if (outcome.meaning === "refused") {
+  const refused = outcome.meaning === "refused";
+  const { title, reason } = noticeText(outcome.summary, outcome.reason ?? "", refused ? "Refused, and why" : "A negative finding");
+  if (refused) {
     return (
-      <RefusalState title={outcome.summary || "Refused, and why"} reason={outcome.reason ?? ""}>
+      <RefusalState title={title} reason={reason}>
         {children}
       </RefusalState>
     );
   }
   return (
-    <NegativeState title={outcome.summary || "A negative finding"} reason={outcome.reason ?? ""}>
+    <NegativeState title={title} reason={reason}>
       {children}
     </NegativeState>
   );
+}
+
+/** Past this length a summary is a paragraph, not a heading. */
+const TITLE_LIMIT = 160;
+
+/**
+ * An outcome's summary is the first line of the command's message, and its
+ * reason is often that whole message: shown as heading and body, the first
+ * sentence was printed twice (bind's "No Ki for ..."), and compose's
+ * 2,000-character list of shapes became a heading. A summary too long to
+ * be a heading gives way to the generic one, and a reason line that only
+ * repeats the heading is left out. Nothing is reworded or cut: every line
+ * the command wrote is still on the page once.
+ */
+export function noticeText(summary: string, reason: string, fallback: string): { title: string; reason: string } {
+  const said = summary.trim();
+  const title = said && said.length <= TITLE_LIMIT ? said : fallback;
+  if (title === fallback) {
+    return { title, reason: reason.includes(said) ? reason : [said, reason].filter(Boolean).join("\n\n") };
+  }
+  const lines = reason.split("\n");
+  const kept = lines.filter((line) => line.trim() !== title);
+  return { title, reason: kept.join("\n").replace(/^\n+/, "") };
 }

@@ -6,6 +6,8 @@ import csv from "./fixtures/sim-ssa-a0-200-k-0.5-end-10-seed-7.csv?raw";
 import createSim from "./fixtures/api/create_sim.json";
 import settingsBad from "./fixtures/api/settings_bad.json";
 import fixture from "@/__fixtures__/api/contract/michaelis-menten-parameters.json";
+import bindNoRows from "@/__fixtures__/api/kinetics/bind-no-rows.json";
+import composeRefused from "@/__fixtures__/api/workspace/refused.json";
 import type { ApiError, Outcome, SourcedValue } from "@/api/types";
 import { intervalData, IntervalBars } from "@/components/charts/IntervalBars";
 import { timeCourseRows, TimeCourseChart } from "@/components/charts/TimeCourseChart";
@@ -13,6 +15,7 @@ import { Field, fieldError, NumberInput, parseNumber } from "@/components/forms/
 import { Segmented } from "@/components/forms/Segmented";
 import { renderMarkdown, shellQuote } from "@/components/report/Report";
 import { DataTable, sortRows } from "@/components/table/DataTable";
+import { outcomeLine } from "@/components/run/RunRow";
 import { ErrorState, OutcomeNotice } from "@/components/states/States";
 import { Loading } from "@/components/states/Loading";
 
@@ -36,6 +39,27 @@ describe("states", () => {
     render(<OutcomeNotice outcome={outcome} />);
     expect(screen.getByText("Negative finding")).toBeInTheDocument();
     expect(screen.getByText("every chain has a blocking defect")).toBeInTheDocument();
+  });
+
+  it("says a refusal's first sentence once when the reason repeats the summary (bind, recorded)", () => {
+    const outcome = bindNoRows.run.outcome as Outcome;
+    const first = outcome.summary;
+    const rest = (outcome.reason ?? "").split("\n").slice(1).join("\n");
+    render(<OutcomeNotice outcome={outcome} />);
+    const notice = screen.getByRole("region", { name: first });
+    expect(within(notice).getByRole("heading", { name: first })).toBeInTheDocument();
+    expect(notice.textContent?.split(first).length).toBe(2);
+    expect(notice).toHaveTextContent(rest);
+    expect(outcomeLine(bindNoRows.run as never)).toBe(first);
+  });
+
+  it("keeps a paragraph-long summary out of the heading and still prints it once (compose, recorded)", () => {
+    const outcome = composeRefused.run.outcome as Outcome;
+    render(<OutcomeNotice outcome={outcome} />);
+    expect(screen.getByRole("heading", { name: "Refused, and why" })).toBeInTheDocument();
+    const reason = document.querySelector(".state-reason");
+    expect(reason?.textContent).toBe(outcome.reason);
+    expect(reason?.textContent?.split(outcome.summary).length).toBe(2);
   });
 
   it("shows nothing extra for a produced result", () => {

@@ -65,6 +65,12 @@
   align-items: baseline;
   gap: 0.375rem 0.625rem;
 }
+/* A Value's hover ground reaches 0.25rem past its text (.value-trigger's
+   negative margin); at the end of a section head that is flush with the
+   pane it made the pane scroll sideways by 4 px. */
+.section-aside .st-inline {
+  margin-inline-end: 0.25rem;
+}
 
 .st-result {
   display: grid;

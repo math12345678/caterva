@@ -17,7 +17,7 @@
  */
 import { Check as CheckIcon, Download, FileArchive, Link2 } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
-import { useLocation, useSearch } from "wouter";
+import { useSearch } from "wouter";
 
 import { downloadFrom } from "@/api/client";
 import { downloadArtifact, downloadBundle } from "@/api/runs";
@@ -91,21 +91,7 @@ export function usePrefill(
   }, [linkKey]);
 }
 
-/**
- * Once a run submitted here exists, the address becomes its permalink
- * (`<path>?run=<id>`, replacing the linked question rather than adding a
- * history entry), so a reload or a copied address reopens this run instead
- * of filling the form for a new one.
- */
-export function useRunAddress(path: string, run: RunRecord | null, reopened: string | null): void {
-  const [, navigate] = useLocation();
-  const id = run?.id ?? null;
-  useEffect(() => {
-    if (id && id !== reopened) navigate(`${path}?run=${encodeURIComponent(id)}`, { replace: true });
-    // navigate is stable; the run id is what decides.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-}
+export { useRunAddress } from "@/lib/runAddress";
 
 /** A request value read back as text for a form field ("" when absent). */
 export function text(v: unknown): string {

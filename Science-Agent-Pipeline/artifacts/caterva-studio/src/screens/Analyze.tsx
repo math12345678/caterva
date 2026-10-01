@@ -21,6 +21,7 @@ import { Link } from "wouter";
 
 import type { AnalyzeRequest, AnalyzeResult, DistanceRow, SourcedValue } from "@/api/types";
 import { useRun } from "@/api/useRun";
+import { useRunAddress } from "@/lib/runAddress";
 import { Disclosure } from "@/components/forms/Disclosure";
 import { Field, fieldError } from "@/components/forms/Field";
 import { Segmented } from "@/components/forms/Segmented";
@@ -51,6 +52,7 @@ const MODES: { mode: Mode; label: string; what: string }[] = [
 export default function AnalyzeScreen() {
   const reopened = useParam("run");
   const run = useRun("analyze", reopened);
+  useRunAddress("/analyze", run.run, reopened);
   const caps = useCapabilities();
   const [directory, setDirectory] = useState(useParam("directory") ?? "");
   const [mode, setMode] = useState<Mode>("native");

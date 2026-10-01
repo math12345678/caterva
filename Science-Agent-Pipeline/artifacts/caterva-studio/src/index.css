@@ -20,7 +20,9 @@
  *
  * Contrast (WCAG 2.1, from each token's sRGB equivalent; light / dark):
  * --fg on --surface 13.0 / 13.8; --fg-soft 8.7 / 10.3; --muted 5.9 / 6.9;
- * --signal-deep, signal as text, 6.1 / 9.1; --caution 4.8 / 7.6; --danger
+ * --signal-deep, signal as text, 6.1 / 9.1; --caution 5.3 / 7.6 (4.8 on
+ * --surface-raised and 4.9 on --caution-wash, where verdicts and placeholder
+ * values sit; the earlier #946522 was 4.3 there); --danger
  * 5.9 / 6.1; --rule-control, the border that identifies a field or a
  * button, 3.2 / 3.1. --signal itself is 4.1:1 on paper, so on the light
  * side it marks and fills and never sets body text.
@@ -86,7 +88,7 @@
   --signal-deep: oklch(0.479 0.038 226.3);    /* #46626E, signal as text */
   --signal-wash: oklch(0.948 0.016 222);
 
-  --caution: oklch(0.544 0.101 71.7);         /* #946522 */
+  --caution: oklch(0.52 0.101 71.7);          /* #8C5E19 */
   --caution-wash: oklch(0.955 0.03 82);
   --danger: oklch(0.506 0.14 27.5);           /* #A63D35 */
   --danger-wash: oklch(0.958 0.022 32);

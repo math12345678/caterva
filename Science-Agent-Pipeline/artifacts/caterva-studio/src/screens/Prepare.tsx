@@ -19,6 +19,7 @@ import { Link } from "wouter";
 
 import type { FindingRow, PrepareRequest, PrepareResult } from "@/api/types";
 import { useRun } from "@/api/useRun";
+import { useRunAddress } from "@/lib/runAddress";
 import { Checkbox, Field, fieldError, NumberInput, parseNumber, Select } from "@/components/forms/Field";
 import { Disclosure } from "@/components/forms/Disclosure";
 import { Citation } from "@/components/provenance/Citation";
@@ -44,6 +45,7 @@ const SEVERITY_TITLE: Record<string, string> = {
 export default function PrepareScreen() {
   const reopened = useParam("run");
   const run = useRun("prepare", reopened);
+  useRunAddress("/prepare", run.run, reopened);
   const [entry, setEntry] = useState(useParam("entry") ?? "");
   const [ph, setPh] = useState("");
   const [noCache, setNoCache] = useState(false);
@@ -81,8 +83,7 @@ export default function PrepareScreen() {
               kind="file"
               purpose="Choose an mmCIF file to audit"
               extensions={["cif", "mmcif"]}
-              placeholder="1I10"
-              hint="A local file is an absolute path to a .cif or .mmcif file."
+              hint="A PDB id, as 1I10, or the absolute path to a local .cif or .mmcif file."
               error={err("entry")}
             />
             <Field

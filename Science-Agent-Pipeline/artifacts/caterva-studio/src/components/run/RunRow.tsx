@@ -9,10 +9,21 @@ import { RunStatusMark, runStatusLabel } from "@/components/shell/RunStatusMark"
 import { formatWhen } from "@/lib/format";
 import { runHref } from "@/lib/jobs";
 
+/**
+ * A refusal's summary is often its reason's first line (bind, structure):
+ * printed as "summary: reason" the same sentence appeared twice in a row,
+ * so a summary the reason already contains, or the other way round, is
+ * said once.
+ */
 export function outcomeLine(run: Pick<RunSummary, "status" | "outcome">): string {
   if (run.outcome) {
-    if (run.outcome.meaning === "produced") return run.outcome.summary;
-    return run.outcome.reason ? `${run.outcome.summary ? `${run.outcome.summary}: ` : ""}${run.outcome.reason.split("\n")[0]}` : run.outcome.summary;
+    const { summary, reason, meaning } = run.outcome;
+    if (meaning === "produced" || !reason) return summary;
+    const first = reason.split("\n")[0].trim();
+    const said = summary.trim();
+    if (!said || said.includes(first)) return said || first;
+    if (first.includes(said)) return first;
+    return `${said}: ${first}`;
   }
   return runStatusLabel(run.status, null);
 }

@@ -19,6 +19,7 @@ import { Link } from "wouter";
 
 import type { ProteinRow, StructureRequest, StructureResult, StructureRow } from "@/api/types";
 import { useRun } from "@/api/useRun";
+import { useRunAddress } from "@/lib/runAddress";
 import { Checkbox, Field, fieldError, NumberInput, parseNumber, TextInput } from "@/components/forms/Field";
 import { Disclosure } from "@/components/forms/Disclosure";
 import { Citation } from "@/components/provenance/Citation";
@@ -55,6 +56,7 @@ export function structureRequest(f: Form): StructureRequest {
 export default function StructureScreen() {
   const reopened = useParam("run");
   const run = useRun("structure", reopened);
+  useRunAddress("/structure", run.run, reopened);
   const caps = useCapabilities();
   const [form, setForm] = useState<Form>({
     subject: useParam("subject") ?? "",
@@ -108,17 +110,17 @@ export default function StructureScreen() {
                   : "An EC number (1.1.1.27) or a name (hexokinase). A name that is several enzymes is refused with each one named."
               }
             >
-              <TextInput mono autoFocus value={form.subject} placeholder="1.1.1.27" onChange={(e) => set("subject", e.target.value)} />
+              <TextInput mono autoFocus value={form.subject} onChange={(e) => set("subject", e.target.value)} />
             </Field>
             <Field label="Organism" optional error={err("organism")} hint="Latin or common name; left out, every organism.">
-              <TextInput value={form.organism} placeholder="human" onChange={(e) => set("organism", e.target.value)} />
+              <TextInput value={form.organism} onChange={(e) => set("organism", e.target.value)} />
             </Field>
             <div className="st-row2">
-              <Field label="Gene" optional error={err("gene")}>
-                <TextInput mono value={form.gene} placeholder="LDHA" onChange={(e) => set("gene", e.target.value)} />
+              <Field label="Gene" optional error={err("gene")} hint="A gene symbol, as LDHA.">
+                <TextInput mono value={form.gene} onChange={(e) => set("gene", e.target.value)} />
               </Field>
-              <Field label="UniProt" optional error={err("uniprot")}>
-                <TextInput mono value={form.uniprot} placeholder="P00338" onChange={(e) => set("uniprot", e.target.value)} />
+              <Field label="UniProt" optional error={err("uniprot")} hint="An accession, as P00338.">
+                <TextInput mono value={form.uniprot} onChange={(e) => set("uniprot", e.target.value)} />
               </Field>
             </div>
             <Field
@@ -127,7 +129,7 @@ export default function StructureScreen() {
               error={err("ligand")}
               hint="A ligand id or name; entries with it bound rank first."
             >
-              <TextInput value={form.ligand} placeholder="oxamate" onChange={(e) => set("ligand", e.target.value)} />
+              <TextInput value={form.ligand} onChange={(e) => set("ligand", e.target.value)} />
             </Field>
             <Field
               label="Entries in the report"

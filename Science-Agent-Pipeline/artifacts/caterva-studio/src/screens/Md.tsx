@@ -232,8 +232,8 @@ function SetupPanel({ runId, onSummarise, active }: { runId: string | null; onSu
         <>
           <p className="field-hint">Writes the inputs and a script into a folder. It does not run the simulation.</p>
           <div className="st-row-chain">
-            <Field label="PDB entry" error={err("pdb")}>
-              <TextInput mono value={f.pdb} placeholder="1AKI" onChange={(e) => set("pdb")(e.target.value)} />
+            <Field label="PDB entry" error={err("pdb")} hint="As 1AKI.">
+              <TextInput mono value={f.pdb} onChange={(e) => set("pdb")(e.target.value)} />
             </Field>
             <Field label="Chain" optional error={err("chain")}>
               <TextInput mono value={f.chain} placeholder="all" onChange={(e) => set("chain")(e.target.value)} />
@@ -253,14 +253,14 @@ function SetupPanel({ runId, onSummarise, active }: { runId: string | null; onSu
           <fieldset className="st-fieldset">
             <legend>Conditions from the measured kinetics</legend>
             <Field label="Enzyme (EC number)" optional error={err("subject")}>
-              <TextInput mono value={f.subject} placeholder="1.1.1.27" onChange={(e) => set("subject")(e.target.value)} />
+              <TextInput mono value={f.subject} onChange={(e) => set("subject")(e.target.value)} />
             </Field>
             <div className="st-row2">
               <Field label="Organism" optional error={err("organism")}>
-                <TextInput value={f.organism} placeholder="human" onChange={(e) => set("organism")(e.target.value)} />
+                <TextInput value={f.organism} onChange={(e) => set("organism")(e.target.value)} />
               </Field>
               <Field label="Substrate" optional error={err("substrate")}>
-                <TextInput value={f.substrate} placeholder="pyruvate" onChange={(e) => set("substrate")(e.target.value)} />
+                <TextInput value={f.substrate} onChange={(e) => set("substrate")(e.target.value)} />
               </Field>
             </div>
             <p className="field-hint">
@@ -837,8 +837,8 @@ function ComplexPanel({ runId, active }: { runId: string | null; active: boolean
             placeholder="/path/to/complex"
             error={fieldError(run.requestError, "directory")}
           />
-          <Field label="Ligand residue name" error={fieldError(run.requestError, "ligand")}>
-            <TextInput mono value={ligand} placeholder="BNZ" onChange={(e) => setLigand(e.target.value)} />
+          <Field label="Ligand residue name" error={fieldError(run.requestError, "ligand")} hint="As the topology names it, as BNZ.">
+            <TextInput mono value={ligand} onChange={(e) => setLigand(e.target.value)} />
           </Field>
         </>
       }
