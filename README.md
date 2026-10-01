@@ -113,7 +113,7 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 5,164 tests (3,593 engine + 1571 literature)
+make test      # runs all 5,143 tests (3,593 engine + 1571 literature)
 ```
 
 ### Or download the release
@@ -638,7 +638,7 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 5,164 tests
+make test        # run all 5,143 tests
 make test-fast   # skip the slow property/robustness suites
 make test-sim    # simulation engine only (3,593 tests)
 make test-lit    # literature layer only (1571 tests)

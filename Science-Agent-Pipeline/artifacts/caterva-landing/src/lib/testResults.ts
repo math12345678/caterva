@@ -241,8 +241,11 @@ export const TEST_SUITES: TestSuite[] = [
         // Then the isoform-reader, simulate and mechanism-evidence tests: a
         // full run on the merged tree (2026-09-30): 1422 passed, 1 skipped.
         // Plus the assay-window and "<mode> to X" fixes: a full run on the
-        // merged tree (2026-10-01) gave 1570 passed, 1 skipped: 1570.
-        passed: 1570,
+        // merged tree (2026-10-01) gave 1570 passed, 1 skipped. 21 of those
+        // are test_popgen_resolver.py, which skips without stdpopsim; CI does
+        // not install it, so the figure CI collects and runs is 1549 passed
+        // of 1550: 1549.
+        passed: 1549,
         skipped: 1,
         failed: 0,
       },
