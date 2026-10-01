@@ -338,19 +338,38 @@ export function KineticsRun<K extends RunKind>({
   onRetry?: () => void;
   children: (result: RunResults[K], run: RunRecord) => ReactNode;
 }) {
+  const top = useRef<HTMLDivElement>(null);
+  // Below 1100 px the result sits under a long form; a run just asked for
+  // is brought into view there, so the answer is not left off screen.
+  useEffect(() => {
+    if (!state.submitting || typeof window.matchMedia !== "function") return;
+    if (!window.matchMedia("(max-width: 1099px)").matches) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const el = top.current;
+    const pane = el?.closest(".main");
+    // The screen's own scroller, not scrollIntoView: that would also scroll
+    // the fixed shell around it and push the top bar off screen.
+    if (el && pane instanceof HTMLElement && typeof pane.scrollTo === "function") {
+      const offset = el.getBoundingClientRect().top - pane.getBoundingClientRect().top - 16;
+      pane.scrollTo({ top: pane.scrollTop + offset, behavior: reduced ? "auto" : "smooth" });
+    }
+  }, [state.submitting]);
   const finished =
     state.status === "done" && state.settled && state.result !== null && state.run !== null && !state.requestError;
   if (!finished) {
     return (
-      <RunPanel state={state} onCancel={() => void state.cancel()} onRetry={onRetry} idle={idle}>
-        {() => null}
-      </RunPanel>
+      <>
+        <div ref={top} className="k-anchor" />
+        <RunPanel state={state} onCancel={() => void state.cancel()} onRetry={onRetry} idle={idle}>
+          {() => null}
+        </RunPanel>
+      </>
     );
   }
   const run = state.run as RunRecord;
   const result = state.result as RunResults[K];
   return (
-    <div className="k-result">
+    <div className="k-result" ref={top}>
       <RunToolbar path={path} run={run} exports={exports ? exports(result, run) : []} />
       {children(result, run)}
       <div className="k-result-foot">

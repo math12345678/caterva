@@ -194,6 +194,11 @@ export default function SettingsScreen() {
             <dd>{caps.data.data_dir.writable ? "yes" : (caps.data.data_dir.reason ?? "no")}</dd>
             <dt>Runs kept</dt>
             <dd className="font-mono">{formatCount(caps.data.data_dir.runs)}</dd>
+            <dt>Deleted runs</dt>
+            <dd>
+              moved to <span className="font-mono">trash/</span> in that folder; the studio never erases them, so a
+              run deleted by mistake is restored by moving its folder back into <span className="font-mono">runs/</span>.
+            </dd>
             <dt>Change it</dt>
             <dd>
               Start the server with <code>caterva studio --data-dir PATH</code>.

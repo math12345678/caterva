@@ -804,3 +804,9 @@
   margin-right: 0.375rem;
   color: var(--fg-soft);
 }
+.k-anchor {
+  scroll-margin-top: 1rem;
+}
+.k-result {
+  scroll-margin-top: 1rem;
+}
