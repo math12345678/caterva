@@ -782,6 +782,7 @@ class JobManager:
         offset = 0
         last = after
         quiet_since = self._clock()
+        draining = False
         while True:
             try:
                 events, offset = self.ws.read_events(run_id, offset)
@@ -795,9 +796,15 @@ class JobManager:
                     quiet_since = self._clock()
                 if name == "end":
                     return
+            if draining:
+                return
             with self._lock:
                 if self._stopping:
-                    return
+                    # Shutdown wrote each unfinished run's last events just
+                    # before it set the flag: read the file once more so the
+                    # stream ends with them rather than stopping short.
+                    draining = True
+                    continue
                 live = run_id in self._jobs and not self._jobs[run_id].finished
             if not live and not events:
                 if not self._foreign_run_may_continue(run_id):

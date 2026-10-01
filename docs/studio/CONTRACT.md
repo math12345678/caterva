@@ -302,9 +302,11 @@ else: 400.
 
 `GET /api/runs/{id}` -> `RunRecord`.
 
-`DELETE /api/runs/{id}` -> `RunSummary` of the removed run. Removes
-`<data dir>/runs/<id>/` entirely (files a run wrote into a user directory,
-section 15, are the user's and are never touched). 409 while `queued` or
+`DELETE /api/runs/{id}` -> `RunSummary` of the removed run. Moves
+`<data dir>/runs/<id>/` into `<data dir>/trash/` (amended by core: out of
+History, never erased by the studio, so a mistaken delete is undone by
+moving the folder back; files a run wrote into a user directory, section
+15, are the user's and are never touched). 409 while `queued` or
 `running`.
 
 `GET /api/runs/{id}/result` -> the kind's Result (contract.KIND_SHAPES). 409
@@ -323,9 +325,10 @@ finished.
 
 `GET /api/runs/{id}/bundle` -> `application/zip`, filename
 `caterva-<id>.zip`: `run.json`, `request.json`, `result.json` (when
-present), `events.jsonl`, `artifacts/<name>` for each artifact, and
+present), `events.jsonl`, `artifacts/<name>` for each artifact,
 `command.txt` holding `shlex.join(run.cli)`, the command that reproduces the
-run in a terminal.
+run in a terminal, and `README.txt` saying what each file is (amended by
+core).
 
 ### Development
 
@@ -489,11 +492,15 @@ Default data dir: macOS `~/Library/Application Support/Caterva`; Linux
 <data dir>/
   settings.json                  Settings
   studio.log                     server log; rotated at 5 MB, one old copy kept
+  instances/<id>.lock            held by each running server (amended by core: a run is
+                                 marked interrupted only when its owner's lock is free)
+  trash/<run id>/                runs deleted from History (amended by core)
   runs/<run id>/
     run.json                     RunRecord, schema "caterva.studio.run/1"
     request.json                 the request as accepted (after parse_cli)
     result.json                  the kind's Result, when one was produced
     events.jsonl                 {"event": name, "data": {...}} per line, in seq order
+    owner                        the instance id of the server running it (amended by core)
     artifacts/<name>             every file listed in run.artifacts
     md-setup/                    md.setup's default output directory
 ```
