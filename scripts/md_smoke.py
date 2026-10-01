@@ -122,8 +122,11 @@ def _face_rows(text: str) -> dict:
     return _table_rows(text, "## Which face of the vertex its partners are on")
 
 
-#: Frames the smoke run keeps per replica: 200 steps, one every 50.
-SMOKE_FRAMES = 5
+#: Frames the smoke run keeps per replica: 200 steps, one every 10. The
+#: principal motions need 21 (caterva/analyze/pca.py, MIN_PCA_FRAMES), and
+#: the smoke run is there to compare them across the two routes.
+SMOKE_FRAMES = 21
+SMOKE_NSTXOUT = 10
 
 
 def _faces_agree(native: dict, gromacs: dict) -> tuple:
@@ -134,9 +137,14 @@ def _faces_agree(native: dict, gromacs: dict) -> tuple:
     about 1e-5. A frame whose polar sine sits that close to the band edge
     lands on opposite sides on the two routes. On the 10 ps lysozyme
     replicas the nearest frame was 0.00099 from the edge, but CI makes a new
-    trajectory every run, and with about 1.3 frames per unit of polar sine
-    near the edges a split is expected in well under 1% of runs (the review
-    of this check, 2026-09-30). So: every row identical, except at most one
+    trajectory every run. The first estimate of how often (the review of
+    this check, 2026-09-30, "well under 1% of runs") was made when the smoke
+    run kept 5 frames per replica. At 21 frames, on a local smoke run
+    (2026-10-01; 24 rows x 21 frames x 2 replicas), 143 of the 1008 frames
+    lay within 0.05 of an edge, about 1400 per unit of polar sine; with the
+    routes about 1e-5 apart, that is about 0.014 split frames per run, so
+    one split is expected in roughly 1% of runs and two in about 1 in 10^4.
+    So: every row identical, except at most one
     row in which one frame of one replica is flat on one route and on a
     face on the other (`_one_edge_frame`). A real disagreement between the
     routes moves more than one frame, moves a frame from one face to the
@@ -185,7 +193,10 @@ def _one_edge_frame(native: str, gromacs: str) -> bool:
         return False
     xs = [float(v) for v in _FRACTION.findall(native)]
     ys = [float(v) for v in _FRACTION.findall(gromacs)]
-    frame, rounding = 1 / SMOKE_FRAMES, 0.006
+    # Each printed fraction is within 0.005 of k / SMOKE_FRAMES, so one
+    # frame's difference prints within 0.01 of a frame: at 21 frames 2/21
+    # and 3/21 print 0.10 and 0.14, 0.0076 short of 1/21.
+    frame, rounding = 1 / SMOKE_FRAMES, 0.01 + 1e-9
     moved = [i for i, (a, b) in enumerate(zip(xs, ys)) if abs(b - a) > rounding]
     if not all(abs(abs(ys[i] - xs[i]) - frame) <= rounding for i in moved):
         return False
@@ -293,6 +304,111 @@ def _sasa_agree(native: dict, gromacs: dict) -> tuple:
     return all(d <= limit + 1e-9 for d, limit in pairs), worst, allowed
 
 
+# -- principal motions of the active site (caterva/analyze/pca.py) ---------------------
+
+def _pca_tables(text: str) -> dict:
+    """The principal-motions section as {"eigen": {replica: cells},
+    "rmsip": {pair: cells}, "cosine": {replica: cells}, "between": value or
+    None, "chance_edge": the largest RMSIP^2 called chance, or None}. Tables
+    are told apart by their header row; the section is cut out first, for
+    the reason _distance_rows gives."""
+    section = text.split("## Principal motions of the active site", 1)[-1].split("\n## ", 1)[0]
+    out: dict = {"eigen": {}, "rmsip": {}, "cosine": {}, "between": None, "chance_edge": None}
+    table = None
+    for line in section.splitlines():
+        if not line.startswith("|"):
+            table = None
+            m = re.match(r"Pooled: .*Between replicas: ([\d.]+) ", line)
+            if m:
+                out["between"] = float(m.group(1))
+            m = re.search(r"standard deviations of the chance value \(at most ([\d.]+)\)", line)
+            if m:
+                out["chance_edge"] = float(m.group(1))
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if cells[0] in ("replica", "replicas"):
+            table = "eigen" if "PC1 (nm²)" in cells else "rmsip" if cells[0] == "replicas" else "cosine"
+        elif table and not cells[0].startswith("---"):
+            out[table][cells[0]] = cells[1:]
+    return out
+
+
+def _close(a: str, b: str, tol: float, relative: bool = False) -> float:
+    """How far over `tol` two printed numbers are (<= 0 when within it)."""
+    x, y = float(a), float(b)
+    diff = abs(x - y) / max(abs(x), abs(y)) if relative and max(abs(x), abs(y)) > 0 else abs(x - y)
+    return diff - tol
+
+
+def _pca_agree(native: dict, gromacs: dict) -> tuple:
+    """(problems, largest differences) between the two routes' tables.
+
+    Tolerances, from how each route prints and what each GROMACS tool
+    rounds to:
+    - eigenvalues and totals (4 significant digits in the report): gmx
+      covar prints 6 and does the same linear algebra in single precision,
+      so the two agree to about 1e-5 relative (6e-6 on the lysozyme
+      fixture, test_pca.py; 1.3e-5 and 7e-6 on two smoke runs, 2026-09-30,
+      the worst a tenth eigenvalue of 1.1e-4 nm^2 off by 1.5e-9 nm^2, of
+      the order of single precision's 6e-8 of the first), and their printed
+      values may differ by one unit in the 4th digit, 1e-3 relative, and no
+      more;
+    - shares and the between-replica share (2 decimals): one unit, 0.01;
+    - RMSIP (3 decimals): gmx anaeig -over prints RMSIP^2 to 0.001, which
+      puts the GROMACS RMSIP within 0.0005 / (2 RMSIP) of the exact one,
+      and each printed value adds 0.0005 of rounding (on a smoke run,
+      2026-09-30, RMSIP^2 0.12955 printed 0.360 natively, and gmx's 0.130
+      0.361);
+    - cosine content (3 decimals): gmx analyze works from projections gmx
+      anaeig printed to 1e-5 nm, and lands within 7e-6 of the native value
+      on the fixture (1.1e-5 on two smoke runs), so one unit of the printed
+      digit, 0.001, and a little over.
+    A verdict may differ only where the value it rests on lies within that
+    tolerance of the threshold."""
+    worst = {"eigenvalue": 0.0, "share": 0.0, "rmsip": 0.0, "cosine": 0.0}
+    problems = [f"{table} rows differ: {sorted(native[table])} vs {sorted(gromacs[table])}"
+                for table in ("eigen", "rmsip", "cosine") if native[table].keys() != gromacs[table].keys()]
+    if problems:
+        return problems, worst
+    for name, n in native["eigen"].items():
+        g = gromacs["eigen"][name]
+        if n[0] != g[0]:
+            problems.append(f"{name}: {n[0]} frames natively, {g[0]} by gmx covar")
+        for a, b in zip(n[1:5], g[1:5]):     # PC1-3 and the total
+            over = _close(a, b, 1.001e-3, relative=True)
+            worst["eigenvalue"] = max(worst["eigenvalue"], over + 1.001e-3)
+            if over > 0:
+                problems.append(f"{name}: eigenvalue {a} natively, {b} by gmx covar")
+        for a, b in zip(n[5:7], g[5:7]):
+            over = _close(a, b, 0.01 + 1e-9)
+            worst["share"] = max(worst["share"], over + 0.01)
+            if over > 0:
+                problems.append(f"{name}: share {a} natively, {b} by gmx covar")
+    b_n, b_g = native["between"], gromacs["between"]
+    if (b_n is None) != (b_g is None) or (b_n is not None and abs(b_n - b_g) > 0.01 + 1e-9):
+        problems.append(f"between-replica share {b_n} natively, {b_g} by gmx")
+    for pair, n in native["rmsip"].items():
+        g = gromacs["rmsip"][pair]
+        tol = 0.001 + 0.0005 / (2 * max(float(g[0]), 0.05))
+        over = _close(n[0], g[0], tol)
+        worst["rmsip"] = max(worst["rmsip"], over + tol)
+        if over > 0:
+            problems.append(f"{pair}: RMSIP {n[0]} natively, {g[0]} by gmx anaeig -over")
+        edges = [e for e in (0.5, native["chance_edge"]) if e is not None]
+        if n[2] != g[2] and all(abs(float(n[1]) - e) > 0.0015 for e in edges):
+            problems.append(f"{pair}: verdict {n[2]!r} natively, {g[2]!r} by gmx")
+    for name, n in native["cosine"].items():
+        g = gromacs["cosine"][name]
+        for a, b in zip(n[1:3], g[1:3]):
+            over = _close(a, b, 0.0011)
+            worst["cosine"] = max(worst["cosine"], over + 0.0011)
+            if over > 0:
+                problems.append(f"{name}: cosine content {a} natively, {b} by gmx analyze")
+        if n[3] != g[3] and min(abs(float(v) - 0.5) for v in n[1:3]) > 0.0011:
+            problems.append(f"{name}: verdict {n[3]!r} natively, {g[3]!r} by gmx")
+    return problems, worst
+
+
 def main() -> int:
     gmx = os.environ.get("GMX", "gmx")
     if shutil.which(gmx) is None and not Path(gmx).exists():
@@ -303,12 +419,14 @@ def main() -> int:
                     "--out", str(OUT), "--ns", "0.001", "--replicas", "2"], check=True, cwd=ROOT)
     em = OUT / "em.mdp"
     em.write_text(re.sub(r"^nsteps\s*=\s*50000$", "nsteps          = 500", em.read_text(), flags=re.M))
-    # A frame every 50 steps, so the 200-step production run keeps five and
-    # RMSF has something to fluctuate over. At the setup's own interval it
-    # kept only frame 0, where the native route rightly measures no RMSF and
-    # gmx rmsf printed 0.0001 nm of rounding; nothing compared the two.
+    # A frame every SMOKE_NSTXOUT steps, so the 200-step production run
+    # keeps SMOKE_FRAMES and RMSF has something to fluctuate over. At the
+    # setup's own interval it kept only frame 0, where the native route
+    # rightly measures no RMSF and gmx rmsf printed 0.0001 nm of rounding;
+    # nothing compared the two. Five frames (one every 50) sufficed for the
+    # RMSF; the principal motions refuse fewer than 21.
     md = OUT / "md.mdp"
-    md.write_text(re.sub(r"^nstxout-compressed\s*=\s*\d+$", "nstxout-compressed = 50",
+    md.write_text(re.sub(r"^nstxout-compressed\s*=\s*\d+$", f"nstxout-compressed = {SMOKE_NSTXOUT}",
                          md.read_text(), flags=re.M))
     run = OUT / "run.sh"
     run.write_text(re.sub(r'(mdrun -deffnm "\$d/(?:nvt|npt|md)") \$MDRUN_FLAGS$',
@@ -330,10 +448,12 @@ def main() -> int:
     # And the enzyme analysis, which fetches lysozyme's catalytic residues
     # (M-CSA via `caterva prepare`), twice: measured by Caterva from the
     # trajectories it reads itself, and by gmx distance, rmsf, angle, gangle,
-    # select and sasa. The distance, flexibility, rotamer, angle, face, water
-    # and solvent-exposure tables must agree, so this job checks the native
-    # reader and geometry against GROMACS on every run.
+    # select, sasa, covar, anaeig and analyze. The distance, flexibility,
+    # rotamer, angle, face, water, solvent-exposure and principal-motion
+    # tables must agree, so this job checks the native reader and geometry
+    # against GROMACS on every run.
     tables, flex, rot, ang, wet, face, area, exposed = {}, {}, {}, {}, {}, {}, {}, {}
+    motions = {}
     for route, extra in (("native", []), ("gromacs", ["--gromacs"])):
         code = subprocess.run([sys.executable, "-m", "caterva.app", "analyze", str(OUT), *extra],
                               cwd=ROOT, env={**os.environ, "GMX": gmx}).returncode
@@ -349,6 +469,7 @@ def main() -> int:
         face[route] = _face_rows(text)
         area[route] = _sasa_rows(text)
         exposed[route] = _sasa_verdicts(text)
+        motions[route] = _pca_tables(text)
     if not (OUT / "rep2" / "catalytic.xvg").exists():
         print("FAIL: caterva analyze --gromacs wrote no catalytic.xvg")
         return 1
@@ -433,6 +554,37 @@ def main() -> int:
           "catalytic residues" + (f"; {', '.join(near)} differ because an area sits within the routes' "
                                   "tolerance of a threshold (20% or 40%) and rounds into another state on "
                                   "each, as the areas are allowed to" if near else "") + ".")
+    # The principal motions of the catalytic heavy atoms: gmx covar, anaeig
+    # and analyze against the native fit and decomposition. Every replica
+    # has SMOKE_FRAMES frames, enough for them, so an empty table (the
+    # section refusing) is a failure too.
+    pm_n, pm_g = motions["native"], motions["gromacs"]
+    reps = sorted(k for k in pm_n["eigen"] if k != "pooled")
+    if len(reps) < 2 or "pooled" not in pm_n["eigen"] or not pm_n["rmsip"] or not pm_n["cosine"]:
+        print(f"FAIL: the native route did not measure the principal motions of two replicas: {pm_n}")
+        return 1
+    if any(pm_n["eigen"][r][0] != str(SMOKE_FRAMES) for r in reps):
+        print(f"FAIL: principal motions over {[pm_n['eigen'][r][0] for r in reps]} frames, "
+              f"the smoke run writes {SMOKE_FRAMES}")
+        return 1
+    problems, worst = _pca_agree(pm_n, pm_g)
+    if problems:
+        print("FAIL: native and GROMACS principal motions differ:\n  " + "\n  ".join(problems))
+        return 1
+    print(f"OK: native and GROMACS agree on the principal motions of the active site for {len(reps)} "
+          f"replicas and the pooled frames (largest differences in the printed values: eigenvalues and "
+          f"totals {worst['eigenvalue']:.1e} relative, printed to 4 significant digits; shares "
+          f"{worst['share']:.2f}; RMSIP {worst['rmsip']:.3f}, "
+          f"{', '.join(f'{k} {v[0]}' for k, v in pm_n['rmsip'].items())}; cosine content "
+          f"{worst['cosine']:.3f}).")
+    # No prediction of the verdict: of ten replicas run locally
+    # (2026-09-30 and 10-01), eight had a PC1 cosine content between 0.63
+    # and 0.99 and two 0.23 and 0.31, so at this length it lands on either
+    # side of the threshold.
+    print("   (200 steps are 0.4 ps: these modes are the thermal motion of the minimised structure over "
+          "a fraction of a picosecond, and at this length the cosine content can land on either side of "
+          "the diffusion threshold. The comparison checks that the two routes compute the same thing; it "
+          "says nothing about the enzyme or about sampling at production length.)")
     print("OK: minimisation, then NVT, NPT, production and RMSD for two replicas, the summary, "
           "and the enzyme analysis.")
     return 0

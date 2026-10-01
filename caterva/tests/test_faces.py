@@ -520,26 +520,29 @@ def _md_smoke():
 
 
 @pytest.mark.parametrize("native_cell, gromacs_cell, agree", [
-    # One frame of five apart, on a face row and on an in-plane row.
-    ("0.80 (0.00)", "1.00 (0.00)", True),
-    ("clockwise 0.20, anticlockwise 0.00, flat 0.80", "clockwise 0.00, anticlockwise 0.00, flat 1.00", True),
+    # One frame of 21 apart, on a face row and on an in-plane row.
+    ("0.95 (0.00)", "1.00 (0.00)", True),
+    ("clockwise 0.05, anticlockwise 0.00, flat 0.95", "clockwise 0.00, anticlockwise 0.00, flat 1.00", True),
+    # One frame whose two printed fractions round apart (19/21 and 18/21
+    # print 0.90 and 0.86, 0.0076 short of 1/21): still one frame.
+    ("0.86 (0.00)", "0.90 (0.00)", True),
     # Two frames apart: a disagreement, which a cell that is not one float
     # used to let through.
-    ("0.60 (0.00)", "1.00 (0.00)", False),
-    ("clockwise 0.40, anticlockwise 0.00, flat 0.60", "clockwise 0.00, anticlockwise 0.00, flat 1.00", False),
+    ("0.90 (0.00)", "1.00 (0.00)", False),
+    ("clockwise 0.10, anticlockwise 0.00, flat 0.90", "clockwise 0.00, anticlockwise 0.00, flat 1.00", False),
     # Different words: not the same rendering.
-    ("0.80 (0.00)", "clockwise 0.80, anticlockwise 0.00, flat 0.20", False),
+    ("0.95 (0.00)", "clockwise 0.95, anticlockwise 0.00, flat 0.05", False),
     # One frame on the other face on one route and on the crystal's on the
     # other: a sign flip across the band, not rounding at its edge.
-    ("0.80 (0.20)", "1.00 (0.00)", False),
-    ("clockwise 0.20, anticlockwise 0.00, flat 0.80", "clockwise 0.00, anticlockwise 0.20, flat 0.80", False),
+    ("0.95 (0.05)", "1.00 (0.00)", False),
+    ("clockwise 0.05, anticlockwise 0.00, flat 0.95", "clockwise 0.00, anticlockwise 0.05, flat 0.95", False),
     # Flat and a face moving the same way is no frame's move at all.
-    ("clockwise 0.20, anticlockwise 0.00, flat 0.80", "clockwise 0.00, anticlockwise 0.00, flat 0.60", False),
+    ("clockwise 0.05, anticlockwise 0.00, flat 0.95", "clockwise 0.00, anticlockwise 0.00, flat 0.90", False),
 ])
 def test_md_smoke_compares_the_fractions_inside_each_cell(native_cell, gromacs_cell, agree):
     """scripts/md_smoke.py's comparison of the two routes' face tables, on
     rows shaped as face_cells renders them. One row may differ by one frame
-    (of the smoke run's five), and its verdict with it; no more."""
+    (of the smoke run's 21), and its verdict with it; no more."""
     faces_agree = _md_smoke()._faces_agree
     native = {"Ser50–Asn46–Asn59": ["-0.3", "flat", native_cell, "partial"],
               "Asp48–Asn59–Asn46": ["+5.8", "flat", "0.00 (0.00)", "partial"]}
@@ -554,17 +557,17 @@ def test_md_smoke_allows_one_edge_frame_in_one_replica_and_nothing_else():
     cells differing, are disagreements: the crystal's cells come from one
     plan on both routes."""
     faces_agree = _md_smoke()._faces_agree
-    native = {"A": ["+20.0", "clockwise", "0.80 (0.00)", "0.80 (0.00)", "partial"]}
-    assert faces_agree(native, {"A": ["+20.0", "clockwise", "1.00 (0.00)", "0.80 (0.00)",
+    native = {"A": ["+20.0", "clockwise", "0.95 (0.00)", "0.95 (0.00)", "partial"]}
+    assert faces_agree(native, {"A": ["+20.0", "clockwise", "1.00 (0.00)", "0.95 (0.00)",
                                       "kept its face"]}) == (True, 1)
     assert faces_agree(native, {"A": ["+20.0", "clockwise", "1.00 (0.00)", "1.00 (0.00)",
                                       "kept its face"]}) == (False, 1)
-    assert faces_agree(native, {"A": ["+20.2", "clockwise", "0.80 (0.00)", "0.80 (0.00)",
+    assert faces_agree(native, {"A": ["+20.2", "clockwise", "0.95 (0.00)", "0.95 (0.00)",
                                       "partial"]}) == (False, 1)
-    assert faces_agree(native, {"A": ["+20.0", "anticlockwise", "0.80 (0.00)", "0.80 (0.00)",
+    assert faces_agree(native, {"A": ["+20.0", "anticlockwise", "0.95 (0.00)", "0.95 (0.00)",
                                       "partial"]}) == (False, 1)
     # The verdict alone differing follows from no frame: a disagreement.
-    assert faces_agree(native, {"A": ["+20.0", "clockwise", "0.80 (0.00)", "0.80 (0.00)",
+    assert faces_agree(native, {"A": ["+20.0", "clockwise", "0.95 (0.00)", "0.95 (0.00)",
                                       "kept its face"]}) == (False, 1)
 
 

@@ -16,15 +16,19 @@ surface solvent can reach, against the whole protein
 (caterva/analyze/sasa.py). Each
 distance and angle is reported as a spread across replicas with
 block-averaged errors, and called a result only when the replicas agree
-(see `caterva md --summarise`).
+(see `caterva md --summarise`). The principal motions of the catalytic
+residues' heavy atoms, per replica and pooled, say whether the replicas
+moved the same way and whether a replica's largest motion is only random
+diffusion, which no converged run shows (caterva/analyze/pca.py).
 
 Caterva does the measuring itself, from the .xtc files it reads natively
 (caterva/md/xtc.py), so this runs where GROMACS is not installed. The
 same measurements as GROMACS commands are written to analyze.sh, and
 `--gromacs` uses them instead, as a cross-check.
 
-Exit codes: 0 every distance and angle is a consistent result, 4 at least
-one is not (unconverged, replicas disagree, one sample), 2 malformed
+Exit codes: 0 every distance and angle is a consistent result and the
+principal motions, where measured, converged; 4 at least one is not
+(unconverged, replicas disagree, one sample), 2 malformed
 question, 3 refused and said why (no finished run, no catalytic residues),
 1 a crash. The verdicts on the hydrogen bonds, rotamers, faces, water and
 solvent exposure do not set it; each says "not yet a result" in the report
@@ -48,6 +52,7 @@ from caterva.analyze.plan import CONTACT_NM, POCKET_RADIUS, Plan, plan, read_pdb
 from caterva.analyze.angles import AngleResult
 from caterva.analyze.faces import Face
 from caterva.analyze.hbonds import Occupancy
+from caterva.analyze.pca import PrincipalMotions
 from caterva.analyze.rotamers import Rotamer
 from caterva.analyze.sasa import Exposure
 from caterva.analyze.water import Hydration
@@ -153,7 +158,152 @@ def sasa_selections(p: Plan) -> str:
     return " ".join(f"'{output_selection(s.resnr)}'" for s in p.sites)
 
 
-def commands(p: Plan, reps: Sequence[str], gmx: str = "$GMX", chi1: Sequence = ()) -> List[str]:
+# -- principal motions of the active site (caterva/analyze/pca.py) ---------------------
+
+def pca_atoms(directory: Path, p: Plan) -> List[int]:
+    """0-based indices in em.gro of every heavy atom of the plan's catalytic
+    residues: the atoms both routes take the principal components of. Empty
+    before run.sh has made em.gro."""
+    from caterva.analyze.pca import heavy_atoms
+    gro = directory / "em.gro"
+    if not gro.exists():
+        return []
+    return heavy_atoms(_gro_atoms(gro), [s.resnr for s in p.sites])
+
+
+def write_pca_index(directory: Path, idx: Sequence[int]) -> None:
+    """pca.ndx: the one group gmx covar and gmx anaeig are given, as both the
+    fit group and the analysis group (1-based). Protein atoms come first in
+    em.gro, so these indices hold in rmsf_reference.pdb and md_whole.xtc,
+    which hold the protein alone."""
+    (directory / "pca.ndx").write_text("[ active_site ]\n" + " ".join(str(i + 1) for i in idx) + "\n")
+
+
+def pca_commands(reps: Sequence[str], gmx: str = "$GMX") -> List[str]:
+    """gmx covar, anaeig and analyze for the principal motions: per replica,
+    then pooled, then each pair of replicas.
+
+    The fit reference and the trajectory are the ones gmx rmsf uses above
+    (em.gro made whole, and the replica made whole), for the reason given
+    there, and the same group is the fit and the analysis group, so gmx
+    covar fits without mass weights as the native route does. No -ref: the
+    covariance is then about the average of the fitted frames, as the native
+    one is about the replica's mean; with -ref it would be about em.gro, and
+    a replica whose mean had moved away from em.gro would show that
+    displacement as a motion. -last keeps RMSIP_MODES eigenvectors in every
+    file: gmx anaeig -over refuses two files with different numbers of them,
+    which replicas of different lengths would otherwise write. The trace,
+    which -last cuts from eigenval.xvg, is read from covar's log instead.
+
+    With -last given, covar writes that many eigenvectors whatever the
+    number of frames: it cuts the output to n - 1 for n frames only when
+    -last is left at -1 (gmx_covar.cpp; read in a GROMACS 2021 source tree,
+    and the behaviour observed on 2026.1; the 2023 release CI installs was
+    not run). On the lysozyme fixture cut to 5 frames, 2026.1 wrote ten
+    eigenvalues, the last six between 3e-10 and 2e-9 nm^2 (null-space
+    directions), and anaeig -proj, analyze -cc and anaeig -over ran on them
+    and exited 0, as they did on 2 frames and on 1, where all ten were 0. So the
+    projection, cosine content and overlap always run, and analyze.sh (set
+    -e) finishes on a short run. Those null-space numbers are never read as a
+    result: the report refuses a replica below MIN_PCA_FRAMES from the
+    frame count covar logged."""
+    from caterva.analyze.pca import COSINE_MODES, RMSIP_MODES
+    k = RMSIP_MODES
+
+    def covar(ref: str, traj: str, out: str) -> str:
+        return (f"printf '0\\n0\\n' | {gmx} covar -s {ref} -f {traj} -n pca.ndx -last {k} "
+                f"-o {out}eigenval.xvg -v {out}eigenvec.trr -av {out}average.pdb -l {out}covar.log")
+
+    lines = []
+    for r in reps:
+        lines.append(covar(f"{r}/rmsf_reference.pdb", f"{r}/md_whole.xtc", f"{r}/pca_"))
+        lines.append(f"printf '0\\n0\\n' | {gmx} anaeig -v {r}/pca_eigenvec.trr "
+                     f"-f {r}/md_whole.xtc -s {r}/rmsf_reference.pdb -n pca.ndx -first 1 -last {COSINE_MODES} "
+                     f"-proj {r}/pca_proj.xvg")
+        lines.append(f"{gmx} analyze -f {r}/pca_proj.xvg -n {COSINE_MODES} -cc {r}/pca_cosine.xvg")
+    if len(reps) >= 2:
+        # -cat keeps every frame: the replicas share their time stamps, and
+        # without it trjcat drops the later file's frames as overlaps (on
+        # the smoke run's two replicas it kept 21 of the 42).
+        lines.append(f"{gmx} trjcat -f {' '.join(f'{r}/md_whole.xtc' for r in reps)} -cat -o pca_pooled.xtc")
+        lines.append(covar(f"{reps[0]}/rmsf_reference.pdb", "pca_pooled.xtc", "pca_pooled_"))
+        for i, a in enumerate(reps):
+            for b in reps[i + 1:]:
+                lines.append(f"{gmx} anaeig -v {a}/pca_eigenvec.trr "
+                             f"-v2 {b}/pca_eigenvec.trr -first 1 -last {k} -over pca_overlap_{a}_{b}.xvg")
+    return lines
+
+
+def _covar_log(path: Path) -> Tuple[int, float]:
+    """(frames read, trace in nm^2) from a gmx covar log."""
+    if not path.exists():
+        raise AnalyzeError(f"{path} does not exist: run analyze.sh again (it measures the principal motions)")
+    text = path.read_text(encoding="utf-8", errors="replace")
+    frames = re.search(r"Read (\d+) frames", text)
+    trace = re.search(r"Trace of the covariance matrix before diagonalizing:\s*(\S+)", text)
+    if not frames or not trace:
+        raise AnalyzeError(f"{path} does not say how many frames gmx covar read and the trace it found: "
+                           "run analyze.sh again")
+    return int(frames.group(1)), float(trace.group(1))
+
+
+def _covar_eigenvalues(path: Path) -> List[float]:
+    cols = read_columns(path) if path.exists() else []
+    if len(cols) != 2:
+        raise AnalyzeError(f"{path} is missing or is not gmx covar's eigenvalues: run analyze.sh again")
+    return cols[1]
+
+
+def gromacs_pca(directory: Path, p: Plan, reps: Sequence[Path], idx: Sequence[int]
+                ) -> Optional[PrincipalMotions]:
+    """The principal motions from what pca_commands wrote: eigenvalues from
+    gmx covar's eigenval.xvg, traces and frame counts from its log, cosine
+    contents from gmx analyze -cc (converted to the bounded form, see
+    caterva/analyze/pca.py), RMSIP from the k-th row of gmx anaeig -over,
+    which is RMSIP^2. None when em.gro, and so the atom set, is not there."""
+    from caterva.analyze import pca
+    if not idx:
+        return None
+    out = pca.PrincipalMotions(len(idx), [s.label for s in p.sites])
+    out.not_measured = pca.too_few_atoms(len(idx))
+    if out.not_measured:
+        return out
+    k = pca.RMSIP_MODES
+    for r in reps:
+        frames, trace = _covar_log(r / "pca_covar.log")
+        if frames < pca.MIN_PCA_FRAMES:
+            out.too_short.append((r.name, frames))
+            continue
+        eig = _covar_eigenvalues(r / "pca_eigenval.xvg")
+        cc = r / "pca_cosine.xvg"
+        cols = read_columns(cc) if cc.exists() else []
+        if len(cols) != 2 or len(cols[1]) != pca.COSINE_MODES:
+            raise AnalyzeError(f"{cc} is missing or does not hold the cosine content of PC1 and PC2: "
+                               "run analyze.sh again")
+        cos = tuple(pca.from_gmx_cosine(v, frames, i + 1) for i, v in enumerate(cols[1]))
+        out.replicas.append(pca.ReplicaModes(r.name, frames, eig[:k], trace, cos))
+    measured = [x.name for x in out.replicas]
+    for i, a in enumerate(measured):
+        for b in measured[i + 1:]:
+            over = directory / f"pca_overlap_{a}_{b}.xvg"
+            cols = read_columns(over) if over.exists() else []
+            rows = dict(zip((int(round(x)) for x in cols[0]), cols[1])) if len(cols) == 2 else {}
+            if k not in rows:
+                raise AnalyzeError(f"{over} is missing or has no row for {k} eigenvectors: run analyze.sh again")
+            ra, rb = (next(x for x in out.replicas if x.name == n) for n in (a, b))
+            out.overlaps.append((a, b, pca.overlap(ra, rb, math.sqrt(max(rows[k], 0.0)))))
+    if len(out.replicas) >= 2 and not out.too_short:
+        frames, trace = _covar_log(directory / "pca_pooled_covar.log")
+        if frames != sum(x.frames for x in out.replicas):
+            raise AnalyzeError(f"the pooled trajectory has {frames} frames and the replicas "
+                               f"{sum(x.frames for x in out.replicas)}: run analyze.sh again")
+        eig = _covar_eigenvalues(directory / "pca_pooled_eigenval.xvg")
+        out.pooled = pca.ReplicaModes("pooled", frames, eig[:k], trace)
+    return out
+
+
+def commands(p: Plan, reps: Sequence[str], gmx: str = "$GMX", chi1: Sequence = (),
+             pca: Sequence[int] = ()) -> List[str]:
     from caterva.analyze.sasa import gmx_options
     sel = " ".join(f"'{q.selection()}'" for q in p.pairs)
     angle_sel = " ".join(f"'{t.selection()}'" for t in p.angles)
@@ -227,13 +377,18 @@ def commands(p: Plan, reps: Sequence[str], gmx: str = "$GMX", chi1: Sequence = (
         # And the area at the start, from the same em.gro.
         lines.append(f"{gmx} sasa -s {reps[0]}/md.tpr -f em.gro {gmx_options()} -output {sasa_sel} "
                      "-o sasa_start.xvg")
+    # The principal motions, last: they read the whole reference and
+    # trajectories the RMSF lines above made.
+    from caterva.analyze.pca import too_few_atoms
+    if pca and too_few_atoms(len(pca)) is None:
+        lines += pca_commands(reps, gmx)
     return lines
 
 
-def script(p: Plan, reps: Sequence[str], chi1: Sequence = ()) -> str:
+def script(p: Plan, reps: Sequence[str], chi1: Sequence = (), pca: Sequence[int] = ()) -> str:
     return ("#!/usr/bin/env bash\n# Written by `caterva analyze`. Needs GROMACS (gmx on PATH, or GMX=...).\n"
             "set -euo pipefail\nGMX=\"${GMX:-gmx}\"\ncd \"$(dirname \"$0\")\"\n\n"
-            + "\n".join(commands(p, reps, chi1=chi1)) + "\n")
+            + "\n".join(commands(p, reps, chi1=chi1, pca=pca)) + "\n")
 
 
 @dataclass
@@ -290,6 +445,9 @@ class Analysis:
     sasa_route: str = "native"
     #: Why the areas were not measured, when they were not (sasa_unmeasurable).
     sasa_not_measured: Optional[str] = None
+    #: Principal motions of the catalytic residues' heavy atoms; None when
+    #: em.gro, which the atoms are read from, is not there.
+    motions: Optional[PrincipalMotions] = None
 
     @property
     def distances_consistent(self) -> bool:
@@ -321,8 +479,17 @@ class Analysis:
         rotamers, faces, water and solvent exposure carry verdicts too, but
         they classify against chosen thresholds, and each says "not yet a
         result" while the distances are not consistent; they do not set the
-        exit code, as the module docstring and --help say."""
-        return self.distances_consistent and all(t.summary.verdict == "consistent" for t in self.angles)
+        exit code, as the module docstring and --help say.
+
+        The principal motions count too, where they were measured: a
+        replica whose PC1 or PC2 looks like random diffusion, or two
+        replicas whose motions are no more alike than chance, is a run
+        that has not converged, whatever its distances say. Like the
+        angles they do not gate the other sections, which are judged by the
+        distances alone."""
+        motions_ok = self.motions is None or self.motions.consistent
+        return (self.distances_consistent and all(t.summary.verdict == "consistent" for t in self.angles)
+                and motions_ok)
 
 
 def measure(directory: Path, p: Plan, reps: Sequence[Path],
@@ -592,11 +759,12 @@ def _gro_atoms(path: Path):
 
 def measure_native(directory: Path, p: Plan, reps: Sequence[Path], sasa: bool = True
                    ) -> Tuple[List[DistanceResult], Flexibility, List["Occupancy"], List["Rotamer"],
-                              List[AngleResult], List[Hydration], List[Face], Optional[List[Exposure]]]:
-    """The same distances, RMSF, chi1, angles, faces, water counts and
-    solvent-accessible areas as analyze.sh, and the hydrogen bonds it does
-    not count, computed by Caterva from the trajectories it reads itself
-    (caterva/md/xtc.py), with no GROMACS. Each trajectory is read once and
+                              List[AngleResult], List[Hydration], List[Face], Optional[List[Exposure]],
+                              Optional[PrincipalMotions]]:
+    """The same distances, RMSF, chi1, angles, faces, water counts,
+    solvent-accessible areas and principal motions as analyze.sh, and the
+    hydrogen bonds it does not count, computed by Caterva from the
+    trajectories it reads itself (caterva/md/xtc.py), with no GROMACS. Each trajectory is read once and
     every quantity taken from it."""
     import numpy as np
     from caterva.md import xtc
@@ -656,8 +824,17 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path], sasa: bool = 
     from caterva.analyze.sasa import summarise_areas
     surface = _sasa_surface(directory, p) if p.sites and sasa else None
     per_area: Dict[int, List[Tuple[str, float, float, float, float]]] = {i: [] for i in range(len(p.sites))}
+    # Principal motions: each replica's frames superposed on em.gro's
+    # catalytic heavy atoms, made whole as gmx trjconv -pbc mol makes the
+    # reference analyze.sh fits to (caterva/analyze/pca.py).
+    from caterva.analyze import pca
+    pca_idx = pca.heavy_atoms(atoms, [s.resnr for s in p.sites])
+    pca_ref = xtc.make_whole(start_x[pca_idx], start_box) if pca_idx else None
+    pca_frames: List[Tuple[str, np.ndarray]] = []
     for r in reps:
         traj = xtc.read(r / "md.xtc")
+        if pca_idx:
+            pca_frames.append((r.name, pca.fitted(traj, pca_idx, pca_ref)))
         for i, (ia, iv, ib) in enumerate(angle_atoms):
             per_angle[i].append((r.name, angle_series(traj, ia, iv, ib)))
         for i, t in enumerate(p.faces):
@@ -705,7 +882,8 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path], sasa: bool = 
     # sasa=False (sasa_unmeasurable gave a reason): None, not measured.
     exposures = (_exposures(p, surface.areas(start_x, start_box), per_area, surface.in_chain)
                  if surface is not None else ([] if sasa else None))
-    return results, Flexibility(flex), occupancies, rotamers, angles, water, faces, exposures
+    motions = pca.from_frames(pca_frames, len(pca_idx), [s.label for s in p.sites]) if pca_idx else None
+    return results, Flexibility(flex), occupancies, rotamers, angles, water, faces, exposures, motions
 
 
 #: Occupancy thresholds for naming what happened to a hydrogen bond. Chosen,
@@ -730,8 +908,9 @@ def hbond_verdict(o) -> str:
     return "partial"
 
 
-def run_gromacs(directory: Path, p: Plan, reps: Sequence[Path], gmx: str, chi1: Sequence = ()) -> None:
-    for line in commands(p, [r.name for r in reps], gmx=shlex_quote(gmx), chi1=chi1):
+def run_gromacs(directory: Path, p: Plan, reps: Sequence[Path], gmx: str, chi1: Sequence = (),
+                pca: Sequence[int] = ()) -> None:
+    for line in commands(p, [r.name for r in reps], gmx=shlex_quote(gmx), chi1=chi1, pca=pca):
         proc = subprocess.run(["bash", "-c", line], cwd=directory, capture_output=True, text=True)
         if proc.returncode != 0:
             raise AnalyzeError(f"GROMACS failed:\n  {line}\n{proc.stderr.strip()[-800:]}")
@@ -809,6 +988,7 @@ def report(a: Analysis) -> List[str]:
             L += ["", "One usable replica: the ratio has no spread."]
     else:
         L += ["Not measurable: RMSF needs more than one frame per replica, and these runs are too short."]
+    L += pca_section(a)
     L += ["", "## Not measured", "",
           "- ligand pose and contacts: `caterva md` strips ligands until they can be parameterised "
           "(MD roadmap M4)", "",
@@ -1132,7 +1312,100 @@ def sasa_section(a: Analysis) -> List[str]:
     return L
 
 
+def pca_section(a: Analysis) -> List[str]:
+    """The principal motions (caterva/analyze/pca.py): eigenvalues per
+    replica and pooled, RMSIP between replicas against its chance level,
+    cosine content against what uncorrelated frames give."""
+    from caterva.analyze import pca
+    L = ["", "## Principal motions of the active site", ""]
+    m = a.motions
+    if m is None:
+        return L + ["Not measured: the atoms are read from em.gro, which is not there yet."]
+    k = pca.RMSIP_MODES
+    L += [f"Principal component analysis of the {m.atoms} heavy atoms (backbone and side chain, no hydrogens) of "
+          f"{', '.join(m.residues)}. Each frame is made whole and superposed on the same atoms of em.gro by "
+          "unweighted least squares, and the covariance of their coordinates is taken about the replica's mean "
+          "over every frame: nothing is discarded as relaxation, because a drift away from the start is one of "
+          "the things this looks for. The modes are its eigenvectors, largest first; each eigenvalue is the "
+          "mean-square fluctuation along its mode (nm²), and the total is their sum.", ""]
+    if m.not_measured:
+        return L + [f"Not measured: {m.not_measured}."]
+    if m.too_short:
+        p_short = pca.chance_diffusion_like(pca.MIN_PCA_FRAMES)
+        L += [f"Not measured in {', '.join(f'{n} ({f} frames)' for n, f in m.too_short)}: principal motions "
+              f"need at least {pca.MIN_PCA_FRAMES} frames per replica. With fewer, the {k} modes compared are "
+              f"more than half of the directions the frames can span, so there is little left for them to be "
+              f"principal among; and at {pca.MIN_PCA_FRAMES} frames, frames with no correlation in time are "
+              f"called diffusion-like below by chance with probability at most {p_short:.1g}, a chance that "
+              "grows quickly as the run gets shorter.", ""]
+    if not m.replicas:
+        return L
+    rows = m.replicas + ([m.pooled] if m.pooled else [])
+    L += ["| replica | frames | PC1 (nm²) | PC2 (nm²) | PC3 (nm²) | total (nm²) | share in PC1 | "
+          f"share in PC1-{k} |", "|---|---|---|---|---|---|---|---|"]
+    for r in rows:
+        ev = [f"{v:.4g}" for v in r.eigenvalues[:3]] + ["n/a"] * (3 - len(r.eigenvalues[:3]))
+        L.append(f"| {r.name} | {r.frames} | " + " | ".join(ev)
+                 + f" | {r.trace:.4g} | {r.share(1):.2f} | {r.share(k):.2f} |")
+    if m.pooled is not None and m.between is not None:
+        L += ["", f"Pooled: every replica's frames in one covariance. Between replicas: {m.between:.2f} of the "
+                  "pooled total is the spread of the replicas' mean structures about their common mean; the rest "
+                  "is motion within the replicas (the pooled total less the frame-weighted mean of the replicas' "
+                  "totals, over the pooled total)."]
+    L += ["", "**Do the replicas move the same way?**", ""]
+    if len(m.replicas) < 2:
+        L += ["Only one replica measured: the comparison needs at least two."]
+    else:
+        mean, sd = pca.chance_rmsip2(k, m.dim)
+        L += [f"Root-mean-square inner product (RMSIP) of each pair of replicas' first {k} modes: 1 when the two "
+              "sets span the same directions, 0 when every mode of one is perpendicular to every mode of the "
+              f"other. RMSIP² is the mean, over one replica's {k} modes, of the fraction of each that lies in the "
+              f"other's {k}.", "",
+              "| replicas | RMSIP | RMSIP² | verdict |", "|---|---|---|---|"]
+        for x, y, v in m.overlaps:
+            cells = "n/a | n/a" if math.isnan(v) else f"{v:.3f} | {v * v:.3f}"
+            L.append(f"| {x}–{y} | {cells} | {pca.rmsip_verdict(v, m.dim)} |")
+        L += ["", f"Chance: two random {k}-dimensional subspaces of the {m.dim} directions the {m.atoms} atoms can "
+                  f"move in once the fit has removed rotation and translation (3 × {m.atoms} - {pca.RIGID}) have "
+                  f"RMSIP² = {k}/{m.dim} = {mean:.3f} on average, with standard deviation {sd:.3f} (RMSIP about "
+                  f"{math.sqrt(mean):.2f}). Verdicts (chosen thresholds): {pca.SAME}, RMSIP² at least "
+                  f"{pca.SAME_RMSIP2:g}, so that on average more than half of each mode lies in the other "
+                  f"replica's {k}; {pca.CHANCE}, RMSIP² within {pca.CHANCE_SD:g} standard deviations of the "
+                  f"chance value (at most {mean + pca.CHANCE_SD * sd:.3f}); {pca.PARTLY}, in between. {k} modes "
+                  "is a choice; the share of the motion they hold is in the table above."]
+    shortest = min(r.frames for r in m.replicas)
+    c_mean, _ = pca.uncorrelated_cosine(shortest)
+    c_chance = pca.chance_diffusion_like(shortest)
+    L += ["", "**Is the largest motion only diffusion?**", "",
+          "Cosine content of each replica's projection on its own PC1 and PC2: its squared correlation with a "
+          "cosine of half a period (PC1) or one period (PC2) over the run, the shape random diffusion gives "
+          "those modes. At 1 the projection has exactly that shape: for PC1 a drift one way along the mode "
+          "with no return, for PC2 one excursion out to an extreme and back. Either way the replica has made "
+          "one slow passage along the mode rather than sampled it back and forth.", "",
+          "| replica | frames | PC1 | PC2 | verdict |", "|---|---|---|---|---|"]
+    for r in m.replicas:
+        cells = " | ".join("n/a" if math.isnan(c) else f"{c:.3f}" for c in (r.cosine or ()))
+        L.append(f"| {r.name} | {r.frames} | {cells} | {pca.cosine_verdict(r)} |")
+    L += ["", f"Frames with no correlation in time would give PC1 {c_mean:.3f} on average at {shortest} frames (the "
+              f"shortest replica), and would be called diffusion-like (PC1 or PC2 at {pca.DIFFUSIVE:g} or more) "
+              f"with probability at most {c_chance:.1g}. Verdict (chosen "
+              f"threshold): {pca.DIFFUSION_LIKE}, when PC1 or PC2 reaches {pca.DIFFUSIVE:g}, the one cosine then "
+              f"being at least half of the projection's mean square; {pca.NOT_DIFFUSIVE} below that. A low "
+              "cosine content does not show convergence: a replica can sample one basin thoroughly and never "
+              "find the next, which the comparison between replicas is the check on. `gmx analyze -cc` prints "
+              "(n + 1)/n times these values (its discrete normalisation; a pure cosine reads 1.048 there at 21 "
+              "frames), and the GROMACS route converts them.", "",
+          "These verdicts are about the sampling, not the enzyme, so the distances do not gate them; a "
+          "replica called diffusion-like, or a pair of replicas called no more alike than chance, makes the "
+          "exit code 4. "
+          "RMSIP: Amadei, Ceruso & Di Nola (1999) Proteins 36:419. Cosine content: Hess (2000) Phys. Rev. E "
+          "62:8438, doi:10.1103/PhysRevE.62.8438; Hess (2002) Phys. Rev. E 65:031910, "
+          "doi:10.1103/PhysRevE.65.031910."]
+    return L
+
+
 def build_parser(prog: str = "caterva analyze") -> argparse.ArgumentParser:
+    from caterva.analyze.pca import DIFFUSIVE, MIN_PCA_FRAMES
     p = argparse.ArgumentParser(prog=prog, description=__doc__.splitlines()[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter,
                                 epilog=("Measures, per replica, against the starting structure:\n"
@@ -1144,20 +1417,28 @@ def build_parser(prog: str = "caterva analyze") -> argparse.ArgumentParser:
                                         "  active-site pocket's C-alpha RMSF against the rest of the protein.\n\n"
                                         "Examples:\n"
                                         f"  {prog} ldha-md\n  {prog} ldha-md --script-only\n"
-                                        "\nExit codes: 0 every distance and angle consistent, 4 at least one\n"
-                                        "not a result, 2 malformed question, 3 refused and said why, 1 a crash.\n"
-                                        "The verdicts on hydrogen bonds, rotamers, faces, water and solvent\n"
-                                        "exposure do not set the exit code."))
+                                        "\nReports, for the catalytic residues: distances, hydrogen bonds, chi1 "
+                                        "rotamers,\nangles, faces, water, pocket flexibility, and the principal "
+                                        "motions of their\nheavy atoms (per replica and pooled; RMSIP between "
+                                        f"replicas against chance;\ncosine content of PC1 and PC2, {DIFFUSIVE:g} or "
+                                        f"more called diffusion-like, not converged;\nfewer than {MIN_PCA_FRAMES} "
+                                        "frames per replica is refused).\n"
+                                                                                "\nExit codes: 0 every distance and angle consistent and the principal\n"
+                                        "motions, where measured, converged; 4 at least one not a result, 2\n"
+                                        "malformed question, 3 refused and said why, 1 a crash. The verdicts\n"
+                                        "on hydrogen bonds, rotamers, faces, water and solvent exposure do not\n"
+                                        "set the exit code."))
     p.add_argument("directory", help="a finished `caterva md` setup")
     p.add_argument("--script-only", action="store_true",
                    help="write analyze.sh and stop; run it, then rerun without this flag")
     p.add_argument("--no-run", action="store_true",
                    help="use the .xvg files analyze.sh already wrote; do not call GROMACS (a run whose "
-                        "analyze.sh predates the angle, face, water and solvent-exposure tables is refused "
-                        "by name: run it again)")
+                        "analyze.sh predates the angle, face, water and solvent-exposure tables or the "
+                        "principal motions is refused by name: run it again)")
     p.add_argument("--gromacs", action="store_true",
-                   help="measure with gmx distance, rmsf, angle, gangle, select and sasa (analyze.sh) "
-                        "instead of Caterva's own reader")
+                   help="measure with gmx distance, rmsf, angle, gangle, select and sasa, and the principal "
+                        "motions with gmx covar, anaeig and analyze (analyze.sh), instead of Caterva's own "
+                        "reader")
     return p
 
 
@@ -1179,11 +1460,15 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
         no_sasa = sasa_unmeasurable(d, p)
         if chi1:
             write_chi1_index(d, chi1)
-        (d / "analyze.sh").write_text(script(p, [r.name for r in reps] or ["rep1"], chi1))
+        pca_idx = pca_atoms(d, p)
+        if pca_idx:
+            write_pca_index(d, pca_idx)
+        (d / "analyze.sh").write_text(script(p, [r.name for r in reps] or ["rep1"], chi1, pca_idx))
         if args.script_only:
             print(f"Wrote {d}/analyze.sh ({len(p.pairs)} catalytic distances, {len(p.angles)} angles, "
                   f"the faces of {len(p.faces)}, water and solvent-accessible area at {len(p.sites)} residues, "
-                  f"pocket of {len(p.pocket)} residues).")
+                  f"pocket of {len(p.pocket)} residues"
+                  + (f", principal motions of {len(pca_idx)} atoms" if pca_idx else "") + ").")
             return 0
         if not reps:
             raise AnalyzeError(f"no finished replicas (rep*/md.xtc) under {d}: run {d}/run.sh first")
@@ -1193,19 +1478,21 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
                 if shutil.which(gmx) is None and not Path(gmx).exists():
                     raise AnalyzeError(f"GROMACS not found ({gmx!r}): set GMX=/path/to/gmx, or run analyze.sh "
                                        "elsewhere and rerun with --no-run")
-                run_gromacs(d, p, reps, gmx, chi1)
+                run_gromacs(d, p, reps, gmx, chi1, pca_idx)
             distances, flex, rotamers = measure(d, p, reps, chi1)
             angles, water = gromacs_angles(p, reps), gromacs_water(d, p, reps)
             faces, exposure = gromacs_faces(p, reps), (gromacs_sasa(d, p, reps) if no_sasa is None else None)
             hbonds = None
+            motions = gromacs_pca(d, p, reps, pca_idx)
         else:
-            distances, flex, hbonds, rotamers, angles, water, faces, exposure = measure_native(
+            distances, flex, hbonds, rotamers, angles, water, faces, exposure, motions = measure_native(
                 d, p, reps, sasa=no_sasa is None)
     except AnalyzeError as e:
         print(f"caterva analyze: {e}", file=sys.stderr)
         return 3
     a = Analysis(pdb, chain, source, p, distances, flex, hbonds, rotamers, angles, water, faces, exposure,
-                 sasa_route="gromacs" if args.gromacs or args.no_run else "native", sasa_not_measured=no_sasa)
+                 sasa_route="gromacs" if args.gromacs or args.no_run else "native", sasa_not_measured=no_sasa,
+                 motions=motions)
     text = "\n".join(report(a)) + "\n"
     print(text, end="")
     (d / "ANALYSIS.md").write_text(text, encoding="utf-8")

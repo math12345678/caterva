@@ -216,7 +216,7 @@ def test_both_routes_give_the_same_water_and_angles_on_real_frames(tmp_path):
     order = [48, 50, 46, 59, 52, 35]      # M-CSA's order, as the lysozyme run had it
     p = plan(protein, [(r, next(a.resname for a in protein if a.resnr == r)) for r in order])
     assert len(p.angles) == 24
-    _, _, _, _, angles, water, _, _ = measure_native(tmp_path, p, [rep])
+    angles, water = measure_native(tmp_path, p, [rep])[4:6]
 
     reference = gmx_water()
     (tmp_path / "water_start.xvg").write_text(

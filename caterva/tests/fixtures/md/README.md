@@ -160,3 +160,22 @@ The surface is the fixture's protein, residues 1-59, not the whole enzyme,
 so these are not lysozyme's areas; they are what `gmx sasa` measures on
 the same atoms and frames Caterva is given. The fragment is whole in every
 frame as stored.
+
+`lyso_1aki_rep1_gmx_pca.txt`: the principal motions of the 47 heavy atoms
+of the six catalytic residues (every atom of residues 35, 46, 48, 50, 52
+and 59 whose name does not start with H) on `lyso_1aki_res1-59.xtc`, as
+GROMACS 2026.1 printed them (2026-09-30), one quantity per line (a key,
+then the values copied from the tool's output). The atoms, 1-based, were
+the one group of an index file, `[ active_site ]`, used as both the fit
+and the analysis group, with `lyso_1aki_res1-59.gro.gz` (em.gro's atoms)
+as the structure: `printf '0\n0\n' | gmx covar -s lyso.gro -f lyso.xtc -n
+pca.ndx -last 10` for `full_` (all 21 frames: its eigenval.xvg, and the
+frame count and "Trace of the covariance matrix before diagonalizing" from
+its log; covar.log also says "Fit is non-mass weighted"), then `gmx anaeig
+-v <its eigenvec.trr> -f lyso.xtc -s lyso.gro -n pca.ndx -first 1 -last 2
+-proj` for `full_projection_pc1/pc2` and `gmx analyze -f <that proj.xvg>
+-n 2 -cc` for `full_cosine`. `first_` and `second_` are the same with
+`-e 4.5` (frames 0-9) and `-b 5` (frames 10-20) on covar and anaeig, and
+`-last 5`; `first_second_overlap` is `gmx anaeig -v <first eigenvec.trr>
+-v2 <second eigenvec.trr> -first 1 -last 5 -over`, one value per row of
+its output (rows 1 to 5).
