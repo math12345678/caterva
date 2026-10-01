@@ -45,13 +45,14 @@ CRUZI_NO_MODE = _row(1.3, "natural hexokinase from epimastigotes, at pH 7.5", "6
 CRUZI_COMPETITIVE = _row(1.5, "competitive to ATP", "640216", organism="Trypanosoma cruzi")
 
 
-def _source(row, candidates, evidence_only=()):
+def _source(row, candidates, evidence_only=(), mode_default=None):
     return SimpleNamespace(value=row["value"], unit=row["unit"],
                            citation=f"BRENDA ref {row['reference_id']}",
                            organism=row["organism"], origin="literature", cross_species=False,
                            ph=row["ph"], temperature_c=row["temperature_c"], buffer=None,
                            explicitly_unreported=(), candidates=tuple(candidates),
-                           commentary=row["conditions"], evidence_only=tuple(evidence_only))
+                           commentary=row["conditions"], evidence_only=tuple(evidence_only),
+                           mode_default=mode_default)
 
 
 def _search(**resolutions):
@@ -78,12 +79,23 @@ class TestEachRequestSaysWhatTheModelIsOf:
             assert (by_table[table].inhibition_mode, by_table[table].model_substrate,
                     by_table[table].isoform) == (None, None, "LDH-A")
 
-    def test_any_mode_asks_for_no_mode(self):
+    def test_any_mode_asks_for_no_mode_and_sends_the_mode_to_compare(self):
+        """`--any-mode` asks the question the API and the CLI ask with no
+        mode, and sends the motif's mode, with the model's substrate, only as
+        the one to compare with (`compare_mode`), so the resolver can say
+        what the default would have carried."""
         model = self._model("Michaelis-Menten with a competitive inhibitor")
         ki = next(r for r in model.parameter_requests(any_mode=True) if r.table == "ki")
-        assert ki.inhibition_mode is None and ki.model_substrate is None
-        assert next(r for r in model.parameter_requests() if r.table == "ki"
-                    ).inhibition_mode == "competitive"
+        assert (ki.inhibition_mode, ki.compare_mode, ki.model_substrate) == (
+            None, "competitive", "pyruvate")
+        default = next(r for r in model.parameter_requests() if r.table == "ki")
+        assert (default.inhibition_mode, default.compare_mode, default.model_substrate) == (
+            "competitive", None, "pyruvate")
+        # A Km or a kcat has no mode either way.
+        for request in model.parameter_requests(any_mode=True):
+            if request.table != "ki":
+                assert (request.inhibition_mode, request.compare_mode,
+                        request.model_substrate) == (None, None, None)
 
     def test_product_inhibition_is_ranked_as_competitive(self):
         """`row_scope.MODE_OF_MOTIF`: a product inhibits competitively."""
@@ -140,7 +152,14 @@ class TestTheScoutPassesThemOn:
         resolve(ParameterRequest(quantity="reaction_Km", substrate="pyruvate",
                                  ec_number="1.1.1.27", table="km"),
                 organism="Homo sapiens", allow_cross_species=False)
-        assert not {"isoform", "inhibition_mode", "model_substrate"} & set(calls[1])
+        assert not {"isoform", "inhibition_mode", "model_substrate", "compare_mode"} & set(calls[1])
+        # --any-mode's request: no mode to rank by, one to compare with.
+        resolve(ParameterRequest(quantity="reaction_Ki", substrate="gossypol",
+                                 ec_number="1.1.1.27", table="ki", compare_mode="competitive",
+                                 model_substrate="pyruvate"),
+                organism="Homo sapiens", allow_cross_species=False)
+        assert "inhibition_mode" not in calls[2]
+        assert (calls[2]["compare_mode"], calls[2]["model_substrate"]) == ("competitive", "pyruvate")
 
     def test_a_refusal_keeps_the_resolvers_word(self):
         from caterva.agents.scheduler import Scheduler
@@ -248,6 +267,93 @@ class TestTheViewTheSelectionsRead:
         m = Measurement(0.03, "mM", "BRENDA ref 286469", commentary=None)
         view = evidence_view({"reaction_Km": m}, {})
         assert view.measured["reaction_Km"] is m and view.chosen == {}
+
+
+class TestAnyModeNamesTheRowTheDefaultCarries:
+    """`--any-mode` carries the resolver's answer to a request with no mode,
+    and says what the default would carry from the resolver's own answer to
+    the default's question (`mode_default`), not from the rows it holds.
+    The rows are the committed pages'; Tests/test_ki_mode_resolution.py
+    runs the same through the real resolver."""
+
+    def _default(self, mode, substrate, row=None, modes=()):
+        return {"mode": mode, "model_substrate": substrate, "row": row,
+                "modes_available": tuple(modes)}
+
+    def test_the_trypanosoma_cruzi_row_the_answer_does_not_hold_is_named(self):
+        """The case that was stated rather than fixed: the no-mode answer
+        holds 1.3 mM alone, so a note over its rows could only say nothing.
+        The resolver's default answer is 1.5 mM, and the note names it."""
+        answer = _source(CRUZI_NO_MODE, [CRUZI_NO_MODE],
+                         mode_default=self._default("competitive", "glucose", CRUZI_COMPETITIVE))
+        chosen = select_for_model(_search(reaction_Ki=SimpleNamespace(source=answer)),
+                                  {"reaction_Ki": ("competitive_inhibition", "ki")},
+                                  substrate="glucose", isoform=None, any_mode=True)
+        carried = chosen.measured["reaction_Ki"]
+        assert (carried.value, carried.commentary) == (1.3, CRUZI_NO_MODE["conditions"])
+        assert carried.chosen_because == "the resolver's pick, kept by --any-mode"
+        assert chosen.notes == [
+            "`reaction_Ki`: --any-mode kept the resolver's pick (1.3 mM, BRENDA ref 640265), "
+            "which states no inhibition mode; without it the row stating competitive inhibition "
+            "versus ATP (1.5 mM, BRENDA ref 640216), this model's mechanism though not its "
+            "substrate (glucose), would be used; the resolver, asked for a competitive model of "
+            "glucose, ranks by the mode every row it keeps once variants are set aside, before "
+            "choosing on evidence, and returns it"]
+        # The default's row is among the alternatives, so the spread printed
+        # is the one the default prints.
+        assert carried.disagreement == (1.3, 1.5)
+
+    def test_a_default_that_refuses_is_said_with_the_modes_it_found(self):
+        answer = _source(COMPETITIVE, [COMPETITIVE, NONCOMPETITIVE], mode_default=self._default(
+            "uncompetitive", "pyruvate", None, ["competitive inhibition versus NADH",
+                                                "noncompetitive inhibition versus pyruvate"]))
+        chosen = select_for_model(_search(reaction_Ki=SimpleNamespace(source=answer)),
+                                  {"reaction_Ki": ("uncompetitive_inhibition", "ki")},
+                                  substrate="pyruvate", isoform=None, any_mode=True)
+        assert chosen.measured["reaction_Ki"].value == 0.00059 and chosen.withheld == {}
+        assert chosen.notes[0].endswith(
+            "without it the constant would be refused; the resolver, asked for an uncompetitive "
+            "model of pyruvate, finds that every row it keeps once variants are set aside "
+            "states another mode (competitive "
+            "inhibition versus NADH; noncompetitive inhibition versus pyruvate)")
+
+    def test_a_default_that_carries_the_same_row_adds_nothing(self):
+        answer = _source(COMPETITIVE, [COMPETITIVE, NONCOMPETITIVE],
+                         mode_default=self._default("competitive", "pyruvate", COMPETITIVE))
+        chosen = select_for_model(_search(reaction_Ki=SimpleNamespace(source=answer)),
+                                  {"reaction_Ki": ("competitive_inhibition", "ki")},
+                                  substrate="pyruvate", isoform=None, any_mode=True)
+        assert chosen.measured["reaction_Ki"].chosen_because is None
+        assert not any("--any-mode" in note for note in chosen.notes)
+
+    def test_without_any_mode_a_default_is_not_read(self):
+        """A default only answers --any-mode's question; the default path
+        carries the resolver's row and says what its choice replaced."""
+        answer = _source(CRUZI_NO_MODE, [CRUZI_NO_MODE],
+                         mode_default=self._default("competitive", "glucose", CRUZI_COMPETITIVE))
+        chosen = select_for_model(_search(reaction_Ki=SimpleNamespace(source=answer)),
+                                  {"reaction_Ki": ("competitive_inhibition", "ki")},
+                                  substrate="glucose", isoform=None, any_mode=False)
+        assert chosen.measured["reaction_Ki"].disagreement is None
+        assert not any("--any-mode" in note for note in chosen.notes)
+
+    def test_the_adapter_hands_it_on_as_a_plain_record(self):
+        from caterva.agents.adapters import mode_default_of, to_parameter_source
+
+        result = SimpleNamespace(
+            found=True, value=1.3, unit="mM", organism="Trypanosoma cruzi",
+            assay_ph=7.5, assay_temperature_c=None, assay_buffer=None,
+            citation=SimpleNamespace(source="BRENDA", reference_id="640265"),
+            cross_species_flag=False, assay_unreported=[], ensemble_candidates=[CRUZI_NO_MODE],
+            commentary=CRUZI_NO_MODE["conditions"], evidence_only=[],
+            mode_default=SimpleNamespace(mode="competitive", model_substrate="glucose",
+                                         row=CRUZI_COMPETITIVE, modes_available=[]))
+        source, _ = to_parameter_source("reaction_Ki", result)
+        assert source.mode_default == {"mode": "competitive", "model_substrate": "glucose",
+                                       "row": CRUZI_COMPETITIVE, "modes_available": ()}
+        # A result that predates the field, or says nothing, gives None.
+        assert mode_default_of(SimpleNamespace()) is None
+        assert mode_default_of(SimpleNamespace(mode_default=None)) is None
 
 
 class TestCarry:

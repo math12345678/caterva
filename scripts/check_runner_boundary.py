@@ -175,6 +175,12 @@ EMITTED_AS: dict[str, str | None] = {
     # names it: the API shows the row returned and never an answer it did
     # not ask for (docs/undelivered-fields-baseline.txt says the same).
     "evidence_only": None,
+    # The other direction: asked for no mode with a model's mode to compare
+    # (`compare_mode`), what the call asked for that mode would return. Read
+    # in-process by `caterva compose --any-mode`, through ParameterSource,
+    # to name the row its default carries. The runner never sends
+    # `compare_mode`, so it never has one to emit.
+    "mode_default": None,
     "literature_candidates": "literatureCandidates",
     "search_log": "logs",
 }

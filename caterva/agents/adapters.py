@@ -206,13 +206,36 @@ def to_parameter_source(
             candidates=tuple(getattr(result, "ensemble_candidates", []) or []),
             commentary=getattr(result, "commentary", None),
             evidence_only=tuple(getattr(result, "evidence_only", []) or []),
+            mode_default=mode_default_of(result),
         ),
         None,
     )
 
 
+def mode_default_of(result: Any) -> Optional[dict]:
+    """`KineticResult.mode_default` as the plain dict `ParameterSource`
+    carries, or None when the result has none.
+
+    A dict rather than the resolver's pydantic model, for the reason
+    `ParameterSource` is not a `KineticResult`: the record is read by code
+    that must not need the literature layer's types to read it. Built from
+    attributes, so a resolver that predates the field, or a test's stand-in,
+    gives None rather than failing."""
+    default = getattr(result, "mode_default", None)
+    if default is None or not getattr(default, "mode", None):
+        return None
+    row = getattr(default, "row", None)
+    return {
+        "mode": default.mode,
+        "model_substrate": getattr(default, "model_substrate", None),
+        "row": dict(row) if row else None,
+        "modes_available": tuple(getattr(default, "modes_available", ()) or ()),
+    }
+
+
 __all__ = [
     "to_parameter_source",
+    "mode_default_of",
     "citation_text",
     "NOT_FOUND_REASONS",
     "FOUND_SOURCES",

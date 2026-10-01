@@ -104,7 +104,11 @@ def _angle_rows(text: str) -> dict:
 def _face_rows(text: str) -> dict:
     """angle -> every cell of its row in the face table: how far the crystal
     is from flat, the crystal's face, each replica's fractions on it and on
-    the other face, and the verdict. The two routes measure the same
+    the other face (for an angle in plane in the crystal, on the clockwise
+    face, the anticlockwise face and flat), and the verdict. Both routes
+    render a row through caterva.analyze.faces.face_cells and face_verdict,
+    so a row is the same string on both whenever the frames are judged
+    alike. The two routes measure the same
     elevation (gmx gangle -g1 plane -g2 vector against the native one, to
     0.00061 degrees per frame on both 10 ps lysozyme replicas, 2026-09-29)
     and decide each frame's face the same way, so the rows must be
@@ -129,24 +133,69 @@ def _faces_agree(native: dict, gromacs: dict) -> tuple:
     trajectory every run, and with about 1.3 frames per unit of polar sine
     near the edges a split is expected in well under 1% of runs (the review
     of this check, 2026-09-30). So: every row identical, except at most one
-    row in which the fractions differ by one frame and no more. A real
-    disagreement between the routes moves more than one frame or more than
-    one row."""
+    row in which one frame of one replica is flat on one route and on a
+    face on the other (`_one_edge_frame`). A real disagreement between the
+    routes moves more than one frame, moves a frame from one face to the
+    other, or differs in more than one row.
+
+    The crystal's two cells (how far it is from flat, and its face) must be
+    identical: both routes take them from the same analysis plan, built from
+    the crystal's coordinates, not from either route's frames. Only the
+    verdict, the last cell, may differ in its words, since one frame can move
+    it across a threshold.
+
+    The fractions are read out of each cell, since a replica's cell holds
+    two or three of them ("1.00 (0.00)", or "clockwise 0.29, anticlockwise
+    0.00, flat 0.71" in plane in the crystal) and is not one number. Until
+    2026-09-30 a cell was compared only when it parsed as a single float,
+    so in the one row allowed to differ no replica's fractions were compared
+    at all. Until 2026-10-01 each number in each cell of that row could be a
+    frame off, so both replicas could differ, and a frame could be on the
+    clockwise face on one route and the anticlockwise one on the other: a
+    sign flip across the band, not rounding at its edge."""
     if not native or native.keys() != gromacs.keys():
         return False, 0
     differing = [k for k in native if native[k] != gromacs[k]]
     if len(differing) > 1:
         return False, len(differing)
     for k in differing:
-        for x, y in zip(native[k], gromacs[k]):
-            if x == y:
-                continue
-            try:
-                if abs(float(x) - float(y)) > 1 / SMOKE_FRAMES + 0.006:
-                    return False, 1
-            except ValueError:
-                continue  # the verdict may follow the one frame
+        x, y = native[k], gromacs[k]
+        if len(x) != len(y) or len(x) < 4 or x[:2] != y[:2]:
+            return False, 1
+        cells = [(a, b) for a, b in zip(x[2:-1], y[2:-1]) if a != b]
+        if len(cells) != 1 or not _one_edge_frame(*cells[0]):
+            return False, 1
     return True, len(differing)
+
+
+def _one_edge_frame(native: str, gromacs: str) -> bool:
+    """True when two renderings of one replica's cell differ by one frame
+    that is flat on one route and on a face on the other, and in nothing
+    else. A cell with a crystal face is "k (o)", the fractions on the
+    crystal's face and on the other: exactly one of the two moves, by one
+    frame. A cell in plane in the crystal is "clockwise a, anticlockwise b,
+    flat c": flat moves by one frame and exactly one face by the same frame
+    the other way. A frame that changes face changes both faces' fractions,
+    and is refused either way."""
+    if _FRACTION.sub("#", native) != _FRACTION.sub("#", gromacs):
+        return False
+    xs = [float(v) for v in _FRACTION.findall(native)]
+    ys = [float(v) for v in _FRACTION.findall(gromacs)]
+    frame, rounding = 1 / SMOKE_FRAMES, 0.006
+    moved = [i for i, (a, b) in enumerate(zip(xs, ys)) if abs(b - a) > rounding]
+    if not all(abs(abs(ys[i] - xs[i]) - frame) <= rounding for i in moved):
+        return False
+    if len(xs) == 2:
+        return len(moved) == 1
+    if len(xs) == 3:
+        return (len(moved) == 2 and 2 in moved
+                and (ys[2] - xs[2]) * (ys[moved[0]] - xs[moved[0]]) < 0)
+    return False
+
+
+#: A number as the face table prints one: a fraction ("0.29") or the
+#: crystal's distance from flat ("+2.1").
+_FRACTION = re.compile(r"[-+]?\d+\.\d+")
 
 
 def _water_rows(text: str) -> dict:

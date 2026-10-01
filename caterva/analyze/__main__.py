@@ -834,7 +834,8 @@ def angle_section(a: Analysis) -> List[str]:
 
 def face_section(a: Analysis) -> List[str]:
     from caterva.analyze.angles import MOVED_DEG
-    from caterva.analyze.faces import FLAT_DEG, FLAT_IN_CRYSTAL, KEPT, SPLIT, face_name, face_verdict
+    from caterva.analyze.faces import (FLAT_DEG, FLAT_IN_CRYSTAL, KEPT, SPLIT, STAYED_IN_PLANE, UNJUDGED,
+                                       face_cells, face_name, face_verdict)
     L = ["", "## Which face of the vertex its partners are on", ""]
     if a.faces is None:
         return L + ["Not measured."]
@@ -855,23 +856,28 @@ def face_section(a: Analysis) -> List[str]:
           "two partners and to its Cα) stands at least that far out of the plane of the other two. A frame is "
           f"on a face only when it is at least {FLAT_DEG:g}°; nearer flat, which face is noise, and the frame "
           "is on neither. Per replica, the fraction of frames on the crystal's face and, in brackets, on the "
-          "other face; the rest are flat. Every frame is counted, as for the rotamers and water.", ""]
+          "other face; the rest are flat. Where the crystal is itself in plane it has no face, and each "
+          "replica's cell gives the fractions on the clockwise face, on the anticlockwise face and flat, so a "
+          "partner that leaves the plane in the simulation shows. Every frame is counted, as for the rotamers "
+          "and water.", ""]
     names = [n for n, _, _ in a.faces[0].per_replica]
     L += ["| angle (vertex in the middle) | out of flat, crystal (°) | crystal face | " + " | ".join(names)
           + " | verdict |",
           "|---|---|---|" + "---|" * len(names) + "---|"]
     for f in a.faces:
         v = face_verdict(f)
-        if not a.distances_consistent and v not in ("one replica", "no frames", FLAT_IN_CRYSTAL):
+        if not a.distances_consistent and not v.endswith(UNJUDGED):
             v = f"({v}, not yet a result)"
-        cells = " | ".join("n/a" if f.crystal_side == 0 or math.isnan(k) else f"{k:.2f} ({o:.2f})"
-                           for _, k, o in f.per_replica)
+        cells = " | ".join(face_cells(f))
         L.append(f"| {f.label} | {f.crystal_out_of_flat_deg:+.1f} | {face_name(f.crystal_side)} | {cells} | {v} |")
     L += ["", f"Verdicts (chosen thresholds): kept its face, on the crystal's face in at least {KEPT:.0%} of "
               f"frames in every replica; changed face, on the other face in at least {KEPT:.0%}; went flat, "
               f"flat in at least {KEPT:.0%}; replicas disagree, when their fractions on either face differ by "
-              f"more than {SPLIT:.0%}; partial, anything else. Flat in the crystal: the crystal's own arms are "
-              f"within {FLAT_DEG:g}° of flat, so there is no face to keep. `{FLAT_DEG:g}°` is half the "
+              f"more than {SPLIT:.0%}; partial, anything else. {FLAT_IN_CRYSTAL.capitalize()}: the crystal's "
+              f"own arms are within {FLAT_DEG:g}° of flat, so there is no face to keep, and what follows says "
+              f"what the replicas did: {STAYED_IN_PLANE}, flat in at least {KEPT:.0%} of frames in every "
+              f"replica; left it for the clockwise or the anticlockwise face, on that face in at least "
+              f"{KEPT:.0%}; replicas disagree and partial as above. `{FLAT_DEG:g}°` is half the "
               f"{MOVED_DEG:g}° angle threshold: a partner counted on opposite faces in two frames has turned at "
               f"least {MOVED_DEG:g}° through the flat arrangement, which moves a group 0.4 nm from the vertex "
               f"by about {MOVED_NM:g} nm."]

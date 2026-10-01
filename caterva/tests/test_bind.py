@@ -56,6 +56,13 @@ def test_no_temperature_gives_a_range_not_a_guess():
     # BRENDA's wording, rabbit hexokinase and MgADP- (ref 640206): read as
     # mixed with nothing measured against until "inhibitor" was accepted.
     ("erythrocyte enzyme, mixed inhibitor versus glucose", "mixed", "glucose"),
+    # BRENDA's wording, Trypanosoma cruzi hexokinase and ADP (ref 640216):
+    # read as measured against nothing until "to" was accepted.
+    ("competitive to ATP", "competitive", "ATP"),
+    ("noncompetitive to glucose", "noncompetitive", "glucose"),
+    # Also the hexokinase page's: a range of modes, so "to" names no molecule.
+    ("mixed to non-competitive inhibitors against ATP, competitive against D-glucose",
+     "mixed", None),
     ("pH 7.0, 4°C", "unstated", None),
     (None, "unstated", None),
 ])

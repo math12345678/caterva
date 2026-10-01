@@ -368,6 +368,67 @@ def test_evidence_against_the_mechanism_crosses_the_boundary(monkeypatch):
     assert result["ki"] == 0.00252 and result["mechanismEvidence"] is None
 
 
+def _hexokinase_page_resolver():
+    """`_ldh_page_resolver` for the recorded hexokinase page
+    (Tests/fixtures/recorded/brenda_2.7.1.1.html.gz), which holds
+    Trypanosoma cruzi's four ADP Ki rows."""
+    import gzip
+    from pathlib import Path
+
+    page = gzip.decompress(
+        (Path(__file__).parent / "fixtures" / "recorded" / "brenda_2.7.1.1.html.gz").read_bytes()
+    ).decode("utf-8")
+    real = fallback_logic.resolve_kinetic_value
+
+    def resolve(*a, **k):
+        return real(*a, **k, html_provider=lambda ec: page,
+                    uniprot_provider=lambda ec, organism: None,
+                    taxon_id_provider={"Trypanosoma cruzi": "5693"}.get,
+                    search_literature=False)
+    return resolve
+
+
+@pytest.mark.parametrize("make_resolver, payload, motif, model_substrate, carried", [
+    (_hexokinase_page_resolver,
+     {"enzymeName": "hexokinase", "organism": "Trypanosoma cruzi", "ecNumber": "2.7.1.1",
+      "quantity": "ki", "substrate": "ADP"},
+     ("competitive_inhibition", "competitive"), "glucose", (1.3, "640265")),
+    (_ldh_page_resolver,
+     {"enzymeName": "lactate dehydrogenase", "organism": "Homo sapiens", "ecNumber": "1.1.1.27",
+      "quantity": "ki", "substrate": QUINOLINE},
+     ("noncompetitive_inhibition", "noncompetitive"), "pyruvate", (0.00059, "739793")),
+])
+def test_with_no_mode_the_runner_returns_the_row_compose_any_mode_carries(
+        monkeypatch, make_resolver, payload, motif, model_substrate, carried):
+    """The parity `caterva compose --any-mode` claims: the API and the
+    TypeScript CLI, sending no `inhibitionMode`, get from the runner the row
+    compose carries with `--any-mode`, which asks the same resolver for no
+    mode with the model's mode to compare (`compare_mode`). Both through the
+    real resolver on committed pages; compose's side is the selection its
+    command runs (`narrowed.select_for_model`)."""
+    from types import SimpleNamespace
+
+    from caterva.agents.adapters import to_parameter_source
+    from caterva.compose.narrowed import select_for_model
+
+    resolve = make_resolver()
+    motif_name, mode = motif
+    answer = resolve(payload["ecNumber"], payload["organism"], payload["substrate"],
+                     quantity="ki", compare_mode=mode, model_substrate=model_substrate)
+    source, _ = to_parameter_source("reaction_Ki", answer)
+    chosen = select_for_model(
+        SimpleNamespace(resolutions={"reaction_Ki": SimpleNamespace(source=source)}),
+        {"reaction_Ki": (motif_name, "ki")}, substrate=model_substrate, isoform=None,
+        any_mode=True)
+    composed = chosen.measured["reaction_Ki"]
+
+    result = run_main(monkeypatch, resolve, payload)
+    assert result["found"] is True
+    assert (result["ki"], result["citation"]["referenceId"]) == carried
+    assert (composed.value, composed.commentary) == (result["ki"], result["commentary"])
+    assert f"BRENDA ref {carried[1]}" in composed.citation
+
+
 def test_mode_withheld_output_shape(monkeypatch):
     """A refusal by mode must name what the rows state.
 

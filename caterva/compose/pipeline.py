@@ -225,6 +225,14 @@ class ComposedModel:
         for Trypanosoma cruzi hexokinase and ADP, competitive model, was
         1.3 mM, a row stating no mode, where the resolver asked for the mode
         returns 1.5 mM, "competitive to ATP" (caterva/compose/narrowed.py).
+
+        With `any_mode` an inhibition constant is asked for no mode, which
+        is the question the API and the CLI ask when no mode is sent, and
+        carries the motif's mode as `compare_mode` instead, with the model's
+        substrate: the resolver's answer is its no-mode answer, row for row,
+        and it also says what it would have returned for the mode, so the
+        report can name the row the default carries (1.5 mM above, where
+        the answer carries 1.3 mM).
         """
         if self.subject is None:
             return []
@@ -248,10 +256,20 @@ class ComposedModel:
         except ImportError:  # pragma: no cover - flat layout
             from row_scope import INHIBITION_TABLES, MODE_OF_MOTIF  # type: ignore[no-redef]
 
-        def mode_of(quantity: ResolvableQuantity) -> Optional[str]:
-            if any_mode or quantity.table not in INHIBITION_TABLES:
+        def motif_mode(quantity: ResolvableQuantity) -> Optional[str]:
+            if quantity.table not in INHIBITION_TABLES:
                 return None
             return MODE_OF_MOTIF.get(quantity.motif_name)
+
+        def mode_of(quantity: ResolvableQuantity) -> Optional[str]:
+            return None if any_mode else motif_mode(quantity)
+
+        def compared(quantity: ResolvableQuantity) -> Optional[str]:
+            # --any-mode asks for no mode, and sends the motif's as the one
+            # to compare with: the resolver answers as the API and the CLI
+            # do when no mode is sent, and says what the default's question
+            # would have returned (fallback_logic.ModeDefault).
+            return motif_mode(quantity) if any_mode else None
 
         return [
             ParameterRequest(
@@ -266,9 +284,10 @@ class ComposedModel:
                 expected_unit=quantity.unit,
                 isoform=self.isoform,
                 inhibition_mode=mode_of(quantity),
+                compare_mode=compared(quantity),
                 # The model's substrate, which a Ki's mode is judged against;
-                # only sent with a mode, the one thing it ranks.
-                model_substrate=self.substrate if mode_of(quantity) else None,
+                # only sent with a mode, ranked by or compared with.
+                model_substrate=(self.substrate if motif_mode(quantity) else None),
             )
             for quantity in self.resolvable
             if quantity.table is not None and quantity.parameter_id not in skip

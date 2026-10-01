@@ -960,6 +960,23 @@ def evidence_only_from_search(search: Any) -> Dict[str, Tuple[Any, ...]]:
     return out
 
 
+def mode_defaults_from_search(search: Any) -> Dict[str, Mapping[str, Any]]:
+    """Per quantity asked for no inhibition mode with the model's mode to
+    compare (`caterva compose --any-mode`), what the resolver would have
+    returned asked for that mode (`ParameterSource.mode_default`, from
+    `KineticResult.mode_default`): its row, or the modes the rows state
+    when it would refuse. Only quantities that carry one. Read by
+    `narrowed.select_for_model`, so the report can name the row the default
+    carries and say why it differs from the one carried."""
+    build = search if hasattr(search, "resolutions") else getattr(search, "build", None)
+    out: Dict[str, Mapping[str, Any]] = {}
+    for quantity, resolution in getattr(build, "resolutions", {}).items():
+        default = getattr(getattr(resolution, "source", None), "mode_default", None)
+        if default:
+            out[quantity] = default
+    return out
+
+
 def withheld_by_resolver(search: Any) -> Dict[str, str]:
     """Per quantity the resolver found rows for and refused every one of for
     the model's isoform or inhibition mode, its word for it

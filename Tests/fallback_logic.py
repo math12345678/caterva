@@ -163,6 +163,33 @@ class MechanismEvidence(BaseModel):
     model_substrate: str
 
 
+class ModeDefault(BaseModel):
+    """What a Ki lookup asked for no inhibition mode would have returned had
+    it been asked for the model's (`resolve_kinetic_value(compare_mode=...)`).
+
+    `caterva compose --any-mode` asks this resolver for a Ki with no mode, so
+    it carries the row the runner returns when no mode is sent (the
+    TypeScript CLI without --mode). Its report must still say what the default, which asks with the
+    model's mode, would have carried instead, and why the two differ. Until
+    2026-09-30 compose worked that out by ranking the rows the answer held,
+    which are the frontier of the rows the evidence kept, and the default's
+    row need not be among them: for Trypanosoma cruzi hexokinase and ADP
+    (Tests/fixtures/recorded/brenda_2.7.1.1.html.gz) the answer holds 1.3 mM
+    alone, the default carries 1.5 mM "competitive to ATP", and the report
+    said nothing. This is that call's row, found here from the same rows by
+    the same steps, so the page is fetched and parsed once.
+    """
+    #: The mode compared for, and the model substrate the ranking read.
+    mode: str
+    model_substrate: str | None = None
+    #: The row the call with `inhibition_mode=mode` returns, as the dicts
+    #: `ensemble_candidates` holds; None when that call refuses.
+    row: dict | None = None
+    #: What the rows state when that call refuses (source "mode_withheld"),
+    #: as its `modes_available` would name them.
+    modes_available: list[str] = []
+
+
 class KineticResult(BaseModel):
     found: bool
     value: float | None = None
@@ -338,6 +365,18 @@ class KineticResult(BaseModel):
     #: returned row measured (`rowScope`) and never show an answer the
     #: resolver was not asked for (docs/undelivered-fields-baseline.txt).
     evidence_only: list = []
+
+    #: The other direction: a Ki asked for no mode, with `compare_mode`,
+    #: carries what the same call asked for that mode would have returned
+    #: (`ModeDefault`). None otherwise, and None when this call found
+    #: nothing, since the call with the mode then finds nothing either: the
+    #: two take the same tier and differ only at the mode step.
+    #:
+    #: Read by `caterva compose --any-mode` to say which row its default
+    #: would carry and why the two differ. Not emitted by the runner, for
+    #: `evidence_only`'s reason: the API always asks with its model's mode,
+    #: and the TypeScript CLI prints the stated mode of the row it returns.
+    mode_default: "ModeDefault | None" = None
 
     #: Set when the value returned IS one of the named forms the pool mixed.
     #:
@@ -842,6 +881,18 @@ def _score_frontier(
             "organism": measured,
             "reference_id": getattr(entry, "reference_id", None),
             "conditions": getattr(entry, "conditions", None),
+            # The row's compound, as the parser labels it: for a request
+            # naming a substrate, that name on every row it matched; for a
+            # request naming none, the row's own compound cell, so the
+            # frontier holds rows of every substrate the table has. Read by
+            # the agents' assay-window re-selection, which can move to
+            # another substrate's row only in the second case and says so
+            # (caterva/agents/scouts.py). The label says nothing more in the
+            # first: the match is a substring of the compound cell, and on
+            # the committed LDH turnover page a "pyruvate" request's
+            # phenylpyruvate rows (94.7 and 6467 1/s, ref 761568) read
+            # "pyruvate".
+            "substrate": getattr(entry, "substrate", None),
             # The row's assay conditions, as PARSED by the existing
             # condition parser (`_parse_ph` / `_parse_temperature` /
             # `AssayConditions`) when the entry was built -- the same values
@@ -985,7 +1036,7 @@ def _ki_mode():
     return ki_mode
 
 
-def _mode_asked(inhibition_mode, quantity, log):
+def _mode_asked(inhibition_mode, quantity, log, name="inhibition_mode"):
     """The inhibition mode to rank Ki rows for, or None when there is none.
 
     A mode says which Ki row is the model's constant. It has no bearing on a
@@ -1003,7 +1054,7 @@ def _mode_asked(inhibition_mode, quantity, log):
     except ImportError:
         modes = None  # for a Ki, _partition_mode says it could not rank
     if modes is not None and inhibition_mode not in modes:
-        raise ValueError(f"inhibition_mode must be one of {', '.join(modes)}; "
+        raise ValueError(f"{name} must be one of {', '.join(modes)}; "
                          f"got {inhibition_mode!r}")
     if quantity != "ki":
         log.append(f"inhibition mode {inhibition_mode!r} not applied: it chooses among Ki "
@@ -1192,6 +1243,56 @@ def _partition_mode(entries, mode, substrate, isoform, isoform_matched, log, whe
     return rows, []
 
 
+def _rank_by_mode(entries, pool, isoform_matched, allow_variants, mode, substrate, isoform,
+                  log, where):
+    """`(ranked, kept, stated)`: the mode step, over the rows the isoform and
+    variant steps kept (`entries`) and, behind them, the rows naming no
+    isoform that `_naming_no_isoform` puts back. `ranked` is every row the
+    step ranked, which `_mechanism_evidence` reads; `kept` and `stated` are
+    `_partition_mode`'s. One function for the call asked for a mode and for
+    `_mode_default`, so the row the latter names is the row the former
+    returns, not a second reading of the rule."""
+    ranked = entries + _naming_no_isoform(pool, isoform_matched, allow_variants)
+    kept, stated = _partition_mode(ranked, mode, substrate, isoform, isoform_matched, log, where)
+    return ranked, kept, stated
+
+
+def _mode_default(entries, pool, isoform_matched, allow_variants, mode, substrate, isoform,
+                  where, tier, organism, quantity, relatedness_by_organism=None):
+    """`KineticResult.mode_default`: what this call, asked for `mode`, would
+    return from the same rows. It takes the steps that call takes after the
+    variant step, which is the only place the two calls part: the mode step
+    (`_rank_by_mode`), then `_best_evidenced` over what it kept, with the
+    same tier and relatedness. Its log lines are discarded, as
+    `_evidence_only` discards its own: they describe a choice this call did
+    not make."""
+    _, kept, stated = _rank_by_mode(entries, pool, isoform_matched, allow_variants, mode,
+                                    substrate, isoform, [], where)
+    if not kept:
+        return ModeDefault(mode=mode, model_substrate=substrate, modes_available=stated)
+    best, _, _ = _best_evidenced(kept, [], tier, organism, relatedness_by_organism,
+                                 quantity=quantity)
+    return ModeDefault(mode=mode, model_substrate=substrate,
+                       row=_score_frontier([best], organism)[0])
+
+
+def _compare_mode_asked(compare_mode, inhibition_mode, quantity):
+    """The mode to say what the call asked for it would return, or None.
+
+    Checked as `_mode_asked` checks a mode: one no model is of is refused
+    with ValueError, and for anything but a Ki it has nothing to change, so
+    it is not applied. It is refused beside `inhibition_mode`: a call ranked
+    by one mode cannot also be the call that ranks by none."""
+    if compare_mode is None:
+        return None
+    if inhibition_mode is not None:
+        raise ValueError(f"compare_mode is for a call asked for no inhibition mode; this one "
+                         f"was asked for {inhibition_mode!r}")
+    # Named as the argument the caller passed, so a bad compare_mode is not
+    # reported as a bad inhibition_mode the caller never sent.
+    return _mode_asked(compare_mode, quantity, [], name="compare_mode")
+
+
 def _mode_withheld_result(mode, stated, log):
     log.append(f"Every candidate row states an inhibition mode other than {mode} "
                f"({'; '.join(stated)}): each is a constant of another mechanism than the "
@@ -1329,6 +1430,7 @@ def resolve_kinetic_value(
     isoform: str | None = None,
     inhibition_mode: str | None = None,
     model_substrate: str | None = None,
+    compare_mode: str | None = None,
 ) -> KineticResult:
     """Resolve a kinetic value for (enzyme, organism, substrate) by trying
     BRENDA exact match, then BRENDA cross-species, then PubMed literature
@@ -1353,11 +1455,19 @@ def resolve_kinetic_value(
     (caterva.compose.ki_mode.rank), and a Ki every row of which states
     another mode is refused, source "mode_withheld", naming what they state
     (`_partition_mode`). Order: isoform, then variants, then mode.
+
+    ``compare_mode`` is a model's mode sent WITHOUT ranking by it, with the
+    model's ``model_substrate``: the answer is the one this call gives with
+    no mode, row for row, and `mode_default` says what it would have
+    returned asked for ``compare_mode``. `caterva compose --any-mode` sends
+    it, so its report can name the row its default carries. Refused
+    beside ``inhibition_mode``; not applied to anything but a Ki.
     """
     table_label = QUANTITY_TABLE_LABELS.get(quantity, KM_TABLE_LABEL)
     quantity_upper = {"ki": "Ki", "kcat": "kcat"}.get(quantity, "Km")
     log = []
     mode = _mode_asked(inhibition_mode, quantity, log)
+    compare = _compare_mode_asked(compare_mode, inhibition_mode, quantity)
     model_substrate = model_substrate or None
 
     log.append(f"BRENDA exact: {enzyme_ec}, {organism}, {substrate} ({quantity})")
@@ -1399,11 +1509,17 @@ def resolve_kinetic_value(
         # constants.
         ranked = []
         if mode:
-            ranked = exact + _naming_no_isoform(pool, isoform_matched, allow_variants)
-            exact, stated = _partition_mode(
-                ranked, mode, model_substrate, isoform, isoform_matched, log, "exact-match")
+            ranked, exact, stated = _rank_by_mode(
+                exact, pool, isoform_matched, allow_variants, mode, model_substrate, isoform,
+                log, "exact-match")
             if not exact:
                 return _mode_withheld_result(mode, stated, log)
+        # Asked for no mode with a model's mode to compare: the answer the
+        # mode would have given, from these same rows (`ModeDefault`).
+        mode_default = (_mode_default(exact, pool, isoform_matched, allow_variants, compare,
+                                      model_substrate, isoform, "exact-match", "exact match",
+                                      organism, quantity)
+                        if compare else None)
         # Detect designed contrasts BEFORE reporting a winner. A value
         # returned while the other arm of its own experiment sits unmentioned
         # in the same pool is half an answer, and the reader cannot ask for
@@ -1456,6 +1572,7 @@ def resolve_kinetic_value(
             source="brenda_exact",
             evidence_only=(_evidence_only(pool, allow_variants, "exact match", organism, quantity)
                            if isoform or mode else []),
+            mode_default=mode_default,
             mechanism_evidence=evidence,
             effector_contrasts=contrasts,
             form_mixtures=mixtures,
@@ -1633,11 +1750,16 @@ def resolve_kinetic_value(
             acceptable = usable
         ranked = []
         if mode:
-            ranked = acceptable + _naming_no_isoform(pool, isoform_matched, allow_variants)
-            acceptable, stated = _partition_mode(
-                ranked, mode, model_substrate, isoform, isoform_matched, log, "cross-species")
+            ranked, acceptable, stated = _rank_by_mode(
+                acceptable, pool, isoform_matched, allow_variants, mode, model_substrate, isoform,
+                log, "cross-species")
             if not acceptable:
                 return _mode_withheld_result(mode, stated, log)
+        relatedness_by_organism = {v.candidate_organism: v for v in verdicts}
+        mode_default = (_mode_default(acceptable, pool, isoform_matched, allow_variants, compare,
+                                      model_substrate, isoform, "cross-species", "cross-species",
+                                      organism, quantity, relatedness_by_organism)
+                        if compare else None)
 
         # Detect designed contrasts BEFORE reporting a winner. A value
         # returned while the other arm of its own experiment sits unmentioned
@@ -1685,7 +1807,7 @@ def resolve_kinetic_value(
             # organism. Passing them here is what turns "close enough?"
             # into "which of these is closest?" -- see ADR 0024 and the
             # relatedness_depth axis in evidence_rank.
-            {v.candidate_organism: v for v in verdicts},
+            relatedness_by_organism,
             quantity=quantity,
         )
         evidence = (_mechanism_evidence(ranked, best, mode, model_substrate, isoform, log)
@@ -1697,8 +1819,9 @@ def resolve_kinetic_value(
             organism=best.organism,
             source="brenda_cross_species",
             evidence_only=(_evidence_only(pool, allow_variants, "cross-species", organism, quantity,
-                                          {v.candidate_organism: v for v in verdicts})
+                                          relatedness_by_organism)
                            if isoform or mode else []),
+            mode_default=mode_default,
             mechanism_evidence=evidence,
             effector_contrasts=contrasts,
             form_mixtures=mixtures,

@@ -472,12 +472,36 @@ Trypanosoma cruzi hexokinase has four Ki rows for ADP: 0.13 mM, 1.3 mM ("at
 pH 7.5"), 1.5 mM ("competitive to ATP") and 7.0 mM ("noncompetitive to
 glucose"). The evidence alone keeps 1.3 mM, the one row reporting a pH,
 which states no mode; a competitive model now carries 1.5 mM in compose as
-in the API, and the report says it replaced 1.3 mM and why. With
-`--any-mode` compose still chooses as it did, so there it carries 1.3 mM
-without saying that the default would carry 1.5 mM. A Ki every row of which
-states another mode is refused there too, with the modes named. The API
-always sends its model's mode. The CLI has no `--any-mode`: leaving `--mode`
-out keeps the resolver's pick, with its stated mode printed beside it.
+in the API, and the report says it replaced 1.3 mM and why. A Ki every row
+of which states another mode is refused there too, with the modes named.
+The API always sends its model's mode. The CLI has no `--any-mode`: leaving
+`--mode` out keeps the resolver's pick, with its stated mode printed beside
+it.
+
+`--any-mode` asks the resolver the question the CLI asks with no `--mode`,
+and carries its answer: 1.3 mM for Trypanosoma cruzi and ADP, the row the
+CLI returns. It also sends the model's mode as one to compare with, and the
+resolver, from the same rows and without fetching the page again, says what
+it would have returned asked for it. The report names that row and why the
+two differ: "--any-mode kept the resolver's pick (1.3 mM, BRENDA ref
+640265), which states no inhibition mode; without it the row stating
+competitive inhibition versus ATP (1.5 mM, BRENDA ref 640216), this model's
+mechanism though not its substrate (glucose), would be used". Until
+2026-09-30 `--any-mode` worked out the default's row from the rows its
+answer held, which lack 1.5 mM, so it said nothing there. The value and
+reference carried are the no-mode answer's. The rows printed beside it are
+not quite: the default's row is added to the carried constant's
+alternatives, so the spread is 1.3 to 1.5 mM either way, where the no-mode
+answer's own candidates hold 1.3 mM alone.
+
+"Competitive to ATP" is read as measured versus ATP. Until 2026-10-01 the
+row reader took only "versus", "vs." and "with respect to", so this row
+read as measured against nothing and was carried for a glucose model with
+no remark; the 7 mM row, "noncompetitive to glucose", is now also read as
+measured versus glucose, and the API and the CLI return it as
+`mechanismEvidence` against a competitive model of glucose. Compose's report
+says the 1.5 mM row was measured versus ATP, not glucose, but does not name
+the 7 mM row: the resolver's answer does not give compose that row.
 
 The API sends its model's substrate with the mode; the CLI takes it as
 `--model-substrate`, because `--substrate` names the inhibitor for a Ki.
@@ -497,9 +521,11 @@ only competitive row, and the API's `provenance.flags` and `scientific
 resolve` both name 0.00252 mM "noncompetitive versus pyruvate": measured
 against pyruvate the inhibitor is not competitive, and no choice of row
 fixes that. The runner sends the row as `mechanismEvidence`, found by the
-function in `ki_mode.py` that compose's note comes from. Only a row saying
-"versus X" is read as measured against X, so the Trypanosoma cruzi ADP
-rows above ("competitive to ATP", "noncompetitive to glucose") are not.
+function in `ki_mode.py` that compose's note comes from. A row saying
+"versus X", "vs. X", "with respect to X" or "<mode> to X" is read as
+measured against X, so for a competitive model of glucose the Trypanosoma
+cruzi ADP row 7 mM "noncompetitive to glucose" is sent as
+`mechanismEvidence` against the 1.5 mM "competitive to ATP" row returned.
 
 `scientific simulate --resolve --model competitive|noncompetitive|product`
 looks its Ki up the same way, and needs `--inhibitor NAME` to do it. Until
@@ -802,11 +828,19 @@ frames that are on a face and skipping the flat frames between them, the
 face changed 6 times, each to or from a lone frame just past the band; the
 two counts are of different things, and only 2 of the 6 fall on strictly
 consecutive frames. Each angle is reported with how far
-its crystal arms are from flat, the crystal's face (or flat, with no face
-to keep), and per replica the fraction of frames on the crystal's face and
-on the other; it is called kept its face, changed face, went flat, partial
-or replicas disagree, with the thresholds printed, and like the rotamers
-and water it is a result only when the distances are. Because the Cα is the
+its crystal arms are from flat, the crystal's face, and per replica the
+fraction of frames on the crystal's face and on the other; it is called
+kept its face, changed face, went flat, partial or replicas disagree, with
+the thresholds printed, and like the rotamers and water it is a result only
+when the distances are. When the crystal's own arms are within 7.5 degrees
+of flat there is no face to keep, and the row says "in plane in the
+crystal"; each replica's cell then gives the fractions of frames on the
+clockwise face, on the anticlockwise face and flat, and the verdict says
+whether the replicas stayed in plane or left it for one face, by the same
+thresholds. Until 2026-09-30 those rows printed n/a for every replica. On
+the 21-frame lysozyme replica, taking its minimised starting structure as
+the crystal, 5 of the 24 angles are in plane there, and Ser50-Asn46-Asn59
+is on the anticlockwise face in 8 of the 21 frames. Because the Cα is the
 vertex's own, a side chain that turns over under its partners changes face
 too, which the rotamer table will show. On 21 frames of a lysozyme replica
 every elevation equals `gmx gangle -g1 plane -g2 vector`'s to 0.001 degree,
