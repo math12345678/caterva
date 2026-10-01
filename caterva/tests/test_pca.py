@@ -91,7 +91,8 @@ def test_eigenvalues_trace_and_projections_equal_gmx_covar_and_anaeig(lysozyme):
     m = pca.modes(lysozyme["X"])
     assert m.frames == int(ref["full_frames"][0]) == 21
     gmx_eig = np.array(ref["full_eigenvalues"])
-    # gmx prints six significant digits; the worst of the ten differs by 5e-6.
+    # gmx prints six significant digits; three of the ten differ by one in the
+    # sixth, the worst (mode 9) by 5.7e-6 relative.
     assert np.max(np.abs(m.eigenvalues[:10] - gmx_eig) / gmx_eig) < 2e-5
     assert abs(m.trace - ref["full_trace"][0]) / ref["full_trace"][0] < 2e-5
     # The covariance of 21 frames has 20 non-zero eigenvalues and no more.
@@ -223,12 +224,11 @@ def test_covar_fits_to_the_whole_reference_and_trajectory_the_rmsf_uses(lysozyme
     assert lines.index(covar[0]) > made
     assert "$GMX trjcat -f rep1/md_whole.xtc rep2/md_whole.xtc -cat -o pca_pooled.xtc" in lines
     over = [line for line in lines if "-over" in line]
-    assert over == ["if [ \"$(grep -cv '^[@#]' rep1/pca_eigenval.xvg)\" -ge 10 ] && "
-                    "[ \"$(grep -cv '^[@#]' rep2/pca_eigenval.xvg)\" -ge 10 ]; then $GMX anaeig "
-                    "-v rep1/pca_eigenvec.trr -v2 rep2/pca_eigenvec.trr -first 1 -last 10 "
-                    "-over pca_overlap_rep1_rep2.xvg; fi"]
-    proj = next(line for line in lines if "-proj rep1/" in line)
-    assert "-first 1 -last 2" in proj and "analyze -f rep1/pca_proj.xvg -n 2 -cc rep1/pca_cosine.xvg" in proj
+    assert over == ["$GMX anaeig -v rep1/pca_eigenvec.trr -v2 rep2/pca_eigenvec.trr -first 1 -last 10 "
+                    "-over pca_overlap_rep1_rep2.xvg"]
+    proj = lines.index(next(line for line in lines if "-proj rep1/" in line))
+    assert "-first 1 -last 2" in lines[proj]
+    assert lines[proj + 1] == "$GMX analyze -f rep1/pca_proj.xvg -n 2 -cc rep1/pca_cosine.xvg"
     assert not any(" covar " in line for line in commands(p, ["rep1"]))            # no em.gro, no atoms
     assert not any(" covar " in line for line in commands(p, ["rep1"], pca=idx[:10]))   # too few atoms
     write_pca_index(tmp_path, idx)
@@ -314,6 +314,40 @@ def test_a_rigidly_moved_frame_has_no_variance_after_the_fit(lysozyme):
     X = pca.fitted(_frames(xs, np.diag([20.0, 20.0, 20.0])), range(len(ref)), ref)
     assert np.max(np.abs(X - ref.ravel())) < 1e-12
     assert pca.modes(X).trace < 1e-24
+
+
+def test_a_replica_that_did_not_move_is_called_no_motion_on_both_routes(lysozyme):
+    """SYNTHETIC: replicas whose frames are the real reference rigidly moved,
+    so nothing is left after the fit but rounding (about 1e-32 nm^2). Its
+    modes and cosine contents are directions in that noise, and must not
+    read as a converged replica or as two replicas with the same motions."""
+    from scipy.spatial.transform import Rotation
+    ref = lysozyme["ref"]
+    c = ref.mean(0)
+    reps = []
+    for seed in (1, 2):
+        rots = Rotation.random(21, random_state=seed).as_matrix()
+        xs = [(ref - c) @ R.T + c for R in rots]
+        reps.append((f"rep{seed}", pca.fitted(_frames(xs, np.diag([20.0, 20.0, 20.0])), range(len(ref)), ref)))
+    m = pca.from_frames(reps, len(ref), ["x"])
+    assert all(r.trace < pca.STILL_NM2 for r in m.replicas)
+    assert [pca.cosine_verdict(r) for r in m.replicas] == [pca.NO_MOTION] * 2
+    assert all(math.isnan(c) for r in m.replicas for c in r.cosine)
+    assert math.isnan(m.overlaps[0][2]) and pca.rmsip_verdict(m.overlaps[0][2], m.dim) == pca.NO_MOTION
+    assert m.between is None
+    # The GROMACS route builds the same records from what gmx printed.
+    still = pca.ReplicaModes("rep1", 21, [1e-10] * 10, 1e-9, (0.9, 0.8))
+    moved = pca.ReplicaModes("rep2", 21, [1e-3] * 10, 2e-2, (0.9, 0.8))
+    assert pca.cosine_verdict(still) == pca.NO_MOTION and pca.cosine_verdict(moved) == pca.DIFFUSION_LIKE
+    assert math.isnan(pca.overlap(still, moved, 0.9)) and pca.overlap(moved, moved, 0.9) == 0.9
+
+
+def test_the_chance_of_a_diffusion_like_verdict_counts_both_modes():
+    """The verdict fires on PC1 or PC2, so its chance on uncorrelated frames
+    is bounded by the sum of the two modes' tails, not PC1's alone."""
+    p1, p2 = pca.uncorrelated_cosine(21, 1)[1], pca.uncorrelated_cosine(21, 2)[1]
+    assert pca.chance_diffusion_like(21) == p1 + p2
+    assert 3e-4 < p1 < 4e-4 and 3e-4 < p2 < 4e-4 and round(pca.chance_diffusion_like(21), 4) == 0.0007
 
 
 def test_rmsip_of_the_same_subspace_is_one_and_of_perpendicular_ones_zero():

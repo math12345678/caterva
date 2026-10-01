@@ -851,20 +851,26 @@ lysozyme; derived exactly, and checked against random subspaces), and
 called same motions (RMSIP² at least 0.5), no more alike than chance
 (within three standard deviations of that) or partly shared. Is a
 replica's largest motion only diffusion? The cosine content of its
-projection on PC1 and PC2 (Hess 2000, 2002) is 1 when the replica went one
-way along the mode and did not come back, which is what random diffusion
-does; at 0.5 or more (a stated choice: the cosine is then at least half of
+projection on PC1 and PC2 (Hess 2000, 2002) is 1 when the projection has
+the shape random diffusion gives that mode: a half cosine for PC1 (a drift
+one way with no return), a full cosine for PC2 (one excursion out and
+back); at 0.5 or more (a stated choice: the cosine is then at least half of
 the projection's mean square) the replica is called diffusion-like, not
 converged. Frames with no correlation in time would give PC1 0.05 at 21
-frames and reach 0.5 with probability 0.0003, and the report prints that
-beside the values. A low cosine content does not show convergence: a
+frames, and would be called diffusion-like (PC1 or PC2 at 0.5 or more)
+with probability at most 0.0007, and the report prints both beside the
+values. A low cosine content does not show convergence: a
 replica can sample one basin thoroughly and never find the next. A
-diffusion-like replica, or a pair no more alike than chance, makes the exit
+replica whose total fluctuation is below 1e-8 nm² (every atom within 1e-4
+nm RMS, a tenth of what an xtc records) is called no motion, and its
+cosine contents and RMSIP are not reported. A diffusion-like replica, or a pair no more alike than chance, makes the exit
 code 4. Fewer than 21 frames per replica is refused rather than reported:
 the ten modes compared must be at most half of the directions the frames
-can span. On the 21 frames of a lysozyme replica the eigenvalues equal
-`gmx covar`'s to the six digits it prints, the projections equal
-`gmx anaeig`'s, the cosine contents equal `gmx analyze -cc`'s once its
+can span. On the 21 frames of a lysozyme replica the first ten eigenvalues
+agree with `gmx covar`'s to within 6e-6 relative (three of them differ by
+one in the sixth digit it prints), the projections agree with
+`gmx anaeig`'s to the 1e-5 nm it prints (up to each mode's sign), the
+cosine contents agree with `gmx analyze -cc`'s to 7e-6 once its
 normalisation is converted (it prints (n + 1)/n times the bounded value,
 so a pure cosine reads 1.048 there at 21 frames), and the RMSIP² between
 the replica's two halves equals `gmx anaeig -over`'s to the 0.001 it

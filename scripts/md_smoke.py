@@ -129,9 +129,14 @@ def _faces_agree(native: dict, gromacs: dict) -> tuple:
     about 1e-5. A frame whose polar sine sits that close to the band edge
     lands on opposite sides on the two routes. On the 10 ps lysozyme
     replicas the nearest frame was 0.00099 from the edge, but CI makes a new
-    trajectory every run, and with about 1.3 frames per unit of polar sine
-    near the edges a split is expected in well under 1% of runs (the review
-    of this check, 2026-09-30). So: every row identical, except at most one
+    trajectory every run. The first estimate of how often (the review of
+    this check, 2026-09-30, "well under 1% of runs") was made when the smoke
+    run kept 5 frames per replica. At 21 frames, on a local smoke run
+    (2026-10-01; 24 rows x 21 frames x 2 replicas), 143 of the 1008 frames
+    lay within 0.05 of an edge, about 1400 per unit of polar sine; with the
+    routes about 1e-5 apart, that is about 0.014 split frames per run, so
+    one split is expected in roughly 1% of runs and two in about 1 in 10^4.
+    So: every row identical, except at most one
     row in which the fractions differ by one frame and no more. A real
     disagreement between the routes moves more than one frame or more than
     one row."""
@@ -406,10 +411,14 @@ def main() -> int:
           f"{worst['share']:.2f}; RMSIP {worst['rmsip']:.3f}, "
           f"{', '.join(f'{k} {v[0]}' for k, v in pm_n['rmsip'].items())}; cosine content "
           f"{worst['cosine']:.3f}).")
+    # No prediction of the verdict: of ten replicas run locally
+    # (2026-09-30 and 10-01), eight had a PC1 cosine content between 0.63
+    # and 0.99 and two 0.23 and 0.31, so at this length it lands on either
+    # side of the threshold.
     print("   (200 steps are 0.4 ps: these modes are the thermal motion of the minimised structure over "
-          "a fraction of a picosecond, and every replica is expected to look diffusion-like. The comparison "
-          "checks that the two routes compute the same thing; it says nothing about the enzyme or about "
-          "sampling at production length.)")
+          "a fraction of a picosecond, and at this length the cosine content can land on either side of "
+          "the diffusion threshold. The comparison checks that the two routes compute the same thing; it "
+          "says nothing about the enzyme or about sampling at production length.)")
     print("OK: minimisation, then NVT, NPT, production and RMSD for two replicas, the summary, "
           "and the enzyme analysis.")
     return 0

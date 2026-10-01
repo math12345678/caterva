@@ -182,17 +182,20 @@ def pca_commands(reps: Sequence[str], gmx: str = "$GMX") -> List[str]:
     which replicas of different lengths would otherwise write. The trace,
     which -last cuts from eigenval.xvg, is read from covar's log instead.
 
-    A replica with fewer than RMSIP_MODES + 1 frames has fewer eigenvectors
-    than anaeig is asked for, and anaeig stops with a fatal error. The
-    projection, cosine content and overlap are therefore run only when
-    covar wrote that many eigenvalues, so analyze.sh still finishes on a
-    short run; the report then says it has too few frames, from the frame
-    count covar logged."""
+    With -last given, covar writes that many eigenvectors whatever the
+    number of frames: it cuts the output to n - 1 for n frames only when
+    -last is left at -1 (gmx_covar.cpp; read in a GROMACS 2021 source tree,
+    and the behaviour observed on 2026.1; the 2023 release CI installs was
+    not run). On the lysozyme fixture cut to 5 frames, 2026.1 wrote ten
+    eigenvalues, the last six between 3e-10 and 2e-9 nm^2 (null-space
+    directions), and anaeig -proj, analyze -cc and anaeig -over ran on them
+    and exited 0, as they did on 2 frames and on 1, where all ten were 0. So the
+    projection, cosine content and overlap always run, and analyze.sh (set
+    -e) finishes on a short run. Those null-space numbers are never read as a
+    result: the report refuses a replica below MIN_PCA_FRAMES from the
+    frame count covar logged."""
     from caterva.analyze.pca import COSINE_MODES, RMSIP_MODES
     k = RMSIP_MODES
-
-    def enough(r: str) -> str:
-        return f"[ \"$(grep -cv '^[@#]' {r}/pca_eigenval.xvg)\" -ge {k} ]"
 
     def covar(ref: str, traj: str, out: str) -> str:
         return (f"printf '0\\n0\\n' | {gmx} covar -s {ref} -f {traj} -n pca.ndx -last {k} "
@@ -201,10 +204,10 @@ def pca_commands(reps: Sequence[str], gmx: str = "$GMX") -> List[str]:
     lines = []
     for r in reps:
         lines.append(covar(f"{r}/rmsf_reference.pdb", f"{r}/md_whole.xtc", f"{r}/pca_"))
-        lines.append(f"if {enough(r)}; then printf '0\\n0\\n' | {gmx} anaeig -v {r}/pca_eigenvec.trr "
+        lines.append(f"printf '0\\n0\\n' | {gmx} anaeig -v {r}/pca_eigenvec.trr "
                      f"-f {r}/md_whole.xtc -s {r}/rmsf_reference.pdb -n pca.ndx -first 1 -last {COSINE_MODES} "
-                     f"-proj {r}/pca_proj.xvg && {gmx} analyze -f {r}/pca_proj.xvg -n {COSINE_MODES} "
-                     f"-cc {r}/pca_cosine.xvg; fi")
+                     f"-proj {r}/pca_proj.xvg")
+        lines.append(f"{gmx} analyze -f {r}/pca_proj.xvg -n {COSINE_MODES} -cc {r}/pca_cosine.xvg")
     if len(reps) >= 2:
         # -cat keeps every frame: the replicas share their time stamps, and
         # without it trjcat drops the later file's frames as overlaps (on
@@ -213,8 +216,8 @@ def pca_commands(reps: Sequence[str], gmx: str = "$GMX") -> List[str]:
         lines.append(covar(f"{reps[0]}/rmsf_reference.pdb", "pca_pooled.xtc", "pca_pooled_"))
         for i, a in enumerate(reps):
             for b in reps[i + 1:]:
-                lines.append(f"if {enough(a)} && {enough(b)}; then {gmx} anaeig -v {a}/pca_eigenvec.trr "
-                             f"-v2 {b}/pca_eigenvec.trr -first 1 -last {k} -over pca_overlap_{a}_{b}.xvg; fi")
+                lines.append(f"{gmx} anaeig -v {a}/pca_eigenvec.trr "
+                             f"-v2 {b}/pca_eigenvec.trr -first 1 -last {k} -over pca_overlap_{a}_{b}.xvg")
     return lines
 
 
@@ -274,7 +277,8 @@ def gromacs_pca(directory: Path, p: Plan, reps: Sequence[Path], idx: Sequence[in
             rows = dict(zip((int(round(x)) for x in cols[0]), cols[1])) if len(cols) == 2 else {}
             if k not in rows:
                 raise AnalyzeError(f"{over} is missing or has no row for {k} eigenvectors: run analyze.sh again")
-            out.overlaps.append((a, b, math.sqrt(max(rows[k], 0.0))))
+            ra, rb = (next(x for x in out.replicas if x.name == n) for n in (a, b))
+            out.overlaps.append((a, b, pca.overlap(ra, rb, math.sqrt(max(rows[k], 0.0)))))
     if len(out.replicas) >= 2 and not out.too_short:
         frames, trace = _covar_log(directory / "pca_pooled_covar.log")
         if frames != sum(x.frames for x in out.replicas):
@@ -1116,13 +1120,13 @@ def pca_section(a: Analysis) -> List[str]:
     if m.not_measured:
         return L + [f"Not measured: {m.not_measured}."]
     if m.too_short:
-        _, p_short = pca.uncorrelated_cosine(pca.MIN_PCA_FRAMES)
+        p_short = pca.chance_diffusion_like(pca.MIN_PCA_FRAMES)
         L += [f"Not measured in {', '.join(f'{n} ({f} frames)' for n, f in m.too_short)}: principal motions "
               f"need at least {pca.MIN_PCA_FRAMES} frames per replica. With fewer, the {k} modes compared are "
               f"more than half of the directions the frames can span, so there is little left for them to be "
-              f"principal among; and at {pca.MIN_PCA_FRAMES} frames, frames with no correlation in time reach "
-              f"the diffusion threshold below by chance with probability {p_short:.1g}, a chance that grows "
-              "quickly as the run gets shorter.", ""]
+              f"principal among; and at {pca.MIN_PCA_FRAMES} frames, frames with no correlation in time are "
+              f"called diffusion-like below by chance with probability at most {p_short:.1g}, a chance that "
+              "grows quickly as the run gets shorter.", ""]
     if not m.replicas:
         return L
     rows = m.replicas + ([m.pooled] if m.pooled else [])
@@ -1139,7 +1143,7 @@ def pca_section(a: Analysis) -> List[str]:
                   "totals, over the pooled total)."]
     L += ["", "**Do the replicas move the same way?**", ""]
     if len(m.replicas) < 2:
-        L += ["One replica measured: there is nothing to compare its motions with."]
+        L += ["Only one replica measured: the comparison needs at least two."]
     else:
         mean, sd = pca.chance_rmsip2(k, m.dim)
         L += [f"Root-mean-square inner product (RMSIP) of each pair of replicas' first {k} modes: 1 when the two "
@@ -1148,7 +1152,8 @@ def pca_section(a: Analysis) -> List[str]:
               f"other's {k}.", "",
               "| replicas | RMSIP | RMSIP² | verdict |", "|---|---|---|---|"]
         for x, y, v in m.overlaps:
-            L.append(f"| {x}–{y} | {v:.3f} | {v * v:.3f} | {pca.rmsip_verdict(v, m.dim)} |")
+            cells = "n/a | n/a" if math.isnan(v) else f"{v:.3f} | {v * v:.3f}"
+            L.append(f"| {x}–{y} | {cells} | {pca.rmsip_verdict(v, m.dim)} |")
         L += ["", f"Chance: two random {k}-dimensional subspaces of the {m.dim} directions the {m.atoms} atoms can "
                   f"move in once the fit has removed rotation and translation (3 × {m.atoms} - {pca.RIGID}) have "
                   f"RMSIP² = {k}/{m.dim} = {mean:.3f} on average, with standard deviation {sd:.3f} (RMSIP about "
@@ -1158,18 +1163,21 @@ def pca_section(a: Analysis) -> List[str]:
                   f"chance value (at most {mean + pca.CHANCE_SD * sd:.3f}); {pca.PARTLY}, in between. {k} modes "
                   "is a choice; the share of the motion they hold is in the table above."]
     shortest = min(r.frames for r in m.replicas)
-    c_mean, c_tail = pca.uncorrelated_cosine(shortest)
+    c_mean, _ = pca.uncorrelated_cosine(shortest)
+    c_chance = pca.chance_diffusion_like(shortest)
     L += ["", "**Is the largest motion only diffusion?**", "",
           "Cosine content of each replica's projection on its own PC1 and PC2: its squared correlation with a "
           "cosine of half a period (PC1) or one period (PC2) over the run, the shape random diffusion gives "
-          "those modes. At 1 the replica went one way along the mode and did not come back: it has not sampled "
-          "that motion, only started it.", "",
+          "those modes. At 1 the projection has exactly that shape: for PC1 a drift one way along the mode "
+          "with no return, for PC2 one excursion out to an extreme and back. Either way the replica has made "
+          "one slow passage along the mode rather than sampled it back and forth.", "",
           "| replica | frames | PC1 | PC2 | verdict |", "|---|---|---|---|---|"]
     for r in m.replicas:
         cells = " | ".join("n/a" if math.isnan(c) else f"{c:.3f}" for c in (r.cosine or ()))
         L.append(f"| {r.name} | {r.frames} | {cells} | {pca.cosine_verdict(r)} |")
     L += ["", f"Frames with no correlation in time would give PC1 {c_mean:.3f} on average at {shortest} frames (the "
-              f"shortest replica), and {pca.DIFFUSIVE:g} or more with probability {c_tail:.1g}. Verdict (chosen "
+              f"shortest replica), and would be called diffusion-like (PC1 or PC2 at {pca.DIFFUSIVE:g} or more) "
+              f"with probability at most {c_chance:.1g}. Verdict (chosen "
               f"threshold): {pca.DIFFUSION_LIKE}, when PC1 or PC2 reaches {pca.DIFFUSIVE:g}, the one cosine then "
               f"being at least half of the projection's mean square; {pca.NOT_DIFFUSIVE} below that. A low "
               "cosine content does not show convergence: a replica can sample one basin thoroughly and never "

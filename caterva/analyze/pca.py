@@ -129,9 +129,13 @@ matrix's distribution does not change under any rotation of the frames
 that keeps their mean), so c_1 would follow Beta(1/2, (n-2)/2), with mean
 1/(n - 1): 0.05 at 21 frames, and 0.5 or more with probability 0.0003. PC2's
 cosine has a mean of 1/n over the frames, which scales both by
-1 - 2/(n(n + 1)). `uncorrelated_cosine` computes this, and the report
-prints it beside the values so the reader can see what low means at that
-length.
+1 - 2/(n(n + 1)): 0.0003 again at 21 frames. The verdict below fires on
+either mode, so the chance that uncorrelated frames are called
+diffusion-like is at most the sum, 0.0007 at 21 frames
+(`chance_diffusion_like`; 200,000 sets of 21 Gaussian frames of 30
+coordinates gave 0.00065, so the bound is close). `uncorrelated_cosine` computes each mode's law, and
+the report prints the mean and the bound beside the values so the reader
+can see what low means at that length.
 
 Verdict (chosen threshold): diffusion-like, not converged, when the cosine
 content of PC1 or PC2 is at least DIFFUSIVE = 0.5, that is when the one
@@ -147,11 +151,12 @@ covariance of n frames has at most n - 1 non-zero eigenvalues. With n - 1
 = k every direction the frames span is among the k "principal" ones and
 the RMSIP only asks whether two replicas visited the same few points; at 2k
 + 1 the k compared are at most half of the directions sampled. At 21
-frames uncorrelated frames reach the cosine threshold by chance with
-probability 0.0003, while 200 random walks of 21 steps in 141 dimensions
-gave PC1 a cosine content between 0.97 and 1.00 (test_pca.py), so the
-test separates the two; at 5 frames, the smoke run's old length, the chance
-is 0.18 and it would not.
+frames uncorrelated frames are called diffusion-like by chance with
+probability at most 0.0007, while 200 random walks of 21 steps in 141
+dimensions gave PC1 a cosine content between 0.97 and 1.00 (test_pca.py),
+so the test separates the two; at 5 frames, the smoke run's old length,
+the chance is 0.18 for PC1 alone and up to 0.34 for either, and it would
+not.
 
 CHECKED AGAINST GROMACS
 -----------------------
@@ -207,6 +212,15 @@ CHANCE_SD = 3.0
 #: Directions the least-squares fit removes: three translations, three
 #: rotations.
 RIGID = 6
+#: Total mean-square fluctuation (nm^2) below which a replica is said not to
+#: have moved. Below it every atom's RMS fluctuation is under 1e-4 nm, a
+#: tenth of the 0.001 nm an xtc stores coordinates to, so no recorded motion
+#: is there; what is left is rounding. A test on exactly zero is not enough:
+#: identical frames leave about 1e-32 nm^2 after centring and superposition,
+#: and their "modes" and cosine contents are then directions in that noise.
+STILL_NM2 = 1e-8
+#: The verdict for a replica that did not move, and for a pair with one.
+NO_MOTION = "no motion"
 
 DIFFUSION_LIKE = "diffusion-like, not converged"
 NOT_DIFFUSIVE = "not diffusion-like"
@@ -314,6 +328,13 @@ def rmsip(a: np.ndarray, b: np.ndarray) -> float:
     return math.sqrt(float((_finite(o, "the inner products") ** 2).sum()) / a.shape[1])
 
 
+def overlap(a: "ReplicaModes", b: "ReplicaModes", value: float) -> float:
+    """The RMSIP of two replicas as reported: `value`, or NaN when either
+    did not move (STILL_NM2), its modes then being directions in rounding
+    noise. Both routes pass their RMSIP through this."""
+    return value if a.moved and b.moved else float("nan")
+
+
 def _cosine(n: int, i: int) -> np.ndarray:
     return np.cos(np.pi * i * np.arange(n) / (n - 1))
 
@@ -363,6 +384,14 @@ def uncorrelated_cosine(n: int, i: int = 1, threshold: float = DIFFUSIVE) -> Tup
     return mean, tail
 
 
+def chance_diffusion_like(n: int, threshold: float = DIFFUSIVE) -> float:
+    """Upper bound on the probability that n uncorrelated frames are called
+    diffusion-like: the verdict fires when PC1 or PC2 reaches `threshold`, so
+    it is the sum of the two modes' tails (the union bound; the two cosines
+    are not independent, so their joint law is not used)."""
+    return sum(uncorrelated_cosine(n, i, threshold)[1] for i in range(1, COSINE_MODES + 1))
+
+
 def too_few_atoms(atoms: int, k: Optional[int] = None) -> Optional[str]:
     """Why an active site of `atoms` heavy atoms is refused, or None: the
     band chance fills must stay below the one called shared."""
@@ -392,8 +421,17 @@ class ReplicaModes:
     #: not one run in time.
     cosine: Optional[Tuple[float, float]] = None
 
+    def __post_init__(self):
+        # Cosine contents of rounding noise are not reported (STILL_NM2).
+        if self.cosine is not None and not self.moved:
+            self.cosine = (float("nan"),) * len(self.cosine)
+
+    @property
+    def moved(self) -> bool:
+        return self.trace >= STILL_NM2
+
     def share(self, m: int) -> float:
-        return sum(self.eigenvalues[:m]) / self.trace if self.trace > 0 else float("nan")
+        return sum(self.eigenvalues[:m]) / self.trace if self.moved else float("nan")
 
 
 @dataclass
@@ -419,7 +457,7 @@ class PrincipalMotions:
     def between(self) -> Optional[float]:
         """The part of the pooled variance that is the difference between
         the replicas' mean structures (law of total variance)."""
-        if self.pooled is None or not self.replicas or self.pooled.trace <= 0:
+        if self.pooled is None or not self.replicas or not self.pooled.moved:
             return None
         n = sum(r.frames for r in self.replicas)
         within = sum(r.frames * r.trace for r in self.replicas) / n
@@ -435,13 +473,15 @@ class PrincipalMotions:
 
 
 def cosine_verdict(r: ReplicaModes) -> str:
-    if r.cosine is None or any(math.isnan(c) for c in r.cosine):
-        return "no motion"
+    if r.cosine is None or not r.moved or any(math.isnan(c) for c in r.cosine):
+        return NO_MOTION
     return DIFFUSION_LIKE if max(r.cosine) >= DIFFUSIVE else NOT_DIFFUSIVE
 
 
 def rmsip_verdict(value: float, dim: int, k: Optional[int] = None) -> str:
     k = RMSIP_MODES if k is None else k
+    if math.isnan(value):
+        return NO_MOTION
     sq = value * value
     if sq >= SAME_RMSIP2:
         return SAME
@@ -474,7 +514,7 @@ def from_frames(per_replica: Sequence[Tuple[str, np.ndarray]], atoms: int,
     for i in range(len(measured)):
         for j in range(i + 1, len(measured)):
             (a, ma), (b, mb) = measured[i], measured[j]
-            out.overlaps.append((a, b, rmsip(ma.vectors, mb.vectors)))
+            out.overlaps.append((a, b, overlap(out.replicas[i], out.replicas[j], rmsip(ma.vectors, mb.vectors))))
     if len(measured) >= 2 and not out.too_short:
         pooled = modes(np.vstack([X for _, X in per_replica]))
         out.pooled = _summary("pooled", pooled, with_cosine=False)
@@ -483,6 +523,6 @@ def from_frames(per_replica: Sequence[Tuple[str, np.ndarray]], atoms: int,
 
 __all__ = ["RMSIP_MODES", "MIN_PCA_FRAMES", "COSINE_MODES", "DIFFUSIVE", "SAME_RMSIP2", "CHANCE_SD", "RIGID",
            "DIFFUSION_LIKE", "NOT_DIFFUSIVE", "SAME", "PARTLY", "CHANCE", "is_hydrogen", "heavy_atoms", "fitted",
-           "Modes", "modes", "rmsip", "cosine_content", "from_gmx_cosine", "chance_rmsip2",
-           "uncorrelated_cosine", "too_few_atoms", "ReplicaModes", "PrincipalMotions", "cosine_verdict",
+           "Modes", "modes", "rmsip", "overlap", "STILL_NM2", "NO_MOTION", "cosine_content", "from_gmx_cosine", "chance_rmsip2",
+           "uncorrelated_cosine", "chance_diffusion_like", "too_few_atoms", "ReplicaModes", "PrincipalMotions", "cosine_verdict",
            "rmsip_verdict", "from_frames"]
