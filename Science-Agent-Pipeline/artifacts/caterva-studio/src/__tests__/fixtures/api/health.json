@@ -1,0 +1,9 @@
+{
+  "status": 200,
+  "body": {
+    "ok": true,
+    "version": "0.4.0",
+    "api_version": 1,
+    "started_at": "2026-10-01T02:15:39.035Z"
+  }
+}
