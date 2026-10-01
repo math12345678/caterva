@@ -53,6 +53,7 @@ class FakeKineticResult:
         self.assay_unreported = kw.get("assay_unreported", [])
         self.ensemble_candidates = kw.get("ensemble_candidates", [])
         self.cross_species_organisms_available = kw.get("available", [])
+        self.commentary = kw.get("commentary")
 
 
 def row(value, ph, temperature_c=None, *, unit="mM", reference_id="R", buffer=None):
@@ -98,6 +99,7 @@ def windowed_resolver(rows):
             assay_ph=winner.get("ph"),
             assay_temperature_c=winner.get("temperature_c"),
             assay_buffer=winner.get("buffer"),
+            commentary=winner.get("conditions"),
             ensemble_candidates=[dict(c) for c in table],
         )
     return resolve
@@ -442,6 +444,25 @@ class TestTheScoutReSelects:
             for n in ar.notes
         )
         assert "already the nearest frontier row inside" in note
+
+    def test_a_row_of_the_same_value_at_another_ph_is_not_the_one_carried(
+        self,
+    ) -> None:
+        # Synthetic table (no committed page has such a pair: none of the 370
+        # frontiers on the three full pages repeats a value at another pH or
+        # temperature). Judged by value alone, the pH 8 row read as the one
+        # already carried, and the pH 6 row's pH and commentary stayed.
+        at_6, at_8 = row(21.1, 6.0, 25.0, unit="1/s"), row(21.1, 8.0, 25.0, unit="1/s")
+        at_6["conditions"], at_8["conditions"] = "pH 6.0, 25°C", "pH 8.0, 25°C"
+        window = Constraint(
+            kind="assay_window", subject="kcat", requirement="pH 8",
+            reason="test", raised_by="test",
+        )
+        report, _ = self._scout_result(
+            "kcat", windowed_resolver({"kcat": [at_6, at_8]}), windows=(window,)
+        )
+        source = report.blackboard.get(param_key("kcat")).source
+        assert (source.value, source.ph, source.commentary) == (21.1, 8.0, "pH 8.0, 25°C")
 
     def test_when_no_row_satisfies_the_window_the_default_stands(self) -> None:
         # Re-selecting an outside row would manufacture a measurement the

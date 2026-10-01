@@ -340,7 +340,13 @@ class ParameterScout:
         # the resolver on the question the window leaves open.
         best = min(eligible, key=lambda c: (rank(c), value_of(c)))
 
-        if best["value"] == source.value:
+        # The row carried now, found by value and commentary. By value alone
+        # a row of the same value at another pH would read as the one
+        # carried, and keep the carried row's pH and commentary. Only a
+        # source whose commentary matches no frontier row (a stand-in that
+        # states none) falls back to the value.
+        current = frontier_row(source)
+        if best == current or (current is None and best["value"] == source.value):
             return (
                 source,
                 reason,

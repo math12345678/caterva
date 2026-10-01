@@ -115,7 +115,14 @@ table has; 21.1 1/s (BRENDA ref 684519) is a pyruvate row and 32.0 1/s
 to 32.0 1/s for NAD+ ... replacing 21.1 1/s for pyruvate"), and the scout
 carries the row's own commentary rather than the default's. Asked for
 pyruvate's kcat, the same search raises no window and keeps 21.1 1/s, with
-the pH gap reported (Tests/test_agent_architecture_on_real_brenda.py).
+the pH gap reported (Tests/test_agent_architecture_on_real_brenda.py). Two
+details of the replacement described above have also changed: the chosen
+row is cited "BRENDA ref 670748", as the adapter cites the resolver's own
+row, not `reference_id:670748`; and its buffer is the row's own as the
+frontier carries it (ADR 0175), not `None`. Added 2026-10-01: whether the
+row carried is already the nearest is decided by value and commentary, not
+by value alone, so a row of the same value at another pH is not mistaken
+for it.
 
 **Nothing was multiplied, moved or manufactured.** 32.0 was already a row of
 kcat's own frontier; the same guarantee holds in the metric by construction:
