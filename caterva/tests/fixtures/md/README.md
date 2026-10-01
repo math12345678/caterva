@@ -142,6 +142,12 @@ lysozyme's em.gro, gmx sasa at 10,000 was within 0.0035 nm^2 of Caterva at
 50,000 points on every residue (caterva/analyze/sasa.py). The same run
 gave a total of 87.130 nm^2.
 
+`t4l_bnz_first6000_gmx_sasa_ndots2000.txt`: the same, from the same
+command with `-ndots 2000` (GROMACS 2026.1, 2026-09-30), the number of
+points analyze.sh asks for and Caterva's own route uses: the two routes'
+difference on one structure, residue by residue. The run gave a total of
+87.113 nm^2.
+
 `lyso_1aki_rep1_gmx_sasa.txt`: for each of the six catalytic residues of
 hen lysozyme, its number, name, its area in `lyso_1aki_res1-59.gro.gz`,
 then its 21 per-frame areas (nm^2) in `lyso_1aki_res1-59.xtc`; and first a

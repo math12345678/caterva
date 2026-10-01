@@ -8,14 +8,15 @@ pair finds, and the patches decide exactly the points that testing each
 point alone decides, on a real protein. And `gmx sasa` itself, which uses
 a different set of points (the double cubic lattice), on two committed
 structures (fixtures/md/README.md): every residue of T4 lysozyme against
-`gmx sasa -ndots 10000`, and the six catalytic residues of hen lysozyme in
-21 real frames against the command analyze.sh runs.
+`gmx sasa -ndots 10000` and `-ndots 2000`, and the six catalytic residues
+of hen lysozyme in 21 real frames against the command analyze.sh runs.
 """
 from __future__ import annotations
 
 import gzip
 import importlib.util
 import math
+import struct
 from pathlib import Path
 
 import numpy as np
@@ -24,7 +25,7 @@ from scipy.spatial.distance import cdist
 
 from caterva.analyze import sasa
 from caterva.analyze.__main__ import (AnalyzeError, Analysis, _exposures, _gro_atoms, _gro_box, commands,
-                                      gromacs_sasa, measure_native, sasa_section)
+                                      gromacs_sasa, main, measure_native, sasa_section, sasa_unmeasurable)
 from caterva.analyze.plan import Atom, plan
 from caterva.md import xtc
 
@@ -149,14 +150,29 @@ def test_no_atoms_and_one_atom_need_no_neighbours():
     assert len(i) == len(j) == 0
 
 
+def test_a_coordinate_that_is_not_a_number_is_refused():
+    """A NaN atom would fall in no cell of the grid and keep, with its
+    neighbours, its whole area, with nothing said."""
+    x = np.array([[math.nan, 0.0, 0.0], [0.0, 0.0, 0.0]])
+    with pytest.raises(ValueError, match="1 of 2 atoms have a coordinate that is not a finite number"):
+        sasa.atom_areas(x, np.array([0.17, 0.17]))
+
+
 # --- the shortcuts, against the plain method on a real protein -----------------------------
 
 @pytest.fixture(scope="module")
-def t4l(tmp_path_factory):
+def t4l_atoms(tmp_path_factory):
+    """Every atom of the T4 lysozyme fixture, and its periodic box."""
+    gro = _gro(tmp_path_factory, "t4l_bnz_first6000")
+    return _gro_atoms(gro), _gro_box(gro.read_text().splitlines()[-1])
+
+
+@pytest.fixture(scope="module")
+def t4l(t4l_atoms):
     """T4 lysozyme's protein from a real `caterva complex` em.gro: 2,603
     atoms with hydrogens, residues 1-162 (the benzene and water after them
     are not part of the surface)."""
-    atoms = _gro_atoms(_gro(tmp_path_factory, "t4l_bnz_first6000"))
+    atoms = t4l_atoms[0]
     index = sasa.surface_atoms(atoms, range(1, 163))
     x = np.array([atoms[i][3] for i in index])
     radii = np.array([sasa.radius(atoms[i][2]) for i in index])
@@ -188,9 +204,11 @@ def test_the_patches_decide_every_point_as_testing_it_alone_would(t4l, dots):
 def test_the_areas_converge_as_points_are_added(t4l):
     """Against 20,000 points: the root-mean-square error of an atom's area
     falls as the points are made denser (0.0029 nm^2 at 250, 0.0010 at
-    1,000, 0.00037 at 4,000 when this was written), and at DOTS no atom is
-    off by more than 0.005 nm^2 (0.0036) and no residue by more than 0.01
-    (0.0065), which the table's 0.01 nm^2 holds."""
+    1,000, 0.00037 at 4,000 when this was written), and at DOTS no atom of
+    this structure is off by more than 0.005 nm^2 (0.0036) and no residue
+    by more than 0.01 (0.0065). On eight lysozyme runs the largest residue
+    error at DOTS was 0.0098 to 0.0157 (sasa.py, THE POINTS), so 0.01 is this
+    structure's bound, not every structure's."""
     x, radii, resnr, _ = t4l
     ref = sasa.atom_areas(x, radii, dots=20000)
     rms = []
@@ -203,21 +221,55 @@ def test_the_areas_converge_as_points_are_added(t4l):
     assert np.abs(np.bincount(resnr, weights=at)).max() <= 0.01
 
 
+def _gmx_t4l(name: str, names) -> np.ndarray:
+    """Per-residue areas gmx sasa printed for the T4 lysozyme fixture."""
+    printed = [line.split() for line in (MD / name).read_text().splitlines()]
+    assert [int(r) for r, _, _ in printed] == list(range(1, 163))
+    assert all(names[int(r)] == n for r, n, _ in printed)
+    return np.array([float(a) for _, _, a in printed])
+
+
+def _within_routes_bound(mine: np.ndarray, gmx: np.ndarray) -> np.ndarray:
+    """Each difference as a share of sasa.routes_agree_nm2 at the larger of
+    the two areas: at most 1 where the routes agree as they are held to."""
+    bound = np.array([sasa.routes_agree_nm2(a) for a in np.maximum(mine, gmx)])
+    return np.abs(mine - gmx) / bound
+
+
+def test_the_routes_bound_grows_with_the_area():
+    assert sasa.routes_agree_nm2(0.0) == sasa.routes_agree_nm2(0.05) == sasa.ROUTES_AGREE_FLOOR_NM2
+    assert sasa.routes_agree_nm2(1.0) == pytest.approx(sasa.ROUTES_AGREE_NM)
+    assert sasa.routes_agree_nm2(1.7965) == pytest.approx(0.0402, abs=5e-5)  # sasa.py's largest measured case
+
+
 def test_every_residue_of_t4_lysozyme_matches_gmx_sasa(t4l):
-    """`gmx sasa -ndots 10000` on the same atoms: every residue within
-    ROUTES_AGREE_NM2 at DOTS points (0.0088 nm^2 at most when this was
+    """`gmx sasa -ndots 10000` on the same atoms: every residue within the
+    routes' bound at DOTS points (0.0088 nm^2 at most when this was
     written, 0.0024 root mean square), and closer as Caterva's points are
     made denser (0.0044 at 10,000), because the two converge on the same
     surface."""
     x, radii, resnr, names = t4l
-    printed = [line.split() for line in (MD / "t4l_bnz_first6000_gmx_sasa.txt").read_text().splitlines()]
-    assert [int(r) for r, _, _ in printed] == list(range(1, 163))
-    assert all(names[int(r)] == n for r, n, _ in printed)
-    gmx = np.array([float(a) for _, _, a in printed])
-    for dots, worst, rms in ((sasa.DOTS, sasa.ROUTES_AGREE_NM2, 0.004), (10000, 0.006, 0.002)):
-        mine = np.bincount(resnr, weights=sasa.atom_areas(x, radii, dots=dots))[1:]
-        assert np.abs(mine - gmx).max() <= worst, dots
-        assert float(np.sqrt(((mine - gmx) ** 2).mean())) <= rms, dots
+    gmx = _gmx_t4l("t4l_bnz_first6000_gmx_sasa.txt", names)
+    mine = np.bincount(resnr, weights=sasa.atom_areas(x, radii))[1:]
+    assert _within_routes_bound(mine, gmx).max() <= 1.0
+    assert float(np.sqrt(((mine - gmx) ** 2).mean())) <= 0.004
+    dense = np.bincount(resnr, weights=sasa.atom_areas(x, radii, dots=10000))[1:]
+    assert np.abs(dense - gmx).max() <= 0.006 and float(np.sqrt(((dense - gmx) ** 2).mean())) <= 0.002
+
+
+def test_every_residue_of_t4_lysozyme_matches_gmx_sasa_at_the_same_points(t4l):
+    """`gmx sasa -ndots 2000` against DOTS points, as the two routes run:
+    each residue within sasa.routes_agree_nm2 of its area. When this was
+    written the largest difference was 0.0138 nm^2 (Ala93, 0.87 nm^2), 0.49
+    of its bound, and the root mean square 0.0033."""
+    assert sasa.DOTS == 2000  # the fixture is gmx sasa at -ndots 2000
+    x, radii, resnr, names = t4l
+    gmx = _gmx_t4l("t4l_bnz_first6000_gmx_sasa_ndots2000.txt", names)
+    mine = np.bincount(resnr, weights=sasa.atom_areas(x, radii))[1:]
+    share = _within_routes_bound(mine, gmx)
+    assert share.max() <= 1.0
+    assert share.max() > 0.3  # two point sets: the bound is approached, not idle
+    assert float(np.sqrt(((mine - gmx) ** 2).mean())) <= 0.005
 
 
 # --- the catalytic residues of lysozyme, frame by frame -----------------------------------
@@ -240,8 +292,8 @@ def lysozyme(tmp_path_factory):
 
 def test_catalytic_areas_match_gmx_sasa_in_every_frame(lysozyme):
     """The command analyze.sh runs, on 21 real frames: every catalytic
-    residue in every frame, and at the start, within ROUTES_AGREE_NM2 (at
-    most 0.0096 nm^2 when this was written)."""
+    residue in every frame, and at the start, within sasa.routes_agree_nm2
+    of its area (at most 0.0096 nm^2 apart when this was written)."""
     gro, traj = lysozyme
     atoms = _gro_atoms(gro)
     order = sorted(CATALYTIC)
@@ -250,12 +302,14 @@ def test_catalytic_areas_match_gmx_sasa_in_every_frame(lysozyme):
     reference = _gmx_lysozyme()
     per_frame = surface.series(traj)
     start = surface.areas(np.array([a[3] for a in atoms]), _gro_box(gro.read_text().splitlines()[-1]))
-    worst = 0.0
+    worst, share = 0.0, 0.0
     for k, resnr in enumerate(order):
         at_start, frames = reference[resnr]
         assert len(frames) == len(per_frame[k]) == 21
-        worst = max(worst, abs(start[k] - at_start), *(abs(a - b) for a, b in zip(per_frame[k], frames)))
-    assert worst <= sasa.ROUTES_AGREE_NM2
+        for a, b in [(start[k], at_start), *zip(per_frame[k], frames)]:
+            worst = max(worst, abs(a - b))
+            share = max(share, abs(a - b) / sasa.routes_agree_nm2(max(a, b)))
+    assert share <= 1.0
     assert worst > 0.001  # two point sets: close, not identical
 
 
@@ -302,6 +356,49 @@ def test_a_residue_numbered_in_two_chains_or_absent_is_refused():
         sasa.residue_members(atoms, surface, 99)
 
 
+def test_two_residues_under_one_number_are_refused():
+    """52 and 52A of a PDB file are both 52 in a .gro file, side by side, so
+    the number does not appear in two places; their atom names repeat."""
+    x = np.zeros(3)
+    atoms = [(51, "ALA", "C", x), (52, "GLY", "N", x), (52, "GLY", "CA", x), (52, "GLY", "C", x),
+             (52, "SER", "N", x), (52, "SER", "CA", x), (52, "SER", "OG", x), (52, "SER", "C", x)]
+    with pytest.raises(ValueError, match="residue number 52 has two atoms named C, CA, N"):
+        sasa.residue_members(atoms, sasa.surface_atoms(atoms), 52)
+
+
+def _backbone(gap_after=None, without=()):
+    """Five residues' N, CA and C on a line (nm), each C 0.133 nm from the
+    next N, a peptide bond, except after residue `gap_after`, where the rest
+    of the chain is moved 0.5 nm on."""
+    atoms = []
+    for k in range(1, 6):
+        at = 0.4 * k + (0.5 if gap_after is not None and k > gap_after else 0.0)
+        for name, dx in (("N", 0.0), ("CA", 0.15), ("C", 0.267)):
+            if (k, name) not in without:
+                atoms.append((k, "ALA", name, np.array([at + dx, 0.0, 0.0])))
+    return atoms
+
+
+def test_a_residue_is_inside_the_chain_when_bonded_on_both_sides():
+    whole = _backbone()
+    assert sasa.Surface(whole, [1, 2, 3, 4, 5]).in_chain == [False, True, True, True, False]
+    broken = _backbone(gap_after=3)
+    assert sasa.Surface(broken, [2, 3, 4]).in_chain == [True, False, False]
+    # Residue 3 without its C has no bond to 4, so neither 3 nor 4 counts.
+    assert sasa.Surface(_backbone(without=[(3, "C")]), [2, 3, 4]).in_chain == [True, False, False]
+    # Across the periodic box the bond is measured to the nearest image.
+    box = np.diag([2.0, 2.0, 2.0])
+    moved = [(r, n, name, xyz + (np.array([2.0, 0.0, 0.0]) if r >= 3 else 0.0)) for r, n, name, xyz in whole]
+    assert sasa.Surface(moved, [2, 3], box=box).in_chain == [True, True]
+    assert sasa.Surface(moved, [2, 3]).in_chain == [False, False]
+
+
+def test_on_a_real_protein_only_the_first_and_last_residues_are_chain_ends(t4l_atoms):
+    atoms, box = t4l_atoms
+    surface = sasa.Surface(atoms, list(range(1, 163)), protein=range(1, 163), box=box)
+    assert [r for r, inside in zip(range(1, 163), surface.in_chain) if not inside] == [1, 162]
+
+
 # --- what is reported -----------------------------------------------------------------------
 
 def test_mean_sd_and_middle_95_percent_of_frames():
@@ -337,6 +434,36 @@ def test_verdicts(e, verdict):
     assert sasa.exposure_verdict(e) == verdict
 
 
+def _r(name, mean, low, high):
+    return (name, mean, 0.03, low, high)
+
+
+def test_a_mean_across_a_threshold_with_frames_still_in_the_starting_state_has_not_clearly_left_it():
+    """The case of lysozyme's Asn46 (largest possible area 1.95 nm^2) in one
+    md_smoke run: partly exposed at the start (23%), rep1 at 22% and rep2's
+    mean at 19% with its middle 95% of frames from 17% to 23%. Rep2's mean
+    is under the 20% line, its frames are on both sides of it, and the same
+    protocol run again put it at 20%: that is not "replicas disagree"."""
+    asn46 = sasa.Exposure("Asn46", "ASN", 0.46, [_r("rep1", 0.43, 0.41, 0.44), _r("rep2", 0.37, 0.34, 0.44)])
+    assert sasa.exposure_verdict(asn46) == ("partly exposed at the start, buried in rep2 by its mean, with "
+                                            "frames still partly exposed")
+    # The same mean with every frame under the line has left the state.
+    left = sasa.Exposure("Asn46", "ASN", 0.46, [_r("rep1", 0.43, 0.41, 0.44), _r("rep2", 0.30, 0.25, 0.36)])
+    assert sasa.exposure_verdict(left) == "partly exposed at the start, buried in rep2; replicas disagree"
+    # Both replicas near the line, on the same side: still not "in every replica".
+    both = sasa.Exposure("Asn46", "ASN", 0.46, [_r("rep1", 0.37, 0.33, 0.42), _r("rep2", 0.37, 0.34, 0.44)])
+    assert sasa.exposure_verdict(both) == ("partly exposed at the start, buried in rep1 by its mean, with frames "
+                                           "still partly exposed, buried in rep2 by its mean, with frames still "
+                                           "partly exposed")
+    # One replica clearly left, the other near the line: no disagreement claimed.
+    mixed = sasa.Exposure("Asn46", "ASN", 0.46, [_r("rep1", 0.20, 0.15, 0.25), _r("rep2", 0.37, 0.34, 0.44)])
+    assert sasa.exposure_verdict(mixed) == ("partly exposed at the start, buried in rep1, buried in rep2 by its "
+                                            "mean, with frames still partly exposed")
+    # Frames that span the start's state from buried to exposed reach back too.
+    wide = sasa.Exposure("Asn46", "ASN", 0.46, [_r("rep1", 0.43, 0.41, 0.44), _r("rep2", 0.80, 0.30, 1.00)])
+    assert sasa.exposure_verdict(wide).endswith("exposed in rep2 by its mean, with frames still partly exposed")
+
+
 def test_the_verdict_reads_the_share_as_printed():
     """0.3099 nm^2 of a serine's 1.55 is 19.99%, printed as 20%: partly
     exposed, as the printed number says, not buried by a hundredth of a
@@ -368,7 +495,21 @@ def test_the_section_prints_areas_shares_ranges_and_verdicts():
     assert f"| Ser30 | 1.55 | 0.50 (32%) | 0.20 ± n/a [0.20, 0.20] (13%) | n/a | {sasa.NO_FRAMES} |" in section
     text = "\n".join(section)
     assert "below 20% of the largest possible area" in text and "at 40% or above" in text
-    assert "Tien et al. (2013) PLoS ONE 8:e80635" in text and "2000 per atom" in text
+    assert "Tien et al. (2013) PLoS ONE 8:e80635" in text
+    assert "Shrake & Rupley's method, 2,000 points per atom" in text and "lattice" not in text
+
+
+def test_the_gromacs_route_names_its_own_points():
+    """gmx sasa places its points on Eisenhaber et al.'s double cubic
+    lattice, and -ndots 2000 gives 2,252 of them per atom (sasa.GMX_DOTS):
+    the section measured that way says so, not the native route's method."""
+    p = _two_sites()
+    rows = _exposures(p, [0.10, 0.50], {0: [("rep1", 0.8, 0.05, 0.7, 0.9)], 1: [("rep1", 0.2, 0.01, 0.2, 0.2)]})
+    text = "\n".join(sasa_section(Analysis("9XYZ", "A", "t", p, [], None, None, None, [], None, None, rows,
+                                           sasa_route="gromacs")))
+    assert "double cubic lattice of Eisenhaber et al. (1995)" in text
+    assert f"-ndots {sasa.DOTS}, which it rounds up to 2,252 per atom" in text
+    assert "Shrake & Rupley's method" not in text
 
 
 def test_a_chain_end_has_no_share_and_no_verdict():
@@ -379,7 +520,10 @@ def test_a_chain_end_has_no_share_and_no_verdict():
     assert f"| Ala1 | n/a | 0.90 | 0.90 ± 0.10 [0.80, 1.00] | 0.90 ± 0.10 [0.80, 1.00] | {sasa.CHAIN_END} |" in section
 
 
-def test_the_chain_ends_are_those_of_protein_pdb():
+def test_without_em_gro_the_chain_ends_are_the_first_and_last_residues_of_protein_pdb():
+    """Both routes take the chain's ends from em.gro's peptide bonds
+    (sasa.Surface.in_chain); a directory analyze.sh has not run in, which
+    has no em.gro, falls back to protein.pdb's numbering."""
     p = _two_sites()
     assert [e.in_chain for e in _exposures(p, [0.1, 0.1], {0: [], 1: []})] == [True, True]
     ends = plan([Atom("A", r, n, "CA", (float(r), 0.0, 0.0)) for r, n in ((1, "GLY"), (5, "ALA"), (9, "GLY"))],
@@ -391,6 +535,9 @@ def test_not_measured_and_nothing_to_measure_are_said():
     p = _two_sites()
     assert sasa_section(Analysis("9XYZ", "A", "t", p, [], None, None, None, [], None, None, None))[-1] == \
         "Not measured."
+    why = sasa_section(Analysis("9XYZ", "A", "t", p, [], None, None, None, [], None, None, None,
+                                sasa_not_measured="residue number 10 appears in more than one place"))
+    assert why[-1] == "Not measured: residue number 10 appears in more than one place."
     assert sasa_section(Analysis("9XYZ", "A", "t", p, [], None, None, None, [], None, None, []))[-1] == \
         "No catalytic residue to measure."
 
@@ -417,9 +564,55 @@ def test_a_missing_or_stale_sasa_output_is_refused(tmp_path):
     with pytest.raises(AnalyzeError, match="sasa_start.xvg does not exist"):
         gromacs_sasa(tmp_path, p, [rep])
     (tmp_path / "sasa_start.xvg").write_text("0.0 9.0 0.1\n")  # an older plan: one residue
-    with pytest.raises(AnalyzeError, match=r"has 2 columns of solvent-accessible area \(the protein's, then "
-                                           r"each catalytic residue's\), the plan has 3"):
+    with pytest.raises(AnalyzeError, match=r"has 2 columns of solvent-accessible area \(one column for the "
+                                           r"whole protein, then one per catalytic residue\), the plan has 3"):
         gromacs_sasa(tmp_path, p, [rep])
+    # A run of gmx that stopped before its first frame leaves the headers.
+    (tmp_path / "sasa_start.xvg").write_text("@ title \"Solvent Accessible Surface\"\n")
+    with pytest.raises(AnalyzeError, match=r"sasa_start.xvg has no frames of solvent-accessible area"):
+        gromacs_sasa(tmp_path, p, [rep])
+
+
+def test_a_nan_area_from_gmx_is_refused_not_read_as_no_frames(tmp_path):
+    """One damaged cell would otherwise print the replica as n/a with the
+    verdict "no frames", over frames that are valid."""
+    p = _two_sites()
+    rep = tmp_path / "rep1"
+    rep.mkdir()
+    (tmp_path / "sasa_start.xvg").write_text("0.0 9.0 0.1 0.2\n")
+    (rep / "sasa.xvg").write_text("0.0 9.0 0.1 0.2\n1.0 9.0 nan 0.2\n2.0 9.0 0.1 0.2\n")
+    with pytest.raises(AnalyzeError, match=r"rep1/sasa.xvg has an area that is not a number"):
+        gromacs_sasa(tmp_path, p, [rep])
+
+
+def _two_chain_em_gro(directory: Path):
+    """An em.gro in which His10 is numbered twice, as when two chains are
+    simulated with the same numbering (`caterva md`'s default is every
+    chain), with Asp20, Gly30 and Leu90 once."""
+    rows = [(10, "HIS", "CA"), (10, "HIS", "ND1"), (10, "HIS", "NE2"), (20, "ASP", "CA"), (20, "ASP", "OD1"),
+            (20, "ASP", "OD2"), (30, "GLY", "CA"), (90, "LEU", "CA"), (10, "HIS", "CA"), (10, "HIS", "ND1"),
+            (10, "HIS", "NE2")]
+    lines = ["two chains", str(len(rows))]
+    for k, (r, n, name) in enumerate(rows, start=1):
+        lines.append(f"{r:5d}{n:<5s}{name:>5s}{k:5d}{0.5 * k:8.3f}{1.0:8.3f}{1.0:8.3f}")
+    lines.append("  10.00000  10.00000  10.00000")
+    (directory / "em.gro").write_text("\n".join(lines) + "\n")
+
+
+def test_a_residue_numbered_in_two_chains_drops_only_this_section(tmp_path, capsys):
+    """The distances and the rest are still reported, as they were before
+    this section existed; the section says why it has no areas, and the
+    exit code is the distances' and angles' as before."""
+    from caterva.tests import test_analyze
+    d = test_analyze._fake_run(tmp_path, [0.40, 0.40, 0.40])
+    _two_chain_em_gro(d)
+    p = plan(test_analyze.read_pdb(test_analyze._protein(), "A"), [(10, "HIS"), (20, "ASP")])
+    assert "residue number 10 appears in more than one place" in sasa_unmeasurable(d, p)
+    assert main([str(d), "--no-run"], catalytic=test_analyze._catalytic) == 0
+    out = capsys.readouterr().out
+    assert "| His10–Asp20 | 0.400 |" in out
+    assert ("## Solvent exposure of the catalytic residues\n\nNot measured: residue number 10 appears in more "
+            "than one place in the protein (more than one chain simulated?)") in out
 
 
 def _smoke():
@@ -429,48 +622,110 @@ def _smoke():
     return module
 
 
+def _split_xtc(path: Path, at: int):
+    """The bytes of an .xtc before frame `at` and from it on. Each frame is
+    a record of its own (a 52-byte header, then its coordinates), so a
+    trajectory cut between two frames is two trajectories."""
+    data = path.read_bytes()
+    pos = 0
+    for _ in range(at):
+        natoms = struct.unpack_from(">3i", data, pos)[1]
+        pos = xtc._coords(data, pos + 52, natoms)[2]
+    return data[:pos], data[pos:]
+
+
 def test_both_routes_give_the_same_section_on_real_frames(tmp_path, lysozyme):
     """The native route measured on the committed lysozyme frames, against
     the GROMACS route reading what gmx sasa printed for them; judged by the
-    helper the CI smoke run uses, and with the same verdicts."""
+    helper the CI smoke run uses, and with the same verdicts. The 21 frames
+    are cut into two replicas (0-10 and 11-20), so each residue gets a
+    verdict from its areas: with one replica every verdict would be "one
+    replica" whatever the areas were."""
     gro, _ = lysozyme
     (tmp_path / "em.gro").write_bytes(gro.read_bytes())
     atoms = _gro_atoms(tmp_path / "em.gro")
     protein = [Atom("A", r, n, name, tuple(float(v) * 10 for v in xyz)) for r, n, name, xyz in atoms]
-    rep = tmp_path / "rep1"
-    rep.mkdir()
-    (rep / "md.xtc").write_bytes((MD / "lyso_1aki_res1-59.xtc").read_bytes())
+    reps = [tmp_path / "rep1", tmp_path / "rep2"]
+    for rep, part in zip(reps, _split_xtc(MD / "lyso_1aki_res1-59.xtc", 11)):
+        rep.mkdir()
+        (rep / "md.xtc").write_bytes(part)
+    assert [len(xtc.read(r / "md.xtc")) for r in reps] == [11, 10]
     p = plan(protein, [(r, next(a.resname for a in protein if a.resnr == r)) for r in CATALYTIC])
-    native = measure_native(tmp_path, p, [rep])[7]
+    native = measure_native(tmp_path, p, reps)[7]
+    assert measure_native(tmp_path, p, reps, sasa=False)[7] is None  # sasa_unmeasurable gave a reason
 
     reference = _gmx_lysozyme()
     columns = ["total"] + [s.resnr for s in p.sites]
     (tmp_path / "sasa_start.xvg").write_text("0.0 " + " ".join(f"{reference[c][0]:.3f}" for c in columns) + "\n")
-    (rep / "sasa.xvg").write_text("".join(
-        f"{t * 0.5:.1f} " + " ".join(f"{reference[c][1][t]:.3f}" for c in columns) + "\n" for t in range(21)))
-    via_gmx = gromacs_sasa(tmp_path, p, [rep])
+    for rep, frames in zip(reps, (range(0, 11), range(11, 21))):
+        (rep / "sasa.xvg").write_text("".join(
+            f"{t * 0.5:.1f} " + " ".join(f"{reference[c][1][t]:.3f}" for c in columns) + "\n" for t in frames))
+    via_gmx = gromacs_sasa(tmp_path, p, reps)
     assert [e.label for e in via_gmx] == [e.label for e in native] == [s.label for s in p.sites]
 
     one = "\n".join(sasa_section(Analysis("1AKI", None, "t", p, [], None, None, None, [], None, None, native)))
     other = "\n".join(sasa_section(Analysis("1AKI", None, "t", p, [], None, None, None, [], None, None, via_gmx)))
     smoke = _smoke()
     rows_native, rows_gmx = smoke._sasa_rows(one), smoke._sasa_rows(other)
-    assert len(rows_native) == 6 and all(len(v) == 4 for v in rows_native.values())
-    agree, worst = smoke._sasa_agree(rows_native, rows_gmx)
-    assert agree and worst <= smoke.SASA_PRINTED_NM2
-    # Asn59 is the last residue of this 59-residue fragment, so it is a chain end.
-    assert "| Asn59 | n/a |" in one and sasa.CHAIN_END in one
-    assert [sasa.exposure_verdict(e) for e in native] == [sasa.exposure_verdict(e) for e in via_gmx]
+    assert len(rows_native) == 6 and all(len(v) == 7 for v in rows_native.values())
+    agree, worst, allowed = smoke._sasa_agree(rows_native, rows_gmx)
+    assert agree and worst <= allowed
+    # Asn59 is the last residue of this 59-residue fragment: no peptide bond
+    # after it in em.gro, so it is a chain end on both routes.
+    assert "| Asn59 | n/a |" in one and "| Asn59 | n/a |" in other and sasa.CHAIN_END in one
+    verdicts = [sasa.exposure_verdict(e) for e in native]
+    assert verdicts == [sasa.exposure_verdict(e) for e in via_gmx]
+    assert smoke._verdicts_differ(smoke._sasa_verdicts(one), smoke._sasa_verdicts(other),
+                                  rows_native, rows_gmx) == ([], [])
+    # What the areas say on this fragment (Asp48, Ser50, Asn46, Asn59, Asp52,
+    # Glu35); Ser50 sits at 21-22% of its maximum, near the 20% threshold.
+    assert verdicts == ["exposed throughout", "partly exposed throughout", "partly exposed throughout",
+                        sasa.CHAIN_END, "buried throughout", "exposed throughout"]
 
 
 def test_the_smoke_comparison_holds_areas_to_the_measured_tolerance():
+    """The allowance is the routes' bound for the larger area the printed
+    value could stand for, plus 0.01 for the rounding of two printed
+    values: 0.0175 near zero, about 0.027 at 0.3 nm^2 and 0.050 at 1.8."""
     smoke = _smoke()
-    assert smoke.SASA_PRINTED_NM2 == pytest.approx(sasa.ROUTES_AGREE_NM2 + 0.01)
+    assert smoke.sasa_allowed(0.00, 0.00) == pytest.approx(sasa.ROUTES_AGREE_FLOOR_NM2 + 0.01)
+    assert smoke.sasa_allowed(0.30, 0.31) == pytest.approx(sasa.ROUTES_AGREE_NM * math.sqrt(0.315) + 0.01)
+    assert smoke.sasa_allowed(1.80, 1.78) > smoke.sasa_allowed(0.30, 0.31)
     base = {"Glu35": (0.34, 0.29, 0.24, 0.31), "Ser50": (0.00, 0.01, 0.00, 0.02)}
     near = {"Glu35": (0.33, 0.30, 0.25, 0.33), "Ser50": (0.00, 0.01, 0.00, 0.02)}
-    assert smoke._sasa_agree(base, near) == (True, pytest.approx(0.02))
-    far = {"Glu35": (0.34, 0.29, 0.24, 0.35), "Ser50": (0.00, 0.01, 0.00, 0.06)}
-    assert smoke._sasa_agree(base, far)[0] is False
+    agree, worst, allowed = smoke._sasa_agree(base, near)
+    assert agree and worst == pytest.approx(0.02) and allowed == pytest.approx(smoke.sasa_allowed(0.31, 0.33))
+    # 0.03 apart at 0.34 nm^2 is beyond the 0.028 allowed there; 0.02 apart
+    # near zero is beyond the 0.0175 allowed there.
+    assert smoke._sasa_agree(base, {**base, "Glu35": (0.34, 0.29, 0.24, 0.34)})[0] is False
+    assert smoke._sasa_agree(base, {**base, "Ser50": (0.00, 0.01, 0.00, 0.04)})[0] is False
+    # A difference that would pass at 1.8 nm^2 does not at 0.3.
+    assert smoke._sasa_agree({"Arg45": (1.80,)}, {"Arg45": (1.77,)})[0] is True
+    assert smoke._sasa_agree({"Asn46": (0.30,)}, {"Asn46": (0.27,)})[0] is False
     assert smoke._sasa_agree(base, {"Glu35": base["Glu35"]})[0] is False     # a residue missing
     assert smoke._sasa_agree(base, {**base, "Ser50": (0.00,)})[0] is False    # a row cut short (n/a)
     assert smoke._sasa_agree({}, {})[0] is False                               # nothing measured
+
+
+def test_the_smoke_run_tells_a_verdict_near_a_threshold_from_one_that_should_not_differ():
+    """md_smoke compares the verdict columns too. A share near 20% can round
+    into a different state on each route, which the area tolerance allows;
+    a different verdict with every area in the same state on both routes is
+    a failure."""
+    smoke = _smoke()
+    native = {"Asn46": (1.95, "partly exposed throughout"), "Glu35": (2.23, "buried throughout")}
+    # Asn46's rep2 mean 0.40 (21%) on one route and 0.38 (19%) on the other.
+    gromacs = {"Asn46": (1.95, "partly exposed at the start, buried in rep2; replicas disagree"),
+               "Glu35": (2.23, "buried throughout")}
+    rows_n = {"Asn46": (0.46, 0.43, 0.41, 0.44, 0.40, 0.39, 0.42), "Glu35": (0.34, 0.29, 0.25, 0.32)}
+    rows_g = {"Asn46": (0.46, 0.43, 0.41, 0.44, 0.38, 0.37, 0.41), "Glu35": (0.33, 0.29, 0.25, 0.32)}
+    assert smoke._verdicts_differ(native, gromacs, rows_n, rows_g) == (["Asn46"], [])
+    # The same areas on both routes, and different verdicts: not explained.
+    assert smoke._verdicts_differ(native, gromacs, rows_n, rows_n) == ([], ["Asn46"])
+    # A residue without a maximum (chain end) has no share to be near a threshold with.
+    assert smoke._verdicts_differ({"Asn59": (None, "x")}, {"Asn59": (None, "y")}, rows_n, rows_g) == \
+        ([], ["Asn59"])
+    text = ("## Solvent exposure of the catalytic residues\n\n| residue | largest possible (nm²) | at start | rep1 "
+            "| verdict |\n|---|---|---|---|---|\n| Asn59 | n/a | 0.24 | 0.21 ± 0.02 [0.18, 0.23] | one replica |\n"
+            "| Glu35 | 2.23 | 0.34 (15%) | 0.29 ± 0.03 [0.25, 0.32] (13%) | one replica |\n")
+    assert smoke._sasa_verdicts(text) == {"Asn59": (None, "one replica"), "Glu35": (2.23, "one replica")}

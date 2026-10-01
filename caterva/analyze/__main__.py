@@ -23,9 +23,12 @@ Caterva does the measuring itself, from the .xtc files it reads natively
 same measurements as GROMACS commands are written to analyze.sh, and
 `--gromacs` uses them instead, as a cross-check.
 
-Exit codes: 0 every quantity is a consistent result, 4 at least one is not
-(unconverged, replicas disagree, one sample), 2 malformed question,
-3 refused and said why (no finished run, no catalytic residues), 1 a crash.
+Exit codes: 0 every distance and angle is a consistent result, 4 at least
+one is not (unconverged, replicas disagree, one sample), 2 malformed
+question, 3 refused and said why (no finished run, no catalytic residues),
+1 a crash. The verdicts on the hydrogen bonds, rotamers, faces, water and
+solvent exposure do not set it; each says "not yet a result" in the report
+while the distances are not consistent.
 """
 from __future__ import annotations
 
@@ -282,6 +285,11 @@ class Analysis:
     #: Solvent-accessible area of each catalytic residue; None when it was
     #: not measured.
     sasa: Optional[List["Exposure"]] = None
+    #: Which route measured the areas, "native" or "gromacs": the two place
+    #: their points differently, and the section says which was used.
+    sasa_route: str = "native"
+    #: Why the areas were not measured, when they were not (sasa_unmeasurable).
+    sasa_not_measured: Optional[str] = None
 
     @property
     def distances_consistent(self) -> bool:
@@ -308,8 +316,12 @@ class Analysis:
     def all_consistent(self) -> bool:
         """For the exit code: every distance and every angle is a consistent
         result. The angles count here although they do not gate the other
-        sections: each carries a replica verdict in the report, and exit 0
-        promises that every quantity printed with one reads consistent."""
+        sections, because their verdict is the same kind as the distances'
+        (do the replicas agree on a measured value). The hydrogen bonds,
+        rotamers, faces, water and solvent exposure carry verdicts too, but
+        they classify against chosen thresholds, and each says "not yet a
+        result" while the distances are not consistent; they do not set the
+        exit code, as the module docstring and --help say."""
         return self.distances_consistent and all(t.summary.verdict == "consistent" for t in self.angles)
 
 
@@ -377,6 +389,10 @@ def _gromacs_output(path: Path, what: str, columns: int) -> List[List[float]]:
     if not path.exists():
         raise AnalyzeError(f"{path} does not exist: run analyze.sh again (it measures {what})")
     cols = read_columns(path)
+    if not cols:
+        # Headers and no rows: a gmx run that stopped before its first
+        # frame. "0 columns" would send the reader looking for the wrong fault.
+        raise AnalyzeError(f"{path} has no frames of {what}: run analyze.sh again")
     if len(cols) != columns + 1:
         raise AnalyzeError(f"{path} has {max(len(cols) - 1, 0)} columns of {what}, the plan has {columns}: "
                            "run analyze.sh again")
@@ -448,24 +464,50 @@ def gromacs_water(directory: Path, p: Plan, reps: Sequence[Path]) -> List[Hydrat
 
 def _sasa_surface(directory: Path, p: Plan):
     """The protein of em.gro as a sasa.Surface for the catalytic residues,
-    or refused by name: a residue not in it, or numbered in two places (more
-    than one chain simulated), would give no residue's area."""
+    or refused by name: a residue not in it, or whose number belongs to two
+    residues (more than one chain simulated, or an insertion code), would
+    give no residue's area."""
     from caterva.analyze.sasa import Surface
+    gro = directory / "em.gro"
     try:
-        return Surface(_gro_atoms(directory / "em.gro"), [s.resnr for s in p.sites],
-                       protein=set(p.pocket) | set(p.rest))
+        return Surface(_gro_atoms(gro), [s.resnr for s in p.sites], protein=set(p.pocket) | set(p.rest),
+                       box=_gro_box(gro.read_text().splitlines()[-1]))
     except ValueError as e:
         raise AnalyzeError(f"solvent exposure: {e}") from None
 
 
-def _exposures(p: Plan, at_start: Sequence[float], per: Dict[int, List[Tuple[str, float, float, float, float]]]
-               ) -> List[Exposure]:
+def sasa_unmeasurable(directory: Path, p: Plan) -> Optional[str]:
+    """Why the solvent exposure cannot be measured on this system, or None.
+    A catalytic residue whose number belongs to two residues (more than one
+    chain simulated, which `caterva md` does by default, or an insertion
+    code), or one em.gro does not have, has no area of its own. Only the
+    section is dropped, with the reason in its place: refusing the whole
+    analysis for it would withhold the distances, RMSF, angles and water,
+    which were reported for such runs before this section existed. Those
+    sections share the underlying defect (`plan` merges atoms of the same
+    residue number), which this does not fix."""
+    if not p.sites or not (directory / "em.gro").exists():
+        return None
+    try:
+        _sasa_surface(directory, p)
+    except AnalyzeError as e:
+        return str(e).removeprefix("solvent exposure: ")
+    return None
+
+
+def _exposures(p: Plan, at_start: Sequence[float], per: Dict[int, List[Tuple[str, float, float, float, float]]],
+               in_chain: Optional[Sequence[bool]] = None) -> List[Exposure]:
     """One Exposure per catalytic residue, with whether it is inside the
-    chain (neither the first nor the last residue of protein.pdb), which
-    Tien et al.'s maxima need."""
-    residues = set(p.pocket) | set(p.rest)
-    ends = (min(residues), max(residues)) if residues else ()
-    return [Exposure(s.label, s.resname, float(at_start[i]), per[i], s.resnr not in ends)
+    chain, which Tien et al.'s maxima need: `in_chain`, a peptide bond on
+    both sides in em.gro (sasa.Surface.in_chain), as both routes give it.
+    Without em.gro, which analyze.sh reads too, so only a directory it has
+    not run in lacks it, the first and last residue numbers of protein.pdb
+    are the chain's ends and no break is seen."""
+    if in_chain is None:
+        residues = set(p.pocket) | set(p.rest)
+        ends = (min(residues), max(residues)) if residues else ()
+        in_chain = [s.resnr not in ends for s in p.sites]
+    return [Exposure(s.label, s.resname, float(at_start[i]), per[i], bool(in_chain[i]))
             for i, s in enumerate(p.sites)]
 
 
@@ -474,21 +516,32 @@ def gromacs_sasa(directory: Path, p: Plan, reps: Sequence[Path]) -> List[Exposur
     one column per catalytic residue, frame by frame) and, for the start,
     sasa_start.xvg from em.gro; summarised as the native route summarises
     its own. em.gro, when it is there, is checked as the native route checks
-    it, so a residue numbered in two chains is refused on both routes
-    rather than summed on this one."""
+    it (main asks sasa_unmeasurable first and does not call this when it
+    gives a reason), so a residue numbered in two chains is not summed on
+    this route while refused on the other."""
     from caterva.analyze.sasa import summarise_areas
     if not p.sites:
         return []
-    if (directory / "em.gro").exists():
-        _sasa_surface(directory, p)
-    what = "solvent-accessible area (the protein's, then each catalytic residue's)"
-    start = _gromacs_output(directory / "sasa_start.xvg", what, len(p.sites) + 1)
+    surface = _sasa_surface(directory, p) if (directory / "em.gro").exists() else None
+    what = "solvent-accessible area (one column for the whole protein, then one per catalytic residue)"
+
+    def areas(path: Path) -> List[List[float]]:
+        cols = _gromacs_output(path, what, len(p.sites) + 1)
+        if not all(math.isfinite(v) for c in cols[1:] for v in c):
+            # An area that is not a number is a damaged file, not a frame
+            # without solvent. Summarised, it would print the replica as
+            # "n/a" with the verdict "no frames", over frames that are valid.
+            raise AnalyzeError(f"{path} has an area that is not a number: run analyze.sh again")
+        return cols
+
+    start = areas(directory / "sasa_start.xvg")
     per: Dict[int, List[Tuple[str, float, float, float, float]]] = {i: [] for i in range(len(p.sites))}
     for r in reps:
-        cols = _gromacs_output(r / "sasa.xvg", what, len(p.sites) + 1)
+        cols = areas(r / "sasa.xvg")
         for i in range(len(p.sites)):
             per[i].append(summarise_areas(r.name, cols[i + 2]))
-    return _exposures(p, [start[i + 2][0] for i in range(len(p.sites))], per)
+    return _exposures(p, [start[i + 2][0] for i in range(len(p.sites))], per,
+                      surface.in_chain if surface is not None else None)
 
 
 def _gro_index(path: Path) -> Dict[Tuple[int, str], int]:
@@ -537,9 +590,9 @@ def _gro_atoms(path: Path):
              np.array([float(l[20 + 8 * k:28 + 8 * k]) for k in range(3)])) for l in lines[2:2 + n]]
 
 
-def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
+def measure_native(directory: Path, p: Plan, reps: Sequence[Path], sasa: bool = True
                    ) -> Tuple[List[DistanceResult], Flexibility, List["Occupancy"], List["Rotamer"],
-                              List[AngleResult], List[Hydration], List[Face], List[Exposure]]:
+                              List[AngleResult], List[Hydration], List[Face], Optional[List[Exposure]]]:
     """The same distances, RMSF, chi1, angles, faces, water counts and
     solvent-accessible areas as analyze.sh, and the hydrogen bonds it does
     not count, computed by Caterva from the trajectories it reads itself
@@ -601,7 +654,7 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
     oxygens = np.array(wat.water_oxygens(atoms), dtype=int)
     per_water: Dict[int, List[Tuple[str, float, float]]] = {i: [] for i in range(len(p.sites))}
     from caterva.analyze.sasa import summarise_areas
-    surface = _sasa_surface(directory, p) if p.sites else None
+    surface = _sasa_surface(directory, p) if p.sites and sasa else None
     per_area: Dict[int, List[Tuple[str, float, float, float, float]]] = {i: [] for i in range(len(p.sites))}
     for r in reps:
         traj = xtc.read(r / "md.xtc")
@@ -649,7 +702,9 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
     water = [Hydration(s.label, wat.count_frame(start_x, start_box, site_atoms[i], oxygens), per_water[i])
              for i, s in enumerate(p.sites)]
     faces = [_face(t, per_face[i]) for i, t in enumerate(p.faces)]
-    exposures = _exposures(p, surface.areas(start_x, start_box), per_area) if surface is not None else []
+    # sasa=False (sasa_unmeasurable gave a reason): None, not measured.
+    exposures = (_exposures(p, surface.areas(start_x, start_box), per_area, surface.in_chain)
+                 if surface is not None else ([] if sasa else None))
     return results, Flexibility(flex), occupancies, rotamers, angles, water, faces, exposures
 
 
@@ -1019,15 +1074,21 @@ def _area_cell(e: "Exposure", area: float, sd: Optional[float] = None, low: Opti
 
 
 def sasa_section(a: Analysis) -> List[str]:
-    from caterva.analyze.sasa import (BURIED, CHAIN_END, DOTS, EXPOSED, NO_FRAMES, ONE_REPLICA, PROBE_NM,
-                                      exposure_verdict)
+    from caterva.analyze.sasa import (BURIED, CHAIN_END, DOTS, EXPOSED, GMX_DOTS, NO_FRAMES, ONE_REPLICA,
+                                      PROBE_NM, exposure_verdict)
     L = ["", "## Solvent exposure of the catalytic residues", ""]
     if a.sasa is None:
-        return L + ["Not measured."]
+        return L + [f"Not measured: {a.sasa_not_measured}." if a.sasa_not_measured else "Not measured."]
     if not a.sasa:
         return L + ["No catalytic residue to measure."]
+    # The two routes place their points differently; the section names the
+    # method that produced these numbers, not the other route's.
+    method = (f"`gmx sasa`'s points, the double cubic lattice of Eisenhaber et al. (1995) J. Comput. Chem. "
+              f"16:273, -ndots {DOTS}, which it rounds up to {GMX_DOTS:,} per atom"
+              if a.sasa_route == "gromacs" else
+              f"Shrake & Rupley's method, {DOTS:,} points per atom on a golden-section spiral")
     L += ["How much of each catalytic residue's surface solvent can reach: its solvent-accessible area in "
-          f"nm² (Shrake & Rupley's dots, {DOTS} per atom; a {PROBE_NM:g} nm probe; Bondi's radii as GROMACS's "
+          f"nm² ({method}; a {PROBE_NM:g} nm probe; Bondi's radii as GROMACS's "
           "vdwradii.dat lists them, hydrogens included). The surface is the whole protein, since a residue's "
           "exposure is set by its neighbours; water and ions are not part of it, and `caterva md` simulates "
           "no ligand. The protein is made whole in each frame and its periodic images are not counted. At "
@@ -1050,12 +1111,16 @@ def sasa_section(a: Analysis) -> List[str]:
               f"at {EXPOSED:.0%} or above; partly exposed, in between. The start is judged by its area and each "
               "replica by its mean: \"throughout\" when every replica stays as the residue started, otherwise "
               "which replicas left that state, and \"replicas disagree\" when they did not all leave it the same "
-              "way. Two thresholds rather than one, so that a residue near a single boundary is not called "
-              "buried in one replica and exposed in the next by a few hundredths. The largest possible areas "
-              "are Tien et al. (2013) PLoS ONE 8:e80635, doi:10.1371/journal.pone.0080635, Table 1 (theoretical, "
-              "ALLOWED region): DSSP's areas, heavy atoms with DSSP's radii, so the share is a guide to how "
-              "exposed a residue is for its size, not a value on their scale (caterva/analyze/sasa.py says how "
-              "the two compare on real proteins). They have none for a residue at either end of the chain, "
+              "way. A replica whose mean crosses a threshold while the middle 95% of its frames still reaches "
+              "back into the starting state is named as such (\"buried in rep2 by its mean, with frames still "
+              "partly exposed\"), not as having left it, and does not make the replicas disagree: a mean near a "
+              "threshold can fall on its other side in another run of the same system. With one replica there "
+              "is no verdict, since it is about whether a change happens again in another run. The "
+              "largest possible areas are Tien et al. (2013) PLoS ONE 8:e80635, doi:10.1371/journal.pone.0080635, "
+              "Table 1 (theoretical, ALLOWED region): DSSP's areas, heavy atoms with DSSP's radii, so the share "
+              "is a guide to how exposed a residue is for its size, not a value on their scale "
+              "(caterva/analyze/sasa.py says how the two compare on real proteins). They have none for a residue "
+              "without a peptide bond on both sides in em.gro (either end of the chain, or beside a break), "
               "which gets no share and no verdict. Shrake & Rupley (1973) J. Mol. Biol. 79:351, "
               "doi:10.1016/0022-2836(73)90011-9."]
     return L
@@ -1073,8 +1138,10 @@ def build_parser(prog: str = "caterva analyze") -> argparse.ArgumentParser:
                                         "  active-site pocket's C-alpha RMSF against the rest of the protein.\n\n"
                                         "Examples:\n"
                                         f"  {prog} ldha-md\n  {prog} ldha-md --script-only\n"
-                                        "\nExit codes: 0 every quantity consistent, 4 at least one not a result, "
-                                        "2 malformed question, 3 refused and said why, 1 a crash."))
+                                        "\nExit codes: 0 every distance and angle consistent, 4 at least one\n"
+                                        "not a result, 2 malformed question, 3 refused and said why, 1 a crash.\n"
+                                        "The verdicts on hydrogen bonds, rotamers, faces, water and solvent\n"
+                                        "exposure do not set the exit code."))
     p.add_argument("directory", help="a finished `caterva md` setup")
     p.add_argument("--script-only", action="store_true",
                    help="write analyze.sh and stop; run it, then rerun without this flag")
@@ -1103,6 +1170,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
         p = plan(read_pdb(protein.read_text(), chain), residues)
         reps = replicas(d)
         chi1 = chi1_groups(d, p)
+        no_sasa = sasa_unmeasurable(d, p)
         if chi1:
             write_chi1_index(d, chi1)
         (d / "analyze.sh").write_text(script(p, [r.name for r in reps] or ["rep1"], chi1))
@@ -1122,14 +1190,16 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
                 run_gromacs(d, p, reps, gmx, chi1)
             distances, flex, rotamers = measure(d, p, reps, chi1)
             angles, water = gromacs_angles(p, reps), gromacs_water(d, p, reps)
-            faces, exposure = gromacs_faces(p, reps), gromacs_sasa(d, p, reps)
+            faces, exposure = gromacs_faces(p, reps), (gromacs_sasa(d, p, reps) if no_sasa is None else None)
             hbonds = None
         else:
-            distances, flex, hbonds, rotamers, angles, water, faces, exposure = measure_native(d, p, reps)
+            distances, flex, hbonds, rotamers, angles, water, faces, exposure = measure_native(
+                d, p, reps, sasa=no_sasa is None)
     except AnalyzeError as e:
         print(f"caterva analyze: {e}", file=sys.stderr)
         return 3
-    a = Analysis(pdb, chain, source, p, distances, flex, hbonds, rotamers, angles, water, faces, exposure)
+    a = Analysis(pdb, chain, source, p, distances, flex, hbonds, rotamers, angles, water, faces, exposure,
+                 sasa_route="gromacs" if args.gromacs or args.no_run else "native", sasa_not_measured=no_sasa)
     text = "\n".join(report(a)) + "\n"
     print(text, end="")
     (d / "ANALYSIS.md").write_text(text, encoding="utf-8")

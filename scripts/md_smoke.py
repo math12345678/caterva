@@ -24,7 +24,7 @@ OUT = ROOT / "md-smoke"
 if str(ROOT) not in sys.path:  # run as scripts/md_smoke.py, the checkout is not on the path
     sys.path.insert(0, str(ROOT))
 
-from caterva.analyze.sasa import ROUTES_AGREE_NM2  # noqa: E402
+from caterva.analyze.sasa import routes_agree_nm2, state  # noqa: E402
 
 
 def _distance_rows(text: str) -> dict:
@@ -160,12 +160,19 @@ def _water_rows(text: str) -> dict:
     return _table_rows(text, "## Water at the catalytic residues")
 
 
-#: How far apart two printed areas (nm^2) of the same residue may be: the
-#: routes' own difference for one residue in one frame (ROUTES_AGREE_NM2,
-#: 0.02, measured rather than picked: caterva/analyze/sasa.py), plus 0.01,
-#: because the table prints each area to 0.01 and the two roundings can add
-#: that much to a difference.
-SASA_PRINTED_NM2 = ROUTES_AGREE_NM2 + 0.01
+#: What the table's rounding can add to the difference between two printed
+#: areas (nm^2): each is printed to 0.01, so each can be up to 0.005 from
+#: the area it stands for.
+SASA_ROUNDING_NM2 = 0.01
+
+
+def sasa_allowed(a: float, b: float) -> float:
+    """How far apart two printed areas (nm^2) of the same residue may be:
+    the routes' own difference for a residue that size
+    (caterva/analyze/sasa.py routes_agree_nm2, which grows with the area:
+    set from 11,514 measured residue areas, not picked), taken at the larger
+    of the two areas it could stand for, plus the rounding."""
+    return routes_agree_nm2(max(a, b) + SASA_ROUNDING_NM2 / 2) + SASA_ROUNDING_NM2
 
 
 def _sasa_rows(text: str) -> dict:
@@ -191,16 +198,50 @@ def _sasa_rows(text: str) -> dict:
     return out
 
 
+def _sasa_verdicts(text: str) -> dict:
+    """residue -> (largest possible area as printed, or None, and the
+    verdict cell), from the solvent-exposure table."""
+    out = {}
+    for label, cells in _table_rows(text, "## Solvent exposure of the catalytic residues").items():
+        largest = re.match(r"(\d+\.\d+)$", cells[0]) if cells else None
+        out[label] = (float(largest.group(1)) if largest else None, cells[-1] if cells else "")
+    return out
+
+
+def _verdicts_differ(native: dict, gromacs: dict, rows_n: dict, rows_g: dict) -> tuple:
+    """(explained, unexplained) residues whose verdicts differ between the
+    routes. The areas agree only to a tolerance, so a share near 20% or 40%
+    can round into a different state on each route, and the verdict with
+    it: that difference is explained when some pair of the routes' areas
+    (the start, a replica's mean or an end of its middle-95% range, all of
+    which the verdict reads) fall in different states. A difference in the
+    verdicts with every pair in the same state is the verdict logic
+    disagreeing with itself, which is a failure."""
+    explained, unexplained = [], []
+    for label in native:
+        if native[label][1] == gromacs.get(label, (None, None))[1]:
+            continue
+        largest = native[label][0]
+        pairs = list(zip(rows_n.get(label, ()), rows_g.get(label, ())))
+        near = largest is not None and any(state(round(a / largest, 2)) != state(round(b / largest, 2))
+                                           for a, b in pairs)
+        (explained if near else unexplained).append(label)
+    return explained, unexplained
+
+
 def _sasa_agree(native: dict, gromacs: dict) -> tuple:
-    """(agree, largest difference) between two routes' solvent-exposure rows:
-    the same residues, rows of the same shape, and every area within
-    SASA_PRINTED_NM2. An empty table is not agreement."""
+    """(agree, largest difference, its allowance) between two routes'
+    solvent-exposure rows: the same residues, rows of the same shape, and
+    every pair of areas within sasa_allowed. The difference reported is the
+    one nearest its allowance. An empty table is not agreement."""
+    nan = float("nan")
     if not native or native.keys() != gromacs.keys():
-        return False, float("nan")
+        return False, nan, nan
     if any(len(native[k]) != len(gromacs[k]) or not native[k] for k in native):
-        return False, float("nan")
-    worst = max(abs(a - b) for k in native for a, b in zip(native[k], gromacs[k]))
-    return worst <= SASA_PRINTED_NM2 + 1e-9, worst
+        return False, nan, nan
+    pairs = [(abs(a - b), sasa_allowed(a, b)) for k in native for a, b in zip(native[k], gromacs[k])]
+    worst, allowed = max(pairs, key=lambda p: p[0] / p[1])
+    return all(d <= limit + 1e-9 for d, limit in pairs), worst, allowed
 
 
 def main() -> int:
@@ -243,7 +284,7 @@ def main() -> int:
     # select and sasa. The distance, flexibility, rotamer, angle, face, water
     # and solvent-exposure tables must agree, so this job checks the native
     # reader and geometry against GROMACS on every run.
-    tables, flex, rot, ang, wet, face, area = {}, {}, {}, {}, {}, {}, {}
+    tables, flex, rot, ang, wet, face, area, exposed = {}, {}, {}, {}, {}, {}, {}, {}
     for route, extra in (("native", []), ("gromacs", ["--gromacs"])):
         code = subprocess.run([sys.executable, "-m", "caterva.app", "analyze", str(OUT), *extra],
                               cwd=ROOT, env={**os.environ, "GMX": gmx}).returncode
@@ -258,6 +299,7 @@ def main() -> int:
         wet[route] = _water_rows(text)
         face[route] = _face_rows(text)
         area[route] = _sasa_rows(text)
+        exposed[route] = _sasa_verdicts(text)
     if not (OUT / "rep2" / "catalytic.xvg").exists():
         print("FAIL: caterva analyze --gromacs wrote no catalytic.xvg")
         return 1
@@ -325,14 +367,23 @@ def main() -> int:
     if not (OUT / "rep2" / "sasa.xvg").exists():
         print("FAIL: caterva analyze --gromacs wrote no rep2/sasa.xvg")
         return 1
-    areas_ok, worst_s = _sasa_agree(area["native"], area["gromacs"])
+    areas_ok, worst_s, allowed_s = _sasa_agree(area["native"], area["gromacs"])
     if not areas_ok:
-        print(f"FAIL: native and GROMACS solvent-accessible areas differ (largest {worst_s:.2f} nm², allowed "
-              f"{SASA_PRINTED_NM2:g}): {area['native']} vs {area['gromacs']}")
+        print(f"FAIL: native and GROMACS solvent-accessible areas differ (the difference nearest its "
+              f"allowance is {worst_s:.2f} nm², allowed {allowed_s:.3f}): {area['native']} vs {area['gromacs']}")
         return 1
     print(f"OK: native and GROMACS agree on the solvent-accessible area of {len(area['native'])} catalytic "
-          f"residues, at the start and per replica (largest difference in the printed areas {worst_s:.2f} "
-          f"nm²; allowed {SASA_PRINTED_NM2:g}).")
+          f"residues, at the start and per replica (the difference in the printed areas nearest its "
+          f"allowance: {worst_s:.2f} nm², allowed {allowed_s:.3f}, which grows with the area).")
+    near, wrong = _verdicts_differ(exposed["native"], exposed["gromacs"], area["native"], area["gromacs"])
+    if wrong:
+        print(f"FAIL: native and GROMACS exposure verdicts differ on {', '.join(wrong)} although every area "
+              f"falls in the same state on both routes: {exposed['native']} vs {exposed['gromacs']}")
+        return 1
+    print(f"OK: native and GROMACS give the same exposure verdict for {len(exposed['native']) - len(near)} "
+          "catalytic residues" + (f"; {', '.join(near)} differ because an area sits within the routes' "
+                                  "tolerance of a threshold (20% or 40%) and rounds into another state on "
+                                  "each, as the areas are allowed to" if near else "") + ".")
     print("OK: minimisation, then NVT, NPT, production and RMSD for two replicas, the summary, "
           "and the enzyme analysis.")
     return 0

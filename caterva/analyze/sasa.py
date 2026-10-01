@@ -42,16 +42,22 @@ the start. The GROMACS route asks `gmx sasa` for the same (-nopbc; it
 makes molecules whole from the tpr itself).
 
 THE POINTS. `sphere(n)`: the golden-section spiral, deterministic and
-equal-area. DOTS = 2000, chosen by convergence on lysozyme's minimised,
-solvated structure from a real `caterva md` run (em.gro, 1,960 protein
-atoms, 129 residues) and five frames of each of its two replicas: against
-the same areas with 20,000 points, 2,000 put every residue's area within
-0.011 nm^2 in every one of those 11 structures (root mean square 0.0024
-nm^2), where 1,000 left it within 0.019 and 4,000 within 0.006. The report
-prints areas to 0.01 nm^2, which 2,000 points hold. On em.gro alone,
-against 50,000 points, every atom's area was within 0.0036 nm^2 at 2,000
-and 0.0066 at 1,000. caterva/tests/test_sasa.py checks this convergence
-on the committed T4 lysozyme structure.
+equal-area. DOTS = 2000 is a choice between accuracy and time, measured on
+eight lysozyme runs of scripts/md_smoke.py (each: em.gro, 1,960 protein
+atoms in 129 residues, and five frames of each of two replicas; 88
+structures in all; the runs are not committed) against the same areas
+with 20,000 points. At 2,000 points the largest error of any residue's
+area in one structure was between 0.0098 and 0.0157 nm^2 in the eight
+runs (root mean square 0.0023 to 0.0024 in each). On four of them,
+1,000 points left it within 0.017 to 0.025, and 4,000 within 0.0061 to
+0.0070, for about 1.4 times the time (0.34 s a frame of em.gro against
+0.24 s at 2,000, fastest of five, on a machine at load average 34). The table prints areas to 0.01 nm^2,
+so the area of a single structure, the one at the start, can be off by
+one or two in its last printed digit. A replica's mean is steadier,
+because each frame turns the protein against the fixed points: over only
+five frames the means were within 0.0052 nm^2 in all eight runs, and a
+real run has hundreds of frames or more. caterva/tests/test_sasa.py
+checks the convergence on the committed T4 lysozyme structure.
 
 HOW IT IS FAST ENOUGH. Shrake & Rupley's whole cost is testing every point
 of every atom against every neighbour whose grown sphere overlaps it.
@@ -71,17 +77,28 @@ route, about three times the reading.
 CHECKED AGAINST `gmx sasa` (GROMACS 2026.1), which uses a different set of
 points, the double cubic lattice method of Eisenhaber et al. (1995) J.
 Comput. Chem. 16:273, doi:10.1002/jcc.540160303. The two converge on the
-same areas: on lysozyme's em.gro, gmx sasa at -ndots 10000 was within
-0.0035 nm^2 of Caterva at 50,000 points on every residue, and its total
-of 66.355 nm^2 against 66.360. At 2,000 points each (the GROMACS route
-asks for -ndots DOTS), over the 11 structures above, the two routes'
-residue areas differed by at most 0.0145 nm^2 (root mean square 0.0033),
-which is the two point sets' error added. The committed checks are in
-caterva/tests/test_sasa.py: an isolated atom, two overlapping atoms
-against the spherical caps worked out by hand, and the per-residue areas
-`gmx sasa` printed for a committed structure (every residue of T4
-lysozyme) and a committed trajectory (lysozyme's catalytic residues, frame
-by frame).
+same areas: on the committed T4 lysozyme structure, with 10,000 points
+each, every residue agreed to 0.0044 nm^2 (root mean square 0.0013), and
+on the em.gro of one of the lysozyme runs above, gmx sasa at 10,000 points
+was within 0.0035 nm^2 of Caterva at 50,000 on every residue (totals
+66.356 and 66.361 nm^2). As the two routes run (2,000 points here, and
+-ndots 2000 there, which gmx rounds up to 2,252: GMX_DOTS), they
+differ by the two point sets' errors added, and the difference grows
+with the surface a residue exposes. Over the eight lysozyme runs above
+(all 129 residues in each of the 88 structures, each structure written
+out whole and given to both) and T4 lysozyme's 162 residues, 11,514
+residue areas in all, the root mean square difference was about 0.0047
+sqrt(area) nm^2 (area in nm^2) above 0.1 nm^2; the largest was 0.0205
+nm^2, on Arg45 with 1.80 nm^2 exposed, and below 0.1 nm^2 none exceeded
+0.0058. A single bound for every residue, set from the catalytic
+residues of one run, would not hold: 0.02 nm^2 was exceeded by that
+arginine. `routes_agree_nm2` is the bound the routes are held to, set
+from these measurements. The lysozyme runs are not committed. The
+committed checks, in caterva/tests/test_sasa.py, are an isolated atom;
+two overlapping atoms against the spherical caps worked out by hand;
+every residue of T4 lysozyme against `gmx sasa` at 10,000 points and at
+2,000; and the six catalytic residues of 21 committed lysozyme frames
+against the command analyze.sh runs, frame by frame.
 
 WHAT IS REPORTED, per catalytic residue: the area in em.gro, the
 minimised, solvated structure every replica began from (not the crystal's
@@ -105,16 +122,29 @@ residue's all-atom area exceeds Tien's maximum for its type (the largest
 fraction is 0.96, Thr47; median 0.23 over the 127 residues that are not
 chain ends), and on the committed T4 lysozyme structure none does either
 (largest 0.82, median 0.24, 160 residues). Tien et al. give no maxima for
-chain ends, so a catalytic residue at either end of the chain has no
-fraction and no verdict.
+chain-terminating residues, which lack a peptide bond on one side, so a
+catalytic residue that lacks one in em.gro (`Surface.in_chain`: the first
+or last residue of the chain, or one beside a break in it) has no fraction
+and no verdict.
 
 VERDICTS. With the fraction f: buried below BURIED (0.20), exposed at
 EXPOSED (0.40) or above, partly exposed in between. The start is judged by
 its area and each replica by its mean, each as the table prints it (to a
 whole per cent), so that a verdict can be checked against the numbers
-beside it. Two thresholds rather than one, so that a residue near a single
-boundary is not called buried in one replica and exposed in the next by a
-few hundredths. Both are choices, printed with the table.
+beside it. With one replica there is no verdict, as for the water: the
+verdict says whether a change from the start happens again in another
+run, which one run cannot say. Two thresholds rather than one, so that
+buried and exposed are never a few hundredths apart. That does not keep a
+mean near either threshold from falling on either side of it in another
+run of the same system, or on the other route: lysozyme's Asn46 was at
+19% of its maximum in rep2 of one scripts/md_smoke.py run, and buried by
+that, and at 20% in the next. So a replica whose mean crosses a threshold
+while its middle 95% of frames still reaches back into the starting state
+is reported as such ("buried in rep2 by its mean, with frames still
+partly exposed"), not as having left it, and does not make the replicas
+disagree (`exposure_verdict`). The start is one structure with no spread,
+so a start near a threshold is only as firm as the share printed for it.
+Both thresholds are choices, printed with the table.
 """
 from __future__ import annotations
 
@@ -138,25 +168,38 @@ RADII_NM: Tuple[Tuple[str, float], ...] = (
     ("Cl", 0.175),
 )
 
-#: Points per atom (module docstring: THE POINTS). The GROMACS route asks
-#: `gmx sasa` for as many (-ndots), so the two carry about the same
-#: discretisation error.
+#: Points per atom (module docstring: THE POINTS). The GROMACS route passes
+#: the same number to `gmx sasa -ndots`, which rounds it up to the next
+#: size of its icosahedral tessellation (10 k^2 + 2 points), so the two
+#: carry about the same discretisation error, not the same points.
 DOTS = 2000
+
+#: How many points `gmx sasa -ndots DOTS` places per atom: counted in the
+#: dots `gmx sasa -q` wrote for one isolated atom (GROMACS 2026.1; 10,242
+#: for -ndots 10000). The GROMACS route's section says this number, not
+#: DOTS, since that is what its areas were measured with.
+GMX_DOTS = 2252
 
 #: Patches the points are grouped into (`atom_areas`). Any number gives the
 #: same areas; 64 was the fastest on lysozyme.
 PATCHES = 64
 
-#: The largest difference expected between the two routes' areas (nm^2) of
-#: one residue in one frame, from their different point sets at DOTS points
-#: each (module docstring, CHECKED AGAINST): at most 0.0145 over the 1,419
-#: residue-frames of a lysozyme run, 0.0096 over the 126 catalytic
-#: residue-frames of the committed lysozyme frames, and 0.0076 over the 66
-#: of a later smoke run (both replicas and em.gro), rounded up. The smoke
-#: run (scripts/md_smoke.py) and caterva/tests/test_sasa.py hold the routes
-#: to it. A mean over frames, and a percentile of them, can differ by no
-#: more than the largest single frame does.
-ROUTES_AGREE_NM2 = 0.02
+#: The two routes' areas of one residue in one frame, at DOTS points each,
+#: are held to within ROUTES_AGREE_NM times the square root of the
+#: residue's area, and never less than ROUTES_AGREE_FLOOR_NM2
+#: (`routes_agree_nm2`). One number for every residue would not do: the
+#: difference is the two point sets' errors added, and it grows with the
+#: surface a residue exposes (module docstring, CHECKED AGAINST). Over the
+#: 11,514 residue areas measured there, no difference came nearer this
+#: bound than 0.71 of it (0.0082 nm^2 against 0.0115, Phe3 with 0.15 nm^2
+#: exposed), and the largest difference was 0.51 of it (0.0205 against
+#: 0.0402, Arg45 with 1.80 nm^2); on T4 lysozyme alone, at most 0.52. The
+#: factor and the floor are choices made from those measurements, not
+#: limits derived from the two methods, and margins set from a few runs
+#: can shrink as runs are added: when they were set, a factor of 0.025
+#: from three runs had left a fifth within 0.86 of it at Phe3.
+ROUTES_AGREE_NM = 0.03
+ROUTES_AGREE_FLOOR_NM2 = 0.0075
 
 #: Residues `caterva md` adds around the protein: water (pdb2gmx and gmx
 #: solvate name it SOL) and genion's ions (-pname NA -nname CL). Everything
@@ -164,10 +207,29 @@ ROUTES_AGREE_NM2 = 0.02
 SOLVENT = ("SOL", "NA", "CL")
 
 #: The same surface as a `gmx sasa -surface` selection: the default index
-#: group GROMACS builds from residue names. It holds exactly the atoms the
-#: native route takes (1,960 on lysozyme's em.gro), and CI compares the two
-#: routes' areas on every run.
+#: group GROMACS builds from residue names (share/top/residuetypes.dat),
+#: where the native route takes protein.pdb's residues less SOLVENT. The two
+#: hold the same atoms on lysozyme's em.gro (1,960) and T4 lysozyme's
+#: (2,603), the only systems they have been compared on. They could differ:
+#: a residue pdb2gmx builds but residuetypes.dat does not call a protein
+#: residue would be in the native surface and not in gmx's. CI compares the
+#: two routes' areas on lysozyme only.
 SURFACE_GROUP = "Protein"
+
+#: A C-N distance (nm) below this is a peptide bond (`Surface.in_chain`):
+#: well above the bond's 0.133 nm, and well below the 0.325 nm at which
+#: the van der Waals spheres of an unbonded C and N (RADII_NM) touch.
+PEPTIDE_BOND_NM = 0.2
+
+
+def routes_agree_nm2(area: float) -> float:
+    """How far apart the two routes' areas (nm^2) of one residue in one
+    frame may be, for a residue with this area (nm^2): ROUTES_AGREE_NM
+    sqrt(area), at least ROUTES_AGREE_FLOOR_NM2. A mean or a percentile of
+    frames differs between the routes by no more than the frames do, and
+    this bound changes little over one residue's frames, so the smoke run
+    (scripts/md_smoke.py) applies it to those at their own values."""
+    return max(ROUTES_AGREE_FLOOR_NM2, ROUTES_AGREE_NM * math.sqrt(max(float(area), 0.0)))
 
 
 def radius(name: str) -> float:
@@ -175,7 +237,13 @@ def radius(name: str) -> float:
     longest prefix of it, the first such entry on a tie. vdwradii.dat is
     read that way ("longest matches are used"), and every atom name
     pdb2gmx writes for a protein starts with its element (CA, HB1, OD2,
-    SG). A name no entry starts is refused rather than given a guess."""
+    SG). A name no entry starts is refused rather than given a guess.
+    Only the file's element entries ("???" for any residue) are kept: its
+    residue-specific entries give radius 0 to virtual-site masses (GLY MN1,
+    ALA MCB1) and to the charge sites of 4-site water (SOL MW), which a
+    `caterva md` system (amber99sb-ildn, no virtual sites, water excluded)
+    does not have. Such a name is refused here, where gmx would give it no
+    area; if virtual sites are ever added, those entries belong here."""
     best, length = None, 0
     for prefix, r in RADII_NM:
         if name.startswith(prefix) and len(prefix) > length:
@@ -313,6 +381,12 @@ def atom_areas(x: np.ndarray, radii: np.ndarray, probe: float = PROBE_NM, dots: 
     n = len(x)
     if n == 0:
         return np.zeros(0)
+    if not np.all(np.isfinite(x)):
+        # A NaN atom falls in no cell of the grid, so it would have no
+        # neighbours: it and the atoms around it would keep their whole
+        # area, with nothing said.
+        raise ValueError(f"{int((~np.isfinite(x).all(1)).sum())} of {n} atoms have a coordinate that is "
+                         "not a finite number")
     u = sphere(dots)
     label, centres, spread, members = _patches(dots, patches)
     I, J = neighbour_pairs(x, R)
@@ -373,9 +447,11 @@ def surface_atoms(atoms: Sequence[Tuple[int, str, str, np.ndarray]],
 def residue_members(atoms: Sequence[Tuple[int, str, str, np.ndarray]], surface: Sequence[int],
                     resnr: int) -> np.ndarray:
     """Positions in `surface` of residue `resnr`'s atoms. Refused when the
-    residue is not in it, or when its number appears in two places (two
-    chains simulated with the same numbering): an area summed over both
-    would be no residue's."""
+    residue is not in it, or when its number belongs to two residues: two
+    chains simulated with the same numbering, or two neighbours told apart
+    only by a PDB insertion code (52 and 52A), which a .gro file drops. An
+    area summed over both would be no residue's, and `gmx sasa`'s `resnr`
+    selection would sum the same two."""
     where = np.array([k for k, i in enumerate(surface) if atoms[i][0] == resnr], dtype=int)
     if not len(where):
         raise ValueError(f"residue {resnr} has no atoms in the protein")
@@ -383,18 +459,62 @@ def residue_members(atoms: Sequence[Tuple[int, str, str, np.ndarray]], surface: 
         raise ValueError(f"residue number {resnr} appears in more than one place in the protein (more "
                          "than one chain simulated?); its solvent exposure needs one chain: `caterva md "
                          "--chain`")
+    names = [atoms[surface[k]][2] for k in where]
+    if len(set(names)) != len(names):
+        twice = sorted({n for n in names if names.count(n) > 1})
+        raise ValueError(f"residue number {resnr} has two atoms named {', '.join(twice)}, so it numbers two "
+                         "residues (a PDB insertion code, which a .gro file drops?); its solvent exposure "
+                         "would be the sum of both")
     return where
+
+
+def peptide_bonded(atoms: Sequence[Tuple[int, str, str, np.ndarray]], surface: Sequence[int],
+                   where: Sequence[int], box: Optional[np.ndarray] = None) -> bool:
+    """Whether the residue at positions `where` of `surface` has a peptide
+    bond on both sides: its N within PEPTIDE_BOND_NM of the C of the residue
+    before it in the structure, and its C of the N of the residue after.
+    Not by residue number, which can skip where nothing is missing (a
+    numbering that follows a homologue's) or run on across a break. `box`,
+    when given, is the periodic box, and the bond is measured to the
+    nearest image. A residue without N or C, or next to one, has no bond
+    there."""
+    def residue_at(k: int, step: int) -> List[int]:
+        r, out = atoms[surface[k]][0], []
+        while 0 <= k < len(surface) and atoms[surface[k]][0] == r:
+            out.append(k)
+            k += step
+        return out
+
+    def position(ks: Sequence[int], name: str) -> Optional[np.ndarray]:
+        found = [atoms[surface[k]][3] for k in ks if atoms[surface[k]][2] == name]
+        return np.asarray(found[0], float) if found else None
+
+    from caterva.md.xtc import nearest_image
+    if where[0] == 0 or where[-1] == len(surface) - 1:
+        return False
+    ends = (position(residue_at(where[0] - 1, -1), "C"), position(where, "N"),
+            position(where, "C"), position(residue_at(where[-1] + 1, 1), "N"))
+    if any(e is None for e in ends):
+        return False
+    for a, b in ((ends[0], ends[1]), (ends[2], ends[3])):
+        d = b - a if box is None else nearest_image(b - a, box)[0]
+        if float(np.sqrt((d * d).sum())) >= PEPTIDE_BOND_NM:
+            return False
+    return True
 
 
 class Surface:
     """The protein of one system, ready to measure: its atoms, their radii,
-    and which of them belong to each residue asked about."""
+    which of them belong to each residue asked about, and whether each of
+    those residues is inside the chain (`peptide_bonded`, in the structure
+    given), which Tien et al.'s maxima need."""
 
     def __init__(self, atoms: Sequence[Tuple[int, str, str, np.ndarray]], residues: Sequence[int],
-                 protein: Optional[Collection[int]] = None):
+                 protein: Optional[Collection[int]] = None, box: Optional[np.ndarray] = None):
         self.index = np.array(surface_atoms(atoms, protein), dtype=int)
         self.radii = np.array([radius(atoms[i][2]) for i in self.index])
         self.members = [residue_members(atoms, self.index, r) for r in residues]
+        self.in_chain = [peptide_bonded(atoms, self.index, m, box) for m in self.members]
 
     def areas(self, x: np.ndarray, box: np.ndarray) -> List[float]:
         """Each residue's area (nm^2) in one frame of the whole system: the
@@ -451,7 +571,8 @@ class Exposure:
     at_start: float
     #: (replica, mean, SD, 2.5th percentile, 97.5th percentile), nm^2
     per_replica: List[Tuple[str, float, float, float, float]]
-    #: False for the first or last residue of the chain, which Tien et al.
+    #: False for a residue without a peptide bond on both sides (the first
+    #: or last of the chain, or one beside a break in it), which Tien et al.
     #: give no maximum for.
     in_chain: bool = True
 
@@ -492,11 +613,26 @@ def no_maximum(resname: str) -> str:
     return f"no maximum area for {resname}"
 
 
+#: The three states in order of exposure, so that a replica's range of
+#: frames can be asked whether it spans the starting state.
+STATES = ("buried", "partly exposed", "exposed")
+
+
 def exposure_verdict(e: Exposure) -> str:
     """The residue's state at the start against its state in each replica:
     "buried throughout", "buried at the start, exposed in every replica",
     or, when the replicas differ, which of them left the starting state
-    ("buried at the start, exposed in rep2; replicas disagree")."""
+    ("buried at the start, exposed in rep2; replicas disagree").
+
+    A replica whose mean is in another state, but whose middle 95% of
+    frames still reaches back into the starting state, has not clearly
+    left it: its mean sits near a threshold, and another run of the same
+    system can put it on the other side (lysozyme's Asn46 was at 19% of its
+    maximum in rep2 of one scripts/md_smoke.py run, with frames from 17% to
+    23%, and at 20% in the next). Such a replica is named with "by its mean,
+    with frames still <start state>", and it is not counted towards
+    "replicas disagree", which is kept for replicas that each clearly stayed
+    or clearly left."""
     if not e.in_chain:
         return CHAIN_END
     if e.max_area is None:
@@ -505,20 +641,34 @@ def exposure_verdict(e: Exposure) -> str:
         return NO_FRAMES
     if len(e.per_replica) < 2:
         return ONE_REPLICA
+
     # Judged on the share as the table prints it (a whole per cent), so a
     # residue shown at 20% is not called buried below 20%.
-    start = state(round(e.relative(e.at_start), 2))
-    states = [state(round(e.relative(m), 2)) for m in e.means]
-    if all(s == start for s in states):
+    def judged(area: float) -> str:
+        return state(round(e.relative(area), 2))
+
+    start = judged(e.at_start)
+    clear: List[Tuple[str, str]] = []    # (replica, state) where the replica clearly stayed or left
+    near: List[Tuple[str, str]] = []     # (replica, state by its mean) where its frames reach back
+    for name, mean, _, low, high in e.per_replica:
+        s = judged(mean)
+        reach = [STATES.index(judged(v)) for v in (low, high) if not math.isnan(v)]
+        if s != start and reach and min(reach) <= STATES.index(start) <= max(reach):
+            near.append((name, s))
+        else:
+            clear.append((name, s))
+    if not near and all(s == start for _, s in clear):
         return f"{start} throughout"
-    if len(set(states)) == 1:
-        return f"{start} at the start, {states[0]} in every replica"
+    if not near and len({s for _, s in clear}) == 1:
+        return f"{start} at the start, {clear[0][1]} in every replica"
     moved: Dict[str, List[str]] = {}
-    for (name, *_), s in zip(e.per_replica, states):
+    for name, s in clear:
         if s != start:
             moved.setdefault(s, []).append(name)
-    return (f"{start} at the start, " + ", ".join(f"{s} in {' and '.join(names)}" for s, names in moved.items())
-            + "; replicas disagree")
+    parts = [f"{s} in {' and '.join(names)}" for s, names in moved.items()]
+    parts += [f"{s} in {name} by its mean, with frames still {start}" for name, s in near]
+    disagree = len({s for _, s in clear}) > 1
+    return f"{start} at the start, " + ", ".join(parts) + ("; replicas disagree" if disagree else "")
 
 
 def output_selection(resnr: int) -> str:
@@ -530,11 +680,14 @@ def output_selection(resnr: int) -> str:
 
 def gmx_options() -> str:
     """The `gmx sasa` options that make its surface this module's: the same
-    atoms, probe and number of points, no periodic images."""
+    atoms, probe and number of points asked for (gmx rounds -ndots up: GMX_DOTS),
+    no periodic images."""
     return f"-surface {SURFACE_GROUP} -probe {PROBE_NM:g} -ndots {DOTS} -nopbc"
 
 
-__all__ = ["PROBE_NM", "RADII_NM", "DOTS", "PATCHES", "ROUTES_AGREE_NM2", "SOLVENT", "SURFACE_GROUP", "radius", "sphere",
-           "neighbour_pairs", "atom_areas", "surface_atoms", "residue_members", "Surface", "summarise_areas",
-           "TIEN_MAX_A2", "BURIED", "EXPOSED", "Exposure", "state", "exposure_verdict", "CHAIN_END",
+__all__ = ["PROBE_NM", "RADII_NM", "DOTS", "GMX_DOTS", "PATCHES", "ROUTES_AGREE_NM", "ROUTES_AGREE_FLOOR_NM2",
+           "routes_agree_nm2", "SOLVENT", "SURFACE_GROUP", "PEPTIDE_BOND_NM", "radius", "sphere",
+           "neighbour_pairs", "atom_areas", "surface_atoms", "residue_members", "peptide_bonded", "Surface",
+           "summarise_areas",
+           "TIEN_MAX_A2", "BURIED", "EXPOSED", "Exposure", "state", "STATES", "exposure_verdict", "CHAIN_END",
            "NO_FRAMES", "ONE_REPLICA", "no_maximum", "output_selection", "gmx_options"]
