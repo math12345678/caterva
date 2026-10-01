@@ -140,6 +140,9 @@ export function MoleculeViewer({ coordinates, highlight = [], selected = null, o
   useEffect(
     () => () => {
       if (frameRequest.current) cancelAnimationFrame(frameRequest.current);
+      // A remount (React's StrictMode runs every effect twice in development)
+      // must be able to ask for a frame again.
+      frameRequest.current = 0;
     },
     [],
   );

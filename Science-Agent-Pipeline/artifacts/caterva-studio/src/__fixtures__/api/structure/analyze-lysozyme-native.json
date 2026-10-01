@@ -1,12 +1,12 @@
 {
  "kind": "analyze",
  "request": {
-  "directory": "/tmp/claude-501/caterva-fixtures-7kk_bdkk/lyso-md"
+  "directory": "/tmp/claude-501/caterva-fixtures-fi2et7n_/lyso-md"
  },
  "cli": [
   "caterva",
   "analyze",
-  "/private/tmp/claude-501/caterva-fixtures-7kk_bdkk/lyso-md"
+  "/private/tmp/claude-501/caterva-fixtures-fi2et7n_/lyso-md"
  ],
  "outcome": {
   "exit_code": 4,
@@ -2644,7 +2644,247 @@
     },
     "label": "pocket / rest SD"
    },
-   "is_result": false
+   "is_result": false,
+   "rmsf": {
+    "unit": "nm",
+    "residues": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39,
+     40,
+     41,
+     42,
+     43,
+     44,
+     45,
+     46,
+     47,
+     48,
+     49,
+     50,
+     51,
+     52,
+     53,
+     54,
+     55,
+     56,
+     57,
+     58,
+     59
+    ],
+    "replicas": {
+     "rep1": [
+      0.053965699768379324,
+      0.03665779555112879,
+      0.029964785162033738,
+      0.0333548467391209,
+      0.035599523728735226,
+      0.04059577409726742,
+      0.032569952327722515,
+      0.026500757167015082,
+      0.029629400200512628,
+      0.03147333216956909,
+      0.028837501814246835,
+      0.023152602939380627,
+      0.03004054085101705,
+      0.03229861483906773,
+      0.033158548571009513,
+      0.04041970921115674,
+      0.034733287474027874,
+      0.03645686290505949,
+      0.03370875098238796,
+      0.03412186722128667,
+      0.03513205248290423,
+      0.03513304922833998,
+      0.025707371945825584,
+      0.024834320194436946,
+      0.03007422830128696,
+      0.04052869840016755,
+      0.031038867079379237,
+      0.03355278122926806,
+      0.034760321590472716,
+      0.029328878230846848,
+      0.035562163316199845,
+      0.03224160448061453,
+      0.03145109739648603,
+      0.03688166930776806,
+      0.02912574172987887,
+      0.03311370137232331,
+      0.031032472564455935,
+      0.025234653243269744,
+      0.0262260179467314,
+      0.026883007770770167,
+      0.02613150039531184,
+      0.02989335601674593,
+      0.03074900215283738,
+      0.03967665548526383,
+      0.033526501072315695,
+      0.039212042366691936,
+      0.05155390223638897,
+      0.027760563416127954,
+      0.05080403400899127,
+      0.02358700883372773,
+      0.024579275482987047,
+      0.029951689785087547,
+      0.027483293128269422,
+      0.031048560630922192,
+      0.02708799514814804,
+      0.03279781634636756,
+      0.02735048794301047,
+      0.03164442881075299,
+      0.03301840622257234
+     ],
+     "rep2": [
+      0.053965699768379324,
+      0.03665779555112879,
+      0.029964785162033738,
+      0.0333548467391209,
+      0.035599523728735226,
+      0.04059577409726742,
+      0.032569952327722515,
+      0.026500757167015082,
+      0.029629400200512628,
+      0.03147333216956909,
+      0.028837501814246835,
+      0.023152602939380627,
+      0.03004054085101705,
+      0.03229861483906773,
+      0.033158548571009513,
+      0.04041970921115674,
+      0.034733287474027874,
+      0.03645686290505949,
+      0.03370875098238796,
+      0.03412186722128667,
+      0.03513205248290423,
+      0.03513304922833998,
+      0.025707371945825584,
+      0.024834320194436946,
+      0.03007422830128696,
+      0.04052869840016755,
+      0.031038867079379237,
+      0.03355278122926806,
+      0.034760321590472716,
+      0.029328878230846848,
+      0.035562163316199845,
+      0.03224160448061453,
+      0.03145109739648603,
+      0.03688166930776806,
+      0.02912574172987887,
+      0.03311370137232331,
+      0.031032472564455935,
+      0.025234653243269744,
+      0.0262260179467314,
+      0.026883007770770167,
+      0.02613150039531184,
+      0.02989335601674593,
+      0.03074900215283738,
+      0.03967665548526383,
+      0.033526501072315695,
+      0.039212042366691936,
+      0.05155390223638897,
+      0.027760563416127954,
+      0.05080403400899127,
+      0.02358700883372773,
+      0.024579275482987047,
+      0.029951689785087547,
+      0.027483293128269422,
+      0.031048560630922192,
+      0.02708799514814804,
+      0.03279781634636756,
+      0.02735048794301047,
+      0.03164442881075299,
+      0.03301840622257234
+     ]
+    },
+    "pocket": [
+     8,
+     12,
+     27,
+     28,
+     29,
+     30,
+     31,
+     32,
+     33,
+     34,
+     35,
+     36,
+     37,
+     38,
+     39,
+     41,
+     42,
+     43,
+     44,
+     45,
+     46,
+     47,
+     48,
+     49,
+     50,
+     51,
+     52,
+     53,
+     54,
+     55,
+     56,
+     57,
+     58,
+     59
+    ],
+    "catalytic": [
+     35,
+     46,
+     48,
+     50,
+     52,
+     59
+    ],
+    "provenance": {
+     "kind": "computed",
+     "method": "Calpha RMSF of each residue about its mean over a replica's frames, each frame superposed on the starting structure (the values the report's pocket and rest means are taken over)",
+     "inputs": [
+      "rep1",
+      "rep2"
+     ]
+    }
+   }
   },
   "hbonds": [
    {
@@ -10206,10 +10446,256 @@
   "report_markdown": "# Enzyme analysis: 1AKI chain A\n\nCatalytic residues from hen lysozyme's M-CSA catalytic residues, given directly as caterva/tests/test_faces.py gives them.\n\n## Catalytic geometry\n\nDistance between the functional groups of each pair of catalytic residues (geometric centres), across replicas, against the starting crystal structure.\n\n| pair | crystal (nm) | simulated (nm, mean ± SD of replicas) | 95% CI of the mean | change | verdict |\n|---|---|---|---|---|---|\n| Asp48–Ser50 | 0.283 | 0.292 ± 0.000 | ± 0.000 | (+0.009, not yet a result) | unconverged |\n| Asp48–Asn46 | 0.536 | 0.560 ± 0.000 | ± 0.000 | (+0.024, not yet a result) | unconverged |\n| Asp48–Asn59 | 0.490 | 0.535 ± 0.000 | ± 0.000 | (+0.045, not yet a result) | unconverged |\n| Asp48–Asp52 | 0.755 | 0.790 ± 0.000 | ± 0.000 | (+0.036, not yet a result) | unconverged |\n| Asp48–Glu35 | 1.364 | 1.387 ± 0.000 | ± 0.000 | (+0.023, not yet a result) | unconverged |\n| Ser50–Asn46 | 0.409 | 0.431 ± 0.000 | ± 0.000 | (+0.022, not yet a result) | unconverged |\n| Ser50–Asn59 | 0.282 | 0.299 ± 0.000 | ± 0.000 | (+0.017, not yet a result) | unconverged |\n| Ser50–Asp52 | 0.568 | 0.578 ± 0.000 | ± 0.000 | (+0.010, not yet a result) | unconverged |\n| Ser50–Glu35 | 1.227 | 1.244 ± 0.000 | ± 0.000 | (+0.017, not yet a result) | unconverged |\n| Asn46–Asn59 | 0.479 | 0.491 ± 0.000 | ± 0.000 | (+0.012, not yet a result) | unconverged |\n| Asn46–Asp52 | 0.309 | 0.327 ± 0.000 | ± 0.000 | (+0.018, not yet a result) | unconverged |\n| Asn46–Glu35 | 0.947 | 0.898 ± 0.000 | ± 0.000 | (-0.050, not yet a result) | unconverged |\n| Asn59–Asp52 | 0.468 | 0.454 ± 0.000 | ± 0.000 | (-0.014, not yet a result) | unconverged |\n| Asn59–Glu35 | 1.052 | 1.091 ± 0.000 | ± 0.000 | (+0.039, not yet a result) | unconverged |\n| Asp52–Glu35 | 0.689 | 0.703 ± 0.000 | ± 0.000 | (+0.013, not yet a result) | unconverged |\n\n- Replicas: 2 are enough; every distance's 95% confidence interval is within ± 0.05 nm, half the 0.1 nm moved threshold.\n\n- every pair: rep1, rep2: the block-averaged error is still rising at the longest blocks the run allows, so each run is shorter than its own correlation time and its error bar is a lower bound\n\n## Hydrogen bonds between catalytic side chains\n\nFraction of frames in which two catalytic side chains are hydrogen-bonded, per replica. Donor-acceptor at most 0.35 nm and acceptor-donor-hydrogen at most 30 degrees, the criterion of `gmx hbond`; backbone atoms excluded.\n\n| pair | bonds at start | rep1 | rep2 | verdict |\n|---|---|---|---|---|\n| Asp48–Ser50 | 1 | 1.00 | 1.00 | (kept, not yet a result) |\n| Ser50–Asn59 | 1 | 0.95 | 0.95 | (kept, not yet a result) |\n| Asn46–Asp52 | 1 | 1.00 | 1.00 | (kept, not yet a result) |\n| Asn59–Asp52 | 1 | 1.00 | 1.00 | (kept, not yet a result) |\n\nThe other 11 pair(s) never hydrogen-bonded, at the start or in any frame.\n\nVerdicts (chosen thresholds): kept, bonded at the start and in at least 80% of frames in every replica; lost, bonded at the start and in at most 20%; formed, not bonded at the start and in at least 50%; rarely formed, not bonded at the start and in at most 20%; replicas disagree, when their occupancies differ by more than 50%.\n\n## Catalytic side-chain rotamers\n\nchi1 (N-CA-CB-gamma) of each catalytic residue, frame by frame, in the well it is nearest: +60, 180 or -60 degrees. The distances above are between functional-group centres and cannot see a side chain turn over; this can. Per replica, the fraction of frames in the well the residue started in.\n\n| residue | chi1 at start | rep1 | rep2 | verdict |\n|---|---|---|---|---|\n| Asp48 | 59 (+60) | 1.00 | 1.00 | (kept, not yet a result) |\n| Ser50 | 72 (+60) | 1.00 | 1.00 | (kept, not yet a result) |\n| Asn46 | -53 (-60) | 1.00 | 1.00 | (kept, not yet a result) |\n| Asn59 | -170 (180) | 1.00 | 1.00 | (kept, not yet a result) |\n| Asp52 | -51 (-60) | 1.00 | 1.00 | (kept, not yet a result) |\n| Glu35 | -70 (-60) | 1.00 | 1.00 | (kept, not yet a result) |\n\nVerdicts (chosen thresholds): kept, in the starting well in at least 80% of frames in every replica; flipped, in at most 20%, named by the well it moved to when the replicas agree on one; replicas disagree, when their fractions differ by more than 50%. The wells are named by angle (+60, 180, -60) because gauche+ and gauche- are used in both senses in the literature.\n\n## Angles between catalytic groups\n\nThe angle at one catalytic group (the middle one of each three) between two others, for every group with two partners within 0.6 nm of it in the crystal (the functional-group centres the distances use), frame by frame, each arm to its nearest periodic image. Per replica, the mean over the second half of the run (the first 50% is discarded as relaxation, as for the distances).\n\nEach angle is fixed, frame by frame, by three distances in the table above (the sides of its triangle), so it adds no information about where the groups are: it states that triangle as its shape at one group, with a verdict of its own. Nor can it tell which side of the group a partner is on, since a partner that turns about the line through the other two keeps the same angle; the next section does. An angle that is not yet a result makes the exit code 4, but the sections below and above are judged by the distances alone.\n\n| angle (vertex in the middle) | crystal (°) | rep1 | rep2 | simulated (°, mean ± SD of replicas) | 95% CI of the mean | change | verdict |\n|---|---|---|---|---|---|---|---|\n| Ser50–Asp48–Asn46 | 48.6 | 49.3 | 49.3 | 49.3 ± 0.0 | ± 0.0 | (+0.7, not yet a result) | unconverged |\n| Ser50–Asp48–Asn59 | 29.8 | 25.5 | 25.5 | 25.5 ± 0.0 | ± 0.0 | (-4.4, not yet a result) | unconverged |\n| Asn46–Asp48–Asn59 | 55.4 | 53.3 | 53.3 | 53.3 ± 0.0 | ± 0.0 | (-2.1, not yet a result) | unconverged |\n| Asp48–Ser50–Asn46 | 100.0 | 99.8 | 99.8 | 99.8 ± 0.0 | ± 0.0 | (-0.2, not yet a result) | unconverged |\n| Asp48–Ser50–Asn59 | 120.2 | 129.6 | 129.6 | 129.6 ± 0.0 | ± 0.0 | (+9.5, not yet a result) | unconverged |\n| Asp48–Ser50–Asp52 | 121.0 | 127.6 | 127.6 | 127.6 ± 0.0 | ± 0.0 | (+6.5, not yet a result) | unconverged |\n| Asn46–Ser50–Asn59 | 85.6 | 82.3 | 82.3 | 82.3 ± 0.0 | ± 0.0 | (-3.3, not yet a result) | unconverged |\n| Asn46–Ser50–Asp52 | 31.9 | 33.9 | 33.9 | 33.9 ± 0.0 | ± 0.0 | (+2.1, not yet a result) | unconverged |\n| Asn59–Ser50–Asp52 | 55.0 | 50.8 | 50.8 | 50.8 ± 0.0 | ± 0.0 | (-4.2, not yet a result) | unconverged |\n| Asp48–Asn46–Ser50 | 31.4 | 30.8 | 30.8 | 30.8 ± 0.0 | ± 0.0 | (-0.5, not yet a result) | unconverged |\n| Asp48–Asn46–Asn59 | 57.4 | 60.7 | 60.7 | 60.7 ± 0.0 | ± 0.0 | (+3.3, not yet a result) | unconverged |\n| Asp48–Asn46–Asp52 | 124.2 | 124.0 | 124.0 | 124.0 ± 0.0 | ± 0.0 | (-0.2, not yet a result) | unconverged |\n| Ser50–Asn46–Asn59 | 36.0 | 37.2 | 37.2 | 37.2 ± 0.0 | ± 0.0 | (+1.2, not yet a result) | unconverged |\n| Ser50–Asn46–Asp52 | 103.8 | 98.7 | 98.7 | 98.7 ± 0.0 | ± 0.0 | (-5.2, not yet a result) | unconverged |\n| Asn59–Asn46–Asp52 | 69.1 | 63.8 | 63.8 | 63.8 ± 0.0 | ± 0.0 | (-5.3, not yet a result) | unconverged |\n| Asp48–Asn59–Ser50 | 30.0 | 24.9 | 24.9 | 24.9 ± 0.0 | ± 0.0 | (-5.1, not yet a result) | unconverged |\n| Asp48–Asn59–Asn46 | 67.2 | 66.0 | 66.0 | 66.0 ± 0.0 | ± 0.0 | (-1.2, not yet a result) | unconverged |\n| Asp48–Asn59–Asp52 | 103.9 | 105.9 | 105.9 | 105.9 ± 0.0 | ± 0.0 | (+2.0, not yet a result) | unconverged |\n| Ser50–Asn59–Asn46 | 58.4 | 60.5 | 60.5 | 60.5 ± 0.0 | ± 0.0 | (+2.1, not yet a result) | unconverged |\n| Ser50–Asn59–Asp52 | 95.4 | 98.4 | 98.4 | 98.4 ± 0.0 | ± 0.0 | (+3.1, not yet a result) | unconverged |\n| Asn46–Asn59–Asp52 | 38.1 | 40.3 | 40.3 | 40.3 ± 0.0 | ± 0.0 | (+2.2, not yet a result) | unconverged |\n| Ser50–Asp52–Asn46 | 44.3 | 47.4 | 47.4 | 47.4 ± 0.0 | ± 0.0 | (+3.1, not yet a result) | unconverged |\n| Ser50–Asp52–Asn59 | 29.6 | 30.7 | 30.7 | 30.7 ± 0.0 | ± 0.0 | (+1.1, not yet a result) | unconverged |\n| Asn46–Asp52–Asn59 | 72.8 | 75.9 | 75.9 | 75.9 ± 0.0 | ± 0.0 | (+3.1, not yet a result) | unconverged |\n\n- Replicas: 2 are enough; every angle's 95% confidence interval is within ± 7.5°, half the 15° moved threshold.\n\n- every angle: rep1, rep2: the block-averaged error is still rising at the longest blocks the run allows, so each run is shorter than its own correlation time and its error bar is a lower bound\n\n`15°` is the chosen threshold for calling an angle changed: a group 0.4 nm from the vertex that turns that far moves about 0.1 nm, the distance threshold. `0.6 nm` between centres is as far apart as two groups can be and still have two of their atoms within a hydrogen bond or salt bridge of each other (0.35 nm), given the 0.10-0.14 nm from each group's centre to its atoms. It is an upper bound, not a test for a bond: two groups within it need not be bonded (the native route's hydrogen-bond table says which are).\n\n## Which face of the vertex its partners are on\n\nFor each angle above: seen from the vertex's own Cα, does the first partner run clockwise or anticlockwise to the second about the vertex? That is which face of the vertex each partner is on. Neither the angle nor the distances can see it: a partner that turns about the line through the other two keeps them all. It is measured as the elevation of the arm from the vertex's functional-group centre to its Cα out of the plane of the angle (each arm to its nearest periodic image), signed as the dihedral first partner-vertex-second partner-Cα, positive clockwise. Because the Cα is the vertex's own, a side chain that turns over under its partners changes face too; the rotamer table says whether one did.\n\nOut of flat is arcsin(sin(angle) × sin(elevation)): each of the three arms from the vertex (to the two partners and to its Cα) stands at least that far out of the plane of the other two. A frame is on a face only when it is at least 7.5°; nearer flat, which face is noise, and the frame is on neither. Per replica, the fraction of frames on the crystal's face and, in brackets, on the other face; the rest are flat. Every frame is counted, as for the rotamers and water.\n\n| angle (vertex in the middle) | out of flat, crystal (°) | crystal face | rep1 | rep2 | verdict |\n|---|---|---|---|---|---|\n| Ser50–Asp48–Asn46 | -38.6 | anticlockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Ser50–Asp48–Asn59 | +2.1 | flat | n/a | n/a | flat in the crystal, no face to keep |\n| Asn46–Asp48–Asn59 | +21.0 | clockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Asp48–Ser50–Asn46 | +52.6 | clockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Asp48–Ser50–Asn59 | -25.0 | anticlockwise | 0.86 (0.00) | 0.86 (0.00) | (kept its face, not yet a result) |\n| Asp48–Ser50–Asp52 | +26.4 | clockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Asn46–Ser50–Asn59 | +50.1 | clockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Asn46–Ser50–Asp52 | +27.4 | clockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Asn59–Ser50–Asp52 | -42.3 | anticlockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Asp48–Asn46–Ser50 | -26.8 | anticlockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Asp48–Asn46–Asn59 | -23.6 | anticlockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Asp48–Asn46–Asp52 | -9.0 | anticlockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Ser50–Asn46–Asn59 | -0.3 | flat | n/a | n/a | flat in the crystal, no face to keep |\n| Ser50–Asn46–Asp52 | -15.2 | anticlockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Asn59–Asn46–Asp52 | -13.3 | anticlockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Asp48–Asn59–Ser50 | +2.6 | flat | n/a | n/a | flat in the crystal, no face to keep |\n| Asp48–Asn59–Asn46 | +5.8 | flat | n/a | n/a | flat in the crystal, no face to keep |\n| Asp48–Asn59–Asp52 | +5.5 | flat | n/a | n/a | flat in the crystal, no face to keep |\n| Ser50–Asn59–Asn46 | +29.2 | clockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Ser50–Asn59–Asp52 | +34.2 | clockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Asn46–Asn59–Asp52 | +12.9 | clockwise | 0.29 (0.00) | 0.29 (0.00) | (partial, not yet a result) |\n| Ser50–Asp52–Asn46 | +36.0 | clockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Ser50–Asp52–Asn59 | -28.6 | anticlockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n| Asn46–Asp52–Asn59 | -59.6 | anticlockwise | 1.00 (0.00) | 1.00 (0.00) | (kept its face, not yet a result) |\n\nVerdicts (chosen thresholds): kept its face, on the crystal's face in at least 80% of frames in every replica; changed face, on the other face in at least 80%; went flat, flat in at least 80%; replicas disagree, when their fractions on either face differ by more than 50%; partial, anything else. Flat in the crystal: the crystal's own arms are within 7.5° of flat, so there is no face to keep. `7.5°` is half the 15° angle threshold: a partner counted on opposite faces in two frames has turned at least 15° through the flat arrangement, which moves a group 0.4 nm from the vertex by about 0.1 nm.\n\n## Water at the catalytic residues\n\nWater oxygens within 0.35 nm of any of each catalytic residue's functional atoms (nearest periodic image). Every frame is counted, as for the hydrogen bonds and rotamers: unlike the distances and angles, nothing is discarded as relaxation, so these fractions include the start of each run. Per replica: the mean number of waters, and in brackets the fraction of frames with at least one. At start: the count in em.gro, the minimised, solvated structure every replica began from.\n\n| residue | atoms | at start | rep1 | rep2 | verdict |\n|---|---|---|---|---|---|\n| Asp48 | OD1 OD2 | 2 | 2.00 (1.00) | 2.00 (1.00) | (hydrated, not yet a result) |\n| Ser50 | OG | 1 | 0.90 (0.90) | 0.90 (0.90) | (hydrated, not yet a result) |\n| Asn46 | OD1 ND2 | 2 | 3.10 (1.00) | 3.10 (1.00) | (hydrated, not yet a result) |\n| Asn59 | OD1 ND2 | 2 | 1.57 (0.95) | 1.57 (0.95) | (hydrated, not yet a result) |\n| Asp52 | OD1 OD2 | 2 | 3.48 (1.00) | 3.48 (1.00) | (hydrated, not yet a result) |\n| Glu35 | OE1 OE2 | 2 | 3.05 (1.00) | 3.05 (1.00) | (hydrated, not yet a result) |\n\nVerdicts (chosen thresholds): hydrated, at least one water in at least 80% of frames in every replica; dry, in at most 20%; intermittent, in between; replicas disagree, when their fractions differ by more than 50%. `0.35 nm` is the donor-acceptor limit of `gmx hbond`, so a counted water is close enough to hydrogen-bond to the group; in a lysozyme run it takes in the first shell of water around carboxylate and hydroxyl oxygens and stops short of the second (the g(r) is in caterva/analyze/water.py).\n\n## Active-site flexibility\n\nMean Cα RMSF of the 34 residues within 8 Å of a catalytic residue (the pocket) against the other 25.\n\n| replica | pocket (nm) | rest (nm) | pocket / rest |\n|---|---|---|---|\n| rep1 | 0.0317 | 0.0338 | 0.94 |\n| rep2 | 0.0317 | 0.0338 | 0.94 |\n\nNot yet a result: pocket / rest 0.94 ± 0.00, from runs the catalytic distances above do not show to be converged. RMSF from unconverged runs measures how far each residue got, not how mobile it is.\n\n## Not measured\n\n- ligand pose and contacts: `caterva md` strips ligands until they can be parameterised (MD roadmap M4)\n\n`0.1 nm` is the chosen threshold for calling a distance changed. The measuring commands are in analyze.sh. Errors: Flyvbjerg & Petersen (1989) J. Chem. Phys. 91:461, doi:10.1063/1.457480. Catalytic residues: Ribeiro et al. (2018) Nucleic Acids Res. 46:D618, doi:10.1093/nar/gkx1012.\n",
   "measured": true,
   "written": [
-   "/private/tmp/claude-501/caterva-fixtures-7kk_bdkk/lyso-md/analyze.sh",
-   "/private/tmp/claude-501/caterva-fixtures-7kk_bdkk/lyso-md/chi1.ndx",
-   "/private/tmp/claude-501/caterva-fixtures-7kk_bdkk/lyso-md/ANALYSIS.md"
+   "/private/tmp/claude-501/caterva-fixtures-fi2et7n_/lyso-md/analyze.sh",
+   "/private/tmp/claude-501/caterva-fixtures-fi2et7n_/lyso-md/chi1.ndx",
+   "/private/tmp/claude-501/caterva-fixtures-fi2et7n_/lyso-md/ANALYSIS.md"
   ],
-  "extra": {}
+  "extra": {},
+  "thresholds": {
+   "replicas": [
+    {
+     "value": 0.5,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "the fraction at the start of each replica left out of its mean (caterva/md/convergence.py)"
+     },
+     "label": "discarded as relaxation"
+    },
+    {
+     "value": 8.0,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "a block level is trusted only with at least this many blocks"
+     },
+     "label": "fewest blocks"
+    },
+    {
+     "value": 10.0,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "a replica with fewer effectively independent samples than this is not converged"
+     },
+     "label": "fewest independent samples"
+    },
+    {
+     "value": 2.0,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "replicas disagree when their spread exceeds this multiple of the typical within-replica error"
+     },
+     "label": "disagreement factor"
+    },
+    {
+     "value": 0.95,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "the two-sided confidence of the interval for the mean"
+     },
+     "label": "confidence level"
+    }
+   ],
+   "distances": [
+    {
+     "value": 0.1,
+     "unit": "nm",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "a consistent mean this far from the crystal distance is reported as moved, else held"
+     },
+     "label": "moved beyond"
+    }
+   ],
+   "angles": [
+    {
+     "value": 15.0,
+     "unit": "°",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "a consistent mean this far from the crystal angle is reported as moved, else held"
+     },
+     "label": "moved beyond"
+    }
+   ],
+   "hbonds": [
+    {
+     "value": 0.35,
+     "unit": "nm",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "a frame counts as bonded within this distance"
+     },
+     "label": "donor-acceptor at most"
+    },
+    {
+     "value": 30.0,
+     "unit": "°",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "and within this hydrogen-donor-acceptor angle"
+     },
+     "label": "angle at most"
+    },
+    {
+     "value": 0.8,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "bonded at the start and at least this fraction of frames in every replica"
+     },
+     "label": "kept at least"
+    },
+    {
+     "value": 0.2,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "bonded at the start and at most this fraction in every replica"
+     },
+     "label": "lost at most"
+    },
+    {
+     "value": 0.5,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "not bonded at the start and at least this fraction in every replica"
+     },
+     "label": "formed at least"
+    },
+    {
+     "value": 0.5,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "the replicas' fractions differ by more than this"
+     },
+     "label": "replicas disagree beyond"
+    }
+   ],
+   "rotamers": [
+    {
+     "value": 0.8,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "at least this fraction of frames in the starting well, every replica"
+     },
+     "label": "kept at least"
+    },
+    {
+     "value": 0.2,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "at most this fraction in the starting well, every replica"
+     },
+     "label": "flipped at most"
+    },
+    {
+     "value": 0.5,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "the replicas' fractions differ by more than this"
+     },
+     "label": "replicas disagree beyond"
+    }
+   ],
+   "faces": [
+    {
+     "value": 7.5,
+     "unit": "°",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "a frame is on a face when every arm stands this far out of the plane of the other two"
+     },
+     "label": "out of flat at least"
+    },
+    {
+     "value": 0.8,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "at least this fraction of frames on one face, every replica"
+     },
+     "label": "kept at least"
+    },
+    {
+     "value": 0.5,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "the replicas' fractions differ by more than this"
+     },
+     "label": "replicas disagree beyond"
+    }
+   ],
+   "water": [
+    {
+     "value": 0.35,
+     "unit": "nm",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "a water oxygen this close to the residue's atoms counts"
+     },
+     "label": "within"
+    },
+    {
+     "value": 0.8,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "at least this fraction of frames with a water, every replica"
+     },
+     "label": "hydrated at least"
+    },
+    {
+     "value": 0.2,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "at most this fraction of frames with a water, every replica"
+     },
+     "label": "dry at most"
+    },
+    {
+     "value": 0.5,
+     "unit": "",
+     "provenance": {
+      "kind": "chosen",
+      "by": "default",
+      "reason": "the replicas' fractions differ by more than this"
+     },
+     "label": "replicas disagree beyond"
+    }
+   ]
+  }
  }
 }

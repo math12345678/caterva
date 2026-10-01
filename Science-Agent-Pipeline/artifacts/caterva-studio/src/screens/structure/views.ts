@@ -8,7 +8,7 @@
  * contract fixes those fields' types; tightening them there is a contract
  * amendment, and these views are what the amendment would say.
  */
-import type { SourcedValue } from "@/api/types";
+import type { Provenance, SourcedValue } from "@/api/types";
 
 /** prepare: one catalytic residue as the audit placed it on a chain. */
 export interface CatalyticRowView {
@@ -79,6 +79,20 @@ export interface AngleView {
   per_replica: ReplicaView[];
 }
 
+/**
+ * analyze: the per-residue C-alpha RMSF the flexibility means are taken
+ * over, one column per replica over `residues` (null where a replica has
+ * none), with one provenance for the whole series.
+ */
+export interface RmsfProfileView {
+  unit: string;
+  residues: number[];
+  replicas: Record<string, (number | null)[]>;
+  pocket: number[];
+  catalytic: number[];
+  provenance: Provenance;
+}
+
 export interface FlexibilityView {
   pocket_residues: number;
   rest_residues: number;
@@ -88,6 +102,7 @@ export interface FlexibilityView {
   ratio_mean: SourcedValue | null;
   ratio_sd: SourcedValue | null;
   is_result: boolean;
+  rmsf?: RmsfProfileView | null;
 }
 
 export interface HbondView {

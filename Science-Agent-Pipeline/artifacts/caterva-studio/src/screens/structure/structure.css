@@ -1,111 +1,364 @@
 /*
- * Styles the four structure screens share and the foundation's
- * index.css does not carry. Tokens only (index.css defines them for both
- * themes); no colour is written here as a literal.
+ * The structure screens' own layout: the form and result panes, the
+ * entry's viewer beside what is known about the chosen residue, the
+ * per-replica strips and the fraction bars of Analyze. Tokens only
+ * (index.css defines them for both themes); no colour is written here as a
+ * literal, and every class is prefixed `st-` so nothing here can restyle a
+ * foundation component.
  */
 
-.btn-quiet {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  border: 1px solid var(--rule);
-  border-radius: 3px;
-  background: var(--surface);
-  color: var(--fg);
-  padding: 0.3rem 0.65rem;
-  font-size: 13px;
-  line-height: 1.3;
-  cursor: pointer;
-  transition: background-color 180ms var(--ease-out-expo);
+.st-form {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
 }
-.btn-quiet:hover {
-  background: var(--surface-raised);
-}
-.btn-quiet:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+@media (min-width: 1100px) {
+  .st-form {
+    position: sticky;
+    top: 1.5rem;
+  }
 }
 
-/* The tab row the Dynamics screen uses between its four questions. */
-.str-tabs {
+.st-fieldset {
+  display: grid;
+  gap: 0.875rem;
+  margin: 0.25rem 0 0;
+  padding: 0.875rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--rule);
+  min-width: 0;
+}
+.st-fieldset > legend {
+  padding: 0 0.5rem 0 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--fg-soft);
+  text-transform: none;
+}
+.st-row2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.875rem;
+}
+.st-row-chain {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6.5rem;
+  gap: 0.875rem;
+}
+
+.st-path {
+  display: flex;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.st-path > .input {
+  flex: 1;
+  min-width: 0;
+}
+.st-path-text {
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.st-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.375rem 0.625rem;
+}
+
+.st-result {
+  display: grid;
+  gap: 1.75rem;
+  min-width: 0;
+}
+.st-result .run-finished {
+  display: grid;
+  gap: 1.75rem;
+}
+
+/* A result's opening line: what was asked, what came back. */
+.st-lede {
+  display: grid;
+  gap: 0.375rem;
+}
+.st-lede-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 400;
+  line-height: 1.2;
+}
+.st-lede-meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  color: var(--fg-soft);
+  font-size: var(--text-sm);
+}
+.st-prose {
+  margin: 0;
+  max-width: 72ch;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--fg-soft);
+}
+
+/* The entry: viewer beside the residue it is about. */
+.st-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem);
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 1280px) {
+  .st-entry {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.st-entry .viewer {
+  min-height: 22rem;
+}
+.st-side {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+  min-width: 0;
+}
+.st-side-title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--fg-soft);
+}
+.st-residues {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.st-residue {
+  display: grid;
+  grid-template-columns: 4.75rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.3125rem 0.5rem;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-quick) var(--ease-out-expo);
+}
+.st-residue:hover {
+  background: var(--surface-raised);
+}
+.st-residue[aria-pressed="true"] {
+  background: var(--signal-wash);
+}
+.st-residue-name {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.st-residue-what {
+  color: var(--fg-soft);
+  font-size: var(--text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* What the tools know about the chosen residue. */
+.st-known {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-overlay);
+  background: var(--surface-sunken);
+}
+.st-known-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.st-known-name {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: 500;
+}
+.st-known ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.375rem;
+  font-size: var(--text-sm);
+}
+
+/* Findings: one row per defect, the distance first. */
+.st-findings {
+  display: grid;
+  gap: 1.5rem;
+}
+.st-group-title {
+  margin: 0 0 0.375rem;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.st-what {
+  max-width: 62ch;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.st-what b {
+  font-weight: 700;
+}
+
+/* Analyze: replicas side by side, on one axis per section. */
+.st-forest {
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) minmax(14rem, 1fr) minmax(8rem, auto);
+  column-gap: 1rem;
+  align-items: center;
+  font-size: var(--text-sm);
+}
+.st-forest-head {
+  display: contents;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.st-forest-head > * {
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--rule-strong);
+}
+.st-forest-row {
+  display: contents;
+}
+.st-forest-row > * {
+  padding: 0.3125rem 0;
+  border-bottom: 1px solid var(--rule);
+  min-width: 0;
+}
+.st-forest-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.st-forest svg {
+  display: block;
+  width: 100%;
+  height: 1.375rem;
+  overflow: visible;
+}
+.st-forest-axis svg {
+  height: 1.25rem;
+}
+.st-forest-axis text {
+  fill: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.st-frac {
+  display: inline-grid;
+  grid-template-columns: 3rem auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+.st-frac-bar {
+  position: relative;
+  height: 0.375rem;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+.st-frac-bar > span {
+  position: absolute;
+  inset: 0;
+  background: var(--signal);
+  border-radius: inherit;
+  transform-origin: left center;
+}
+.st-wells {
+  display: flex;
+  width: 6rem;
+  height: 0.5rem;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--surface-raised);
+}
+.st-wells > span {
+  height: 100%;
+}
+
+.st-thresholds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  margin: 0.5rem 0 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.st-thresholds > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.375rem;
+}
+
+.st-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 1.5rem;
   border-bottom: 1px solid var(--rule);
+  margin-bottom: 1.5rem;
 }
-.str-tabs [role="tab"] {
+.st-tabs [role="tab"] {
   background: none;
   border: 0;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  padding: 0.4rem 0;
-  color: var(--muted);
-  font-size: 14px;
+  padding: 0.5rem 0;
+  color: var(--fg-soft);
+  font: inherit;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
-.str-tabs [role="tab"][aria-selected="true"] {
+.st-tabs [role="tab"]:hover {
+  color: var(--fg);
+}
+.st-tabs [role="tab"][aria-selected="true"] {
   color: var(--fg);
   border-bottom-color: var(--signal-deep);
-  font-weight: 600;
+  font-weight: 700;
 }
 
-/* A selectable row in a results table. */
-.data-table tbody tr[data-selectable] {
-  cursor: pointer;
-}
-.data-table tbody tr[data-selectable]:hover,
-.data-table tbody tr[aria-selected="true"] {
-  background: var(--surface-raised);
-}
-
-/* The markdown report the command prints, as the terminal would show it. */
-.report-md h1,
-.report-md h2,
-.report-md h3 {
-  font-size: 1.05rem;
-  margin: 1.1rem 0 0.4rem;
-}
-.report-md p,
-.report-md ul {
-  margin: 0.4rem 0;
-}
-.report-md table {
-  border-collapse: collapse;
-  font-size: 12.5px;
-  margin: 0.5rem 0;
-}
-.report-md th,
-.report-md td {
-  border-bottom: 1px solid var(--rule);
-  padding: 0.2rem 0.6rem 0.2rem 0;
-  text-align: left;
-  vertical-align: top;
-}
-.report-md code {
+.st-files {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.125rem 1.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
   font-family: var(--font-mono);
-  font-size: 0.95em;
+  font-size: var(--text-xs);
 }
 
-/* An ink slab for a command the person runs themselves. */
-.command-slab {
-  background: var(--fg);
-  color: var(--surface);
-  border-radius: 3px;
-  padding: 0.75rem 1rem;
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  overflow-x: auto;
-  white-space: pre;
-}
-
-.viewer-canvas:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.viewer-canvas {
-  cursor: grab;
-  touch-action: none;
-}
-.viewer-canvas:active {
-  cursor: grabbing;
+.st-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }

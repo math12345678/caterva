@@ -1,187 +1,162 @@
 /**
- * The pieces the four structure screens (Structure, Prepare, Dynamics,
- * Analyze) share: their form fields, the run area that shows a run's stage,
- * refusal or failure, the verdict word, the command that reproduces a run,
- * and the report the terminal prints.
+ * What the four structure screens (Structures, Prepare, Dynamics, Analyze)
+ * need beyond the foundation's components, and nothing the foundation
+ * already has: a path field that opens the native panel inside Caterva.app,
+ * a verdict word set as the library wrote it, a run artifact downloaded
+ * with the session header, a path the run wrote shown (never served), the
+ * query parameter a screen was opened with, and the form | result frame
+ * every one of them uses.
  *
- * They compose the foundation's components (Loading, the states, Value)
- * rather than copying them; what is here is only what these screens need
- * beyond them. Every number still reaches the page as a SourcedValue and is
- * drawn by Value; nothing in this file formats a number.
+ * Forms, fields, the run's states, tables, the viewer, charts and the
+ * report are the foundation's (src/components); these screens compose them
+ * and keep no copy. Nothing in this file formats a number: every number is
+ * a SourcedValue drawn by Value.
  */
-import MarkdownIt from "markdown-it";
-import { type ReactNode, useId, useMemo, useState } from "react";
+import { FolderOpen } from "lucide-react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { useSearch } from "wouter";
 
 import { ApiRequestError, apiFetch } from "@/api/client";
-import type { ApiError, Outcome, RunRecord, RunStatus } from "@/api/types";
-import { Loading } from "@/components/states/Loading";
-import { ErrorState, RefusalState } from "@/components/states/States";
+import type { RunKind, RunResults } from "@/api/types";
+import type { RunState } from "@/api/useRun";
+import { Field, FormActions, TextInput } from "@/components/forms/Field";
+import { Split } from "@/components/layout/Split";
+import { useCommand } from "@/components/palette/commands";
+import { RunPanel } from "@/components/run/RunPanel";
 import { chooseDirectory, chooseFile, isDesktop, reveal } from "@/lib/desktop";
+import { modKey, useHotkey } from "@/lib/keyboard";
 
-/* ------------------------------------------------------------------ */
-/* Form fields                                                         */
-/* ------------------------------------------------------------------ */
+/** One query parameter of the current location (`?pdb=1I10`), or null. */
+export function useParam(name: string): string | null {
+  return new URLSearchParams(useSearch()).get(name);
+}
 
-export function FieldRow({
-  label,
-  hint,
-  error,
+/**
+ * Refill a form from the request of the run it was opened on (`?run=` from
+ * History), once that run's record has arrived, so a reopened run can be
+ * changed and asked again rather than retyped. Values are written back as
+ * the text the form holds; nothing is computed.
+ */
+export function useRefill(
+  reopened: string | null,
+  run: { id: string; request: Record<string, unknown> } | null,
+  apply: (request: Record<string, unknown>) => void,
+): void {
+  const done = useRef<string | null>(null);
+  const latest = useRef(apply);
+  latest.current = apply;
+  useEffect(() => {
+    if (!reopened || !run || run.id !== reopened || done.current === reopened) return;
+    done.current = reopened;
+    latest.current(run.request);
+  }, [reopened, run]);
+}
+
+/** A request value as the text a form field holds. */
+export function text(v: unknown): string {
+  return v === undefined || v === null ? "" : String(v);
+}
+
+export function busy(state: { status: string; submitting: boolean }): boolean {
+  return state.submitting || state.status === "queued" || state.status === "running";
+}
+
+/**
+ * The frame of a structure screen: the form in the first pane, the run in
+ * the second (the foundation's Split, stacked below 1100 px). The form's
+ * primary action is the submit button, Cmd-Enter from anywhere on the
+ * screen, and an entry in the command palette.
+ */
+export function RunScreen<K extends RunKind>({
+  kind: _kind,
+  id,
+  form,
+  action,
+  canSubmit,
+  onSubmit,
+  run,
+  idle,
   children,
-  htmlFor,
+  formLabel,
+  firstSize = 30,
+  active = true,
 }: {
-  label: string;
-  hint?: ReactNode;
-  error?: string | null;
-  children: ReactNode;
-  htmlFor: string;
-}) {
-  const hintId = `${htmlFor}-hint`;
-  return (
-    <div className="grid gap-1">
-      <label htmlFor={htmlFor} className="text-[13px] font-semibold text-fg">
-        {label}
-      </label>
-      {children}
-      {hint ? (
-        <p id={hintId} className="m-0 text-[12.5px] leading-snug text-muted">
-          {hint}
-        </p>
-      ) : null}
-      {error ? (
-        <p className="m-0 text-[12.5px] leading-snug text-danger" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-const inputClass =
-  "w-full rounded-[3px] border border-rule bg-surface px-2.5 py-1.5 text-[14px] text-fg " +
-  "placeholder:text-muted/70 focus-visible:outline-2 focus-visible:outline-offset-1 " +
-  "focus-visible:outline-[var(--focus)] aria-[invalid=true]:border-danger";
-
-export function TextField({
-  id,
-  label,
-  value,
-  onChange,
-  placeholder,
-  hint,
-  error,
-  mono = false,
-  autoFocus,
-}: {
+  /** The run's kind; it fixes the result type the children draw. */
+  kind: K;
   id: string;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  hint?: ReactNode;
-  error?: string | null;
-  mono?: boolean;
-  autoFocus?: boolean;
+  form: ReactNode;
+  /** The primary action's name: "Search", "Audit", "Write setup", "Analyze". */
+  action: string;
+  canSubmit: boolean;
+  onSubmit: () => void;
+  run: RunState<NoInfer<K>> & { cancel: () => Promise<void> };
+  idle: ReactNode;
+  children: (result: RunResults[NoInfer<K>]) => ReactNode;
+  formLabel: string;
+  firstSize?: number;
+  /** False while the screen shows another of its panels (Dynamics' tabs): no hotkey, no palette entry. */
+  active?: boolean;
 }) {
-  return (
-    <FieldRow label={label} hint={hint} error={error} htmlFor={id}>
-      <input
-        id={id}
-        className={`${inputClass} ${mono ? "font-mono" : ""}`}
-        value={value}
-        placeholder={placeholder}
-        spellCheck={false}
-        autoComplete="off"
-        autoFocus={autoFocus}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={hint ? `${id}-hint` : undefined}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </FieldRow>
+  const working = busy(run);
+  const submit = () => {
+    if (canSubmit && !working) onSubmit();
+  };
+  useHotkey({ key: "Enter", mod: true }, submit, active);
+  useCommand(active ? {
+    id: `${id}.submit`,
+    title: action,
+    hint: working ? "a run is in progress" : canSubmit ? `${modKey()} Enter on this screen` : "fill in the form first",
+    disabled: working || !canSubmit,
+    run: submit,
+  } : null);
+  useCommand(
+    working && active
+      ? { id: `${id}.cancel`, title: `Cancel: ${action}`, hint: "the current step finishes first", run: () => void run.cancel() }
+      : null,
   );
-}
-
-/** A number typed by the person; empty means "leave it to the command's default". */
-export function NumberField({
-  id,
-  label,
-  value,
-  onChange,
-  placeholder,
-  hint,
-  error,
-  step = "any",
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  hint?: ReactNode;
-  error?: string | null;
-  step?: string;
-}) {
   return (
-    <FieldRow label={label} hint={hint} error={error} htmlFor={id}>
-      <input
-        id={id}
-        className={`${inputClass} font-mono tabular-nums`}
-        inputMode="decimal"
-        type="number"
-        step={step}
-        value={value}
-        placeholder={placeholder}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={hint ? `${id}-hint` : undefined}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </FieldRow>
-  );
-}
-
-/** The number in a field, or undefined when it is empty or not a number. */
-export function parsed(text: string): number | undefined {
-  if (text.trim() === "") return undefined;
-  const n = Number(text);
-  return Number.isFinite(n) ? n : undefined;
-}
-
-export function CheckField({
-  id,
-  label,
-  checked,
-  onChange,
-  hint,
-}: {
-  id: string;
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  hint?: ReactNode;
-}) {
-  return (
-    <div className="grid gap-1">
-      <label htmlFor={id} className="inline-flex items-center gap-2 text-[14px]">
-        <input
-          id={id}
-          type="checkbox"
-          className="size-4 accent-[var(--signal-deep)]"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-        {label}
-      </label>
-      {hint ? <p className="m-0 pl-6 text-[12.5px] leading-snug text-muted">{hint}</p> : null}
-    </div>
+    <Split
+      id={id}
+      firstSize={firstSize}
+      minFirst={22}
+      first={
+        <form
+          className="st-form"
+          aria-label={formLabel}
+          onSubmit={(e: FormEvent) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
+          {form}
+          <FormActions>
+            <button type="submit" className="btn btn-primary" aria-disabled={!canSubmit || working}>
+              {action}
+            </button>
+            <span className="field-hint">
+              <kbd className="kbd">{modKey()}</kbd> <kbd className="kbd">Enter</kbd>
+            </span>
+          </FormActions>
+        </form>
+      }
+      second={
+        <div className="st-result" aria-live="polite">
+          <RunPanel state={run} onCancel={() => void run.cancel()} onRetry={submit} idle={idle}>
+            {(result) => children(result)}
+          </RunPanel>
+        </div>
+      }
+    />
   );
 }
 
 /**
  * An absolute path on this computer. Inside Caterva.app a button opens the
- * native panel; in a browser the path is typed (a page cannot learn a
- * folder's location).
+ * native panel; in a browser the path is typed, because a page cannot learn
+ * where a folder is (CONTRACT.md 15 and 16). The server checks it either
+ * way and a refusal lands under this field.
  */
 export function PathField({
-  id,
   label,
   value,
   onChange,
@@ -191,8 +166,8 @@ export function PathField({
   hint,
   error,
   placeholder,
+  optional,
 }: {
-  id: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -202,170 +177,58 @@ export function PathField({
   hint?: ReactNode;
   error?: string | null;
   placeholder?: string;
+  optional?: boolean;
 }) {
   const desktop = isDesktop();
   return (
-    <FieldRow label={label} hint={hint} error={error} htmlFor={id}>
-      <div className="flex gap-2">
-        <input
-          id={id}
-          className={`${inputClass} font-mono text-[13px]`}
-          value={value}
-          placeholder={placeholder}
-          spellCheck={false}
-          autoComplete="off"
-          aria-invalid={error ? true : undefined}
-          aria-describedby={hint ? `${id}-hint` : undefined}
-          onChange={(e) => onChange(e.target.value)}
-        />
+    <Field label={label} hint={hint} error={error} optional={optional}>
+      <span className="st-path">
+        <TextInput mono value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
         {desktop ? (
           <button
             type="button"
-            className="btn-quiet shrink-0"
+            className="btn"
             onClick={async () => {
-              const chosen =
-                kind === "directory" ? await chooseDirectory(purpose) : await chooseFile(purpose, extensions);
+              const chosen = kind === "directory" ? await chooseDirectory(purpose) : await chooseFile(purpose, extensions);
               if (chosen) onChange(chosen);
             }}
           >
+            <FolderOpen size={14} aria-hidden="true" />
             Choose
           </button>
         ) : null}
-      </div>
-    </FieldRow>
+      </span>
+    </Field>
   );
 }
 
-/** The one primary action of a form. */
-export function PrimaryButton({ children, busy, disabled }: { children: ReactNode; busy?: boolean; disabled?: boolean }) {
-  return (
-    <button
-      type="submit"
-      disabled={disabled || busy}
-      className={
-        "inline-flex items-center justify-center rounded-[3px] bg-[var(--signal-deep)] px-4 py-2 text-[14px] " +
-        "font-semibold text-[var(--surface)] transition-opacity duration-200 ease-[var(--ease-out-expo)] " +
-        "hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-      }
-    >
-      {children}
-    </button>
-  );
-}
-
-/** The 400 for this field, when the server named it. */
-export function fieldError(error: ApiError | null, field: string): string | null {
-  return error && error.code === "malformed" && error.field === field ? error.message : null;
-}
-
-/* ------------------------------------------------------------------ */
-/* A run's life on the page                                            */
-/* ------------------------------------------------------------------ */
-
-export interface RunView {
-  run: RunRecord | null;
-  status: RunStatus | "idle";
-  stage: { label: string; fraction: number | null } | null;
-  outcome: Outcome | null;
-  requestError: ApiError | null;
-  runError: { type: string; message: string } | null;
-}
+const STEADY = new Set([
+  "consistent",
+  "held",
+  "kept",
+  "kept its face",
+  "agrees",
+  "hydrated",
+  "formed",
+  "settled, protonated",
+  "settled, deprotonated",
+]);
 
 /**
- * Everything a run shows before its result: the mark in motion with the
- * stage the server reported, a request the server would not accept (a 400
- * under its field is shown by the form; anything else here), a crash, a
- * cancel, a refusal in the command's words. `children` renders the result
- * once there is one; a refusal that still produced a result shows both.
- */
-export function RunArea({
-  view,
-  waiting,
-  hasResult,
-  children,
-  fieldErrors = [],
-}: {
-  view: RunView;
-  waiting: string;
-  hasResult: boolean;
-  children?: ReactNode;
-  fieldErrors?: string[];
-}) {
-  const { status, stage, outcome, requestError, runError } = view;
-  if (requestError) {
-    if (requestError.code === "malformed" && requestError.field && fieldErrors.includes(requestError.field)) {
-      return null;
-    }
-    return <ErrorState error={requestError} />;
-  }
-  if (status === "queued" || status === "running") {
-    return (
-      <div className="py-6">
-        <Loading label={stage?.label ?? (status === "queued" ? "Waiting for a free worker" : waiting)} />
-      </div>
-    );
-  }
-  if (status === "failed" || status === "interrupted" || status === "cancelled") {
-    const message =
-      status === "cancelled"
-        ? "The run was cancelled; a cancelled run keeps no result."
-        : `${runError?.type ?? "Error"}: ${runError?.message ?? "the run stopped without saying why"}`;
-    return (
-      <ErrorState
-        error={{ code: status === "failed" ? "crash" : "unavailable", message }}
-      />
-    );
-  }
-  if (status !== "done") return null;
-  return (
-    <>
-      {outcome?.meaning === "refused" && outcome.reason ? <RefusalState reason={outcome.reason} /> : null}
-      {hasResult ? children : null}
-    </>
-  );
-}
-
-/** The command a run reproduces in a terminal, as the server recorded it. */
-export function CommandLine({ run }: { run: RunRecord | null }) {
-  if (!run) return null;
-  const text = run.cli.map(shellQuote).join(" ");
-  return (
-    <p className="m-0 flex flex-wrap items-baseline gap-x-2 text-[12.5px] text-muted">
-      <span>In a terminal:</span>
-      <code className="font-mono break-all text-fg">{text}</code>
-    </p>
-  );
-}
-
-export function shellQuote(arg: string): string {
-  return /^[A-Za-z0-9_@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, `'\\''`)}'`;
-}
-
-/* ------------------------------------------------------------------ */
-/* Words the library uses for its judgements                           */
-/* ------------------------------------------------------------------ */
-
-const STEADY = new Set(["consistent", "held", "kept", "agrees", "settled, protonated", "settled, deprotonated"]);
-
-/**
- * A verdict word, set as the library wrote it. A word that means "this is a
- * result" is ink; anything else is the caution colour that means "read
- * twice". Never red: a negative finding is a finding.
+ * A verdict word, as the library wrote it. A word that is a result is set
+ * in ink; anything else ("not yet a result", "replicas disagree", "moved")
+ * in the caution colour that means "read twice". Never red: a negative
+ * finding is a finding.
  */
 export function Verdict({ word }: { word: string }) {
-  const steady = STEADY.has(word);
   return (
-    <span
-      className={`inline-block whitespace-nowrap rounded-[2px] px-1.5 py-px font-mono text-[12px] ${
-        steady ? "bg-surface-raised text-fg" : "bg-[color-mix(in_oklch,var(--caution)_14%,transparent)] text-caution"
-      }`}
-    >
+    <span className="chip" data-tone={STEADY.has(word) ? undefined : "caution"}>
       {word}
     </span>
   );
 }
 
-/** "doi:10.x/y" and "PMID n" inside library prose, as links of the forms the contract allows. */
+/** "doi:10.x/y" inside the library's prose, linked through the DOI resolver (CONTRACT.md 9). */
 export function Linkified({ text }: { text: string }) {
   const parts: ReactNode[] = [];
   const re = /doi:(10\.\d{4,9}\/[^\s;,)]+[^\s;,.)])/g;
@@ -373,7 +236,7 @@ export function Linkified({ text }: { text: string }) {
   for (let m = re.exec(text); m; m = re.exec(text)) {
     parts.push(text.slice(last, m.index));
     parts.push(
-      <a key={m.index} href={`https://doi.org/${m[1]}`} target="_blank" rel="noreferrer noopener">
+      <a key={m.index} href={`https://doi.org/${m[1]}`} target="_blank" rel="noopener noreferrer">
         doi:{m[1]}
       </a>,
     );
@@ -383,56 +246,26 @@ export function Linkified({ text }: { text: string }) {
   return <>{parts}</>;
 }
 
-/* ------------------------------------------------------------------ */
-/* The terminal's own report                                           */
-/* ------------------------------------------------------------------ */
-
-const md = new MarkdownIt({ html: false, linkify: false, typographer: false });
-
-export function TerminalReport({ text, markdown, title = "The report the terminal prints" }: {
-  text: string;
-  markdown: boolean;
-  title?: string;
-}) {
-  const html = useMemo(() => (markdown ? md.render(text) : ""), [markdown, text]);
-  return (
-    <details className="group border-t border-rule pt-3">
-      <summary className="cursor-pointer select-none text-[13px] font-semibold text-muted hover:text-fg">
-        {title}
-      </summary>
-      {markdown ? (
-        <div className="report-md mt-3 max-w-[80ch] overflow-x-auto text-[13.5px]" dangerouslySetInnerHTML={{ __html: html }} />
-      ) : (
-        <pre className="mt-3 overflow-x-auto whitespace-pre font-mono text-[12.5px] leading-relaxed">{text}</pre>
-      )}
-    </details>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Files                                                               */
-/* ------------------------------------------------------------------ */
-
-/** Download a run's artifact (the session header rides on the request, never in a URL). */
+/** Download one of a run's artifacts. The session header rides on the request, never in a URL. */
 export function ArtifactButton({ runId, name, label }: { runId: string; name: string; label: string }) {
   const [error, setError] = useState<string | null>(null);
   return (
-    <span className="inline-flex items-baseline gap-2">
+    <span className="st-inline">
       <button
         type="button"
-        className="btn-quiet"
+        className="btn btn-sm"
         onClick={async () => {
           setError(null);
           try {
-            const response = await apiFetch(
-              `/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(name)}`,
-            );
+            const response = await apiFetch(`/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(name)}`);
             const url = URL.createObjectURL(await response.blob());
             const a = document.createElement("a");
             a.href = url;
             a.download = name;
+            document.body.appendChild(a);
             a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 30_000);
           } catch (e) {
             setError(e instanceof ApiRequestError ? e.error.message : String(e));
           }
@@ -440,7 +273,7 @@ export function ArtifactButton({ runId, name, label }: { runId: string; name: st
       >
         {label}
       </button>
-      {error ? <span className="text-[12.5px] text-danger">{error}</span> : null}
+      {error ? <span className="field-error">{error}</span> : null}
     </span>
   );
 }
@@ -448,10 +281,10 @@ export function ArtifactButton({ runId, name, label }: { runId: string; name: st
 /** A path the run wrote on this computer: shown, never served; revealed in Finder inside the app. */
 export function WrittenPath({ path }: { path: string }) {
   return (
-    <span className="inline-flex flex-wrap items-baseline gap-2">
-      <code className="font-mono text-[12.5px] break-all">{path}</code>
+    <span className="st-inline">
+      <code className="font-mono st-path-text">{path}</code>
       {isDesktop() ? (
-        <button type="button" className="btn-quiet" onClick={() => void reveal(path)}>
+        <button type="button" className="btn btn-sm btn-quiet" onClick={() => void reveal(path)}>
           Show in Finder
         </button>
       ) : null}
@@ -459,49 +292,28 @@ export function WrittenPath({ path }: { path: string }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Layout                                                              */
-/* ------------------------------------------------------------------ */
-
-/** A titled part of a result: a heading on a hairline, an aside on the same line. Not a card. */
-export function Part({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
-  const id = useId();
+/**
+ * A table cell's controls (a value's provenance button, a link) kept to
+ * themselves: a click or Enter on them must not also select the row the
+ * table makes selectable.
+ */
+export function Own({ children }: { children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className="grid gap-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-rule pb-1.5">
-        <h2 id={id} className="m-0 text-[1.15rem] leading-tight">
-          {title}
-        </h2>
-        {aside ? <div className="text-[12.5px] text-muted">{aside}</div> : null}
-      </div>
+    <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
       {children}
-    </section>
+    </span>
   );
 }
 
-/** A dense table of results; the caller supplies the rows. */
-export function Table({ caption, head, children }: { caption?: string; head: ReactNode[]; children: ReactNode }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="data-table w-full border-collapse text-[13.5px]">
-        {caption ? <caption className="sr-only">{caption}</caption> : null}
-        <thead>
-          <tr>
-            {head.map((h, i) => (
-              <th
-                key={i}
-                scope="col"
-                className="border-b border-rule px-2 py-1.5 text-left align-bottom text-[12px] font-semibold text-muted first:pl-0"
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>{children}</tbody>
-      </table>
-    </div>
-  );
+/** A residue as people write it: "His192". */
+export function residueName(resname: string | null, resseq: string | number): string {
+  const r = resname ?? "?";
+  return `${r.charAt(0)}${r.slice(1).toLowerCase()}${resseq}`;
 }
 
-export const td = "border-b border-rule px-2 py-1.5 align-top first:pl-0";
+/** An entry title the PDB stores in capitals, in sentence case; any other title as it is. */
+export function sentenceCase(title: string): string {
+  if (title !== title.toUpperCase()) return title;
+  const lower = title.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}

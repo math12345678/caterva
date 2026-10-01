@@ -3,42 +3,37 @@
  * defect placed against the catalytic residues (kind `prepare`,
  * `caterva prepare ENTRY`).
  *
+ * The findings are ranked as the report ranks them: what blocks a faithful
+ * setup first, then the choices to make and record, then what is worth
+ * knowing; within each, nearest the active site first, by the distance the
+ * audit measured, and those with no distance last. Choosing a finding
+ * (click, or Enter on its row) shows it in the viewer beside the table,
+ * with what else the audit knows about its residues.
+ *
  * Exit 4 ("every chain has at least one blocking defect") is a finding,
- * not a failure: the screen leads with the blocking findings and says which
- * chains a faithful setup cannot start from. Findings are listed in the
- * report's order: by severity (blocks, decide, note), then nearest the
- * active site first, findings with no distance last.
+ * not a failure: the run's outcome says so above the result, and the
+ * blocking findings lead.
  */
-import { type FormEvent, useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Link } from "wouter";
 
 import type { FindingRow, PrepareRequest, PrepareResult } from "@/api/types";
 import { useRun } from "@/api/useRun";
+import { Checkbox, Field, fieldError, NumberInput, parseNumber, Select } from "@/components/forms/Field";
+import { Disclosure } from "@/components/forms/Disclosure";
+import { Citation } from "@/components/provenance/Citation";
 import { Value } from "@/components/provenance/Value";
-import { Screen } from "@/components/screen/Screen";
+import { MarkdownReport } from "@/components/report/Report";
+import { Screen, Section } from "@/components/screen/Screen";
 import { EmptyState } from "@/components/states/States";
+import { DataTable } from "@/components/table/DataTable";
 
-import { EntryView } from "./structure/EntryView";
-import {
-  CheckField,
-  CommandLine,
-  NumberField,
-  Part,
-  PathField,
-  PrimaryButton,
-  RunArea,
-  Table,
-  TerminalReport,
-  Verdict,
-  fieldError,
-  parsed,
-  td,
-} from "./structure/kit";
-import { useParam } from "./structure/useCoordinates";
+import { type EntryFocus, EntryView } from "./structure/EntryView";
+import { Own, PathField, residueName, RunScreen, text, useParam, useRefill, Verdict } from "./structure/kit";
+import { findingFocus, rankFindings } from "./structure/residues";
 import type { CatalyticRowView, ChargeRowView } from "./structure/views";
 import "./structure/structure.css";
 
-const FIELDS = ["entry", "ph", "no_cache"];
 const PDB_ID = /^[0-9][A-Za-z0-9]{3}$/;
 const SEVERITY_TITLE: Record<string, string> = {
   blocks: "Blocks a faithful setup",
@@ -47,147 +42,140 @@ const SEVERITY_TITLE: Record<string, string> = {
 };
 
 export default function PrepareScreen() {
-  const run = useRun("prepare", useParam("run"));
+  const reopened = useParam("run");
+  const run = useRun("prepare", reopened);
   const [entry, setEntry] = useState(useParam("entry") ?? "");
   const [ph, setPh] = useState("");
   const [noCache, setNoCache] = useState(false);
-  const err = run.requestError;
-  const busy = run.status === "queued" || run.status === "running";
+  useRefill(reopened, run.run, (r) => {
+    setEntry(text(r.entry));
+    setPh(text(r.ph));
+    setNoCache(Boolean(r.no_cache));
+  });
+  const err = (field: string) => fieldError(run.requestError, field);
 
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
+  const request = (): PrepareRequest => {
     const r: PrepareRequest = { entry: entry.trim() };
-    const p = parsed(ph);
-    if (p !== undefined) r.ph = p;
+    if (ph.trim()) r.ph = (parseNumber(ph) ?? ph.trim()) as number;
     if (noCache) r.no_cache = true;
-    void run.submit(r);
+    return r;
   };
 
   return (
-    <Screen title="Prepare" purpose="Audit a PDB entry before simulating it, defects ranked by distance to the active site.">
-      <div className="grid gap-8 xl:grid-cols-[18rem_minmax(0,1fr)]">
-        <form onSubmit={submit} className="grid content-start gap-4" aria-label="Audit an entry">
-          <PathField
-            id="prepare-entry"
-            label="PDB id or mmCIF file"
-            value={entry}
-            onChange={setEntry}
-            kind="file"
-            purpose="Choose an mmCIF file to audit"
-            extensions={["cif", "mmcif"]}
-            placeholder="1I10, or /path/to/entry.cif"
-            hint="A local file must be an absolute path to a .cif or .mmcif file."
-            error={fieldError(err, "entry")}
-          />
-          <NumberField
-            id="prepare-ph"
-            label="Assay pH"
-            value={ph}
-            onChange={setPh}
-            placeholder="not given"
-            hint="Given, the audit judges each titratable residue near the active site at this pH."
-            error={fieldError(err, "ph")}
-          />
-          <CheckField id="prepare-no-cache" label="Fetch everything fresh" checked={noCache} onChange={setNoCache} />
-          <div>
-            <PrimaryButton busy={busy} disabled={!entry.trim()}>
-              Audit
-            </PrimaryButton>
-          </div>
-        </form>
-
-        <div className="grid min-w-0 content-start gap-8">
-          {run.status === "idle" && !err ? (
-            <EmptyState title="Audit an entry before you simulate it">
-              <p className="m-0 max-w-[60ch] text-muted">
-                Sequence differences from UniProt, chain breaks, truncated side chains, alternate conformations,
-                non-standard residues and the biological assembly, each placed by its distance to the catalytic
-                residues M-CSA records for the enzyme. Find an entry on the Structures screen.
-              </p>
-            </EmptyState>
-          ) : null}
-          <RunArea view={run} waiting="Reading the entry" hasResult={run.result !== null} fieldErrors={FIELDS}>
-            {run.result ? <PrepareResultView result={run.result} entry={String(run.run?.request.entry ?? "")} /> : null}
-          </RunArea>
-          <CommandLine run={run.run} />
-        </div>
-      </div>
+    <Screen title="Prepare" purpose="Audit a PDB entry before simulating it, every defect ranked by its distance to the active site.">
+      <RunScreen
+        kind="prepare"
+        id="prepare"
+        formLabel="Audit an entry"
+        action="Audit"
+        canSubmit={Boolean(entry.trim())}
+        onSubmit={() => void run.submit(request())}
+        run={run}
+        firstSize={26}
+        form={
+          <>
+            <PathField
+              label="PDB id or mmCIF file"
+              value={entry}
+              onChange={setEntry}
+              kind="file"
+              purpose="Choose an mmCIF file to audit"
+              extensions={["cif", "mmcif"]}
+              placeholder="1I10"
+              hint="A local file is an absolute path to a .cif or .mmcif file."
+              error={err("entry")}
+            />
+            <Field
+              label="Assay pH"
+              optional
+              error={err("ph")}
+              hint="Given, each titratable residue near the active site is judged at this pH."
+            >
+              <NumberInput value={ph} onChange={(e) => setPh(e.target.value)} />
+            </Field>
+            <Checkbox
+              label="Fetch everything fresh"
+              hint="caterva prepare --no-cache: ignore the copies kept from earlier audits."
+              checked={noCache}
+              onChange={setNoCache}
+            />
+          </>
+        }
+        idle={
+          <EmptyState title="Audit an entry before you simulate it">
+            <p className="st-prose">
+              Sequence differences from UniProt, chain breaks, truncated side chains, alternate conformations,
+              non-standard residues and the biological assembly, each placed by its distance to the catalytic residues
+              M-CSA records for the enzyme. Find an entry on the <Link href="/structure">Structures</Link> screen.
+            </p>
+          </EmptyState>
+        }
+      >
+        {(result) => <PrepareResultView result={result} entry={String(run.run?.request.entry ?? entry)} />}
+      </RunScreen>
     </Screen>
   );
 }
 
-function rankFindings(findings: FindingRow[]): FindingRow[] {
-  const order = ["blocks", "decide", "note"];
-  return [...findings].sort(
-    (a, b) =>
-      order.indexOf(a.severity) - order.indexOf(b.severity) ||
-      (a.distance?.value ?? Infinity) - (b.distance?.value ?? Infinity) ||
-      (a.chain ?? "").localeCompare(b.chain ?? ""),
-  );
+function findingKey(f: FindingRow, i: number): string {
+  return `${f.severity}|${f.chain ?? ""}|${f.residues.join(",")}|${f.check ?? ""}|${i}`;
 }
 
 export function PrepareResultView({ result, entry }: { result: PrepareResult; entry: string }) {
   const [chain, setChain] = useState<string>("all");
-  const findings = useMemo(
-    () => rankFindings(result.findings).filter((f) => chain === "all" || f.chain === null || f.chain === chain),
-    [result, chain],
+  const ranked = useMemo(() => rankFindings(result.findings).map((f, i) => ({ f, key: findingKey(f, i) })), [result]);
+  const shown = useMemo(
+    () => ranked.filter(({ f }) => chain === "all" || f.chain === null || f.chain === chain),
+    [ranked, chain],
   );
+  const [picked, setPicked] = useState<string | null>(null);
+  const viewerId = useId();
+  const pick = (key: string) => {
+    const next = key === picked ? null : key;
+    setPicked(next);
+    if (next) {
+      const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      document.getElementById(viewerId)?.scrollIntoView({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
+    }
+  };
+  const pickedRow = ranked.find((r) => r.key === picked)?.f ?? null;
+  const focus = useMemo<EntryFocus | null>(() => {
+    if (!pickedRow) return null;
+    const { refs, flanking } = findingFocus(pickedRow);
+    return { refs, flanking, what: `${pickedRow.check ? `${pickedRow.check}: ` : ""}${pickedRow.what}` };
+  }, [pickedRow]);
   const clean = result.clean_chains ?? [];
   const catalytic = result.catalytic as unknown as CatalyticRowView[];
-  const protonation = result.protonation as unknown as ChargeRowView[] | null;
+  const charges = (result.protonation ?? []) as unknown as ChargeRowView[];
   const isPdbId = PDB_ID.test(entry.trim());
 
   return (
-    <div className="grid gap-8">
-      <div className="grid gap-2">
-        <p className="m-0 font-display text-[1.35rem] leading-snug">
+    <>
+      <div className="st-lede">
+        <h2 className="st-lede-title">
+          <span className="font-mono">{result.pdb_id}</span>
           {clean.length ? (
             <>
-              <span className="font-mono text-[1.15rem]">{result.pdb_id}</span>: a setup can start from chain
-              {clean.length > 1 ? "s" : ""} <span className="font-mono">{clean.join(", ")}</span>
+              : a setup can start from chain{clean.length > 1 ? "s" : ""} <span className="font-mono">{clean.join(", ")}</span>
             </>
           ) : (
-            <>
-              <span className="font-mono text-[1.15rem]">{result.pdb_id}</span>: every chain has at least one blocking
-              defect
-            </>
+            <>: every chain has at least one blocking defect</>
           )}
-        </p>
-        <p className="m-0 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px] text-muted">
+        </h2>
+        <p className="st-lede-meta">
           <span>{result.method.toLowerCase()}</span>
-          {result.resolution ? (
-            <span className="text-fg">
-              <Value v={result.resolution} />
-            </span>
-          ) : null}
+          {result.resolution ? <Value v={result.resolution} /> : null}
           {result.r_free ? (
-            <span>
-              R-free{" "}
-              <span className="text-fg">
-                <Value v={result.r_free} />
-              </span>
+            <span className="st-inline">
+              R-free <Value v={result.r_free} />
             </span>
           ) : null}
-          {result.entry_citation ? (
-            <span>
-              {result.entry_citation.url ? (
-                <a href={result.entry_citation.url} target="_blank" rel="noreferrer noopener">
-                  {result.entry_citation.text}
-                </a>
-              ) : (
-                result.entry_citation.text
-              )}
-            </span>
-          ) : null}
+          {result.entry_citation ? <Citation citation={result.entry_citation} /> : null}
         </p>
         {clean.length && isPdbId ? (
-          <p className="m-0 flex flex-wrap gap-2">
+          <p className="st-inline">
             {clean.map((c) => (
-              <Link
-                key={c}
-                className="btn-quiet no-underline"
-                href={`/md?pdb=${encodeURIComponent(result.pdb_id)}&chain=${encodeURIComponent(c)}`}
-              >
+              <Link key={c} className="btn btn-sm" href={`/md?pdb=${encodeURIComponent(result.pdb_id)}&chain=${encodeURIComponent(c)}`}>
                 Write an MD setup for chain {c}
               </Link>
             ))}
@@ -195,153 +183,229 @@ export function PrepareResultView({ result, entry }: { result: PrepareResult; en
         ) : null}
       </div>
 
-      <Part title="Chains" aside={result.active_site_radius ? <>near the site: within <Value v={result.active_site_radius} /></> : null}>
-        <Table head={["chain", "blocking findings", "findings near the site", "catalytic residues intact"]} caption="Chains">
-          {result.chain_summary.map((s) => (
-            <tr key={s.chain}>
-              <td className={`${td} font-mono`}>{s.chain}</td>
-              <td className={`${td} font-mono tabular-nums`}>{s.blocks}</td>
-              <td className={`${td} font-mono tabular-nums`}>{s.near_site}</td>
-              <td className={td}>{s.catalytic_intact ? "yes" : <Verdict word="no" />}</td>
-            </tr>
-          ))}
-        </Table>
-      </Part>
+      <Section
+        title="Chains"
+        aside={
+          result.active_site_radius ? (
+            <span className="st-inline">
+              near the site: within <Value v={result.active_site_radius} />
+            </span>
+          ) : null
+        }
+      >
+        <DataTable
+          caption="Chains"
+          captionHidden
+          rows={result.chain_summary}
+          rowKey={(s) => s.chain}
+          columns={[
+            { key: "chain", header: "chain", cell: (s) => <span className="font-mono">{s.chain}</span> },
+            { key: "blocks", header: "blocking findings", numeric: true, cell: (s) => s.blocks, sortValue: (s) => s.blocks },
+            { key: "near", header: "findings near the site", numeric: true, cell: (s) => s.near_site, sortValue: (s) => s.near_site },
+            {
+              key: "intact",
+              header: "catalytic residues intact",
+              cell: (s) => (s.catalytic_intact ? "yes" : <Verdict word="no" />),
+            },
+            {
+              key: "clean",
+              header: "a setup can start here",
+              cell: (s) => (clean.includes(s.chain) ? <span className="chip" data-tone="signal">yes</span> : "no"),
+            },
+          ]}
+        />
+      </Section>
 
-      <Part
-        title={`Findings (${result.findings.length})`}
+      <Section
+        title={`Findings, nearest the active site first (${result.findings.length})`}
         aside={
           result.chains.length > 1 ? (
-            <label className="inline-flex items-center gap-2">
-              Chain
-              <select
-                className="rounded-[3px] border border-rule bg-surface px-1.5 py-0.5 font-mono text-[12.5px] text-fg"
-                value={chain}
-                onChange={(e) => setChain(e.target.value)}
-              >
+            <label className="st-inline">
+              chain
+              <Select value={chain} onChange={(e) => setChain(e.target.value)} aria-label="Show the findings of chain">
                 <option value="all">all</option>
                 {result.chains.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           ) : null
         }
       >
-        {(["blocks", "decide", "note"] as const).map((sev) => {
-          const rows = findings.filter((f) => f.severity === sev);
-          if (!rows.length) return null;
-          return (
-            <div key={sev} className="grid gap-2">
-              <h3 className="m-0 font-sans text-[13.5px] font-semibold">
-                {SEVERITY_TITLE[sev]} <span className="font-mono text-muted tabular-nums">({rows.length})</span>
-              </h3>
-              <Table head={["chain", "where", "to the active site", "finding", "from"]} caption={SEVERITY_TITLE[sev]}>
-                {rows.map((f, i) => (
-                  <tr key={`${f.chain}-${f.residues.join(",")}-${f.check ?? ""}-${i}`}>
-                    <td className={`${td} font-mono`}>{f.chain ?? ""}</td>
-                    <td className={`${td} font-mono text-[12.5px]`}>{f.residues.join(", ")}</td>
-                    <td className={`${td} whitespace-nowrap`}>
-                      {f.distance ? <Value v={f.distance} /> : <span className="text-muted">no distance</span>}
-                      {f.catalytic ? <span className="ml-1.5"><Verdict word="catalytic residue" /></span> : null}
-                    </td>
-                    <td className={`${td} max-w-[44rem] text-[13px]`}>
-                      {f.check ? <span className="font-semibold">{f.check}: </span> : null}
-                      {f.what}
-                    </td>
-                    <td className={`${td} font-mono text-[12px] text-muted`}>{f.source}</td>
-                  </tr>
-                ))}
-              </Table>
-            </div>
-          );
-        })}
-      </Part>
+        <div className="st-findings">
+          {(["blocks", "decide", "note"] as const).map((sev) => {
+            const rows = shown.filter(({ f }) => f.severity === sev);
+            if (!rows.length) return null;
+            return (
+              <div key={sev}>
+                <h3 className="st-group-title">
+                  {SEVERITY_TITLE[sev]} <span className="font-mono muted">{rows.length}</span>
+                </h3>
+                <DataTable
+                  caption={SEVERITY_TITLE[sev]}
+                  captionHidden
+                  rows={rows}
+                  rowKey={(r) => r.key}
+                  selectedKey={picked}
+                  onRowSelect={(r) => pick(r.key)}
+                  maxHeight="22rem"
+                  columns={[
+                    {
+                      key: "distance",
+                      header: "to the active site",
+                      headerText: "distance to the active site",
+                      width: "9rem",
+                      sortValue: (r) => r.f.distance?.value ?? null,
+                      cell: ({ f }) =>
+                        f.distance ? (
+                          <Own>
+                            <Value v={f.distance} />
+                          </Own>
+                        ) : (
+                          <span className="muted">no distance</span>
+                        ),
+                    },
+                    { key: "chain", header: "chain", cell: ({ f }) => <span className="font-mono">{f.chain ?? ""}</span> },
+                    {
+                      key: "where",
+                      header: "where",
+                      cell: ({ f }) => (
+                        <span className="font-mono">
+                          {f.residues.join(", ")}
+                          {f.catalytic ? (
+                            <>
+                              {" "}
+                              <Verdict word="catalytic residue" />
+                            </>
+                          ) : null}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: "what",
+                      header: "finding",
+                      cell: ({ f }) => (
+                        <span className="st-what">
+                          {f.check ? <b>{f.check}: </b> : null}
+                          {f.what}
+                        </span>
+                      ),
+                    },
+                    { key: "source", header: "from", cell: ({ f }) => <span className="font-mono muted">{f.source}</span> },
+                  ]}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </Section>
 
-      <Part title="Catalytic residues" aside="M-CSA's reference residues, carried onto each chain by global alignment">
-        {catalytic.length ? (
-          <Table head={["chain", "residue", "reference", "role", "conserved"]} caption="Catalytic residues">
-            {catalytic.map((c) => (
-              <tr key={`${c.chain}-${c.resseq}-${c.reference}`}>
-                <td className={`${td} font-mono`}>{c.chain}</td>
-                <td className={`${td} font-mono`}>
-                  {(c.found ?? "-").charAt(0)}
-                  {(c.found ?? "").slice(1).toLowerCase()}
-                  {c.resseq}
-                </td>
-                <td className={`${td} font-mono text-[12.5px]`}>{c.reference}</td>
-                <td className={`${td} text-[13px]`}>{c.roles}</td>
-                <td className={td}>{c.conserved ? "yes" : <Verdict word={`no, ${c.expected} expected`} />}</td>
-              </tr>
-            ))}
-          </Table>
-        ) : (
-          <p className="m-0 text-[13.5px] text-muted">
-            {result.not_checked.find((n) => n.startsWith("catalytic residues")) ?? "None placed."}
-          </p>
-        )}
-      </Part>
-
-      {protonation ? (
-        <Part
-          title="Protonation at the active site"
-          aside={result.ph ? <>judged at <Value v={result.ph} /></> : null}
+      {isPdbId ? (
+        <Section
+          id={viewerId}
+          title={`PDB ${result.pdb_id} in 3D`}
+          aside={pickedRow ? "showing the chosen finding" : "choose a finding above to see it here"}
         >
-          {protonation.length ? (
-            <Table
-              head={["residue", "to the active site", "typical pKa", "fraction protonated", "at this pH", "state"]}
-              caption="Protonation"
-            >
-              {protonation.map((p) => (
-                <tr key={`${p.chain}-${p.resseq}`}>
-                  <td className={`${td} font-mono`}>{p.residue}</td>
-                  <td className={td}>
-                    <Value v={p.distance} />
-                  </td>
-                  <td className={`${td} whitespace-nowrap`}>
-                    {p.pka ? (
-                      <>
-                        <Value v={p.pka} />
-                        {p.pka_sd ? (
-                          <span className="text-muted">
-                            {" "}
-                            ± <Value v={p.pka_sd} />
-                          </span>
-                        ) : null}
-                      </>
-                    ) : (
-                      <span className="text-muted">not in the survey</span>
-                    )}
-                  </td>
-                  <td className={`${td} whitespace-nowrap`}>{p.protonated ? <Value v={p.protonated} /> : null}</td>
-                  <td className={`${td} text-[13px]`}>{p.at_ph}</td>
-                  <td className={td}>{p.emphasised ? <Verdict word={p.state} /> : <span className="text-[13px]">{p.state}</span>}</td>
-                </tr>
-              ))}
-            </Table>
-          ) : (
-            <p className="m-0 text-[13.5px] text-muted">No titratable residue within the active-site radius.</p>
-          )}
-        </Part>
+          <EntryView pdbId={result.pdb_id} focus={focus} findings={result.findings} charges={charges} />
+        </Section>
+      ) : (
+        <p className="st-prose">A local file is audited from disk; the 3D view draws entries the PDB serves.</p>
+      )}
+
+      <Section title="Catalytic residues" aside="M-CSA's reference residues, carried onto each chain by global alignment">
+        {catalytic.length ? (
+          <DataTable
+            caption="Catalytic residues"
+            captionHidden
+            rows={catalytic}
+            rowKey={(c) => `${c.chain}-${c.resseq}-${c.reference}`}
+            columns={[
+              { key: "chain", header: "chain", cell: (c) => <span className="font-mono">{c.chain}</span> },
+              { key: "residue", header: "residue", cell: (c) => <span className="font-mono">{residueName(c.found ?? "-", c.resseq)}</span> },
+              { key: "reference", header: "carried from", cell: (c) => <span className="font-mono">{c.reference}</span> },
+              { key: "roles", header: "role", cell: (c) => c.roles },
+              {
+                key: "conserved",
+                header: "conserved",
+                cell: (c) => (c.conserved ? "yes" : <Verdict word={`no, ${c.expected} expected`} />),
+              },
+            ]}
+          />
+        ) : (
+          <p className="st-prose">{result.not_checked.find((n) => n.startsWith("catalytic residues")) ?? "None placed."}</p>
+        )}
+      </Section>
+
+      {result.protonation ? (
+        <Section
+          title="Protonation at the active site"
+          aside={
+            result.ph ? (
+              <span className="st-inline">
+                judged at <Value v={result.ph} />
+              </span>
+            ) : null
+          }
+        >
+          <DataTable
+            caption="Protonation"
+            captionHidden
+            rows={charges}
+            rowKey={(p) => `${p.chain}-${p.resseq}`}
+            empty="No titratable residue within the active-site radius."
+            columns={[
+              { key: "residue", header: "residue", cell: (p) => <span className="font-mono">{p.residue}</span> },
+              {
+                key: "distance",
+                header: "to the active site",
+                numeric: true,
+                sortValue: (p) => p.distance.value,
+                cell: (p) => <Value v={p.distance} />,
+              },
+              {
+                key: "pka",
+                header: "typical pKa",
+                numeric: true,
+                cell: (p) =>
+                  p.pka ? (
+                    <span className="st-inline">
+                      <Value v={p.pka} />
+                      {p.pka_sd ? (
+                        <span className="muted st-inline">
+                          ± <Value v={p.pka_sd} showUnit={false} />
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <span className="muted">not in the survey</span>
+                  ),
+              },
+              {
+                key: "protonated",
+                header: "fraction protonated",
+                numeric: true,
+                cell: (p) => (p.protonated ? <Value v={p.protonated} /> : null),
+              },
+              { key: "at_ph", header: "at this pH", cell: (p) => p.at_ph },
+              { key: "state", header: "state", cell: (p) => (p.emphasised ? <Verdict word={p.state} /> : p.state) },
+            ]}
+          />
+        </Section>
       ) : null}
 
-      <Part title="Not checked">
-        <ul className="m-0 grid gap-1 pl-5 text-[13.5px]">
+      <Section title="Not checked">
+        <ul className="st-prose" style={{ paddingLeft: "1.1rem", display: "grid", gap: "0.25rem" }}>
           {result.not_checked.map((n) => (
             <li key={n}>{n}</li>
           ))}
         </ul>
-      </Part>
+      </Section>
 
-      {isPdbId ? (
-        <Part title={`PDB ${result.pdb_id} in 3D`}>
-          <EntryView pdbId={result.pdb_id} />
-        </Part>
-      ) : null}
-
-      <TerminalReport text={result.report_markdown} markdown />
-    </div>
+      <Disclosure title="The report the terminal prints">
+        <MarkdownReport source={result.report_markdown} />
+      </Disclosure>
+    </>
   );
 }
