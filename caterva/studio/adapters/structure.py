@@ -12,7 +12,9 @@ structure.cxc`) names the same file the run stored. The report is the
 command's own stdout, captured; every row of the result is read from the
 same StructureSearch the report was printed from.
 
-Exit 3 has three causes, all the command's: the search could not run (no
+Exit 3 has four causes, all the command's: a name that is not exactly one
+enzyme (the result is the candidates the resolver named, so the page can
+offer each as a search; nothing else), the search could not run (no
 network: no result), the EC number is several proteins and none was chosen
 (the protein table is still a result, so the page can offer the choice),
 and a ChimeraX script was asked for a protein with no entry (a gap the
@@ -35,6 +37,11 @@ unreachable) the response says so in the audit's words and draws none.
 Coordinates are sent as the file gives them, in angstroms, unrounded,
 column by column (one list per field) so a 50,000-atom entry is one compact
 JSON document rather than 50,000 objects.
+
+The same audit's findings (the rows `caterva prepare ENTRY` lists, through
+the prepare adapter's `finding_row`) ride along, so a residue chosen in the
+viewer on any screen can say what the audit found at it without a second
+fetch or a second audit.
 """
 from __future__ import annotations
 
@@ -135,8 +142,21 @@ def structure_argv(request: Mapping[str, Any]) -> List[str]:
     return argv
 
 
+def _named(request: Mapping[str, Any]) -> bool:
+    """Whether `subject` is a name the command will look up (it is then a
+    literature-layer question too), by the command's own test."""
+    from caterva.structure.__main__ import EC_LIKE
+
+    return not EC_LIKE.fullmatch(str(request.get("subject", "")))
+
+
+def _needs(request: Mapping[str, Any]) -> tuple:
+    return ("network", "literature") if _named(request) else ("network",)
+
+
 def _describe(request: Mapping[str, Any]) -> str:
-    what = f"Structures of EC {request.get('subject', '?')}"
+    subject = request.get("subject", "?")
+    what = f"Structures of {subject}" if _named(request) else f"Structures of EC {subject}"
     for key in ("organism", "gene", "uniprot"):
         if request.get(key):
             what += f", {request[key]}"
@@ -182,6 +202,15 @@ def structure_run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome
     ctx.progress.check_cancelled()
     out, err = io.StringIO(), io.StringIO()
     done = run_structure(args, out, err, write=False)
+    named = done.subject.name if done.subject else None
+    if done.search is None and done.subject is not None and done.subject.candidates:
+        candidates: contract.StructureResult = {
+            "ec": "", "organism": done.organism, "ligand": args.ligand, "proteins": [], "chosen": None,
+            "undecided": done.refusal, "entries": [], "total": 0, "report_markdown": out.getvalue(),
+            "chimerax_artifact": None, "organism_note": done.organism_note, "top": args.top, "sources": [],
+            "subject_name": named, "candidates": list(done.subject.candidates),
+        }
+        return AdapterOutcome(3, candidates, first_line(done.refusal), done.refusal)
     if done.search is None:
         return AdapterOutcome(3, None, first_line(done.refusal), done.refusal)
     ctx.progress.stage("rank", "Ranking the chosen protein's entries by ligand, method and resolution")
@@ -206,6 +235,7 @@ def structure_run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome
         "top": args.top,
         "sources": [method_citation("pdb"),
                     {"text": "UniProt for the protein grouping", "registry": "UniProt", "url": None}],
+        "subject_name": named,
     }
     if search.chosen is not None:
         who = f"{search.chosen.gene or search.chosen.accession} ({search.chosen.accession})"
@@ -346,6 +376,7 @@ def coordinates(req: EndpointRequest) -> contract.CoordinatesResponse:
         "catalytic": [],
         "catalytic_reference": None,
         "catalytic_reason": None,
+        "findings": [],
     }
     try:
         a = audit(text, sequence_fetcher(fetch))
@@ -366,6 +397,9 @@ def coordinates(req: EndpointRequest) -> contract.CoordinatesResponse:
     response["chains"] = list(a.chains)
     response["catalytic"] = _catalytic(a)
     response["catalytic_reference"] = catalytic_reference(a)
+    from caterva.studio.adapters.prepare import finding_row
+
+    response["findings"] = [finding_row(f) for f in a.findings]
     if a.reference is None:
         response["catalytic_reason"] = _no_catalytic_reason(a)
     return response
@@ -376,11 +410,12 @@ def register(registry) -> None:
         kind="structure",
         title="Find structures",
         command="structure",
-        needs=("network",),
+        needs=("network", "literature"),
         argv=structure_argv,
         run=structure_run,
         describe=_describe,
         cli_prefix=("caterva", "structure"),
+        needs_for=_needs,
     ))
     registry.add_endpoint("structure_coordinates", coordinates, owner="structure")
 

@@ -133,7 +133,50 @@ def test_the_native_route_on_real_frames_matches_the_command(tmp_path, lysozyme_
     assert r["replicas"] == ["rep1", "rep2"] and r["mode"] == "native" and r["measured"] is True
     assert r["written"] == [str(d / "analyze.sh"), str(d / "chi1.ndx"), str(d / "ANALYSIS.md")]
     assert r["extra"] == {}
+    _the_rmsf_profile_is_the_librarys(r["flexibility"], a)
+    _the_thresholds_are_the_librarys(r["thresholds"])
     json.dumps(r, allow_nan=False)
+
+
+def _the_thresholds_are_the_librarys(sent):
+    """Each verdict's threshold is the library's constant, labelled a choice."""
+    from caterva.analyze import faces, hbonds, rotamers, water
+    from caterva.analyze.angles import MOVED_DEG
+    from caterva.md import convergence as conv
+
+    def values(section):
+        assert all(v["provenance"] == {"kind": "chosen", "by": "default", "reason": v["provenance"]["reason"]}
+                   for v in sent[section])
+        return [v["value"] for v in sent[section]]
+
+    assert values("replicas") == [conv.DISCARD, conv.MIN_BLOCKS, conv.MIN_EFFECTIVE_SAMPLES,
+                                  conv.DISAGREEMENT_FACTOR, conv.CONFIDENCE]
+    assert values("distances") == [cli.MOVED_NM] and values("angles") == [MOVED_DEG]
+    assert values("hbonds") == [hbonds.MAX_DA_NM, hbonds.MAX_ANGLE_DEG, cli.KEPT, cli.LOST, cli.FORMED, cli.SPLIT]
+    assert values("rotamers") == [rotamers.KEPT, rotamers.FLIPPED, rotamers.SPLIT]
+    assert values("faces") == [faces.FLAT_DEG, faces.KEPT, faces.SPLIT]
+    assert values("water") == [water.WATER_NM, water.WET, water.DRY, water.SPLIT]
+
+
+def _the_rmsf_profile_is_the_librarys(flex, a):
+    """The per-residue RMSF sent is every value the library measured, per
+    replica, and the report's pocket and rest means are their means."""
+    profile = flex["rmsf"]
+    assert profile["unit"] == "nm" and profile["provenance"]["kind"] == "computed"
+    assert profile["pocket"] == sorted(a.plan.pocket)
+    assert profile["catalytic"] == sorted({s.resnr for s in a.plan.sites})
+    assert list(profile["replicas"]) == [n for n, _ in a.flexibility.per_residue]
+    pocket = set(a.plan.pocket)
+    rest = set(a.plan.rest)
+    for (name, per), (_, pv, rv) in zip(a.flexibility.per_residue, a.flexibility.per_replica):
+        column = profile["replicas"][name]
+        assert len(column) == len(profile["residues"])
+        sent = {k: v for k, v in zip(profile["residues"], column) if v is not None}
+        assert sent == {k: v for k, v in per.items() if not math.isnan(v)}
+        inside = [v for k, v in sent.items() if k in pocket]
+        outside = [v for k, v in sent.items() if k in rest]
+        assert sum(inside) / len(inside) == pytest.approx(pv, rel=1e-12)
+        assert sum(outside) / len(outside) == pytest.approx(rv, rel=1e-12)
 
 
 def test_script_only_writes_the_script_and_measures_nothing(tmp_path, lysozyme_run):
@@ -208,6 +251,8 @@ def test_the_no_run_route_matches_the_command(tmp_path, monkeypatch, means, kwar
     m, sd = a.flexibility.spread
     assert flex["ratio_mean"]["value"] == m and flex["ratio_sd"]["value"] == sd
     assert flex["is_result"] is a.distances_consistent
+    _the_rmsf_profile_is_the_librarys(flex, a)
+    assert flex["rmsf"]["residues"] == [10, 20, 30, 90]
     if expected == 0:
         assert f"Pocket / rest: {m:.2f} ± {sd:.2f}" in r["report_markdown"]
         assert r["distances"][0]["change"] == "held"

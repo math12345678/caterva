@@ -78,8 +78,19 @@ def test_a_setup_writes_the_commands_files_and_labels_every_default(tmp_path):
     r = got.result
     library = MdSetup(pdb_id="1I10", chain="A", conditions=Conditions())
     assert r["files"] == list(library.files())
-    assert r["parameters"] == [{"name": p.name, "value": p.value, "origin": p.origin, "source": p.source}
-                               for p in library.parameters]
+    assert [{k: row[k] for k in ("name", "value", "origin", "source")} for row in r["parameters"]] == [
+        {"name": p.name, "value": p.value, "origin": p.origin, "source": p.source} for p in library.parameters]
+    from caterva.methods import METHODS
+
+    for row in r["parameters"]:
+        if row["origin"] == "chosen":
+            assert row["by"] == "default" and "citation" not in row
+        elif row["origin"] == "method":
+            # Every cited method is a METHODS entry; its citation is that entry's, linked by its DOI.
+            m = next(m for m in METHODS.values() if row["source"].startswith(m.cite()))
+            assert row["citation"]["text"] == m.cite() and row["citation"]["url"] == f"https://doi.org/{m.doi}"
+    structure_row = next(row for row in r["parameters"] if row["name"] == "structure")
+    assert structure_row["origin"] == "measured" and structure_row["citation"]["url"].endswith("/1I10")
     assert r["temperature"]["value"] == 298.15
     assert r["temperature"]["provenance"] == {"kind": "chosen", "by": "default",
                                               "reason": "chosen: 25 C, no measured value supplied"}
@@ -100,6 +111,11 @@ def test_what_the_person_chose_is_labelled_theirs(tmp_path):
     assert r["ns"]["value"] == 2.5 and r["ns"]["provenance"]["by"] == "user"
     assert r["seeds"] == [7]
     assert "One replica is one sample" in r["report_text"]
+    by = {row["name"]: row.get("by") for row in r["parameters"]}
+    assert by["temperature"] == by["production length"] == "user"
+    # PROVENANCE.md calls a pH the person gave "measured" (caterva/md/setup.py); the result's `ph` says whose it is.
+    assert by["pH (protonation)"] is None and r["ph"]["provenance"]["by"] == "user"
+    assert by["replicas"] == by["velocity seed"] == "user" and by["ionic strength"] == by["pressure"] == "default"
 
 
 def test_measured_conditions_carry_their_citation(tmp_path, monkeypatch):

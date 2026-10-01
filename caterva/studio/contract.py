@@ -1073,6 +1073,12 @@ class StructureResult(_StructureResultRequired, total=False):
     top: int
     #: The databases the search read, cited (the report's "Sources").
     sources: List[Citation]
+    #: The name `subject` was, when it was a name and not an EC number;
+    #: `ec` is then the EC number the literature layer resolved it to.
+    subject_name: Optional[str]
+    #: The EC numbers a name could be, when it was refused for naming more
+    #: than one (exit 3; `ec` is then "" and nothing was searched).
+    candidates: List[str]
 
 
 class AtomColumns(TypedDict):
@@ -1144,6 +1150,9 @@ class CoordinatesResponse(_CoordinatesResponseRequired, total=False):
     #: Why no catalytic residue is given, when none is: the audit's own
     #: words (no M-CSA mechanism, a twilight-zone alignment, no network).
     catalytic_reason: Optional[str]
+    #: The same audit's findings, as `caterva prepare ENTRY` lists them
+    #: (no pH), so a residue chosen in the viewer can say what was found at it.
+    findings: List["FindingRow"]
 
 
 class _PrepareRequestRequired(TypedDict):
@@ -1229,11 +1238,19 @@ class MdSetupRequest(_MdSetupRequestRequired, total=False):
     replicas: int
 
 
-class MdParameterRow(TypedDict):
+class _MdParameterRowRequired(TypedDict):
     name: str
     value: str
     origin: str
     source: str
+
+
+class MdParameterRow(_MdParameterRowRequired, total=False):
+    #: For a `chosen` row: `user` when this request set it, else `default`.
+    by: Literal["user", "default"]
+    #: For a `method` or `measured` row: the source as a Citation, the
+    #: METHODS entry (or the PDB entry) whose `cite()` the source text is.
+    citation: Citation
 
 
 class _MdSetupResultRequired(TypedDict):
@@ -1361,6 +1378,11 @@ class AnalyzeResult(_AnalyzeResultRequired, total=False):
     #: Sections an Analysis carries that this adapter does not name
     #: (added on later branches), through `jsonable`, by field name.
     extra: Dict[str, Any]
+    #: The library's verdict thresholds by the section they judge
+    #: ("replicas", "distances", "angles", "hbonds", "rotamers", "faces",
+    #: "water"), each a value chosen by the command, labelled, with the
+    #: sentence that says what it decides.
+    thresholds: Dict[str, List[SourcedValue]]
 
 
 class _FepReplicaRowRequired(TypedDict):

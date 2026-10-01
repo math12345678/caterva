@@ -136,6 +136,45 @@ def test_a_chimerax_script_for_a_protein_with_no_entry_is_refused_not_a_crash(tm
     assert got.artifacts == () and got.result["chimerax_artifact"] is None
 
 
+NAMES = json.loads((FIX / "structure" / "uniprot_ec_by_name.json").read_text())["answers"]
+
+
+@pytest.fixture
+def recorded_names(monkeypatch):
+    """UniProt's real answers to the name lookup (recorded 2026-10-01), parsed by the resolver's own parser."""
+    from caterva.checkout import literature_module
+
+    lookup = literature_module("enzyme_lookup")
+    monkeypatch.setattr(lookup, "fetch_ec_numbers_by_name",
+                        lambda name, taxon_id=None, timeout=15: lookup.parse_ec_number_candidates(NAMES[name]))
+
+
+def test_a_name_is_looked_up_and_searched_as_its_ec_number(tmp_path, recorded_names):
+    request = {"subject": "L-lactate dehydrogenase A chain", "organism": "human", "gene": "LDHA", "top": 3}
+    got, (code, out, err), _ = _both(tmp_path, request)
+    assert got.exit_code == code == 0 and err == ""
+    assert got.result["report_markdown"] == out
+    assert out.startswith("'L-lactate dehydrogenase A chain' is EC 1.1.1.27:")
+    assert got.result["ec"] == "1.1.1.27" and got.result["subject_name"] == "L-lactate dehydrogenase A chain"
+    by_ec, _, _ = _both(tmp_path / "ec", {**request, "subject": "1.1.1.27"})
+    assert [e["pdb_id"] for e in got.result["entries"]] == [e["pdb_id"] for e in by_ec.result["entries"]]
+    assert by_ec.result["subject_name"] is None
+    assert adapter._needs(request) == ("network", "literature")
+    assert adapter._needs({"subject": "1.1.1.27"}) == ("network",)
+
+
+def test_a_name_that_is_several_enzymes_is_refused_with_every_candidate(tmp_path, recorded_names):
+    got, (code, out, err), _ = _both(tmp_path, {"subject": "lactate dehydrogenase"})
+    assert got.exit_code == code == 3 and out == ""
+    assert got.refusal == err.strip() and "names more than one enzyme" in got.refusal
+    from caterva.checkout import literature_module
+
+    expected = literature_module("enzyme_lookup").parse_ec_number_candidates(NAMES["lactate dehydrogenase"])
+    assert got.result["candidates"] == expected and "1.1.1.27" in expected and len(expected) > 1
+    assert got.result["ec"] == "" and got.result["entries"] == [] and got.result["proteins"] == []
+    assert contract.outcome_for("structure", got.exit_code, got.summary, got.refusal)["meaning"] == "refused"
+
+
 def test_no_network_is_a_refusal_with_no_result(tmp_path, monkeypatch):
     from caterva.structure import search
 
@@ -228,6 +267,12 @@ def test_coordinates_are_the_first_model_as_the_file_gives_them(tmp_path, record
     assert got["catalytic_reason"] is None
     assert got["resolution"]["value"] == a.resolution
     assert got["citation"]["registry"] == "PDB" and got["citation"]["url"]
+    # The findings are the ones `caterva prepare 1I10` lists, in its order.
+    from caterva.studio.adapters import prepare as prepare_adapter
+
+    ctx = RunContext("20260930-120000-prepare-0badc0de", tmp_path, tmp_path, Progress())
+    audited = prepare_adapter.prepare_run({"entry": "1I10"}, ctx).result
+    assert got["findings"] == audited["findings"] and len(got["findings"]) == len(a.findings) > 0
     json.dumps(got, allow_nan=False)
 
 

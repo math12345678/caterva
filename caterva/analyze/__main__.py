@@ -226,6 +226,10 @@ class DistanceResult:
 @dataclass
 class Flexibility:
     per_replica: List[Tuple[str, float, float]]  # (replica, pocket mean RMSF, rest mean RMSF)
+    #: (replica, {residue number: Calpha RMSF in nm}): the per-residue values
+    #: the two means above are taken over, kept so a reader can see where
+    #: along the chain the flexibility is rather than only its two averages.
+    per_residue: List[Tuple[str, Dict[int, float]]] = field(default_factory=list)
 
     @property
     def ratios(self) -> List[float]:
@@ -299,6 +303,7 @@ def measure(directory: Path, p: Plan, reps: Sequence[Path],
             chi1: Sequence = ()) -> Tuple[List[DistanceResult], Flexibility, List["Rotamer"]]:
     per_pair: Dict[int, List[Tuple[str, List[float]]]] = {i: [] for i in range(len(p.pairs))}
     flex = []
+    per_residue: List[Tuple[str, Dict[int, float]]] = []
     pocket, rest = set(p.pocket), set(p.rest)
     for r in reps:
         frames = None
@@ -315,13 +320,14 @@ def measure(directory: Path, p: Plan, reps: Sequence[Path],
             continue
         cols = read_columns(r / "rmsf.xvg")
         rmsf = dict(zip((int(x) for x in cols[0]), cols[1]))
+        per_residue.append((r.name, rmsf))
         pv = [v for k, v in rmsf.items() if k in pocket and not math.isnan(v)]
         rv = [v for k, v in rmsf.items() if k in rest and not math.isnan(v)]
         if pv and rv:
             flex.append((r.name, sum(pv) / len(pv), sum(rv) / len(rv)))
     results = [DistanceResult(q.label, q.crystal_nm, summarise(per_pair[i], q.label, "nm"))
                for i, q in enumerate(p.pairs)]
-    return results, Flexibility(flex), _gromacs_rotamers(directory, reps, chi1)
+    return results, Flexibility(flex, per_residue), _gromacs_rotamers(directory, reps, chi1)
 
 
 def _gromacs_rotamers(directory: Path, reps: Sequence[Path], chi1: Sequence) -> List["Rotamer"]:
@@ -503,6 +509,7 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
     from caterva.analyze.hbonds import Occupancy, count_frame, occupancy, side_chain_group
     per_pair: Dict[int, List[Tuple[str, List[float]]]] = {i: [] for i in range(len(p.pairs))}
     flex = []
+    per_residue: List[Tuple[str, Dict[int, float]]] = []
     pocket, rest = set(p.pocket), set(p.rest)
     atoms = _gro_atoms(ref_gro)
     groups = {}
@@ -561,6 +568,7 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
             continue
         f_ca = xtc.rmsf(traj, [i for _, i in ca], ref)
         rmsf = {res: float(v) for (res, _), v in zip(ca, f_ca)}
+        per_residue.append((r.name, rmsf))
         pv = [v for k, v in rmsf.items() if k in pocket]
         rv = [v for k, v in rmsf.items() if k in rest]
         if pv and rv:
@@ -580,7 +588,7 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
     water = [Hydration(s.label, wat.count_frame(start_x, start_box, site_atoms[i], oxygens), per_water[i])
              for i, s in enumerate(p.sites)]
     faces = [_face(t, per_face[i]) for i, t in enumerate(p.faces)]
-    return results, Flexibility(flex), occupancies, rotamers, angles, water, faces
+    return results, Flexibility(flex, per_residue), occupancies, rotamers, angles, water, faces
 
 
 #: Occupancy thresholds for naming what happened to a hydrogen bond. Chosen,
