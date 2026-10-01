@@ -601,7 +601,11 @@ def _fake_run(tmp_path, elevations, distance_phi=0.5, n=4000):
                                              for i in range(n)))
         (d / "rmsf.xvg").write_text("10 0.05\n20 0.05\n30 0.06\n40 0.20\n")
         (d / "water.xvg").write_text("0.0 1 0 2\n0.5 1 1 2\n")
+        # gmx sasa -o: the protein's total area, then one per catalytic
+        # residue (made-up areas; this test is about the faces).
+        (d / "sasa.xvg").write_text("0.0 60.0 0.5 0.1 0.9\n0.5 60.1 0.6 0.1 0.8\n")
     (tmp_path / "water_start.xvg").write_text("0.0 1 0 2\n")
+    (tmp_path / "sasa_start.xvg").write_text("0.0 60.0 0.5 0.1 0.9\n")
     return tmp_path
 
 

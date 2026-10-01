@@ -868,9 +868,93 @@ translated across the periodic box, and both are tests. The GROMACS route
 runs `gmx select`, and CI checks that the two routes' water tables are
 identical.
 
+It also measures how much of each catalytic residue solvent can reach:
+its solvent-accessible surface area (Lee & Richards' surface, measured
+on Caterva's own route with Shrake & Rupley's points: 2,000 per atom, a
+0.14 nm probe, and Bondi's radii exactly as GROMACS's `vdwradii.dat`
+lists them, hydrogens included). The surface is the whole protein in every frame, because a
+residue's exposure is set by its neighbours; water and ions are not part
+of it, and `caterva md` simulates no ligand. The protein is made whole
+first and its periodic images are not counted. Each residue is reported
+in `em.gro` (the structure every replica began from; the crystal's
+`protein.pdb` has no hydrogens, so set against an all-atom surface a
+change would be only the hydrogens) and per replica as the mean ± SD over
+every frame, with the range the middle 95% of frames fall in. An area
+alone does not say buried or exposed, since a fully exposed glycine has
+less surface than a buried tryptophan, so each is also given as a share
+of the largest area its residue type can have (Tien et al. 2013, PLoS ONE
+8:e80635, Table 1). Those maxima are DSSP's heavy-atom areas with other
+radii, so the share is a guide rather than a value on their scale; on
+the minimised structures of hen lysozyme and T4 lysozyme no residue's
+all-atom area exceeds its maximum (chain ends aside; the largest share is
+0.96). A residue
+is called buried below 20% of it, exposed at 40% or above, and partly
+exposed in between (chosen thresholds, printed with the table), at the
+start and in each replica: "buried throughout", "buried at the start,
+exposed in every replica", or which replicas left the starting state when
+they disagree. A mean near a threshold can fall on either side of it in
+another run of the same system (lysozyme's Asn46 was at 19% in one smoke
+run and 20% in the next), so a replica whose mean crosses a threshold
+while the middle 95% of its frames still reaches back into the starting
+state is reported as "buried in rep2 by its mean, with frames still partly
+exposed", not as having left that state, and does not make the replicas
+disagree. The start is one structure, so a start near a threshold is only
+as firm as the share printed beside it. A residue without a peptide bond on
+both sides in `em.gro` (either end of the chain, or beside a break) has
+no maximum and no verdict, and with one replica there is no verdict. A
+residue number that belongs to two residues (two chains simulated, which
+`caterva md` does by default, or an insertion code, which `.gro` files
+drop) has no area of its own: on both routes the section then says "Not
+measured" and why, and the rest of the report is written as before. Like
+the water, the verdict is a result only when the distances are, and it
+does not set the exit code.
+
+2,000 points per atom is a choice between accuracy and time. On eight
+lysozyme smoke runs (not committed), one structure's residue areas were
+within 0.0098 to 0.0157 nm² of the same areas with 20,000 points, so the
+area at the start can be off by one or two in its last printed digit
+(0.01 nm²); over only five frames a replica's mean was within 0.0052.
+4,000 points would roughly halve the error for about 1.4 times the time.
+
+Every frame is measured, with no stride, and the areas are the largest
+cost of the native route: about 0.25 to 0.4 s a frame for lysozyme (1,960
+protein atoms) and T4 lysozyme (2,603), timed on a heavily loaded machine
+(`caterva/analyze/sasa.py`), so the 1,000 frames a replica of the default
+10 ns run writes add several minutes per replica, and more for a larger
+protein or a longer run (a 100 ns replica at the same output rate, about
+an hour). `--gromacs` measures with `gmx sasa` in `analyze.sh` instead.
+
+The GROMACS route runs `gmx sasa`, which places its points differently
+(Eisenhaber et al.'s double cubic lattice), with the same probe, radii
+and surface (`-surface Protein -nopbc`) and `-ndots 2000`, which it rounds
+up to 2,252 points per atom (its tessellation's next size); the section
+names the method that produced its numbers. Its `-or` file has every
+residue's mean area, for the rest of the protein. The two converge on
+the same surface: on T4 lysozyme, `gmx sasa -ndots 10000` and Caterva at
+10,000 points agree to 0.0044 nm² on all 162 residues. As the routes run
+(2,000 points against 2,252) they differ by the two point sets' errors
+added, which grow with the area a residue exposes: over 11,514 residue
+areas (every residue of 88 structures from eight lysozyme smoke runs,
+which are not committed, and of T4 lysozyme) the root mean square
+difference was about 0.0047 √area nm² (area in nm²) and the largest
+0.0205 nm², on an arginine with 1.80 nm² exposed. The routes are held to
+0.03 √area nm², and at least 0.0075, a margin chosen over those
+measurements: none of them came nearer than 0.71 of it. The tests check
+an isolated atom and two overlapping atoms against the areas worked out
+by hand; every residue of T4 lysozyme against `gmx sasa` at 10,000
+points and at 2,000; the six catalytic residues of 21 committed lysozyme
+frames against `gmx sasa` frame by frame, and two replicas made from
+those frames, which get the same verdicts on both routes; and the same
+frames moved so that the active site straddles the periodic box, which
+give the same areas. CI compares the two routes' tables on every run, to
+that bound plus 0.01 nm² for the rounding of the two printed values, and
+their verdicts: a verdict may differ only where an area rounds into
+another state on each route, which the smoke run reports by name.
+
 `--gromacs --no-run` on a run whose `analyze.sh` was written before the
-angle, face and water tables existed is refused, naming the missing file,
-rather than reporting without them: run `analyze.sh` again first.
+angle, face, water and solvent-exposure tables existed is refused, naming
+the missing file, rather than reporting without them: run `analyze.sh`
+again first.
 
 Each catalytic distance now carries the 95% confidence interval of its
 mean across replicas (Student's t, which is 12.7 for two replicas), and
