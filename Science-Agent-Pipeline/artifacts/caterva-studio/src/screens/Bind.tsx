@@ -121,11 +121,11 @@ export default function BindScreen() {
         />
       </div>
       <div className="k-row2">
-        <Field label="EC number" error={err("ec")}>
-          <TextInput mono value={form.ec} onChange={(e) => set("ec", e.target.value)} placeholder="1.1.1.27" />
+        <Field label="EC number" hint="Four numbers, as 1.1.1.27." error={err("ec")}>
+          <TextInput mono value={form.ec} onChange={(e) => set("ec", e.target.value)} />
         </Field>
         <Field label="Organism" optional error={err("organism")}>
-          <TextInput value={form.organism} onChange={(e) => set("organism", e.target.value)} placeholder="human" />
+          <TextInput value={form.organism} onChange={(e) => set("organism", e.target.value)} />
         </Field>
       </div>
       {form.mode === "inhibitor" ? (

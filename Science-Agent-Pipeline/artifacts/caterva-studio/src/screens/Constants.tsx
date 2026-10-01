@@ -136,16 +136,16 @@ export default function ConstantsScreen() {
       </div>
       <Field
         label={form.by === "ec" ? "EC number" : "Enzyme name"}
-        hint={form.by === "enzyme" ? "Looked up in UniProt, and refused if it names more than one enzyme." : undefined}
+        hint={form.by === "enzyme" ? "Looked up in UniProt, and refused if it names more than one enzyme." : "Four numbers, as 2.7.1.1."}
         error={err(form.by)}
       >
-        <TextInput mono={form.by === "ec"} value={form.who} onChange={(e) => set("who", e.target.value)} placeholder={form.by === "ec" ? "2.7.1.1" : "hexokinase"} />
+        <TextInput mono={form.by === "ec"} value={form.who} onChange={(e) => set("who", e.target.value)} />
       </Field>
       <Field label="Organism" hint="Required: the organism is never inferred." error={err("organism")}>
-        <TextInput value={form.organism} onChange={(e) => set("organism", e.target.value)} placeholder="human" />
+        <TextInput value={form.organism} onChange={(e) => set("organism", e.target.value)} />
       </Field>
       <Field label="Substrate" error={err("substrate")}>
-        <TextInput value={form.substrate} onChange={(e) => set("substrate", e.target.value)} placeholder="glucose" />
+        <TextInput value={form.substrate} onChange={(e) => set("substrate", e.target.value)} />
       </Field>
       <FieldGroup title="Constants">
         {QUANTITIES.map((q) => (

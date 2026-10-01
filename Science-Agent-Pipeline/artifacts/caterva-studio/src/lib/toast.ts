@@ -114,6 +114,11 @@ function snapshot(): Toast[] {
   return toasts;
 }
 
+/** Whether a notification is still on screen (held open while hovered or focused). */
+export function isToastShown(id: string): boolean {
+  return toasts.some((t) => t.id === id);
+}
+
 export function useToasts(): Toast[] {
   return useSyncExternalStore(subscribe, snapshot, snapshot);
 }

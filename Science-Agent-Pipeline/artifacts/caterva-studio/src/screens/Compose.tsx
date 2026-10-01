@@ -211,12 +211,11 @@ export default function ComposeScreen() {
       running={running}
       onCancel={() => void run.cancel()}
     >
-      <Field label="Mechanism" hint="A shape, not a pathway or a subject." error={err("description")}>
+      <Field label="Mechanism" hint="A shape, not a pathway: “Michaelis-Menten with a competitive inhibitor”, “a toggle switch”." error={err("description")}>
         <TextInput
           ref={descriptionRef}
           value={form.description}
           onChange={(e) => set("description", e.target.value)}
-          placeholder="Michaelis-Menten with a competitive inhibitor"
           required
         />
       </Field>
@@ -233,10 +232,10 @@ export default function ComposeScreen() {
         <Field
           label="Enzyme"
           optional
-          hint="An EC number or a name. With one, Km, kcat and Ki are searched in BRENDA; without one the model keeps labelled placeholders."
+          hint="An EC number (1.1.1.27) or a name. With one, Km, kcat and Ki are searched in BRENDA; without one the model keeps labelled placeholders."
           error={err("subject")}
         >
-          <TextInput mono value={form.subject} onChange={(e) => set("subject", e.target.value)} placeholder="1.1.1.27" />
+          <TextInput mono value={form.subject} onChange={(e) => set("subject", e.target.value)} />
         </Field>
         <Field label="Organism" optional hint={organismNote ?? "Never inferred; a measurement in another organism is never substituted."} error={err("organism")}>
           <TextInput
@@ -246,7 +245,7 @@ export default function ComposeScreen() {
               setOrganismNote(null);
             }}
             onBlur={readOrganism}
-            placeholder="human"
+           
           />
         </Field>
         <div className="k-row2">

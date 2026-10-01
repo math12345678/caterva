@@ -26,7 +26,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, type Plugin, searchForWorkspaceRoot } from "vite";
 
 const TOKEN_PLACEHOLDER = "__CATERVA_SESSION_TOKEN__";
 const studioApi = process.env.STUDIO_API;
@@ -140,7 +140,15 @@ export default defineConfig({
     host: "127.0.0.1",
     port,
     strictPort: true,
-    fs: { strict: true },
+    // The workspace, plus the one file outside it the page imports: About
+    // reads docs/data-sources.json, the attribution table the exports use.
+    fs: {
+      strict: true,
+      allow: [
+        searchForWorkspaceRoot(import.meta.dirname),
+        path.resolve(import.meta.dirname, "..", "..", "..", "docs", "data-sources.json"),
+      ],
+    },
     proxy: studioApi
       ? {
           "/api": { target: studioApi, changeOrigin: true, ws: false },
