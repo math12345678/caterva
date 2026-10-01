@@ -60,11 +60,15 @@ function finished<K extends RunKind>(fixture: Captured): RunState<K> {
     run,
     status: run.status,
     stage: null,
+    stages: [],
     log: [],
     outcome: run.outcome,
     result: fixture.result as RunState<K>["result"],
     requestError: null,
     runError: run.error,
+    submitting: false,
+    cancelling: false,
+    settled: true,
   };
 }
 
@@ -90,8 +94,8 @@ describe("Compose", () => {
     const ki = param(result, "reaction_Ki");
     expect(ki.provenance.kind).toBe("measured");
     render(<ComposeResultView result={result} />);
-    await userEvent.click(screen.getByRole("button", { name: new RegExp(`^${ki.label} ${formatValue(ki)} `) }));
-    const link = await screen.findByRole("link", { name: ki.provenance.citation!.text });
+    await userEvent.click(screen.getByRole("button", { name: new RegExp(`^${ki.label}, ${formatValue(ki)} `) }));
+    const link = await screen.findByRole("link", { name: new RegExp(`^${escape(ki.provenance.citation!.text)}(,|$)`) });
     expect(link).toHaveAttribute("href", ki.provenance.citation!.url);
     expect(screen.getByText(ki.provenance.commentary!)).toBeInTheDocument();
   });
@@ -100,7 +104,7 @@ describe("Compose", () => {
     const kcat = param(result, "reaction_kcat");
     expect(kcat.provenance.kind).toBe("placeholder");
     render(<ComposeResultView result={result} />);
-    await userEvent.click(screen.getByRole("button", { name: /^kcat .*placeholder, not measured$/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^kcat, .*placeholder, not measured$/ }));
     const popover = await screen.findByRole("dialog");
     expect(within(popover).getByText(kcat.provenance.reason!)).toBeInTheDocument();
   });
@@ -110,7 +114,7 @@ describe("Compose", () => {
     const ki = param(r, "reaction_Ki");
     expect(ki.provenance.chosen_because).toBeTruthy();
     render(<ComposeResultView result={r} />);
-    expect(screen.getByRole("button", { name: new RegExp(`^Ki ${formatValue(ki)} mM, measured, cited$`) })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: new RegExp(`^Ki, ${formatValue(ki)} mM, measured, cited$`) })).toBeInTheDocument();
   });
 
   it("draws every section under its heading, a refused one marked refused", () => {
@@ -139,7 +143,7 @@ describe("Compose", () => {
 
   it("shows a running run as the stage the server reported", () => {
     const stage = (analyses as Captured).events.find((e) => e.event === "stage")!.data;
-    const state = { ...finished<"compose">(analyses as Captured), status: "running" as const, result: null, stage: { label: String(stage.label), fraction: null } };
+    const state = { ...finished<"compose">(analyses as Captured), status: "running" as const, result: null, stage: { stage: String(stage.stage), label: String(stage.label), fraction: null }, settled: false };
     render(
       <RunView<"compose"> state={state} empty={null}>
         {() => null}
@@ -215,7 +219,7 @@ describe("Constants", () => {
     render(<ConstantsResultView result={result} />);
     for (const v of result.supplied) {
       expect(v.provenance.by).toBe("default");
-      expect(screen.getByRole("button", { name: new RegExp(`^${v.id} .*a stated default$`) })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: new RegExp(`^${v.id}, .*a stated default$`) })).toBeInTheDocument();
     }
   });
 });
@@ -252,7 +256,7 @@ describe("Binding", () => {
     expect(within(verdict).getByRole("button", { name: new RegExp(formatValue(result.verdict!.ki_fold)) })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /ΔG°bind of each Ki row/ })).toBeInTheDocument();
     for (const row of result.target!.used) {
-      expect(screen.getAllByRole("button", { name: new RegExp(`^Ki ${formatValue(row.ki)} mM`) }).length).toBeGreaterThan(0);
+      expect(screen.getAllByRole("button", { name: new RegExp(`^Ki, ${formatValue(row.ki)} mM`) }).length).toBeGreaterThan(0);
     }
   });
 

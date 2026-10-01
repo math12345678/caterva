@@ -33,7 +33,11 @@ export function useSaveSettings() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (next: Settings) => apiPut<Settings>("/api/settings", next, SettingsSchema),
-    onSuccess: (stored) => client.setQueryData(SETTINGS_KEY, stored),
+    onSuccess: (stored) => {
+      client.setQueryData(SETTINGS_KEY, stored);
+      // Offline mode and the GROMACS path change what capabilities report.
+      void client.invalidateQueries({ queryKey: ["capabilities"] });
+    },
   });
 }
 

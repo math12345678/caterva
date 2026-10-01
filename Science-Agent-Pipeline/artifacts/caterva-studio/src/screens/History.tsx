@@ -125,7 +125,7 @@ function RunDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
       void client.invalidateQueries({ queryKey: ["runs"] });
       void client.invalidateQueries({ queryKey: ["capabilities"] });
       client.removeQueries({ queryKey: ["run", id] });
-      notify("info", `Deleted: ${removed.title}`);
+      notify("info", `Moved to the trash folder: ${removed.title}`);
       onDeleted();
     },
     onError: (e) => notify("failed", "The run was not deleted", { description: describeError(e).message }),
@@ -174,7 +174,7 @@ function RunDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
         </button>
         {confirming ? (
           <span className="confirm-inline" role="group" aria-label="Confirm deleting this run">
-            <span>Delete this run and its files in the workspace?</span>
+            <span>Move this run and its files to the workspace&apos;s trash folder?</span>
             <button type="button" className="btn btn-sm btn-danger" onClick={() => remove.mutate()} disabled={remove.isPending}>
               Delete
             </button>

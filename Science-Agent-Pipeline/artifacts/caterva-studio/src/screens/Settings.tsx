@@ -1,9 +1,10 @@
 /**
  * /settings: the theme, how many runs work at once, whether deleting a run
- * asks first, and where the workspace is.
+ * asks first, offline mode, which GROMACS to use, and where the workspace
+ * is.
  *
  * The theme applies the moment it is chosen (and is stored at once); the
- * other two are saved together with the Save button, and a value the
+ * others are saved together with the Save button, and a value the
  * server refuses comes back under its field in the server's words. Keys
  * the server stores that this page does not edit are sent back unchanged,
  * so a newer server's settings survive an older page.
@@ -11,7 +12,7 @@
 import { useEffect, useState } from "react";
 
 import type { Settings } from "@/api/types";
-import { Field, fieldError, FormActions, Select, Switch } from "@/components/forms/Field";
+import { Field, fieldError, FormActions, Select, Switch, TextInput } from "@/components/forms/Field";
 import { useCommand } from "@/components/palette/commands";
 import { Screen, Section } from "@/components/screen/Screen";
 import { ThemeSwitch } from "@/components/shell/ThemeSwitch";
@@ -41,14 +42,23 @@ export default function SettingsScreen() {
   const dirty =
     draft !== null &&
     settings.data !== undefined &&
-    (draft.max_parallel_runs !== settings.data.max_parallel_runs || draft.confirm_delete !== settings.data.confirm_delete);
+    (draft.max_parallel_runs !== settings.data.max_parallel_runs ||
+      draft.confirm_delete !== settings.data.confirm_delete ||
+      Boolean(draft.offline) !== Boolean(settings.data.offline) ||
+      (draft.gromacs_path ?? null) !== (settings.data.gromacs_path ?? null));
   const serverError = save.error instanceof ApiRequestError ? save.error.error : null;
 
   const submit = () => {
     if (!draft || !settings.data) return;
     // The theme is whatever is stored now (it is saved the moment it is chosen).
     save.mutate(
-      { ...settings.data, max_parallel_runs: draft.max_parallel_runs, confirm_delete: draft.confirm_delete },
+      {
+        ...settings.data,
+        max_parallel_runs: draft.max_parallel_runs,
+        confirm_delete: draft.confirm_delete,
+        offline: Boolean(draft.offline),
+        gromacs_path: draft.gromacs_path ?? null,
+      },
       {
         onSuccess: (stored) => {
           setDraft(stored);
@@ -61,7 +71,7 @@ export default function SettingsScreen() {
   useCommand(dirty ? { id: "settings.save", title: "Save settings", run: submit } : null);
 
   return (
-    <Screen title="Settings" purpose="Theme, how many runs at once, and where the workspace lives.">
+    <Screen title="Settings" purpose="Theme, how many runs at once, offline mode, GROMACS, and where the workspace lives.">
       <Section title="Appearance">
         <div className="field">
           <span className="field-label" id="theme-label">
@@ -110,8 +120,33 @@ export default function SettingsScreen() {
               checked={draft.confirm_delete}
               onChange={(v) => setDraft({ ...draft, confirm_delete: v })}
               label="Ask before deleting a run"
-              hint="Deleting removes the run's folder in the workspace; files a run wrote into a folder of yours are never touched."
+              hint="Deleting moves the run's folder to the workspace's trash folder; files a run wrote into a folder of yours are never touched."
             />
+            <Switch
+              checked={Boolean(draft.offline)}
+              onChange={(v) => setDraft({ ...draft, offline: v })}
+              label="Offline mode"
+              hint="Nothing contacts BRENDA, UniProt, the RCSB or NCBI. A run whose request needs the network is refused with that reason; a model without a subject, a local .cif file and a GROMACS setup without a subject still run."
+            />
+            <Field
+              label="GROMACS"
+              optional
+              hint={
+                caps.data?.gromacs.found
+                  ? `Found now: ${caps.data.gromacs.path ?? "gmx"}${caps.data.gromacs.version ? `, ${caps.data.gromacs.version}` : ""}. Leave empty to look for gmx on the PATH and in the Homebrew folders.`
+                  : "The absolute path of a gmx executable. Leave empty to look for gmx on the PATH and in the Homebrew folders."
+              }
+              error={fieldError(serverError, "gromacs_path")}
+            >
+              <TextInput
+                mono
+                value={draft.gromacs_path ?? ""}
+                placeholder="/opt/homebrew/bin/gmx"
+                spellCheck={false}
+                autoComplete="off"
+                onChange={(e) => setDraft({ ...draft, gromacs_path: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+            </Field>
             {serverError && !serverError.field ? <ErrorState error={serverError} /> : null}
             {save.isError && !serverError ? <ErrorState error={save.error} /> : null}
             <FormActions>
