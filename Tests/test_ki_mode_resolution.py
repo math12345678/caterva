@@ -728,7 +728,9 @@ class TestAnyMode:
         states = reading.says() if reading.mode != "unstated" else "no inhibition mode"
         label = row_label(default.value, default.unit, default.citation.reference_id)
         assert f"row stating {states} ({label})" in said[0]
-        assert "ranks every row BRENDA holds by the mode before choosing on evidence, and returns it" in said[0]
+        kept = ("every row it keeps once variants"
+                + (" and rows naming another isoform" if isoform else "") + " are set aside")
+        assert f"ranks by the mode {kept}, before choosing on evidence, and returns it" in said[0]
 
     def test_trypanosoma_cruzi_names_the_row_its_answer_dropped(self):
         got = any_mode_asks("2.7.1.1", "ADP", "Trypanosoma cruzi", "competitive", "glucose", None)
@@ -739,11 +741,27 @@ class TestAnyMode:
         assert chosen.notes == [
             "`reaction_Ki`: --any-mode kept the resolver's pick (1.3 mM, BRENDA ref 640265), "
             "which states no inhibition mode; without it the row stating competitive inhibition "
-            "(1.5 mM, BRENDA ref 640216), this model's mechanism, would be used; the resolver, "
-            "asked for a competitive model of glucose, ranks every row BRENDA holds by the mode "
-            "before choosing on evidence, and returns it"]
+            "versus ATP (1.5 mM, BRENDA ref 640216), this model's mechanism though not its "
+            "substrate (glucose), would be used; the resolver, asked for a competitive model of "
+            "glucose, ranks by the mode every row it keeps once variants are set aside, before "
+            "choosing on evidence, and returns it"]
         # The spread is the default's: 1.3 is carried, 1.5 is among its rows.
         assert carried.disagreement == (1.3, 1.5)
+
+    def test_trypanosoma_cruzi_rows_say_what_they_were_measured_to(self):
+        """BRENDA writes these two rows "competitive to ATP" and
+        "noncompetitive to glucose" (ref 640216). Read as measured against
+        nothing until "to" was read, the 1.5 mM row was carried for a glucose
+        model with no remark, and the 7 mM row, which states another mode
+        measured against glucose, was never named as evidence against a
+        competitive model of glucose."""
+        default = asked_for("2.7.1.1", "ADP", "Trypanosoma cruzi", "competitive", "glucose", None)
+        assert (default.value, default.commentary) == (1.5, "competitive to ATP")
+        against = default.mechanism_evidence
+        assert against is not None
+        assert (against.value, against.reference_id, against.inhibition_mode, against.versus,
+                against.conditions) == (7.0, "640216", "noncompetitive", "glucose",
+                                        "noncompetitive to glucose")
 
     def test_the_quinoline_sulfonamide_names_the_other_mechanisms_row(self):
         got = any_mode_asks("1.1.1.27", QUINOLINE, "Homo sapiens", "noncompetitive", "pyruvate",
@@ -754,8 +772,8 @@ class TestAnyMode:
             "which measured competitive inhibition versus NADH, and this model is noncompetitive; "
             "without it the row stating noncompetitive inhibition versus pyruvate (0.00252 mM, "
             "BRENDA ref 739793), this model's mechanism and substrate, would be used; the "
-            "resolver, asked for a noncompetitive model of pyruvate, ranks every row BRENDA holds "
-            "by the mode before choosing on evidence, and returns it"))
+            "resolver, asked for a noncompetitive model of pyruvate, ranks by the mode every row "
+            "it keeps once variants are set aside, before choosing on evidence, and returns it"))
 
     def test_the_quinoline_sulfonamide_for_a_mode_no_row_states(self):
         got = any_mode_asks("1.1.1.27", QUINOLINE, "Homo sapiens", "uncompetitive", "pyruvate",
@@ -764,7 +782,8 @@ class TestAnyMode:
         assert chosen.measured["reaction_Ki"].value == 0.00059 and chosen.withheld == {}
         assert chosen.notes[0].endswith(
             "without it the constant would be refused; the resolver, asked for an uncompetitive "
-            "model of pyruvate, finds that every row it holds states another mode (competitive "
+            "model of pyruvate, finds that every row it keeps once variants are set aside states "
+            "another mode (competitive "
             "inhibition versus NADH; noncompetitive inhibition versus pyruvate)")
 
     @pytest.mark.parametrize("mode", ["competitive", "noncompetitive", "uncompetitive"])
@@ -790,7 +809,7 @@ class TestAnyMode:
     def test_compare_mode_is_refused_beside_a_mode_and_checked_as_one(self):
         with pytest.raises(ValueError, match="compare_mode is for a call asked for no inhibition"):
             ldh(inhibition_mode="competitive", compare_mode="noncompetitive")
-        with pytest.raises(ValueError, match="inhibition_mode must be one of"):
+        with pytest.raises(ValueError, match="compare_mode must be one of"):
             ldh(compare_mode="mixed")
         # A Km has no mode to compare: nothing is said.
         assert ki("2.7.1.1", "glucose", quantity="km", compare_mode="competitive").mode_default is None
@@ -830,7 +849,7 @@ class TestTheCommand:
         assert "| `reaction_Ki` | 1.3 mM | literature (Trypanosoma cruzi) | BRENDA ref 640265 |" in out
         assert ("`reaction_Ki`: --any-mode kept the resolver's pick (1.3 mM, BRENDA ref 640265), "
                 "which states no inhibition mode; without it the row stating competitive "
-                "inhibition (1.5 mM, BRENDA ref 640216)") in out
+                "inhibition versus ATP (1.5 mM, BRENDA ref 640216)") in out
         assert "spanning **1.3 to 1.5 mM**" in out
 
     def test_the_default_carries_the_row_the_note_named(self, compose):
@@ -840,6 +859,9 @@ class TestTheCommand:
         assert default.value == 1.5 and default.citation.reference_id == "640216"
         assert "| `reaction_Ki` | 1.5 mM | literature (Trypanosoma cruzi) | BRENDA ref 640216 |" in out
         assert "spanning **1.3 to 1.5 mM**" in out
+        # "competitive to ATP" is read as measured versus ATP, and said.
+        assert ("`reaction_Ki`: the row measured inhibition **versus ATP**, not versus glucose, "
+                "the substrate in this model") in out
 
 
 class TestTheArgument:

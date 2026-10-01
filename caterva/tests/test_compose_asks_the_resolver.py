@@ -295,9 +295,10 @@ class TestAnyModeNamesTheRowTheDefaultCarries:
         assert chosen.notes == [
             "`reaction_Ki`: --any-mode kept the resolver's pick (1.3 mM, BRENDA ref 640265), "
             "which states no inhibition mode; without it the row stating competitive inhibition "
-            "(1.5 mM, BRENDA ref 640216), this model's mechanism, would be used; the resolver, "
-            "asked for a competitive model of glucose, ranks every row BRENDA holds by the mode "
-            "before choosing on evidence, and returns it"]
+            "versus ATP (1.5 mM, BRENDA ref 640216), this model's mechanism though not its "
+            "substrate (glucose), would be used; the resolver, asked for a competitive model of "
+            "glucose, ranks by the mode every row it keeps once variants are set aside, before "
+            "choosing on evidence, and returns it"]
         # The default's row is among the alternatives, so the spread printed
         # is the one the default prints.
         assert carried.disagreement == (1.3, 1.5)
@@ -312,7 +313,8 @@ class TestAnyModeNamesTheRowTheDefaultCarries:
         assert chosen.measured["reaction_Ki"].value == 0.00059 and chosen.withheld == {}
         assert chosen.notes[0].endswith(
             "without it the constant would be refused; the resolver, asked for an uncompetitive "
-            "model of pyruvate, finds that every row it holds states another mode (competitive "
+            "model of pyruvate, finds that every row it keeps once variants are set aside "
+            "states another mode (competitive "
             "inhibition versus NADH; noncompetitive inhibition versus pyruvate)")
 
     def test_a_default_that_carries_the_same_row_adds_nothing(self):

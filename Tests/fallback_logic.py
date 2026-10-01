@@ -168,8 +168,8 @@ class ModeDefault(BaseModel):
     it been asked for the model's (`resolve_kinetic_value(compare_mode=...)`).
 
     `caterva compose --any-mode` asks this resolver for a Ki with no mode, so
-    it carries the row the API and the TypeScript CLI return when no mode is
-    sent. Its report must still say what the default, which asks with the
+    it carries the row the runner returns when no mode is sent (the
+    TypeScript CLI without --mode). Its report must still say what the default, which asks with the
     model's mode, would have carried instead, and why the two differ. Until
     2026-09-30 compose worked that out by ranking the rows the answer held,
     which are the frontier of the rows the evidence kept, and the default's
@@ -1036,7 +1036,7 @@ def _ki_mode():
     return ki_mode
 
 
-def _mode_asked(inhibition_mode, quantity, log):
+def _mode_asked(inhibition_mode, quantity, log, name="inhibition_mode"):
     """The inhibition mode to rank Ki rows for, or None when there is none.
 
     A mode says which Ki row is the model's constant. It has no bearing on a
@@ -1054,7 +1054,7 @@ def _mode_asked(inhibition_mode, quantity, log):
     except ImportError:
         modes = None  # for a Ki, _partition_mode says it could not rank
     if modes is not None and inhibition_mode not in modes:
-        raise ValueError(f"inhibition_mode must be one of {', '.join(modes)}; "
+        raise ValueError(f"{name} must be one of {', '.join(modes)}; "
                          f"got {inhibition_mode!r}")
     if quantity != "ki":
         log.append(f"inhibition mode {inhibition_mode!r} not applied: it chooses among Ki "
@@ -1288,7 +1288,9 @@ def _compare_mode_asked(compare_mode, inhibition_mode, quantity):
     if inhibition_mode is not None:
         raise ValueError(f"compare_mode is for a call asked for no inhibition mode; this one "
                          f"was asked for {inhibition_mode!r}")
-    return _mode_asked(compare_mode, quantity, [])
+    # Named as the argument the caller passed, so a bad compare_mode is not
+    # reported as a bad inhibition_mode the caller never sent.
+    return _mode_asked(compare_mode, quantity, [], name="compare_mode")
 
 
 def _mode_withheld_result(mode, stated, log):

@@ -485,10 +485,23 @@ resolver, from the same rows and without fetching the page again, says what
 it would have returned asked for it. The report names that row and why the
 two differ: "--any-mode kept the resolver's pick (1.3 mM, BRENDA ref
 640265), which states no inhibition mode; without it the row stating
-competitive inhibition (1.5 mM, BRENDA ref 640216), this model's mechanism,
-would be used", and the spread printed is 1.3 to 1.5 mM either way. Until
+competitive inhibition versus ATP (1.5 mM, BRENDA ref 640216), this model's
+mechanism though not its substrate (glucose), would be used". Until
 2026-09-30 `--any-mode` worked out the default's row from the rows its
-answer held, which lack 1.5 mM, so it said nothing there.
+answer held, which lack 1.5 mM, so it said nothing there. The value and
+reference carried are the no-mode answer's. The rows printed beside it are
+not quite: the default's row is added to the carried constant's
+alternatives, so the spread is 1.3 to 1.5 mM either way, where the no-mode
+answer's own candidates hold 1.3 mM alone.
+
+"Competitive to ATP" is read as measured versus ATP. Until 2026-10-01 the
+row reader took only "versus", "vs." and "with respect to", so this row
+read as measured against nothing and was carried for a glucose model with
+no remark; the 7 mM row, "noncompetitive to glucose", is now also read as
+measured versus glucose, and the API and the CLI return it as
+`mechanismEvidence` against a competitive model of glucose. Compose's report
+says the 1.5 mM row was measured versus ATP, not glucose, but does not name
+the 7 mM row: the resolver's answer does not give compose that row.
 
 The API sends its model's substrate with the mode; the CLI takes it as
 `--model-substrate`, because `--substrate` names the inhibitor for a Ki.
@@ -508,9 +521,11 @@ only competitive row, and the API's `provenance.flags` and `scientific
 resolve` both name 0.00252 mM "noncompetitive versus pyruvate": measured
 against pyruvate the inhibitor is not competitive, and no choice of row
 fixes that. The runner sends the row as `mechanismEvidence`, found by the
-function in `ki_mode.py` that compose's note comes from. Only a row saying
-"versus X" is read as measured against X, so the Trypanosoma cruzi ADP
-rows above ("competitive to ATP", "noncompetitive to glucose") are not.
+function in `ki_mode.py` that compose's note comes from. A row saying
+"versus X", "vs. X", "with respect to X" or "<mode> to X" is read as
+measured against X, so for a competitive model of glucose the Trypanosoma
+cruzi ADP row 7 mM "noncompetitive to glucose" is sent as
+`mechanismEvidence` against the 1.5 mM "competitive to ATP" row returned.
 
 `scientific simulate --resolve --model competitive|noncompetitive|product`
 looks its Ki up the same way, and needs `--inhibitor NAME` to do it. Until

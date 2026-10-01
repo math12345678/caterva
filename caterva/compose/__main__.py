@@ -161,12 +161,12 @@ def build_parser(prog: str = "python -m caterva.compose") -> argparse.ArgumentPa
                              "measured on other isoforms is refused")
     parser.add_argument("--any-mode", action="store_true",
                         help="take an inhibition constant from the row the resolver returns when "
-                             "asked for no inhibition mode, as the API and the CLI do when no mode "
-                             "is sent, whatever mode it states. By default a Ki comes from a row "
+                             "asked for no inhibition mode, as the TypeScript CLI does without "
+                             "--mode, whatever mode it states. By default a Ki comes from a row "
                              "stating this model's mode (mixed counts for noncompetitive), else from "
                              "one stating none, and a Ki only measured for another mode is refused. "
                              "The report flags a mismatch either way, and names the row the default "
-                             "would carry")
+                             "would carry when that row is another")
     parser.add_argument("--product",
                         help="the product, for constants measured on it: a reverse Km, a "
                              "product-inhibition Kp")

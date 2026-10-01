@@ -60,8 +60,9 @@ and chose it, and its `chosen_because` says so in every export.
 WITH --any-mode
 ---------------
 The resolver is asked for the isoform and no mode, which is the question
-the API and the TypeScript CLI ask when no mode is sent, so the row carried
-is theirs: for Trypanosoma cruzi and ADP above, 1.3 mM. The request also
+the runner answers when no mode is sent (the TypeScript CLI without
+`--mode`; the API always sends one), so the row carried is that answer's:
+for Trypanosoma cruzi and ADP above, 1.3 mM. The request also
 carries the model's mode as one to compare with (`compare_mode`), and the
 resolver says what it would have returned asked for it (`KineticResult.
 mode_default`), from the same rows by the same steps. The note saying what
@@ -69,19 +70,22 @@ the default would carry names that row, and why the two differ:
 
     `reaction_Ki`: --any-mode kept the resolver's pick (1.3 mM, BRENDA ref
     640265), which states no inhibition mode; without it the row stating
-    competitive inhibition (1.5 mM, BRENDA ref 640216), this model's
-    mechanism, would be used; the resolver, asked for a competitive model
-    of glucose, ranks every row BRENDA holds by the mode before choosing on
+    competitive inhibition versus ATP (1.5 mM, BRENDA ref 640216), this
+    model's mechanism though not its substrate (glucose), would be used; the
+    resolver, asked for a competitive model of glucose, ranks by the mode
+    every row it keeps once variants are set aside, before choosing on
     evidence, and returns it
 
 Until 2026-09-30 that note was ki_mode's over the rows the answer held, the
 frontier of the rows the evidence kept, which lacks 1.5 mM, so it carried
 1.3 mM and said nothing. The default's row is also put among the carried
 constant's alternatives, so the printed spread is the default's (1.3 to 1.5
-mM) whichever way the model is built. The resolver computes it without a
-second fetch or parse of the page; a resolver that does not return one (a
-stand-in, or one that predates the field) leaves the note to the rows, as
-before.
+mM) whichever way the model is built. So the parity with the runner and
+the TypeScript CLI asked for no mode is in the row carried, not in the rows
+listed beside it: their no-mode answer's candidates hold 1.3 mM alone. The
+resolver computes the default's row without a second fetch or parse of the
+page; a resolver that does not return one (a stand-in, or one that predates
+the field) leaves the note to the rows, as before.
 """
 from __future__ import annotations
 

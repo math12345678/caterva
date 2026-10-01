@@ -86,12 +86,18 @@ substrate is checked for it by this function, over the rows its mode step
 ranked. One rule, then, and not three (ADR 0027); but each front end runs
 it over the rows it has, and compose's rows (the resolver's answer and the
 evidence view beside it) are not always every row the literature layer's
-mode step saw, so the rule cannot drift while the inputs still can. Only a row stating "versus X" is
-read as measured against X. The recorded hexokinase page has Trypanosoma
-cruzi's ADP rows "competitive to ATP" and "noncompetitive to glucose";
-`read_mode` reads neither as measured against anything, so neither is
-taken as evidence against a competitive glucose model, although the
-second states exactly that.
+mode step saw, so the rule cannot drift while the inputs still can. A row
+is read as measured against X when it says "versus X", "vs. X", "with
+respect to X" or "<mode> to X" (`read_mode`). The recorded hexokinase page
+has Trypanosoma cruzi's ADP rows "competitive to ATP" (1.5 mM) and
+"noncompetitive to glucose" (7 mM, both ref 640216). Until 2026-10-01
+"to" was not read, so neither row was taken as measured against
+anything. Now the literature layer, asked for a competitive model of
+glucose, carries 1.5 mM and returns the 7 mM row as `mechanism_evidence`.
+Compose carries the same 1.5 mM row and `row_scope` says it was measured
+versus ATP, not glucose; it does not name the 7 mM row, because that row is
+not among the rows the resolver's answer gives compose. That is the
+difference in inputs described above, not a second rule.
 
 MIXED FOR NONCOMPETITIVE, AND NOT THE REVERSE
 ---------------------------------------------
@@ -652,9 +658,10 @@ def select_mode(
     resolver's `mode_default`). The note then names that row as the one the
     default carries, or says the default refuses and what the rows state,
     rather than the best of the rows this is shown. The two can differ: the
-    resolver ranks every row BRENDA holds, and a row it would return for the
-    mode can be one the evidence alone dropped before any row reached here
-    (Trypanosoma cruzi hexokinase and ADP, narrowed.py). Without it, as for
+    resolver ranks by the mode every row its isoform and variant steps
+    kept, and a row it would return for the mode can be one the evidence
+    alone dropped before any row reached here (Trypanosoma cruzi hexokinase
+    and ADP, narrowed.py). Without it, as for
     a resolver that does not say, the note is over the rows this is shown.
     """
     out = ModeSelection(measured={})
@@ -702,12 +709,18 @@ def select_mode(
                     asked = ((f"{isoform} and " if isoform else "")
                              + f"{'an' if want[0] in 'aeiou' else 'a'} {want} model"
                              + (f" of {substrate}" if substrate else ""))
+                    # The rows it ranks are those its isoform and variant
+                    # steps kept, not every row BRENDA holds: a variant's
+                    # row, or another isoform's, is never ranked.
+                    kept_rows = ("every row it keeps once variants"
+                                 + (" and rows naming another isoform" if isoform else "")
+                                 + " are set aside")
                     if best is not None:
-                        instead += (f"; the resolver, asked for {asked}, ranks every row BRENDA "
-                                    f"holds by the mode before choosing on evidence, and returns it")
+                        instead += (f"; the resolver, asked for {asked}, ranks by the mode "
+                                    f"{kept_rows}, before choosing on evidence, and returns it")
                     else:
-                        instead += (f"; the resolver, asked for {asked}, finds that every row it "
-                                    f"holds states another mode"
+                        instead += (f"; the resolver, asked for {asked}, finds that {kept_rows} "
+                                    f"states another mode"
                                     + (f" ({'; '.join(modes)})" if modes else ""))
                 out.notes.append(
                     f"`{identifier}`: {ANY_MODE_FLAG} kept {_carried(m)} ({pick.label()}), "

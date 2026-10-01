@@ -648,12 +648,13 @@ describe('the command printed "in full" is the run that was asked for', () => {
 
 describe('a refused product model is not switched to another model', () => {
   // Rabbit hexokinase and N-acetyl-D-glucosamine, asked for a noncompetitive
-  // Ki: the real runner's answer on the committed page (2026-09-30). BRENDA's
-  // one rabbit row (ref 640206, 0.7 mM) says "competitive to glucose".
+  // Ki: the real runner's answer on the committed page (2026-10-01). BRENDA's
+  // one rabbit row (ref 640206, 0.7 mM) says "competitive to glucose", which
+  // has been read as measured versus glucose since 2026-10-01.
   const COMPETITIVE_ONLY = {
     ...NOTHING('ki'),
     source: 'mode_withheld',
-    modesAvailable: ['competitive inhibition'],
+    modesAvailable: ['competitive inhibition versus glucose'],
   } as ResolverResult;
   const run = (model: 'product' | 'noncompetitive') =>
     commandSimulateResolved({
@@ -676,7 +677,7 @@ describe('a refused product model is not switched to another model', () => {
     jest.mocked(resolveKinetic).mockResolvedValue(COMPETITIVE_ONLY);
     await run('product');
     const ki = document().unresolved.find((u) => u.startsWith('ki '))!;
-    expect(ki).toContain('(competitive inhibition)');
+    expect(ki).toContain('(competitive inhibition versus glucose)');
     expect(ki).not.toContain('run with --model');
     expect(ki).toContain('no other --model is offered');
     // Not the default, which would deny that a competitive model exists.
