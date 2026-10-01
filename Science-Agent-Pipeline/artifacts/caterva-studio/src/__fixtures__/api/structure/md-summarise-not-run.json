@@ -1,0 +1,19 @@
+{
+ "kind": "md.summarise",
+ "request": {
+  "directory": "/tmp/claude-501/caterva-fixtures-7kk_bdkk/lyso-md"
+ },
+ "cli": [
+  "caterva",
+  "md",
+  "--summarise",
+  "/private/tmp/claude-501/caterva-fixtures-7kk_bdkk/lyso-md"
+ ],
+ "outcome": {
+  "exit_code": 3,
+  "meaning": "refused",
+  "summary": "Refused: no rep*/rmsd.xvg under /private/tmp/claude-501/caterva-fixtures-7kk_bdkk/lyso-md. Run its run.sh first.",
+  "reason": "Refused: no rep*/rmsd.xvg under /private/tmp/claude-501/caterva-fixtures-7kk_bdkk/lyso-md. Run its run.sh first."
+ },
+ "result": null
+}

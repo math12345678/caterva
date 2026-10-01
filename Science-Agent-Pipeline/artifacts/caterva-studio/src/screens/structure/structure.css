@@ -1,0 +1,111 @@
+/*
+ * Styles the four structure screens share and the foundation's
+ * index.css does not carry. Tokens only (index.css defines them for both
+ * themes); no colour is written here as a literal.
+ */
+
+.btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--fg);
+  padding: 0.3rem 0.65rem;
+  font-size: 13px;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background-color 180ms var(--ease-out-expo);
+}
+.btn-quiet:hover {
+  background: var(--surface-raised);
+}
+.btn-quiet:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* The tab row the Dynamics screen uses between its four questions. */
+.str-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+.str-tabs [role="tab"] {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 0.4rem 0;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+.str-tabs [role="tab"][aria-selected="true"] {
+  color: var(--fg);
+  border-bottom-color: var(--signal-deep);
+  font-weight: 600;
+}
+
+/* A selectable row in a results table. */
+.data-table tbody tr[data-selectable] {
+  cursor: pointer;
+}
+.data-table tbody tr[data-selectable]:hover,
+.data-table tbody tr[aria-selected="true"] {
+  background: var(--surface-raised);
+}
+
+/* The markdown report the command prints, as the terminal would show it. */
+.report-md h1,
+.report-md h2,
+.report-md h3 {
+  font-size: 1.05rem;
+  margin: 1.1rem 0 0.4rem;
+}
+.report-md p,
+.report-md ul {
+  margin: 0.4rem 0;
+}
+.report-md table {
+  border-collapse: collapse;
+  font-size: 12.5px;
+  margin: 0.5rem 0;
+}
+.report-md th,
+.report-md td {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.2rem 0.6rem 0.2rem 0;
+  text-align: left;
+  vertical-align: top;
+}
+.report-md code {
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+}
+
+/* An ink slab for a command the person runs themselves. */
+.command-slab {
+  background: var(--fg);
+  color: var(--surface);
+  border-radius: 3px;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.viewer-canvas:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.viewer-canvas {
+  cursor: grab;
+  touch-action: none;
+}
+.viewer-canvas:active {
+  cursor: grabbing;
+}

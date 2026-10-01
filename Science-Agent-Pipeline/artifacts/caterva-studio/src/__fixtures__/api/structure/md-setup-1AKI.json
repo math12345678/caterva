@@ -1,0 +1,223 @@
+{
+ "kind": "md.setup",
+ "request": {
+  "pdb": "1AKI",
+  "chain": "A",
+  "replicas": 3
+ },
+ "cli": [
+  "caterva",
+  "md",
+  "--pdb",
+  "1AKI",
+  "--chain",
+  "A",
+  "--replicas",
+  "3",
+  "--out",
+  "/tmp/claude-501/caterva-fixtures-7kk_bdkk/runs/20260930-120000-md-setup-0badc0de/md-setup"
+ ],
+ "outcome": {
+  "exit_code": 0,
+  "meaning": "produced",
+  "summary": "PDB 1AKI, chain A: 10 files written to /tmp/claude-501/caterva-fixtures-7kk_bdkk/runs/20260930-120000-md-setup-0badc0de/md-setup, 298.15 K, 3 replicas",
+  "reason": null
+ },
+ "result": {
+  "out_dir": "/tmp/claude-501/caterva-fixtures-7kk_bdkk/runs/20260930-120000-md-setup-0badc0de/md-setup",
+  "pdb": "1AKI",
+  "chain": "A",
+  "temperature": {
+   "value": 298.15,
+   "unit": "K",
+   "provenance": {
+    "kind": "chosen",
+    "by": "default",
+    "reason": "chosen: 25 C, no measured value supplied"
+   },
+   "label": "temperature"
+  },
+  "ph": null,
+  "parameters": [
+   {
+    "name": "temperature",
+    "value": "298.15 K",
+    "origin": "chosen",
+    "source": "chosen: 25 C, no measured value supplied"
+   },
+   {
+    "name": "pH (protonation)",
+    "value": "standard states",
+    "origin": "chosen",
+    "source": "not stated; GROMACS assigns standard protonation states"
+   },
+   {
+    "name": "ionic strength",
+    "value": "0.15 M NaCl, net charge neutralised",
+    "origin": "chosen",
+    "source": "physiological default; override with --ionic-strength"
+   },
+   {
+    "name": "pressure",
+    "value": "1.0 bar",
+    "origin": "chosen",
+    "source": "ambient"
+   },
+   {
+    "name": "production length",
+    "value": "10 ns",
+    "origin": "chosen",
+    "source": "override with --ns"
+   },
+   {
+    "name": "replicas",
+    "value": "3",
+    "origin": "chosen",
+    "source": "independent runs from one solvated, minimised system, differing only in their initial velocities; every quantity is reported as a spread across them"
+   },
+   {
+    "name": "velocity seed",
+    "value": "rep1: 20260927, rep2: 20260928, rep3: 20260929",
+    "origin": "chosen",
+    "source": "fixed so each run can be reproduced; ion placement uses 20260927 for all replicas, so they share one starting structure"
+   },
+   {
+    "name": "force field",
+    "value": "amber99sb-ildn",
+    "origin": "method",
+    "source": "Lindorff-Larsen et al. (2010) Proteins 78:1950, doi:10.1002/prot.22711"
+   },
+   {
+    "name": "water model",
+    "value": "tip3p",
+    "origin": "method",
+    "source": "Jorgensen et al. (1983) J. Chem. Phys. 79:926, doi:10.1063/1.445869"
+   },
+   {
+    "name": "thermostat",
+    "value": "V-rescale, tau 0.1 ps",
+    "origin": "method",
+    "source": "Bussi, Donadio & Parrinello (2007) J. Chem. Phys. 126:014101, doi:10.1063/1.2408420"
+   },
+   {
+    "name": "barostat (equilibration)",
+    "value": "C-rescale, tau 2 ps",
+    "origin": "method",
+    "source": "Bernetti & Bussi (2020) J. Chem. Phys. 153:114107, doi:10.1063/5.0020514"
+   },
+   {
+    "name": "barostat (production)",
+    "value": "Parrinello-Rahman, tau 2 ps",
+    "origin": "method",
+    "source": "Parrinello & Rahman (1981) J. Appl. Phys. 52:7182, doi:10.1063/1.328693"
+   },
+   {
+    "name": "electrostatics",
+    "value": "PME, 1.0 nm real-space cut-off",
+    "origin": "method",
+    "source": "Essmann et al. (1995) J. Chem. Phys. 103:8577, doi:10.1063/1.470117 (ions.mdp, which only places ions and simulates nothing, uses a plain cut-off: the system is still charged then)"
+   },
+   {
+    "name": "PME grid",
+    "value": "0.16 nm spacing, 4th-order interpolation",
+    "origin": "chosen",
+    "source": "GROMACS's defaults for PME accuracy"
+   },
+   {
+    "name": "van der Waals",
+    "value": "1.0 nm cut-off, dispersion correction to energy and pressure",
+    "origin": "chosen",
+    "source": "the cut-off the force field was parameterised with"
+   },
+   {
+    "name": "neighbour list",
+    "value": "Verlet buffer, updated every 10 steps",
+    "origin": "chosen",
+    "source": "GROMACS default; the buffer is sized automatically"
+   },
+   {
+    "name": "compressibility",
+    "value": "4.5e-5 1/bar",
+    "origin": "chosen",
+    "source": "isothermal compressibility of water near 300 K"
+   },
+   {
+    "name": "minimisation",
+    "value": "steepest descent to max force < 1000 kJ/mol/nm, at most 50000 steps",
+    "origin": "chosen",
+    "source": "standard pre-equilibration target"
+   },
+   {
+    "name": "equilibration",
+    "value": "NVT 100 ps then NPT 100 ps, protein heavy atoms restrained",
+    "origin": "chosen",
+    "source": "restraints released for production"
+   },
+   {
+    "name": "output",
+    "value": "coordinates every 10 ps; energies and log every 2 ps",
+    "origin": "chosen",
+    "source": "enough to analyse, small enough to keep"
+   },
+   {
+    "name": "constraints",
+    "value": "h-bonds, LINCS; 2 fs time step",
+    "origin": "method",
+    "source": "Hess et al. (1997) J. Comput. Chem. 18:1463, doi:10.1002/(SICI)1096-987X(199709)18:12<1463::AID-JCC4>3.0.CO;2-H"
+   },
+   {
+    "name": "engine",
+    "value": "GROMACS",
+    "origin": "method",
+    "source": "Abraham et al. (2015) SoftwareX 1-2:19, doi:10.1016/j.softx.2015.06.001"
+   },
+   {
+    "name": "structure",
+    "value": "PDB 1AKI, chain A",
+    "origin": "measured",
+    "source": "Berman et al. (2000) Nucleic Acids Res. 28:235, doi:10.1093/nar/28.1.235; entry doi:10.2210/pdb1aki/pdb"
+   }
+  ],
+  "files": [
+   "ions.mdp",
+   "em.mdp",
+   "rep1/nvt.mdp",
+   "rep2/nvt.mdp",
+   "rep3/nvt.mdp",
+   "caterva-setup.json",
+   "npt.mdp",
+   "md.mdp",
+   "run.sh",
+   "PROVENANCE.md"
+  ],
+  "note": null,
+  "report_text": "Wrote /tmp/claude-501/caterva-fixtures-7kk_bdkk/runs/20260930-120000-md-setup-0badc0de/md-setup/: run.sh, em/npt/md.mdp, rep1..rep3/nvt.mdp, PROVENANCE.md (298.15 K, 10 ns, 3 replicas).\n  temperature          298.15 K                               chosen\n  pH (protonation)     standard states                        chosen\n  ionic strength       0.15 M NaCl, net charge neutralised    chosen\n  pressure             1.0 bar                                chosen\n  production length    10 ns                                  chosen\n  replicas             3                                      chosen\n  velocity seed        rep1: 20260927, rep2: 20260928, rep3: 20260929 chosen\n  PME grid             0.16 nm spacing, 4th-order interpolation chosen\n  van der Waals        1.0 nm cut-off, dispersion correction to energy and pressure chosen\n  neighbour list       Verlet buffer, updated every 10 steps  chosen\n  compressibility      4.5e-5 1/bar                           chosen\n  minimisation         steepest descent to max force < 1000 kJ/mol/nm, at most 50000 steps chosen\n  equilibration        NVT 100 ps then NPT 100 ps, protein heavy atoms restrained chosen\n  output               coordinates every 10 ps; energies and log every 2 ps chosen\n  structure            PDB 1AKI, chain A                      measured\nRun it: bash /tmp/claude-501/caterva-fixtures-7kk_bdkk/runs/20260930-120000-md-setup-0badc0de/md-setup/run.sh   (GROMACS needed; GMX=/path/to/gmx to choose one)\nThen:   caterva md --summarise /tmp/claude-501/caterva-fixtures-7kk_bdkk/runs/20260930-120000-md-setup-0badc0de/md-setup\n",
+  "ns": {
+   "value": 10.0,
+   "unit": "ns",
+   "provenance": {
+    "kind": "chosen",
+    "by": "default",
+    "reason": "override with --ns"
+   },
+   "label": "production length"
+  },
+  "ionic_strength": {
+   "value": 0.15,
+   "unit": "M",
+   "provenance": {
+    "kind": "chosen",
+    "by": "default",
+    "reason": "physiological default; override with --ionic-strength"
+   },
+   "label": "ionic strength (NaCl)"
+  },
+  "replicas": 3,
+  "seeds": [
+   20260927,
+   20260928,
+   20260929
+  ],
+  "provenance_markdown": "# Provenance: MD setup for PDB 1AKI\n\nEvery setting in the `*.mdp` files, and the choices `run.sh` makes, is in\nthis table with where it came from (a test maps each mdp key to a row): **measured** (from the assay behind a cited kinetic constant, or the\ndeposited structure), **chosen** (a labelled default), or **method** (a\npublished model or algorithm, cited).\n\n| parameter | value | origin | source |\n|---|---|---|---|\n| temperature | 298.15 K | chosen | chosen: 25 C, no measured value supplied |\n| pH (protonation) | standard states | chosen | not stated; GROMACS assigns standard protonation states |\n| ionic strength | 0.15 M NaCl, net charge neutralised | chosen | physiological default; override with --ionic-strength |\n| pressure | 1.0 bar | chosen | ambient |\n| production length | 10 ns | chosen | override with --ns |\n| replicas | 3 | chosen | independent runs from one solvated, minimised system, differing only in their initial velocities; every quantity is reported as a spread across them |\n| velocity seed | rep1: 20260927, rep2: 20260928, rep3: 20260929 | chosen | fixed so each run can be reproduced; ion placement uses 20260927 for all replicas, so they share one starting structure |\n| force field | amber99sb-ildn | method | Lindorff-Larsen et al. (2010) Proteins 78:1950, doi:10.1002/prot.22711 |\n| water model | tip3p | method | Jorgensen et al. (1983) J. Chem. Phys. 79:926, doi:10.1063/1.445869 |\n| thermostat | V-rescale, tau 0.1 ps | method | Bussi, Donadio & Parrinello (2007) J. Chem. Phys. 126:014101, doi:10.1063/1.2408420 |\n| barostat (equilibration) | C-rescale, tau 2 ps | method | Bernetti & Bussi (2020) J. Chem. Phys. 153:114107, doi:10.1063/5.0020514 |\n| barostat (production) | Parrinello-Rahman, tau 2 ps | method | Parrinello & Rahman (1981) J. Appl. Phys. 52:7182, doi:10.1063/1.328693 |\n| electrostatics | PME, 1.0 nm real-space cut-off | method | Essmann et al. (1995) J. Chem. Phys. 103:8577, doi:10.1063/1.470117 (ions.mdp, which only places ions and simulates nothing, uses a plain cut-off: the system is still charged then) |\n| PME grid | 0.16 nm spacing, 4th-order interpolation | chosen | GROMACS's defaults for PME accuracy |\n| van der Waals | 1.0 nm cut-off, dispersion correction to energy and pressure | chosen | the cut-off the force field was parameterised with |\n| neighbour list | Verlet buffer, updated every 10 steps | chosen | GROMACS default; the buffer is sized automatically |\n| compressibility | 4.5e-5 1/bar | chosen | isothermal compressibility of water near 300 K |\n| minimisation | steepest descent to max force < 1000 kJ/mol/nm, at most 50000 steps | chosen | standard pre-equilibration target |\n| equilibration | NVT 100 ps then NPT 100 ps, protein heavy atoms restrained | chosen | restraints released for production |\n| output | coordinates every 10 ps; energies and log every 2 ps | chosen | enough to analyse, small enough to keep |\n| constraints | h-bonds, LINCS; 2 fs time step | method | Hess et al. (1997) J. Comput. Chem. 18:1463, doi:10.1002/(SICI)1096-987X(199709)18:12<1463::AID-JCC4>3.0.CO;2-H |\n| engine | GROMACS | method | Abraham et al. (2015) SoftwareX 1-2:19, doi:10.1016/j.softx.2015.06.001 |\n| structure | PDB 1AKI, chain A | measured | Berman et al. (2000) Nucleic Acids Res. 28:235, doi:10.1093/nar/28.1.235; entry doi:10.2210/pdb1aki/pdb |\n\n## What this setup does not do\n\n- **Small molecules are stripped.** `run.sh` removes every HETATM record and\n  prints what it removed. A substrate, inhibitor or cofactor needs its own\n  topology (for example from ACPYPE/GAFF or CGenFF) before it can be\n  simulated; none is invented here.\n- **Protonation.** No assay pH was supplied, so the standard protonation states pdb2gmx assigns are an assumption, not a measurement.\n- **Replicas.** 3 runs, seeds 20260927, 20260928, 20260929.\n  Report every quantity as a spread across them (`caterva md --summarise`); a mean without that spread is one number pretending to be a result.\n- **Length.** 10 ns samples side-chain and loop motion. It does not\n  sample catalysis, and a kcat cannot be read off it.\n\n## Stages\n\nenergy minimisation (steepest descent) -> NVT 100 ps (position restraints)\n-> NPT 100 ps (C-rescale, restraints) -> production 10 ns\n(Parrinello-Rahman), all at 298.15 K.\n"
+ }
+}

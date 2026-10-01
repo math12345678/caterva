@@ -1,0 +1,95 @@
+{
+ "kind": "structure",
+ "request": {
+  "subject": "1.1.1.27",
+  "organism": "human"
+ },
+ "cli": [
+  "caterva",
+  "structure",
+  "--subject",
+  "1.1.1.27",
+  "--organism",
+  "human"
+ ],
+ "outcome": {
+  "exit_code": 3,
+  "meaning": "refused",
+  "summary": "EC 1.1.1.27: 5 proteins, none chosen",
+  "reason": "Refused: EC 1.1.1.27 in Homo sapiens is 3 different proteins with structures, and a structure belongs to one of them. Choose with --gene or --uniprot: LDHA (P00338, 46 entries), LDHB (P07195, 7 entries), LDHC (P07864, 2 entries)."
+ },
+ "result": {
+  "ec": "1.1.1.27",
+  "organism": "Homo sapiens",
+  "ligand": null,
+  "proteins": [
+   {
+    "accession": "P00338",
+    "gene": "LDHA",
+    "name": "L-lactate dehydrogenase A chain",
+    "organism": "Homo sapiens",
+    "entries": 46,
+    "chosen": false,
+    "url": "https://www.uniprot.org/uniprotkb/P00338"
+   },
+   {
+    "accession": "P07195",
+    "gene": "LDHB",
+    "name": "L-lactate dehydrogenase B chain",
+    "organism": "Homo sapiens",
+    "entries": 7,
+    "chosen": false,
+    "url": "https://www.uniprot.org/uniprotkb/P07195"
+   },
+   {
+    "accession": "P07864",
+    "gene": "LDHC",
+    "name": "L-lactate dehydrogenase C chain",
+    "organism": "Homo sapiens",
+    "entries": 2,
+    "chosen": false,
+    "url": "https://www.uniprot.org/uniprotkb/P07864"
+   },
+   {
+    "accession": "Q6ZMR3",
+    "gene": "LDHAL6A",
+    "name": "L-lactate dehydrogenase A-like 6A",
+    "organism": "Homo sapiens",
+    "entries": 0,
+    "chosen": false,
+    "url": "https://www.uniprot.org/uniprotkb/Q6ZMR3"
+   },
+   {
+    "accession": "Q9BYZ2",
+    "gene": "LDHAL6B",
+    "name": "L-lactate dehydrogenase A-like 6B",
+    "organism": "Homo sapiens",
+    "entries": 0,
+    "chosen": false,
+    "url": "https://www.uniprot.org/uniprotkb/Q9BYZ2"
+   }
+  ],
+  "chosen": null,
+  "undecided": "EC 1.1.1.27 in Homo sapiens is 3 different proteins with structures, and a structure belongs to one of them. Choose with --gene or --uniprot: LDHA (P00338, 46 entries), LDHB (P07195, 7 entries), LDHC (P07864, 2 entries).",
+  "entries": [],
+  "total": 0,
+  "report_markdown": "Read --organism 'human' as Homo sapiens.\n\n# Structures for EC 1.1.1.27 in Homo sapiens\n\n| protein | gene | UniProt | entries |\n|---|---|---|---|\n| L-lactate dehydrogenase A chain | LDHA | P00338 | 46 |\n| L-lactate dehydrogenase B chain | LDHB | P07195 | 7 |\n| L-lactate dehydrogenase C chain | LDHC | P07864 | 2 |\n| L-lactate dehydrogenase A-like 6A | LDHAL6A | Q6ZMR3 | 0 |\n| L-lactate dehydrogenase A-like 6B | LDHAL6B | Q9BYZ2 | 0 |\n\n\nRefused: EC 1.1.1.27 in Homo sapiens is 3 different proteins with structures, and a structure belongs to one of them. Choose with --gene or --uniprot: LDHA (P00338, 46 entries), LDHB (P07195, 7 entries), LDHC (P07864, 2 entries).\n",
+  "chimerax_artifact": null,
+  "organism_note": "Read --organism 'human' as Homo sapiens.",
+  "top": 10,
+  "sources": [
+   {
+    "text": "Berman et al. (2000) Nucleic Acids Res. 28:235, doi:10.1093/nar/28.1.235",
+    "registry": null,
+    "doi": "10.1093/nar/28.1.235",
+    "url": "https://doi.org/10.1093/nar/28.1.235",
+    "title": "Protein Data Bank"
+   },
+   {
+    "text": "UniProt for the protein grouping",
+    "registry": "UniProt",
+    "url": null
+   }
+  ]
+ }
+}
