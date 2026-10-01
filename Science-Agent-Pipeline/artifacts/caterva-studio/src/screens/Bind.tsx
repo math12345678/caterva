@@ -19,7 +19,7 @@ import { Screen } from "@/components/screen/Screen";
 import { EmptyState } from "@/components/states/States";
 
 import { BindResultView } from "./kinetics/BindResult";
-import { FieldGroup, KineticsLayout, KineticsRun, RunForm, text, useLinkedQuestion, usePrefill, useReopenedRun } from "./kinetics/kit";
+import { FieldGroup, KineticsLayout, KineticsRun, RunForm, text, useLinkedQuestion, usePrefill, useReopenedRun, useRunAddress } from "./kinetics/kit";
 import "./kinetics/kinetics.css";
 
 export interface BindForm {
@@ -95,6 +95,7 @@ export default function BindScreen() {
   const running = run.submitting || run.status === "queued" || run.status === "running";
 
   usePrefill(run.run, reopened, linked, (request) => setForm(bindForm(request)), (fields) => setForm({ ...EMPTY_BIND, ...fields }));
+  useRunAddress("/bind", run.run, reopened);
 
   const pick = (compound: string) => {
     const next = { ...form, mode: "inhibitor" as const, inhibitor: compound, computed: "", error: "" };

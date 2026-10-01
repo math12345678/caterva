@@ -17,10 +17,10 @@
  */
 import { Check as CheckIcon, Download, FileArchive, Link2 } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
-import { useSearch } from "wouter";
+import { useLocation, useSearch } from "wouter";
 
 import { downloadFrom } from "@/api/client";
-import { downloadArtifact, downloadBundle, isTerminal } from "@/api/runs";
+import { downloadArtifact, downloadBundle } from "@/api/runs";
 import type { RunKind, RunRecord, RunResults } from "@/api/types";
 import type { RunState } from "@/api/useRun";
 import { Disclosure } from "@/components/forms/Disclosure";
@@ -89,6 +89,22 @@ export function usePrefill(
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linkKey]);
+}
+
+/**
+ * Once a run submitted here exists, the address becomes its permalink
+ * (`<path>?run=<id>`, replacing the linked question rather than adding a
+ * history entry), so a reload or a copied address reopens this run instead
+ * of filling the form for a new one.
+ */
+export function useRunAddress(path: string, run: RunRecord | null, reopened: string | null): void {
+  const [, navigate] = useLocation();
+  const id = run?.id ?? null;
+  useEffect(() => {
+    if (id && id !== reopened) navigate(`${path}?run=${encodeURIComponent(id)}`, { replace: true });
+    // navigate is stable; the run id is what decides.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 }
 
 /** A request value read back as text for a form field ("" when absent). */
@@ -311,7 +327,6 @@ export function KineticsRun<K extends RunKind>({
   path,
   idle,
   exports,
-  progress,
   onRetry,
   children,
 }: {
@@ -320,22 +335,16 @@ export function KineticsRun<K extends RunKind>({
   path: string;
   idle: ReactNode;
   exports?: (result: RunResults[K], run: RunRecord) => ExportChoice[];
-  /** Drawn under the loading mark while the run works (Compose's lookups). */
-  progress?: ReactNode;
   onRetry?: () => void;
   children: (result: RunResults[K], run: RunRecord) => ReactNode;
 }) {
   const finished =
     state.status === "done" && state.settled && state.result !== null && state.run !== null && !state.requestError;
   if (!finished) {
-    const live = state.submitting || (!isTerminal(state.status) && state.status !== "idle");
     return (
-      <>
-        <RunPanel state={state} onCancel={() => void state.cancel()} onRetry={onRetry} idle={idle}>
-          {() => null}
-        </RunPanel>
-        {live && progress ? progress : null}
-      </>
+      <RunPanel state={state} onCancel={() => void state.cancel()} onRetry={onRetry} idle={idle}>
+        {() => null}
+      </RunPanel>
     );
   }
   const run = state.run as RunRecord;

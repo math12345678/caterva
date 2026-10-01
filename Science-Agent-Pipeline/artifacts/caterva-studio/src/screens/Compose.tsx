@@ -24,9 +24,8 @@ import { Checkbox, Field, fieldError, NumberInput, parseNumber, TextInput } from
 import { Screen } from "@/components/screen/Screen";
 import { EmptyState } from "@/components/states/States";
 
-import { ComposeProgress } from "./kinetics/ComposeProgress";
 import { composeExports, ComposeResultView } from "./kinetics/ComposeResult";
-import { FieldGroup, KineticsLayout, KineticsRun, names, RunForm, text, useLinkedQuestion, usePrefill, useReopenedRun } from "./kinetics/kit";
+import { FieldGroup, KineticsLayout, KineticsRun, names, RunForm, text, useLinkedQuestion, usePrefill, useReopenedRun, useRunAddress } from "./kinetics/kit";
 import { ShapeCatalogue } from "./kinetics/ShapeCatalogue";
 import "./kinetics/kinetics.css";
 
@@ -191,6 +190,7 @@ export default function ComposeScreen() {
     (request) => setForm(composeForm(request)),
     (fields) => setForm({ ...EMPTY_COMPOSE, ...fields }),
   );
+  useRunAddress("/compose", run.run, reopened);
 
   const readOrganism = () => {
     const name = form.organism.trim();
@@ -349,7 +349,6 @@ export default function ComposeScreen() {
             path="/compose"
             exports={composeExports}
             onRetry={() => void run.submit(composeRequest(form))}
-            progress={<ComposeProgress stages={run.stages} />}
             idle={
               <EmptyState title="Describe a mechanism, not a pathway">
                 <p>

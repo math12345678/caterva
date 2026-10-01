@@ -39,7 +39,6 @@ import BindScreen, { bindForm, bindRequest } from "../Bind";
 import ComposeScreen, { composeForm, composeRequest, EMPTY_COMPOSE } from "../Compose";
 import { simForm, simRequest } from "../Sim";
 import { BindResultView } from "./BindResult";
-import { ComposeProgress, lookups } from "./ComposeProgress";
 import { composeExports, ComposeResultView } from "./ComposeResult";
 import { composeHref, ConstantsResultView } from "./ConstantsResult";
 import { KineticsRun } from "./kit";
@@ -231,24 +230,24 @@ describe("A kinetics run", () => {
     expect(screen.getByText(state.outcome!.reason!.replace(/\s+/g, " ").trim(), { normalizer: (t) => t.replace(/\s+/g, " ").trim() })).toBeInTheDocument();
   });
 
-  it("shows a running compose as the server's stage, and each constant as it is looked up", () => {
+  it("shows a running compose as each stage the server reported, the constants it looks up among them", () => {
     const stages = (gossypol as Captured).events
       .filter((e) => e.event === "stage")
       .slice(0, 6)
       .map((e) => ({ stage: String(e.data.stage), label: String(e.data.label), fraction: null, at: String(e.data.at) }));
     const last = stages[stages.length - 1];
     const state = { ...finished<"compose">(gossypol as Captured), status: "running" as const, result: null, settled: false, stage: last, stages };
-    const asked = lookups(stages);
-    expect(asked.length).toBeGreaterThan(0);
     render(
-      <KineticsRun<"compose"> state={state} path="/compose" idle={null} progress={<ComposeProgress stages={stages} />}>
+      <KineticsRun<"compose"> state={state} path="/compose" idle={null}>
         {() => null}
       </KineticsRun>,
     );
     expect(screen.getAllByText(last.label).length).toBeGreaterThan(0);
-    const list = screen.getByRole("region", { name: "Constants being looked up" });
-    for (const label of asked) expect(within(list).getByText(label)).toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "Stages so far" });
+    for (const s of stages) expect(within(list).getByText(s.label)).toBeInTheDocument();
+    expect(stages.some((s) => s.label.startsWith("Looking up "))).toBe(true);
   });
+
 });
 
 describe("Compose form", () => {

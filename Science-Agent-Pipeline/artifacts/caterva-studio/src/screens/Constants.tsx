@@ -21,7 +21,7 @@ import { EmptyState, ErrorState } from "@/components/states/States";
 import { useCapabilities } from "@/lib/queries";
 
 import { ConstantsResultView } from "./kinetics/ConstantsResult";
-import { FieldGroup, KineticsLayout, KineticsRun, RunForm, text, useLinkedQuestion, usePrefill, useReopenedRun } from "./kinetics/kit";
+import { FieldGroup, KineticsLayout, KineticsRun, RunForm, text, useLinkedQuestion, usePrefill, useReopenedRun, useRunAddress } from "./kinetics/kit";
 import "./kinetics/kinetics.css";
 
 const QUANTITIES = [
@@ -112,6 +112,7 @@ export default function ConstantsScreen() {
     (request) => setForm(constantsForm(request)),
     (fields) => setForm({ ...EMPTY_CONSTANTS, by: fields.enzyme ? "enzyme" : "ec", who: fields.enzyme ?? fields.ec ?? "", organism: fields.organism ?? "", substrate: fields.substrate ?? "" }),
   );
+  useRunAddress("/constants", run.run, reopened);
 
   const formPane = (
     <RunForm

@@ -19,7 +19,7 @@ import { Segmented } from "@/components/forms/Segmented";
 import { Screen } from "@/components/screen/Screen";
 import { EmptyState } from "@/components/states/States";
 
-import { KineticsLayout, KineticsRun, RunForm, text, usePrefill, useReopenedRun } from "./kinetics/kit";
+import { KineticsLayout, KineticsRun, RunForm, text, usePrefill, useReopenedRun, useRunAddress } from "./kinetics/kit";
 import "./kinetics/kinetics.css";
 import { SimResultView } from "./kinetics/SimResult";
 
@@ -81,6 +81,7 @@ export default function SimScreen() {
   const running = run.submitting || run.status === "queued" || run.status === "running";
 
   usePrefill(run.run, reopened, null, (request) => setForm(simForm(request)), () => {});
+  useRunAddress("/sim", run.run, reopened);
 
   const submit = () => {
     if (!form.k.trim()) {
