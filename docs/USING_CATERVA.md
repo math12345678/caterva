@@ -72,6 +72,49 @@ That is the whole product in three commands. Everything below is detail.
 
 ---
 
+## The same thing in a window: Caterva Studio
+
+`caterva studio` starts a small server on this computer (127.0.0.1 only)
+and opens a page in your browser. On macOS, Caterva.app opens the same page
+in its own window and stops the server when you quit. The page runs the
+same library functions as the commands in this guide, so a number on screen
+is the number the command prints, and keeps every run so you can reopen or
+export it later.
+
+```bash
+caterva studio                      # opens your browser
+caterva studio --no-browser --port 8765 --data-dir ~/caterva-runs
+caterva studio --self-test          # starts, checks itself over a socket, exits 0 or 1
+```
+
+What you will see:
+
+- **Every number wears a mark.** A solid dot is a cited measurement; click
+  it for the paper, the organism, the assay conditions and the source
+  row's own words. A ring is a fitted value, a small square a value Caterva
+  computed, and a hollow dashed dot a placeholder, with the reason it is
+  one. Values you chose, and defaults a command states, say so.
+- **Home** starts a model from one written line, the same line you would
+  give `caterva compose`.
+- **Compose** puts the verdict and the worst thing wrong with the model
+  first, then a table of where every constant came from.
+- **History** keeps every run. Reopen one with its question back in the
+  form, copy its link, or export it as a zip holding its files, the
+  command that reproduces it in a terminal, and a README.
+- **Settings** has the theme (light paper by default, a dark theme for the
+  evening, or follow the system), offline mode, and the GROMACS program to
+  use.
+
+Runs and settings are kept in `~/Library/Application Support/Caterva` on
+macOS (`~/.local/share/caterva` on Linux, `%APPDATA%\Caterva` on Windows)
+unless you pass `--data-dir`. The macOS app is not signed with an Apple
+Developer ID and is not notarised; the first time, Control-click Caterva in
+Applications and choose Open. [docs/studio/README.md](studio/README.md)
+says what each screen runs and how the app is built, and
+[docs/studio/USING_STUDIO.md](studio/USING_STUDIO.md) lists every flag.
+
+---
+
 ## How to read the report
 
 A report has fixed sections, in this order. You can skip most of them most

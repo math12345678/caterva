@@ -57,4 +57,25 @@ describe("the shell", () => {
     // Every kind is listed with the server's reason it cannot run yet.
     expect((await screen.findAllByText("not built yet in this version of Caterva Studio")).length).toBeGreaterThan(5);
   });
+
+  it("says why a reserved screen is missing, in the server's words, and retitles the tab", async () => {
+    setSessionToken("token");
+    serve();
+    window.history.replaceState(null, "", "/rates");
+    render(<App />);
+    expect(await screen.findByText("Rates is not in this installation")).toBeInTheDocument();
+    expect(
+      await screen.findByText("The caterva.rates module is not in this installation; no adapter registered the rates kind."),
+    ).toBeInTheDocument();
+    expect(document.title).toBe("Rates · Caterva Studio");
+  });
+
+  it("says an unknown address names no screen", async () => {
+    setSessionToken("token");
+    serve();
+    window.history.replaceState(null, "", "/nowhere");
+    render(<App />);
+    expect(await screen.findByText("There is no screen at this address")).toBeInTheDocument();
+    expect(document.title).toBe("No screen · Caterva Studio");
+  });
 });

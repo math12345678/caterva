@@ -306,7 +306,7 @@ def make_dmg(app: Path, out: Path, version: str, arch: str) -> Path:
     _run(["hdiutil", "verify", dmg])
     digest = hashlib.sha256(dmg.read_bytes()).hexdigest()
     (out / (dmg.name + ".sha256")).write_text(f"{digest}  {dmg.name}\n", encoding="utf-8")
-    print(f"dmg    : {dmg} ({dmg.stat().st_size / 1e6:.0f} MB)\nsha256 : {digest}")
+    print(f"dmg    : {dmg} ({dmg.stat().st_size / 1e6:.1f} MB)\nsha256 : {digest}")
     return dmg
 
 

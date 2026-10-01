@@ -10,11 +10,11 @@
  * it is still worth reading) and says so above the screen.
  */
 import { QueryClientProvider } from "@tanstack/react-query";
-import { type ReactNode, Suspense, useState } from "react";
-import { Link, Route, Switch } from "wouter";
+import { type ReactNode, Suspense, useEffect, useState } from "react";
+import { Link, Route, Switch, useLocation } from "wouter";
 
 import { sessionToken } from "@/api/client";
-import { STUDIO_API_VERSION } from "@/api/types";
+import { type Capabilities, STUDIO_API_VERSION } from "@/api/types";
 import { CommandPalette, visibleRoutes } from "@/components/palette/CommandPalette";
 import { CommandProvider } from "@/components/palette/commands";
 import { Rail } from "@/components/shell/Rail";
@@ -26,12 +26,44 @@ import { Toaster } from "@/components/toast/Toaster";
 import { JobsProvider } from "@/lib/jobs";
 import { makeQueryClient, useCapabilities, useHealth } from "@/lib/queries";
 import { useAdoptServerTheme, useSettings } from "@/lib/settings";
+import { ROUTES } from "@/routes";
 
 function ShellMessage({ children }: { children: ReactNode }) {
   return (
     <main className="shell-message" id="main">
       <div>{children}</div>
     </main>
+  );
+}
+
+/**
+ * The address names no screen. A reserved path whose capability is off
+ * (`/rates` before `caterva rates` is installed) says why, in the server's
+ * words, instead of reading as a typo; anything else says there is nothing
+ * here. Either way the tab's title stops naming the screen left behind.
+ */
+function sentence(text: string): string {
+  const t = text.trim();
+  return t.charAt(0).toUpperCase() + t.slice(1) + (/[.!?]$/.test(t) ? "" : ".");
+}
+
+function NoScreen({ capabilities }: { capabilities: Capabilities | undefined }) {
+  const [location] = useLocation();
+  const reserved = ROUTES.find((r) => r.gate && r.path === location);
+  const title = reserved ? `${reserved.title} is not in this installation` : "There is no screen at this address";
+  useEffect(() => {
+    document.title = `${reserved ? reserved.title : "No screen"} · Caterva Studio`;
+  }, [reserved]);
+  const reason = reserved?.gate === "rates" ? capabilities?.rates.reason : null;
+  return (
+    <div className="screen">
+      <EmptyState title={title}>
+        {reason ? <p>{sentence(reason)}</p> : null}
+        <p>
+          <Link href="/">Go to Home</Link>, or press the command palette's key to go anywhere.
+        </p>
+      </EmptyState>
+    </div>
   );
 }
 
@@ -126,13 +158,7 @@ function Shell() {
               <Route key={r.path} path={r.path} component={r.screen} />
             ))}
             <Route>
-              <div className="screen">
-                <EmptyState title="There is no screen at this address">
-                  <p>
-                    <Link href="/">Go to Home</Link>, or press the command palette's key to go anywhere.
-                  </p>
-                </EmptyState>
-              </div>
+              <NoScreen capabilities={capabilities.data} />
             </Route>
           </Switch>
         </Suspense>
