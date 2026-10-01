@@ -1,0 +1,378 @@
+{
+ "captured": {
+  "via": "caterva.studio.dispatch.App.dispatch",
+  "request": {
+   "kind": "bind",
+   "request": {
+    "ec": "1.1.1.27",
+    "organism": "human",
+    "mode": "inhibitor",
+    "inhibitor": "gossypol"
+   }
+  }
+ },
+ "run": {
+  "schema": "caterva.studio.run/1",
+  "id": "20261001-073714-bind-59b4e077",
+  "kind": "bind",
+  "title": "EC 1.1.1.27, gossypol, human",
+  "status": "done",
+  "created_at": "2026-10-01T07:37:14.027Z",
+  "started_at": "2026-10-01T07:37:14.031Z",
+  "finished_at": "2026-10-01T07:37:14.042Z",
+  "caterva_version": "0.4.0",
+  "cli": [
+   "caterva",
+   "bind",
+   "--ec=1.1.1.27",
+   "--organism=human",
+   "--inhibitor=gossypol"
+  ],
+  "request": {
+   "ec": "1.1.1.27",
+   "organism": "human",
+   "mode": "inhibitor",
+   "inhibitor": "gossypol"
+  },
+  "outcome": {
+   "exit_code": 0,
+   "meaning": "produced",
+   "summary": "TARGET  ΔG°bind -8.31 to -6.82 kcal/mol (band 1.49 kcal/mol wide, 1 publication(s), c° = 1 M)",
+   "reason": null
+  },
+  "error": null,
+  "artifacts": [],
+  "progress": {
+   "stage": "target",
+   "label": "Building the free-state band for gossypol",
+   "fraction": null
+  }
+ },
+ "result_status": 200,
+ "result": {
+  "mode": "inhibitor",
+  "compounds": [
+   "gossypol"
+  ],
+  "survey": [],
+  "target": {
+   "compound": "gossypol",
+   "organism": "Homo sapiens",
+   "state": "free",
+   "used": [
+    {
+     "ki": {
+      "value": 0.0014,
+      "unit": "mM",
+      "provenance": {
+       "kind": "measured",
+       "citation": {
+        "text": "BRENDA ref 711801",
+        "registry": "BRENDA",
+        "reference_id": "711801",
+        "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+        "via": "brenda/ki"
+       },
+       "organism": "Homo sapiens",
+       "cross_species": false,
+       "conditions": {
+        "ph": null,
+        "temperature_c": null,
+        "buffer": null,
+        "unreported": [
+         "pH",
+         "temperature"
+        ]
+       },
+       "commentary": "LDH-B, pH not specified in the publication, temperature not specified in the publication",
+       "scope": [],
+       "chosen_because": null,
+       "spread": null
+      },
+      "id": "ki:0:711801",
+      "label": "Ki"
+     },
+     "dg": {
+      "value": null,
+      "unit": "kcal/mol",
+      "provenance": {
+       "kind": "computed",
+       "method": "ΔG°bind = RT ln(Ki / 1 M) at the row's assay temperature (bind.core.dg_kj)",
+       "inputs": [
+        "ki:0:711801"
+       ]
+      },
+      "id": "dg:0",
+      "label": "ΔG°bind",
+      "interval": {
+       "low": -8.3075545701124,
+       "high": -7.423629692428346,
+       "meaning": "the row states no assay temperature; ΔG°bind over 4-37 °C instead of at a guessed one"
+      }
+     },
+     "compound": "gossypol",
+     "organism": "Homo sapiens",
+     "reference": "711801",
+     "commentary": "LDH-B, pH not specified in the publication, temperature not specified in the publication",
+     "mode": "unstated",
+     "versus": null,
+     "preparation": "unstated",
+     "isoform": "LDH-B",
+     "excluded": null
+    },
+    {
+     "ki": {
+      "value": 0.0019,
+      "unit": "mM",
+      "provenance": {
+       "kind": "measured",
+       "citation": {
+        "text": "BRENDA ref 711801",
+        "registry": "BRENDA",
+        "reference_id": "711801",
+        "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+        "via": "brenda/ki"
+       },
+       "organism": "Homo sapiens",
+       "cross_species": false,
+       "conditions": {
+        "ph": null,
+        "temperature_c": null,
+        "buffer": null,
+        "unreported": [
+         "pH",
+         "temperature"
+        ]
+       },
+       "commentary": "LDH-A, pH not specified in the publication, temperature not specified in the publication",
+       "scope": [],
+       "chosen_because": null,
+       "spread": null
+      },
+      "id": "ki:1:711801",
+      "label": "Ki"
+     },
+     "dg": {
+      "value": null,
+      "unit": "kcal/mol",
+      "provenance": {
+       "kind": "computed",
+       "method": "ΔG°bind = RT ln(Ki / 1 M) at the row's assay temperature (bind.core.dg_kj)",
+       "inputs": [
+        "ki:1:711801"
+       ]
+      },
+      "id": "dg:1",
+      "label": "ΔG°bind",
+      "interval": {
+       "low": -8.119338270264043,
+       "high": -7.255439631158084,
+       "meaning": "the row states no assay temperature; ΔG°bind over 4-37 °C instead of at a guessed one"
+      }
+     },
+     "compound": "gossypol",
+     "organism": "Homo sapiens",
+     "reference": "711801",
+     "commentary": "LDH-A, pH not specified in the publication, temperature not specified in the publication",
+     "mode": "unstated",
+     "versus": null,
+     "preparation": "unstated",
+     "isoform": "LDH-A",
+     "excluded": null
+    },
+    {
+     "ki": {
+      "value": 0.0042,
+      "unit": "mM",
+      "provenance": {
+       "kind": "measured",
+       "citation": {
+        "text": "BRENDA ref 711801",
+        "registry": "BRENDA",
+        "reference_id": "711801",
+        "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+        "via": "brenda/ki"
+       },
+       "organism": "Homo sapiens",
+       "cross_species": false,
+       "conditions": {
+        "ph": null,
+        "temperature_c": null,
+        "buffer": null,
+        "unreported": [
+         "pH",
+         "temperature"
+        ]
+       },
+       "commentary": "LDH-C, pH not specified in the publication, temperature not specified in the publication",
+       "scope": [],
+       "chosen_because": null,
+       "spread": null
+      },
+      "id": "ki:2:711801",
+      "label": "Ki"
+     },
+     "dg": {
+      "value": null,
+      "unit": "kcal/mol",
+      "provenance": {
+       "kind": "computed",
+       "method": "ΔG°bind = RT ln(Ki / 1 M) at the row's assay temperature (bind.core.dg_kj)",
+       "inputs": [
+        "ki:2:711801"
+       ]
+      },
+      "id": "dg:2",
+      "label": "ΔG°bind",
+      "interval": {
+       "low": -7.630445319294793,
+       "high": -6.8185649532244135,
+       "meaning": "the row states no assay temperature; ΔG°bind over 4-37 °C instead of at a guessed one"
+      }
+     },
+     "compound": "gossypol",
+     "organism": "Homo sapiens",
+     "reference": "711801",
+     "commentary": "LDH-C, pH not specified in the publication, temperature not specified in the publication",
+     "mode": "unstated",
+     "versus": null,
+     "preparation": "unstated",
+     "isoform": "LDH-C",
+     "excluded": null
+    }
+   ],
+   "excluded": [],
+   "band_low": {
+    "value": -8.3075545701124,
+    "unit": "kcal/mol",
+    "provenance": {
+     "kind": "computed",
+     "method": "the lowest ΔG°bind of the rows that fit the state, each row's whole range when its temperature is unstated (bind.core.target)",
+     "inputs": [
+      "dg:0",
+      "dg:1",
+      "dg:2"
+     ]
+    },
+    "id": "band_lowest"
+   },
+   "band_high": {
+    "value": -6.8185649532244135,
+    "unit": "kcal/mol",
+    "provenance": {
+     "kind": "computed",
+     "method": "the highest ΔG°bind of the rows that fit the state, each row's whole range when its temperature is unstated (bind.core.target)",
+     "inputs": [
+      "dg:0",
+      "dg:1",
+      "dg:2"
+     ]
+    },
+    "id": "band_highest"
+   },
+   "references": [
+    "711801"
+   ],
+   "caveats": [
+    "one publication: how far this constant moves between laboratories is unknown, so agreement with it is consistency, not validation",
+    "a row reports no assay temperature; its ΔG is given over 4-37 °C instead of at a guessed one",
+    "the band pools 3 isoforms (LDH-A, LDH-B, LDH-C), which are different proteins; pass the one simulated (--isoform) to compare like with like",
+    "a row does not state its inhibition mode, so which binding event it measured is unknown"
+   ]
+  },
+  "verdict": null,
+  "report_text": "gossypol binding Homo sapiens, simulated state: free (inhibitor + apo enzyme)\n\nMEASURED (3 row(s) fit this state)\n  Ki 0.0014 mM  ->  ΔG -8.31..-7.42 kcal/mol   [T not stated, pH not stated, unstated, LDH-B]  BRENDA ref 711801\n  Ki 0.0019 mM  ->  ΔG -8.12..-7.26 kcal/mol   [T not stated, pH not stated, unstated, LDH-A]  BRENDA ref 711801\n  Ki 0.0042 mM  ->  ΔG -7.63..-6.82 kcal/mol   [T not stated, pH not stated, unstated, LDH-C]  BRENDA ref 711801\n\nTARGET  ΔG°bind -8.31 to -6.82 kcal/mol (band 1.49 kcal/mol wide, 1 publication(s), c° = 1 M)\n  A computed value cannot be judged more finely than this 1.49 kcal/mol band (different measured Ki, unstated assay temperature).\n  caveat: one publication: how far this constant moves between laboratories is unknown, so agreement with it is consistency, not validation\n  caveat: a row reports no assay temperature; its ΔG is given over 4-37 °C instead of at a guessed one\n  caveat: the band pools 3 isoforms (LDH-A, LDH-B, LDH-C), which are different proteins; pass the one simulated (--isoform) to compare like with like\n  caveat: a row does not state its inhibition mode, so which binding event it measured is unknown"
+ },
+ "error": null,
+ "events": [
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-073714-bind-59b4e077",
+    "seq": 1,
+    "at": "2026-10-01T07:37:14.029Z",
+    "status": "queued"
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-073714-bind-59b4e077",
+    "seq": 2,
+    "at": "2026-10-01T07:37:14.032Z",
+    "status": "running"
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261001-073714-bind-59b4e077",
+    "seq": 3,
+    "at": "2026-10-01T07:37:14.034Z",
+    "stage": "fetch",
+    "label": "Reading BRENDA's page for EC 1.1.1.27",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261001-073714-bind-59b4e077",
+    "seq": 4,
+    "at": "2026-10-01T07:37:14.035Z",
+    "stage": "rows",
+    "label": "Reading the Ki rows for EC 1.1.1.27 in Homo sapiens",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261001-073714-bind-59b4e077",
+    "seq": 5,
+    "at": "2026-10-01T07:37:14.041Z",
+    "stage": "target",
+    "label": "Building the free-state band for gossypol",
+    "fraction": null
+   }
+  },
+  {
+   "event": "result",
+   "data": {
+    "run_id": "20261001-073714-bind-59b4e077",
+    "seq": 6,
+    "at": "2026-10-01T07:37:14.042Z",
+    "outcome": {
+     "exit_code": 0,
+     "meaning": "produced",
+     "summary": "TARGET  ΔG°bind -8.31 to -6.82 kcal/mol (band 1.49 kcal/mol wide, 1 publication(s), c° = 1 M)",
+     "reason": null
+    }
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-073714-bind-59b4e077",
+    "seq": 7,
+    "at": "2026-10-01T07:37:14.043Z",
+    "status": "done",
+    "outcome": {
+     "exit_code": 0,
+     "meaning": "produced",
+     "summary": "TARGET  ΔG°bind -8.31 to -6.82 kcal/mol (band 1.49 kcal/mol wide, 1 publication(s), c° = 1 M)",
+     "reason": null
+    }
+   }
+  },
+  {
+   "event": "end",
+   "data": {
+    "run_id": "20261001-073714-bind-59b4e077",
+    "seq": 8,
+    "at": "2026-10-01T07:37:14.043Z",
+    "status": "done"
+   }
+  }
+ ]
+}

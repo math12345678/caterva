@@ -590,6 +590,12 @@ class StructuredSection(TypedDict):
 # Kinetics kinds (owner: sci-kinetics). compose, constants, sim, bind.
 # ---------------------------------------------------------------------------
 
+#: The most rows of an event table (an SSA trajectory) a result carries.
+#: A run with more is sent as every n-th row and its last row, and says so
+#: (`rows`, `every`): each row sent is one the run held, never an
+#: interpolation, and the full table is the CLI's (or the CSV artefact).
+SERIES_ROW_LIMIT = 20_000
+
 
 class _SweepRequestRequired(TypedDict):
     parameters: List[str]
@@ -845,7 +851,7 @@ class ConstantRow(TypedDict):
     raw: Dict[str, Any]
 
 
-class ConstantsResult(TypedDict):
+class _ConstantsResultRequired(TypedDict):
     document_markdown: str
     constants: List[ConstantRow]
     supplied: List[SourcedValue]
@@ -854,6 +860,12 @@ class ConstantsResult(TypedDict):
     refusals: List[str]
     disagreements: List[Any]
     defensible: bool
+
+
+class ConstantsResult(_ConstantsResultRequired, total=False):
+    #: How cite.py read the organism typed ("Read --organism 'human' as
+    #: Homo sapiens."), which it prints to stderr; None when used as typed.
+    organism_note: Optional[str]
 
 
 class _SimRequestRequired(TypedDict):
@@ -870,7 +882,7 @@ class SimRequest(_SimRequestRequired, total=False):
     end: float
 
 
-class SimResult(TypedDict):
+class _SimResultRequired(TypedDict):
     columns: List[str]
     series: Dict[str, List[Optional[float]]]
     events: int
@@ -879,6 +891,14 @@ class SimResult(TypedDict):
     final: Dict[str, SourcedValue]
     expected: SourcedValue
     report_text: str
+
+
+class SimResult(_SimResultRequired, total=False):
+    #: Rows in the run's event table (initial, one per event, final).
+    rows: int
+    #: `series` holds every `every`-th row and the last one; 1 when it holds
+    #: them all (SERIES_ROW_LIMIT).
+    every: int
 
 
 class _ComputedDGRequired(TypedDict):
@@ -929,7 +949,7 @@ class BindTarget(TypedDict):
     caveats: List[str]
 
 
-class BindVerdict(TypedDict):
+class _BindVerdictRequired(TypedDict):
     word: str
     gap_kcal: SourcedValue
     ki_fold: SourcedValue
@@ -937,10 +957,35 @@ class BindVerdict(TypedDict):
     computed: SourcedValue
 
 
+class BindVerdict(_BindVerdictRequired, total=False):
+    #: The computed value's stated error (σ), in kcal/mol like `computed`.
+    computed_error: SourcedValue
+    #: The temperature the Ki fold was judged at: the mean assay
+    #: temperature of the rows used, or the command's 25 °C default.
+    temperature_c: SourcedValue
+
+
+class BindSurveyRow(TypedDict):
+    """One (compound, organism, isoform) of `caterva bind --survey`: the
+    library's survey row with the band as numbers that carry their origin."""
+
+    compound: str
+    organism: str
+    isoform: Optional[str]
+    rows: int
+    used: int
+    references: List[str]
+    band_low: Optional[SourcedValue]
+    band_high: Optional[SourcedValue]
+    benchmark: bool
+    why_not: List[str]
+
+
 class BindResult(TypedDict):
     mode: str
     compounds: List[str]
-    survey: List[Dict[str, Any]]
+    #: One row per compound, organism and isoform, for mode "survey".
+    survey: List[BindSurveyRow]
     target: Optional[BindTarget]
     verdict: Optional[BindVerdict]
     report_text: str

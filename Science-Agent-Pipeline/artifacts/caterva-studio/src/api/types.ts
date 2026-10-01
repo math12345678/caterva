@@ -384,6 +384,9 @@ export interface StructuredSection {
 // Kinetics kinds (owner: sci-kinetics)
 // ---------------------------------------------------------------------------
 
+/** The most rows of an event table a result carries; more are sent as every n-th row and the last (`rows`, `every`). */
+export const SERIES_ROW_LIMIT = 20000;
+
 export interface SweepRequest {
   parameters: string[];
   low?: number;
@@ -621,6 +624,8 @@ export interface ConstantsResult {
   refusals: string[];
   disagreements: unknown[];
   defensible: boolean;
+  /** How cite.py read the organism typed, which it prints to stderr; null when used as typed. */
+  organism_note?: string | null;
 }
 
 export interface SimRequest {
@@ -641,6 +646,10 @@ export interface SimResult {
   final: Record<string, SourcedValue>;
   expected: SourcedValue;
   report_text: string;
+  /** Rows in the run's event table (initial, one per event, final). */
+  rows?: number;
+  /** `series` holds every `every`-th row and the last one; 1 when it holds them all. */
+  every?: number;
 }
 
 export interface ComputedDG {
@@ -691,12 +700,30 @@ export interface BindVerdict {
   ki_fold: SourcedValue;
   detail: string;
   computed: SourcedValue;
+  /** The computed value's stated error (sigma), in kcal/mol like `computed`. */
+  computed_error?: SourcedValue;
+  /** The temperature the Ki fold was judged at: the rows' mean assay temperature, or the 25 C default. */
+  temperature_c?: SourcedValue;
+}
+
+export interface BindSurveyRow {
+  compound: string;
+  organism: string;
+  isoform: string | null;
+  rows: number;
+  used: number;
+  references: string[];
+  band_low: SourcedValue | null;
+  band_high: SourcedValue | null;
+  benchmark: boolean;
+  why_not: string[];
 }
 
 export interface BindResult {
   mode: string;
   compounds: string[];
-  survey: Record<string, unknown>[];
+  /** One row per compound, organism and isoform, for mode "survey". */
+  survey: BindSurveyRow[];
   target: BindTarget | null;
   verdict: BindVerdict | null;
   report_text: string;

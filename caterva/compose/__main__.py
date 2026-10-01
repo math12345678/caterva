@@ -55,6 +55,18 @@ A run with none of the analysis flags exits exactly as it did before this
 file grew: the dossier's own internal failures are notes inside the report
 and do not move the exit code.
 
+ONE RUN, TWO READERS
+--------------------
+`compose_report` is the whole of a report run: compose, search, the
+verdict's inputs, the dossier, the sections, the footer. `main` calls it
+with the terminal's streams; Caterva Studio (caterva/studio/adapters/
+compose.py) calls it with two string buffers and reads back the objects it
+printed from. Each section keeps the report object its text was rendered
+from (`SectionRecord.data`), so the studio serialises the same object the
+terminal reader was shown and never computes a section a second time. The
+exports go through `export_texts` for the same reason: `--export` and the
+studio's four artefacts are one function over one ProvenancedModel.
+
 WHAT THIS DOES NOT CLAIM
 ------------------------
 That the sections agree with each other. They deliberately do not share a
@@ -71,12 +83,12 @@ named, and the sections say so where it changes what they mean.
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
 import re
 
 import argparse
 import sys
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 #: `--robustness` given with no sample count. argparse cannot use `None`
 #: for both "flag absent" and "flag present, number unstated", and the
@@ -295,6 +307,29 @@ def build_parser(prog: str = "python -m caterva.compose") -> argparse.ArgumentPa
 # ---------------------------------------------------------------------------
 
 
+#: A section's status, as SectionRecord.status reports it.
+ANSWERED, REFUSED, PARTLY_REFUSED = "answered", "refused", "partly_refused"
+
+
+@dataclass
+class SectionRecord:
+    """One section as it was printed, and the objects it was printed from.
+
+    `text` is the body exactly as it went to the stream under `## title`.
+    `refusals` are the reasons, in the module's words, of every part that
+    declined. `data` holds the module's own report objects (a ScaleReport,
+    a RobustnessReport, ...) under the names the section gave them, so a
+    reader who wants the numbers reads the object the text came from.
+    """
+
+    key: str
+    title: str
+    status: str
+    text: str
+    refusals: List[str] = field(default_factory=list)
+    data: Dict[str, Any] = field(default_factory=dict)
+
+
 class Sections:
     """The analysis sections, printed as they are produced.
 
@@ -307,15 +342,42 @@ class Sections:
     reason belongs beside the heading it qualifies, which is the rule the
     dossier already follows for its own caveats; a list of refusals at the
     bottom would separate each one from the thing it is about.
+
+    Every section written is also kept as a SectionRecord in `records`,
+    with the report objects the section handed to `keep`. Printing is
+    unchanged by it: the record is what was printed, not a second rendering.
     """
 
     def __init__(self, stream: Any = None) -> None:
         self.stream = sys.stdout if stream is None else stream
         self.refused: List[str] = []
+        self.records: List[SectionRecord] = []
+        self._key = ""
+        self._data: Dict[str, Any] = {}
+        self._reasons: List[str] = []
 
-    def write(self, title: str, body: str) -> None:
+    def start(self, key: str) -> None:
+        """Begin the section named by its flag (`crnt`, `scale`, ...)."""
+        self._key = key
+        self._data = {}
+        self._reasons = []
+
+    def keep(self, name: str, obj: Any) -> Any:
+        """Keep a report object the current section is printed from."""
+        self._data[name] = obj
+        return obj
+
+    def write(self, title: str, body: str, *, whole_refusal: bool = False) -> None:
         print(f"\n## {title}\n", file=self.stream)
         print(body, file=self.stream)
+        status = (REFUSED if whole_refusal
+                  else PARTLY_REFUSED if self._reasons else ANSWERED)
+        self.records.append(SectionRecord(
+            key=self._key, title=title, status=status, text=body,
+            refusals=list(self._reasons), data=dict(self._data),
+        ))
+        self._data = {}
+        self._reasons = []
 
     def refusal(self, title: str, reason: str) -> str:
         """Record a refusal and return the paragraph that reports it.
@@ -325,6 +387,7 @@ class Sections:
         part into a body whose other parts answered.
         """
         self.refused.append(title)
+        self._reasons.append(reason)
         return f"**Refused.** {reason}"
 
     def attempt(
@@ -347,7 +410,7 @@ class Sections:
         try:
             body = produce()
         except refusals as exc:  # noqa: B902 - the module's own refusal types
-            self.write(title, self.refusal(title, str(exc)))
+            self.write(title, self.refusal(title, str(exc)), whole_refusal=True)
             return
         self.write(title, body)
 
@@ -394,7 +457,7 @@ def _scale_section(sections: Sections, model: Any) -> None:
     from caterva.compose.scale import ScaleError, check_model
 
     def produce() -> str:
-        report = check_model(model)
+        report = sections.keep("report", check_model(model))
         return (
             report.summary()
             + "\n\nThe units came from the motifs that declared them. "
@@ -428,8 +491,11 @@ def _predictions_section(sections: Sections, model: Any) -> None:
         composition = model.recognition.composition
         proteins = tuple(sorted(composition.protein_species()))
 
-        stability = analyse(model.network)
-        for report in check_steady_states(stability, proteins=proteins):
+        stability = sections.keep("stability", analyse(model.network))
+        steady = sections.keep(
+            "steady_states", check_steady_states(stability, proteins=proteins)
+        )
+        for report in steady:
             parts.append(report.summary())
 
         # The transient is the reading that earns this section: a run can
@@ -439,9 +505,9 @@ def _predictions_section(sections: Sections, model: Any) -> None:
             from caterva.compose.simulate import run
 
             parts.append("")
-            parts.append(check_trajectory(
+            parts.append(sections.keep("trajectory", check_trajectory(
                 run(model), subject="the simulated run", proteins=proteins,
-            ).summary())
+            )).summary())
         except Exception as exc:  # noqa: BLE001
             parts.append("")
             parts.append(
@@ -480,7 +546,7 @@ def _crnt_section(sections: Sections, model: Any) -> None:
 
     def produce() -> str:
         parts = [
-            describe(network),
+            sections.keep("description", describe(network)),
             "",
             "Nothing above reads a parameter value. Deficiency is a "
             "property of the wiring, so it holds for EVERY choice of "
@@ -493,7 +559,7 @@ def _crnt_section(sections: Sections, model: Any) -> None:
         ):
             parts.append("")
             try:
-                parts.append(verdict(network).summary())
+                parts.append(sections.keep(name, verdict(network)).summary())
             except StructuralRefusal as exc:
                 parts.append(f"{name}: " + sections.refusal(title, str(exc)))
         return "\n".join(parts)
@@ -509,15 +575,16 @@ def _reduction_section(sections: Sections, model: Any) -> None:
     from caterva.compose.sensitivity import SensitivityUnavailable
 
     def produce() -> str:
-        separation = timescale_separation(model.network)
-        candidates = candidates_for_elimination(
+        separation = sections.keep("separation", timescale_separation(model.network))
+        candidates = sections.keep("candidates", candidates_for_elimination(
             model.network, separation=separation
-        )
+        ))
         parts = [separation.summary(), ""]
         for candidate in candidates:
             parts.append(f"- {candidate.describe()}")
         parts.append("")
-        parts.append(validity_report(separation, candidates).summary())
+        parts.append(sections.keep(
+            "validity", validity_report(separation, candidates)).summary())
         return "\n".join(parts)
 
     sections.attempt(
@@ -562,10 +629,10 @@ def _identifiability_section(sections: Sections, model: Any) -> None:
         names = [f"steady state of {s.id}" for s in model.network.species]
         quantities.append(settling_time())
         names.append("settling time")
-        report = analyse(
+        report = sections.keep("report", analyse(
             model.network, quantities,
             parameters=targets, quantity_names=names,
-        )
+        ))
         return (
             report.summary()
             + "\n\nAsked about the "
@@ -595,7 +662,8 @@ def _design_section(sections: Sections, model: Any) -> None:
                 "measurements against the starting amounts would rank them "
                 "against numbers you already know, because you chose them."
             )
-        return rank_observations(model.network, targets).summary()
+        return sections.keep(
+            "report", rank_observations(model.network, targets)).summary()
 
     sections.attempt(
         "What to measure next",
@@ -706,6 +774,8 @@ def _robustness_section(
             precomputed if precomputed is not None
             else _robustness_assessment(model, samples)
         )
+        sections.keep("report", assessment)
+        sections.keep("conclusion", name)
         return (
             assessment.summary()
             + f"\n\nThe conclusion resampled -- '{name}' -- is the one this "
@@ -745,12 +815,15 @@ def _perturbation_section(
             [knockout(model.network, name) for name in knockouts]
             + [overexpress(model.network, name) for name in overexpressions]
         )
+        sections.keep("readout", readout)
         if applied:
-            parts.append(compare(model.network, applied, readout).summary())
+            parts.append(sections.keep(
+                "comparison", compare(model.network, applied, readout)).summary())
         if screen:
             if applied:
                 parts.append("")
-            parts.append(single_knockouts(model.network, readout).summary())
+            parts.append(sections.keep(
+                "screen", single_knockouts(model.network, readout)).summary())
         parts.append("")
         parts.append(
             f"Every fold change above is in **{readout}**, at the "
@@ -790,16 +863,18 @@ def _stochastic_section(
     unit = _concentration_unit(model)
 
     def diagnosis() -> str:
-        return discreteness_matters(
+        return sections.keep("diagnosis", discreteness_matters(
             model.network, volume=volume, concentration_unit=unit
-        ).summary()
+        )).summary()
 
     def trajectory() -> str:
         window, basis = choose_window(model.network, end)
+        sections.keep("window", window)
+        sections.keep("window_basis", basis)
         system = to_propensities(
             model.network, volume=volume, concentration_unit=unit
         )
-        run = simulate_ssa(system, end=window, seed=seed)
+        run = sections.keep("run", simulate_ssa(system, end=window, seed=seed))
         return (
             f"Horizon {window:g} s -- {basis}.\n\n"
             + run.summary()
@@ -810,13 +885,18 @@ def _stochastic_section(
         )
 
     parts: List[str] = []
+    declined = 0
+    sections.keep("volume_l", volume)
+    sections.keep("seed", seed)
+    sections.keep("concentration_unit", unit)
     for produce in (diagnosis, trajectory):
         try:
             parts.append(produce())
         except StochasticRefusal as exc:
             parts.append(sections.refusal(title, str(exc)))
+            declined += 1
         parts.append("")
-    sections.write(title, "\n".join(parts).rstrip())
+    sections.write(title, "\n".join(parts).rstrip(), whole_refusal=declined == 2)
 
 
 def _validate_section(
@@ -835,10 +915,10 @@ def _validate_section(
     from caterva.compose.validate import ValidationError, validate
 
     def produce() -> str:
-        report = (
+        report = sections.keep("report", (
             precomputed if precomputed is not None
             else validate(model, species=species)
-        )
+        ))
         tail = (
             ""
             if species
@@ -875,10 +955,16 @@ def compounds_from(args) -> Dict[str, str]:
     return out
 
 
-def _search_the_literature(
-    model: Any, args: Any,
+def search_the_literature(
+    model: Any, args: Any, *, resolve: Optional[Callable[..., Any]] = None,
 ) -> Tuple[Any, Optional[str], bool]:
     """Resolve this model's constants from the literature.
+
+    `resolve` replaces the resolver `compose_and_parameterise` would build
+    (`agents.scouts.brenda_resolver()`); the studio passes that same
+    resolver wrapped so it can say which constant is being looked up.
+    `caterva md` and the tests import this under its old private name,
+    `_search_the_literature`, which is kept.
 
     Returns `(model, note, refused)`. `refused` is True when the search
     could not be RUN -- an ambiguous enzyme name, a missing substrate, no
@@ -970,6 +1056,7 @@ def _search_the_literature(
             substrate=args.substrate, compounds=compounds_from(args),
             isoform=getattr(args, "isoform", None) or None,
             any_mode=bool(getattr(args, "any_mode", False)),
+            resolve=resolve,
         )
     except LiteratureLayerUnavailable as exc:
         return model, str(exc), True
@@ -1097,6 +1184,49 @@ def _search_the_literature(
     return sourced, note, False
 
 
+_search_the_literature = search_the_literature
+
+
+def provenanced_for_export(model: Any) -> Any:
+    """The ProvenancedModel every export of `model` is written from.
+
+    One call, so `--export` and the studio's artefacts cannot be written
+    from two different decisions about where each number came from."""
+    from caterva.compose.export import provenance_of
+
+    return provenance_of(model, measured=dict(model.measured) or None)
+
+
+def export_texts(
+    provenanced: Any, formats: Sequence[str] = EXPORT_FORMATS,
+) -> Dict[str, Tuple[Optional[str], Optional[str]]]:
+    """format -> (the artefact's text, None), or (None, ExportRefused's
+    message) for a format that could not be written.
+
+    The text is what `--export FORMAT` prints, without print's newline.
+    Each format is refused on its own: the SBML toolchain being absent is
+    no reason to withhold the CSV.
+    """
+    from caterva.compose.export import (
+        ExportRefused, to_antimony, to_methods_paragraph, to_parameter_csv,
+        to_sbml,
+    )
+
+    writers = {
+        "sbml": to_sbml,
+        "antimony": to_antimony,
+        "csv": to_parameter_csv,
+        "methods": to_methods_paragraph,
+    }
+    out: Dict[str, Tuple[Optional[str], Optional[str]]] = {}
+    for fmt in formats:
+        try:
+            out[fmt] = (writers[fmt](provenanced), None)
+        except ExportRefused as exc:
+            out[fmt] = (None, str(exc))
+    return out
+
+
 def _export(description: str, subject: Optional[str], fmt: str,
             args: Any = None) -> int:
     """Write one artefact to stdout, or a refusal to stderr.
@@ -1106,18 +1236,9 @@ def _export(description: str, subject: Optional[str], fmt: str,
     why `--export` refuses to run alongside the analysis flags rather than
     printing both -- see `_check_combination`.
     """
-    from caterva.compose.export import (
-        ExportRefused, provenance_of, to_antimony, to_methods_paragraph,
-        to_parameter_csv, to_sbml,
-    )
+    from caterva.compose.export import ExportRefused
     from caterva.compose.pipeline import compose
 
-    writers = {
-        "sbml": to_sbml,
-        "antimony": to_antimony,
-        "csv": to_parameter_csv,
-        "methods": to_methods_paragraph,
-    }
     try:
         model = compose(description, subject=subject,
                         organism=getattr(args, "organism", None),
@@ -1128,8 +1249,10 @@ def _export(description: str, subject: Optional[str], fmt: str,
             # beside it carried measurements would be the disagreement the
             # provenance machinery exists to prevent.
             model, _, _ = _search_the_literature(model, args)
-        provenanced = provenance_of(model, measured=dict(model.measured) or None)
-        print(writers[fmt](provenanced))
+        text, refused = export_texts(provenanced_for_export(model), (fmt,))[fmt]
+        if refused is not None:
+            raise ExportRefused(refused)
+        print(text)
     except ExportRefused as exc:
         print(f"Not exported.\n\n{exc}", file=sys.stderr)
         return 3
@@ -1186,6 +1309,30 @@ def _check_combination(parser: argparse.ArgumentParser, args: Any) -> None:
         )
 
 
+def check_request(parser: argparse.ArgumentParser, args: Any) -> None:
+    """Every check `main` makes after parsing, each through `parser.error`.
+
+    A report needs a description (`main` prints the help instead, exit 2),
+    a sample count of at least one, and a combination of flags that can all
+    be honoured. One function so the studio refuses exactly what the
+    terminal refuses, with the same words, before anything runs.
+    """
+    if not args.description:
+        parser.error("the following arguments are required: description")
+    if (
+        args.robustness is not None
+        and args.robustness != SAMPLES_UNSTATED
+        and args.robustness < 1
+    ):
+        parser.error(
+            f"--robustness needs at least one sample; got "
+            f"{args.robustness}. A fraction over zero draws is not a small "
+            f"number, it is no number."
+        )
+
+    _check_combination(parser, args)
+
+
 def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> int:
     parser = build_parser(prog) if prog else build_parser()
     args = parser.parse_args(argv)
@@ -1207,18 +1354,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
         parser.print_help()
         return 2
 
-    if (
-        args.robustness is not None
-        and args.robustness != SAMPLES_UNSTATED
-        and args.robustness < 1
-    ):
-        parser.error(
-            f"--robustness needs at least one sample; got "
-            f"{args.robustness}. A fraction over zero draws is not a small "
-            f"number, it is no number."
-        )
-
-    _check_combination(parser, args)
+    check_request(parser, args)
 
     from caterva.compose.organisms import normalise_organism
 
@@ -1238,76 +1374,167 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
             print(compile_to_antimony(model.network))
             return 0
 
-        from caterva.compose.pipeline import compose
-        from caterva.compose.report import dossier
-
-        # COMPOSE ONCE, AND RUN THE VERDICT'S INPUTS BEFORE THE VERDICT.
-        #
-        # The dossier's verdict page reports whether `validate` and
-        # `robustness` ran. It used to be formed before either had, so a
-        # run with `--validate --robustness` printed "validate: not run,
-        # robustness: not run" at the top and then ran both underneath --
-        # one report whose headline contradicted its own body. Both are
-        # computed here when asked for, handed to the dossier so the
-        # verdict can read them, and printed by their sections afterwards
-        # without being computed a second time.
-        model = compose(args.description, subject=args.subject,
-                        organism=args.organism, substrate=args.substrate,
-                        compounds=compounds_from(args))
-        search_note = None
-        search_refused = False
-        if args.subject:
-            # The search runs BEFORE the analyses, so every section below --
-            # stability, sensitivity, the time course, the verdict -- reads
-            # the literature's numbers rather than the library's (ADR 0178).
-            model, search_note, search_refused = _search_the_literature(model, args)
-            if search_refused and not model.searched and model.search_refused is None:
-                model = replace(model, search_refused=search_note)
-        precomputed = _precompute_for_verdict(args, model)
-
-        report = dossier(
-            args.description,
-            subject=args.subject,
-            analyse_stability=not args.no_analysis,
-            simulate=not args.no_simulate,
-            sweep_parameters=args.sweep,
-            sweep_range=(args.sweep_from, args.sweep_to),
-            sweep_steps=args.sweep_steps,
-            rank_unmeasured=not args.no_ranking,
-            rank_against=args.rank_against,
-            model=model,
-            validation=precomputed.validation,
-            robustness=precomputed.robustness,
-            conclusion_name=precomputed.conclusion_name,
-        )
-        # Footer withheld until the analysis sections have run: a document
-        # that says "Built by Caterva..." and then carries on for three more
-        # pages has put its last word in the middle.
-        if organism_note and args.subject:
-            model.recognition.composition.note(organism_note)
-        if search_note:
-            model.recognition.composition.note(search_note)
-        print(report.markdown(footer=False))
-
-        code = _analyses(args, report.model, precomputed)
-        if search_refused and code == 0:
-            # The reason is already in the report, beside what it is about.
-            # This says only that a script should look (the same shape the
-            # analysis refusals use).
-            print(
-                "1 refusal(s) in 1 section(s), each explained where it "
-                "belongs in the report: the literature search.",
-                file=sys.stderr,
-            )
-            code = 3
-        print("\n".join(report.footer_section()))
-        return code
+        return compose_report(args, organism_note=organism_note).code
 
     except UnrecognisedShape as exc:
         # Exit 3, not 1: this is a REFUSAL with information in it, not a
         # crash, and a script should be able to tell the two apart.
         print(f"Not built.\n\n{exc}", file=sys.stderr)
         return 3
+
+
+@dataclass
+class ComposedReport:
+    """What one report run of `caterva compose` produced and printed.
+
+    `model` is the ComposedModel after the search, the one every section
+    read; `dossier` the report.ModelDossier whose markdown was printed;
+    `sections` the analysis sections with their records; `code` the exit
+    code `main` returns.
+    """
+
+    model: Any
+    dossier: Any
+    precomputed: Any
+    sections: "Sections"
+    search_note: Optional[str]
+    search_refused: bool
+    code: int
+
+
+def _quiet_stage(key: str, label: str, fraction: Optional[float] = None) -> None:
+    """The terminal reports no stages: the report is what it prints."""
+
+
+def compose_report(
+    args: Any,
+    *,
+    organism_note: Optional[str] = None,
+    stream: Any = None,
+    err: Any = None,
+    progress: Any = None,
+) -> ComposedReport:
+    """Compose, search, run the verdict's inputs, print the dossier and the
+    sections, and return what was printed from.
+
+    `args` is the parsed and checked namespace, with the organism already
+    normalised (`organism_note` says how). `stream` and `err` default to
+    the process's streams at call time. `progress`, when given, has
+    `stage(key, label, fraction)` and `check_cancelled()`; each stage
+    boundary reports and then checks, and the literature search reports
+    each constant as it is looked up. UnrecognisedShape propagates, as it
+    did from `main`, which turns it into exit 3.
+    """
+    out = sys.stdout if stream is None else stream
+    err = sys.stderr if err is None else err
+
+    def at(key: str, label: str, fraction: Optional[float] = None) -> None:
+        if progress is not None:
+            progress.check_cancelled()
+            progress.stage(key, label, fraction)
+
+    from caterva.compose.pipeline import compose
+    from caterva.compose.report import dossier
+
+    # COMPOSE ONCE, AND RUN THE VERDICT'S INPUTS BEFORE THE VERDICT.
+    #
+    # The dossier's verdict page reports whether `validate` and
+    # `robustness` ran. It used to be formed before either had, so a
+    # run with `--validate --robustness` printed "validate: not run,
+    # robustness: not run" at the top and then ran both underneath --
+    # one report whose headline contradicted its own body. Both are
+    # computed here when asked for, handed to the dossier so the
+    # verdict can read them, and printed by their sections afterwards
+    # without being computed a second time.
+    at("compose", "Composing the model from its description")
+    model = compose(args.description, subject=args.subject,
+                    organism=args.organism, substrate=args.substrate,
+                    compounds=compounds_from(args))
+    search_note = None
+    search_refused = False
+    if args.subject:
+        # The search runs BEFORE the analyses, so every section below --
+        # stability, sensitivity, the time course, the verdict -- reads
+        # the literature's numbers rather than the library's (ADR 0178).
+        at("search", f"Searching the literature for {args.subject}")
+        model, search_note, search_refused = search_the_literature(
+            model, args, resolve=_announcing_resolver(progress),
+        )
+        if search_refused and not model.searched and model.search_refused is None:
+            model = replace(model, search_refused=search_note)
+    if args.validate or args.robustness is not None:
+        at("precompute", "Running the checks the verdict reads: "
+           + ", ".join(n for n, asked in (("validate", args.validate),
+                                           ("robustness", args.robustness is not None))
+                       if asked))
+    precomputed = precompute_for_verdict(args, model)
+
+    at("dossier", "Building the dossier: stability, time course, influence ranking, sweeps, verdict")
+    report = dossier(
+        args.description,
+        subject=args.subject,
+        analyse_stability=not args.no_analysis,
+        simulate=not args.no_simulate,
+        sweep_parameters=args.sweep,
+        sweep_range=(args.sweep_from, args.sweep_to),
+        sweep_steps=args.sweep_steps,
+        rank_unmeasured=not args.no_ranking,
+        rank_against=args.rank_against,
+        model=model,
+        validation=precomputed.validation,
+        robustness=precomputed.robustness,
+        conclusion_name=precomputed.conclusion_name,
+    )
+    # Footer withheld until the analysis sections have run: a document
+    # that says "Built by Caterva..." and then carries on for three more
+    # pages has put its last word in the middle.
+    if organism_note and args.subject:
+        model.recognition.composition.note(organism_note)
+    if search_note:
+        model.recognition.composition.note(search_note)
+    print(report.markdown(footer=False), file=out)
+
+    code, sections = run_analyses(
+        args, report.model, precomputed, stream=out, err=err, progress=progress,
+    )
+    if search_refused and code == 0:
+        # The reason is already in the report, beside what it is about.
+        # This says only that a script should look (the same shape the
+        # analysis refusals use).
+        print(
+            "1 refusal(s) in 1 section(s), each explained where it "
+            "belongs in the report: the literature search.",
+            file=err,
+        )
+        code = 3
+    print("\n".join(report.footer_section()), file=out)
+    return ComposedReport(
+        model=report.model, dossier=report, precomputed=precomputed,
+        sections=sections, search_note=search_note,
+        search_refused=search_refused, code=code,
+    )
+
+
+def _announcing_resolver(progress: Any) -> Optional[Callable[..., Any]]:
+    """The resolver `compose_and_parameterise` would build, reporting each
+    constant before it is looked up; None (that resolver, unwrapped) when
+    nobody is listening."""
+    if progress is None:
+        return None
+    from caterva.agents.scouts import brenda_resolver
+
+    live = brenda_resolver()
+
+    def resolve(request: Any, **kwargs: Any) -> Any:
+        progress.stage(
+            "search",
+            f"Looking up {request.quantity} in BRENDA's {request.table} table "
+            f"for EC {request.ec_number}",
+            None,
+        )
+        return live(request, **kwargs)
+
+    return resolve
 
 
 class _Precomputed:
@@ -1325,7 +1552,7 @@ class _Precomputed:
         self.robustness_pair: Optional[Tuple[Any, str]] = None
 
 
-def _precompute_for_verdict(args: Any, model: Any) -> _Precomputed:
+def precompute_for_verdict(args: Any, model: Any) -> _Precomputed:
     out = _Precomputed()
     if args.validate:
         try:
@@ -1345,10 +1572,14 @@ def _precompute_for_verdict(args: Any, model: Any) -> _Precomputed:
     return out
 
 
-def _analyses(
+_precompute_for_verdict = precompute_for_verdict
+
+
+def run_analyses(
     args: Any, model: Any, precomputed: Optional[_Precomputed] = None,
-) -> int:
-    """Run every analysis asked for, and return the exit code.
+    *, stream: Any = None, err: Any = None, progress: Any = None,
+) -> Tuple[int, Sections]:
+    """Run every analysis asked for; return the exit code and the sections.
 
     Order is structure first, then the numbers, then the cross-checks --
     the same order the dossier itself uses, and the order in which a reader
@@ -1356,44 +1587,58 @@ def _analyses(
     so a reader who distrusts the placeholders can stop after it and still
     have something true.
     """
-    sections = Sections()
+    sections = Sections(stream)
+    err = sys.stderr if err is None else err
 
+    asked: List[Tuple[str, str, Callable[[], None]]] = []
     if args.crnt:
-        _crnt_section(sections, model)
+        asked.append(("crnt", "Reaction network structure",
+                      lambda: _crnt_section(sections, model)))
     if args.scale:
-        _scale_section(sections, model)
+        asked.append(("scale", "Physical scale", lambda: _scale_section(sections, model)))
     if args.predictions:
-        _predictions_section(sections, model)
+        asked.append(("predictions", "Predicted amounts",
+                      lambda: _predictions_section(sections, model)))
     if args.reduction:
-        _reduction_section(sections, model)
+        asked.append(("reduction", "Timescale separation",
+                      lambda: _reduction_section(sections, model)))
     if args.identifiability:
-        _identifiability_section(sections, model)
+        asked.append(("identifiability", "Identifiability",
+                      lambda: _identifiability_section(sections, model)))
     if args.design:
-        _design_section(sections, model)
+        asked.append(("design", "What to measure next",
+                      lambda: _design_section(sections, model)))
     if args.robustness is not None:
-        _robustness_section(
+        asked.append(("robustness", "Robustness to the placeholders", lambda: _robustness_section(
             sections, model, args.robustness,
             precomputed=precomputed.robustness_pair if precomputed else None,
-        )
+        )))
     if args.knockout or args.overexpress or args.screen:
-        _perturbation_section(
+        asked.append(("perturbations", "Perturbations", lambda: _perturbation_section(
             sections, model, args.knockout, args.overexpress, args.screen,
             _answer_species(model, args.rank_against),
-        )
+        )))
     if args.stochastic is not None:
-        _stochastic_section(
+        asked.append(("stochastic", "Stochastic simulation", lambda: _stochastic_section(
             sections, model, args.stochastic, args.stochastic_end,
             DEFAULT_SEED if args.stochastic_seed is None
             else args.stochastic_seed,
-        )
+        )))
     if args.validate:
-        _validate_section(
+        asked.append(("validate", "Cross-checks", lambda: _validate_section(
             sections, model, args.rank_against,
             precomputed=precomputed.validation if precomputed else None,
-        )
+        )))
+
+    for done, (key, title, section) in enumerate(asked):
+        if progress is not None:
+            progress.check_cancelled()
+            progress.stage(f"section:{key}", title, done / len(asked))
+        sections.start(key)
+        section()
 
     if not sections.refused:
-        return 0
+        return 0, sections
     # On stderr, so it survives `| less` and does not land in a redirected
     # report. The reasons are already in the report, next to what they are
     # about; this line says only that a script should look.
@@ -1411,13 +1656,17 @@ def _analyses(
         f"{len(sections.refused)} refusal(s) in {len(where)} section(s), "
         f"each explained where it belongs in the report: "
         + ", ".join(where) + ".",
-        file=sys.stderr,
+        file=err,
     )
-    return 3
+    return 3, sections
 
 
-__all__ = ["Sections", "build_parser", "main"]
-
+__all__ = [
+    "ComposedReport", "SectionRecord", "Sections", "build_parser",
+    "check_request", "compose_report", "export_texts", "main",
+    "precompute_for_verdict", "provenanced_for_export", "run_analyses",
+    "search_the_literature",
+]
 
 
 def console_main() -> int:

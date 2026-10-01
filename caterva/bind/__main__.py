@@ -19,18 +19,28 @@ recorded LDH page).
 Exit codes: 0 a target was built (and, with --computed, agrees), 4 the
 computed value disagrees, 3 refused and said why (no Ki rows, none fit the
 state), 2 malformed question, 1 a crash.
+
+The parser (`build_parser`), the page read (`read_page`), the survey's
+targets (`survey_targets`), the compound list (`compound_names`) and the
+judgement (`assess`, rendered by `render`) are functions of their own so
+that Caterva Studio (caterva/studio/adapters/bind.py) reads the same
+objects this command prints from: the band's edges unrounded, the
+temperature the Ki fold was judged at, the rows each with its exclusion.
+`report` is `render(assess(...))`, and every byte this command prints is
+what it printed before they were separated.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
 from caterva.bind.core import (
-    KJ_PER_KCAL, MODE_MEANING, Measurement, judge, measurement, parse_computed, target,
+    KJ_PER_KCAL, MODE_MEANING, Measurement, Target, Verdict, judge, measurement, parse_computed,
+    target,
 )
 
 EXIT_OK, EXIT_CRASH, EXIT_USAGE, EXIT_REFUSED, EXIT_DISAGREES = 0, 1, 2, 3, 4
@@ -61,9 +71,29 @@ def _rows(html: str, ec: str, organism: str, inhibitor: Optional[str]) -> List[M
     return out
 
 
-def _compound_names(html: str, ec: str, organism: str) -> List[str]:
+def compound_names(html: str, ec: str, organism: str) -> List[str]:
+    """Every compound with a Ki row for this enzyme and organism (--list)."""
     return sorted({m.compound for m in _rows(html, ec, organism, None)
                    if m.compound != "unknown compound"}, key=str.lower)
+
+
+_compound_names = compound_names
+
+
+def organism_of(text: str) -> str:
+    """The organism --organism names: a common name read as its species."""
+    return COMMON.get(text.strip().lower(), text.strip())
+
+
+def read_page(ec: str, html: Optional[Path] = None) -> str:
+    """The BRENDA page for `ec`: the saved file --html names, else fetched.
+
+    Raises whatever reading or fetching raised (network, missing file,
+    missing literature layer); `main` reports it as a refusal."""
+    if html:
+        return html.read_text(encoding="utf-8")
+    from caterva.checkout import literature_module
+    return literature_module("brenda_client").fetch_brenda_html(ec)
 
 
 def _fmt_row(m: Measurement) -> str:
@@ -83,9 +113,21 @@ def _fmt_row(m: Measurement) -> str:
 BENCHMARK_RULE = "at least 2 publications, inhibition mode stated, assay temperature stated"
 
 
-def survey(html: str, ec: str, organism: str, state: str) -> List[dict]:
-    """One row per (compound, isoform): its band and whether it can benchmark."""
-    from caterva.bind.core import target
+@dataclass
+class SurveyTarget:
+    """One (compound, organism, isoform) of the survey: its Target and why it
+    cannot benchmark, if it cannot (empty when it can)."""
+    compound: str
+    organism: str
+    isoform: Optional[str]
+    rows: List[Measurement]
+    target: Target
+    why_not: List[str]
+
+
+def survey_targets(html: str, ec: str, organism: str, state: str) -> List[SurveyTarget]:
+    """One SurveyTarget per (compound, organism, isoform), unrounded, in the
+    order `survey` lists them."""
     groups: dict = {}
     for m in _rows(html, ec, organism, None):
         if m.compound == "unknown compound":
@@ -105,14 +147,19 @@ def survey(html: str, ec: str, organism: str, state: str) -> List[dict]:
             missing.append("temperature not stated")
         if t.lo is None:
             missing = [f"no row measured the {state} state"]
-        out.append({
-            "compound": compound, "organism": species, "isoform": isoform, "rows": len(ms), "used": len(t.used),
-            "references": t.references,
-            "band_kcal": None if t.lo is None else [round(t.lo, 2), round(t.hi, 2)],
-            "benchmark": not missing, "why_not": missing,
-        })
-    out.sort(key=lambda r: (not r["benchmark"], r["band_kcal"] is None, r["compound"].lower()))
+        out.append(SurveyTarget(compound, species, isoform, ms, t, missing))
+    out.sort(key=lambda r: (bool(r.why_not), r.target.lo is None, r.compound.lower()))
     return out
+
+
+def survey(html: str, ec: str, organism: str, state: str) -> List[dict]:
+    """One row per (compound, isoform): its band and whether it can benchmark."""
+    return [{
+        "compound": r.compound, "organism": r.organism, "isoform": r.isoform, "rows": len(r.rows),
+        "used": len(r.target.used), "references": r.target.references,
+        "band_kcal": None if r.target.lo is None else [round(r.target.lo, 2), round(r.target.hi, 2)],
+        "benchmark": not r.why_not, "why_not": r.why_not,
+    } for r in survey_targets(html, ec, organism, state)]
 
 
 def render_survey(rows: List[dict], ec: str, organism: str, state: str) -> str:
@@ -134,9 +181,48 @@ def render_survey(rows: List[dict], ec: str, organism: str, state: str) -> str:
     return "\n".join(lines)
 
 
+@dataclass
+class Assessment:
+    """What one `--inhibitor` question found, before it is rendered.
+
+    `computed` is the computed value and its σ in kcal/mol (converted from
+    kJ/mol when --unit kj), `temperature_c` the temperature the Ki fold was
+    judged at (the mean stated assay temperature of the rows used, else
+    25 °C), `verdict` the judgement; all three None without --computed or
+    when no row fits the state."""
+    state: str
+    target: Target
+    computed: Optional[Tuple[float, float]] = None
+    temperature_c: Optional[float] = None
+    verdict: Optional[Verdict] = None
+
+
+def assess(rows: List[Measurement], state: str, computed: Optional[tuple], unit: str,
+           isoform: Optional[str] = None) -> Assessment:
+    """The band for `state` and, with a computed value, the verdict on it."""
+    t = target(rows, state, isoform)
+    out = Assessment(state, t)
+    if t.lo is None or computed is None:
+        return out
+    value, err = computed
+    if unit == "kj":
+        value, err = value / KJ_PER_KCAL, err / KJ_PER_KCAL
+    temps = [m.temperature_c for m in t.used if m.temperature_c is not None]
+    temperature = (sum(temps) / len(temps)) if temps else 25.0
+    out.computed = (value, err)
+    out.temperature_c = temperature
+    out.verdict = judge(t, value, err, temperature_c=temperature)
+    return out
+
+
 def report(rows: List[Measurement], state: str, computed: Optional[tuple], unit: str,
            isoform: Optional[str] = None) -> tuple[str, int, dict]:
-    t = target(rows, state, isoform)
+    return render(assess(rows, state, computed, unit, isoform))
+
+
+def render(a: Assessment) -> tuple[str, int, dict]:
+    """(the text --inhibitor prints, the exit code, the --json payload)."""
+    t, state = a.target, a.state
     lines = [f"{t.compound} binding {t.organism}, simulated state: {state} "
              f"({'inhibitor + apo enzyme' if state == 'free' else 'inhibitor + enzyme-substrate complex'})", ""]
     lines.append(f"MEASURED ({len(t.used)} row(s) fit this state)")
@@ -172,12 +258,9 @@ def report(rows: List[Measurement], state: str, computed: Optional[tuple], unit:
         lines.append(f"  caveat: {c}")
 
     code = EXIT_OK
-    if computed is not None:
-        value, err = computed
-        if unit == "kj":
-            value, err = value / KJ_PER_KCAL, err / KJ_PER_KCAL
-        temps = [m.temperature_c for m in t.used if m.temperature_c is not None]
-        v = judge(t, value, err, temperature_c=(sum(temps) / len(temps)) if temps else 25.0)
+    if a.verdict is not None and a.computed is not None:
+        value, err = a.computed
+        v = a.verdict
         lines += ["", f"VERDICT  {v.word.upper()}: computed {value:.2f} ± {err:.2f} kcal/mol. {v.detail}."]
         if err == 0.0:
             lines.append("  No uncertainty was given for the computed value; a single number has none only "
@@ -190,7 +273,22 @@ def report(rows: List[Measurement], state: str, computed: Optional[tuple], unit:
     return "\n".join(lines), code, payload
 
 
-def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva bind") -> int:
+def render_list(names: List[str], ec: str, organism: str) -> str:
+    """What --list prints for the compounds it found."""
+    return "\n".join([f"Compounds with a recorded Ki for EC {ec} in {organism}:"]
+                     + [f"  {n}" for n in names])
+
+
+def no_rows_for(inhibitor: str, ec: str, organism: str, names: List[str]) -> str:
+    """The refusal --inhibitor prints to stderr when the compound has no Ki
+    row, naming the compounds that do."""
+    lines = [f"No Ki for {inhibitor!r} with EC {ec} in {organism}."]
+    if names:
+        lines.append("Compounds that do have one: " + "; ".join(names))
+    return "\n".join(lines)
+
+
+def build_parser(prog: str = "caterva bind") -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog=prog, description=__doc__.split("\n\n")[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--ec", required=True, help="EC number, e.g. 1.1.1.27")
@@ -207,6 +305,11 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva bind") -> in
     p.add_argument("--unit", choices=("kcal", "kj"), default="kcal")
     p.add_argument("--html", type=Path, help="a saved BRENDA page, instead of fetching one")
     p.add_argument("--json", action="store_true", help="machine-readable output")
+    return p
+
+
+def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva bind") -> int:
+    p = build_parser(prog)
     # Binding free energies are negative, and argparse reads "-7.9" as a flag.
     args = list(sys.argv[1:] if argv is None else argv)
     for i in range(len(args) - 1):
@@ -217,7 +320,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva bind") -> in
         a = p.parse_args(args)
     except SystemExit as e:
         return EXIT_USAGE if e.code else EXIT_OK
-    organism = COMMON.get(a.organism.strip().lower(), a.organism.strip())
+    organism = organism_of(a.organism)
     computed = None
     if a.computed:
         try:
@@ -227,11 +330,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva bind") -> in
             return EXIT_USAGE
 
     try:
-        if a.html:
-            html = a.html.read_text(encoding="utf-8")
-        else:
-            from caterva.checkout import literature_module
-            html = literature_module("brenda_client").fetch_brenda_html(a.ec)
+        html = read_page(a.ec, a.html)
     except Exception as e:  # network, missing file, missing literature layer
         print(f"caterva bind: could not read BRENDA for {a.ec}: {e}", file=sys.stderr)
         return EXIT_REFUSED
@@ -248,21 +347,17 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva bind") -> in
         return EXIT_OK
 
     if a.list:
-        names = _compound_names(html, a.ec, organism)
+        names = compound_names(html, a.ec, organism)
         if not names:
             print(f"No Ki rows for EC {a.ec} in {organism}.")
             return EXIT_REFUSED
-        print(f"Compounds with a recorded Ki for EC {a.ec} in {organism}:")
-        for n in names:
-            print(f"  {n}")
+        print(render_list(names, a.ec, organism))
         return EXIT_OK
 
     rows = _rows(html, a.ec, organism, a.inhibitor)
     if not rows:
-        names = _compound_names(html, a.ec, organism)
-        print(f"No Ki for {a.inhibitor!r} with EC {a.ec} in {organism}.", file=sys.stderr)
-        if names:
-            print("Compounds that do have one: " + "; ".join(names), file=sys.stderr)
+        print(no_rows_for(a.inhibitor, a.ec, organism, compound_names(html, a.ec, organism)),
+              file=sys.stderr)
         return EXIT_REFUSED
 
     text, code, payload = report(rows, a.state, computed, a.unit, a.isoform)
