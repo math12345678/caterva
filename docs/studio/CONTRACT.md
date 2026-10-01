@@ -258,8 +258,14 @@ number. Must answer in milliseconds: imports nothing of the engine.
 `GET /api/settings` -> `Settings`. `PUT /api/settings` with a full
 `Settings` -> the stored `Settings`. Keys: `theme` (`system` | `light` |
 `dark`, default `system`), `max_parallel_runs` (1..8, default 2),
-`confirm_delete` (default true). Unknown or missing keys, or values out of
-range: 400 naming the `field`. Stored in `<data dir>/settings.json`.
+`confirm_delete` (default true). Two optional keys (amended by core): a
+PUT without one keeps its stored value; GET always returns both.
+`gromacs_path` (absolute path of an executable `gmx`, or null to look for
+it as section 10 says; it also sets `$GMX` for the runs) and `offline`
+(default false; when true the network probe contacts nothing and a run of
+any kind whose `needs` include `network` is 503 with that reason).
+Unknown or missing keys, or values out of range: 400 naming the `field`.
+Stored in `<data dir>/settings.json`.
 
 ### Adapter-owned helpers
 

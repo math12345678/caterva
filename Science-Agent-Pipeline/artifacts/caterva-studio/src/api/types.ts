@@ -228,6 +228,10 @@ export interface Settings {
   theme: Theme;
   max_parallel_runs: number;
   confirm_delete: boolean;
+  /** Optional on PUT (kept when omitted); always present on GET. */
+  gromacs_path?: string | null;
+  /** True: no network probe, and runs of kinds that need the network are refused (503). */
+  offline?: boolean;
 }
 
 export interface NormaliseOrganismRequest {

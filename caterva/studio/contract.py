@@ -396,10 +396,22 @@ class Capabilities(TypedDict):
     dev_origin: Optional[str]
 
 
-class Settings(TypedDict):
+class _SettingsRequired(TypedDict):
     theme: Theme
     max_parallel_runs: int
     confirm_delete: bool
+
+
+class Settings(_SettingsRequired, total=False):
+    #: Optional on PUT (a body without it keeps the stored value, so a page
+    #: that does not know the key cannot erase it); always present on GET.
+    #: The absolute path of the `gmx` program, or None to look for it
+    #: (CONTRACT.md 10). Checked to be an executable file when set.
+    gromacs_path: Optional[str]
+    #: True: the studio contacts no network host on its own (the network
+    #: probe answers without probing) and refuses to start a run of any kind
+    #: whose `needs` include "network", with that reason (503). Default False.
+    offline: bool
 
 
 class NormaliseOrganismRequest(TypedDict):
