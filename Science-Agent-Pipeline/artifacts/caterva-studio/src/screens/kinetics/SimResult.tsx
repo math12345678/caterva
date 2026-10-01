@@ -1,88 +1,92 @@
 /**
- * A `caterva sim ssa` result: the trajectory as the engine wrote it, the
- * final counts, the ODE expectation beside them, and the text the command
- * prints.
+ * A `caterva sim ssa` result: the counts at the end beside the deterministic
+ * (ODE) expectation the command prints, the trajectory as the engine wrote
+ * it, the inputs with whether you or the command's default chose each, and
+ * the text the command prints.
+ *
+ * The comparison is the library's two numbers side by side, each with its
+ * mark (the run's count is computed by the SSA, the expectation by its
+ * closed form); the page does not subtract them.
  */
 import type { SimResult as Result } from "@/api/types";
+import { TimeCourseChart } from "@/components/charts/TimeCourseChart";
+import { Disclosure } from "@/components/forms/Disclosure";
 import { Value } from "@/components/provenance/Value";
-
-import { Report } from "./Report";
-import { SeriesChart } from "./SeriesChart";
+import { TextReport } from "@/components/report/Report";
+import { Section } from "@/components/screen/Screen";
+import { formatCount } from "@/lib/format";
 
 export function SimResultView({ result }: { result: Result }) {
   const { time, ...counts } = result.series;
-  const rows = result.rows ?? result.series.time?.length ?? 0;
-  const thinned = (result.every ?? 1) > 1;
+  const rows = result.rows ?? time?.length ?? 0;
+  const every = result.every ?? 1;
   const finalNames = Object.keys(result.final);
+  const timeUnit = result.parameters.end?.unit ?? "time units";
   return (
     <>
-      <section className="k-verdict" aria-label="Summary">
-        <p className="k-section-sub">
-          {result.events} events, seed <span className="k-code">{result.seed}</span>
+      <section className="k-verdict" aria-label="At the end of the run">
+        <p className="k-eyebrow">
+          <span className="font-mono">{formatCount(result.events)}</span> events, seed{" "}
+          <span className="font-mono">{result.seed}</span>
         </p>
-        <div className="k-table-wrap">
-          <table className="k-table" style={{ width: "auto" }}>
-            <thead>
-              <tr>
-                <th scope="col" />
-                {finalNames.map((n) => (
-                  <th key={n} scope="col" className="k-code">
-                    {n.toUpperCase()}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row">At the end of this run</th>
-                {finalNames.map((n) => (
-                  <td key={n} className="k-num">
-                    <Value v={result.final[n]} showUnit={false} />
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p className="k-prose">
-          {result.expected.label ?? "Expected (ODE)"}: <Value v={result.expected} />
+        <dl className="k-finals">
+          {finalNames.map((n) => (
+            <div key={n}>
+              <dt className="font-mono">{n.toUpperCase()} at the end</dt>
+              <dd>
+                <Value v={result.final[n]} />
+              </dd>
+            </div>
+          ))}
+          <div data-kind="expected">
+            <dt>{result.expected.label ?? "Expected (ODE)"}</dt>
+            <dd>
+              <Value v={result.expected} />
+            </dd>
+          </div>
+        </dl>
+        <p className="k-verdict-licence muted">
+          One trajectory is one draw; the expectation is the mean a large population would follow. The same seed gives
+          this same trajectory again.
         </p>
       </section>
-      <SeriesChart
-        x={time ?? []}
+      <TimeCourseChart
+        title="Molecule counts, one step per event"
+        caption={
+          every > 1
+            ? `${formatCount(rows)} rows in the event table; every ${every}th row and the last are drawn. The CSV export holds them all.`
+            : `${formatCount(rows)} rows in the event table, every one drawn.`
+        }
+        times={time ?? []}
         series={counts}
-        xLabel="time"
-        yLabel="molecules"
+        timeUnit={timeUnit}
+        unit="molecules"
         step
-        label="Molecule counts over the run, one step per event"
       />
-      <p className="k-section-sub">
-        {thinned
-          ? `${rows} rows in the event table; every ${result.every}th row and the last are drawn. The CSV file holds them all.`
-          : `${rows} rows in the event table, every one drawn.`}
-      </p>
-      <section className="k-section" aria-labelledby="k-inputs">
-        <h2 className="k-section-title" id="k-inputs">
-          Inputs
-        </h2>
-        <div className="k-table-wrap">
-          <table className="k-table" style={{ width: "auto" }}>
+      <Section title="Inputs" id="k-sim-inputs">
+        <div className="table-wrap">
+          <table className="table k-inputs">
             <tbody>
               {Object.entries(result.parameters).map(([name, v]) => (
                 <tr key={name}>
-                  <th scope="row" className="k-code" style={{ fontWeight: 400 }}>
+                  <th scope="row" className="font-mono k-ledger-name">
                     {name}
                   </th>
-                  <td className="k-num">
+                  <td data-align="end">
                     <Value v={v} />
+                  </td>
+                  <td className="muted">
+                    {v.provenance.kind === "chosen" ? (v.provenance.by === "user" ? "chosen by you" : "the command's default") : ""}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </section>
-      <Report title="What caterva sim ssa prints" text={result.report_text} />
+      </Section>
+      <Disclosure title="What caterva sim ssa prints">
+        <TextReport text={result.report_text} />
+      </Disclosure>
     </>
   );
 }

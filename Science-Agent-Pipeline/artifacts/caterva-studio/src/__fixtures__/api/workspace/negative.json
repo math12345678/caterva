@@ -1,0 +1,378 @@
+{
+ "captured": {
+  "kind": "bind",
+  "request": {
+   "ec": "1.1.1.27",
+   "mode": "inhibitor",
+   "organism": "human",
+   "inhibitor": "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid",
+   "computed": {
+    "value": -10.5,
+    "error": 0.3,
+    "unit": "kcal"
+   }
+  }
+ },
+ "run": {
+  "schema": "caterva.studio.run/1",
+  "id": "20261001-093929-bind-e37ed557",
+  "kind": "bind",
+  "title": "EC 1.1.1.27, 3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid, human",
+  "status": "done",
+  "created_at": "2026-10-01T09:39:29.694Z",
+  "started_at": "2026-10-01T09:39:29.697Z",
+  "finished_at": "2026-10-01T09:39:29.706Z",
+  "caterva_version": "0.4.0",
+  "cli": [
+   "caterva",
+   "bind",
+   "--ec=1.1.1.27",
+   "--organism=human",
+   "--inhibitor=3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid",
+   "--computed=-10.5±0.3",
+   "--unit=kcal"
+  ],
+  "request": {
+   "ec": "1.1.1.27",
+   "mode": "inhibitor",
+   "organism": "human",
+   "inhibitor": "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid",
+   "computed": {
+    "value": -10.5,
+    "error": 0.3,
+    "unit": "kcal"
+   }
+  },
+  "outcome": {
+   "exit_code": 4,
+   "meaning": "negative",
+   "summary": "VERDICT  DISAGREES: computed -10.50 ± 0.30 kcal/mol. the simulation binds too tightly: 1.06 kcal/mol beyond the band even at 2σ, a 5.58-fold error in Ki.",
+   "reason": "the computed value disagrees with the measured band"
+  },
+  "error": null,
+  "artifacts": [],
+  "progress": {
+   "stage": "judge",
+   "label": "Judging the computed value against the band at 2σ",
+   "fraction": null
+  }
+ },
+ "result_status": 200,
+ "result": {
+  "mode": "inhibitor",
+  "compounds": [
+   "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid"
+  ],
+  "survey": [],
+  "target": {
+   "compound": "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid",
+   "organism": "Homo sapiens",
+   "state": "free",
+   "used": [
+    {
+     "ki": {
+      "value": 0.00059,
+      "unit": "mM",
+      "provenance": {
+       "kind": "measured",
+       "citation": {
+        "text": "BRENDA ref 739793",
+        "registry": "BRENDA",
+        "reference_id": "739793",
+        "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+        "via": "brenda/ki"
+       },
+       "organism": "Homo sapiens",
+       "cross_species": false,
+       "conditions": {
+        "ph": 7.5,
+        "temperature_c": 37.0,
+        "buffer": null,
+        "unreported": []
+       },
+       "commentary": "competitive versus NADH, pH 7.5, 37°C, recombinant His-tagged enzyme",
+       "scope": [],
+       "chosen_because": null,
+       "spread": null
+      },
+      "id": "ki:0:739793",
+      "label": "Ki"
+     },
+     "dg": {
+      "value": -8.8401296020803,
+      "unit": "kcal/mol",
+      "provenance": {
+       "kind": "computed",
+       "method": "ΔG°bind = RT ln(Ki / 1 M) at the row's assay temperature (bind.core.dg_kj)",
+       "inputs": [
+        "ki:0:739793"
+       ]
+      },
+      "id": "dg:0",
+      "label": "ΔG°bind"
+     },
+     "compound": "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid",
+     "organism": "Homo sapiens",
+     "reference": "739793",
+     "commentary": "competitive versus NADH, pH 7.5, 37°C, recombinant His-tagged enzyme",
+     "mode": "competitive",
+     "versus": "NADH",
+     "preparation": "tagged",
+     "isoform": null,
+     "excluded": null
+    },
+    {
+     "ki": {
+      "value": 0.00252,
+      "unit": "mM",
+      "provenance": {
+       "kind": "measured",
+       "citation": {
+        "text": "BRENDA ref 739793",
+        "registry": "BRENDA",
+        "reference_id": "739793",
+        "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+        "via": "brenda/ki"
+       },
+       "organism": "Homo sapiens",
+       "cross_species": false,
+       "conditions": {
+        "ph": 7.5,
+        "temperature_c": 37.0,
+        "buffer": null,
+        "unreported": []
+       },
+       "commentary": "noncompetitive versus pyruvate, pH 7.5, 37°C, recombinant His-tagged enzyme",
+       "scope": [],
+       "chosen_because": null,
+       "spread": null
+      },
+      "id": "ki:1:739793",
+      "label": "Ki"
+     },
+     "dg": {
+      "value": -7.945283191558134,
+      "unit": "kcal/mol",
+      "provenance": {
+       "kind": "computed",
+       "method": "ΔG°bind = RT ln(Ki / 1 M) at the row's assay temperature (bind.core.dg_kj)",
+       "inputs": [
+        "ki:1:739793"
+       ]
+      },
+      "id": "dg:1",
+      "label": "ΔG°bind"
+     },
+     "compound": "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid",
+     "organism": "Homo sapiens",
+     "reference": "739793",
+     "commentary": "noncompetitive versus pyruvate, pH 7.5, 37°C, recombinant His-tagged enzyme",
+     "mode": "noncompetitive",
+     "versus": "pyruvate",
+     "preparation": "tagged",
+     "isoform": null,
+     "excluded": null
+    }
+   ],
+   "excluded": [],
+   "band_low": {
+    "value": -8.8401296020803,
+    "unit": "kcal/mol",
+    "provenance": {
+     "kind": "computed",
+     "method": "the lowest ΔG°bind of the rows that fit the state, each row's whole range when its temperature is unstated (bind.core.target)",
+     "inputs": [
+      "dg:0",
+      "dg:1"
+     ]
+    },
+    "id": "band_lowest"
+   },
+   "band_high": {
+    "value": -7.945283191558134,
+    "unit": "kcal/mol",
+    "provenance": {
+     "kind": "computed",
+     "method": "the highest ΔG°bind of the rows that fit the state, each row's whole range when its temperature is unstated (bind.core.target)",
+     "inputs": [
+      "dg:0",
+      "dg:1"
+     ]
+    },
+    "id": "band_highest"
+   },
+   "references": [
+    "739793"
+   ],
+   "caveats": [
+    "one publication: how far this constant moves between laboratories is unknown, so agreement with it is consistency, not validation",
+    "measured on a tagged enzyme; a simulation of the unmodified protein is compared with a construct",
+    "inhibition was measured against NADH, pyruvate; a Ki is specific to that assay"
+   ]
+  },
+  "verdict": {
+   "word": "disagrees",
+   "gap_kcal": {
+    "value": 1.0598703979197008,
+    "unit": "kcal/mol",
+    "provenance": {
+     "kind": "computed",
+     "method": "distance from the computed value ± 2σ to the band's nearer edge (bind.core.judge)",
+     "inputs": [
+      "computed",
+      "computed_error",
+      "band_lowest",
+      "band_highest"
+     ]
+    },
+    "id": "gap"
+   },
+   "ki_fold": {
+    "value": 5.582538937194897,
+    "unit": "fold",
+    "provenance": {
+     "kind": "computed",
+     "method": "exp(gap / RT) at the judging temperature (bind.core.judge)",
+     "inputs": [
+      "gap",
+      "judged_at"
+     ]
+    },
+    "id": "ki_fold"
+   },
+   "detail": "the simulation binds too tightly: 1.06 kcal/mol beyond the band even at 2σ, a 5.58-fold error in Ki",
+   "computed": {
+    "value": -10.5,
+    "unit": "kcal/mol",
+    "provenance": {
+     "kind": "chosen",
+     "by": "user"
+    },
+    "id": "computed"
+   },
+   "computed_error": {
+    "value": 0.3,
+    "unit": "kcal/mol",
+    "provenance": {
+     "kind": "chosen",
+     "by": "user"
+    },
+    "id": "computed_error"
+   },
+   "temperature_c": {
+    "value": 37.0,
+    "unit": "°C",
+    "provenance": {
+     "kind": "computed",
+     "method": "the mean stated assay temperature of the rows used",
+     "inputs": []
+    },
+    "id": "judged_at"
+   }
+  },
+  "report_text": "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid binding Homo sapiens, simulated state: free (inhibitor + apo enzyme)\n\nMEASURED (2 row(s) fit this state)\n  Ki 0.00059 mM  ->  ΔG  -8.84 kcal/mol   [37 °C, pH 7.5, competitive vs NADH, tagged enzyme]  BRENDA ref 739793\n  Ki 0.00252 mM  ->  ΔG  -7.95 kcal/mol   [37 °C, pH 7.5, noncompetitive vs pyruvate, tagged enzyme]  BRENDA ref 739793\n\nTARGET  ΔG°bind -8.84 to -7.95 kcal/mol (band 0.89 kcal/mol wide, 1 publication(s), c° = 1 M)\n  A computed value cannot be judged more finely than this 0.89 kcal/mol band (different measured Ki).\n  caveat: one publication: how far this constant moves between laboratories is unknown, so agreement with it is consistency, not validation\n  caveat: measured on a tagged enzyme; a simulation of the unmodified protein is compared with a construct\n  caveat: inhibition was measured against NADH, pyruvate; a Ki is specific to that assay\n\nVERDICT  DISAGREES: computed -10.50 ± 0.30 kcal/mol. the simulation binds too tightly: 1.06 kcal/mol beyond the band even at 2σ, a 5.58-fold error in Ki."
+ },
+ "error": null,
+ "events": [
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-093929-bind-e37ed557",
+    "seq": 1,
+    "at": "2026-10-01T09:39:29.696Z",
+    "status": "queued"
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-093929-bind-e37ed557",
+    "seq": 2,
+    "at": "2026-10-01T09:39:29.698Z",
+    "status": "running"
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261001-093929-bind-e37ed557",
+    "seq": 3,
+    "at": "2026-10-01T09:39:29.699Z",
+    "stage": "fetch",
+    "label": "Reading BRENDA's page for EC 1.1.1.27",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261001-093929-bind-e37ed557",
+    "seq": 4,
+    "at": "2026-10-01T09:39:29.700Z",
+    "stage": "rows",
+    "label": "Reading the Ki rows for EC 1.1.1.27 in Homo sapiens",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261001-093929-bind-e37ed557",
+    "seq": 5,
+    "at": "2026-10-01T09:39:29.704Z",
+    "stage": "target",
+    "label": "Building the free-state band for 3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261001-093929-bind-e37ed557",
+    "seq": 6,
+    "at": "2026-10-01T09:39:29.705Z",
+    "stage": "judge",
+    "label": "Judging the computed value against the band at 2σ",
+    "fraction": null
+   }
+  },
+  {
+   "event": "result",
+   "data": {
+    "run_id": "20261001-093929-bind-e37ed557",
+    "seq": 7,
+    "at": "2026-10-01T09:39:29.707Z",
+    "outcome": {
+     "exit_code": 4,
+     "meaning": "negative",
+     "summary": "VERDICT  DISAGREES: computed -10.50 ± 0.30 kcal/mol. the simulation binds too tightly: 1.06 kcal/mol beyond the band even at 2σ, a 5.58-fold error in Ki.",
+     "reason": "the computed value disagrees with the measured band"
+    }
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-093929-bind-e37ed557",
+    "seq": 8,
+    "at": "2026-10-01T09:39:29.707Z",
+    "status": "done",
+    "outcome": {
+     "exit_code": 4,
+     "meaning": "negative",
+     "summary": "VERDICT  DISAGREES: computed -10.50 ± 0.30 kcal/mol. the simulation binds too tightly: 1.06 kcal/mol beyond the band even at 2σ, a 5.58-fold error in Ki.",
+     "reason": "the computed value disagrees with the measured band"
+    }
+   }
+  },
+  {
+   "event": "end",
+   "data": {
+    "run_id": "20261001-093929-bind-e37ed557",
+    "seq": 9,
+    "at": "2026-10-01T09:39:29.707Z",
+    "status": "done"
+   }
+  }
+ ]
+}

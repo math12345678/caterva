@@ -6,16 +6,22 @@
  * filtered to, because "which of my questions did Caterva decline, and
  * why" is a question worth asking of a workspace. The selected run is in
  * the address (`?run=<id>`), so a link to a run in History survives a
- * reload. Deleting asks once, in place, when the settings say to; it
- * removes the run's folder in the workspace and never a file the run wrote
- * into a folder of yours (CONTRACT.md 15).
+ * reload. The search reads what the list shows (title, kind, id, how it
+ * ended) and "/" puts the cursor in it; the arrow keys walk the list.
+ *
+ * Deleting takes the run out of the list at once and offers Undo; the
+ * delete itself is held until the offer lapses (./workspace/trash.ts), so
+ * an undo never needs a folder moved back by hand. When the settings ask
+ * for it, the delete is confirmed in place first, never in a dialog. It
+ * moves the run's folder to the workspace's trash folder and never touches
+ * a file the run wrote into a folder of yours (CONTRACT.md 15).
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, ExternalLink, FileDown, RotateCw, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Download, ExternalLink, FileDown, RotateCw, Search, Trash2 } from "lucide-react";
+import { type KeyboardEvent, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 
-import { createRun, deleteRun, downloadArtifact, downloadBundle, getRun, isTerminal, listRuns } from "@/api/runs";
+import { createRun, downloadArtifact, downloadBundle, getRun, isTerminal, listRuns } from "@/api/runs";
 import type { RunKind, RunRecord, RunSummary } from "@/api/types";
 import { Disclosure } from "@/components/forms/Disclosure";
 import { Select } from "@/components/forms/Field";
@@ -31,9 +37,13 @@ import { Loading, SkeletonRows } from "@/components/states/Loading";
 import { EmptyState, ErrorState, OutcomeNotice, RunFailedState } from "@/components/states/States";
 import { describeError } from "@/lib/errors";
 import { elapsed, formatBytes, formatDateTime } from "@/lib/format";
+import { modKey, useHotkey } from "@/lib/keyboard";
 import { runHref, useJobActionsOptional } from "@/lib/jobs";
 import { useSettings } from "@/lib/settings";
-import { notify } from "@/lib/toast";
+import { isToastShown, notify } from "@/lib/toast";
+
+import { scheduleDelete, undoDelete, UNDO_MS, useHeldDeletes } from "./workspace/trash";
+import "./workspace/workspace.css";
 
 type Filter = "all" | "working" | "produced" | "refused" | "negative" | "failed";
 
@@ -78,6 +88,16 @@ export function matchesFilter(run: RunSummary, filter: Filter): boolean {
   }
 }
 
+/** Whether a run matches what was typed: every word somewhere in what the list shows of it. */
+export function matchesSearch(run: RunSummary, query: string): boolean {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = [run.title, run.kind, run.id, run.status, run.outcome?.summary ?? "", run.outcome?.reason ?? "", run.outcome?.meaning ?? ""]
+    .join(" ")
+    .toLowerCase();
+  return words.every((w) => hay.includes(w));
+}
+
 const PAGE = 50;
 
 function useAllRuns(kind: RunKind | "") {
@@ -119,17 +139,36 @@ function RunDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
     },
     onError: (e) => notify("failed", "The run was not started again", { description: describeError(e).message }),
   });
-  const remove = useMutation({
-    mutationFn: () => deleteRun(id),
-    onSuccess: (removed) => {
-      void client.invalidateQueries({ queryKey: ["runs"] });
-      void client.invalidateQueries({ queryKey: ["capabilities"] });
-      client.removeQueries({ queryKey: ["run", id] });
-      notify("info", `Moved to the trash folder: ${removed.title}`);
-      onDeleted();
-    },
-    onError: (e) => notify("failed", "The run was not deleted", { description: describeError(e).message }),
-  });
+  const remove = () => {
+    if (!run.data) return;
+    const r = run.data;
+    const toast = notify("info", `Moved to the trash: ${r.title}`, {
+      description: "Undo keeps it here. Once this note goes, the run waits in the workspace's trash folder.",
+      duration: UNDO_MS,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          if (undoDelete(r.id)) notify("info", `Kept: ${r.title}`, { duration: 3000 });
+        },
+      },
+    });
+    scheduleDelete(
+      r.id,
+      r.title,
+      (error) => {
+        void client.invalidateQueries({ queryKey: ["runs"] });
+        if (error) {
+          notify("failed", "The run was not deleted", { description: describeError(error).message });
+          return;
+        }
+        void client.invalidateQueries({ queryKey: ["capabilities"] });
+        client.removeQueries({ queryKey: ["run", r.id] });
+      },
+      () => isToastShown(toast),
+    );
+    setConfirming(false);
+    onDeleted();
+  };
   const exportBundle = useMutation({
     mutationFn: () => downloadBundle(id),
     onError: (e) => notify("failed", "The bundle was not exported", { description: describeError(e).message }),
@@ -140,6 +179,13 @@ function RunDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
       ? { id: "history.export", title: `Export ${run.data.title} as a bundle`, hint: `caterva-${id}.zip`, run: () => exportBundle.mutate() }
       : null,
   );
+  useCommand(
+    run.data && isTerminal(run.data.status)
+      ? { id: "history.delete", title: `Delete ${run.data.title}`, hint: "moves it to the workspace's trash, with Undo", run: remove }
+      : null,
+  );
+  const shownRun = run.data;
+  useCommand(shownRun ? { id: "history.open", title: `Open ${shownRun.title} on its screen`, run: () => navigate(runHref(shownRun)) } : null);
 
   if (run.isPending) return <Loading label="Reading the run" />;
   if (run.isError) return <ErrorState error={run.error} />;
@@ -174,8 +220,8 @@ function RunDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
         </button>
         {confirming ? (
           <span className="confirm-inline" role="group" aria-label="Confirm deleting this run">
-            <span>Move this run and its files to the workspace&apos;s trash folder?</span>
-            <button type="button" className="btn btn-sm btn-danger" onClick={() => remove.mutate()} disabled={remove.isPending}>
+            <span>Move this run and its files to the workspace&apos;s trash folder? Undo stays offered for a few seconds.</span>
+            <button type="button" className="btn btn-sm btn-danger" onClick={remove}>
               Delete
             </button>
             <button type="button" className="btn btn-sm btn-quiet" onClick={() => setConfirming(false)}>
@@ -186,9 +232,9 @@ function RunDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
           <button
             type="button"
             className="btn btn-sm btn-danger"
-            disabled={live || remove.isPending}
+            disabled={live}
             title={live ? "A run that is still working cannot be deleted; cancel it first." : undefined}
-            onClick={() => (askFirst ? setConfirming(true) : remove.mutate())}
+            onClick={() => (askFirst ? setConfirming(true) : remove())}
           >
             <Trash2 size={13} aria-hidden="true" />
             Delete
@@ -244,18 +290,58 @@ function RunDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
   );
 }
 
+/** Up and down move between the rows of a list of run buttons; Home and End go to its ends. */
+function walk(e: KeyboardEvent<HTMLDivElement>) {
+  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) return;
+  const rows = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button.run-row")];
+  if (!rows.length) return;
+  const at = rows.indexOf(document.activeElement as HTMLButtonElement);
+  const next =
+    e.key === "Home" ? 0 : e.key === "End" ? rows.length - 1 : e.key === "ArrowDown" ? Math.min(rows.length - 1, at + 1) : Math.max(0, at - 1);
+  e.preventDefault();
+  rows[next].focus();
+  rows[next].click();
+}
+
 export default function HistoryScreen() {
   const [kind, setKind] = useState<RunKind | "">("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [query, setQuery] = useState("");
+  const search = useRef<HTMLInputElement>(null);
   const shown = useShownRunId();
+  const held = useHeldDeletes();
   const [, navigate] = useLocation();
   const all = useAllRuns(kind);
-  const runs = useMemo(() => (all.data?.runs ?? []).filter((r) => matchesFilter(r, filter)), [all.data, filter]);
+  const runs = useMemo(
+    () => (all.data?.runs ?? []).filter((r) => !held.has(r.id) && matchesFilter(r, filter) && matchesSearch(r, query)),
+    [all.data, filter, query, held],
+  );
   const select = (id: string | null) => navigate(id ? `/history?run=${encodeURIComponent(id)}` : "/history", { replace: true });
+  useHotkey({ key: "/" }, () => search.current?.focus());
+  useCommand({ id: "history.search", title: "Search the runs", hint: "/", run: () => search.current?.focus() });
+  const total = (all.data?.runs ?? []).filter((r) => !held.has(r.id)).length;
 
   const list = (
     <div className="history-list">
       <div className="history-filters">
+        <label className="history-search">
+          <Search size={13} aria-hidden="true" />
+          <span className="sr-only">Search the runs</span>
+          <input
+            ref={search}
+            className="input"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setQuery("");
+            }}
+            placeholder="Search titles, kinds, reasons"
+            spellCheck={false}
+            autoComplete="off"
+          />
+          {query ? null : <kbd aria-hidden="true">/</kbd>}
+        </label>
         <Segmented<Filter> label="Show" size="sm" value={filter} onChange={setFilter} options={FILTERS} />
         <label className="sr-only" htmlFor="history-kind">
           Kind of run
@@ -274,26 +360,32 @@ export default function HistoryScreen() {
       ) : all.isError ? (
         <ErrorState error={all.error} />
       ) : runs.length === 0 ? (
-        <EmptyState title={all.data?.runs.length ? "No run matches" : "Nothing has run here yet"}>
+        <EmptyState title={total ? "No run matches" : "Nothing has run here yet"}>
           <p>
-            {all.data?.runs.length
-              ? "Choose another filter, or every kind."
+            {total
+              ? "Search for other words, choose another filter, or every kind."
               : "Runs appear here as soon as they start, from any screen or the command palette."}
           </p>
         </EmptyState>
       ) : (
-        <div className="run-list" role="list" aria-label="Runs, newest first">
-          {runs.map((r) => (
-            <div role="listitem" key={r.id}>
-              <RunRow run={r} selected={r.id === shown} onSelect={() => select(r.id)} />
-            </div>
-          ))}
-          {all.data?.more ? (
-            <button type="button" className="btn btn-sm history-more" onClick={all.loadMore} disabled={all.isFetching}>
-              {all.isFetching ? "Reading" : "Older runs"}
-            </button>
-          ) : null}
-        </div>
+        <>
+          <p className="history-count" aria-live="polite">
+            {runs.length === total ? `${total} run(s)` : `${runs.length} of ${total} run(s)`}
+            {all.data?.more ? ", older ones not read yet" : ""}
+          </p>
+          <div className="run-list" role="list" aria-label="Runs, newest first" onKeyDown={walk}>
+            {runs.map((r) => (
+              <div role="listitem" key={r.id}>
+                <RunRow run={r} selected={r.id === shown} onSelect={() => select(r.id)} />
+              </div>
+            ))}
+            {all.data?.more ? (
+              <button type="button" className="btn btn-sm history-more" onClick={all.loadMore} disabled={all.isFetching}>
+                {all.isFetching ? "Reading" : "Older runs"}
+              </button>
+            ) : null}
+          </div>
+        </>
       )}
     </div>
   );
@@ -305,11 +397,14 @@ export default function HistoryScreen() {
         firstSize={40}
         first={list}
         second={
-          shown ? (
+          shown && !held.has(shown) ? (
             <RunDetail key={shown} id={shown} onDeleted={() => select(null)} />
           ) : (
             <EmptyState title="Choose a run">
-              <p>Its request, outcome, files and the command that reproduces it appear here.</p>
+              <p>
+                Its request, outcome, files and the command that reproduces it appear here. The arrow keys walk the
+                list; {modKey()} K finds any run by name.
+              </p>
             </EmptyState>
           )
         }

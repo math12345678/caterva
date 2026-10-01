@@ -1,139 +1,174 @@
 /**
- * A `scripts/cite.py` result: each constant the resolver returned, with the
- * paper that measured it, the rows it could not rank below it, the values
- * the person supplied, and the document cite.py prints.
+ * A `scripts/cite.py` result: for each constant asked for, the row the
+ * resolver chose and every other row it read, each with the paper that
+ * measured it; the values the person supplied (marked as theirs or as the
+ * script's defaults); what was declined and why; and the document cite.py
+ * prints.
+ *
+ * "Use in Compose" fills Compose's form with the same enzyme, organism and
+ * substrate. Compose then looks the constants up itself, through the same
+ * resolver, when its button is pressed: a number is never carried from one
+ * screen into another's model by the page.
  */
-import type { ConstantRow, ConstantsResult as Result } from "@/api/types";
+import { ArrowRight } from "lucide-react";
+import { Link } from "wouter";
+
+import type { ConstantRow, ConstantsResult as Result, SourcedValue } from "@/api/types";
+import { Disclosure } from "@/components/forms/Disclosure";
+import { Citation } from "@/components/provenance/Citation";
 import { Value } from "@/components/provenance/Value";
+import { MarkdownReport } from "@/components/report/Report";
+import { Section } from "@/components/screen/Screen";
+import { DataTable } from "@/components/table/DataTable";
 
-import { Report } from "./Report";
+const QUANTITY_LABEL: Record<string, string> = { km: "Km", kcat: "kcat", ki: "Ki" };
 
-function Constant({ row }: { row: ConstantRow }) {
-  const p = row.value?.provenance;
+interface Row {
+  key: string;
+  v: SourcedValue;
+  role: "chosen" | "other";
+}
+
+function conditionsText(v: SourcedValue): string {
+  const c = v.provenance.conditions;
+  if (!c) return "";
+  const parts: string[] = [];
+  if (c.ph !== null) parts.push(`pH ${c.ph}`);
+  if (c.temperature_c !== null) parts.push(`${c.temperature_c} °C`);
+  if (c.buffer) parts.push(c.buffer);
+  return parts.join(", ");
+}
+
+/** The address that fills Compose's form with this lookup's enzyme, organism and substrate. */
+export function composeHref(request: Record<string, unknown>, quantity: string): string {
+  const params = new URLSearchParams();
+  params.set("description", quantity === "ki" ? "Michaelis-Menten with a competitive inhibitor" : "Michaelis-Menten");
+  const subject = typeof request.ec === "string" ? request.ec : typeof request.enzyme === "string" ? request.enzyme : "";
+  if (subject) params.set("subject", subject);
+  if (typeof request.organism === "string") params.set("organism", request.organism);
+  if (typeof request.substrate === "string") params.set("substrate", request.substrate);
+  return `/compose?${params.toString()}`;
+}
+
+function Constant({ row, request }: { row: ConstantRow; request: Record<string, unknown> }) {
+  const rows: Row[] = [
+    ...(row.value ? [{ key: row.value.id ?? "chosen", v: row.value, role: "chosen" as const }] : []),
+    ...row.alternatives.map((a, i) => ({ key: a.id ?? `alt-${i}`, v: a, role: "other" as const })),
+  ];
+  const label = QUANTITY_LABEL[row.quantity] ?? row.quantity;
   return (
-    <section className="k-section" aria-label={`${row.name}, ${row.quantity}`}>
-      <div className="k-actions" style={{ alignItems: "baseline" }}>
-        <h3 className="k-section-title k-code" style={{ fontSize: "1.2rem" }}>
-          {row.name}
-        </h3>
-        {row.value ? (
-          <span style={{ fontSize: "1.35rem" }}>
+    <Section
+      title={label}
+      id={`k-constant-${row.name}`}
+      aside={
+        row.found ? (
+          <Link href={composeHref(request, row.quantity)} className="k-inline-link">
+            Use in Compose
+            <ArrowRight size={12} aria-hidden="true" />
+          </Link>
+        ) : undefined
+      }
+    >
+      {row.value ? (
+        <p className="k-constant-headline">
+          <span className="k-constant-value">
             <Value v={row.value} />
           </span>
-        ) : (
-          <span className="k-muted">not found ({row.source})</span>
-        )}
-      </div>
-      {p?.kind === "measured" ? (
-        <p className="k-prose k-small">
-          {p.citation?.url ? (
-            <a href={p.citation.url} target="_blank" rel="noreferrer noopener">
-              {p.citation.text}
-            </a>
-          ) : (
-            p.citation?.text
-          )}
-          {p.organism ? `, ${p.organism}` : ""}
-          {p.conditions
-            ? `, ${p.conditions.ph !== null ? `pH ${p.conditions.ph}` : "pH not stated"}, ${
-                p.conditions.temperature_c !== null ? `${p.conditions.temperature_c} °C` : "temperature not stated"
-              }`
-            : ""}
-          {p.commentary ? <span className="k-muted block">BRENDA's row: {p.commentary}</span> : null}
+          <span className="muted">
+            the resolver&apos;s pick ({row.source}); {rows.length} row(s) read in all
+          </span>
+        </p>
+      ) : (
+        <p className="k-constant-headline">
+          <span className="text-caution">Not found</span>{" "}
+          <span className="muted">
+            ({row.source}){row.organisms_available.length ? `. Measured in: ${row.organisms_available.join(", ")}` : ""}
+          </span>
+        </p>
+      )}
+      {rows.length ? (
+        <DataTable
+          caption={`Every ${label} row the resolver read`}
+          rows={rows}
+          rowKey={(r) => r.key}
+          columns={[
+            { key: "v", header: "Value", cell: (r) => <Value v={r.v} />, sortValue: (r) => r.v.value, align: "end" },
+            {
+              key: "ref",
+              header: "Reference",
+              cell: (r) => (r.v.provenance.citation ? <Citation citation={r.v.provenance.citation} /> : <span className="muted">none recorded</span>),
+              sortValue: (r) => r.v.provenance.citation?.text ?? null,
+            },
+            { key: "org", header: "Organism", cell: (r) => <em>{r.v.provenance.organism ?? ""}</em>, sortValue: (r) => r.v.provenance.organism ?? null },
+            { key: "cond", header: "Conditions", cell: (r) => <span className="font-mono">{conditionsText(r.v)}</span> },
+            { key: "says", header: "The row says", cell: (r) => <span className="k-cell-prose">{r.v.provenance.commentary ?? ""}</span> },
+            { key: "role", header: "", cell: (r) => (r.role === "chosen" ? <span className="chip" data-tone="signal">chosen</span> : null) },
+          ]}
+        />
+      ) : null}
+      {row.isoforms_available.length || row.modes_available.length || row.variants_available.length ? (
+        <p className="k-invariants muted">
+          {row.isoforms_available.length ? `Isoforms with rows: ${row.isoforms_available.join(", ")}. ` : ""}
+          {row.modes_available.length ? `Inhibition modes stated: ${row.modes_available.join(", ")}. ` : ""}
+          {row.variants_available.length ? `Variants: ${row.variants_available.join(", ")}.` : ""}
         </p>
       ) : null}
-      {row.alternatives.length > 0 ? (
-        <div className="k-table-wrap">
-          <table className="k-table">
-            <caption className="k-section-sub" style={{ textAlign: "left", paddingBottom: "0.35rem" }}>
-              Other rows the resolver read for {row.name}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Value</th>
-                <th scope="col">Reference</th>
-                <th scope="col">Organism</th>
-                <th scope="col">Row</th>
-              </tr>
-            </thead>
-            <tbody>
-              {row.alternatives.map((a) => (
-                <tr key={a.id}>
-                  <td className="k-num">
-                    <Value v={a} />
-                  </td>
-                  <td className="k-code">{a.provenance.citation?.text}</td>
-                  <td>{a.provenance.organism}</td>
-                  <td className="k-small k-muted">{a.provenance.commentary}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-      {!row.found && row.organisms_available.length > 0 ? (
-        <p className="k-small">Measured in: {row.organisms_available.join(", ")}</p>
-      ) : null}
-      {row.isoforms_available.length > 0 ? (
-        <p className="k-small k-muted">Isoforms with rows: {row.isoforms_available.join(", ")}</p>
-      ) : null}
-    </section>
+    </Section>
   );
 }
 
-export function ConstantsResultView({ result }: { result: Result }) {
+export function ConstantsResultView({ result, request }: { result: Result; request: Record<string, unknown> }) {
   return (
     <>
       <section className="k-verdict" aria-label="Summary">
-        <p className="k-section-sub">From the literature</p>
-        <p className="k-verdict-word">{result.sourced.length > 0 ? result.sourced.join(", ") : "nothing found"}</p>
-        <p className="k-prose">
+        <p className="k-eyebrow">From the literature</p>
+        <h2 className="k-verdict-word" data-tone={result.sourced.length ? undefined : "caution"}>
+          {result.sourced.length ? result.sourced.map((n) => QUANTITY_LABEL[n] ?? n).join(", ") : "nothing found"}
+        </h2>
+        <p className="k-verdict-licence">
           {result.defensible
-            ? "Every number in the model is either cited or declared as yours (the lab report's own check)."
-            : "Not every number in the model is cited or declared as yours (the lab report's own check); the document says which."}
+            ? "Every number in the lab report is either cited or declared as yours (cite.py's own check)."
+            : "Not every number in the lab report is cited or declared as yours (cite.py's own check); the document says which."}
         </p>
-        {result.organism_note ? <p className="k-small k-muted">{result.organism_note}</p> : null}
+        {result.organism_note ? <p className="k-verdict-behaviour muted">{result.organism_note}</p> : null}
+        {result.refusals.length ? (
+          <div className="k-part-refusal" role="note">
+            <span className="state-kicker">Declined</span>
+            {result.refusals.map((r) => (
+              <p key={r} className="k-part-refusal-reason">
+                {r}
+              </p>
+            ))}
+          </div>
+        ) : null}
       </section>
       {result.constants.map((row) => (
-        <Constant key={row.name} row={row} />
+        <Constant key={row.name} row={row} request={request} />
       ))}
-      {result.supplied.length > 0 ? (
-        <section className="k-section" aria-labelledby="k-supplied">
-          <h2 className="k-section-title" id="k-supplied">
-            Supplied, not measured
-          </h2>
-          <div className="k-table-wrap">
-            <table className="k-table">
+      {result.supplied.length ? (
+        <Section title="Yours, not the literature's" id="k-supplied">
+          <div className="table-wrap">
+            <table className="table">
               <tbody>
                 {result.supplied.map((v) => (
                   <tr key={v.id}>
-                    <th scope="row" className="k-code" style={{ fontWeight: 400 }}>
+                    <th scope="row" className="font-mono k-ledger-name">
                       {v.id}
                     </th>
-                    <td className="k-num">
+                    <td data-align="end">
                       <Value v={v} />
                     </td>
-                    <td className="k-small k-muted">{v.provenance.reason}</td>
+                    <td className="muted">{v.provenance.reason}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </section>
+        </Section>
       ) : null}
-      {result.refusals.length > 0 ? (
-        <section className="k-section" aria-labelledby="k-declined">
-          <h2 className="k-section-title" id="k-declined">
-            Declined, and why
-          </h2>
-          <ul className="k-list">
-            {result.refusals.map((r) => (
-              <li key={r}>{r}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-      <Report title="The document cite.py prints" markdown={result.document_markdown} />
+      <Disclosure title="The document cite.py prints">
+        <MarkdownReport source={result.document_markdown} />
+      </Disclosure>
     </>
   );
 }
