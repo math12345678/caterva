@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow test-ts guards pr demo publish-check evidence cli clean release-artifacts release-app
+.PHONY: cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow test-ts test-studio guards pr demo publish-check evidence cli clean release-artifacts release-app
 
 help:
 	@echo "Caterva"
@@ -32,6 +32,8 @@ help:
 	@echo "  make test-lit   literature layer only (Tests/)"
 	@echo "  make test-ts    the root TypeScript package (src/, the scientific CLI):"
 	@echo "                  type-check and jest suite; needs Node (runs npm ci once)"
+	@echo "  make test-studio  Caterva Studio: the page's type-check, tests and build,"
+	@echo "                  then the studio server tests against it; needs Node and pnpm"
 	@echo "  make guards     the guards CI runs (no test suites)"
 	@echo "  make counts-fix update README counts after adding a test/guard/ADR"
 	@echo "  make pr         everything CI runs -- do this before opening a PR"
@@ -242,6 +244,25 @@ test-ts: check-python
 	npm run type-check
 	npm test -- --ci --json --outputFile=root-jest-results.json
 	@"$(PY)" scripts/check_typescript_suites_discovered.py --jest-results root-jest-results.json
+
+# Caterva Studio, as the `studio` job in .github/workflows/tests.yml runs it:
+# the page (Science-Agent-Pipeline/artifacts/caterva-studio) type-checked,
+# tested and built into caterva/studio/static/, then the studio server tests
+# and the self-test against that build. Not part of `test` or `pr`, for the
+# reason test-ts is not: it needs Node and pnpm (docs/studio/CONTRACT.md,
+# section 19, says where to get them). The install is --frozen-lockfile, so
+# it never rewrites pnpm-lock.yaml.
+test-studio: check-python
+	@if ! command -v pnpm >/dev/null 2>&1; then \
+		echo "No pnpm on PATH. With Node 22 or later: corepack enable, then run this again."; \
+		exit 2; \
+	fi
+	cd Science-Agent-Pipeline && pnpm install --frozen-lockfile --filter @workspace/caterva-studio...
+	cd Science-Agent-Pipeline/artifacts/caterva-studio && pnpm run typecheck
+	cd Science-Agent-Pipeline/artifacts/caterva-studio && pnpm run test
+	cd Science-Agent-Pipeline/artifacts/caterva-studio && pnpm run build
+	"$(PY)" -m pytest -p no:cacheprovider -o addopts="" caterva/tests/test_studio_*.py -q
+	"$(PY)" -m caterva.app studio --self-test
 
 # The guards CI runs, in CI's order, minus the test suites -- plus the
 # two that keep this target and the docs honest, which run under pytest

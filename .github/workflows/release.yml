@@ -23,6 +23,11 @@
 #               the copies compiled into libroadrunner and Antimony, carries
 #               every third-party licence, and runs the frozen binary from
 #               an empty directory
+#   studio-dmg  .github/workflows/studio-dmg.yml, called with the tag: the
+#               studio's page built into a wheel of its own, that wheel
+#               frozen and self-tested, wrapped in Caterva.app and a DMG, and
+#               the copy inside the DMG smoke-tested; the DMG and its
+#               .sha256 are attached beside the folders
 #   sources     the corresponding source of every libSBML version the
 #               folders carry, and of the two libraries that embed it, is
 #               fetched from upstream and attached beside the folders
@@ -247,9 +252,20 @@ jobs:
             dist/app/libsbml-copies-*.tsv
           if-no-files-found: error
 
+  # The macOS app, as a DMG. A reusable workflow, so the steps live in one
+  # file and run the same way by hand (workflow_dispatch there) and here.
+  # Its wheel carries the studio's page and stays inside the app; the wheel
+  # this release publishes is the `artifacts` job's.
+  studio-dmg:
+    name: Caterva.app DMG
+    needs: [artifacts, verify]
+    uses: ./.github/workflows/studio-dmg.yml
+    with:
+      ref: ${{ github.event.inputs.tag || github.ref_name }}
+
   publish:
     name: GitHub Release
-    needs: [artifacts, reproduce, verify, app]
+    needs: [artifacts, reproduce, verify, app, studio-dmg]
     if: ${{ github.event_name == 'push' || github.event.inputs.publish == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -297,12 +313,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          find staged -type f \( -name '*.whl' -o -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release/ \;
+          find staged -type f \( -name '*.whl' -o -name '*.tar.gz' -o -name '*.zip' -o -name '*.dmg' \) -exec cp {} release/ \;
+          ls release/Caterva-*-macos-arm64.dmg > /dev/null || { echo "::error::the studio-dmg job's DMG is not among the staged artifacts"; exit 1; }
           cd release
           # Named inputs, not `*`: the redirect can create SHA256SUMS before
           # the glob expands, and the file then lists itself with the digest
           # of an empty file.
-          sha256sum -- *.whl *.tar.gz *.zip *.tsv | sort -k2 > SHA256SUMS
+          sha256sum -- *.whl *.tar.gz *.zip *.dmg *.tsv | sort -k2 > SHA256SUMS
           # The wheel/sdist lines must equal the tested build's own sums.
           grep -E '  caterva-[0-9][0-9.]*(-py3-none-any\.whl|\.tar\.gz)$' SHA256SUMS | diff - <(sort -k2 ../staged/python-artifacts/SHA256SUMS)
           cat SHA256SUMS

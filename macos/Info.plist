@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Caterva.app's Info.plist. scripts/build_studio_app.py copies it into the
+  bundle with @VERSION@ replaced by caterva.__version__ and @BUILD@ by the
+  build number it is given (the commit count in CI), and refuses a result
+  that still holds an @...@ placeholder.
+
+  NSAllowsLocalNetworking: the window loads the studio server over plain
+  http on a loopback address. It allows exactly that; every other load is
+  refused by StudioWindowController and opened in the default browser.
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Caterva</string>
+	<key>CFBundleExecutable</key>
+	<string>Caterva</string>
+	<key>CFBundleIconFile</key>
+	<string>Caterva</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.math12345678.caterva</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Caterva</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@BUILD@</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.education</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>Apache License 2.0. Not signed with an Apple Developer ID and not notarised.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
+</dict>
+</plist>

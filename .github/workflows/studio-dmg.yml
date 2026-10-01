@@ -1,0 +1,165 @@
+# Caterva.app in a DMG: the studio's page, the wheel that carries it, the
+# frozen `caterva` folder, the Swift shell around it, and the disk image.
+#
+# WHEN IT RUNS
+#   workflow_dispatch   by hand, on any ref, to get a DMG to try
+#   workflow_call       from release.yml, for a pushed `v*` tag, whose
+#                       publish job attaches the DMG to the GitHub Release
+# It has no tag trigger of its own: release.yml already runs on every tag
+# and calls this, so a tag builds one DMG, not two.
+#
+# WHAT IT PROVES BEFORE IT UPLOADS
+#   page     pnpm install --frozen-lockfile, tsc, vitest and the Vite build
+#            into caterva/studio/static/
+#   wheel    scripts/build_release.py after the page build, so the wheel
+#            carries the page (pyproject package-data); checked to contain it
+#   folder   scripts/build_app.py --require-studio-page: the frozen folder's
+#            CLI smoke (a time course, an SBML export) and
+#            `caterva studio --self-test` with the built page served
+#   app      scripts/build_studio_app.py: swiftc, the icon, Info.plist with
+#            the package's version, an ad-hoc signature over the bundle,
+#            and `Caterva --smoke --require-page` (the shell starts the
+#            bundled server, reads its URL, fetches the page, stops it)
+#   image    hdiutil create + verify; then the DMG is mounted read-only and
+#            the copy INSIDE it is smoke-tested again, because that copy is
+#            what a person drags to Applications
+#
+# WHAT IT DOES NOT DO
+# Sign with a Developer ID or notarise: the repository holds no Apple
+# Developer ID. The DMG's README (macos/dmg/README.txt) and the app's
+# first-run sheet say how to open an unsigned app and claim nothing more.
+# The wheel built here carries the page and is used only inside the app;
+# the wheel on the release page is release.yml's, built without the page.
+#
+# Apple silicon only (macos-14 is arm64). An Intel build would need its own
+# runner and its own frozen Python; none is claimed.
+
+name: studio-dmg
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: "The git ref to build (release.yml passes the tag)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+  # The same setuptools as release.yml, so the wheel inside the app is built
+  # the way the released wheel is.
+  SETUPTOOLS_PIN: "setuptools==84.0.0"
+
+jobs:
+  dmg:
+    name: Caterva.app (macOS arm64)
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          # The commit count is the app's CFBundleVersion.
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # `corepack enable`, for the reason tests.yml's api-server job gives.
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      - name: Install the studio package
+        working-directory: Science-Agent-Pipeline
+        run: pnpm install --frozen-lockfile --filter @workspace/caterva-studio...
+
+      - name: Page type-checks, passes its tests, and builds
+        working-directory: Science-Agent-Pipeline/artifacts/caterva-studio
+        run: |
+          set -euo pipefail
+          pnpm run typecheck
+          pnpm run test
+          pnpm run build
+          test -f "$GITHUB_WORKSPACE/caterva/studio/static/index.html"
+
+      - name: Build the wheel, with the page inside
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip "$SETUPTOOLS_PIN"
+          python scripts/build_release.py --out dist/python
+          python - <<'PY'
+          import glob, zipfile
+          (wheel,) = glob.glob("dist/python/caterva-*.whl")
+          names = zipfile.ZipFile(wheel).namelist()
+          page = "caterva/studio/static/index.html"
+          assets = [n for n in names if n.startswith("caterva/studio/static/assets/")]
+          assert page in names, f"{wheel} does not carry {page}"
+          assert assets, f"{wheel} carries no caterva/studio/static/assets/"
+          print(f"{wheel}: {page} and {len(assets)} asset files")
+          PY
+
+      - name: Install that wheel and the freezer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install dist/python/caterva-*.whl -r requirements-release.txt
+
+      - name: Freeze, check, run the studio self-test
+        shell: bash
+        # Outside the checkout, so the analysis cannot pick the source tree
+        # over the installed wheel; build_app.py refuses if it did.
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          python "$GITHUB_WORKSPACE/scripts/build_app.py" --out "$GITHUB_WORKSPACE/dist/app" \
+            --require-studio-page --keep-folder "$GITHUB_WORKSPACE/dist/frozen"
+
+      - name: Build Caterva.app and the DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/build_studio_app.py --frozen dist/frozen/caterva --out dist/studio \
+            --build-number "$(git rev-list --count HEAD)" --dmg
+
+      - name: The frozen server inside the app passes its self-test
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          "$GITHUB_WORKSPACE/dist/studio/Caterva.app/Contents/Resources/caterva/caterva" studio --self-test | tee self-test.txt
+          if grep -q 'not built' self-test.txt; then echo "::error::the app's server served its not-built page"; exit 1; fi
+
+      - name: The copy inside the DMG starts, serves the page and stops
+        shell: bash
+        run: |
+          set -euo pipefail
+          mnt="$RUNNER_TEMP/caterva-dmg"
+          mkdir -p "$mnt"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" dist/studio/Caterva-*-macos-arm64.dmg
+          trap 'hdiutil detach "$mnt" -quiet || hdiutil detach "$mnt" -force' EXIT
+          ls -la "$mnt"
+          test -L "$mnt/Applications"
+          test -f "$mnt/README.txt"
+          codesign --verify --deep --strict "$mnt/Caterva.app"
+          "$mnt/Caterva.app/Contents/MacOS/Caterva" --version
+          "$mnt/Caterva.app/Contents/MacOS/Caterva" --smoke --require-page
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-dmg
+          path: |
+            dist/studio/Caterva-*-macos-arm64.dmg
+            dist/studio/Caterva-*-macos-arm64.dmg.sha256
+          if-no-files-found: error

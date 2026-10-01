@@ -552,6 +552,73 @@ jobs:
           jq -r '.testResults[] | .name as $file | .assertionResults[] | select(.status != "passed" and .status != "failed") | "  did not run (\(.status)): \($file) > \(.fullName)"' root-jest-results.json
           jq -e '.numPendingTests == 0 and .numTodoTests == 0' root-jest-results.json > /dev/null
 
+  # Caterva Studio: the page (Science-Agent-Pipeline/artifacts/caterva-studio)
+  # and the server that serves it (caterva/studio). The page is checked the
+  # three ways that each catch something the others cannot: tsc over every
+  # file (vitest compiles only what a test imports), vitest under jsdom, and
+  # the production build, which writes caterva/studio/static/. The Python
+  # studio tests then run against THAT build, so the server's static
+  # serving, token injection and CSP are exercised on the real page rather
+  # than on the not-built page every other job sees. test_studio_socket.py
+  # binds real loopback sockets here; a sandbox that refuses to bind makes it
+  # fail loudly, never skip, and this runner can bind.
+  #
+  # Ubuntu, not macOS: nothing here is macOS-specific, and the macOS shell
+  # and DMG are built by studio-dmg.yml. `make test-studio` runs the same
+  # commands locally.
+  studio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # `corepack enable`, for the reason the api-server job gives.
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      # --frozen-lockfile proves the lockfile satisfies every package.json
+      # and never rewrites it; the filter installs the studio package and
+      # its workspace dependencies only (docs/studio/CONTRACT.md, section 19).
+      - name: Install the studio package
+        working-directory: Science-Agent-Pipeline
+        run: pnpm install --frozen-lockfile --filter @workspace/caterva-studio...
+
+      - name: Studio page type-checks
+        working-directory: Science-Agent-Pipeline/artifacts/caterva-studio
+        run: pnpm run typecheck
+
+      - name: Studio page tests (vitest)
+        working-directory: Science-Agent-Pipeline/artifacts/caterva-studio
+        run: pnpm run test
+
+      - name: Studio page builds into caterva/studio/static
+        working-directory: Science-Agent-Pipeline/artifacts/caterva-studio
+        run: pnpm run build
+
+      - name: Studio server tests against the built page
+        run: python -m pytest -p no:cacheprovider -o addopts="" caterva/tests/test_studio_*.py -q
+
+      # The same self-test the frozen app runs before it is packaged; here
+      # it must find the built page, not the not-built one.
+      - name: Studio self-test over a real socket
+        run: python -m caterva.app studio --self-test
+
   # `caterva md` writes a GROMACS setup; this runs it, every stage, with
   # Ubuntu's GROMACS, on hen lysozyme (1AKI, EC 3.2.1.17: small, one chain,
   # the standard GROMACS test protein). Steps are capped so each stage is

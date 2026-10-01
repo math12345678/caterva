@@ -51,6 +51,19 @@ WHAT IT CHECKS BEFORE IT WRITES THE ARCHIVE
   A folder that cannot do all of that is not archived.
 - libSBML's extension is a separate file; roadrunner's 48 MB of test
   fixtures are pruned and the executable still runs afterwards.
+- `caterva studio --self-test` passes from the frozen folder: the studio
+  server starts on a real loopback socket, answers /api/health with its
+  session token and refuses it without, and serves `/`. Caterva.app runs
+  exactly this executable, so a folder whose studio cannot start would
+  ship an app that opens onto an error view. With `--require-studio-page`
+  the built page must also be inside (_internal/caterva/studio/static/,
+  collected from the installed wheel) and be the page `/` serves; the DMG
+  build passes it, the plain archive does not, because the release wheel
+  is built without the page (docs/studio/CONTRACT.md, section 16).
+
+`--keep-folder DIR` also copies the checked folder to DIR/caterva, which
+scripts/build_studio_app.py wraps into Caterva.app. It is the same folder
+the archive holds, copied after every check above passed.
 
 NOT REPRODUCIBLE BYTE-FOR-BYTE
 ------------------------------
@@ -61,6 +74,7 @@ not, and SHA256SUMS on the release page records the folder that was tested.
 
 Usage (in a venv where `pip install pyinstaller dist/caterva-*.whl` ran):
     python3 scripts/build_app.py --out dist/app
+    python3 scripts/build_app.py --out dist/app --require-studio-page --keep-folder dist/frozen
 """
 from __future__ import annotations
 
@@ -462,7 +476,7 @@ WHAT THIS FOLDER DOES NOT DO
     (bundle / "README.txt").write_text(text, encoding="utf-8")
 
 
-def _smoke(bundle: Path, version: str) -> None:
+def _smoke(bundle: Path, version: str, require_studio_page: bool = False) -> None:
     exe = _exe(bundle)
     if not exe.is_file():
         _fail(f"executable missing: {exe}")
@@ -515,6 +529,61 @@ def _smoke(bundle: Path, version: str) -> None:
         print("smoke  : --version, sim --help, a simulated time course, an SBML export and an")
         print("         expansion-library shape all ran from an empty directory")
 
+        r = run("studio", "--self-test", timeout=300)
+        problems = studio_self_test_problems(r.returncode, r.stdout, require_studio_page)
+        if problems:
+            _fail(
+                "caterva studio --self-test: " + "; ".join(problems)
+                + f"; stdout {r.stdout[-1200:]!r}, stderr {r.stderr[-1200:]!r}"
+            )
+        for line in r.stdout.strip().splitlines():
+            print(f"studio : {line}")
+
+
+#: Where the studio's built page lands inside a onedir folder: PyInstaller's
+#: `--collect-all caterva` copies the installed package's data files there.
+STUDIO_PAGE = Path("_internal") / "caterva" / "studio" / "static" / "index.html"
+#: What the built page carries until the server writes the session token in
+#: (caterva.studio.contract.TOKEN_PLACEHOLDER; read as text, not imported,
+#: so this script needs nothing but the standard library).
+TOKEN_PLACEHOLDER = "__CATERVA_SESSION_TOKEN__"
+
+
+def studio_page_problem(bundle: Path) -> str | None:
+    """Why the folder does not carry the studio's built page, or None."""
+    page = bundle / STUDIO_PAGE
+    if not page.is_file():
+        return (f"{STUDIO_PAGE.as_posix()} is missing: the installed wheel was built without the page "
+                "(build it first: pnpm --filter @workspace/caterva-studio run build, from Science-Agent-Pipeline/)")
+    if TOKEN_PLACEHOLDER not in page.read_text(encoding="utf-8", errors="replace"):
+        return f"{STUDIO_PAGE.as_posix()} has no {TOKEN_PLACEHOLDER} to replace: it is not the studio's built page"
+    if not any((page.parent / "assets").glob("*.js")):
+        return f"{STUDIO_PAGE.as_posix()} is there but static/assets/ holds no script"
+    return None
+
+
+def studio_self_test_problems(returncode: int, stdout: str, require_page: bool) -> list[str]:
+    """What is wrong with one run of `caterva studio --self-test`, or [].
+
+    The self-test prints one line per check, `ok   ...` or `FAIL ...`
+    (caterva/studio/__main__.py), and exits 0 only when all passed. Both are
+    read: an exit status alone would pass a self-test that checked nothing.
+    """
+    lines = [line for line in stdout.splitlines() if line.strip()]
+    problems = []
+    if returncode != 0:
+        problems.append(f"exit {returncode}")
+    failed = [line for line in lines if line.startswith("FAIL")]
+    if failed:
+        problems.append("failed checks: " + " | ".join(failed))
+    if not any(line.startswith("ok") and "/api/health" in line for line in lines):
+        problems.append("no passing /api/health check was reported")
+    if not any(line.startswith("ok") and line[2:].lstrip().startswith("/:") for line in lines):
+        problems.append("no passing check of / was reported")
+    if require_page and "not built" in stdout:
+        problems.append("the server served its not-built page; this folder must carry the built page")
+    return problems
+
 
 def _archive(bundle: Path, out_dir: Path, version: str, tag: str) -> Path:
     if platform.system() == "Windows":
@@ -540,6 +609,10 @@ def _sha256(path: Path) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", default=str(ROOT / "dist" / "app"), help="where the archive goes (default: dist/app/)")
+    parser.add_argument("--keep-folder", metavar="DIR",
+                        help="also copy the checked folder to DIR/caterva (scripts/build_studio_app.py reads it)")
+    parser.add_argument("--require-studio-page", action="store_true",
+                        help="refuse a folder without the studio's built page (the DMG build passes this)")
     args = parser.parse_args(argv)
     out_dir = Path(args.out).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -566,7 +639,20 @@ def main(argv: list[str] | None = None) -> int:
         copies = _libsbml_copies(bundle)
         _write_licences(bundle)
         _write_readme(bundle, version, copies, tag)
-        _smoke(bundle, version)
+        if args.require_studio_page:
+            problem = studio_page_problem(bundle)
+            if problem:
+                _fail(problem)
+        _smoke(bundle, version, require_studio_page=args.require_studio_page)
+        if args.keep_folder:
+            kept = Path(args.keep_folder).resolve() / "caterva"
+            if kept.exists():
+                shutil.rmtree(kept)
+            kept.parent.mkdir(parents=True, exist_ok=True)
+            # symlinks=True: PyInstaller's macOS folder links Python.framework's
+            # members, and following them would duplicate the runtime.
+            shutil.copytree(bundle, kept, symlinks=True)
+            print(f"kept   : {kept}")
 
         archive = _archive(bundle, out_dir, version, tag)
         size = sum(p.stat().st_size for p in bundle.rglob("*") if p.is_file())
