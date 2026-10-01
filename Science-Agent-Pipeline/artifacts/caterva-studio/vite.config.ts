@@ -13,7 +13,16 @@
  *   `--dev-origin <this server's origin>`. The token the backend minted is
  *   fetched from its /api/dev/session when index.html is served, and written
  *   into the same meta tag, so the page reads it the same way in both modes.
+ *
+ * Development only, and only while the backend at STUDIO_API does not
+ * answer (a worktree whose `caterva studio` is still the contract's
+ * skeleton): `/api/health` is answered here, with the checkout's version,
+ * so the shell can be seen; every other /api/ path answers 503 saying the
+ * server is not running. It never answers a science question and is not
+ * part of the build (`apply: "serve"`).
  */
+import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -29,7 +38,7 @@ if (rawPort && (Number.isNaN(port) || (port ?? 0) <= 0)) {
 }
 
 /** Writes the backend's session token into index.html while developing. */
-function studioDevSession(): Plugin {
+function studioDevSession(stub: DevStub): Plugin {
   return {
     name: "caterva-studio-dev-session",
     apply: "serve",
@@ -40,19 +49,72 @@ function studioDevSession(): Plugin {
         if (!response.ok) return html;
         const body = (await response.json()) as { token?: unknown };
         if (typeof body.token !== "string" || !/^[A-Za-z0-9_-]+$/.test(body.token)) return html;
+        stub.active = false;
         return html.replace(TOKEN_PLACEHOLDER, body.token);
       } catch {
-        // The backend is not running yet. The page says so (it finds the
-        // placeholder still in place) instead of this server failing.
-        return html;
+        // The backend is not running. The health-only stub below answers
+        // instead, under a token minted for this development server.
+        stub.active = true;
+        return html.replace(TOKEN_PLACEHOLDER, stub.token);
       }
     },
   };
 }
 
+interface DevStub {
+  active: boolean;
+  token: string;
+  startedAt: string;
+}
+
+function checkoutVersion(): string {
+  const init = path.resolve(import.meta.dirname, "..", "..", "..", "caterva", "__init__.py");
+  const match = /__version__\s*=\s*"([^"]+)"/.exec(readFileSync(init, "utf8"));
+  if (!match) throw new Error(`no __version__ in ${init}`);
+  return match[1];
+}
+
+/** /api/health only, while the backend does not answer; see the header. */
+function studioDevStub(stub: DevStub): Plugin {
+  return {
+    name: "caterva-studio-dev-health-stub",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? "";
+        if (!stub.active || !(url === "/api" || url.startsWith("/api/"))) return next();
+        const send = (status: number, body: unknown) => {
+          res.statusCode = status;
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader("Cache-Control", "no-store");
+          res.end(JSON.stringify(body));
+        };
+        if (req.headers["x-caterva-session"] !== stub.token) {
+          send(401, { error: { code: "unauthorized", message: "this request does not carry this development server's session token" } });
+        } else if (req.method === "GET" && url === "/api/health") {
+          send(200, { ok: true, version: checkoutVersion(), api_version: 1, started_at: stub.startedAt });
+        } else {
+          send(503, {
+            error: {
+              code: "unavailable",
+              message: `The studio server at ${studioApi} is not running, so only /api/health is answered (by the development server). Start \`caterva studio --port 18740 --dev-origin <this origin>\` and reload.`,
+            },
+          });
+        }
+      });
+    },
+  };
+}
+
+const devStub: DevStub = {
+  active: false,
+  token: randomBytes(24).toString("base64url"),
+  startedAt: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
+};
+
 export default defineConfig({
   base: "/",
-  plugins: [react(), tailwindcss(), studioDevSession()],
+  plugins: [react(), tailwindcss(), studioDevSession(devStub), studioDevStub(devStub)],
   resolve: {
     alias: { "@": path.resolve(import.meta.dirname, "src") },
     dedupe: ["react", "react-dom"],

@@ -1,0 +1,135 @@
+{
+  "status": 200,
+  "body": {
+    "version": "0.4.0",
+    "api_version": 1,
+    "python": "3.12.13",
+    "platform": "darwin",
+    "frozen": false,
+    "literature": {
+      "available": true,
+      "reason": null
+    },
+    "network": {
+      "checked": false,
+      "reachable": null,
+      "hosts": {
+        "www.brenda-enzymes.org": null,
+        "rest.uniprot.org": null,
+        "search.rcsb.org": null,
+        "files.rcsb.org": null,
+        "eutils.ncbi.nlm.nih.gov": null
+      },
+      "checked_at": null,
+      "reason": "not checked: probing contacts third-party hosts, so it is done only when asked"
+    },
+    "gromacs": {
+      "found": true,
+      "path": "/opt/homebrew/bin/gmx",
+      "version": "2026.1-Homebrew",
+      "reason": null
+    },
+    "rates": {
+      "available": false,
+      "reason": "the caterva.rates module is not in this installation; no adapter registered the rates kind"
+    },
+    "ui": {
+      "built": true,
+      "static_dir": "/private/tmp/claude-501/wt-core/caterva/studio/static",
+      "reason": null
+    },
+    "data_dir": {
+      "path": "/tmp/claude-501/studio-capture-gwj0sbwi",
+      "writable": true,
+      "runs": 0,
+      "reason": null
+    },
+    "kinds": {
+      "compose": {
+        "available": false,
+        "title": "caterva compose",
+        "command": "caterva compose",
+        "needs": [],
+        "reason": "not built yet in this version of Caterva Studio"
+      },
+      "constants": {
+        "available": false,
+        "title": "python3 scripts/cite.py",
+        "command": "python3 scripts/cite.py",
+        "needs": [],
+        "reason": "not built yet in this version of Caterva Studio"
+      },
+      "sim": {
+        "available": false,
+        "title": "caterva sim ssa",
+        "command": "caterva sim ssa",
+        "needs": [],
+        "reason": "not built yet in this version of Caterva Studio"
+      },
+      "bind": {
+        "available": false,
+        "title": "caterva bind",
+        "command": "caterva bind",
+        "needs": [],
+        "reason": "not built yet in this version of Caterva Studio"
+      },
+      "structure": {
+        "available": false,
+        "title": "caterva structure",
+        "command": "caterva structure",
+        "needs": [],
+        "reason": "not built yet in this version of Caterva Studio"
+      },
+      "prepare": {
+        "available": false,
+        "title": "caterva prepare",
+        "command": "caterva prepare",
+        "needs": [],
+        "reason": "not built yet in this version of Caterva Studio"
+      },
+      "md.setup": {
+        "available": false,
+        "title": "caterva md",
+        "command": "caterva md",
+        "needs": [],
+        "reason": "not built yet in this version of Caterva Studio"
+      },
+      "md.summarise": {
+        "available": false,
+        "title": "caterva md --summarise",
+        "command": "caterva md --summarise",
+        "needs": [],
+        "reason": "not built yet in this version of Caterva Studio"
+      },
+      "analyze": {
+        "available": false,
+        "title": "caterva analyze",
+        "command": "caterva analyze",
+        "needs": [],
+        "reason": "not built yet in this version of Caterva Studio"
+      },
+      "fep.status": {
+        "available": false,
+        "title": "caterva fep --summarise",
+        "command": "caterva fep --summarise",
+        "needs": [],
+        "reason": "not built yet in this version of Caterva Studio"
+      },
+      "complex.check": {
+        "available": false,
+        "title": "caterva complex --check",
+        "command": "caterva complex --check",
+        "needs": [],
+        "reason": "not built yet in this version of Caterva Studio"
+      },
+      "rates": {
+        "available": false,
+        "title": "caterva rates",
+        "command": "caterva rates",
+        "needs": [],
+        "reason": "not built yet in this version of Caterva Studio"
+      }
+    },
+    "dev_origin": null
+  }
+}

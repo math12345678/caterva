@@ -1,0 +1,10 @@
+{
+  "status": 200,
+  "body": {
+    "theme": "system",
+    "max_parallel_runs": 2,
+    "confirm_delete": true,
+    "gromacs_path": null,
+    "offline": false
+  }
+}
