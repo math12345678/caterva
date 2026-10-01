@@ -6,18 +6,20 @@
 
 Exit codes follow the rest of Caterva: 0 produced what was asked, 2 a
 malformed question, 3 refused and said why (an EC number that is several
-proteins, no structure, no network), 1 a crash.
+proteins, no structure, no network, a ChimeraX script for a protein with no
+entry to open), 1 a crash.
 """
 from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, TextIO
 
 from caterva.compose.organisms import normalise_organism
 from caterva.methods import METHODS
-from caterva.structure.search import StructureSearchError, find_structures
+from caterva.structure.search import Structure, StructureSearch, StructureSearchError, find_structures
 
 ROLES = ("ligand", "cofactor", "metal", "additive")
 
@@ -92,28 +94,75 @@ def _report(search, top: int) -> List[str]:
     return lines
 
 
-def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva structure") -> int:
-    args = build_parser(prog).parse_args(argv)
+@dataclass
+class StructureRun:
+    """What one `caterva structure` question found, printed and decided.
+
+    `main` prints it and exits with `code`; the studio's adapter
+    (caterva/studio/adapters/structure.py) reads the same object, so the
+    page and the terminal are drawn from one search rather than two.
+    """
+
+    code: int
+    organism: Optional[str]
+    organism_note: Optional[str]
+    search: Optional[StructureSearch]
+    #: The refusal exactly as printed ("Refused: ..."), for exit 3.
+    refusal: Optional[str] = None
+    #: The top entry and the ChimeraX script written for it, when asked.
+    best: Optional[Structure] = None
+    chimerax: Optional[str] = None
+
+
+def run(args: argparse.Namespace, out: Optional[TextIO] = None, err: Optional[TextIO] = None,
+        write: bool = True) -> StructureRun:
+    """Search, print the report to `out` and any refusal to `err`, and
+    write the ChimeraX script (unless `write` is False: the studio stores
+    the script itself, as a run artifact at the same path).
+
+    `--chimerax` with no entry to open used to index `ranked()[0]` of an
+    empty ranking (a chosen protein with no structure) and crash; it is a
+    refusal with a reason now, exit 3, after the table that shows why.
+    """
+    out = sys.stdout if out is None else out
+    err = sys.stderr if err is None else err
     organism, organism_note = normalise_organism(args.organism)
     try:
         search = find_structures(args.subject, organism=organism, gene=args.gene,
                                  uniprot=args.uniprot, ligand=args.ligand)
     except StructureSearchError as exc:
-        print(f"Refused: {exc}", file=sys.stderr)
-        return 3
+        refusal = f"Refused: {exc}"
+        print(refusal, file=err)
+        return StructureRun(3, organism, organism_note, None, refusal)
     if organism_note:
-        print(organism_note + "\n")
-    print("\n".join(_report(search, args.top)))
+        print(organism_note + "\n", file=out)
+    print("\n".join(_report(search, args.top)), file=out)
     if search.undecided:
-        print(f"\nRefused: {search.undecided}")
-        return 3
+        refusal = f"Refused: {search.undecided}"
+        print(f"\n{refusal}", file=out)
+        return StructureRun(3, organism, organism_note, search, refusal)
     if args.chimerax:
         from caterva.structure.chimerax import script
 
-        best = search.ranked()[0]
-        Path(args.chimerax).write_text(script(best, search.chosen, focus=args.ligand), encoding="utf-8")
-        print(f"\nWrote {args.chimerax}: PDB {best.pdb_id}. Run it with `chimerax {args.chimerax}`.")
-    return 0
+        ranked = search.ranked()
+        if not ranked:
+            chosen = search.chosen
+            refusal = (f"Refused: {chosen.gene or chosen.accession} ({chosen.accession}) has no entry in the "
+                       "PDB, so there is no structure to write a ChimeraX script for.")
+            print(refusal, file=err)
+            return StructureRun(3, organism, organism_note, search, refusal)
+        best = ranked[0]
+        text = script(best, search.chosen, focus=args.ligand)
+        if write:
+            Path(args.chimerax).write_text(text, encoding="utf-8")
+        print(f"\nWrote {args.chimerax}: PDB {best.pdb_id}. Run it with `chimerax {args.chimerax}`.", file=out)
+        return StructureRun(0, organism, organism_note, search, None, best, text)
+    return StructureRun(0, organism, organism_note, search)
+
+
+def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva structure") -> int:
+    args = build_parser(prog).parse_args(argv)
+    return run(args).code
 
 
 def console_main() -> int:

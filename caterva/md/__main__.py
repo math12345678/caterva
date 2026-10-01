@@ -13,8 +13,9 @@ from __future__ import annotations
 import argparse
 import stat
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence, Tuple
+from typing import Any, List, Optional, Sequence, TextIO, Tuple
 
 from caterva.compose.organisms import normalise_organism
 from caterva.md.setup import Conditions, MdSetup
@@ -86,41 +87,55 @@ def _from_kinetics(ec: str, organism: Optional[str], substrate: str) -> Tuple[Co
         c.temperature_k = m.assay_temperature_c + 273.15
         c.temperature_source = f"measured: {m.assay_temperature_c:g} C in {cite}"
         c.measured_temperature = True
+        c.temperature_measurement = m
         if m.assay_ph is not None:
             c.ph = m.assay_ph
             c.ph_source = f"measured: pH {m.assay_ph:g} in {cite}"
+            c.ph_measurement = m
         return c, f"conditions from {cite}"
     stated = ", ".join(f"{k.split('_')[1]} ({v.citation})" for k, v in measured.items())
     c.temperature_source = f"chosen: 25 C; none of the cited constants states a temperature: {stated}"
     return c, "no cited constant states its assay temperature; 25 C used, labelled a choice"
 
 
-def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva md") -> int:
-    args = build_parser(prog).parse_args(argv)
+def check(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """The refusals argparse cannot express on its own, through `parser.error`
+    (exit 2), so that anything driving this parser (the studio refuses a
+    malformed request before a run exists) sees them as argparse's."""
     if args.summarise:
-        return _summarise(Path(args.summarise))
+        return
     if not args.pdb or not args.out:
-        print("Refused: a setup needs --pdb and --out (or use --summarise DIR on a finished run).",
-              file=sys.stderr)
-        return 2
+        parser.error("a setup needs --pdb and --out (or use --summarise DIR on a finished run)")
     if args.replicas < 1:
-        print("Refused: --replicas must be at least 1.", file=sys.stderr)
-        return 2
+        parser.error("--replicas must be at least 1")
     pdb = args.pdb.strip().upper()
     if len(pdb) != 4 or not pdb[0].isdigit() or not pdb.isalnum():
-        print(f"Refused: {args.pdb!r} is not a PDB id (four characters, starting with a digit, like 1I10).",
-              file=sys.stderr)
-        return 2
+        parser.error(f"{args.pdb!r} is not a PDB id (four characters, starting with a digit, like 1I10)")
+    if (args.subject or args.substrate) and not (args.subject and args.substrate):
+        parser.error("taking conditions from the kinetics needs both --subject and --substrate")
+
+
+@dataclass
+class Planned:
+    """A setup computed and not yet written: what `main` writes and prints."""
+
+    setup: MdSetup
+    #: Where the conditions came from, or why they are not measured.
+    note: Optional[str]
+    #: 3 when measured conditions were asked for and not found, else 0.
+    exit_code: int
+
+
+def plan(args: argparse.Namespace, out: Optional[TextIO] = None) -> Planned:
+    """The setup a well-formed question asks for (after `check`): the
+    literature searched when --subject and --substrate ask for measured
+    conditions, the overrides applied, nothing written."""
     exit_code = 0
     conditions, note = Conditions(), None
     if args.subject or args.substrate:
-        if not (args.subject and args.substrate):
-            print("Refused: taking conditions from the kinetics needs both --subject and --substrate.",
-                  file=sys.stderr)
-            return 2
         organism, organism_note = normalise_organism(args.organism)
         if organism_note:
-            print(organism_note)
+            print(organism_note, file=out)
         conditions, note = _from_kinetics(args.subject, organism, args.substrate)
         if not conditions.measured_temperature:
             exit_code = 3  # asked for measured conditions and did not get them: say so in the exit code
@@ -128,52 +143,98 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva md") -> int:
         conditions.temperature_k = args.temperature
         conditions.temperature_source = f"chosen: {args.temperature:g} K, set with --temperature"
         conditions.measured_temperature = False
+        conditions.temperature_measurement = None
     if args.ph is not None:
         conditions.ph = args.ph
         conditions.ph_source = "chosen: set with --ph"
-
-    setup = MdSetup(pdb_id=pdb, chain=args.chain, conditions=conditions, ns=args.ns,
+        conditions.ph_measurement = None
+    setup = MdSetup(pdb_id=args.pdb.strip().upper(), chain=args.chain, conditions=conditions, ns=args.ns,
                     ionic_strength_m=args.ionic_strength, seed=args.seed, replicas=args.replicas)
-    out = Path(args.out)
+    return Planned(setup, note, exit_code)
+
+
+def write(setup: MdSetup, out: Path) -> List[str]:
+    """Write the setup's files under `out`; their names, in the order written."""
     out.mkdir(parents=True, exist_ok=True)
+    names = []
     for name, text in setup.files().items():
         path = out / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
         if name.endswith(".sh"):
             path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        names.append(name)
+    return names
 
-    if note:
-        print(note)
-    print(f"Wrote {out}/: run.sh, em/npt/md.mdp, rep1..rep{args.replicas}/nvt.mdp, PROVENANCE.md "
-          f"({conditions.temperature_k:.2f} K, {args.ns:g} ns, {args.replicas} replica"
-          f"{'s' if args.replicas > 1 else ''}).")
-    if args.replicas == 1:
-        print("  One replica is one sample: it has no spread, and nothing it shows can be told apart from chance.")
+
+def written_lines(planned: Planned, out: Path, prog: str = "caterva md") -> List[str]:
+    """What `main` prints once the files are written."""
+    setup = planned.setup
+    lines = [planned.note] if planned.note else []
+    lines.append(f"Wrote {out}/: run.sh, em/npt/md.mdp, rep1..rep{setup.replicas}/nvt.mdp, PROVENANCE.md "
+                 f"({setup.conditions.temperature_k:.2f} K, {setup.ns:g} ns, {setup.replicas} replica"
+                 f"{'s' if setup.replicas > 1 else ''}).")
+    if setup.replicas == 1:
+        lines.append("  One replica is one sample: it has no spread, and nothing it shows can be told apart "
+                     "from chance.")
     for p in setup.parameters:
         if p.origin != "method":
-            print(f"  {p.name:<20} {p.value:<38} {p.origin}")
-    print(f"Run it: bash {out}/run.sh   (GROMACS needed; GMX=/path/to/gmx to choose one)")
-    print(f"Then:   {prog} --summarise {out}")
-    return exit_code
+            lines.append(f"  {p.name:<20} {p.value:<38} {p.origin}")
+    lines.append(f"Run it: bash {out}/run.sh   (GROMACS needed; GMX=/path/to/gmx to choose one)")
+    lines.append(f"Then:   {prog} --summarise {out}")
+    return lines
+
+
+def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva md") -> int:
+    parser = build_parser(prog)
+    args = parser.parse_args(argv)
+    try:
+        check(parser, args)
+    except SystemExit as refused:  # parser.error printed the usage and the reason
+        return int(refused.code or 2)
+    if args.summarise:
+        return summarise_run(Path(args.summarise)).code
+    planned = plan(args)
+    out = Path(args.out)
+    write(planned.setup, out)
+    for line in written_lines(planned, out, prog):
+        print(line)
+    return planned.exit_code
 
 
 #: `--summarise` found the run is not (yet) a result.
 EXIT_NOT_A_RESULT = 4
 
 
-def _summarise(directory: Path) -> int:
+@dataclass
+class Summarised:
+    """What `--summarise DIR` read, decided and printed."""
+
+    code: int
+    summary: Optional[Any] = None
+    #: The report, as printed and as written to CONVERGENCE.md.
+    text: str = ""
+    #: The refusal printed to stderr, for exit 3.
+    refusal: Optional[str] = None
+    written: Optional[Path] = None
+
+
+def summarise_run(directory: Path, out: Optional[TextIO] = None, err: Optional[TextIO] = None) -> Summarised:
+    """Each replica's backbone RMSD, block-averaged and compared across
+    replicas; the report printed and written to DIR/CONVERGENCE.md."""
     from caterva.md.convergence import collect, report, summarise
 
     series = collect(directory)
     if not series:
-        print(f"Refused: no rep*/rmsd.xvg under {directory}. Run its run.sh first.", file=sys.stderr)
-        return 3
+        refusal = f"Refused: no rep*/rmsd.xvg under {directory}. Run its run.sh first."
+        print(refusal, file=sys.stderr if err is None else err)
+        return Summarised(3, refusal=refusal)
     s = summarise(series, "backbone RMSD from the starting structure", "nm")
     text = "\n".join(report(s)) + "\n"
-    print(text, end="")
-    (directory / "CONVERGENCE.md").write_text(text, encoding="utf-8")
-    return 0 if s.verdict == "consistent" else EXIT_NOT_A_RESULT
+    print(text, end="", file=out)
+    written = directory / "CONVERGENCE.md"
+    written.write_text(text, encoding="utf-8")
+    return Summarised(0 if s.verdict == "consistent" else EXIT_NOT_A_RESULT, s, text, None, written)
 
 
 def console_main() -> int:

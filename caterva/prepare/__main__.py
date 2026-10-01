@@ -22,12 +22,15 @@ import json
 import os
 import re
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable, List, Optional, Sequence
+from typing import TYPE_CHECKING, Callable, List, Optional, Sequence, Tuple
 
 from caterva.methods import METHODS
-from caterva.prepare.audit import ACTIVE_SITE_RADIUS, Audit, audit
+from caterva.prepare.audit import ACTIVE_SITE_RADIUS, Audit, TitratableSite, audit
+
+if TYPE_CHECKING:
+    from caterva.prepare.protonation import Titration
 
 RCSB_CIF = "https://files.rcsb.org/download/{id}.cif"
 UNIPROT_FASTA = "https://rest.uniprot.org/uniprotkb/{acc}.fasta"
@@ -101,10 +104,60 @@ def _dist(d: Optional[float]) -> str:
     return "?" if d is None else f"{d:.1f}"
 
 
+def protonation_sites(a: Audit) -> List[TitratableSite]:
+    """The titratable residues the protonation section judges: those of the
+    first chain of the enzyme (the chain a setup starts from)."""
+    return [t for t in a.titratable if t.chain == (a.chains[0] if a.chains else t.chain)]
+
+
+@dataclass
+class ChargeState:
+    """One active-site residue's charge at the assay pH, as the table states it."""
+
+    site: TitratableSite
+    #: "Glu35 (catalytic)", as the table names it.
+    name: str
+    #: None when the residue type is not in the survey (arginine).
+    titration: Optional["Titration"]
+    #: The "at pH" column: the titration's own description, or "not assessed".
+    at_ph: str
+    #: The "state" column, without the emphasis the table puts on it.
+    state: str
+    emphasised: bool = False
+
+    @property
+    def contradicted(self) -> bool:
+        return self.titration is not None and self.titration.default_contradicted
+
+    @property
+    def uncertain(self) -> bool:
+        return self.titration is not None and not self.contradicted and self.titration.settled is None
+
+
+def charge_states(a: Audit, ph: float) -> List[ChargeState]:
+    """Each active-site residue of the first chain judged at `ph`: the rows
+    of the protonation table, for the report and for the studio alike."""
+    from caterva.prepare.protonation import assess
+    out: List[ChargeState] = []
+    for t in protonation_sites(a):
+        ti = assess(t.resname, ph)
+        name = f"{t.resname.title()}{t.auth_seq_id}" + (" (catalytic)" if t.catalytic else "")
+        if ti is None:
+            out.append(ChargeState(t, name, None, "not assessed",
+                                   f"{t.resname.title()} is not in the survey; taken as charged below pH 12"))
+            continue
+        state = {True: "settled, protonated", False: "settled, deprotonated", None: "uncertain"}[ti.settled]
+        emphasised = ti.settled is None
+        if ti.default_contradicted:
+            state, emphasised = "pdb2gmx default contradicts it", True
+        out.append(ChargeState(t, name, ti, ti.describe(), state, emphasised))
+    return out
+
+
 def protonation_section(a: Audit, ph: Optional[float]) -> List[str]:
     """Titratable residues at the active site, judged at the assay pH."""
-    from caterva.prepare.protonation import SETTLED, SOURCE, assess
-    sites = [t for t in a.titratable if t.chain == (a.chains[0] if a.chains else t.chain)]
+    from caterva.prepare.protonation import SETTLED, SOURCE
+    sites = protonation_sites(a)
     L = ["## Protonation at the active site", ""]
     if not sites:
         return L + ["No titratable residue within the active-site radius of chain "
@@ -120,21 +173,12 @@ def protonation_section(a: Audit, ph: Optional[float]) -> List[str]:
           "the charge, so a structure-based estimate (PROPKA) or constant-pH simulation is needed "
           "before trusting the state GROMACS assigns.", "",
           "| residue | Å to active site | at pH | state |", "|---|---|---|---|"]
-    uncertain, wrong = [], []
-    for t in sites:
-        ti = assess(t.resname, ph)
-        name = f"{t.resname.title()}{t.auth_seq_id}" + (" (catalytic)" if t.catalytic else "")
-        if ti is None:
-            L.append(f"| {name} | {t.distance:.1f} | not assessed | {t.resname.title()} is not in the survey; "
-                     "taken as charged below pH 12 |")
-            continue
-        state = {True: "settled, protonated", False: "settled, deprotonated", None: "**uncertain**"}[ti.settled]
-        if ti.default_contradicted:
-            state = "**pdb2gmx default contradicts it**"
-            wrong.append(name)
-        elif ti.settled is None:
-            uncertain.append(name)
-        L.append(f"| {name} | {t.distance:.1f} | {ti.describe()} | {state} |")
+    states = charge_states(a, ph)
+    for c in states:
+        state = f"**{c.state}**" if c.emphasised else c.state
+        L.append(f"| {c.name} | {c.site.distance:.1f} | {c.at_ph} | {state} |")
+    wrong = [c.name for c in states if c.contradicted]
+    uncertain = [c.name for c in states if c.uncertain]
     L.append("")
     if wrong:
         L.append(f"- Set these by hand before simulating (pdb2gmx -asp/-glu/-lys/-his): {', '.join(wrong)}.")
@@ -147,6 +191,12 @@ def protonation_section(a: Audit, ph: Optional[float]) -> List[str]:
           "any pKa within one standard deviation of the survey mean (Henderson-Hasselbalch); a chosen rule.",
           ""]
     return L
+
+
+def clean_chains(a: Audit) -> List[str]:
+    """Chains a faithful setup can start from: no blocking defect, and the
+    catalytic residues intact. Exit 0 needs at least one; the report names them."""
+    return [s.chain for s in a.chain_summary if s.blocks == 0 and s.catalytic_intact]
 
 
 def report(a: Audit, ph: Optional[float] = None) -> List[str]:
@@ -181,7 +231,7 @@ def report(a: Audit, ph: Optional[float] = None) -> List[str]:
           "catalytic residues intact |", "|---|---|---|---|"]
     for s in a.chain_summary:
         L.append(f"| {s.chain} | {s.blocks} | {s.near_site} | {'yes' if s.catalytic_intact else '**no**'} |")
-    clean = [s.chain for s in a.chain_summary if s.blocks == 0 and s.catalytic_intact]
+    clean = clean_chains(a)
     L += ["", ("Chains with no blocking defect: " + ", ".join(clean) + "."
                if clean else "**Every chain has at least one blocking defect.**"), ""]
 
@@ -239,28 +289,40 @@ def build_parser(prog: str = "caterva prepare") -> argparse.ArgumentParser:
     return p
 
 
+def audit_or_refuse(entry: str, fetch: Callable[[str], str]) -> Tuple[Optional[Audit], Optional[str]]:
+    """(audit, None), or (None, the refusal `main` prints to stderr, exit 3).
+
+    A network failure is a refusal, not a crash; any other exception is a
+    crash and propagates."""
+    try:
+        return run_audit(entry, fetch), None
+    except PrepareError as e:
+        return None, f"caterva prepare: {e}"
+    except Exception as e:
+        if type(e).__module__.startswith("requests"):
+            return None, f"caterva prepare: could not reach the PDB or UniProt ({e})"
+        raise
+
+
+def fetcher(no_cache: bool = False) -> Callable[[str], str]:
+    """The fetch `main` uses: RCSB and UniProt, cached unless told not to."""
+    return cached(live_fetch(), None if no_cache else _cache_dir())
+
+
 def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva prepare",
          fetch: Optional[Callable[[str], str]] = None) -> int:
     args = build_parser(prog).parse_args(argv)
-    try:
-        get = fetch or cached(live_fetch(), None if args.no_cache else _cache_dir())
-        a = run_audit(args.entry, get)
-    except PrepareError as e:
-        print(f"caterva prepare: {e}", file=sys.stderr)
+    a, refusal = audit_or_refuse(args.entry, fetch or fetcher(args.no_cache))
+    if a is None:
+        print(refusal, file=sys.stderr)
         return 3
-    except Exception as e:  # a network failure is a refusal, not a crash
-        if type(e).__module__.startswith("requests"):
-            print(f"caterva prepare: could not reach the PDB or UniProt ({e})", file=sys.stderr)
-            return 3
-        raise
     text = "\n".join(report(a, args.ph)) + "\n"
     print(text, end="")
     if args.out:
         Path(args.out).write_text(text, encoding="utf-8")
     if args.json:
         Path(args.json).write_text(json.dumps(asdict(a), indent=2, default=str), encoding="utf-8")
-    clean = any(s.blocks == 0 and s.catalytic_intact for s in a.chain_summary)
-    return 0 if clean else EXIT_BLOCKS
+    return 0 if clean_chains(a) else EXIT_BLOCKS
 
 
 def console_main() -> int:

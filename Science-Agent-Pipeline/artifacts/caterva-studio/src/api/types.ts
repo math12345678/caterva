@@ -725,6 +725,8 @@ export interface ProteinRow {
   organism: string;
   entries: number;
   chosen: boolean;
+  /** The protein's UniProt entry page. */
+  url?: string;
 }
 
 export interface StructureRow {
@@ -737,6 +739,11 @@ export interface StructureRow {
   bound: BoundMoleculeView[];
   citation: Citation;
   binds_ligand: boolean | null;
+  /** Every PDB entry's own DOI (10.2210/pdbXXXX/pdb), paper or not. */
+  entry_doi?: string;
+  entry_url?: string;
+  /** False when the primary citation is "To Be Published". */
+  published?: boolean;
 }
 
 export interface StructureResult {
@@ -750,6 +757,11 @@ export interface StructureResult {
   total: number;
   report_markdown: string;
   chimerax_artifact: string | null;
+  organism_note?: string | null;
+  /** How many entries the report lists; `entries` holds every ranked one. */
+  top?: number;
+  /** The databases the search read, cited. */
+  sources?: Citation[];
 }
 
 export interface AtomColumns {
@@ -764,12 +776,45 @@ export interface AtomColumns {
   hetero: boolean[];
 }
 
+/** A catalytic residue as `caterva prepare` places it on one chain. */
+export interface CatalyticSite {
+  chain: string;
+  /** Author numbering, as atoms.resseq gives it. */
+  resseq: string;
+  resname: string | null;
+  expected: string;
+  conserved: boolean;
+  roles: string;
+  /** "His194 of P00341": the reference residue it was mapped from. */
+  reference: string;
+}
+
+/** Which M-CSA mechanism the catalytic residues come from, and why. */
+export interface CatalyticReference {
+  mcsa_id: number;
+  enzyme: string;
+  uniprot: string;
+  how: string;
+  identity: SourcedValue;
+  citation: Citation;
+  rejected: string[];
+}
+
 export interface CoordinatesResponse {
   pdb_id: string;
   citation: Citation;
   atoms: AtomColumns;
   count: number;
   truncated: boolean;
+  title?: string;
+  method?: string;
+  resolution?: SourcedValue | null;
+  omitted?: string | null;
+  chains?: string[];
+  catalytic?: CatalyticSite[];
+  catalytic_reference?: CatalyticReference | null;
+  /** Why no catalytic residue is given, in the audit's words. */
+  catalytic_reason?: string | null;
 }
 
 export interface PrepareRequest {
@@ -792,6 +837,9 @@ export interface FindingRow {
   distance: SourcedValue | null;
   what: string;
   source: string;
+  check?: string;
+  catalytic?: boolean;
+  near_active_site?: boolean;
 }
 
 export interface PrepareResult {
@@ -810,6 +858,10 @@ export interface PrepareResult {
   not_checked: string[];
   report_markdown: string;
   audit: Record<string, unknown>;
+  entry_citation?: Citation;
+  clean_chains?: string[];
+  ph?: SourcedValue | null;
+  active_site_radius?: SourcedValue;
 }
 
 export interface MdSetupRequest {
@@ -844,6 +896,12 @@ export interface MdSetupResult {
   files: string[];
   note: string | null;
   report_text: string;
+  ns?: SourcedValue;
+  ionic_strength?: SourcedValue;
+  replicas?: number;
+  seeds?: number[];
+  /** PROVENANCE.md as written. */
+  provenance_markdown?: string;
 }
 
 export interface DirectoryRequest {
@@ -855,6 +913,10 @@ export interface ReplicaRow {
   mean: SourcedValue;
   error: SourcedValue;
   verdict: string;
+  frames?: number;
+  kept?: number;
+  plateaued?: boolean;
+  effective_samples?: SourcedValue | null;
 }
 
 export interface ConvergenceResult {
@@ -864,6 +926,11 @@ export interface ConvergenceResult {
   replicas: ReplicaRow[];
   report_markdown: string;
   summary: Record<string, unknown>;
+  mean?: SourcedValue;
+  spread?: SourcedValue | null;
+  ci95?: SourcedValue | null;
+  reasons?: string[];
+  written?: string | null;
 }
 
 export interface AnalyzeRequest {
@@ -878,6 +945,12 @@ export interface DistanceRow {
   drift: SourcedValue | null;
   moved: boolean;
   verdict: string;
+  spread?: SourcedValue | null;
+  ci95?: SourcedValue | null;
+  /** "held" or "moved" once the distance is a consistent result, else null. */
+  change?: string | null;
+  reasons?: string[];
+  per_replica?: Record<string, unknown>[];
 }
 
 export interface AnalyzeResult {
@@ -895,6 +968,16 @@ export interface AnalyzeResult {
   faces: Record<string, unknown>[] | null;
   script_written: boolean;
   report_markdown: string;
+  mode?: string;
+  measured?: boolean;
+  written?: string[];
+  replicas?: string[];
+  catalytic?: Record<string, unknown>[];
+  notes?: string[];
+  counts?: Record<string, number>;
+  gmx?: string | null;
+  /** Sections a newer Analysis carries that the adapter does not name. */
+  extra?: Record<string, unknown>;
 }
 
 export interface FepReplicaRow {
@@ -902,6 +985,10 @@ export interface FepReplicaRow {
   complex_kj: SourcedValue;
   solvent_kj: SourcedValue;
   dg_kcal: SourcedValue;
+  complex_err_kj?: SourcedValue;
+  solvent_err_kj?: SourcedValue;
+  complex_estimator?: string;
+  solvent_estimator?: string;
 }
 
 export interface FepStatusResult {
@@ -917,6 +1004,13 @@ export interface FepStatusResult {
   not_a_result: string | null;
   warnings: string[];
   report_text: string;
+  replicas_planned?: number;
+  lines?: string[];
+  references?: string[];
+  caveats?: string[];
+  state?: string;
+  sigma?: SourcedValue | null;
+  sem?: SourcedValue | null;
 }
 
 export interface ComplexCheckRequest {
@@ -928,6 +1022,9 @@ export interface ComplexCheckResult {
   kept: boolean;
   values: Record<string, SourcedValue>;
   report_text: string;
+  ligand?: string;
+  ca_atoms?: number;
+  frames?: number | null;
 }
 
 /** Reserved until `caterva rates` is integrated (contract.py RatesRequest). */
