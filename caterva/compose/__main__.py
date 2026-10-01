@@ -877,6 +877,38 @@ def compounds_from(args) -> Dict[str, str]:
     return out
 
 
+def _substrates_brenda_lists(ec: str, organism: Optional[str]) -> str:
+    """Name the substrates BRENDA holds Km rows for, so the refusal can be acted on.
+
+    The enzyme WAS found when this is called; what is missing is the one
+    thing only the user knows. Naming the candidates turns "re-run with
+    --substrate" into a choice the user can make, without Caterva making it
+    for them: picking one would cite a Km for a reaction nobody asked about.
+    Returns "" when the list cannot be built, because the refusal stands
+    either way and a failed lookup must not replace it.
+    """
+    try:
+        from caterva.checkout import literature_module
+        from caterva.compose.organisms import normalise_organism
+        client = literature_module("brenda_client")
+        name, _ = normalise_organism(organism) if organism else (None, None)
+        html = client.fetch_brenda_html(ec)
+        rows = client.parse_brenda_km_html(
+            html, ec, [], name, require_substrate_match=False)
+    except Exception:  # noqa: BLE001 - the refusal above is the answer
+        return ""
+    counts: Dict[str, int] = {}
+    for row in rows:
+        counts[row.substrate] = counts.get(row.substrate, 0) + 1
+    if not counts:
+        return ""
+    top = sorted(counts, key=lambda k: (-counts[k], k))[:8]
+    listed = "; ".join(f"{n} ({counts[n]} row{'s' if counts[n] != 1 else ''})" for n in top)
+    where = f" for {name}" if name else ""
+    return (f" BRENDA holds Km rows{where} for {len(counts)} substrate(s) of "
+            f"EC {ec}; the best-measured: {listed}. Pass one with --substrate.")
+
+
 def _search_the_literature(
     model: Any, args: Any,
 ) -> Tuple[Any, Optional[str], bool]:
@@ -964,6 +996,7 @@ def _search_the_literature(
             f"from BRENDA, and those tables are per-substrate. A motif knows "
             f"it needs a Km; it cannot know what the Km is FOR. Re-run with "
             f"--substrate NAME."
+            + _substrates_brenda_lists(ec, args.organism)
         ), True
 
     try:

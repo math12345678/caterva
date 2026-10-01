@@ -606,3 +606,31 @@ class TestTheExitCodeWhenASearchIsRefused:
         )
         assert "--substrate" in run.stdout, "the reason belongs in the report"
         assert "refusal(s)" in run.stderr, "and a script is told to look"
+
+
+def test_missing_substrate_refusal_names_what_brenda_holds(monkeypatch):
+    """The refusal must be actionable: it lists substrates BRENDA has rows for."""
+    from types import SimpleNamespace
+    from caterva.compose import __main__ as cli
+
+    rows = [SimpleNamespace(substrate="Boc-Ala-Ala-Asp-SBzl")] * 3 + [
+        SimpleNamespace(substrate="VEID-p-nitroanilide")]
+    client = SimpleNamespace(
+        fetch_brenda_html=lambda ec: "<html/>",
+        parse_brenda_km_html=lambda *a, **k: rows,
+    )
+    import caterva.checkout as checkout
+    monkeypatch.setattr(checkout, "literature_module", lambda name: client)
+    text = cli._substrates_brenda_lists("3.4.21.79", "Human")
+    assert "Boc-Ala-Ala-Asp-SBzl (3 rows)" in text
+    assert "Homo sapiens" in text and "--substrate" in text
+
+
+def test_missing_substrate_list_failure_does_not_replace_refusal(monkeypatch):
+    from caterva.compose import __main__ as cli
+    import caterva.checkout as checkout
+
+    def boom(name):
+        raise RuntimeError("offline")
+    monkeypatch.setattr(checkout, "literature_module", boom)
+    assert cli._substrates_brenda_lists("3.4.21.79", "Human") == ""
