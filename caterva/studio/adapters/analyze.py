@@ -25,6 +25,27 @@ gromacs route looks there too before it gives up, and records which one it
 called; without one it is the command's own refusal (exit 3), in the
 command's words. The native route needs no GROMACS.
 
+RMSF ALONG THE CHAIN
+--------------------
+The flexibility section's two means (pocket, rest) are taken over the
+per-residue Calpha RMSF the library measures for every replica. Those
+values are sent too (`flexibility.rmsf`), as one column per replica over
+the residue numbers, with one provenance for the whole series (they are
+all the same measurement), so the page can draw where along the chain a
+replica moved, and the pocket residues the means were split by. A residue
+a replica has no value for (a NaN from the GROMACS route) is null, never
+interpolated.
+
+THE THRESHOLDS BEHIND EACH VERDICT
+----------------------------------
+Every verdict word is a comparison with a number the library chose and
+prints with its table (the hydrogen bonds' 0.8 and 0.2, a distance's 0.1 nm
+"moved", the half of each run discarded as relaxation). `thresholds` sends
+those numbers, read from the library's own constants, each as a value
+chosen by the command with the sentence that says what it decides, so the
+page can put each verdict beside the number it was judged against. None is
+re-stated here as a literal.
+
 SECTIONS ADDED LATER
 --------------------
 An Analysis may carry sections this adapter does not name (principal
@@ -165,6 +186,21 @@ def flexibility_view(a: Any) -> Optional[Dict[str, Any]]:
         })
     spread = f.spread
     names = [r["replica"] for r in rows]
+    residues = sorted({k for _, per in f.per_residue for k in per})
+    profile = None
+    if residues:
+        profile = {
+            "unit": "nm",
+            "residues": residues,
+            "replicas": {name: [None if k not in per or math.isnan(per[k]) else float(per[k]) for k in residues]
+                         for name, per in f.per_residue},
+            "pocket": sorted(a.plan.pocket),
+            "catalytic": sorted({site.resnr for site in a.plan.sites}),
+            "provenance": contract.computed(
+                "Calpha RMSF of each residue about its mean over a replica's frames, each frame superposed on the "
+                "starting structure "
+                "(the values the report's pocket and rest means are taken over)", [n for n, _ in f.per_residue]),
+        }
     return {
         "pocket_residues": len(a.plan.pocket), "rest_residues": len(a.plan.rest),
         "pocket_radius": contract.sourced(POCKET_RADIUS, "Å", contract.chosen(
@@ -177,6 +213,7 @@ def flexibility_view(a: Any) -> Optional[Dict[str, Any]]:
         "ratio_sd": None if spread is None else computed_value(spread[1], "", "SD of the replicas' pocket / rest",
                                                           names, label="pocket / rest SD"),
         "is_result": a.distances_consistent,
+        "rmsf": profile,
     }
 
 
@@ -273,6 +310,59 @@ def water_rows(a: Any) -> Optional[List[Dict[str, Any]]]:
     return rows
 
 
+def thresholds() -> Dict[str, List[contract.SourcedValue]]:
+    """The library's verdict thresholds, by the section they judge."""
+    from caterva.analyze import faces, hbonds, rotamers, water
+    from caterva.analyze.__main__ import KEPT, LOST, FORMED, MOVED_NM, SPLIT
+    from caterva.analyze.angles import MOVED_DEG
+    from caterva.md import convergence as conv
+
+    def t(value: float, unit: str, label: str, decides: str) -> contract.SourcedValue:
+        return contract.sourced(value, unit, contract.chosen("default", decides), label=label)
+
+    return {
+        "replicas": [
+            t(conv.DISCARD, "", "discarded as relaxation",
+              "the fraction at the start of each replica left out of its mean (caterva/md/convergence.py)"),
+            t(conv.MIN_BLOCKS, "", "fewest blocks", "a block level is trusted only with at least this many blocks"),
+            t(conv.MIN_EFFECTIVE_SAMPLES, "", "fewest independent samples",
+              "a replica with fewer effectively independent samples than this is not converged"),
+            t(conv.DISAGREEMENT_FACTOR, "", "disagreement factor",
+              "replicas disagree when their spread exceeds this multiple of the typical within-replica error"),
+            t(conv.CONFIDENCE, "", "confidence level", "the two-sided confidence of the interval for the mean"),
+        ],
+        "distances": [t(MOVED_NM, "nm", "moved beyond",
+                        "a consistent mean this far from the crystal distance is reported as moved, else held")],
+        "angles": [t(MOVED_DEG, "°", "moved beyond",
+                     "a consistent mean this far from the crystal angle is reported as moved, else held")],
+        "hbonds": [
+            t(hbonds.MAX_DA_NM, "nm", "donor-acceptor at most", "a frame counts as bonded within this distance"),
+            t(hbonds.MAX_ANGLE_DEG, "°", "angle at most", "and within this hydrogen-donor-acceptor angle"),
+            t(KEPT, "", "kept at least", "bonded at the start and at least this fraction of frames in every replica"),
+            t(LOST, "", "lost at most", "bonded at the start and at most this fraction in every replica"),
+            t(FORMED, "", "formed at least", "not bonded at the start and at least this fraction in every replica"),
+            t(SPLIT, "", "replicas disagree beyond", "the replicas' fractions differ by more than this"),
+        ],
+        "rotamers": [
+            t(rotamers.KEPT, "", "kept at least", "at least this fraction of frames in the starting well, every replica"),
+            t(rotamers.FLIPPED, "", "flipped at most", "at most this fraction in the starting well, every replica"),
+            t(rotamers.SPLIT, "", "replicas disagree beyond", "the replicas' fractions differ by more than this"),
+        ],
+        "faces": [
+            t(faces.FLAT_DEG, "°", "out of flat at least",
+              "a frame is on a face when every arm stands this far out of the plane of the other two"),
+            t(faces.KEPT, "", "kept at least", "at least this fraction of frames on one face, every replica"),
+            t(faces.SPLIT, "", "replicas disagree beyond", "the replicas' fractions differ by more than this"),
+        ],
+        "water": [
+            t(water.WATER_NM, "nm", "within", "a water oxygen this close to the residue's atoms counts"),
+            t(water.WET, "", "hydrated at least", "at least this fraction of frames with a water, every replica"),
+            t(water.DRY, "", "dry at most", "at most this fraction of frames with a water, every replica"),
+            t(water.SPLIT, "", "replicas disagree beyond", "the replicas' fractions differ by more than this"),
+        ],
+    }
+
+
 def extra_sections(a: Any) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
     for f in dataclasses.fields(a):
@@ -351,6 +441,7 @@ def analyze_run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
         "measured": True,
         "written": _written(d, True),
         "extra": extra_sections(a),
+        "thresholds": thresholds(),
     }
     verdicts = [x.summary.verdict for x in a.distances]
     summary = (f"{a.pdb}{' chain ' + a.chain if a.chain else ''}: {len(done.replicas)} replica"
@@ -373,4 +464,4 @@ def register(registry) -> None:
 
 
 __all__ = ["GMX_FALLBACKS", "MODES", "PROG", "analyze_argv", "analyze_run", "angle_row", "distance_row",
-           "extra_sections", "find_gmx", "flexibility_view", "register"]
+           "extra_sections", "find_gmx", "thresholds", "flexibility_view", "register"]

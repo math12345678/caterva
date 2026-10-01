@@ -266,6 +266,33 @@ def _condition(value: Optional[float], unit: str, measurement: Any, sentence: st
     return contract.sourced(value, unit, prov, label=label)
 
 
+#: The request key that sets each `chosen` parameter of the setup, by the
+#: parameter's name in PROVENANCE.md; a row not here is the command's own.
+SET_BY_REQUEST: Mapping[str, str] = {
+    "temperature": "temperature_k", "pH (protonation)": "ph", "ionic strength": "ionic_strength_m",
+    "production length": "ns", "replicas": "replicas", "velocity seed": "seed",
+}
+
+
+def parameter_row(p: Any, request: Mapping[str, Any], pdb_id: str) -> contract.MdParameterRow:
+    """A row of PROVENANCE.md's parameter table, with who chose it (a
+    `chosen` row) or its source as a Citation (a `method` row is a METHODS
+    entry's `cite()`, and the measured structure is the PDB entry)."""
+    from caterva.methods import METHODS
+    from caterva.studio.adapters.structure import entry_citation, method_citation
+
+    row: contract.MdParameterRow = {"name": p.name, "value": p.value, "origin": p.origin, "source": p.source}
+    if p.origin == "chosen":
+        row["by"] = "user" if SET_BY_REQUEST.get(p.name) in request else "default"
+    elif p.origin == "method":
+        key = next((k for k, m in METHODS.items() if p.source.startswith(m.cite())), None)
+        if key is not None:
+            row["citation"] = method_citation(key)
+    elif p.origin == "measured" and p.name == "structure":
+        row["citation"] = entry_citation(pdb_id)
+    return row
+
+
 def _parameter(setup: Any, name: str) -> Any:
     return next(p for p in setup.parameters if p.name == name)
 
@@ -295,8 +322,7 @@ def setup_run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
         "temperature": _condition(c.temperature_k, "K", c.temperature_measurement, c.temperature_source,
                                   args.temperature is not None, args.subject, "temperature"),
         "ph": _condition(c.ph, "", c.ph_measurement, c.ph_source, args.ph is not None, args.subject, "pH"),
-        "parameters": [{"name": p.name, "value": p.value, "origin": p.origin, "source": p.source}
-                       for p in setup.parameters],
+        "parameters": [parameter_row(p, request, setup.pdb_id) for p in setup.parameters],
         "files": names,
         "note": planned.note,
         "report_text": text_of(printed),

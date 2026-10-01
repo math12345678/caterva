@@ -1,0 +1,42 @@
+{
+ "kind": "structure",
+ "request": {
+  "subject": "lactate dehydrogenase"
+ },
+ "cli": [
+  "caterva",
+  "structure",
+  "--subject",
+  "lactate dehydrogenase"
+ ],
+ "outcome": {
+  "exit_code": 3,
+  "meaning": "refused",
+  "summary": "Refused: 'lactate dehydrogenase' names more than one enzyme: 1.1.98.-, 1.1.1.27, 1.1.1.28, 1.1.-.-, 1.1.5.12, 1.1.2.4. These are different proteins, so Caterva will not pick one for you — a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. Re-run with the one you meant.",
+  "reason": "Refused: 'lactate dehydrogenase' names more than one enzyme: 1.1.98.-, 1.1.1.27, 1.1.1.28, 1.1.-.-, 1.1.5.12, 1.1.2.4. These are different proteins, so Caterva will not pick one for you — a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. Re-run with the one you meant."
+ },
+ "result": {
+  "ec": "",
+  "organism": null,
+  "ligand": null,
+  "proteins": [],
+  "chosen": null,
+  "undecided": "Refused: 'lactate dehydrogenase' names more than one enzyme: 1.1.98.-, 1.1.1.27, 1.1.1.28, 1.1.-.-, 1.1.5.12, 1.1.2.4. These are different proteins, so Caterva will not pick one for you — a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. Re-run with the one you meant.",
+  "entries": [],
+  "total": 0,
+  "report_markdown": "",
+  "chimerax_artifact": null,
+  "organism_note": null,
+  "top": 10,
+  "sources": [],
+  "subject_name": "lactate dehydrogenase",
+  "candidates": [
+   "1.1.98.-",
+   "1.1.1.27",
+   "1.1.1.28",
+   "1.1.-.-",
+   "1.1.5.12",
+   "1.1.2.4"
+  ]
+ }
+}

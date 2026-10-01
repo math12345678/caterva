@@ -6,8 +6,10 @@ and committed real inputs, for the structure screens' component tests
 (src/screens/structure/structure.test.tsx). Nothing here is typed by hand,
 and none of it may be edited by hand.
 
-Produced 2026-10-01 in the `studio/sci-structure` worktree with the script
-below, run from the repository root as
+Produced 2026-10-01 in the `studio/str` worktree (after the adapters began
+sending the per-residue RMSF, the verdict thresholds, each setup
+parameter's chooser and citation, the coordinates' findings and the
+structure search by name) with the script below, run from the repository root as
 `PYTHONPATH=$PWD python capture.py` (the venv of the CLI tests: numpy 2.2.6,
 scipy 1.15.3). Each JSON file holds `kind`, `request`, `cli` (the command
 line that reproduces it), `outcome` (contract.outcome_for over the
@@ -28,9 +30,20 @@ What each one read:
 - `prepare-1I10-ph7.4.json` (exit 0) and `prepare-1L63.json` (exit 4, every
   chain blocked): `caterva prepare 1I10 --ph 7.4` and `caterva prepare 1L63`
   over the same committed entries and sequences.
+- `structure-by-name-ldha.json`, `structure-name-several-enzymes.json`:
+  `caterva structure --subject 'L-lactate dehydrogenase A chain' --organism
+  human --gene LDHA --top 8 --chimerax ...` and `--subject 'lactate
+  dehydrogenase'`, the name looked up through the literature layer's
+  `enzyme_lookup` with UniProt's answers replayed from
+  `caterva/tests/fixtures/structure/uniprot_ec_by_name.json` (recorded
+  2026-10-01, the recording test_studio_structure.py uses). The second is
+  the refusal of a name that is six EC numbers, with the candidates.
 - `md-setup-1AKI.json`: `caterva md --pdb 1AKI --chain A --replicas 3 --out
   <run dir>/md-setup`; no network (no `--subject`). The paths in it are the
-  temporary folder the script wrote into.
+  temporary folder the script wrote into. `md-setup-1I10-chosen.json` is
+  `caterva md --pdb 1I10 --chain A --temperature 310 --ph 7.4 --ns 20
+  --replicas 4` into the same folder: every one of those labelled chosen
+  by you.
 - `analyze-lysozyme-native.json`: `caterva analyze DIR` (native route) on
   the 21 real frames of replica 1 of a 10 ps `caterva md` run on hen
   lysozyme 1AKI (`caterva/tests/fixtures/md/lyso_1aki_res1-59_water.xtc`,
@@ -41,6 +54,8 @@ What each one read:
   library makes of that. The catalytic residues are hen lysozyme's M-CSA
   residues given directly (as test_faces.py gives them), so no network was
   asked.
+- `analyze-lysozyme-script-only.json`: the same folder with
+  `--script-only`.
 - `md-summarise-not-run.json`, `fep-status-not-fep.json`: the commands'
   refusals (exit 3) on that same folder, which has no rmsd.xvg and was not
   written by `caterva fep`.
@@ -88,6 +103,11 @@ prepare.live_fetch = lambda timeout=60.0: fetch
 LYSO = [(48, "ASP"), (50, "SER"), (46, "ASN"), (59, "ASN"), (52, "ASP"), (35, "GLU")]
 analyze_cli.catalytic_residues = lambda pdb, chain: (list(LYSO), "hen lysozyme's M-CSA catalytic residues, given directly as caterva/tests/test_faces.py gives them")
 
+from caterva.checkout import literature_module
+names = json.loads((FIX / "structure" / "uniprot_ec_by_name.json").read_text())["answers"]
+lookup = literature_module("enzyme_lookup")
+lookup.fetch_ec_numbers_by_name = lambda name, taxon_id=None, timeout=15: lookup.parse_ec_number_candidates(names[name])
+
 registry = load_registry()
 def run(kind, request, name):
     spec = registry.get(kind)
@@ -104,12 +124,15 @@ def run(kind, request, name):
 
 run("structure", {"subject": "1.1.1.27", "organism": "human", "gene": "LDHA", "ligand": "oxamate", "top": 8}, "structure-ldha-oxamate")
 run("structure", {"subject": "1.1.1.27", "organism": "human"}, "structure-ldh-several-proteins")
+run("structure", {"subject": "L-lactate dehydrogenase A chain", "organism": "human", "gene": "LDHA", "top": 8, "chimerax": True}, "structure-by-name-ldha")
+run("structure", {"subject": "lactate dehydrogenase"}, "structure-name-several-enzymes")
 coords = registry.endpoint("structure_coordinates")(EndpointRequest({"pdb_id": "1L63"}, {}, None, work))
 (OUT / "coordinates-1L63.json").write_text(json.dumps(coords, ensure_ascii=False, allow_nan=False) + "\n")
 print("coordinates", coords["count"])
 run("prepare", {"entry": "1I10", "ph": 7.4}, "prepare-1I10-ph7.4")
 run("prepare", {"entry": "1L63"}, "prepare-1L63")
 run("md.setup", {"pdb": "1AKI", "chain": "A", "replicas": 3}, "md-setup-1AKI")
+run("md.setup", {"pdb": "1I10", "chain": "A", "temperature_k": 310.0, "ph": 7.4, "ns": 20.0, "replicas": 4}, "md-setup-1I10-chosen")
 
 lyso = work / "lyso-md"; lyso.mkdir()
 (lyso / "caterva-setup.json").write_text(json.dumps({"pdb": "1AKI", "chain": "A"}))
@@ -125,6 +148,7 @@ for rep in ("rep1", "rep2"):
     shutil.copyfile(FIX / "md" / "lyso_1aki_res1-59_water.xtc", lyso / rep / "md.xtc")
     (lyso / rep / "md.tpr").write_text("")
 run("analyze", {"directory": str(lyso)}, "analyze-lysozyme-native")
+run("analyze", {"directory": str(lyso), "mode": "script_only"}, "analyze-lysozyme-script-only")
 run("md.summarise", {"directory": str(lyso)}, "md-summarise-not-run")
 run("fep.status", {"directory": str(lyso)}, "fep-status-not-fep")
 print("work dir", work)

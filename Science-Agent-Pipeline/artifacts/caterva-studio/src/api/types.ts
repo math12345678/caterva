@@ -793,6 +793,10 @@ export interface StructureResult {
   top?: number;
   /** The databases the search read, cited. */
   sources?: Citation[];
+  /** The name `subject` was, when it was a name; `ec` is what it resolved to. */
+  subject_name?: string | null;
+  /** The EC numbers a refused name could be (exit 3; `ec` is then "" and nothing was searched). */
+  candidates?: string[];
 }
 
 export interface AtomColumns {
@@ -846,6 +850,8 @@ export interface CoordinatesResponse {
   catalytic_reference?: CatalyticReference | null;
   /** Why no catalytic residue is given, in the audit's words. */
   catalytic_reason?: string | null;
+  /** The same audit's findings, as `caterva prepare ENTRY` lists them (no pH). */
+  findings?: FindingRow[];
 }
 
 export interface PrepareRequest {
@@ -915,6 +921,10 @@ export interface MdParameterRow {
   value: string;
   origin: string;
   source: string;
+  /** For a `chosen` row: `user` when this request set it, else `default`. */
+  by?: "user" | "default";
+  /** For a `method` or `measured` row: its source as a Citation (the METHODS entry, or the PDB entry). */
+  citation?: Citation;
 }
 
 export interface MdSetupResult {
@@ -1009,6 +1019,8 @@ export interface AnalyzeResult {
   gmx?: string | null;
   /** Sections a newer Analysis carries that the adapter does not name. */
   extra?: Record<string, unknown>;
+  /** The library's verdict thresholds by the section they judge, each a value the command chose. */
+  thresholds?: Record<string, SourcedValue[]>;
 }
 
 export interface FepReplicaRow {

@@ -1,166 +1,170 @@
 /**
  * /structure: an enzyme's experimental structures in the PDB, grouped by
- * protein, each with its method, resolution, bound molecules and citation,
- * and the chosen entry in 3D with the catalytic residues `caterva prepare`
- * places on it.
+ * protein with each isoform kept apart, every entry with its method,
+ * resolution, bound molecules and citation, and the chosen entry in 3D
+ * with the catalytic residues `caterva prepare` places on it.
  *
- * One run of `caterva structure` (kind `structure`). When the EC number is
- * several proteins the command refuses to pick one and says so; the screen
- * shows that refusal with the protein table, and choosing a protein asks
- * the same question again with its gene (or accession), as the command's
- * own hint says to.
+ * One run of `caterva structure` (kind `structure`). The enzyme is an EC
+ * number or a name; a name is looked up by the command, and one that names
+ * several enzymes is refused with each candidate, which the screen offers
+ * as a search. An EC number that is several proteins is refused too (the
+ * command will not choose LDHA for you when you asked for LDH), and the
+ * screen shows the protein table with a choice per protein, which asks the
+ * same question again with that protein's gene, as the command's own hint
+ * says to.
  */
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { ExternalLink } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 
-import type { StructureRequest, StructureResult, StructureRow } from "@/api/types";
+import type { ProteinRow, StructureRequest, StructureResult, StructureRow } from "@/api/types";
 import { useRun } from "@/api/useRun";
+import { Checkbox, Field, fieldError, NumberInput, parseNumber, TextInput } from "@/components/forms/Field";
+import { Disclosure } from "@/components/forms/Disclosure";
+import { Citation } from "@/components/provenance/Citation";
 import { Value } from "@/components/provenance/Value";
+import { MarkdownReport } from "@/components/report/Report";
+import { Screen, Section } from "@/components/screen/Screen";
 import { EmptyState } from "@/components/states/States";
-import { Screen } from "@/components/screen/Screen";
+import { DataTable } from "@/components/table/DataTable";
+import { useCapabilities } from "@/lib/queries";
 
 import { EntryView } from "./structure/EntryView";
-import {
-  ArtifactButton,
-  CheckField,
-  CommandLine,
-  NumberField,
-  Part,
-  PrimaryButton,
-  RunArea,
-  Table,
-  TerminalReport,
-  TextField,
-  fieldError,
-  parsed,
-  td,
-} from "./structure/kit";
-import { useParam } from "./structure/useCoordinates";
+import { ArtifactButton, Own, RunScreen, sentenceCase, text, useParam, useRefill } from "./structure/kit";
 import "./structure/structure.css";
 
-const FIELDS = ["subject", "organism", "gene", "uniprot", "ligand", "top", "chimerax"];
+interface Form {
+  subject: string;
+  organism: string;
+  gene: string;
+  uniprot: string;
+  ligand: string;
+  top: string;
+  chimerax: boolean;
+}
+
+/** The request for a form. A number the page cannot read is sent as typed, so the server names it. */
+export function structureRequest(f: Form): StructureRequest {
+  const r: StructureRequest = { subject: f.subject.trim() };
+  for (const key of ["organism", "gene", "uniprot", "ligand"] as const) if (f[key].trim()) r[key] = f[key].trim();
+  if (f.top.trim()) r.top = (parseNumber(f.top) ?? f.top.trim()) as number;
+  if (f.chimerax) r.chimerax = true;
+  return r;
+}
 
 export default function StructureScreen() {
-  const runParam = useParam("run");
-  const run = useRun("structure", runParam);
-  const [form, setForm] = useState({
+  const reopened = useParam("run");
+  const run = useRun("structure", reopened);
+  const caps = useCapabilities();
+  const [form, setForm] = useState<Form>({
     subject: useParam("subject") ?? "",
     organism: useParam("organism") ?? "",
     gene: "",
     uniprot: "",
     ligand: "",
     top: "",
-    chimerax: false,
+    chimerax: true,
   });
-  const set = (key: keyof typeof form) => (v: string | boolean) => setForm((f) => ({ ...f, [key]: v }));
-
-  const request = (f: typeof form): StructureRequest => {
-    const r: StructureRequest = { subject: f.subject.trim() };
-    for (const key of ["organism", "gene", "uniprot", "ligand"] as const) if (f[key].trim()) r[key] = f[key].trim();
-    const top = parsed(f.top);
-    if (top !== undefined) r.top = top;
-    if (f.chimerax) r.chimerax = true;
-    return r;
-  };
-  const submit = (e?: FormEvent) => {
-    e?.preventDefault();
-    void run.submit(request(form));
-  };
-  const choose = (gene: string | null, accession: string) => {
-    const next = { ...form, gene: gene ?? "", uniprot: gene ? "" : accession };
+  const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
+  useRefill(reopened, run.run, (r) =>
+    setForm({
+      subject: text(r.subject),
+      organism: text(r.organism),
+      gene: text(r.gene),
+      uniprot: text(r.uniprot),
+      ligand: text(r.ligand),
+      top: text(r.top),
+      chimerax: Boolean(r.chimerax),
+    }),
+  );
+  const err = (field: string) => fieldError(run.requestError, field);
+  const ask = (next: Form) => {
     setForm(next);
-    void run.submit(request(next));
+    void run.submit(structureRequest(next));
   };
-
-  const busy = run.status === "queued" || run.status === "running";
-  const err = run.requestError;
+  const literature = caps.data?.literature;
 
   return (
     <Screen
       title="Structures"
-      purpose="An enzyme's experimental structures in the PDB, grouped by protein, each with its method, resolution and citation."
+      purpose="An enzyme's experimental structures in the PDB, grouped by protein, each with its method, resolution, bound molecules and citation."
     >
-      <div className="grid gap-8 xl:grid-cols-[18rem_minmax(0,1fr)]">
-        <form onSubmit={submit} className="grid content-start gap-4" aria-label="Search the PDB">
-          <TextField
-            id="structure-subject"
-            label="EC number"
-            value={form.subject}
-            onChange={set("subject")}
-            placeholder="1.1.1.27"
-            mono
-            autoFocus
-            error={fieldError(err, "subject")}
-          />
-          <TextField
-            id="structure-organism"
-            label="Organism"
-            value={form.organism}
-            onChange={set("organism")}
-            placeholder="human, Homo sapiens, E. coli"
-            hint="Latin or common name; left out, every organism."
-            error={fieldError(err, "organism")}
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <TextField id="structure-gene" label="Gene" value={form.gene} onChange={set("gene")} placeholder="LDHA" mono error={fieldError(err, "gene")} />
-            <TextField
-              id="structure-uniprot"
-              label="UniProt"
-              value={form.uniprot}
-              onChange={set("uniprot")}
-              placeholder="P00338"
-              mono
-              error={fieldError(err, "uniprot")}
+      <RunScreen
+        kind="structure"
+        id="structure"
+        formLabel="Search the PDB"
+        action="Search"
+        canSubmit={Boolean(form.subject.trim())}
+        onSubmit={() => void run.submit(structureRequest(form))}
+        run={run}
+        form={
+          <>
+            <Field
+              label="Enzyme"
+              error={err("subject")}
+              hint={
+                literature && !literature.available
+                  ? "An EC number. Looking up a name needs the literature layer, which this installation does not have."
+                  : "An EC number (1.1.1.27) or a name (hexokinase). A name that is several enzymes is refused with each one named."
+              }
+            >
+              <TextInput mono autoFocus value={form.subject} placeholder="1.1.1.27" onChange={(e) => set("subject", e.target.value)} />
+            </Field>
+            <Field label="Organism" optional error={err("organism")} hint="Latin or common name; left out, every organism.">
+              <TextInput value={form.organism} placeholder="human" onChange={(e) => set("organism", e.target.value)} />
+            </Field>
+            <div className="st-row2">
+              <Field label="Gene" optional error={err("gene")}>
+                <TextInput mono value={form.gene} placeholder="LDHA" onChange={(e) => set("gene", e.target.value)} />
+              </Field>
+              <Field label="UniProt" optional error={err("uniprot")}>
+                <TextInput mono value={form.uniprot} placeholder="P00338" onChange={(e) => set("uniprot", e.target.value)} />
+              </Field>
+            </div>
+            <Field
+              label="Prefer entries holding"
+              optional
+              error={err("ligand")}
+              hint="A ligand id or name; entries with it bound rank first."
+            >
+              <TextInput value={form.ligand} placeholder="oxamate" onChange={(e) => set("ligand", e.target.value)} />
+            </Field>
+            <Field
+              label="Entries in the report"
+              optional
+              error={err("top")}
+              hint="The command's default is 10. The table holds every ranked entry either way."
+            >
+              <NumberInput value={form.top} onChange={(e) => set("top", e.target.value)} />
+            </Field>
+            <Checkbox
+              label="Write the ChimeraX script for the top entry"
+              hint="caterva structure --chimerax, kept with the run to download."
+              checked={form.chimerax}
+              onChange={(v) => set("chimerax", v)}
             />
-          </div>
-          <TextField
-            id="structure-ligand"
-            label="Prefer entries with"
-            value={form.ligand}
-            onChange={set("ligand")}
-            placeholder="oxamate or OXM"
-            hint="A ligand id or name; entries holding it rank first."
-            error={fieldError(err, "ligand")}
+          </>
+        }
+        idle={
+          <EmptyState title="Name an enzyme">
+            <p className="st-prose">
+              The search reads UniProt for the proteins with that EC number and the RCSB for their entries. When the
+              number covers several proteins (lactate dehydrogenase in human is LDHA, LDHB, LDHC and more) it lists
+              them and asks you to choose one, because a structure belongs to one protein.
+            </p>
+          </EmptyState>
+        }
+      >
+        {(result) => (
+          <StructureResultView
+            result={result}
+            runId={run.run?.id ?? null}
+            busy={run.status === "queued" || run.status === "running"}
+            onChoose={(p) => ask({ ...form, gene: p.gene ?? "", uniprot: p.gene ? "" : p.accession })}
+            onCandidate={(ec) => ask({ ...form, subject: ec, gene: "", uniprot: "" })}
           />
-          <NumberField
-            id="structure-top"
-            label="Entries in the report"
-            value={form.top}
-            onChange={set("top")}
-            placeholder="10"
-            step="1"
-            hint="The table below holds every ranked entry either way."
-            error={fieldError(err, "top")}
-          />
-          <CheckField
-            id="structure-chimerax"
-            label="Write a ChimeraX script for the top entry"
-            checked={form.chimerax}
-            onChange={set("chimerax")}
-          />
-          <div>
-            <PrimaryButton busy={busy} disabled={!form.subject.trim()}>
-              Search
-            </PrimaryButton>
-          </div>
-        </form>
-
-        <div className="grid content-start gap-8 min-w-0">
-          {run.status === "idle" && !err ? (
-            <EmptyState title="Name an enzyme by its EC number">
-              <p className="m-0 max-w-[60ch] text-muted">
-                The search reads UniProt for the proteins with that EC number and the RCSB for their entries. When the
-                number covers several proteins (LDH in human is LDHA, LDHB, LDHC and more), it lists them and asks you
-                to choose one by gene.
-              </p>
-            </EmptyState>
-          ) : null}
-          <RunArea view={run} waiting="Searching UniProt and the PDB" hasResult={run.result !== null} fieldErrors={FIELDS}>
-            {run.result ? <StructureResultView result={run.result} runId={run.run?.id ?? null} onChoose={choose} busy={busy} /> : null}
-          </RunArea>
-          <CommandLine run={run.run} />
-        </div>
-      </div>
+        )}
+      </RunScreen>
     </Screen>
   );
 }
@@ -169,139 +173,188 @@ export function StructureResultView({
   result,
   runId,
   onChoose,
+  onCandidate,
   busy = false,
 }: {
   result: StructureResult;
   runId: string | null;
-  onChoose?: (gene: string | null, accession: string) => void;
+  onChoose?: (protein: ProteinRow) => void;
+  onCandidate?: (ec: string) => void;
   busy?: boolean;
 }) {
-  const top = result.top ?? 10;
-  const [all, setAll] = useState(false);
   const [open, setOpen] = useState<string | null>(result.entries[0]?.pdb_id ?? null);
   useEffect(() => setOpen(result.entries[0]?.pdb_id ?? null), [result]);
-  const shown = useMemo(() => (all ? result.entries : result.entries.slice(0, top)), [all, result, top]);
   const chosen = result.proteins.find((p) => p.chosen) ?? null;
 
+  if (result.candidates?.length) {
+    return (
+      <Section title="Which enzyme did you mean?" aside={`${result.candidates.length} EC numbers`}>
+        <p className="st-prose">
+          UniProt's reviewed entries file <q>{result.subject_name}</q> under each of these. Search one:
+        </p>
+        <div className="st-candidates">
+          {result.candidates.map((ec) => (
+            <button key={ec} type="button" className="btn font-mono" disabled={busy} onClick={() => onCandidate?.(ec)}>
+              EC {ec}
+            </button>
+          ))}
+        </div>
+      </Section>
+    );
+  }
+
   return (
-    <div className="grid gap-8">
-      <div className="grid gap-1">
-        <p className="m-0 font-display text-[1.35rem] leading-snug">
-          EC <span className="font-mono text-[1.15rem]">{result.ec}</span>
-          {result.organism ? <> in <em>{result.organism}</em></> : null}
+    <>
+      <div className="st-lede">
+        <h2 className="st-lede-title">
+          EC <span className="font-mono">{result.ec}</span>
+          {result.organism ? (
+            <>
+              {" "}
+              in <em>{result.organism}</em>
+            </>
+          ) : null}
           {chosen ? (
             <>
-              {": "}
-              {chosen.gene ?? chosen.accession}, <span className="font-mono tabular-nums">{result.total}</span>{" "}
+              : {chosen.gene ?? chosen.accession}, <span className="font-mono">{result.total}</span>{" "}
               {result.total === 1 ? "entry" : "entries"}
             </>
           ) : null}
-        </p>
-        {result.organism_note ? <p className="m-0 text-[13px] text-muted">{result.organism_note}</p> : null}
+        </h2>
+        {result.subject_name ? (
+          <p className="st-prose">
+            <q>{result.subject_name}</q> is EC {result.ec}: the one EC number UniProt's reviewed entries give that name.
+          </p>
+        ) : null}
+        {result.organism_note ? <p className="st-prose">{result.organism_note}</p> : null}
       </div>
 
-      <Part title="Proteins with this EC number" aside={chosen ? null : "choose one to see its entries"}>
-        <Table head={["protein", "gene", "UniProt", "organism", "entries", ""]} caption="Proteins">
-          {result.proteins.map((p) => (
-            <tr key={p.accession} aria-current={p.chosen ? "true" : undefined}>
-              <td className={td}>{p.name}</td>
-              <td className={`${td} font-mono`}>{p.gene ?? ""}</td>
-              <td className={`${td} font-mono`}>
-                {p.url ? (
-                  <a href={p.url} target="_blank" rel="noreferrer noopener">
+      <Section title="Proteins with this EC number" aside={chosen ? "isoforms kept apart" : "choose one to see its entries"}>
+        <DataTable
+          caption="Proteins"
+          captionHidden
+          rows={result.proteins}
+          rowKey={(p) => p.accession}
+          selectedKey={chosen?.accession ?? null}
+          columns={[
+            { key: "name", header: "protein", cell: (p) => p.name },
+            { key: "gene", header: "gene", cell: (p) => <span className="font-mono">{p.gene ?? ""}</span> },
+            {
+              key: "accession",
+              header: "UniProt",
+              cell: (p) =>
+                p.url ? (
+                  <a className="font-mono" href={p.url} target="_blank" rel="noopener noreferrer">
                     {p.accession}
                   </a>
                 ) : (
-                  p.accession
-                )}
-              </td>
-              <td className={`${td} italic`}>{p.organism}</td>
-              <td className={`${td} font-mono tabular-nums`}>{p.entries}</td>
-              <td className={`${td} text-right`}>
-                {p.chosen ? (
-                  <span className="text-[12.5px] text-muted">chosen</span>
+                  <span className="font-mono">{p.accession}</span>
+                ),
+            },
+            { key: "entries", header: "entries", numeric: true, cell: (p) => p.entries, sortValue: (p) => p.entries },
+            {
+              key: "choose",
+              header: "",
+              align: "end",
+              cell: (p) =>
+                p.chosen ? (
+                  <span className="chip" data-tone="signal">
+                    chosen
+                  </span>
                 ) : onChoose && p.entries > 0 ? (
-                  <button type="button" className="btn-quiet" disabled={busy} onClick={() => onChoose(p.gene, p.accession)}>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    disabled={busy}
+                    aria-label={`Choose ${p.gene ?? p.accession}`}
+                    onClick={() => onChoose(p)}
+                  >
                     Choose
                   </button>
-                ) : null}
-              </td>
-            </tr>
-          ))}
-        </Table>
-      </Part>
+                ) : null,
+            },
+            ...(new Set(result.proteins.map((p) => p.organism)).size > 1
+              ? [{ key: "organism", header: "organism", cell: (p: ProteinRow) => <em>{p.organism}</em> }]
+              : []),
+          ]}
+        />
+      </Section>
 
-      {result.entries.length > 0 ? (
-        <Part
-          title="Entries, best first"
-          aside={
-            <>
-              ranked by ligand bound, method, then resolution
-              {result.entries.length > top ? (
-                <>
-                  {" · "}
-                  <button type="button" className="btn-quiet" onClick={() => setAll((a) => !a)}>
-                    {all ? `Show the top ${top}` : `Show all ${result.entries.length}`}
-                  </button>
-                </>
-              ) : null}
-            </>
-          }
+      {result.entries.length ? (
+        <Section
+          title="Entries, best evidence first"
+          aside={`ranked by ${result.ligand ? `${result.ligand} bound, then ` : ""}method, then resolution; the report lists ${Math.min(result.top ?? 10, result.entries.length)}`}
         >
-          <EntriesTable rows={shown} ligand={result.ligand} open={open} onOpen={setOpen} />
-        </Part>
+          <EntriesTable rows={result.entries} ligand={result.ligand} open={open} onOpen={setOpen} />
+        </Section>
       ) : null}
 
-      {open ? (
-        <Part
-          title={`PDB ${open}`}
-          aside={
-            <span className="inline-flex flex-wrap gap-2">
-              <Link className="btn-quiet no-underline" href={`/prepare?entry=${encodeURIComponent(open)}`}>
-                Audit this entry
-              </Link>
-              <Link className="btn-quiet no-underline" href={`/md?pdb=${encodeURIComponent(open)}`}>
-                Write an MD setup
-              </Link>
-            </span>
-          }
-        >
-          <EntryView key={open} pdbId={open} />
-        </Part>
-      ) : null}
-
-      {result.chimerax_artifact && runId ? (
-        <p className="m-0 flex flex-wrap items-baseline gap-3 text-[13.5px]">
-          <ArtifactButton runId={runId} name={result.chimerax_artifact} label="Download the ChimeraX script" />
-          <span className="text-muted">
-            for the top entry; open it with <code className="font-mono">chimerax {result.chimerax_artifact}</code>
-          </span>
-        </p>
-      ) : null}
+      {open ? <OpenEntry pdbId={open} result={result} runId={runId} /> : null}
 
       {result.sources?.length ? (
-        <p className="m-0 text-[12.5px] text-muted">
-          Read from:{" "}
+        <p className="st-prose">
+          Read from{" "}
           {result.sources.map((s, i) => (
             <span key={s.text}>
               {i ? "; " : ""}
-              {s.url ? (
-                <a href={s.url} target="_blank" rel="noreferrer noopener">
-                  {s.text}
-                </a>
-              ) : (
-                s.text
-              )}
+              <Citation citation={s} />
             </span>
           ))}
           .
         </p>
       ) : null}
 
-      <TerminalReport text={result.report_markdown} markdown />
-    </div>
+      {result.report_markdown ? (
+        <Disclosure title="The report the terminal prints">
+          <MarkdownReport source={result.report_markdown} />
+        </Disclosure>
+      ) : null}
+    </>
   );
 }
+
+function OpenEntry({ pdbId, result, runId }: { pdbId: string; result: StructureResult; runId: string | null }) {
+  const row = result.entries.find((e) => e.pdb_id === pdbId);
+  const top = result.entries[0]?.pdb_id;
+  return (
+    <Section
+      title={`PDB ${pdbId}`}
+      aside={
+        <span className="st-inline">
+          <Link className="btn btn-sm" href={`/prepare?entry=${encodeURIComponent(pdbId)}`}>
+            Audit this entry
+          </Link>
+          <Link className="btn btn-sm" href={`/md?pdb=${encodeURIComponent(pdbId)}`}>
+            Write an MD setup
+          </Link>
+          {row?.entry_url ? (
+            <a className="btn btn-sm btn-quiet" href={row.entry_url} target="_blank" rel="noopener noreferrer">
+              RCSB <ExternalLink size={11} aria-hidden="true" />
+            </a>
+          ) : null}
+        </span>
+      }
+    >
+      {row ? (
+        <p className="st-lede-meta" style={{ marginBottom: "0.75rem" }}>
+          <Citation citation={row.citation} detailed />
+        </p>
+      ) : null}
+      <EntryView key={pdbId} pdbId={pdbId} />
+      {result.chimerax_artifact && runId ? (
+        <p className="st-inline" style={{ marginTop: "1rem" }}>
+          <ArtifactButton runId={runId} name={result.chimerax_artifact} label="Download the ChimeraX script" />
+          <span className="st-prose">
+            {pdbId === top ? "for this entry, the top one" : `for the top entry, ${top}`}; open it with{" "}
+            <code className="font-mono">chimerax {result.chimerax_artifact}</code>
+          </span>
+        </p>
+      ) : null}
+    </Section>
+  );
+}
+
+const ROLE_ORDER = ["ligand", "cofactor", "metal", "additive"];
 
 function EntriesTable({
   rows,
@@ -314,67 +367,93 @@ function EntriesTable({
   open: string | null;
   onOpen: (id: string) => void;
 }) {
-  return (
-    <Table
-      caption="PDB entries"
-      head={["entry", "title", "method", "resolution", "bound", ...(ligand ? [`holds ${ligand}`] : []), "primary citation"]}
-    >
-      {rows.map((s) => (
-        <tr
-          key={s.pdb_id}
-          data-selectable
-          aria-selected={open === s.pdb_id}
-          onClick={() => onOpen(s.pdb_id)}
-        >
-          <td className={`${td} whitespace-nowrap`}>
-            <button
-              type="button"
-              className="font-mono text-[13.5px] text-[var(--signal-deep)] underline-offset-2 hover:underline"
-              aria-label={`Open PDB ${s.pdb_id} in 3D`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpen(s.pdb_id);
-              }}
-            >
-              {s.pdb_id}
-            </button>
-          </td>
-          <td className={`${td} max-w-[28rem]`}>
-            <span className="line-clamp-2">{sentenceCase(s.title)}</span>
-          </td>
-          <td className={`${td} whitespace-nowrap text-muted`}>{s.method.toLowerCase()}</td>
-          <td className={`${td} whitespace-nowrap`} onClick={(e) => e.stopPropagation()}>
-            {s.resolution ? <Value v={s.resolution} /> : <span className="text-muted">none given</span>}
-          </td>
-          <td className={`${td} text-[12.5px]`}>
-            {s.bound.length ? (
-              s.bound.map((b) => (
-                <span key={`${b.component}-${b.role}`} className="mr-2 inline-block whitespace-nowrap" title={`${b.name}, ${b.role}`}>
-                  <span className="font-mono">{b.component}</span> <span className="text-muted">{b.role}</span>
-                </span>
-              ))
-            ) : (
-              <span className="text-muted">nothing</span>
-            )}
-          </td>
-          {ligand ? <td className={td}>{s.binds_ligand ? "yes" : "no"}</td> : null}
-          <td className={`${td} text-[12.5px]`} onClick={(e) => e.stopPropagation()}>
-            {s.citation.url ? (
-              <a href={s.citation.url} target="_blank" rel="noreferrer noopener">
-                {s.citation.text}
-              </a>
-            ) : (
-              s.citation.text
-            )}
-          </td>
-        </tr>
-      ))}
-    </Table>
+  const columns = useMemo(
+    () => [
+      {
+        key: "pdb",
+        header: "entry",
+        cell: (s: StructureRow) => (
+          <span className="font-mono" aria-label={`PDB ${s.pdb_id}`}>
+            {s.pdb_id}
+          </span>
+        ),
+      },
+      {
+        key: "title",
+        header: "title",
+        cell: (s: StructureRow) => <span className="st-what">{sentenceCase(s.title)}</span>,
+      },
+      { key: "method", header: "method", cell: (s: StructureRow) => <span className="muted">{s.method.toLowerCase()}</span> },
+      {
+        key: "resolution",
+        header: "resolution",
+        headerText: "resolution",
+        numeric: true,
+        sortValue: (s: StructureRow) => s.resolution?.value ?? null,
+        cell: (s: StructureRow) =>
+          s.resolution ? (
+            <Own>
+              <Value v={s.resolution} />
+            </Own>
+          ) : (
+            <span className="muted">none given</span>
+          ),
+      },
+      {
+        key: "bound",
+        header: "bound",
+        cell: (s: StructureRow) =>
+          s.bound.length ? (
+            <span className="st-inline">
+              {[...s.bound]
+                .sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role))
+                .map((b) => (
+                  <span
+                    key={`${b.component}-${b.role}`}
+                    className="chip chip-mono"
+                    data-tone={b.role === "additive" ? undefined : b.role === "ligand" ? "signal" : undefined}
+                    title={`${b.name}, ${b.role}`}
+                  >
+                    {b.component}
+                    <span className="muted">{b.role}</span>
+                  </span>
+                ))}
+            </span>
+          ) : (
+            <span className="muted">nothing</span>
+          ),
+      },
+      ...(ligand
+        ? [
+            {
+              key: "holds",
+              header: `holds ${ligand}`,
+              cell: (s: StructureRow) => (s.binds_ligand ? "yes" : "no"),
+            },
+          ]
+        : []),
+      {
+        key: "citation",
+        header: "primary citation",
+        cell: (s: StructureRow) => (
+          <Own>
+            <Citation citation={s.citation} />
+          </Own>
+        ),
+      },
+    ],
+    [ligand],
   );
-}
-
-function sentenceCase(title: string): string {
-  if (title !== title.toUpperCase()) return title;
-  const lower = title.toLowerCase();
-  return lower.charAt(0).toUpperCase() + lower.slice(1);
+  return (
+    <DataTable
+      caption="PDB entries: Enter or a click opens one in 3D"
+      captionHidden
+      rows={rows}
+      rowKey={(s) => s.pdb_id}
+      columns={columns}
+      selectedKey={open}
+      onRowSelect={(s) => onOpen(s.pdb_id)}
+      maxHeight="26rem"
+    />
+  );
 }
