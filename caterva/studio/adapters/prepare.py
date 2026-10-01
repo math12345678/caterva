@@ -213,6 +213,8 @@ def register(registry) -> None:
         run=prepare_run,
         describe=_describe,
         cli_prefix=("caterva", "prepare"),
+        # A local .cif is read from disk; a PDB id is fetched from the RCSB.
+        needs_for=lambda request: () if str(request.get("entry", "")).strip().startswith("/") else ("network",),
     ))
 
 

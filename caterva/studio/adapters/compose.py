@@ -656,6 +656,8 @@ SPEC = AdapterSpec(
     describe=describe,
     cli_prefix=("caterva", "compose"),
     serial=True,
+    # Only a subject sends compose to the literature (contract section 13).
+    needs_for=lambda request: ("network", "literature") if request.get("subject") else (),
 )
 
 

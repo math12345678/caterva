@@ -262,8 +262,10 @@ number. Must answer in milliseconds: imports nothing of the engine.
 PUT without one keeps its stored value; GET always returns both.
 `gromacs_path` (absolute path of an executable `gmx`, or null to look for
 it as section 10 says; it also sets `$GMX` for the runs) and `offline`
-(default false; when true the network probe contacts nothing and a run of
-any kind whose `needs` include `network` is 503 with that reason).
+(default false; when true the network probe contacts nothing and a run
+whose request needs `network` is 503 with that reason: the adapter's
+`needs_for(request)` when it has one, else every `needs` of its kind, so a
+compose without a subject or a prepare of a local file still runs).
 Unknown or missing keys, or values out of range: 400 naming the `field`.
 Stored in `<data dir>/settings.json`.
 
@@ -527,7 +529,11 @@ An adapter module:
 1. Builds an `AdapterSpec` per kind: `kind`, `title`, `command`, `needs`
    (subset of `network`, `literature`, `gromacs`), `argv(request)`,
    `run(request, ctx)`, `unavailable()`, `describe(request)`, `cli_prefix`,
-   `serial`.
+   `serial`, and optionally `needs_for(request)`: which of `needs` this
+   request has (offline mode refuses by it), and `check_paths(request,
+   data_dir)`: the section 15 rules that need the data dir, run by the
+   server right after `argv` so a breach is a 400 (both amended at
+   integration).
 2. `argv(request)` turns the JSON request into the exact argv the CLI would
    receive; unknown keys or wrong types raise `contract.Malformed(message,
    field)`. The server then runs `parse_cli(build_parser, argv, prog)` (the

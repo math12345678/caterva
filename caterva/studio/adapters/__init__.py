@@ -136,6 +136,25 @@ class AdapterSpec:
     #: engine lock around every serial run: they run one at a time, in
     #: submission order, while network-bound kinds run beside them.
     serial: bool = False
+    #: request -> which of `needs` this request has (compose without a
+    #: subject searches nothing). None: every request has all of `needs`.
+    #: Called only on a request `argv` accepted. Offline mode refuses a run
+    #: by these, so a question that needs no network is not refused for one
+    #: that would.
+    needs_for: Optional[Callable[[Mapping[str, Any]], Tuple[str, ...]]] = None
+    #: (request, data dir) -> None, raising contract.Malformed: the user-path
+    #: rules of contract section 15 that need the data dir, which `argv`
+    #: cannot see (an md.setup `out` inside the workspace). Called by the
+    #: server right after `argv`, so a breach is a 400 and never a run.
+    check_paths: Optional[Callable[[Mapping[str, Any], Path], None]] = None
+
+
+def request_needs(spec: AdapterSpec, request: Mapping[str, Any]) -> Tuple[str, ...]:
+    """What this request needs: `spec.needs_for(request)`, never more than
+    `spec.needs`, or all of `spec.needs` when the kind cannot tell."""
+    if spec.needs_for is None:
+        return tuple(spec.needs)
+    return tuple(n for n in spec.needs_for(request) if n in spec.needs)
 
 
 @dataclass(frozen=True)
@@ -259,5 +278,5 @@ def parse_cli(build_parser: Callable[..., argparse.ArgumentParser], argv: Sequen
 __all__ = [
     "ADAPTER_MODULES", "AdapterOutcome", "AdapterSpec", "Artifact", "Cancelled",
     "EndpointHandler", "EndpointRequest", "Progress", "Registry", "RunContext",
-    "cli_parser", "load_registry", "parse_cli",
+    "cli_parser", "load_registry", "parse_cli", "request_needs",
 ]

@@ -10,6 +10,7 @@ what is tested is the machinery, not a science result.
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import sys
 import threading
@@ -181,6 +182,51 @@ def test_offline_mode_refuses_a_kind_that_may_need_the_network(tmp_path):
     try:
         with pytest.raises(Unavailable, match="offline mode is on"):
             manager.submit("constants", {})
+        assert manager.ws.run_ids() == []
+    finally:
+        manager.shutdown()
+
+
+def test_offline_mode_runs_a_request_that_needs_no_network(tmp_path):
+    from caterva.studio.contract import Unavailable
+
+    registry = Registry()
+    base = spec("compose", Gate().run, needs=("network", "literature"))
+    registry.register(dataclasses.replace(
+        base, needs_for=lambda request: ("network",) if request.get("say") == "search" else ()))
+    manager = make_manager(tmp_path, registry, offline=lambda: True)
+    try:
+        with pytest.raises(Unavailable, match="offline mode is on"):
+            manager.submit("compose", {"say": "search"})
+        assert manager.ws.run_ids() == []
+        record = manager.submit("compose", {"say": "local"})
+        assert record["status"] == "queued"
+    finally:
+        manager.shutdown()
+
+
+def test_the_real_adapters_need_the_network_only_for_requests_that_search():
+    from caterva.studio.adapters import load_registry, request_needs
+
+    registry = load_registry()
+    compose, md_setup, prepare = registry.get("compose"), registry.get("md.setup"), registry.get("prepare")
+    assert request_needs(compose, {"description": "Michaelis-Menten"}) == ()
+    assert request_needs(compose, {"description": "Michaelis-Menten", "subject": "2.7.1.1"}) == ("network", "literature")
+    assert request_needs(md_setup, {"pdb": "1AKI"}) == ()
+    assert request_needs(md_setup, {"pdb": "1AKI", "subject": "3.2.1.17", "substrate": "x"}) == ("network", "literature")
+    assert request_needs(prepare, {"entry": "/data/1l63.cif"}) == ()
+    assert request_needs(prepare, {"entry": "1L63"}) == ("network",)
+    assert request_needs(registry.get("bind"), {}) == ("network", "literature")
+
+
+def test_an_md_setup_writing_into_the_workspace_is_malformed_before_a_run_exists(tmp_path):
+    from caterva.studio.adapters import load_registry
+
+    manager = make_manager(tmp_path, load_registry())
+    try:
+        with pytest.raises(Malformed, match="inside the studio's workspace") as refused:
+            manager.submit("md.setup", {"pdb": "1AKI", "out": str(manager.ws.root / "elsewhere")})
+        assert refused.value.field == "out"
         assert manager.ws.run_ids() == []
     finally:
         manager.shutdown()

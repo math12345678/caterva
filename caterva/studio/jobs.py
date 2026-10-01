@@ -73,7 +73,7 @@ import traceback
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Sequence, TextIO, Tuple
 
-from caterva.studio.adapters import AdapterOutcome, AdapterSpec, Artifact, Cancelled, RunContext, parse_cli
+from caterva.studio.adapters import AdapterOutcome, AdapterSpec, Artifact, Cancelled, RunContext, parse_cli, request_needs
 from caterva.studio.contract import RUN_RECORD_SCHEMA, Malformed, Unavailable, outcome_for
 from caterva.studio.routes import ARTIFACT_NAME_PATTERN
 from caterva.studio.workspace import (
@@ -363,14 +363,15 @@ class JobManager:
             reason = f"could not tell whether {kind} can run here: {type(exc).__name__}: {exc}"
         if reason:
             raise Unavailable(reason)
-        if "network" in spec.needs and self._offline():
-            raise Unavailable(f"{kind}: {OFFLINE_REASON}")
-
         run_id = self._new_run_id(kind)
         run_dir = self.ws.run_dir(run_id)
         argv = spec.argv(request)
         if not isinstance(argv, (list, tuple)) or not all(isinstance(a, str) for a in argv):
             raise TypeError(f"the {kind} adapter's argv() returned {type(argv).__name__}, not a list of strings")
+        if spec.check_paths is not None:
+            spec.check_paths(request, self.ws.root)
+        if self._offline() and "network" in request_needs(spec, request):
+            raise Unavailable(f"{kind}: {OFFLINE_REASON}")
         argv = [a.replace(RUN_DIR_PLACEHOLDER, str(run_dir)) for a in argv]
         prefix = cli_prefix(spec)
         _parse_with_command_parser(prefix, argv)

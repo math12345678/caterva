@@ -404,6 +404,12 @@ def summarise_run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome
     return AdapterOutcome(done.code, result, summary)
 
 
+def _setup_paths(request: Mapping[str, Any], data_dir: Path) -> None:
+    """A user `out` must not be inside the studio's workspace (section 15)."""
+    if "out" in request:
+        output_directory(request["out"], "out", data_dir)
+
+
 def _directory_describe(what: str) -> Any:
     def describe(request: Mapping[str, Any]) -> str:
         return f"{what} {Path(str(request.get('directory', '?'))).name}"
@@ -423,6 +429,8 @@ def register(registry) -> None:
         # With --subject the conditions come from a compose search, which
         # builds a model through the simulation engine.
         serial=True,
+        needs_for=lambda request: ("network", "literature") if request.get("subject") else (),
+        check_paths=_setup_paths,
     ))
     registry.register(AdapterSpec(
         kind="md.summarise",
