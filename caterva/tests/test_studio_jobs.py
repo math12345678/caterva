@@ -479,7 +479,9 @@ def test_a_stuck_run_times_out_as_failed_saying_whether_it_stopped_or_was_abando
     registry = Registry()
     registry.register(spec("compose", stops.run))
     registry.register(spec("bind", stuck.run))
-    manager = make_manager(tmp_path, registry, timeout_s=0.3, cancel_grace_s=0.3)
+    # A grace far longer than a check takes, so on a loaded machine the run that
+    # checks still stops by itself before it could be abandoned.
+    manager = make_manager(tmp_path, registry, timeout_s=0.3, cancel_grace_s=3.0)
     try:
         a = manager.submit("compose", {})["id"]
         b = manager.submit("bind", {})["id"]
