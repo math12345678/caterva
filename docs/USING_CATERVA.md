@@ -1262,15 +1262,19 @@ degrees of freedom; add `--error-model proportional` when the noise grows
 with the rate); or `--sigma-from residuals` (ordinary least squares, sigma
 from the fit's own scatter, which is what R's `nls` reports and which
 assumes the rate law is right, so no goodness-of-fit chi-square is printed
-for it). With none of these it refuses, names the three, and exits 3.
+for it). With none of these it refuses, names the three, and exits 3. With
+`--group` and `--sigma-from replicates`, one sigma is pooled across all the
+groups' replicates, which assumes every group was measured with the same
+precision; the report says so.
 
 ### A worked example, on real data
 
 `examples/rates/puromycin.csv` is Treloar's 1974 galactosyltransferase data,
 published in Bates & Watts (1988), *Nonlinear Regression Analysis and Its
 Applications*, Appendix A1.3, and shipped with R as `datasets::Puromycin`:
-rates from puromycin-treated and untreated cells, in duplicate, substrate in
-parts per million and rate in counts per minute per minute.
+rates from puromycin-treated and untreated cells, in duplicate except the
+untreated cells' highest concentration (1.10 ppm, measured once), substrate
+in parts per million and rate in counts per minute per minute.
 
 ```
 caterva rates examples/rates/puromycin.csv --sigma-from residuals --group state --model michaelis-menten
@@ -1371,7 +1375,9 @@ A constant the data cannot bound is never printed as a number. Rates taken
 only far below Km determine Vmax/Km and neither constant alone, and the
 report says exactly that, with the interval of the ratio and a one-sided
 bound on each ("Km > [the bound]: the data do not determine an upper bound"),
-instead of an estimate with an absurd interval.
+instead of an estimate with an absurd interval. For the Hill law the
+combination the low-[S] rates fix is Vmax/K0.5^n, not Vmax/K0.5, and the
+report names it without an interval, since its exponent is itself fitted.
 It also says whether your substrate range brackets Km, against the Assay
 Guidance Manual's design range of 0.2 to 5 Km with 8 or more concentrations,
 and lists concentrations that would (above, for the puromycin rates, whose
@@ -1392,6 +1398,9 @@ for the mechanism your data support, chosen by the same resolver
 cited value, its BRENDA reference and commentary, what the commentary says
 about isoform, mode and construct, the spread of equally good rows, whether
 your interval contains the cited value, and the ratio, with units converted.
+When your data do not determine the constant (rates far below Km, say), no
+fitted value or ratio is printed: only the one-sided bound is held against
+the cited value.
 A mixed fit's two constants are not compared, because a database row does
 not say which of the two it measured. From the app folder the fit is
 reported and the comparison is refused, with exit code 3.

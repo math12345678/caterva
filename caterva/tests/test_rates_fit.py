@@ -14,7 +14,8 @@ What is checked:
   * with seeded noise, every law's estimates and standard errors equal those
     of scipy.optimize.curve_fit, an independent implementation (different
     parameterisation, different Jacobian, different optimiser), fitted with
-    the same weights;
+    the same weights to the rate laws written out again in this file
+    (TEXTBOOK), not to the command's own;
   * the complex-step Jacobian equals the analytic derivative of
     Michaelis-Menten to rounding error.
 """
@@ -48,6 +49,22 @@ SUBSTRATE = {
     "substrate-inhibition": np.geomspace(0.05, 50.0, 10),
     "hill": np.geomspace(0.2, 20.0, 9),
 }
+#: The seven laws written out again, from the textbook forms (Cornish-Bowden,
+#: Fundamentals of Enzyme Kinetics, 4th ed. 2012; Segel 1975), and NOT from
+#: caterva/rates/models.py. The synthetic rates are made with these and the
+#: curve_fit cross-check fits these, so a slip in a law in models.py makes
+#: the command disagree with both instead of agreeing with itself.
+TEXTBOOK = {
+    "michaelis-menten": lambda c, s, i: c["Vmax"] * s / (c["Km"] + s),
+    "substrate-inhibition": lambda c, s, i: c["Vmax"] * s / (c["Km"] + s + s ** 2 / c["Ksi"]),
+    "hill": lambda c, s, i: c["Vmax"] * s ** c["n"] / (c["K_half"] ** c["n"] + s ** c["n"]),
+    "competitive": lambda c, s, i: c["Vmax"] * s / (c["Km"] * (1 + i / c["Ki"]) + s),
+    "uncompetitive": lambda c, s, i: c["Vmax"] * s / (c["Km"] + s * (1 + i / c["Ki_prime"])),
+    "noncompetitive": lambda c, s, i: c["Vmax"] * s / ((c["Km"] + s) * (1 + i / c["Ki"])),
+    "mixed": lambda c, s, i: c["Vmax"] * s / (c["Km"] * (1 + i / c["Ki"])
+                                             + s * (1 + i / c["Ki_prime"])),
+}
+
 INHIBITION_S = np.geomspace(0.1, 10.0, 6)
 INHIBITION_I = np.array([0.0, 0.5, 1.5, 4.5])
 
@@ -76,7 +93,7 @@ def synthetic(name, noise=0.0, seed=0, replicates=1):
     law = law_for(name)
     s, i = design(name)
     s, i = np.repeat(s, replicates), np.repeat(i, replicates)
-    v = law.rate(TRUE[name], s, i)
+    v = TEXTBOOK[name](TRUE[name], s, i)
     sd = 0.02 * v + 0.01
     rng = np.random.default_rng(seed)
     observed = v + noise * sd * rng.standard_normal(len(v))
@@ -97,7 +114,7 @@ def test_noise_free_rates_give_back_the_constants_they_were_made_from(name):
 @pytest.mark.parametrize("name", list(LAWS))
 def test_estimates_and_errors_equal_scipy_curve_fit_with_the_same_weights(name):
     """curve_fit fits the constants themselves (not their logarithms), with
-    its own finite-difference Jacobian, from the true values; absolute_sigma
+    its own finite-difference Jacobian, to TEXTBOOK's law, from the true values; absolute_sigma
     takes the file's standard deviations as known, as this command does."""
     data = synthetic(name, noise=1.0, seed=7, replicates=2)
     law = law_for(name)
@@ -108,7 +125,7 @@ def test_estimates_and_errors_equal_scipy_curve_fit_with_the_same_weights(name):
     sd = np.asarray(data.sigma)
 
     def model(x, *p):
-        return law.rate(dict(zip(law.names, p)), x[0], x[1])
+        return TEXTBOOK[name](dict(zip(law.names, p)), x[0], x[1])
 
     start = [TRUE[name][c] for c in law.names]
     popt, pcov = curve_fit(model, np.vstack([s, i]), v, p0=start, sigma=sd, absolute_sigma=True,

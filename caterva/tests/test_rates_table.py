@@ -62,6 +62,20 @@ class TestColumnsAndUnits:
         # An amount per time is a readout, not a concentration: it stays arbitrary.
         assert read_unit("rate", "nmol/min", "rate").kind == "arbitrary"
 
+    @pytest.mark.parametrize("unit", ["umol/L/min", "nmol/mL/min", "mmol/L"])
+    def test_an_amount_per_volume_is_a_molar_unit_and_not_taken_as_arbitrary(self, unit):
+        """umol/L/min is uM/min written out. Read as arbitrary it would be
+        fitted as given and then refused every conversion it has, and the
+        report would call a molar rate an arbitrary readout."""
+        with pytest.raises(UnitRefused, match="amount of substance per volume"):
+            read_unit("rate", unit, "rate")
+
+    def test_greek_mu_reads_as_the_micro_sign(self):
+        greek, micro = read_unit("s", "\u03bcM", "substrate"), read_unit("s", "\u00b5M", "substrate")
+        assert greek.kind == micro.kind == "concentration"
+        assert greek.unit.scale == micro.unit.scale == pytest.approx(1e-6)
+        assert greek.text == "\u03bcM"  # kept as written, for the report
+
     def test_a_column_without_a_unit_is_refused(self):
         with pytest.raises(UnitRefused, match="column 'substrate' has no unit"):
             table("substrate,rate (uM/min)\n1,2\n")
@@ -138,6 +152,20 @@ class TestUncertainty:
             resolve(table("substrate (mM),rate (uM/min)\n1,2\n2,3\n"), "replicates")
 
     def test_pure_error_by_hand(self):
+        # (10-11)^2 + (12-11)^2 + (20-21.5)^2 + (23-21.5)^2 = 2 + 4.5 = 6.5, on
+        # 5 rows - 3 conditions = 2 degrees of freedom.
         data = table(self.DUPLICATES)
-        ss, df, conditions = pure_error(data, [1.0] * 5)
+        keys = [data.condition(r) for r in range(len(data))]
+        ss, df, conditions = pure_error(data.rate, [1.0] * 5, keys)
         assert (ss, df, conditions) == (6.5, 2, 3)
+
+    def test_the_lack_of_fit_test_uses_that_pure_error(self):
+        from caterva.rates.discriminate import lack_of_fit
+        from caterva.rates.fit import build_problem, fit
+        from caterva.rates.models import law_for
+
+        data = table(self.DUPLICATES)
+        fitted = fit(build_problem(law_for("michaelis-menten"), data, resolve(data, "residuals")))
+        result = lack_of_fit(fitted)
+        assert result.ss_pe == pytest.approx(6.5, rel=1e-12)
+        assert (result.df_pe, result.df_lof) == (2, 1)

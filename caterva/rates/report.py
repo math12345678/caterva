@@ -11,7 +11,11 @@ Where a profile is open on one side (fit.py), the tables print the one-sided
 statement ("Km > [bound]") and leave the estimate and its standard error out,
 because the optimiser's stopping point along a flat direction is not an
 estimate of anything. The CSV has an empty estimate cell and a `determined`
-column saying no; the JSON has the bound and `"determined": false`.
+column saying no; the JSON has the bound and `"determined": false`. The
+literature comparison follows the same rule: an undetermined Km or Ki is held
+against the cited value by its one-sided bound only, with no fitted value and
+no ratio, since a ratio to the optimiser's stopping point would be a ratio to
+nothing.
 """
 from __future__ import annotations
 
@@ -26,8 +30,8 @@ import numpy as np
 
 from caterva.rates import linearize
 from caterva.rates.analysis import Analysis, GroupResult, LawResult
-from caterva.rates.fit import Interval, curve
-from caterva.rates.models import law_for
+from caterva.rates.fit import Interval, band_note, curve
+from caterva.rates.models import ROLE_INHIBITOR, law_for
 from caterva.rates.table import INHIBITOR, RATE, SUBSTRATE
 from caterva.rates.uncertainty import KNOWN, POOLED, RESIDUAL
 
@@ -85,6 +89,42 @@ def _where(group: Optional[str]) -> str:
     return f"[{group}] " if group else ""
 
 
+def _cap(text: str) -> str:
+    """A law's title at the start of a line ("Competitive inhibition")."""
+    return text[:1].upper() + text[1:]
+
+
+def _edge_note(name: str, label: str, edge: str) -> str:
+    """What a constant at the edge of the search means. It depends on which
+    constant and which edge: an inhibition or substrate-inhibition constant
+    at its upper edge drops its term from the law, which is the limiting
+    law; Km at its upper edge is the opposite case, [S] negligible beside
+    Km, where only Vmax/Km acts."""
+    where = "upper" if edge == "high" else "lower"
+    head = (f"{label} ran to the {where} edge of the search (a factor of 1e8 beyond the range of "
+            f"the data it acts on)" if name != "n" else
+            f"{label} ran to the {where} edge of its search range")
+    if name in ("Ki", "Ki_prime", "Ksi") and edge == "high":
+        tail = ("its term in the law is negligible there, and the fit is the law without it")
+    elif name in ("Ki", "Ki_prime", "Ksi"):
+        tail = ("the inhibition it describes is complete at every concentration used, so the data "
+                "give only an upper bound on it")
+    elif name in ("Km", "K_half") and edge == "high":
+        power = "[S]" if name == "Km" else "[S]^n"
+        tail = (f"every [S] is negligible beside it, so the rate is proportional to {power} and "
+                f"only its combination with Vmax acts; Vmax runs with it")
+    elif name in ("Km", "K_half"):
+        tail = ("every [S] saturates the enzyme, so the rate is Vmax at every concentration used "
+                "and the data give only an upper bound on it")
+    elif name == "Vmax":
+        tail = ("it runs with Km (or K0.5), which the data leave unbounded above; see what the data "
+                "determine, above")
+    else:
+        tail = "the data do not bound it on that side"
+    return (f"{head}: {tail}. Standard errors and correlations of the other constants are "
+            f"conditional on it being held there.")
+
+
 # ---------------------------------------------------------------------------
 # The verdict
 # ---------------------------------------------------------------------------
@@ -98,14 +138,14 @@ def verdict_lines(analysis: Analysis) -> List[str]:
         if verdict is not None:
             if not verdict.sentences and len(result.laws) == 1:
                 only = next(iter(result.laws))
-                out.append(f"{where}{law_for(only).title}, the law asked for (--model {only}); no "
+                out.append(f"{where}{_cap(law_for(only).title)}, the law asked for (--model {only}); no "
                            f"other law was fitted or tested.")
             for sentence in verdict.sentences:
                 out.append(where + sentence)
         for law in result.reported:
             headline = _headline(analysis, law)
             if headline:
-                out.append(f"{where}{law.law.title}: {headline}")
+                out.append(f"{where}{_cap(law.law.title)}: {headline}")
         if verdict is not None:
             for sentence in verdict.advice:
                 out.append(where + "To decide: " + sentence)
@@ -113,25 +153,25 @@ def verdict_lines(analysis: Analysis) -> List[str]:
             det = law.determination
             if det is not None:
                 for finding in det.findings:
-                    out.append(f"{where}{law.law.title}: {finding}")
+                    out.append(f"{where}{_cap(law.law.title)}: {finding}")
             if law.lack_of_fit is not None and law.lack_of_fit.p is not None and \
                     law.lack_of_fit.p < analysis.options.significance:
-                out.append(f"{where}{law.law.title}: "
+                out.append(f"{where}{_cap(law.law.title)}: "
                            + law.lack_of_fit.sentence(analysis.options.significance))
             fit = law.fit
             if fit is not None and fit.gof_p() is not None:
                 p = fit.gof_p()
                 if p < 0.01:
-                    out.append(f"{where}{law.law.title}: chi-square {g(fit.chi2)} on {fit.dof} "
+                    out.append(f"{where}{_cap(law.law.title)}: chi-square {g(fit.chi2)} on {fit.dof} "
                                f"degrees of freedom (p = {p:.3g}): the rates scatter more than the "
                                f"stated errors allow, so either the law or the error bars are wrong.")
                 elif p > 0.99:
-                    out.append(f"{where}{law.law.title}: chi-square {g(fit.chi2)} on {fit.dof} "
+                    out.append(f"{where}{_cap(law.law.title)}: chi-square {g(fit.chi2)} on {fit.dof} "
                                f"degrees of freedom (p = {p:.3g}): the fit is closer than the "
                                f"stated errors allow; they are probably overstated.")
             if (fit is not None and fit.other_minimum is not None and
                     fit.normalised(fit.other_minimum) < fit.threshold(analysis.options.level)):
-                out.append(f"{where}{law.law.title}: a second minimum fits almost as well "
+                out.append(f"{where}{_cap(law.law.title)}: a second minimum fits almost as well "
                            f"(objective {g(fit.other_minimum)} against {g(fit.chi2)}, inside the "
                            f"interval threshold); the data do not clearly choose between them, "
                            f"and the lower is reported.")
@@ -173,8 +213,14 @@ def literature_sentence(c) -> str:
         return text + f"; {c.refused or 'the fitted value could not be expressed in that unit'}."
     fitted = _interval_cell(c.converted, c.cited_unit or "")
     inside = "inside" if c.contains else "OUTSIDE"
-    text += (f"; fitted {g(c.converted.estimate)} {c.cited_unit} ({fitted}): the cited value is "
-             f"{inside} the fitted interval, ratio fitted/cited {g(c.ratio, 3)}")
+    if not c.determined:
+        # An undetermined constant has a bound and no value (module docstring).
+        text += (f"; fitted: not determined, {fitted}: the cited value is {inside} that "
+                 f"one-sided interval; no fitted value or ratio is given, because the data do not "
+                 f"determine {c.constant}")
+    else:
+        text += (f"; fitted {g(c.converted.estimate)} {c.cited_unit} ({fitted}): the cited value "
+                 f"is {inside} the fitted interval, ratio fitted/cited {g(c.ratio, 3)}")
     if c.conditional:
         text += f"; {c.conditional}"
     return text + "."
@@ -187,6 +233,7 @@ def literature_sentence(c) -> str:
 
 def _law_table(analysis: Analysis, law: LawResult, level: float) -> List[str]:
     units = _units(analysis, law)
+    products = law.determination.product_units if law.determination else {}
     undetermined = set(law.determination.undetermined if law.determination else ())
     lines = [f"| constant | estimate | standard error | {_pct(level)} profile interval | unit |",
              "|---|---|---|---|---|"]
@@ -200,8 +247,20 @@ def _law_table(analysis: Analysis, law: LawResult, level: float) -> List[str]:
     if law.determination is not None:
         for product in law.determination.products:
             lines.append(f"| {product.label} | {g(product.estimate)} | {g(product.se)} | "
-                         f"{_interval_cell(product, '')} | - |")
+                         f"{_interval_cell(product, '')} | {products.get(product.label) or '-'} |")
     return lines
+
+
+def _edge_caveat(law: LawResult) -> List[str]:
+    """Below a comparison table: the standard errors there are conditional on
+    any constant held at the edge, which the profile intervals are not."""
+    fit = law.fit
+    held = [label for label, e in zip(fit.problem.labels, fit.edge) if e]
+    if not held:
+        return []
+    return ["", f"{', '.join(held)} ran to the edge of the search; the standard errors above are "
+                f"conditional on {'it' if len(held) == 1 else 'them'} being held there, so they can "
+                f"understate the uncertainty the profile intervals beside them show."]
 
 
 def _statistics(analysis: Analysis, law: LawResult) -> List[str]:
@@ -218,6 +277,9 @@ def _statistics(analysis: Analysis, law: LawResult) -> List[str]:
         out.append(f"Chi-square {g(fit.chi2)} on {fit.dof} degrees of freedom, with sigma pooled from "
                    f"replicates ({u.dof} degrees of freedom). Most of that chi-square is the replicate "
                    f"scatter sigma was estimated from, so it is not a test; the lack-of-fit F test is.")
+    elif fit.dof <= 0:
+        out.append(f"Chi-square {g(fit.chi2)} on {fit.dof} degrees of freedom: as many constants as "
+                   f"rates, so the law passes through every point and nothing about it is tested.")
     else:
         p = fit.gof_p()
         out.append(f"Chi-square {g(fit.chi2)} on {fit.dof} degrees of freedom"
@@ -234,17 +296,23 @@ def _statistics(analysis: Analysis, law: LawResult) -> List[str]:
     out.append(f"Starts: {fit.starts_agreeing} of {fit.starts_tried} reached this minimum"
                + (f"; the lowest other minimum found had objective {g(fit.other_minimum)}."
                   if fit.other_minimum is not None else "; no start found a different one."))
-    out.append(f"Condition number of the weighted Jacobian (log constants): {g(fit.condition_number, 3)}.")
+    held = [label for label, e in zip(fit.problem.labels, fit.edge) if e]
+    if held:
+        out.append(f"Condition number of the weighted Jacobian (log constants): "
+                   f"{_cond(fit.condition_number)} over every constant; "
+                   f"{_cond(fit.condition_number_live)} over those not at the edge of the search, "
+                   f"without {', '.join(held)}.")
+    else:
+        out.append(f"Condition number of the weighted Jacobian (log constants): "
+                   f"{_cond(fit.condition_number)}.")
     if law.lack_of_fit is not None:
         out.append("Lack of fit: " + law.lack_of_fit.sentence(analysis.options.significance))
     else:
         out.append("Lack of fit: not tested (it needs replicates, and more distinct conditions "
                    "than constants).")
-    for edge, label in zip(fit.edge, fit.problem.labels):
+    for edge, label, name in zip(fit.edge, fit.problem.labels, fit.problem.constants):
         if edge:
-            out.append(f"{label} ran to the {'upper' if edge == 'high' else 'lower'} edge of the "
-                       f"search (a factor of 1e8 beyond the data's range): its term in the law is "
-                       f"negligible, and the fit is the limiting law.")
+            out.append(_edge_note(name, label, edge))
     out.extend(fit.notes)
     return out
 
@@ -280,12 +348,15 @@ def render(analysis: Analysis) -> str:
                                   f"and not comparable with a cited constant)")
     L.append("Units: " + "; ".join(unit_parts) + ".")
     L.append("Uncertainty: " + analysis.uncertainty.describe(analysis.unit_of("rate")) + ".")
+    if analysis.uncertainty.source == POOLED and groups:
+        L.append("One error estimate is pooled across all groups' replicates, which assumes every "
+                 "group was measured with the same precision.")
     for note in analysis.notes:
         L.append(note)
 
     for result in analysis.results:
         for law in result.reported:
-            L += ["", f"## {law.law.title}{_group_heading(result)}", "", f"`{law.law.equation}`", ""]
+            L += ["", f"## {_cap(law.law.title)}{_group_heading(result)}", "", f"`{law.law.equation}`", ""]
             L += _law_table(analysis, law, level)
             L.append("")
             L += [f"- {s}" for s in _statistics(analysis, law)]
@@ -293,7 +364,8 @@ def render(analysis: Analysis) -> str:
                 L += [f"- Substrate range: {s}" for s in result.design.text]
         others = [r for n, r in result.laws.items() if r not in result.reported]
         if result.tests or others:
-            L += ["", f"## The laws tested{_group_heading(result)}", ""]
+            heading = "The laws tested" if result.tests else "The other laws"
+            L += ["", f"## {heading}{_group_heading(result)}", ""]
             if result.tests:
                 L += ["| restricted law | general law | restriction | kind | statistic | p | verdict |",
                       "|---|---|---|---|---|---|---|"]
@@ -309,14 +381,27 @@ def render(analysis: Analysis) -> str:
                           f"(a constant going to infinity) is tested against the 50:50 mixture of "
                           f"chi-square(0) and chi-square(1) (Self & Liang 1987): half the ordinary "
                           f"p-value."]
+                if analysis.data.has_inhibitor and len(result.tests) > 1:
+                    L += ["", "Each restricted law is tested against mixed inhibition at "
+                              f"{analysis.options.significance:g}. The restrictions are different "
+                              "and, for an inhibitor that inhibits at all, at most one of them is "
+                              "true, so the chance of ruling out the true mechanism is that of its "
+                              f"own test, {analysis.options.significance:g}; the tests are not "
+                              "repeated chances at one null hypothesis."]
             if result.verdict is not None:
                 L += ["", *result.verdict.described]
             for other in others:
                 if other.fit is None:
                     L += ["", f"{other.law.title}: not fitted -- {other.refused}"]
                     continue
-                L += ["", f"{other.law.title}, for comparison (`{other.law.equation}`):", ""]
+                L += ["", f"{_cap(other.law.title)}, for comparison (`{other.law.equation}`):", ""]
                 L += _law_table(analysis, other, level)
+                L += _edge_caveat(other)
+                # What the data determine of this law too: an interval four
+                # decades wide in a comparison table reads as a determination
+                # unless it says otherwise.
+                if other.determination is not None and other.determination.findings:
+                    L += [""] + [f"- {f}" for f in other.determination.findings]
     comparison = analysis.comparison
     if comparison is not None:
         L += ["", f"## Between groups ({comparison.law.title})", ""]
@@ -365,9 +450,18 @@ def render(analysis: Analysis) -> str:
         L += ["", "## Straight-line plots (for teaching; never the estimate)", "", linearize.WHY]
         for result in analysis.results:
             for lin in result.linearizations:
-                head = f"{_where(result.group)}[I] = {lin.inhibitor:g}".strip()
+                i_unit = analysis.unit_of(ROLE_INHIBITOR)
+                head = (f"{_where(result.group)}[I] = {lin.inhibitor:g}"
+                        + (f" {i_unit}" if i_unit and lin.inhibitor else "")).strip()
                 L += ["", f"### {head}", ""]
-                L += ["| plot | x | y | points (x, y) | Vmax | Km |", "|---|---|---|---|---|---|"]
+                if lin.inhibitor:
+                    # With inhibitor present a straight line gives the APPARENT
+                    # constants at that [I] (Km,app = Km (1 + [I]/Ki) for a
+                    # competitive inhibitor), not Vmax and Km.
+                    L += ["| plot | x | y | points (x, y) | apparent Vmax | apparent Km |",
+                          "|---|---|---|---|---|---|"]
+                else:
+                    L += ["| plot | x | y | points (x, y) | Vmax | Km |", "|---|---|---|---|---|---|"]
                 for line in lin.lines:
                     pts = "; ".join(f"({g(x, 3)}, {g(y, 3)})" for x, y in line.points)
                     L.append(f"| {line.plot} | {line.x_label} | {line.y_label} | {pts} | "
@@ -385,8 +479,11 @@ def render(analysis: Analysis) -> str:
           f"- Intervals are {_pct(level)} profile-likelihood intervals (Bates & Watts 1988); the "
           "standard errors are asymptotic and are what a +-2 SE interval would be built from, which "
           "for Km is often too symmetric.",
-          "- A fit this good is not evidence that the law is right; the tests above compare the laws "
-          "fitted, and a law not fitted was not considered.",
+          ("- A fit this good is not evidence that the law is right; the tests above compare the "
+           "laws fitted, and a law not fitted was not considered."
+           if any(r.tests for r in analysis.results) else
+           "- A fit this good is not evidence that the law is right: no other law was tested "
+           "against it here, and a law not fitted was not considered."),
           "- References: " + " ".join(REFERENCES)]
     return "\n".join(L) + "\n"
 
@@ -417,8 +514,9 @@ def _law_json(analysis: Analysis, law: LawResult) -> Dict[str, Any]:
     return {
         "law": law.law.name, "equation": law.law.equation, "fitted": True,
         "constants": [_interval_json(iv, units.get(iv.label, ""), undetermined) for iv in law.intervals],
-        "determined_products": [_interval_json(p, "") for p in
-                                (law.determination.products if law.determination else [])],
+        "determined_products": [
+            _interval_json(p, law.determination.product_units.get(p.label, ""))
+            for p in (law.determination.products if law.determination else [])],
         "findings": law.determination.findings if law.determination else [],
         "n": fit.n, "parameters": fit.p, "degrees_of_freedom": fit.dof,
         "objective": fit.chi2,
@@ -433,7 +531,12 @@ def _law_json(analysis: Analysis, law: LawResult) -> Dict[str, Any]:
         # constant ran to the edge of the search and has no covariance.
         "correlation_matrix": [[float(corr[a, b]) if np.isfinite(corr[a, b]) else None
                                 for b in range(fit.p)] for a in range(fit.p)],
-        "condition_number": fit.condition_number,
+        # Over every constant; and over those not at the edge, which the
+        # covariance and the standard errors are built from.
+        # null when infinite (a column of the Jacobian is zero or two are
+        # exactly dependent): JSON has no infinity.
+        "condition_number": _finite(fit.condition_number),
+        "condition_number_without_edge_constants": _finite(fit.condition_number_live),
         "starts": {"tried": fit.starts_tried, "reached_minimum": fit.starts_agreeing,
                    "other_minimum": fit.other_minimum},
         "at_edge": {label: edge for label, edge in zip(fit.problem.labels, fit.edge) if edge},
@@ -516,11 +619,21 @@ def _literature_json(c) -> Dict[str, Any]:
         "resolver_source": c.source, "concerns": c.concerns,
         "spread": list(c.spread) if c.spread else None, "equally_evidenced_rows": c.spread_rows,
         "tie": c.tie, "evidence_against_mechanism": c.evidence_against,
+        "fitted_determined": c.determined,
         "fitted_in_cited_unit": None if c.converted is None else {
-            "estimate": c.converted.estimate, "low": c.converted.low, "high": c.converted.high},
+            "estimate": c.converted.estimate if c.determined else None,
+            "low": c.converted.low, "high": c.converted.high},
         "contains_cited": c.contains, "ratio_fitted_to_cited": c.ratio,
         "refused": c.refused, "conditional": c.conditional,
     }
+
+
+def _finite(x: float) -> Optional[float]:
+    return float(x) if math.isfinite(x) else None
+
+
+def _cond(x: float) -> str:
+    return g(x, 3) if math.isfinite(x) else "infinite"
 
 
 def _default(value: Any) -> Any:
@@ -577,7 +690,7 @@ def parameters_csv(analysis: Analysis) -> str:
             rows(result.group, name, name in reported, law.intervals, units,
                  det.undetermined if det else [])
             if det is not None:
-                rows(result.group, name, name in reported, det.products, {}, [])
+                rows(result.group, name, name in reported, det.products, det.product_units, [])
     comparison = analysis.comparison
     if comparison is not None:
         for t in comparison.tests:
@@ -598,7 +711,10 @@ def curves_csv(analysis: Analysis, points: int = 60) -> str:
     """The reported laws' curves on a grid of [S], at each [I] of the data,
     with the measured rates, one row per point, units in the headers. The
     band is ASYMPTOTIC and POINTWISE (fit.curve): not a profile interval,
-    and not a band for the whole curve at once."""
+    and not a band for the whole curve at once. The `band` column says so on
+    every fitted row, and says when the band is conditional on a constant
+    held at the edge of the search, or absent because the covariance is
+    undefined (fit.band_note)."""
     data = analysis.data
     level = _pct(analysis.options.level)
     s_unit = data.units[SUBSTRATE].text
@@ -612,7 +728,7 @@ def curves_csv(analysis: Analysis, points: int = 60) -> str:
         header.append(f"inhibitor ({i_unit})")
     header += [f"substrate ({s_unit})", f"rate ({r_unit})",
                f"rate low ({level} pointwise, asymptotic) ({r_unit})",
-               f"rate high ({level} pointwise, asymptotic) ({r_unit})"]
+               f"rate high ({level} pointwise, asymptotic) ({r_unit})", "band"]
     writer.writerow(header)
     for result in analysis.results:
         rows = result.rows
@@ -622,6 +738,7 @@ def curves_csv(analysis: Analysis, points: int = 60) -> str:
         positive = s[s > 0]
         grid = np.geomspace(positive.min() / 2.0, positive.max() * 1.5, points) if positive.size else np.array([])
         for law in result.reported:
+            note = band_note(law.fit)
             for level_i in sorted(set(i.tolist())):
                 centre, low, high = curve(law.fit, grid, np.full_like(grid, level_i), result.group,
                                           analysis.options.level)
@@ -629,13 +746,13 @@ def curves_csv(analysis: Analysis, points: int = 60) -> str:
                     row = ["fit", result.group or "", law.law.name]
                     if has_i:
                         row.append(_num(level_i))
-                    row += [_num(x), _num(c), _num(lo), _num(hi)]
+                    row += [_num(x), _num(c), _num(lo), _num(hi), note]
                     writer.writerow(row)
         for x, y, z in zip(s, v, i):
             row = ["measured", result.group or "", ""]
             if has_i:
                 row.append(_num(z))
-            row += [_num(x), _num(y), "", ""]
+            row += [_num(x), _num(y), "", "", ""]
             writer.writerow(row)
     return buffer.getvalue()
 
@@ -676,13 +793,17 @@ def methods(analysis: Analysis) -> str:
     elif u.source == POOLED:
         if u.error_model == "proportional":
             parts.append(f"Each rate was weighted by the inverse square of a standard deviation "
-                         f"proportional to the mean rate at its condition, with the coefficient "
+                         f"proportional to the mean rate at its condition (for a condition "
+                         f"measured once, that one rate), with the coefficient "
                          f"of variation ({u.pooled:.3g}) pooled from {u.sets} replicate sets "
                          f"({u.dof} degrees of freedom).")
         else:
             parts.append(f"Rates were weighted equally, with the standard deviation "
                          f"({u.pooled:.4g} {data.units[RATE].text}) pooled from {u.sets} replicate "
                          f"sets ({u.dof} degrees of freedom).")
+        if data.groups():
+            parts.append("One error estimate was pooled across all groups, which assumes every "
+                         "group was measured with the same precision.")
     else:
         parts.append("Rates were weighted equally (ordinary least squares) and the standard "
                      "deviation was estimated from the residuals, which assumes the rate law is "

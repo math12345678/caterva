@@ -12,9 +12,22 @@ the constant the rates were made from.
 
 With 300 datasets the count's own binomial standard error at 0.95 is
 sqrt(0.95 * 0.05 / 300) = 0.0126, so a correct procedure lands within
-3 of those (0.912 to 0.988) except about 3 times in a thousand. A procedure
-that used the normal quantile where t is right, or the chi-square(1)
-threshold on an estimated sigma, falls outside it at these sample sizes.
+3 of those (0.912 to 0.988) except about 3 times in a thousand.
+
+WHAT THIS STUDY CANNOT CATCH
+----------------------------
+A band that wide does not tell the normal quantile from Student's t at
+these sample sizes. With sigma from the residuals (12 rows, 2 constants,
+10 degrees of freedom) a z threshold on a t(10) statistic covers with
+probability 2 * P(T10 < 1.96) - 1 = 0.922, inside the band; with sigma from
+replicates (6 degrees of freedom) it is 0.902, just below it, and a draw of
+300 still lands inside about a quarter of the time. Telling those apart by
+coverage would take thousands of datasets per case. So the choice of
+quantile is checked directly instead, by
+test_the_threshold_is_students_t_on_the_degrees_of_freedom_of_sigma below:
+deterministic, and exact for that defect. The coverage study checks what
+only simulation can: that the profile, the multi-start fit and the
+quantile together give intervals near their nominal level.
 
 The cases are one per source of sigma, for Michaelis-Menten at 6
 concentrations in duplicate (0.2 to 10 Km), and one for an inhibition
@@ -87,3 +100,23 @@ def test_a_competitive_ki_interval_covers_at_the_nominal_rate():
         hits += interval.contains(TRUE["Ki"])
     coverage = hits / DATASETS
     assert abs(coverage - LEVEL) <= BAND, coverage
+
+
+@pytest.mark.parametrize("source, dof", [(None, None), ("residuals", 10), ("replicates", 6)],
+                         ids=["sigma-known", "sigma-from-residuals", "sigma-from-replicates"])
+def test_the_threshold_is_students_t_on_the_degrees_of_freedom_of_sigma(source, dof):
+    """The quantile the intervals are built on (module docstring): normal for
+    a stated sigma, t on n - p for the residuals, t on the replicates' pooled
+    degrees of freedom. Checked against scipy.stats, which the code does not
+    call for it; one SYNTHETIC dataset of the design above."""
+    from scipy import stats as scipy_stats
+
+    law = law_for("michaelis-menten")
+    s = np.repeat([0.2, 0.5, 1.0, 2.0, 5.0, 10.0], 2)
+    data = synthetic_rates(law, s, np.zeros_like(s), np.random.default_rng(SEED),
+                           with_sigma=source is None)
+    fitted = fit(build_problem(law, data, resolve(data, source)))
+    expected = (scipy_stats.norm.ppf(0.975) if dof is None
+                else scipy_stats.t.ppf(0.975, dof))
+    assert fitted.critical(LEVEL) == pytest.approx(expected, rel=1e-9)
+    assert fitted.threshold(LEVEL) == pytest.approx(expected ** 2, rel=1e-9)

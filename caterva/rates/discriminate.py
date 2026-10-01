@@ -87,7 +87,7 @@ import numpy as np
 from caterva.rates import stats
 from caterva.rates.fit import Fit, Interval
 from caterva.rates.models import NESTINGS, Nesting, law_for
-from caterva.rates.uncertainty import KNOWN, POOLED, RESIDUAL
+from caterva.rates.uncertainty import KNOWN, POOLED, RESIDUAL, pure_error
 
 DEFAULT_SIGNIFICANCE = 0.05
 
@@ -133,17 +133,7 @@ class LackOfFit:
 def lack_of_fit(fitted: Fit) -> Optional[LackOfFit]:
     """The pure-error F test, or None without replicates or spare conditions."""
     problem = fitted.problem
-    weight = 1.0 / problem.sigma ** 2
-    ss_pe = 0.0
-    conditions = problem.conditions
-    for c in set(conditions.tolist()):
-        rows = conditions == c
-        w = weight[rows]
-        v = problem.v[rows]
-        mean = float((w * v).sum() / w.sum())
-        ss_pe += float((w * (v - mean) ** 2).sum())
-    m = len(set(conditions.tolist()))
-    df_pe = problem.n - m
+    ss_pe, df_pe, m = pure_error(problem.v, problem.sigma, problem.conditions.tolist())
     df_lof = m - problem.p
     if df_pe <= 0 or df_lof <= 0 or ss_pe <= 0:
         return None

@@ -246,6 +246,42 @@ def test_rates_far_below_km_determine_only_vmax_over_km():
     assert "Extend the highest concentration" in text
 
 
+def test_when_km_runs_to_the_edge_the_report_says_what_that_means_and_the_condition_shows_it():
+    """Rates far below Km with sigma pooled from duplicates (SYNTHETIC,
+    seeded): Km runs to the upper edge of the search. The note must say that
+    [S] is negligible beside Km there (not that Km's term is negligible, which
+    is the inhibition constants' case), and the condition number must be
+    computed over every constant: over the live ones alone it is 1, which
+    says nothing about Vmax and Km being confounded."""
+    s = np.array([0.001, 0.002, 0.004, 0.008, 0.016])
+    data = rates("michaelis-menten", s, np.zeros(5), seed=5, sigma_column=False,
+                 constants={"Vmax": 100.0, "Km": 1.0})
+    analysis = analyse(data, resolve(data, "replicates"), Options(model="michaelis-menten"))
+    fit = analysis.results[0].laws["michaelis-menten"].fit
+    assert fit.edge[fit.problem.labels.index("Km")] == "high"
+    assert fit.condition_number_live == pytest.approx(1.0)
+    assert fit.condition_number > 1e6
+    text = render(analysis)
+    assert "Km ran to the upper edge of the search" in text
+    assert "every [S] is negligible beside it, so the rate is proportional to [S]" in text
+    assert "its term in the law is negligible" not in text
+    assert "over every constant" in text
+
+
+def test_hill_rates_far_below_k_half_do_not_claim_vmax_over_k_half():
+    """At [S] << K0.5 the Hill law is (Vmax/K0.5^n)[S]^n: the combination the
+    data act on is Vmax/K0.5^n, not Vmax/K0.5 (SYNTHETIC, n = 1.5, seeded)."""
+    s = np.array([0.001, 0.002, 0.004, 0.008, 0.016])
+    data = rates("hill", s, np.zeros(5), seed=3, constants={"Vmax": 100.0, "K_half": 1.0, "n": 1.5})
+    analysis = analyse(data, resolve(data, None), Options(model="hill"))
+    det = analysis.results[0].laws["hill"].determination
+    assert {"Vmax", "K0.5"} <= set(det.undetermined)
+    assert not any(p.label == "Vmax/K0.5" for p in det.products)
+    finding = next(f for f in det.findings if "well below K0.5" in f)
+    assert "Vmax/K0.5^n" in finding and "unless n = 1" in finding
+    assert "the data determine only Vmax/K0.5" not in render(analysis)
+
+
 def test_rates_far_above_km_determine_vmax_and_only_bound_km():
     # At 1e4 Km and above, Km moves every rate by at most 1e-4 of itself,
     # far inside the 3% noise.

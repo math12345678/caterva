@@ -259,6 +259,33 @@ def test_malformed_questions_exit_2(tmp_path):
     assert run([str(tmp_path / "missing.csv"), "--sigma-from", "residuals"])[0] == 2
 
 
+def test_a_source_of_uncertainty_named_twice_is_malformed():
+    # argparse would keep the second and say nothing about the first.
+    code, _, err = run([str(EXAMPLE), "--sigma-from", "residuals", "--sigma-from", "replicates"])
+    assert code == 2 and "--sigma-from was given twice" in err
+
+
+def test_a_law_through_every_point_is_not_called_a_test(tmp_path):
+    path = tmp_path / "two.csv"
+    path.write_text("# SYNTHETIC: two rates for a test\n"
+                    "substrate (mM),rate (uM/min),sigma (uM/min)\n0.1,1.0,0.1\n1,5,0.1\n")
+    code, out, _ = run([str(path), "--model", "michaelis-menten"])
+    assert code == 0
+    assert "on 0 degrees of freedom: as many constants as rates" in out
+    assert "the test of this law" not in out
+    assert "## The laws tested" not in out
+
+
+def test_straight_lines_at_an_inhibitor_concentration_give_apparent_constants(tmp_path):
+    path = synthetic_inhibition(tmp_path, "competitive")
+    code, out, _ = run([str(path), "--model", "competitive", "--show-linearizations"])
+    assert code == 0
+    assert "### [I] = 2700 nM" in out
+    block = out[out.index("### [I] = 2700 nM"):]
+    assert "| apparent Vmax | apparent Km |" in block.split("###")[1]
+    assert "| Vmax | Km |" in out[out.index("### [I] = 0"):].split("###")[1]
+
+
 def test_an_inhibition_law_on_rates_without_inhibitor_is_refused():
     code, _, err = run([str(EXAMPLE), "--sigma-from", "residuals", "--model", "competitive"])
     assert code == 3 and "needs rates measured with an inhibitor" in err
@@ -358,6 +385,32 @@ def test_a_mixed_fit_is_not_matched_to_a_single_row(tmp_path):
     ki = next(c for c in doc["literature"] if c["law"] == "mixed" and c["constant"] == "Ki")
     assert "does not say which one it measured" in ki["refused"]
     assert code == 3 and "Ki" in err
+
+
+def test_an_undetermined_km_is_held_to_the_cited_value_by_its_bound_alone(tmp_path):
+    """SYNTHETIC rates (seeded) all at or below 1.6% of a Km of 1 mM, sigma
+    from duplicates: Km runs to the edge of the search. The comparison must
+    not print the optimiser's stopping point as a fitted Km, nor a ratio to
+    it; it holds the one-sided bound against the cited 0.03 mM."""
+    s = np.repeat([0.001, 0.002, 0.004, 0.008, 0.016], 2)
+    v = 100.0 * s / (1.0 + s)
+    v = v + 0.03 * v * np.random.default_rng(5).standard_normal(len(v))
+    path = tmp_path / "low.csv"
+    path.write_text("# SYNTHETIC rates for a test; not a measurement\nsubstrate (mM),rate (uM/min)\n"
+                    + "".join(f"{float(a)!r},{float(b)!r}\n" for a, b in zip(s, v)))
+    argv = [str(path), "--sigma-from", "replicates", "--model", "michaelis-menten", "--ec",
+            "1.1.1.27", "--organism", "human", "--substrate", "pyruvate"]
+    code, out, _ = run(argv, resolver=offline_resolver)
+    assert code == 0
+    line = next(x for x in out.splitlines() if x.startswith("- Literature: Km"))
+    assert "cited 0.03 mM" in line and "fitted: not determined" in line
+    assert "ratio" not in line.replace("no fitted value or ratio", "")
+    code, out, _ = run(argv + ["--json"], resolver=offline_resolver)
+    [found] = json.loads(out)["literature"]
+    assert found["fitted_determined"] is False and found["ratio_fitted_to_cited"] is None
+    assert found["fitted_in_cited_unit"]["estimate"] is None
+    assert found["fitted_in_cited_unit"]["high"] is None
+    assert found["contains_cited"] is False  # 0.03 mM is below the lower bound
 
 
 def test_an_arbitrary_unit_declines_the_comparison_by_name():

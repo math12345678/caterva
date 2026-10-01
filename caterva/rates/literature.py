@@ -31,7 +31,12 @@ The cited value, its unit, the BRENDA reference, the row's commentary and
 what `compose/row_scope` reads in it (isoform, mode, what it was measured
 against, the preparation), the spread of the rows the resolver found equally
 well evidenced, whether the fitted profile interval contains the cited
-value, and the ratio of the fitted estimate to it, both in one unit. A
+value, and the ratio of the fitted estimate to it, both in one unit. When
+the data do not determine the constant (its profile is open on a side, or
+determine.py found it confounded with Vmax), there is no fitted estimate to
+take a ratio of: the optimiser stopped somewhere along a flat direction,
+1e8 times beyond the data at worst. Then only the one-sided interval is held
+against the cited value, and the ratio is left out. A
 fitted interval that excludes a cited value is a finding about two
 measurements, not an error in either: assay conditions, isoform and
 construct differ between laboratories, which is what the commentary is
@@ -104,6 +109,10 @@ class Comparison:
     evidence_against: Optional[str] = None
     #: The mode the contradicting row states, when there is one.
     evidence_mode: Optional[str] = None
+    #: Whether the data determine the fitted constant (module docstring).
+    #: When False the converted interval's estimate is not a value, and no
+    #: ratio is computed.
+    determined: bool = True
     #: The fitted interval in the cited unit, and the estimate over the cited.
     converted: Optional[Interval] = None
     contains: Optional[bool] = None
@@ -189,11 +198,15 @@ def compare(
     group: Optional[str] = None,
     resolver: Optional[Resolver] = None,
     conditional: Optional[str] = None,
+    determined: bool = True,
 ) -> Comparison:
-    """One fitted constant against the resolver's row for it."""
+    """One fitted constant against the resolver's row for it. `determined`
+    is False when determine.py found the constant undetermined even though
+    its own profile may be closed (module docstring)."""
     is_ki = constant in ("Ki", "Ki'")
     out = Comparison(constant, law.name, group, compound, law.mode if is_ki else None,
-                     interval, column.text, conditional=conditional)
+                     interval, column.text, conditional=conditional,
+                     determined=bool(determined and interval is not None and interval.bounded))
     if interval is None:
         out.refused = f"{constant} was not fitted"
         out.declined = True
@@ -246,7 +259,8 @@ def compare(
     factor = column.unit.scale / cited_unit.scale
     out.converted = _convert(interval, factor)
     out.contains = out.converted.contains(out.cited)
-    out.ratio = out.converted.estimate / out.cited if out.cited > 0 else None
+    out.ratio = (out.converted.estimate / out.cited
+                 if out.determined and out.cited > 0 else None)
     return out
 
 

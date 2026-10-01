@@ -20,11 +20,25 @@ edge is not bounded on that side. Three patterns are named:
   Km and Vmax both unbounded above: every [S] is well below Km, and only
       Vmax/Km is determined. Its interval is the profile of the product
       Vmax * Km^-1, refitting Km freely at each value, so it carries the
-      uncertainty of the Km that the data could not fix.
+      uncertainty of the Km that the data could not fix. This holds for
+      every law whose low-[S] limit is (Vmax/Km)[S]: Michaelis-Menten,
+      substrate inhibition and the four inhibition laws. It does NOT hold
+      for the Hill law, whose low-[S] limit is (Vmax/K0.5^n)[S]^n: there the
+      determined combination is Vmax/K0.5^n, a product whose exponent is
+      itself fitted, so it is not a fixed product of powers this module can
+      profile. For the Hill law the finding says so, names that combination,
+      and gives no interval for it rather than one for Vmax/K0.5, which the
+      data do not determine unless n = 1.
   Km unbounded below, Vmax bounded: every [S] is well above Km, and only
       Vmax is determined; Km is below a stated bound.
   Any other constant unbounded on a side: the one-sided statement, and what
       concentration range would bound it.
+  A constant bounded on both sides by an interval more than four decades
+      wide (WIDE): the bounds are printed, because the profile does cross
+      the threshold, with a sentence that an interval that wide is close to
+      one-sided. A profile that is nearly flat crosses the threshold
+      wherever rounding and the last decimal of the data put it, and the
+      far bound is not a determination a reader should quote.
 
 The Jacobian's condition number is reported beside this, as a second
 opinion; the profile is the one decisions are made on, because a
@@ -66,6 +80,9 @@ HIGH_MULTIPLE = 5.0
 RECOMMENDED_COUNT = 8
 #: "Multiple points above and below the Km", read as at least two.
 EACH_SIDE = 2
+#: An interval whose high/low ratio exceeds this is reported as close to
+#: one-sided (module docstring): four decades.
+WIDE = 1e4
 
 
 @dataclass
@@ -92,6 +109,8 @@ class Determination:
     undetermined: List[str] = field(default_factory=list)
     #: Products that ARE determined when their factors are not (Vmax/Km).
     products: List[Interval] = field(default_factory=list)
+    #: Each product's unit, by label ("uM/min per mM").
+    product_units: Dict[str, str] = field(default_factory=dict)
     design: Optional[DesignAdvice] = None
 
 
@@ -121,11 +140,26 @@ def determine(fitted: Fit, intervals: Sequence[Interval], units: Dict[str, str],
             continue
         v_iv, km_iv = intervals[v_k], intervals[km_k]
         km_name = labels[km_k]
-        if km_iv.high is None and v_iv.high is None:
+        hill = "K_half" in roles and "Km" not in roles
+        if km_iv.high is None and v_iv.high is None and hill:
+            out.findings.append(
+                f"Every substrate concentration is well below {km_name}: there the Hill law is "
+                f"v = ({labels[v_k]}/{km_name}^n)[S]^n, so only n and the combination "
+                f"{labels[v_k]}/{km_name}^n act on these rates, and neither {labels[v_k]} nor "
+                f"{km_name} alone is determined. "
+                f"{km_iv.describe(units.get(km_name, ''))}; "
+                f"{v_iv.describe(units.get(labels[v_k], ''))}. No interval is given for "
+                f"{labels[v_k]}/{km_name}^n, because its exponent n is itself fitted, and none "
+                f"for {labels[v_k]}/{km_name}, which these data do not determine unless n = 1.")
+            for label in (labels[v_k], km_name):
+                if label not in out.undetermined:
+                    out.undetermined.append(label)
+        elif km_iv.high is None and v_iv.high is None:
             ratio = profile_product(fitted, {v_k: 1.0, km_k: -1.0}, level,
                                     f"{labels[v_k]}/{km_name}")
             if ratio is not None and ratio not in out.products:
                 out.products.append(ratio)
+                out.product_units[ratio.label] = _ratio_unit(units, labels[v_k], km_name)
             lead = (f"Every substrate concentration is well below {km_name}: the data determine "
                     f"only {labels[v_k]}/{km_name}")
             if ratio is not None and ratio.bounded:
@@ -152,6 +186,13 @@ def determine(fitted: Fit, intervals: Sequence[Interval], units: Dict[str, str],
             continue
         iv = by_label[label]
         if iv.bounded:
+            if iv.low > 0 and iv.high / iv.low > WIDE:
+                unit = units.get(label, "")
+                out.findings.append(
+                    f"{label} {iv.low:.4g} to {iv.high:.4g}{' ' + unit if unit else ''}: an "
+                    f"interval more than four decades wide. The profile does cross the threshold "
+                    f"there, but it rises so slowly that the far bound is close to one-sided; "
+                    f"treat {label} as bounded on one side, not as determined.")
             continue
         out.undetermined.append(label)
         role = law.constant(name).role

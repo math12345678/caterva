@@ -389,6 +389,8 @@ class Fit:
     edge: Tuple[Optional[str], ...]
     #: Covariance of the log parameters; NaN rows and columns at the edge.
     cov_log: np.ndarray
+    #: Singular values of the weighted Jacobian over the constants NOT at the
+    #: edge (the ones the covariance is built from), largest first.
     singular: np.ndarray
     starts_tried: int
     starts_agreeing: int
@@ -397,6 +399,13 @@ class Fit:
     notes: List[str] = field(default_factory=list)
     #: Whether the optimiser met its tolerance at the reported minimum.
     converged: bool = True
+    #: Singular values of the weighted Jacobian over EVERY constant. A
+    #: constant at the edge is in here: when Km runs to its upper edge its
+    #: column is minus Vmax's (v = (Vmax/Km)[S]), and the condition number
+    #: of this matrix is what says so. Over the live constants alone the same
+    #: fit is perfectly conditioned, which is true of the live constants and
+    #: says nothing about the confounding.
+    singular_all: np.ndarray = field(default_factory=lambda: np.array([]))
 
     @property
     def law(self) -> RateLaw:
@@ -450,9 +459,13 @@ class Fit:
 
     @property
     def condition_number(self) -> float:
-        if self.singular.size == 0 or self.singular[-1] <= 0:
-            return float("inf")
-        return float(self.singular[0] / self.singular[-1])
+        """Over every constant, edge or not (`singular_all`)."""
+        return _ratio(self.singular_all)
+
+    @property
+    def condition_number_live(self) -> float:
+        """Over the constants not at the edge, which the covariance uses."""
+        return _ratio(self.singular)
 
     def critical(self, level: float) -> float:
         """The quantile the intervals use: normal for a known sigma, t on the
@@ -593,6 +606,12 @@ def _projected(problem: Problem, x0: np.ndarray, free: np.ndarray,
     return theta, problem.objective(theta), ok
 
 
+def _ratio(singular: np.ndarray) -> float:
+    if singular.size == 0 or singular[-1] <= 0 or not np.all(np.isfinite(singular)):
+        return float("inf")
+    return float(singular[0] / singular[-1])
+
+
 def _edges(problem: Problem, theta: np.ndarray) -> Tuple[Optional[str], ...]:
     out: List[Optional[str]] = []
     for value, lo, hi in zip(theta, problem.lower, problem.upper):
@@ -665,9 +684,11 @@ def fit(problem: Problem, starts: Optional[Sequence[np.ndarray]] = None) -> Fit:
     dof = problem.n - problem.p
     scale2 = best_value / dof if problem.source == RESIDUAL and dof > 0 else 1.0
     cov, singular = _covariance(problem, best_theta, edge, scale2)
+    singular_all = np.linalg.svd(problem.jacobian(best_theta), compute_uv=False)
     fitted = Fit(problem=problem, theta=best_theta, chi2=best_value, edge=edge, cov_log=cov,
                  singular=singular, starts_tried=len(results), starts_agreeing=agreeing,
-                 other_minimum=min(others) if others else None, converged=converged)
+                 other_minimum=min(others) if others else None, converged=converged,
+                 singular_all=singular_all)
     if not converged:
         fitted.notes.append(
             "the optimiser used its whole budget of evaluations at this minimum without meeting "
@@ -906,15 +927,35 @@ def curve(fitted: Fit, s: np.ndarray, i: np.ndarray, group: Optional[str], level
             step = fitted.theta.astype(complex)
             step[k] += 1j * COMPLEX_STEP
             grad[:, k] = log_rate(step).imag / COMPLEX_STEP
-        cov = np.nan_to_num(fitted.cov_log)
-        sd = np.sqrt(np.maximum(np.einsum("ij,jk,ik->i", grad, cov, grad), 0.0))
+        live = [k for k, e in enumerate(fitted.edge) if e is None]
+        block = fitted.cov_log[np.ix_(live, live)]
+        if not live or not np.all(np.isfinite(block)):
+            # The live constants' covariance is undefined (a singular
+            # Jacobian): no band, rather than a band of zero width.
+            nan = np.full(len(s), np.nan)
+            return centre, nan, nan
+        # Constants at the edge have no covariance and are held there: the
+        # band is conditional on them (band_note says which).
+        sd = np.sqrt(np.maximum(np.einsum("ij,jk,ik->i", grad[:, live], block, grad[:, live]), 0.0))
         factor = np.exp(fitted.critical(level) * sd)
         low = np.where(centre > 0, centre / factor, 0.0)
         high = np.where(centre > 0, centre * factor, 0.0)
     return centre, low, high
 
 
+def band_note(fitted: Fit) -> str:
+    """What `curve`'s band is, in a few words, for the export."""
+    live = [k for k, e in enumerate(fitted.edge) if e is None]
+    if not live or not np.all(np.isfinite(fitted.cov_log[np.ix_(live, live)])):
+        return "no band: the covariance of the constants is undefined (singular Jacobian)"
+    held = [label for label, e in zip(fitted.problem.labels, fitted.edge) if e]
+    if held:
+        return ("asymptotic, pointwise, conditional on " + ", ".join(held)
+                + " held at the edge of the search")
+    return "asymptotic, pointwise"
+
+
 __all__ = [
     "EDGE", "HILL_RANGE", "FitRefused", "Problem", "Fit", "Interval", "build_problem",
-    "grid_starts", "fit", "profile", "profile_all", "profile_product", "curve",
+    "grid_starts", "fit", "profile", "profile_all", "profile_product", "curve", "band_note",
 ]

@@ -49,12 +49,16 @@ chi-square loses its distribution. The single observation gives a low
 reading a large weight because it is low. The condition's mean is fixed
 before the fit, averages the replicates it was pooled from, and is what the
 CV was computed against, so it is used, and the methods paragraph says so.
+A condition measured once has only its one rate for a mean, so its scale IS
+the single observation, with the bias described above; the methods paragraph
+says that too. The alternative, a scale from a first fit, would make the
+weights depend on a model chosen before the comparison of models.
 """
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -203,19 +207,24 @@ def resolve(data: Dataset, source: Optional[str], error_model: Optional[str] = N
                        pooled=pooled, sets=len(sets))
 
 
-def pure_error(data: Dataset, sigma: np.ndarray) -> Tuple[float, int, int]:
+def pure_error(rate: Sequence[float], sigma: Sequence[float],
+               conditions: Sequence[object]) -> Tuple[float, int, int]:
     """(weighted pure-error sum of squares, its degrees of freedom, the number
     of distinct conditions) -- the replicate scatter that no model of the
-    conditions can remove (Draper & Smith, Applied Regression Analysis)."""
-    rate = np.asarray(data.rate, dtype=float)
+    conditions can remove (Draper & Smith, Applied Regression Analysis).
+    Rows with equal `conditions` keys are replicates. The lack-of-fit test
+    (discriminate.lack_of_fit) calls this on the rows of one fit."""
+    rate = np.asarray(rate, dtype=float)
     weight = 1.0 / np.asarray(sigma, dtype=float) ** 2
-    sets = list(_replicate_sets(data).values())
+    sets: Dict[object, List[int]] = {}
+    for row, key in enumerate(conditions):
+        sets.setdefault(key, []).append(row)
     ss = 0.0
-    for rows in sets:
+    for rows in sets.values():
         w = weight[rows]
         mean = float((w * rate[rows]).sum() / w.sum())
         ss += float((w * (rate[rows] - mean) ** 2).sum())
-    return ss, len(data) - len(sets), len(sets)
+    return ss, len(rate) - len(sets), len(sets)
 
 
 __all__ = [

@@ -38,7 +38,14 @@ rather than guessing a molar mass. A word that is none of these ("mMol",
 "uM/mn") is still refused, because a misspelled molar unit read as
 "arbitrary" would silently turn off the conversion it needed; so is a unit
 made only of molar and time words that the parser cannot read as written
-("uM min^-1"), which is a molar unit in the wrong notation, not a readout.
+("uM min^-1"), which is a molar unit in the wrong notation, not a readout,
+and so is an amount of substance over a volume ("umol/L/min", "nmol/mL"),
+which is a molar concentration written out: read as arbitrary, it would be
+fitted correctly and then refused every conversion it has.
+
+The Greek letter mu (U+03BC) is read as the micro sign (U+00B5) that
+compose/units.py parses: the two look the same, and which one a keyboard
+types depends on the platform.
 
 REPLICATES ARE IDENTICAL CONDITIONS
 -----------------------------------
@@ -85,6 +92,8 @@ ARBITRARY = frozenset({
 #: its own is not a concentration, and "mMol" for mM would otherwise read
 #: as millimoles.
 AMOUNTS = frozenset({"mol", "mmol", "umol", "µmol", "nmol", "pmol"})
+#: Volumes: an amount over one of these is a molar concentration.
+VOLUMES = frozenset({"l", "ml", "ul", "µl"})
 _WAVELENGTH = re.compile(r"^(?:a|od)\d{3}$", re.IGNORECASE)
 _MOLAR = re.compile(r"^(?:[munpkµ]?M)$")
 
@@ -166,8 +175,10 @@ def read_unit(column: str, text: Optional[str], role: str) -> ColumnUnit:
             f"cannot be compared with anything. If the readout has no convertible "
             f"unit, name the one it has (counts/min, A340/min, ppm)."
         )
+    # Greek mu to the micro sign (module docstring); `text` is kept as written.
+    text_read = text.replace("\u03bc", "\u00b5")
     try:
-        unit = parse_unit(text)
+        unit = parse_unit(text_read)
     except UnitError:
         unit = None
     if unit is not None:
@@ -190,7 +201,14 @@ def read_unit(column: str, text: Optional[str], role: str) -> ColumnUnit:
             f"concentration per time (uM/min), a turnover per time (1/s), or an "
             f"arbitrary readout per time (A340/min, counts/min/min)."
         )
-    words = _arbitrary_words(text, role)
+    lowered = [re.sub(r"\^-?\d+$", "", w).lower() for w in re.split(r"[\s/*()]+", text_read) if w]
+    if any(w in AMOUNTS for w in lowered) and any(w in VOLUMES for w in lowered):
+        raise UnitRefused(
+            f"column {column!r} is in {text!r}, an amount of substance per volume, which is a "
+            f"molar concentration (umol/L is uM, nmol/mL is uM, mmol/L is mM). Write it in "
+            f"molar units, as uM/min or mM: read as an arbitrary unit it would be fitted as "
+            f"given and then refused every unit conversion it has.")
+    words = _arbitrary_words(text_read, role)
     if words is None:
         raise UnitRefused(
             f"cannot read the unit {text!r} of column {column!r}. Molar units are "

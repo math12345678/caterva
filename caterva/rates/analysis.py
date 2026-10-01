@@ -303,7 +303,8 @@ def compare_literature(analysis: Analysis, *, ec: str, organism: Optional[str],
                 analysis.literature.append(compare(
                     constant="Km", law=first.law, interval=km, column=data.units[SUBSTRATE],
                     ec=ec, organism=organism, compound=substrate, substrate=substrate,
-                    isoform=isoform, group=result.group, resolver=resolver))
+                    isoform=isoform, group=result.group, resolver=resolver,
+                    determined=_determined(first, "Km")))
         if inhibitor and data.has_inhibitor:
             for law_result in reported:
                 law = law_result.law
@@ -318,9 +319,14 @@ def compare_literature(analysis: Analysis, *, ec: str, organism: Optional[str],
                     constant=label, law=law, interval=law_result.interval(label),
                     column=data.units[INHIBITOR], ec=ec, organism=organism, compound=inhibitor,
                     substrate=substrate, isoform=isoform, group=result.group, resolver=resolver,
-                    conditional=conditional)
+                    conditional=conditional, determined=_determined(law_result, label))
                 _relate(found, result)
                 analysis.literature.append(found)
+
+
+def _determined(law: LawResult, label: str) -> bool:
+    det = law.determination
+    return det is None or label not in det.undetermined
 
 
 def _relate(found: Comparison, result: GroupResult) -> None:

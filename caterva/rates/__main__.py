@@ -44,6 +44,19 @@ EXIT_OK, EXIT_CRASH, EXIT_USAGE, EXIT_REFUSED = 0, 1, 2, 3
 EXPORTS = ("csv", "curves", "methods")
 
 
+class _Once(argparse.Action):
+    """An option that may be given once. argparse keeps the last of two, so
+    `--sigma-from residuals --sigma-from replicates` would otherwise fit with
+    replicates and say nothing about the residuals asked for first; one
+    source of uncertainty is the rule, and two named is a malformed question."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if getattr(namespace, self.dest, None) is not None:
+            parser.error(f"{option_string} was given twice ({getattr(namespace, self.dest)} and "
+                         f"{values}); give it once")
+        setattr(namespace, self.dest, values)
+
+
 def build_parser(prog: str = "caterva rates") -> argparse.ArgumentParser:
     from caterva.rates.analysis import MODEL_CHOICES
 
@@ -85,12 +98,12 @@ def build_parser(prog: str = "caterva rates") -> argparse.ArgumentParser:
                          help="fit each group of rows (wild type and mutant, treated and untreated) "
                               "separately, then test which constants differ between groups")
     errors = p.add_argument_group("uncertainty (exactly one source; none is ever invented)")
-    errors.add_argument("--sigma-from", choices=("replicates", "residuals"),
+    errors.add_argument("--sigma-from", choices=("replicates", "residuals"), action=_Once,
                         help="replicates: pool the spread of rows with identical conditions, its "
                              "degrees of freedom stated; residuals: ordinary least squares with "
                              "sigma from the fit's own scatter, which assumes the law is right "
                              "(what R's nls reports). Without this, a sigma column is required")
-    errors.add_argument("--error-model", choices=("constant", "proportional"),
+    errors.add_argument("--error-model", choices=("constant", "proportional"), action=_Once,
                         help="with --sigma-from replicates: pool the standard deviation "
                              "(constant, the default) or the coefficient of variation "
                              "(proportional, for noise that grows with the rate)")
