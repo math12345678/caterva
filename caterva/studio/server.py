@@ -44,6 +44,7 @@ import http.server
 import logging
 import socket
 import socketserver
+import sys
 import threading
 from email.utils import formatdate
 from typing import Any, List, Optional, Tuple
@@ -55,6 +56,10 @@ log = logging.getLogger("caterva.studio.server")
 #: How long a connection may sit without sending a request line, in seconds.
 #: An event stream is written to at least every jobs.KEEPALIVE_S, well inside it.
 IDLE_TIMEOUT_S = 60.0
+
+
+#: What a socket raises when the other end has gone: never a fault of the server's.
+PEER_GONE = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, socket.timeout)
 
 
 def bind_address(host: str) -> Tuple[socket.AddressFamily, str]:
@@ -94,7 +99,15 @@ class StudioHTTPServer(http.server.ThreadingHTTPServer):
         return int(self.server_address[1])
 
     def handle_error(self, request: Any, client_address: Any) -> None:
-        log.exception("a connection from %s ended with an error", client_address[0] if client_address else "?")
+        # A page that navigates away, or a browser dropping a kept-alive
+        # connection, resets the socket while the handler waits for the next
+        # request line. That is the peer leaving, not a fault here; a
+        # traceback for it at ERROR buries the faults in studio.log.
+        peer = client_address[0] if client_address else "?"
+        if isinstance(sys.exc_info()[1], PEER_GONE):
+            log.debug("a connection from %s closed from its end", peer)
+            return
+        log.exception("a connection from %s ended with an error", peer)
 
 
 class StudioRequestHandler(http.server.BaseHTTPRequestHandler):
@@ -199,7 +212,7 @@ class StudioRequestHandler(http.server.BaseHTTPRequestHandler):
             for frame in frames:
                 self.wfile.write(frame)
                 self.wfile.flush()
-        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, socket.timeout):
+        except PEER_GONE:
             log.debug("an event stream's page went away")
         finally:
             close = getattr(frames, "close", None)

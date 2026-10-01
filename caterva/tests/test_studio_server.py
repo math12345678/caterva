@@ -32,7 +32,7 @@ from caterva.studio.contract import (
 )
 from caterva.studio.dispatch import App, Request
 from caterva.studio.routes import ROUTES
-from caterva.studio.server import StudioRequestHandler, bind_address
+from caterva.studio.server import StudioHTTPServer, StudioRequestHandler, bind_address
 from caterva.studio.static_files import IMMUTABLE, StaticSite
 from caterva.studio.workspace import Workspace
 
@@ -544,3 +544,26 @@ def test_the_self_test_reports_a_server_that_could_not_start(tmp_path, monkeypat
     out = capsys.readouterr().out
     assert out.startswith("FAIL start: ") and "refused to let the studio listen" in out
     assert len(out.strip().splitlines()) == 1
+
+
+def test_a_peer_that_leaves_is_logged_quietly_and_a_fault_is_not(caplog):
+    # handle_error is called by socketserver inside the except block that
+    # caught the exception; the server itself is not needed to decide.
+    caplog.set_level("DEBUG", logger="caterva.studio")
+    try:
+        raise ConnectionResetError(54, "Connection reset by peer")
+    except ConnectionResetError:
+        StudioHTTPServer.handle_error(None, None, ("127.0.0.1", 50000))
+    left = [r for r in caplog.records if "127.0.0.1" in r.getMessage()]
+    assert [(r.levelname, r.exc_info) for r in left] == [("DEBUG", None)]
+    assert "closed from its end" in left[0].getMessage()
+
+    caplog.clear()
+    try:
+        raise ValueError("a fault in the handler")
+    except ValueError:
+        StudioHTTPServer.handle_error(None, None, ("127.0.0.1", 50001))
+    fault = [r for r in caplog.records if "127.0.0.1" in r.getMessage()]
+    assert [r.levelname for r in fault] == ["ERROR"]
+    assert fault[0].exc_info is not None and fault[0].exc_info[0] is ValueError
+
