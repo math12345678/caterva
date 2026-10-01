@@ -68,12 +68,19 @@
 
 .st-result {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.75rem;
   min-width: 0;
 }
 .st-result .run-finished {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.75rem;
+  min-width: 0;
+}
+.st-result .section,
+.st-result .chart {
+  min-width: 0;
 }
 
 /* A result's opening line: what was asked, what came back. */
@@ -108,7 +115,7 @@
 /* The entry: viewer beside the residue it is about. */
 .st-entry {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem);
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 19rem);
   gap: 1.25rem;
   align-items: start;
 }

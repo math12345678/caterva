@@ -317,7 +317,7 @@ function valueOfRow(result: MdSetupResult, row: MdParameterRow): SourcedValue | 
 function Origin({ row, value }: { row: MdParameterRow; value: SourcedValue | null }) {
   if (value) {
     return (
-      <span className="st-inline">
+      <span className="st-inline" style={{ flexWrap: "nowrap", whiteSpace: "nowrap" }}>
         <ProvenanceMark provenance={value.provenance} decorative />
         {provenanceLabel(value.provenance)}
       </span>
@@ -326,7 +326,7 @@ function Origin({ row, value }: { row: MdParameterRow; value: SourcedValue | nul
   if (row.origin === "chosen") {
     const p = { kind: "chosen" as const, by: row.by ?? "default" };
     return (
-      <span className="st-inline">
+      <span className="st-inline" style={{ flexWrap: "nowrap", whiteSpace: "nowrap" }}>
         <ProvenanceMark provenance={p} decorative />
         {provenanceLabel(p)}
       </span>
@@ -347,7 +347,11 @@ export function SetupResultView({ result, onSummarise }: { result: MdSetupResult
   const out = result.out_dir;
   const counts = useMemo(() => {
     const c = { measured: 0, chosen: 0, method: 0 };
-    for (const p of result.parameters) if (p.origin in c) c[p.origin as keyof typeof c] += 1;
+    for (const p of result.parameters) {
+      // As the origin column shows it: a value the result carries says whose it is.
+      const kind = valueOfRow(result, p)?.provenance.kind ?? p.origin;
+      if (kind in c) c[kind as keyof typeof c] += 1;
+    }
     return c;
   }, [result]);
   return (
@@ -453,6 +457,7 @@ export function SetupResultView({ result, onSummarise }: { result: MdSetupResult
             {
               key: "origin",
               header: "origin",
+              width: "10.5rem",
               sortValue: (p) => p.origin,
               cell: (p) => <Origin row={p} value={valueOfRow(result, p)} />,
             },
