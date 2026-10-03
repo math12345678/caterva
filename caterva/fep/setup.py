@@ -222,8 +222,8 @@ class FepSetup:
             if inc.startswith(ff) or not p.is_file() or p.resolve() == self.ligand_itp.resolve():
                 continue
             if re.search(r"\[\s*atomtypes\s*\]", p.read_text()) and "moleculetype" not in p.read_text():
-                keep.append(f'#include "{p.name}"')
-        keep += [f'#include "{self.ligand_itp.name}"', f'#include "{ff}/{self.water}.itp"', f'#include "{ff}/ions.itp"']
+                keep.append(f'#include "{_file_name(p.name)}"')
+        keep += [f'#include "{_file_name(self.ligand_itp.name)}"', f'#include "{ff}/{self.water}.itp"', f'#include "{ff}/ions.itp"']
         return ("; Caterva FEP solvent leg: the ligand alone in water. See PROVENANCE.md\n"
                 + "\n".join(keep) + f"\n\n[ system ]\n{self.moleculetype} in water\n\n[ molecules ]\n{self.moleculetype} 1\n")
 
@@ -305,7 +305,7 @@ class FepSetup:
     def _script(self) -> str:
         nc, ns = len(schedule("complex")), len(schedule("solvent"))
         return f"""#!/usr/bin/env bash
-# Caterva absolute binding free energy: {self.target.compound} -> {self.target.organism}.
+# Caterva absolute binding free energy: {_one_line(self.target.compound)} -> {_one_line(self.target.organism)}.
 # Read PROVENANCE.md first. Needs GROMACS (gmx). Stops at the first error.
 # Every window of every replica is independent: to spread them over a
 # cluster, run one `leg rep lambda` triple per job with ONLY=leg:rep:lambda.
@@ -410,6 +410,19 @@ the band at 2σ.
   pocket that opens on microseconds, needs more than {self.ns:g} ns a window.
 """
 
+
+def _one_line(text: object) -> str:
+    """`text` for a comment line of a script or a file: control characters
+    (a newline would end the comment and start a command) become spaces."""
+    return "".join(" " if (not c.isprintable() or c in "\r\n\t") else c for c in str(text))
+
+
+def _file_name(name: str) -> str:
+    """A file name that goes into a `#include "..."` line: no quote, newline
+    or other control character, or the include could be closed early."""
+    if any(not c.isprintable() or c == '"' for c in name):
+        raise ValueError(f"{name!r} cannot be named in a topology include: it holds a quote or a control character")
+    return name
 
 def _short(a) -> str:
     return f"{a.resname}{a.resnr}:{a.name}"

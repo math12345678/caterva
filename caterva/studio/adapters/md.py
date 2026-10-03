@@ -298,7 +298,7 @@ def _parameter(setup: Any, name: str) -> Any:
 
 
 def setup_run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
-    from caterva.md.__main__ import build_parser, plan, write, written_lines
+    from caterva.md.__main__ import UnsafeOutput, build_parser, plan, write, written_lines
 
     argv = setup_argv(request, run_dir=ctx.run_dir, data_dir=ctx.data_dir)
     args = cli_parser(build_parser, PROG).parse_args(argv)
@@ -310,7 +310,10 @@ def setup_run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
     ctx.progress.check_cancelled()
     out = Path(args.out)
     ctx.progress.stage("write", f"Writing the GROMACS setup into {out}")
-    names = write(planned.setup, out)
+    try:
+        names = write(planned.setup, out)
+    except UnsafeOutput as exc:
+        raise contract.Malformed(str(exc), field="out") from None
     for line in written_lines(planned, out, PROG):
         print(line, file=printed)
     setup, c = planned.setup, planned.setup.conditions
