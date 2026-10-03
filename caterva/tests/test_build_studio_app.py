@@ -102,9 +102,20 @@ def test_a_development_app_refuses_a_folder_that_is_not_a_checkout(tmp_path):
 def test_the_texts_claim_no_signature_and_say_how_to_open_it(relative):
     text = (REPO / relative).read_text(encoding="utf-8")
     assert studio_app.unsigned_wording_problems(text, relative) == []
-    assert "Control-click" in text
+    # The route Apple's own page lists comes first; the Terminal command that
+    # clears the download mark is given in full.
     assert "Open Anyway" in text
+    assert "xattr -dr com.apple.quarantine /Applications/Caterva.app" in text
+    assert text.index("Open Anyway") < text.index("xattr -dr")
     assert "://caterva.app" not in text.lower()
+
+
+def test_the_readme_does_not_offer_control_click_as_a_way_in():
+    text = (REPO / "macos/dmg/README.txt").read_text(encoding="utf-8")
+    for line in text.splitlines():
+        if re.match(r"\s*\d\.\s", line):
+            assert "Control-click" not in line
+    assert "(Control-click" not in (REPO / "macos/Resources/first-run.txt").read_text(encoding="utf-8")
 
 
 def test_the_wording_check_catches_a_claim():
@@ -131,11 +142,17 @@ def _frozen(tmp_path: Path, page: str | None) -> Path:
     exe.chmod(exe.stat().st_mode | stat.S_IXUSR)
     for name in ("LICENSE", "NOTICE", "licenses/README.txt"):
         (folder / name).write_text("terms\n", encoding="utf-8")
+    literature = folder / "_internal" / "caterva" / "_literature"
+    literature.mkdir(parents=True)
+    for name in ("fallback_logic.py", "brenda_client.py", "http_retry.py", "enzyme_lookup.py", "cite.py", "report_lab.py"):
+        (literature / name).write_text("# a literature module\n", encoding="utf-8")
     if page is not None:
         static = folder / "_internal" / "caterva" / "studio" / "static"
         (static / "assets").mkdir(parents=True)
         (static / "index.html").write_text(page, encoding="utf-8")
         (static / "assets" / "index-abc123.js").write_text("export {}\n", encoding="utf-8")
+        (static / "licenses").mkdir()
+        (static / "licenses" / "THIRD-PARTY-NOTICES.txt").write_text("notices\n", encoding="utf-8")
     return folder
 
 
@@ -164,6 +181,27 @@ def test_a_frozen_folder_without_its_licences_is_refused(tmp_path):
     os.remove(folder / "NOTICE")
     problems = studio_app.frozen_problems(folder, require_page=False)
     assert len(problems) == 1 and "NOTICE is missing" in problems[0]
+
+
+def test_a_frozen_folder_without_the_literature_layer_is_refused(tmp_path):
+    folder = _frozen(tmp_path, None)
+    os.remove(folder / "_internal" / "caterva" / "_literature" / "fallback_logic.py")
+    problems = studio_app.frozen_problems(folder, require_page=False)
+    assert len(problems) == 1 and "fallback_logic.py is missing" in problems[0]
+    assert "fallback_logic.py" in build_app.literature_problem(folder)
+
+
+def test_a_frozen_folder_with_the_literature_layer_passes_build_apps_check(tmp_path):
+    assert build_app.literature_problem(_frozen(tmp_path, None)) is None
+
+
+def test_a_page_without_third_party_notices_is_refused(tmp_path):
+    page = f'<meta name="{contract.SESSION_META_NAME}" content="{contract.TOKEN_PLACEHOLDER}">'
+    folder = _frozen(tmp_path, page)
+    os.remove(folder / "_internal" / "caterva" / "studio" / "static" / "licenses" / "THIRD-PARTY-NOTICES.txt")
+    problems = studio_app.frozen_problems(folder)
+    assert len(problems) == 1 and "THIRD-PARTY-NOTICES.txt is missing" in problems[0]
+    assert "THIRD-PARTY-NOTICES.txt is missing" in build_app.studio_page_problem(folder)
 
 
 # --- reading the self-tests -------------------------------------------------
@@ -254,8 +292,91 @@ def test_every_resource_the_shell_loads_is_copied_into_the_bundle():
         assert (REPO / "macos" / "Resources" / name).is_file()
 
 
-def test_the_swift_compile_targets_the_minimum_macos_the_plist_declares():
+def test_every_statement_of_the_minimum_macos_says_14():
+    """NumPy 2.2.6 and SciPy 1.15.3 are macosx_14_0 wheels, libRoadRunner 2.8.0
+    macosx_14_0_universal2: the app cannot run on 13, whatever the plist said."""
     data = plistlib.loads(studio_app.render_info_plist(TEMPLATE, "1.2.3", "1"))
+    assert studio_app.MIN_MACOS == data["LSMinimumSystemVersion"] == "14.0"
+    assert "majorVersion: 14, minorVersion: 0" in SWIFT["Requirement.swift"]
+    assert "macOS 14" in (REPO / "macos" / "dmg" / "README.txt").read_text(encoding="utf-8")
+    for name in ("README.md", "docs/studio/README.md", "docs/USING_CATERVA.md"):
+        assert "macOS 12" not in (REPO / name).read_text(encoding="utf-8"), name
+
+
+def test_the_shell_is_compiled_for_a_target_that_can_show_the_message():
+    """Lower than the minimum on purpose: a shell that cannot start on macOS 13
+    cannot say why. Requirement.swift checks ProcessInfo against the minimum."""
     command = studio_app.swiftc_command([Path("a.swift")], Path("out"), "arm64", Path("cache"))
-    assert f"arm64-apple-macos{data['LSMinimumSystemVersion']}" in command
     assert command[:2] == ["xcrun", "swiftc"]
+    assert f"arm64-apple-macos{studio_app.SHELL_TARGET_MACOS}" in command
+    assert float(studio_app.SHELL_TARGET_MACOS) <= float(studio_app.MIN_MACOS)
+
+
+def test_the_shell_checks_the_os_before_it_starts_anything():
+    main = SWIFT["main.swift"]
+    assert "MacOSRequirement.problem()" in main
+    assert main.index("MacOSRequirement.problem()") < main.index("Smoke.run(") < main.index("application.run()")
+    assert "isOperatingSystemAtLeast(minimum)" in SWIFT["Requirement.swift"]
+
+
+def test_the_smoke_run_uses_a_temporary_data_folder_of_its_own():
+    smoke = SWIFT["Smoke.swift"]
+    assert 'caterva-smoke-\\(UUID().uuidString)' in smoke
+    assert "dataDirectory: resolved.dataDirectory ?? scratch.path" in smoke
+    assert "removeItem(at: scratch)" in smoke
+
+
+def test_help_licences_opens_the_pages_licences_too():
+    assert "caterva/_internal/caterva/studio/static/licenses" in SWIFT["AppDelegate.swift"]
+    assert "caterva/licenses" in SWIFT["AppDelegate.swift"]
+
+
+# --- the disk image is retried, and a failure names its step ---------------
+
+def test_hdiutil_create_is_tried_three_times_with_a_pause(monkeypatch):
+    calls, sleeps = [], []
+
+    def fake_run(command, **kwargs):
+        calls.append(list(command))
+        if len(calls) < 3:
+            raise studio_app.subprocess.CalledProcessError(1, command)
+        return studio_app.subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(studio_app, "_run", lambda command, **kw: fake_run(command))
+    monkeypatch.setattr(studio_app.time, "sleep", sleeps.append)
+    studio_app._retry(["hdiutil", "create"], attempts=studio_app.DMG_ATTEMPTS, pause=7)
+    assert len(calls) == 3 and sleeps == [7, 7] and studio_app.DMG_ATTEMPTS == 3
+
+
+def test_hdiutil_create_gives_up_after_the_last_attempt(monkeypatch):
+    sleeps = []
+
+    def always_fail(command, **kwargs):
+        raise studio_app.subprocess.CalledProcessError(1, command)
+
+    monkeypatch.setattr(studio_app, "_run", always_fail)
+    monkeypatch.setattr(studio_app.time, "sleep", sleeps.append)
+    with pytest.raises(studio_app.subprocess.CalledProcessError):
+        studio_app._retry(["hdiutil", "create"], attempts=3, pause=1)
+    assert len(sleeps) == 2
+
+
+def test_a_failing_step_is_named_in_the_log(capsys):
+    with pytest.raises(SystemExit):
+        with studio_app.step("make the disk image (hdiutil create)"):
+            raise studio_app.subprocess.CalledProcessError(1, ["hdiutil", "create"])
+    out = capsys.readouterr().out
+    assert "build failed at the step: make the disk image (hdiutil create)" in out and "hdiutil" in out
+    with pytest.raises(SystemExit):
+        with studio_app.step("compile the Swift shell (swiftc)"):
+            studio_app._fail("no Swift sources")
+    assert "build failed at the step: compile the Swift shell (swiftc)" in capsys.readouterr().out
+
+
+def test_the_dmg_workflow_names_the_step_that_failed():
+    workflow = (REPO / ".github" / "workflows" / "studio-dmg.yml").read_text(encoding="utf-8")
+    assert "if: failure()" in workflow and "failed at the step" in workflow
+    ids = re.findall(r"^\s+id: (\w+)$", workflow, re.M)
+    assert len(ids) >= 8
+    for step_id in ids:
+        assert f"steps.{step_id}.outcome" in workflow, step_id

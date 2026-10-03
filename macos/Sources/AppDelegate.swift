@@ -148,8 +148,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             "Enzyme kinetics and molecular dynamics where every number says whether it was cited, measured, fitted or computed.\n\n"
             + "Caterva is free software under the Apache License 2.0. This app carries the Python runtime and the libraries "
             + "Caterva uses, each under its own licence; libSBML is under the GNU LGPL 2.1. Their texts are in the app "
-            + "(Help, Licences). The page's typefaces, Spectral, Atkinson Hyperlegible Next and DM Mono, are under the "
-            + "SIL Open Font License 1.1.\n\n"
+            + "(Help, Licences), with those of the page's JavaScript packages and its typefaces, Spectral, "
+            + "Atkinson Hyperlegible Next and DM Mono (SIL Open Font License 1.1). Enzyme names come from the "
+            + "ExPASy ENZYME database (SIB Swiss Institute of Bioinformatics, CC BY 4.0); constants come from BRENDA "
+            + "(CC BY 4.0) when you search the literature.\n\n"
             + "Not signed with an Apple Developer ID and not notarised.\n\n"
             + "Unaffiliated with Tellurium.", attributes: body))
         NSApp.orderFrontStandardAboutPanel(options: [
@@ -192,12 +194,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @objc func showLicences(_ sender: Any?) {
-        // The frozen folder's licences/ (scripts/build_app.py writes it) and
-        // the app's own LICENSE and NOTICE beside it.
+        // The frozen folder's licences/ (scripts/build_app.py writes it), the
+        // app's own LICENSE and NOTICE beside it, and the page's own
+        // licences/ (THIRD-PARTY-NOTICES.txt for the page's JavaScript
+        // packages, and the three typefaces' OFL texts), which the page build
+        // writes and the wheel carries.
         guard let resources = Bundle.main.resourceURL else { return }
         let folder = resources.appendingPathComponent("caterva/licenses", isDirectory: true)
+        let pageFolder = resources.appendingPathComponent("caterva/_internal/caterva/studio/static/licenses", isDirectory: true)
         let notice = resources.appendingPathComponent("caterva/NOTICE")
-        let present = [folder, notice].filter { FileManager.default.fileExists(atPath: $0.path) }
+        let present = [folder, pageFolder, notice].filter { FileManager.default.fileExists(atPath: $0.path) }
         if present.isEmpty {
             explain("The licence files are not in this copy",
                     "A development build runs the server from a checkout; the licences are in the repository "

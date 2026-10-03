@@ -109,7 +109,7 @@ final class ErrorView: NSView {
         }
 
         if let command = problem.quarantineCommand {
-            views.append(paragraph("macOS still marks this copy of Caterva as downloaded from the internet, and that can stop the server's libraries from loading. If you trust this copy, clear the mark in Terminal, then press Restart:"))
+            views.append(paragraph("macOS still marks this copy of Caterva as downloaded from the internet, and that can stop the server's libraries from loading: Open Anyway in Privacy & Security approves the app's main file but not the libraries inside it. If you trust this copy, clear the mark in Terminal, then press Restart:"))
             views.append(selectableMono(command))
         }
 

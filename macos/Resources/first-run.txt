@@ -1,6 +1,6 @@
 Before you start
 
-This copy of Caterva is not signed with an Apple Developer ID and has not been notarised by Apple, because the project does not hold a Developer ID. That is why macOS asked before opening it. You did that once; it will not ask again for this copy. A new version you download will need the same step: Control-click Caterva in Applications and choose Open, or open it once and then use System Settings, Privacy & Security, Open Anyway.
+This copy of Caterva is not signed with an Apple Developer ID and has not been notarised by Apple, because the project does not hold a Developer ID. That is why macOS asked before opening it. You did that once; it will not ask again for this copy. A new version you download will need the same step: try to open it, then use System Settings, Privacy & Security, Open Anyway. If macOS keeps refusing, or the window says the server could not start, run this in Terminal: xattr -dr com.apple.quarantine /Applications/Caterva.app
 
 Caterva runs its engine as a small server on this Mac, reachable only from this Mac (127.0.0.1), with a key that changes at every launch. It stops when you quit. Your runs and settings are kept in ~/Library/Application Support/Caterva (File, Show Data Folder in Finder).
 
