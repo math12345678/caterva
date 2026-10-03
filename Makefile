@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: enzyme-index cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow test-ts test-studio guards pr demo publish-check evidence cli clean release-artifacts release-app
+.PHONY: enzyme-index cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow test-ts test-studio studio-page studio guards pr demo publish-check evidence cli clean release-artifacts release-app
 
 help:
 	@echo "Caterva"
@@ -35,6 +35,9 @@ help:
 	@echo "                  type-check and jest suite; needs Node (runs npm ci once)"
 	@echo "  make test-studio  Caterva Studio: the page's type-check, tests and build,"
 	@echo "                  then the studio server tests against it; needs Node and pnpm"
+	@echo "  make studio-page  build Caterva Studio's page into caterva/studio/static/"
+	@echo "                  (the wheel and the plain app folder have no page; this makes one)"
+	@echo "  make studio     build the page, then run 'caterva studio' from this checkout"
 	@echo "  make guards     the guards CI runs (no test suites)"
 	@echo "  make counts-fix update README counts after adding a test/guard/ADR"
 	@echo "  make pr         everything CI runs -- do this before opening a PR"
@@ -265,6 +268,22 @@ test-studio: check-python
 	"$(PY)" -m pytest -p no:cacheprovider -o addopts="" caterva/tests/test_studio_*.py -q
 	"$(PY)" -m caterva.app studio --self-test
 
+# The studio's page, built from this checkout (needs Node 22+ and pnpm):
+# `caterva studio` serves what is in caterva/studio/static/ and, with nothing
+# there, a page saying how to build it. The build also writes the page's
+# licences/THIRD-PARTY-NOTICES.txt.
+studio-page:
+	@if ! command -v pnpm >/dev/null 2>&1; then \
+		echo "No pnpm on PATH. With Node 22 or later: corepack enable, then run this again."; \
+		exit 2; \
+	fi
+	cd Science-Agent-Pipeline && pnpm install --frozen-lockfile --filter @workspace/caterva-studio...
+	cd Science-Agent-Pipeline/artifacts/caterva-studio && pnpm run build
+
+# Build the page, then start the studio and open it in the browser.
+studio: check-python studio-page
+	"$(PY)" -m caterva.app studio
+
 # The guards CI runs, in CI's order, minus the test suites -- plus the
 # two that keep this target and the docs honest, which run under pytest
 # rather than in the workflow.
@@ -354,6 +373,9 @@ guards: require-pytest
 	@"$(PY)" scripts/check_non_affiliation_notice.py
 	@echo ">> dependency licences"
 	@"$(PY)" scripts/check_dependency_licenses.py
+	@echo ">> no machine-specific paths"
+	@"$(PY)" scripts/check_no_machine_paths.py --selftest
+	@"$(PY)" scripts/check_no_machine_paths.py
 	@echo ">> citations name the right enzyme"
 	@"$(PY)" scripts/check_citations_match_their_enzyme.py --selftest
 	@"$(PY)" scripts/check_citations_match_their_enzyme.py
@@ -449,9 +471,8 @@ cli: check-python
 	@"$(PY)" -m caterva.cli --help
 	@echo ""
 	@echo "Examples:"
-	@echo "  python -m caterva.cli wf --population-size 100 --generations 200 --seed 42"
-	@echo "  python -m caterva.cli wf --scenario bottleneck --out results.csv"
-	@echo "  python -m caterva.cli kimura --p0 0.3 --s 0.03 --population-size 50"
+	@echo "  python -m caterva.cli ssa --a0 1000 --k 0.5 --end 10 --seed 42"
+	@echo "  python -m caterva.cli ssa --bimolecular --out results.csv"
 
 clean:
 	find . -type d -name __pycache__ -not -path "./.venv/*" -exec rm -rf {} + 2>/dev/null || true

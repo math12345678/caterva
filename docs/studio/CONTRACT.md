@@ -213,7 +213,7 @@ Every error response has body `ErrorBody` `{"error": {"code", "message",
 | 409 | `conflict` | result of a run not finished; cancelling a finished run; deleting a running run | none |
 | 413 | `too_large` | body over 1 MiB | none |
 | 415 | `unsupported_media_type` | POST/PUT without `application/json` | none |
-| 503 | `unavailable` | the kind or adapter endpoint cannot run in this installation (`contract.Unavailable`: literature layer absent, module not built, `rates` not integrated), with the reason in `message` | the CLI's refusal to start ("needs the source checkout") |
+| 503 | `unavailable` | the kind or adapter endpoint cannot run in this installation (`contract.Unavailable`: literature layer absent, module not built, `rates` not integrated), with the reason in `message` | the CLI's refusal to start |
 | 500 | `crash` | a handler raised something undeclared; the message names the exception type; the traceback goes to stderr and `studio.log`, not to the page | exit 1 |
 
 Three outcomes of a science question are kept apart all the way to the
@@ -749,8 +749,9 @@ Command Line Tools (no Xcode project).
   with the exit status, the last stderr lines and a Restart button.
 - Quit: close stdin, SIGTERM, wait 5 s, SIGKILL.
 - Unsigned: no Apple Developer ID. The DMG's README and the app's first-run
-  sheet say how to open an unsigned app (Control-click, Open; or System
-  Settings, Privacy & Security, Open Anyway). Never claim notarisation.
+  sheet say how to open an unsigned app (System Settings, Privacy &
+  Security, Open Anyway; then the `xattr -dr com.apple.quarantine` command).
+  Never claim notarisation.
 - Packaging: the page is built (`pnpm ... run build`), the wheel is built
   with `caterva/studio/static/**` inside (pyproject package-data), frozen by
   `scripts/build_app.py`, wrapped as `Caterva.app`, and put in a DMG with
@@ -952,18 +953,16 @@ Not edited by any builder: `CHANGELOG.md`, `README.md`, `docs/readmes/*`,
 
 ## 19. How to install in a new worktree
 
-Proven on 2026-09-30 in `/tmp/claude-501/wt-contract` from a state with no
-`node_modules` anywhere in the workspace. pnpm 11.20.0 puts its content store
-beside the project (`/private/tmp/claude-501/.pnpm-store/v11` for worktrees
-under `/tmp/claude-501`), and every package the studio needs is in it now,
-so `--offline` works from any worktree there.
+Proven on 2026-09-30 in a fresh git worktree with no `node_modules`
+anywhere in the workspace. pnpm 11.20.0 keeps a content store beside the
+project, and once every package the studio needs is in it, `--offline` works
+from any worktree that shares the store.
 
-Any node 24 and pnpm 11.20.0 will do; the two lines below are where they
-are on the machine these worktrees were made on.
+Any node 22 or later and pnpm 11 will do (`corepack enable` provides pnpm
+from the repository's `packageManager` field).
 
 ```sh
-export PATH=/Users/smyan/.openclawdesk/node/bin:$PATH      # node 24
-PNPM=/Users/smyan/.nvm/versions/node/v24.17.0/bin/pnpm       # pnpm 11.20.0
+PNPM=pnpm
 cd <worktree>/Science-Agent-Pipeline
 
 # the studio package and its dependencies only (about 15 s):
@@ -994,8 +993,8 @@ $PNPM run build          # writes <worktree>/caterva/studio/static/
   modules directory due to no TTY"), rerun with `CI=true` or remove that
   worktree's `node_modules` first.
 - `vite build` empties and rewrites `caterva/studio/static/` (ignored by
-  git). The Python side needs nothing installed beyond the venv:
-  `/Users/smyan/Desktop/Coding/Terrium/.claude/worktrees/optimistic-taussig-6914c2/.venv/bin/python -m caterva.app studio --help`.
+  git). The Python side needs nothing installed beyond the project's
+  virtual environment: `python -m caterva.app studio --help`.
 
 ## 20. Verification and guards
 
@@ -1003,7 +1002,7 @@ Every builder, before finishing, from the worktree root with the venv
 python:
 
 ```sh
-PY=/Users/smyan/Desktop/Coding/Terrium/.claude/worktrees/optimistic-taussig-6914c2/.venv/bin/python
+PY=python   # the project's virtual environment's interpreter
 $PY -m pytest -p no:cacheprovider -o addopts="" caterva/tests/test_studio_contract.py caterva/tests/test_studio_*.py -q
 $PY -m caterva.app --help | grep studio
 ```
