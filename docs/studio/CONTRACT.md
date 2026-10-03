@@ -254,6 +254,19 @@ page, because the CLI keeps them apart in its exit code:
   measured conditions were asked for and not found), or none (compose's
   UnrecognisedShape): then `GET /api/runs/{id}/result` is 404 and the page
   shows the reason.
+- **an upstream outage** (`outcome.meaning = "network"`): a run whose
+  refusal text is a database not answering (a timeout, a connection that
+  was never made, an HTTP error status from UniProt, the RCSB, BRENDA or
+  NCBI). It exits 3 like a refusal, but an outage is not Caterva declining
+  the question, so `contract.outcome_for` classifies it from the exception
+  signature in the text (`contract.network_failure`) and carries the host
+  and status in `outcome.network` (`NetworkFailure` `{host, status,
+  timed_out}`). `outcome.reason` stays the raw text; the page shows a
+  plain sentence ("UniProt did not answer") with a retry and keeps the raw
+  text in a disclosure. A refusal that only mentions the network (offline
+  mode) stays `refused`. `outcome.has_result` is `false` when the run
+  finished without a result, so the page never requests a `/result` that
+  would be 404.
 - **a crash** (exit 1): status `failed`, `RunRecord.error` `{type, message,
   traceback}`. The traceback is kept for the report-a-bug path; the page
   shows type and message.
@@ -871,10 +884,14 @@ colour second so it survives greyscale:
 | kind | mark |
 |---|---|
 | measured | solid signal dot (the mark's own signal dot); the number is a button: one click opens the citation (text, registry, reference, commentary, conditions, scope, spread, link) |
-| fitted | ring |
+| fitted | heavy solid ring |
 | computed | small square; hover/focus shows method and inputs |
-| placeholder | hollow dashed dot in the caution colour; hover/focus shows the reason |
-| chosen | short bar; caution when a default chose it, ink when the user did |
+| placeholder | lighter ring in four coarse dashes, in the caution colour; hover/focus shows the reason |
+| chosen | filled diamond (ink) when the user chose it; outlined diamond with a tick, in the caution colour, when a stated default did |
+
+Marks are drawn at 12 px at the least (`MARK_SIZE`), the smallest size at
+which a dashed ring and a solid ring, and a filled and an outlined diamond,
+still differ.
 
 A number is formatted for display only by `src/lib/format.ts`, from the
 value the API sent; the full-precision value is one hover away and is what
@@ -908,6 +925,39 @@ tailwindcss + @tailwindcss/vite, typescript, vitest, jsdom,
 A builder who truly needs another package says so in their report, with
 the reason; nobody but the integrator edits `package.json` dependencies or
 `pnpm-lock.yaml`.
+
+### 17.6 Copy, problems and forms
+
+The engine writes for a terminal; the page does not repeat it. `src/lib/copy.ts`
+is the one place its phrasings are rewritten for the window: a flag is named
+by the field that sets it ("Set Inhibitor"), a script name or a command in
+parentheses is dropped, `--` and the long dash are not punctuation here,
+`row(s)` is `rows`, a request URL is its host's name ("UniProt"), and a
+Python exception that is a database not answering is the sentence "UniProt
+did not answer. Check the network, then try again." with the raw text in a
+disclosure. A rewrite only rephrases; each is tested with the engine's own
+string as input (`src/__tests__/copy.test.ts`). Code, file names and the
+terminal command stay as written.
+
+A refusal, a failure, a negative finding and an outage are one component
+(`States.tsx`): kicker, heading, reason, what to change, the engine's text in
+a disclosure, actions. Exception text is never an accessible name or a toast.
+
+A form frame (`RunForm`, the structure `RunScreen`) pins its action bar to
+the bottom of the pane, names an empty required field inline before any
+request (`aria-required`, `aria-invalid`), and points a disabled primary
+button at the sentence that says why. The only live region while a run works
+is its one-line stage sentence; the counter beside it is not announced. When
+a run finishes, one status sentence is announced and focus moves to the
+result's heading. A run whose `outcome.has_result` is false is not asked for
+its result. Health and the live-run list are polled only while the tab is
+visible, a quarter as often when idle, and less after failures
+(`src/lib/polling.ts`).
+
+Chart series are told apart by luminance (each 3:1 against the surface,
+neighbours 3:1 against each other, asserted over `index.css` in
+`seriesContrast.test.ts`), a dash pattern, a marker where a series has few
+points, and a direct label at the end of its line.
 
 ## 18. Ownership map
 

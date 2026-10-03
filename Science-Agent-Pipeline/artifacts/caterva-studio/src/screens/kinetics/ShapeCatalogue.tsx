@@ -68,7 +68,7 @@ export function ShapeCatalogue({
           onClick={() => setOpen((o) => !o)}
         >
           <ChevronDown size={13} aria-hidden="true" data-open={open ? "true" : undefined} />
-          {open ? "Hide the shapes" : `Browse the ${parsed.length} shapes it recognises`}
+          {open ? "Hide the shapes" : <>Browse the <span className="font-mono">{parsed.length}</span> shapes it recognises</>}
         </button>
         {open ? (
           <input

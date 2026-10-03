@@ -124,7 +124,11 @@ export function useRun<K extends RunKind>(kind: K, existingRunId?: string | null
     try {
       const finished = await getRun(id);
       let result: RunResults[K] | null = null;
-      if (finished.status === "done") {
+      // A run whose outcome says it has no result is not asked for one: the
+      // request would be a 404, drawn as an error in the console. Records
+      // written before the server said so are still asked, and a 404 there
+      // is "no result".
+      if (finished.status === "done" && finished.outcome?.has_result !== false) {
         try {
           result = await getResult<K>(id);
         } catch (e) {

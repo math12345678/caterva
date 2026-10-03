@@ -114,6 +114,8 @@ export default function BindScreen() {
     void run.submit(bindRequest(next));
   };
 
+  const fillInhibitor = (compound: string) => setForm((f) => ({ ...f, mode: "inhibitor", inhibitor: compound }));
+
   const action =
     form.mode === "inhibitor" ? (form.computed.trim() ? "Judge" : "Build the target") : form.mode === "list" ? "List compounds" : "Survey";
 
@@ -204,6 +206,8 @@ export default function BindScreen() {
             path="/bind"
             exports={() => [{ label: "JSON", artifact: "result.json", description: "the result exactly as the studio API sent it" }]}
             onRetry={() => void run.submit(bindRequest(form))}
+            onChooseCompound={fillInhibitor}
+            retryVerb="search again"
             idle={
               <EmptyState title="Name an enzyme and an inhibitor">
                 <p>

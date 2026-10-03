@@ -12,7 +12,7 @@ import { DataTable } from "@/components/table/DataTable";
 import { formatNumber } from "@/lib/format";
 
 import { ChartFrame } from "./ChartFrame";
-import { AXIS, GRID, seriesColor, seriesDash, tick } from "./theme";
+import { AXIS, GRID, niceTicks, seriesColor, seriesDash, SeriesMarker, SPARSE_POINTS, spreadLabels, tick, timeAxisTitle } from "./theme";
 
 type Row = { t: number | null } & Record<string, number | null>;
 
@@ -78,18 +78,47 @@ export function TimeCourseChart({
 }) {
   const names = useMemo(() => Object.keys(series), [series]);
   const rows = useMemo(() => timeCourseRows(times, series), [times, series]);
+  const sparse = rows.length <= SPARSE_POINTS;
+  const geometry = useMemo(() => {
+    const finite = (v: number | null | undefined): v is number => typeof v === "number" && Number.isFinite(v);
+    const ts = times.filter(finite);
+    const all = names.flatMap((n) => series[n].filter(finite));
+    const x = niceTicks(ts.length ? Math.min(...ts) : 0, ts.length ? Math.max(...ts) : 1, 6, false);
+    const y = niceTicks(all.length ? Math.min(...all) : 0, all.length ? Math.max(...all) : 1, 5, true);
+    const lastIndex = names.map((n) => {
+      for (let i = series[n].length - 1; i >= 0; i--) if (finite(series[n][i])) return i;
+      return -1;
+    });
+    const ends = names.map((n, k) => (lastIndex[k] >= 0 ? (series[n][lastIndex[k]] as number) : null));
+    const plotHeight = height - 8 - 22;
+    return { x, y, lastIndex, offsets: spreadLabels(ends, y.domain, plotHeight), ends, plotHeight };
+  }, [times, series, names, height]);
+  const labelWidth = Math.min(132, 12 + 7 * Math.max(0, ...names.map((n) => n.length)));
   const chart = (
-    <LineChart data={rows} margin={{ top: 8, right: 16, bottom: 22, left: 8 }} width={width} height={width ? height : undefined}>
+    <LineChart
+      data={rows}
+      margin={{ top: 8, right: names.length > 1 ? labelWidth : 16, bottom: 22, left: 8 }}
+      width={width}
+      height={width ? height : undefined}
+    >
       <CartesianGrid {...GRID} vertical={false} />
       <XAxis
         dataKey="t"
         type="number"
-        domain={["dataMin", "dataMax"]}
+        domain={geometry.x.domain}
+        ticks={geometry.x.ticks}
         tickFormatter={tick}
         {...AXIS}
-        label={{ value: `time (${timeUnit})`, position: "insideBottom", offset: -12 }}
+        label={{ value: timeAxisTitle(timeUnit), position: "insideBottom", offset: -12 }}
       />
-      <YAxis tickFormatter={tick} {...AXIS} width={56} label={{ value: unit, angle: -90, position: "insideLeft" }} />
+      <YAxis
+        tickFormatter={tick}
+        {...AXIS}
+        width={56}
+        domain={geometry.y.domain}
+        ticks={geometry.y.ticks}
+        label={{ value: unit, angle: -90, position: "insideLeft" }}
+      />
       <Tooltip
         content={<ChartTooltip timeUnit={timeUnit} unit={unit} />}
         cursor={{ stroke: "var(--rule-strong)" }}
@@ -104,10 +133,28 @@ export function TimeCourseChart({
           stroke={seriesColor(i)}
           strokeDasharray={seriesDash(i)}
           strokeWidth={1.75}
-          dot={false}
+          dot={sparse ? (p: { cx?: number; cy?: number; value?: unknown; key?: string }) => <SeriesMarker key={p.key} cx={p.cx} cy={p.cy} index={i} value={p.value} /> : false}
           activeDot={{ r: 3 }}
           connectNulls={false}
           isAnimationActive={false}
+          label={
+            names.length > 1
+              ? (p: { x?: number; y?: number; index?: number }) =>
+                  p.index === geometry.lastIndex[i] && typeof p.x === "number" && typeof p.y === "number" ? (
+                    <text
+                      key={`end-${n}`}
+                      className="chart-end-label"
+                      x={p.x + 8}
+                      y={(geometry.offsets[i] === null ? p.y : 8 + (geometry.offsets[i] as number)) + 4}
+                      fill={seriesColor(i)}
+                    >
+                      {n}
+                    </text>
+                  ) : (
+                    <g key={`end-${n}-${p.index}`} />
+                  )
+              : undefined
+          }
         />
       ))}
     </LineChart>
@@ -117,6 +164,7 @@ export function TimeCourseChart({
       title={title}
       caption={caption}
       height={height}
+      summary={`${names.length} series (${names.join(", ")}) over ${rows.length} time points`}
       legend={names.map((n, i) => ({ label: n, index: i }))}
       table={
         <DataTable
@@ -125,7 +173,7 @@ export function TimeCourseChart({
           rows={rows}
           rowKey={(_, i) => String(i)}
           columns={[
-            { key: "t", header: `time (${timeUnit})`, numeric: true, cell: (r) => (r.t === null ? "none" : formatNumber(r.t)) },
+            { key: "t", header: timeAxisTitle(timeUnit), numeric: true, cell: (r) => (r.t === null ? "none" : formatNumber(r.t)) },
             ...names.map((n) => ({
               key: n,
               header: `${n} (${unit})`,

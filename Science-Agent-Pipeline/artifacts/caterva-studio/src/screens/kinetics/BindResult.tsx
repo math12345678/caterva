@@ -24,6 +24,7 @@ import { TextReport } from "@/components/report/Report";
 import { Section } from "@/components/screen/Screen";
 import { NegativeState } from "@/components/states/States";
 import { DataTable } from "@/components/table/DataTable";
+import { plural } from "@/lib/copy";
 import { formatNumber } from "@/lib/format";
 
 function dgSpan(v: SourcedValue): [number, number] | null {
@@ -68,7 +69,7 @@ export function BandFigure({ target, verdict }: { target: BindTarget; verdict: B
       <svg
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label={`ΔG°bind of ${rows.length} Ki row(s)${bandLow != null && bandHigh != null ? `, the band from ${formatNumber(bandLow)} to ${formatNumber(bandHigh)} kcal/mol` : ", no band"}${whisker && verdict?.computed.value != null ? `, and the computed value ${formatNumber(verdict.computed.value)} kcal/mol with its 2σ range` : ""}`}
+        aria-label={`ΔG°bind of ${plural(rows.length, "Ki row")}${bandLow != null && bandHigh != null ? `, the band from ${formatNumber(bandLow)} to ${formatNumber(bandHigh)} kcal/mol` : ", no band"}${whisker && verdict?.computed.value != null ? `, and the computed value ${formatNumber(verdict.computed.value)} kcal/mol with its 2σ range` : ""}`}
       >
         {bandLow != null && bandHigh != null ? (
           <rect x={x(bandLow)} y={top - 8} width={Math.max(1, x(bandHigh) - x(bandLow))} height={axisY - top + 4} className="k-band-fill" />
@@ -231,7 +232,7 @@ function Target({ target, verdict, run }: { target: BindTarget; verdict: BindVer
               <Value v={target.band_low} /> <span className="muted">to</span> <Value v={target.band_high} />
             </p>
             <p className="muted">
-              From {target.references.length} publication(s): {target.references.map((r) => `BRENDA ref ${r}`).join(", ")}.
+              From {plural(target.references.length, "publication")}: {target.references.map((r) => `BRENDA ref ${r}`).join(", ")}.
               The band&apos;s edges are the lowest and highest ΔG°bind of the rows below.
             </p>
           </div>
@@ -250,7 +251,7 @@ function Target({ target, verdict, run }: { target: BindTarget; verdict: BindVer
             </ul>
           </div>
         ) : null}
-        <RowsTable rows={target.used} caption={`${target.used.length} row(s) fit this state`} />
+        <RowsTable rows={target.used} caption={`${plural(target.used.length, "row")} ${target.used.length === 1 ? "fits" : "fit"} this state`} />
         {target.excluded.length ? (
           <Disclosure title="Rows not comparable, and why" aside={<span className="font-mono">{target.excluded.length}</span>}>
             <RowsTable rows={target.excluded} caption="Shown so each exclusion can be argued with" excluded />

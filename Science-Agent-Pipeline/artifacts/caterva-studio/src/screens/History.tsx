@@ -35,6 +35,8 @@ import { RunStatusMark, runStatusLabel } from "@/components/shell/RunStatusMark"
 import { useShownRunId } from "@/components/shell/TopBar";
 import { Loading, SkeletonRows } from "@/components/states/Loading";
 import { EmptyState, ErrorState, OutcomeNotice, RunFailedState } from "@/components/states/States";
+import { plain, plural } from "@/lib/copy";
+import { Identified } from "@/components/run/Identified";
 import { describeError } from "@/lib/errors";
 import { elapsed, formatBytes, formatDateTime } from "@/lib/format";
 import { modKey, useHotkey } from "@/lib/keyboard";
@@ -45,7 +47,7 @@ import { isToastShown, notify } from "@/lib/toast";
 import { scheduleDelete, undoDelete, UNDO_MS, useHeldDeletes } from "./workspace/trash";
 import "./workspace/workspace.css";
 
-type Filter = "all" | "working" | "produced" | "refused" | "negative" | "failed";
+type Filter = "all" | "working" | "produced" | "refused" | "negative" | "network" | "failed";
 
 const FILTERS: { value: Filter; label: string }[] = [
   { value: "all", label: "All" },
@@ -53,6 +55,7 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: "produced", label: "Results" },
   { value: "refused", label: "Refused" },
   { value: "negative", label: "Negative" },
+  { value: "network", label: "No answer" },
   { value: "failed", label: "Failed" },
 ];
 
@@ -83,6 +86,8 @@ export function matchesFilter(run: RunSummary, filter: Filter): boolean {
       return run.status === "done" && run.outcome?.meaning === "refused";
     case "negative":
       return run.status === "done" && run.outcome?.meaning === "negative";
+    case "network":
+      return run.status === "done" && run.outcome?.meaning === "network";
     case "failed":
       return run.status === "failed" || run.status === "interrupted" || run.status === "abandoned";
   }
@@ -199,7 +204,9 @@ function RunDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
       <header className="run-detail-head">
         <RunStatusMark status={r.status} meaning={r.outcome?.meaning ?? null} />
         <div>
-          <h2 className="run-detail-title">{r.title}</h2>
+          <h2 className="run-detail-title">
+            <Identified text={r.title} />
+          </h2>
           <p className="run-detail-meta font-mono">
             {r.kind} · {runStatusLabel(r.status, r.outcome?.meaning ?? null)} · {formatDateTime(r.created_at)}
             {r.finished_at ? ` · ${elapsed(r.started_at ?? r.created_at, r.finished_at)}` : ""} · caterva {r.caterva_version}
@@ -253,7 +260,7 @@ function RunDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
       ) : null}
       {r.outcome ? (
         r.outcome.meaning === "produced" ? (
-          <p className="run-detail-summary">{r.outcome.summary}</p>
+          <p className="run-detail-summary">{plain(r.outcome.summary)}</p>
         ) : (
           <OutcomeNotice outcome={r.outcome} />
         )
@@ -375,7 +382,7 @@ export default function HistoryScreen() {
       ) : (
         <>
           <p className="history-count" aria-live="polite">
-            {runs.length === total ? `${total} run(s)` : `${runs.length} of ${total} run(s)`}
+            {runs.length === total ? plural(total, "run") : `${runs.length} of ${plural(total, "run")}`}
             {all.data?.more ? ", older ones not read yet" : ""}
           </p>
           <div className="run-list" role="list" aria-label="Runs, newest first" onKeyDown={walk}>

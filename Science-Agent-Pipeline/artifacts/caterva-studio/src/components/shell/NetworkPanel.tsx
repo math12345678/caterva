@@ -19,6 +19,12 @@ export function NetworkPanel({ net }: { net: NetworkCapability }) {
         <span className="status-dot" data-state={reading.state === "off" ? "off" : reading.state} aria-hidden="true" />
         {reading.sentence}
       </p>
+      {reading.detail ? (
+        <details className="state-raw">
+          <summary>What the check reported</summary>
+          <pre>{reading.detail}</pre>
+        </details>
+      ) : null}
       <ul className="host-list" aria-label="Database hosts">
         {Object.entries(net.hosts).map(([host, ok]) => (
           <li key={host}>

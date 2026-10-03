@@ -20,11 +20,15 @@
  */
 import type { ReactNode } from "react";
 
-import type { ApiError, Outcome, RunError } from "@/api/types";
+import type { ApiError, NetworkFailure, Outcome, RunError } from "@/api/types";
 import { cn } from "@/lib/cn";
+import { CompoundChoices } from "@/components/run/CompoundChoices";
+import { hostLabel, networkFailureOf, networkSentence, plain, plural, readCompoundList, withoutUrls } from "@/lib/copy";
 import { describeApiError, describeError, type ReadableError } from "@/lib/errors";
 
-function Kicker({ tone, children }: { tone: "refusal" | "negative" | "error" | "empty"; children: ReactNode }) {
+type Tone = "refusal" | "negative" | "error" | "empty" | "network";
+
+function Kicker({ tone, children }: { tone: Tone; children: ReactNode }) {
   const mark =
     tone === "error" ? (
       <rect x="1.5" y="1.5" width="7" height="7" fill="var(--danger)" />
@@ -32,6 +36,8 @@ function Kicker({ tone, children }: { tone: "refusal" | "negative" | "error" | "
       <circle cx="5" cy="5" r="3.35" fill="none" stroke="var(--caution)" strokeWidth="1.6" />
     ) : tone === "refusal" ? (
       <circle cx="5" cy="5" r="3.4" fill="none" stroke="currentColor" strokeWidth="1.35" strokeDasharray="1.7 1.35" />
+    ) : tone === "network" ? (
+      <path d="M1.5 5h2M6.5 5h2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none" />
     ) : (
       <circle cx="5" cy="5" r="3.4" fill="none" stroke="var(--rule-strong)" strokeWidth="1.35" />
     );
@@ -42,6 +48,62 @@ function Kicker({ tone, children }: { tone: "refusal" | "negative" | "error" | "
       </svg>
       {children}
     </span>
+  );
+}
+
+/**
+ * One layout for everything that did not come out: a kicker, a heading, the
+ * reason in plain words, what to change, the engine's own text in a
+ * disclosure when it was reworded, and the actions. The refusal, the
+ * negative finding, the failure and the outage are this component with a
+ * different tone, so they read the same on every screen.
+ */
+function Problem({
+  tone,
+  kicker,
+  title,
+  reason,
+  raw,
+  change,
+  actions,
+  children,
+  inset,
+  role,
+  labelled = true,
+}: {
+  tone: Tone;
+  kicker: string;
+  title: string;
+  reason?: string;
+  /** The engine's text before the page reworded it; shown in a disclosure when it differs from `reason`. */
+  raw?: string;
+  /** What to change, in a sentence. */
+  change?: ReactNode;
+  actions?: ReactNode;
+  children?: ReactNode;
+  inset: boolean;
+  role?: "alert";
+  labelled?: boolean;
+}) {
+  return (
+    <section
+      className={cn("state", `state-${tone === "network" ? "refusal state-network" : tone}`, inset && "state-inset")}
+      aria-label={labelled ? title : undefined}
+      role={role}
+    >
+      <Kicker tone={tone}>{kicker}</Kicker>
+      <h2 className="state-title">{title}</h2>
+      {reason ? <p className="state-reason">{reason}</p> : null}
+      {change ? <p className="state-change">{change}</p> : null}
+      {children ? <div className="state-body">{children}</div> : null}
+      {raw && raw.trim() !== (reason ?? "").trim() ? (
+        <details className="state-raw">
+          <summary>What the engine said</summary>
+          <pre>{raw}</pre>
+        </details>
+      ) : null}
+      {actions ? <div className="state-actions">{actions}</div> : null}
+    </section>
   );
 }
 
@@ -69,22 +131,79 @@ export function EmptyState({
 export function RefusalState({
   title = "Refused, and why",
   reason,
+  rawText,
+  change,
   children,
   inset = true,
 }: {
   title?: string;
-  /** The command's own words, verbatim. */
+  /** The command's own words. Request URLs, flags and dashes are reworded; the engine's text stays in a disclosure. */
   reason: string;
+  /** The engine's whole text, when `reason` is only part of it. */
+  rawText?: string;
+  change?: ReactNode;
   children?: ReactNode;
   inset?: boolean;
 }) {
   return (
-    <section className={cn("state state-refusal", inset && "state-inset")} aria-label={title}>
-      <Kicker tone="refusal">Refused</Kicker>
-      <h2 className="state-title">{title}</h2>
-      <p className="state-reason">{reason}</p>
-      {children ? <div className="state-body">{children}</div> : null}
-    </section>
+    <Problem
+      tone="refusal"
+      kicker="Refused"
+      title={plain(withoutUrls(title))}
+      reason={plain(withoutUrls(reason))}
+      raw={rawText ?? reason}
+      change={change}
+      inset={inset}
+    >
+      {children}
+    </Problem>
+  );
+}
+
+/**
+ * A database that did not answer. Not Caterva declining: a sentence naming
+ * the host, what to do, a Retry, and the engine's exception text behind a
+ * disclosure.
+ */
+export function NetworkState({
+  failure,
+  raw,
+  again = "try again",
+  onRetry,
+  retryLabel = "Retry",
+  inset = true,
+  children,
+}: {
+  failure: NetworkFailure | null;
+  raw?: string;
+  /** Finishes "Check the network, then ...": "search again", "try again". */
+  again?: string;
+  onRetry?: () => void;
+  retryLabel?: string;
+  inset?: boolean;
+  children?: ReactNode;
+}) {
+  const who = failure?.host ? hostLabel(failure.host) : "A database";
+  const cap = who.charAt(0).toUpperCase() + who.slice(1);
+  const refusedRequest = failure?.status !== null && failure?.status !== undefined && failure.status < 500 && failure.status !== 429;
+  return (
+    <Problem
+      tone="network"
+      kicker="Did not answer"
+      title={`${cap} ${refusedRequest ? "refused the request" : "did not answer"}`}
+      reason={networkSentence(failure, again)}
+      raw={raw}
+      inset={inset}
+      actions={
+        onRetry ? (
+          <button type="button" className="btn btn-sm" onClick={onRetry}>
+            {retryLabel}
+          </button>
+        ) : undefined
+      }
+    >
+      {children}
+    </Problem>
   );
 }
 
@@ -102,12 +221,9 @@ export function NegativeState({
   inset?: boolean;
 }) {
   return (
-    <section className={cn("state state-negative", inset && "state-inset")} aria-label={title}>
-      <Kicker tone="negative">Negative finding</Kicker>
-      <h2 className="state-title">{title}</h2>
-      <p className="state-reason">{reason}</p>
-      {children ? <div className="state-body">{children}</div> : null}
-    </section>
+    <Problem tone="negative" kicker="Negative finding" title={plain(title)} reason={plain(reason)} raw={reason} inset={inset}>
+      {children}
+    </Problem>
   );
 }
 
@@ -120,61 +236,123 @@ function readable(error: unknown): ReadableError {
 
 /**
  * Something failed. Takes anything a request can throw (or an ApiError the
- * server sent) and says what happened and what to do, in that order.
+ * server sent) and says what happened and what to do, in that order. A
+ * failure that is a database not answering takes the network layout.
  */
 export function ErrorState({
   error,
   title,
   action,
+  onRetry,
+  again,
   inset = false,
 }: {
   error: unknown;
   title?: string;
   action?: ReactNode;
+  /** Draws the outage's Retry button when the failure is a database not answering. */
+  onRetry?: () => void;
+  again?: string;
   inset?: boolean;
 }) {
   const r = readable(error);
+  const outage = r.code === "unavailable" || r.code === "crash" || r.code === "page" ? networkFailureOf(r.raw) : null;
+  if (outage) {
+    return <NetworkState failure={outage} raw={r.raw} onRetry={onRetry} again={again} inset={inset} />;
+  }
   return (
-    <section className={cn("state state-error", inset && "state-inset")} role="alert">
-      <Kicker tone="error">{r.code === "malformed" ? "Not well formed" : "Failed"}</Kicker>
-      <h2 className="state-title">{title ?? r.title}</h2>
-      <p className="state-reason">{r.message}</p>
+    <Problem
+      tone="error"
+      kicker={r.code === "malformed" ? "Not well formed" : "Failed"}
+      title={title ?? r.title}
+      reason={r.message}
+      raw={r.raw}
+      change={r.hint ?? undefined}
+      inset={inset}
+      role="alert"
+      labelled={false}
+      actions={action}
+    >
       {r.field ? (
         <p className="state-field">
           field <span className="font-mono">{r.field}</span>
         </p>
       ) : null}
-      {r.hint ? <p className="state-body">{r.hint}</p> : null}
-      {action ? <div className="state-actions">{action}</div> : null}
-    </section>
+    </Problem>
   );
 }
 
 /** A run that crashed (exit 1): its exception type and message; the traceback stays in the bundle. */
-export function RunFailedState({ error, action }: { error: RunError; action?: ReactNode }) {
+export function RunFailedState({ error, action, onRetry }: { error: RunError; action?: ReactNode; onRetry?: () => void }) {
+  const outage = networkFailureOf(error.message);
+  if (outage) {
+    return <NetworkState failure={outage} raw={`${error.type}: ${error.message}`} onRetry={onRetry} again="run it again" />;
+  }
   return (
-    <section className="state state-error state-inset" role="alert">
-      <Kicker tone="error">Failed</Kicker>
-      <h2 className="state-title">The run stopped with an error</h2>
-      <p className="state-reason">
-        <span className="font-mono">{error.type}</span>: {error.message}
-      </p>
-      <p className="state-body">
-        The full traceback is kept with the run; export its bundle from History to report it.
-      </p>
-      {action ? <div className="state-actions">{action}</div> : null}
-    </section>
+    <Problem
+      tone="error"
+      kicker="Failed"
+      title="The run stopped with an error"
+      reason={`${error.type}: ${plain(withoutUrls(error.message))}`}
+      raw={`${error.type}: ${error.message}`}
+      change="The full traceback is kept with the run; export its bundle from History to report it."
+      inset
+      role="alert"
+      labelled={false}
+      actions={action}
+    />
   );
 }
 
 /**
  * The verdict of a finished run, chosen from its outcome: nothing for a
- * produced result (the screen draws the result), a refusal, or a negative
- * finding. The screen draws the result itself below a negative finding.
+ * produced result (the screen draws the result), a refusal, an upstream
+ * outage or a negative finding. The screen draws the result itself below a
+ * negative finding.
  */
-export function OutcomeNotice({ outcome, children }: { outcome: Outcome | null; children?: ReactNode }) {
+export function OutcomeNotice({
+  outcome,
+  onRetry,
+  again,
+  onChooseCompound,
+  children,
+}: {
+  outcome: Outcome | null;
+  onRetry?: () => void;
+  again?: string;
+  /** Fills the form's Inhibitor field with a compound a refusal says has a measurement. */
+  onChooseCompound?: (name: string) => void;
+  children?: ReactNode;
+}) {
   if (!outcome || outcome.meaning === "produced") return null;
+  if (outcome.meaning === "network") {
+    return (
+      <NetworkState
+        failure={outcome.network ?? networkFailureOf(outcome.reason)}
+        raw={outcome.reason ?? outcome.summary}
+        onRetry={onRetry}
+        again={again}
+      >
+        {children}
+      </NetworkState>
+    );
+  }
   const refused = outcome.meaning === "refused";
+  const compounds = refused && outcome.reason ? readCompoundList(outcome.reason) : null;
+  if (compounds) {
+    const n = compounds.compounds.length;
+    const lead = noticeText(compounds.lead.split("\n")[0], compounds.lead, "Refused, and why");
+    return (
+      <RefusalState
+        title={lead.title}
+        reason={`${lead.reason}\n${plural(n, "compound")} ${n === 1 ? "does" : "do"} have one.`}
+        rawText={outcome.reason ?? undefined}
+      >
+        <CompoundChoices compounds={compounds.compounds} onChoose={onChooseCompound} />
+        {children}
+      </RefusalState>
+    );
+  }
   const { title, reason } = noticeText(outcome.summary, outcome.reason ?? "", refused ? "Refused, and why" : "A negative finding");
   if (refused) {
     return (

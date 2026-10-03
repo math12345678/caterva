@@ -87,3 +87,11 @@ export function parseCsv(text: string): { columns: string[]; series: Record<stri
   }
   return { columns, series };
 }
+
+/**
+ * A text matcher for a run's title in a list. The title is drawn with its
+ * identifiers ("EC 1.1.1.27") in their own spans, so the text is split across
+ * elements; this matches the title element by its whole text.
+ */
+export const runTitle = (text: string) => (_content: string, element: Element | null): boolean =>
+  Boolean(element && element.matches(".run-row-title") && element.textContent === text);

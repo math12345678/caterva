@@ -219,7 +219,7 @@ export default function ComposeScreen() {
     <RunForm
       id="compose.submit"
       label="Compose"
-      hint={form.description.trim() ? `caterva compose "${form.description.trim()}"` : "Write a mechanism first"}
+      hint={form.description.trim() ? `Compose "${form.description.trim()}"` : "Write a mechanism first"}
       onSubmit={() => void run.submit(composeRequest(form))}
       running={running}
       onCancel={() => void run.cancel()}

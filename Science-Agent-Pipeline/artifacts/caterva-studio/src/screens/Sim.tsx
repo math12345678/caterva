@@ -94,7 +94,7 @@ export default function SimScreen() {
   const timeUnit = "time units";
 
   const formPane = (
-    <RunForm id="sim.submit" label="Simulate" hint="caterva sim ssa, seeded" onSubmit={submit} running={running} onCancel={() => void run.cancel()}>
+    <RunForm id="sim.submit" label="Simulate" hint="Stochastic simulation, with a seed" onSubmit={submit} running={running} onCancel={() => void run.cancel()}>
       <div className="field">
         <span className="field-label">Reaction</span>
         <Segmented

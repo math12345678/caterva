@@ -80,7 +80,12 @@ def test_a_gene_circuit_is_not_told_to_name_an_enzyme() -> None:
 
     concerns, _ = _provenance_concerns(compose("two genes repressing each other"))
     assert "name the enzyme" not in concerns[0].remedy
-    assert "not kept in an enzyme database" in concerns[0].remedy
+    # Why an enzyme does not apply is said once, in the detail; the remedy
+    # does not then tell the reader the thing it asked for is pointless.
+    assert "not kept in an enzyme database" in concerns[0].detail
+    assert "would not find" not in concerns[0].remedy
+    assert "enzyme database" not in concerns[0].remedy
+    assert "no enzyme was named" not in concerns[0].detail
 
 
 def test_an_enzyme_shape_still_is() -> None:
@@ -88,3 +93,25 @@ def test_an_enzyme_shape_still_is() -> None:
 
     concerns, _ = _provenance_concerns(compose("Michaelis Menten"))
     assert concerns[0].remedy.startswith("name the enzyme")
+
+
+def test_a_toggle_switch_says_why_no_enzyme_applies_once_and_does_not_contradict_itself() -> None:
+    """The verdict said "because no enzyme was named" and then that naming one
+    would not find anything. A mechanism with no enzyme step says why an enzyme
+    does not apply in one place, and its remedy is the one thing left to do."""
+    from caterva.compose.pipeline import compose
+    from caterva.compose.report import dossier
+
+    model = compose("a toggle switch")
+    concerns, note = _provenance_concerns(model)
+    detail, remedy = concerns[0].detail, concerns[0].remedy
+    assert "no enzyme step" in detail and "not kept in an enzyme database" in detail
+    assert "no enzyme was named" not in detail
+    assert "name the enzyme" not in remedy and "naming an enzyme" not in remedy
+    assert remedy.startswith("supply the constants the provenance table lists")
+    text = "\n".join(str(part) for part in (detail, remedy))
+    assert text.count("enzyme database") == 1
+    report = dossier("a toggle switch", analyse_stability=False, simulate=False, rank_unmeasured=False)
+    markdown = report.markdown()
+    assert "because no enzyme was named" not in markdown
+    assert "no enzyme step" in markdown

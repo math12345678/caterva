@@ -77,6 +77,7 @@ export default function AnalyzeScreen() {
         formLabel="Analyze a finished run"
         action="Analyze"
         canSubmit={Boolean(directory.trim())}
+        blockedReason="Choose a finished replica folder first."
         onSubmit={() => void run.submit(request())}
         run={run}
         firstSize={26}

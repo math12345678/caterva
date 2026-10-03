@@ -21,6 +21,7 @@ import { useLocation } from "wouter";
 
 import { createRun } from "@/api/runs";
 import type { Capabilities, RunSummary } from "@/api/types";
+import { plain } from "@/lib/copy";
 import { describeError } from "@/lib/errors";
 import { formatWhen } from "@/lib/format";
 import { runHref, useJobActionsOptional } from "@/lib/jobs";
@@ -29,6 +30,7 @@ import { useRunList } from "@/lib/queries";
 import { useSetTheme } from "@/lib/settings";
 import { ROUTES, type StudioRoute } from "@/routes";
 
+import { Identified } from "@/components/run/Identified";
 import { RunStatusMark } from "@/components/shell/RunStatusMark";
 
 import { useCommandRegistry } from "./commands";
@@ -113,6 +115,23 @@ export function CommandPalette({ capabilities }: { capabilities: Capabilities | 
     }
   }, [open]);
 
+  // The rest of the page is inert while the palette is open: a screen reader
+  // cannot wander into it and a click cannot reach it, whatever the engine's
+  // own handling of a modal <dialog> does. What was inert already stays so.
+  useEffect(() => {
+    if (!open) return;
+    const here = dialog.current;
+    const parent = here?.parentElement;
+    if (!here || !parent) return;
+    const made: Element[] = [];
+    for (const el of Array.from(parent.children)) {
+      if (el === here || el.hasAttribute("inert")) continue;
+      el.setAttribute("inert", "");
+      made.push(el);
+    }
+    return () => made.forEach((el) => el.removeAttribute("inert"));
+  }, [open]);
+
   const close = useCallback(() => setOpen(false), [setOpen]);
   const go = useCallback(
     (href: string) => {
@@ -162,10 +181,10 @@ export function CommandPalette({ capabilities }: { capabilities: Capabilities | 
               </span>
               <span className="palette-item-sub">
                 {compose?.available === false
-                  ? `Not available: ${compose.reason ?? "this installation cannot run compose"}`
+                  ? `Not available: ${plain(compose.reason ?? "this installation cannot run compose")}`
                   : busy
                     ? "Starting the run"
-                    : `caterva compose "${text}"`}
+                    : "Builds a model from this mechanism and opens the result"}
               </span>
             </span>
             <CornerDownLeft size={13} aria-hidden="true" />
@@ -232,7 +251,9 @@ export function CommandPalette({ capabilities }: { capabilities: Capabilities | 
             <Command.Item key={run.id} value={`${run.title} ${run.id} ${run.kind}`} onSelect={() => go(runHref(run))}>
               <RunStatusMark status={run.status} meaning={run.outcome?.meaning ?? null} />
               <span className="palette-item-main">
-                <span className="palette-item-title">{run.title}</span>
+                <span className="palette-item-title">
+                  <Identified text={run.title} />
+                </span>
                 <span className="palette-item-sub font-mono">
                   {run.kind} · {formatWhen(run.created_at)}
                 </span>
@@ -289,6 +310,8 @@ export function CommandPalette({ capabilities }: { capabilities: Capabilities | 
     <dialog
       ref={dialog}
       className="overlay palette"
+      role="dialog"
+      aria-modal="true"
       aria-label="Command palette"
       onClose={close}
       onCancel={(e) => {

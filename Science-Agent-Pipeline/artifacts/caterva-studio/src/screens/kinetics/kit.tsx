@@ -16,7 +16,7 @@
  * finding's verdict on Binding).
  */
 import { Check as CheckIcon, Download, FileArchive, Link2 } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useSearch } from "wouter";
 
 import { downloadFrom } from "@/api/client";
@@ -24,11 +24,11 @@ import { downloadArtifact, downloadBundle } from "@/api/runs";
 import type { RunKind, RunRecord, RunResults } from "@/api/types";
 import type { RunState } from "@/api/useRun";
 import { Disclosure } from "@/components/forms/Disclosure";
-import { FormActions } from "@/components/forms/Field";
+import { FormActions, useRequiredCheck } from "@/components/forms/Field";
 import { Split } from "@/components/layout/Split";
 import { useCommand } from "@/components/palette/commands";
 import { CommandSlab } from "@/components/report/Report";
-import { RunPanel } from "@/components/run/RunPanel";
+import { RunAnnouncer, RunPanel } from "@/components/run/RunPanel";
 import { describeError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { modKey, useHotkey } from "@/lib/keyboard";
@@ -107,11 +107,7 @@ export function KineticsLayout({ id, form, result }: { id: string; form: ReactNo
       minFirst={26}
       minSecond={40}
       first={<div className="k-form-pane">{form}</div>}
-      second={
-        <div className="k-result-pane" aria-live="polite">
-          {result}
-        </div>
-      }
+      second={<div className="k-result-pane">{result}</div>}
     />
   );
 }
@@ -120,6 +116,11 @@ export function KineticsLayout({ id, form, result }: { id: string; form: ReactNo
  * The form frame: Enter in a field, and Cmd-Enter (Ctrl-Enter) anywhere on
  * the screen, submit; while the run works the primary action becomes Cancel. The
  * same submit is registered in the command palette under `label`.
+ *
+ * The action bar is pinned to the bottom of the pane at every width, so the
+ * primary action is never a screen away from the field being edited. A
+ * required field left empty is named inline (aria-required, aria-invalid)
+ * and nothing is requested; a disabled button says why in text it points at.
  */
 export function RunForm({
   id,
@@ -129,6 +130,7 @@ export function RunForm({
   running,
   onCancel,
   disabled = false,
+  disabledReason,
   children,
 }: {
   /** The palette command id, e.g. "compose.submit". */
@@ -140,11 +142,21 @@ export function RunForm({
   running: boolean;
   onCancel?: () => void;
   disabled?: boolean;
+  /** Why the button is disabled, when it is (shown under it and read with it). */
+  disabledReason?: string;
   children: ReactNode;
 }) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const required = useRequiredCheck();
+  const whyId = useId();
+  const attempt = () => {
+    if (running || disabled) return;
+    if (!required.check(formRef.current)) return;
+    onSubmit();
+  };
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!running && !disabled) onSubmit();
+    attempt();
   };
   // Anywhere on the screen, not only inside the form: WebKit does not focus a
   // button or checkbox on click, so a key pressed after ticking a box would
@@ -154,28 +166,49 @@ export function RunForm({
     { key: "Enter", mod: true },
     (e) => {
       if (e.target instanceof Element && e.target.closest("dialog, [role='dialog']")) return;
-      if (!running && !disabled) onSubmit();
+      attempt();
     },
   );
-  useCommand({ id, title: label, hint, run: onSubmit, disabled: running || disabled });
+  useCommand({ id, title: label, hint, run: attempt, disabled: running || disabled });
+  const why = running ? "A run is in progress." : disabled ? disabledReason : undefined;
   return (
-    <form className="k-form" onSubmit={submit} aria-label={label} noValidate>
-      {children}
-      <FormActions>
-        <button type="submit" className="btn btn-primary" disabled={running || disabled}>
-          {label}
-        </button>
-        {running && onCancel ? (
-          <button type="button" className="btn" onClick={onCancel}>
-            Cancel
+    <form
+      ref={formRef}
+      className="k-form"
+      onSubmit={submit}
+      onInput={(e) => required.clear((e.target as HTMLElement).id)}
+      onChange={(e) => required.clear((e.target as HTMLElement).id)}
+      aria-label={label}
+      noValidate
+    >
+      {required.provider(children)}
+      <div className="form-bar">
+        <FormActions>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={running || disabled}
+            aria-describedby={running || disabled ? whyId : undefined}
+          >
+            {label}
           </button>
-        ) : (
-          <span className="k-shortcut" aria-hidden="true">
-            <kbd>{modKey()}</kbd>
-            <kbd>Enter</kbd>
-          </span>
-        )}
-      </FormActions>
+          {running && onCancel ? (
+            <button type="button" className="btn" onClick={onCancel}>
+              Cancel
+            </button>
+          ) : (
+            <span className="k-shortcut" aria-hidden="true">
+              <kbd>{modKey()}</kbd>
+              <kbd>Enter</kbd>
+            </span>
+          )}
+        </FormActions>
+        {why ? (
+          <p className="form-why" id={whyId}>
+            {why}
+          </p>
+        ) : null}
+      </div>
     </form>
   );
 }
@@ -314,7 +347,9 @@ export function KineticsRun<K extends RunKind>({
   idle,
   exports,
   onRetry,
+  retryVerb,
   onChooseEnzyme,
+  onChooseCompound,
   children,
 }: {
   state: RunState<K> & { cancel: () => Promise<void> };
@@ -323,11 +358,16 @@ export function KineticsRun<K extends RunKind>({
   idle: ReactNode;
   exports?: (result: RunResults[K], run: RunRecord) => ExportChoice[];
   onRetry?: () => void;
+  /** Finishes "Check the network, then ...", for an outage's message. */
+  retryVerb?: string;
   /** Sets the form's enzyme when the person picks one of the candidates a refused name was given. */
   onChooseEnzyme?: (ec: string) => void;
+  /** Fills the form's Inhibitor field with a compound a refusal says has a measurement. */
+  onChooseCompound?: (name: string) => void;
   children: (result: RunResults[K], run: RunRecord) => ReactNode;
 }) {
   const top = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   // Below 1100 px the result sits under a long form; a run just asked for
   // is brought into view there, so the answer is not left off screen.
   useEffect(() => {
@@ -345,28 +385,36 @@ export function KineticsRun<K extends RunKind>({
   }, [state.submitting]);
   const finished =
     state.status === "done" && state.settled && state.result !== null && state.run !== null && !state.requestError;
-  if (!finished) {
-    return (
-      <>
-        <div ref={top} className="k-anchor" />
-        <RunPanel state={state} onCancel={() => void state.cancel()} onRetry={onRetry} onChooseEnzyme={onChooseEnzyme} idle={idle}>
+  const run = state.run;
+  const result = state.result;
+  return (
+    <div ref={panel}>
+      <RunAnnouncer state={state} root={panel} />
+      <div ref={top} className="k-anchor" />
+      {finished && run !== null && result !== null ? (
+        <div className="k-result">
+          <RunToolbar path={path} run={run} exports={exports ? exports(result, run) : []} />
+          {children(result, run)}
+          <div className="k-result-foot">
+            <RunFiles run={run} />
+            <Disclosure title="The same run in a terminal">
+              <CommandSlab argv={run.cli} />
+            </Disclosure>
+          </div>
+        </div>
+      ) : (
+        <RunPanel
+          state={state}
+          onCancel={() => void state.cancel()}
+          onRetry={onRetry}
+          retryVerb={retryVerb}
+          onChooseEnzyme={onChooseEnzyme}
+          onChooseCompound={onChooseCompound}
+          idle={idle}
+        >
           {() => null}
         </RunPanel>
-      </>
-    );
-  }
-  const run = state.run as RunRecord;
-  const result = state.result as RunResults[K];
-  return (
-    <div className="k-result" ref={top}>
-      <RunToolbar path={path} run={run} exports={exports ? exports(result, run) : []} />
-      {children(result, run)}
-      <div className="k-result-foot">
-        <RunFiles run={run} />
-        <Disclosure title="The same run in a terminal">
-          <CommandSlab argv={run.cli} />
-        </Disclosure>
-      </div>
+      )}
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { useCommandRegistry } from "@/components/palette/commands";
 
 import { JobActivity } from "./JobActivity";
 import { GROUP_LABEL } from "./Rail";
+import { Identified } from "@/components/run/Identified";
 import { RunStatusMark } from "./RunStatusMark";
 import { ThemeSwitch } from "./ThemeSwitch";
 
@@ -55,7 +56,9 @@ export function TopBar({ routes }: { routes: StudioRoute[] }) {
             </span>
             <span className="topbar-run" title={run.data.id}>
               <RunStatusMark status={run.data.status} meaning={run.data.outcome?.meaning ?? null} />
-              <span className="topbar-run-title">{run.data.title}</span>
+              <span className="topbar-run-title">
+                <Identified text={run.data.title} />
+              </span>
             </span>
           </>
         ) : null}

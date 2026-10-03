@@ -126,7 +126,16 @@ function Shell() {
   const routes = visibleRoutes(capabilities.data);
   return (
     <div className="app">
-      <a className="skip-link" href="#main">
+      <a
+        className="skip-link"
+        href="#main"
+        onClick={(e) => {
+          // Following the anchor would rewrite the address to "#main" and
+          // leave the router on a hash; move focus instead.
+          e.preventDefault();
+          document.getElementById("main")?.focus();
+        }}
+      >
         Skip to the screen
       </a>
       <Rail routes={routes} version={health.data.version} />

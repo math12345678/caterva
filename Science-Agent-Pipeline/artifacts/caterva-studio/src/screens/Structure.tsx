@@ -103,6 +103,8 @@ export default function StructureScreen() {
         formLabel="Search the PDB"
         action="Search"
         canSubmit={isCompleteEc(form.subject)}
+        blockedReason="Choose an enzyme first."
+        retryVerb="search again"
         onChooseEnzyme={(ec) => setForm((f) => ({ ...f, subject: ec, subjectSeed: "", gene: "", uniprot: "" }))}
         onSubmit={() => void run.submit(structureRequest(form))}
         run={run}
@@ -150,7 +152,7 @@ export default function StructureScreen() {
             </Field>
             <Checkbox
               label="Write the ChimeraX script for the top entry"
-              hint="caterva structure --chimerax, kept with the run to download."
+              hint="Kept with the run, to download."
               checked={form.chimerax}
               onChange={(v) => set("chimerax", v)}
             />
