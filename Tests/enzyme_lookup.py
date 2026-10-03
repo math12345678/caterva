@@ -585,10 +585,11 @@ def parse_ec_number_search(data: dict) -> str | None:
     # about what UniProt's response contains. Two parsers of one document
     # drift, and this project has the scars (ADR 0003).
     #
-    # It still returns the FIRST candidate, so callers keep their current
-    # behaviour. That is a silent pick when there is more than one, and it
-    # is a known gap rather than a solved problem -- `catalog` refuses and
-    # names the candidates instead, and the runner path does not yet.
+    # It still returns the FIRST candidate. That is a silent pick when there
+    # is more than one, which is why no command resolves a name through it:
+    # `resolve_name` above is the policy, and it refuses and names the
+    # candidates. This and `fetch_ec_number_by_name` remain only as the
+    # single-answer parser their own tests pin.
     candidates = parse_ec_number_candidates(data)
     return candidates[0] if candidates else None
 
