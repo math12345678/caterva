@@ -503,9 +503,10 @@ data: <one line of JSON>
   a request header (rule 3.4): `src/api/runs.ts`, `followRun`.
 - A comment line `: keep-alive` is sent every 15 s while a run is live.
 - The server closes the stream after sending `end`.
-- Order: `status{queued}`, `status{running}`, then any `stage`/`log`, then
-  exactly one of: `result{outcome}` + `status{done, outcome}`;
-  `error{error}` + `status{failed}`; `status{cancelled}`;
+- Order: `status{queued}`, `status{running}`, then any `stage`/`log` (and
+  `status{cancelling}` once a cancel was asked for), then exactly one of:
+  `result{outcome}` + `status{done, outcome}`; `error{error}` +
+  `status{failed}`; `status{cancelled}`; `error{error}` + `status{abandoned}`;
   `status{interrupted}`; and finally `end{status}`.
 - Shapes: `StatusEvent`, `StageEvent` `{stage, label, fraction}`,
   `LogEvent` `{line}`, `ResultEvent` `{outcome}`, `ErrorEvent` `{error}`,
@@ -635,7 +636,8 @@ An adapter module:
    parser path first.
 3. `run(request, ctx)` imports the engine lazily (so `/api/health` stays
    fast), calls the same library functions the CLI calls in the same order,
-   reports `ctx.progress.stage(...)`, checks `ctx.progress.check_cancelled()`,
+   reports `ctx.progress.stage(...)`, checks `ctx.progress.check_cancelled()`
+   (and hands `ctx.progress.is_cancelled` to a library loop that polls a flag),
    and returns `AdapterOutcome(exit_code, result, summary, refusal,
    artifacts)`. Anything it raises other than Malformed or Cancelled is a
    crash (status `failed`).

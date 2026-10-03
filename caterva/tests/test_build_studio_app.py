@@ -11,8 +11,8 @@ decide what a person downloads and reads:
 - a frozen folder without its licences or without the built page is
   refused, and `caterva studio --self-test` output is read line by line,
   not by exit status alone;
-- the shell speaks the contract's protocol: the URL line, the token
-  placeholder, the session meta tag and the bridge's name are the values
+- the shell speaks the contract's protocol: the URL line, the page marker,
+  the token's fragment key and the bridge's name are the values
   caterva/studio/contract.py fixes, so the two sides cannot drift apart.
 """
 from __future__ import annotations
