@@ -1374,7 +1374,7 @@ caterva enzyme "hexokinse" --organism human --limit 2
 ```
 Enzyme finder: 'hexokinse' (ExPASy ENZYME release 02-Sep-2026, human)
 
-Not resolved: no enzyme is named 'hexokinse'; these are close.. Did you mean one of these?
+Not resolved: no enzyme is named 'hexokinse'; these are close. Did you mean one of these?
 
  1. EC 2.7.1.1  hexokinase
       why: close to the accepted name: did you mean?
