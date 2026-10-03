@@ -30,6 +30,7 @@ import { useRunList } from "@/lib/queries";
 import { useSetTheme } from "@/lib/settings";
 import { ROUTES, type StudioRoute } from "@/routes";
 
+import { Identified } from "@/components/run/Identified";
 import { RunStatusMark } from "@/components/shell/RunStatusMark";
 
 import { useCommandRegistry } from "./commands";
@@ -250,7 +251,9 @@ export function CommandPalette({ capabilities }: { capabilities: Capabilities | 
             <Command.Item key={run.id} value={`${run.title} ${run.id} ${run.kind}`} onSelect={() => go(runHref(run))}>
               <RunStatusMark status={run.status} meaning={run.outcome?.meaning ?? null} />
               <span className="palette-item-main">
-                <span className="palette-item-title">{run.title}</span>
+                <span className="palette-item-title">
+                  <Identified text={run.title} />
+                </span>
                 <span className="palette-item-sub font-mono">
                   {run.kind} · {formatWhen(run.created_at)}
                 </span>

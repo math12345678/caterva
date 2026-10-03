@@ -36,6 +36,7 @@ import { useShownRunId } from "@/components/shell/TopBar";
 import { Loading, SkeletonRows } from "@/components/states/Loading";
 import { EmptyState, ErrorState, OutcomeNotice, RunFailedState } from "@/components/states/States";
 import { plain, plural } from "@/lib/copy";
+import { Identified } from "@/components/run/Identified";
 import { describeError } from "@/lib/errors";
 import { elapsed, formatBytes, formatDateTime } from "@/lib/format";
 import { modKey, useHotkey } from "@/lib/keyboard";
@@ -202,7 +203,9 @@ function RunDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
       <header className="run-detail-head">
         <RunStatusMark status={r.status} meaning={r.outcome?.meaning ?? null} />
         <div>
-          <h2 className="run-detail-title">{r.title}</h2>
+          <h2 className="run-detail-title">
+            <Identified text={r.title} />
+          </h2>
           <p className="run-detail-meta font-mono">
             {r.kind} · {runStatusLabel(r.status, r.outcome?.meaning ?? null)} · {formatDateTime(r.created_at)}
             {r.finished_at ? ` · ${elapsed(r.started_at ?? r.created_at, r.finished_at)}` : ""} · caterva {r.caterva_version}

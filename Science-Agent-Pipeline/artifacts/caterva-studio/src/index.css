@@ -2692,6 +2692,7 @@ button.run-row {
 /* A panel's contents are never clipped by the panel, so the action bar can
    stick to the edge of the screen's own scroller (react-resizable-panels
    sets overflow:hidden on every panel, and a sticky box cannot escape it). */
+.split,
 .split-pane {
   overflow: visible !important;
 }

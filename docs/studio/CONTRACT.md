@@ -879,6 +879,39 @@ A builder who truly needs another package says so in their report, with
 the reason; nobody but the integrator edits `package.json` dependencies or
 `pnpm-lock.yaml`.
 
+### 17.6 Copy, problems and forms
+
+The engine writes for a terminal; the page does not repeat it. `src/lib/copy.ts`
+is the one place its phrasings are rewritten for the window: a flag is named
+by the field that sets it ("Set Inhibitor"), a script name or a command in
+parentheses is dropped, `--` and the long dash are not punctuation here,
+`row(s)` is `rows`, a request URL is its host's name ("UniProt"), and a
+Python exception that is a database not answering is the sentence "UniProt
+did not answer. Check the network, then try again." with the raw text in a
+disclosure. A rewrite only rephrases; each is tested with the engine's own
+string as input (`src/__tests__/copy.test.ts`). Code, file names and the
+terminal command stay as written.
+
+A refusal, a failure, a negative finding and an outage are one component
+(`States.tsx`): kicker, heading, reason, what to change, the engine's text in
+a disclosure, actions. Exception text is never an accessible name or a toast.
+
+A form frame (`RunForm`, the structure `RunScreen`) pins its action bar to
+the bottom of the pane, names an empty required field inline before any
+request (`aria-required`, `aria-invalid`), and points a disabled primary
+button at the sentence that says why. The only live region while a run works
+is its one-line stage sentence; the counter beside it is not announced. When
+a run finishes, one status sentence is announced and focus moves to the
+result's heading. A run whose `outcome.has_result` is false is not asked for
+its result. Health and the live-run list are polled only while the tab is
+visible, a quarter as often when idle, and less after failures
+(`src/lib/polling.ts`).
+
+Chart series are told apart by luminance (each 3:1 against the surface,
+neighbours 3:1 against each other, asserted over `index.css` in
+`seriesContrast.test.ts`), a dash pattern, a marker where a series has few
+points, and a direct label at the end of its line.
+
 ## 18. Ownership map
 
 Five builders work at once from branch `studio/contract`. A file is edited
