@@ -150,7 +150,7 @@ def read_organism(args: argparse.Namespace) -> str | None:
 
     # The same reading `caterva compose` applies: "human" is Homo sapiens,
     # and saying so beats a search for an organism nobody spells that way.
-    if str(ROOT) not in sys.path:
+    if (ROOT / "caterva").is_dir() and str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
     from caterva.compose.organisms import normalise_organism
 
@@ -159,7 +159,11 @@ def read_organism(args: argparse.Namespace) -> str | None:
 
 
 REPORT_LAB = ROOT / "scripts" / "report_lab.py"
-MISSING = f"{REPORT_LAB} is missing; this needs the source checkout, not the app folder."
+if not REPORT_LAB.is_file() and Path(__file__).with_name("report_lab.py").is_file():
+    # The copy scripts/vendor_literature.py puts beside this file in the
+    # installed package (caterva/_literature/), where there is no scripts/.
+    REPORT_LAB = Path(__file__).resolve().with_name("report_lab.py")
+MISSING = f"{REPORT_LAB} is missing; this build carries no literature layer."
 
 
 def run_report_lab(payload: dict) -> dict:

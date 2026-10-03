@@ -49,6 +49,15 @@ WHAT IT CHECKS BEFORE IT WRITES THE ARCHIVE
   the two packaged data files), and builds a shape from an expansion
   library (reached only through importlib, invisible to static analysis).
   A folder that cannot do all of that is not archived.
+- The literature layer is inside: `_internal/caterva/_literature/` holds the
+  modules the wheel carries (scripts/vendor_literature.py), their imports are
+  analysed by the freezer, and the frozen executable runs
+  `caterva compose --subject 2.7.1.1 --organism human --substrate glucose`
+  OFFLINE from the repository's recorded BRENDA page and database answers
+  (Tests/fixtures/recorded/, read from the checkout this script sits in, set
+  for that one child process only, with every proxy closed so a request with
+  no recording fails instead of reaching a database), and the report must
+  say the two constants came from the literature with their citations.
 - libSBML's extension is a separate file; roadrunner's 48 MB of test
   fixtures are pruned and the executable still runs afterwards.
 - `caterva studio --self-test` passes from the frozen folder: the studio
@@ -111,6 +120,16 @@ PRUNE = ("roadrunner/tests",)
 
 LAUNCHER = "from caterva.app import main\nimport sys\nsys.exit(main())\n"
 
+#: The recorded real answers the offline literature smoke check replays: the
+#: BRENDA page for EC 2.7.1.1 and the NCBI, UniProt and PubChem responses one
+#: human hexokinase Km lookup makes (Tests/fixtures/recorded/README.md). They
+#: stay in the repository; no release artifact carries them, and nothing at
+#: run time reads them unless these variables point at them.
+RECORDED = ROOT / "Tests" / "fixtures" / "recorded"
+PROXY_VARIABLES = ("HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "all_proxy")
+#: Port 9 on loopback: nothing listens, so a request with no recording fails at once.
+CLOSED_PROXY = "http://127.0.0.1:9"
+
 
 def _fail(msg: str) -> NoReturn:
     print(f"NOT A RELEASE FOLDER: {msg}", file=sys.stderr)
@@ -139,7 +158,19 @@ def _installed_caterva():
     return caterva
 
 
-def _run_pyinstaller(launcher: Path, work: Path, stage: Path) -> None:
+def _literature_dir(caterva) -> Path:
+    """The installed wheel's copy of the literature layer, or fail."""
+    directory = Path(caterva.__file__).resolve().parent / "_literature"
+    if not (directory / "fallback_logic.py").is_file():
+        _fail(
+            f"{directory} has no fallback_logic.py: the installed wheel carries no literature layer.\n"
+            "  scripts/build_release.py vendors it (scripts/vendor_literature.py) before building the wheel."
+        )
+    return directory
+
+
+def _run_pyinstaller(launcher: Path, work: Path, stage: Path, literature: Path) -> None:
+    modules = sorted(p.stem for p in literature.glob("*.py"))
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--noconfirm", "--clean", "--log-level", "WARN",
@@ -155,6 +186,18 @@ def _run_pyinstaller(launcher: Path, work: Path, stage: Path) -> None:
     ]
     for pkg in COLLECT_ALL:
         cmd += ["--collect-all", pkg]
+    # The literature layer is a directory of flat modules that
+    # caterva.checkout imports through importlib, so the freezer sees no
+    # import of them. Its files go in as data at caterva/_literature/ (the
+    # directory checkout.py looks in; --collect-all does not take .py data),
+    # and each module is a hidden import found through --paths, so the
+    # libraries THEY import (bs4, httpx, requests, ...) are analysed too.
+    cmd += ["--paths", str(literature)]
+    for module in modules:
+        cmd += ["--hidden-import", module]
+    for source in sorted(literature.glob("*")):
+        if source.is_file():
+            cmd += ["--add-data", f"{source}{os.pathsep}caterva/_literature"]
     cmd.append(str(launcher))
     # cwd is the scratch directory so the checkout is never on the analysis path.
     subprocess.run(cmd, cwd=str(work), check=True)
@@ -425,9 +468,16 @@ WHAT TO TYPE FIRST (from a terminal, inside this folder)
         the quick start, whenever you are lost
     {exe} compose --help
         every option on the model builder, with examples
+    {exe} compose "Michaelis Menten" --subject 2.7.1.1 --organism human --substrate glucose
+        The same model with measured constants from BRENDA, each cited
+        (needs a network connection: see below).
+    {exe} enzyme "pyruvate kinase"
+        Which enzyme a name means: the EC number, and why.
     {exe} sim --help
-        the population-genetics engine: drift, selection, migration,
-        Gillespie SSA
+        exact stochastic chemical kinetics (Gillespie SSA)
+    {exe} studio --help
+        the local window onto all of the above (the page is in the macOS
+        app; this folder serves a "not built" page instead)
 
 IT RECOGNISES A SHAPE, NEVER A SUBJECT
     "two genes repressing each other" builds. "glycolysis" does not, and
@@ -443,8 +493,11 @@ USEFUL FLAGS ON compose
     --export FORMAT methods | csv | sbml | antimony, written to stdout
     --no-ranking    skip the slowest step when you just want the structure
 
-Nothing is installed, nothing is written outside the directory you run it
-in, and no network connection is made.
+Nothing is installed and nothing is written outside the directory you run it
+in. No network connection is made, except when you ask for measured constants
+(--subject, `caterva bind`, `caterva rates --ec`): those read BRENDA, NCBI
+Taxonomy, UniProt and PubChem live, and the report says what could not be
+reached rather than substituting a value.
 
 The full guide, with worked examples, is docs/USING_CATERVA.md in the
 repository, and the release notes for this version are on the release page
@@ -470,9 +523,13 @@ WHAT IS INSIDE, AND THE LGPL
     Every other component's licence is in licenses/ too, listed in
     licenses/README.txt.
 
-WHAT THIS FOLDER DOES NOT DO
-    The literature search (BRENDA resolvers) is not included; `--subject`
-    builds the model and says no search was run. See the release notes.
+THE LITERATURE SEARCH
+    _internal/caterva/_literature/ holds the resolvers that read BRENDA and
+    rank what they find (copies of the repository's Tests/ modules, made by
+    the release build). BRENDA's data is licensed CC BY 4.0 (Chang et al.
+    2021, Nucleic Acids Res. 49:D498, doi:10.1093/nar/gkaa1025); NOTICE gives
+    the attribution. No recorded answer is in this folder: every lookup is
+    live.
 """
     (bundle / "README.txt").write_text(text, encoding="utf-8")
 
@@ -492,8 +549,9 @@ def _smoke(bundle: Path, version: str, require_studio_page: bool = False) -> Non
         env["PYTHONUTF8"] = "1"
         env["PYTHONIOENCODING"] = "utf-8"
 
-        def run(*args: str, timeout: int = 900) -> subprocess.CompletedProcess:
-            raw = subprocess.run([str(exe), *args], cwd=empty, env=env, capture_output=True, timeout=timeout)
+        def run(*args: str, timeout: int = 900, extra_env: dict | None = None) -> subprocess.CompletedProcess:
+            raw = subprocess.run([str(exe), *args], cwd=empty, env={**env, **(extra_env or {})},
+                                 capture_output=True, timeout=timeout)
             return subprocess.CompletedProcess(
                 raw.args, raw.returncode,
                 raw.stdout.decode("utf-8", errors="replace"),
@@ -503,9 +561,11 @@ def _smoke(bundle: Path, version: str, require_studio_page: bool = False) -> Non
         r = run("--version", timeout=120)
         if r.returncode != 0 or r.stdout.strip() != f"caterva {version}":
             _fail(f"--version: exit {r.returncode}, stdout {r.stdout!r}, stderr {r.stderr[-400:]!r}")
+        # `sim` is the Gillespie engine only (the population-genetics domains
+        # were archived), so its help names the one subcommand, `ssa`.
         r = run("sim", "--help", timeout=300)
-        if r.returncode != 0 or "kimura" not in r.stdout:
-            _fail(f"sim --help: exit {r.returncode}, stderr {r.stderr[-400:]!r}")
+        if r.returncode != 0 or "ssa" not in r.stdout or "Gillespie" not in r.stdout:
+            _fail(f"sim --help: exit {r.returncode}, stdout {r.stdout[-300:]!r}, stderr {r.stderr[-400:]!r}")
         # A VERDICT alone proves little: the report turns a failed simulation
         # into the note "no time course: ..." and still exits 0. So the time
         # course must have been integrated (roadrunner + antimony ran), the
@@ -533,6 +593,8 @@ def _smoke(bundle: Path, version: str, require_studio_page: bool = False) -> Non
         print("smoke  : --version, sim --help, a simulated time course, an SBML export, an")
         print("         expansion-library shape and an enzyme-name lookup all ran from an empty directory")
 
+        _literature_smoke(run, bundle)
+
         r = run("studio", "--self-test", timeout=300)
         problems = studio_self_test_problems(r.returncode, r.stdout, require_studio_page)
         if problems:
@@ -542,6 +604,49 @@ def _smoke(bundle: Path, version: str, require_studio_page: bool = False) -> Non
             )
         for line in r.stdout.strip().splitlines():
             print(f"studio : {line}")
+
+
+#: What the offline literature check must find in the report, and must not.
+LITERATURE_MARKERS = ("VERDICT:", "2 of 2 constant(s) came from the literature", "BRENDA ref 641068", "BRENDA ref 739603")
+LITERATURE_REFUSAL = "could not run"
+
+
+def literature_problem(bundle: Path) -> str | None:
+    """Why the folder lacks the literature layer's files, or None."""
+    directory = bundle / "_internal" / "caterva" / "_literature"
+    needed = ("fallback_logic.py", "brenda_client.py", "http_retry.py", "enzyme_lookup.py", "cite.py", "report_lab.py")
+    missing = [name for name in needed if not (directory / name).is_file()]
+    if missing:
+        return f"_internal/caterva/_literature/ lacks {missing}: the folder cannot run a literature search"
+    return None
+
+
+def _literature_smoke(run, bundle: Path) -> None:
+    """The headline feature, run from the frozen folder, offline."""
+    problem = literature_problem(bundle)
+    if problem:
+        _fail(problem)
+    page = RECORDED / "brenda_2.7.1.1.html.gz"
+    if not page.is_file() or not (RECORDED / "http").is_dir():
+        _fail(f"the recorded answers the literature check replays are not at {RECORDED}; run this script from a checkout of the tagged commit")
+    replay = {
+        "CATERVA_BRENDA_RECORDED": str(RECORDED),
+        "CATERVA_HTTP_RECORDED": str(RECORDED / "http"),
+        "NO_PROXY": "", "no_proxy": "",
+        **{name: CLOSED_PROXY for name in PROXY_VARIABLES},
+    }
+    args = ("compose", "Michaelis Menten", "--subject", "2.7.1.1", "--organism", "human",
+            "--substrate", "glucose", "--no-ranking")
+    r = run(*args, extra_env=replay)
+    missing = [m for m in LITERATURE_MARKERS if m not in r.stdout]
+    if r.returncode != 0 or missing or LITERATURE_REFUSAL in r.stdout:
+        _fail(
+            f"{' '.join(args)} (offline, recorded BRENDA page): exit {r.returncode}, missing {missing}, "
+            f"'{LITERATURE_REFUSAL}' present: {LITERATURE_REFUSAL in r.stdout}; "
+            f"stdout tail {r.stdout[-400:]!r}, stderr {r.stderr[-600:]!r}"
+        )
+    print("smoke  : compose --subject 2.7.1.1 ran the literature search from the frozen folder, offline,")
+    print("         and cited BRENDA ref 641068 and 739603 for the constants")
 
 
 #: Where the studio's built page lands inside a onedir folder: PyInstaller's
@@ -563,6 +668,9 @@ def studio_page_problem(bundle: Path) -> str | None:
         return f"{STUDIO_PAGE.as_posix()} has no {TOKEN_PLACEHOLDER} to replace: it is not the studio's built page"
     if not any((page.parent / "assets").glob("*.js")):
         return f"{STUDIO_PAGE.as_posix()} is there but static/assets/ holds no script"
+    if not (page.parent / "licenses" / "THIRD-PARTY-NOTICES.txt").is_file():
+        return (f"{STUDIO_PAGE.parent.as_posix()}/licenses/THIRD-PARTY-NOTICES.txt is missing: the page's packages "
+                "would be conveyed without their licences (the page build writes it)")
     return None
 
 
@@ -634,7 +742,7 @@ def main(argv: list[str] | None = None) -> int:
         launcher = work / "caterva_launcher.py"
         launcher.write_text(LAUNCHER, encoding="utf-8")
         stage = work / "stage"
-        _run_pyinstaller(launcher, work, stage)
+        _run_pyinstaller(launcher, work, stage, _literature_dir(caterva))
         bundle = stage / "caterva"
         if not bundle.is_dir():
             _fail(f"PyInstaller did not produce {bundle}")

@@ -95,8 +95,8 @@ REAL CONSTANTS, WITH REAL CITATIONS
   why: most often it exists in another organism, which it names. Find an
   EC number with `caterva enzyme "lactate dehydrogenase" --organism human`,
   which works offline and lists every enzyme that name could mean.
-  The search needs the source checkout (git clone, then make setup); the
-  downloaded app folder builds and simulates but cannot search, and says so.
+  The search reads BRENDA, NCBI, UniProt and PubChem live, so it needs a
+  network connection; the report says what could not be reached.
 
 MORE
 
