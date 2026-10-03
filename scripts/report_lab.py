@@ -498,13 +498,24 @@ def run_payload(payload: dict) -> dict:
             return _failure(str(exc), getattr(exc, "view", None))
 
     if not ec or not organism:
-        return _failure(
-            "A report needs an enzyme and an organism. Give the enzyme as an "
-            "EC number ('ec') or as a name ('enzyme') — a name is looked up "
-            "in UniProt, and refused if it matches more than one enzyme. The "
-            "organism is not inferred from free text: guessing it would "
+        # Name only what is missing: a message about the enzyme sent to
+        # someone who left the organism empty names the wrong field.
+        enzyme_help = (
+            "Give the enzyme as an EC number ('ec') or as a name ('enzyme'); "
+            "a name is looked up in UniProt, and refused if it matches more "
+            "than one enzyme."
+        )
+        organism_help = (
+            "The organism is not inferred from free text: guessing it would "
             "attach real citations to a system nobody named."
         )
+        if not ec and not organism:
+            message = f"A report needs an enzyme and an organism. {enzyme_help} {organism_help}"
+        elif not ec:
+            message = f"A report needs an enzyme. {enzyme_help}"
+        else:
+            message = f"A report needs an organism. {organism_help}"
+        return _failure(message)
 
     # Read BEFORE anything is fetched. A malformed payload should cost a
     # message, not a BRENDA round trip followed by a document with a hole in
