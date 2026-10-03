@@ -107,11 +107,11 @@ class StudioHTTPServer(http.server.ThreadingHTTPServer):
     #: Restarting the app at once must not fail on a port still in TIME_WAIT.
     allow_reuse_address = True
 
-    def __init__(self, host: str, port: int, *, max_connections: int = limits.MAX_CONNECTIONS) -> None:
+    def __init__(self, host: str, port: int, *, max_connections: Optional[int] = None) -> None:
         family, address = bind_address(host)
         self.address_family = family
         self.app: Optional[App] = None
-        self.connections = limits.Gate(max_connections)
+        self.connections = limits.Gate(limits.MAX_CONNECTIONS if max_connections is None else max_connections)
         super().__init__((address, port), StudioRequestHandler, bind_and_activate=True)
 
     def process_request(self, request: Any, client_address: Any) -> None:

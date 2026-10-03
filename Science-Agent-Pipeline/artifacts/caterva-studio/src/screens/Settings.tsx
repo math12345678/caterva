@@ -9,6 +9,7 @@
  * the server stores that this page does not edit are sent back unchanged,
  * so a newer server's settings survive an older page.
  */
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import type { Settings } from "@/api/types";
@@ -22,19 +23,24 @@ import { ErrorState } from "@/components/states/States";
 import { ApiRequestError } from "@/api/client";
 import { describeError } from "@/lib/errors";
 import { formatCount } from "@/lib/format";
-import { useCapabilities } from "@/lib/queries";
+import { refreshGromacs, useCapabilities } from "@/lib/queries";
 import { useSaveSettings, useSettings } from "@/lib/settings";
 import { reveal, isDesktop } from "@/lib/desktop";
 import { notify } from "@/lib/toast";
 
 /** contract.py Settings: max_parallel_runs is 1..8. */
 const PARALLEL = [1, 2, 3, 4, 5, 6, 7, 8];
+/** keep_runs is 10..5000; these are the choices offered, and the stored value is always one of the options. */
+const KEEP_RUNS = [50, 100, 200, 500, 1000, 5000];
+const DEFAULT_KEEP_RUNS = 200;
 
 export default function SettingsScreen() {
   const settings = useSettings();
   const save = useSaveSettings();
   const caps = useCapabilities();
   const [draft, setDraft] = useState<Settings | null>(null);
+  const [checking, setChecking] = useState(false);
+  const client = useQueryClient();
 
   useEffect(() => {
     if (settings.data && draft === null) setDraft(settings.data);
@@ -46,6 +52,7 @@ export default function SettingsScreen() {
     (draft.max_parallel_runs !== settings.data.max_parallel_runs ||
       draft.confirm_delete !== settings.data.confirm_delete ||
       Boolean(draft.offline) !== Boolean(settings.data.offline) ||
+      (draft.keep_runs ?? DEFAULT_KEEP_RUNS) !== (settings.data.keep_runs ?? DEFAULT_KEEP_RUNS) ||
       (draft.gromacs_path ?? null) !== (settings.data.gromacs_path ?? null));
   const serverError = save.error instanceof ApiRequestError ? save.error.error : null;
 
@@ -58,6 +65,7 @@ export default function SettingsScreen() {
         max_parallel_runs: draft.max_parallel_runs,
         confirm_delete: draft.confirm_delete,
         offline: Boolean(draft.offline),
+        ...(draft.keep_runs === undefined ? {} : { keep_runs: draft.keep_runs }),
         gromacs_path: draft.gromacs_path ?? null,
       },
       {
@@ -117,6 +125,25 @@ export default function SettingsScreen() {
                 ))}
               </Select>
             </Field>
+            <Field
+              label="Runs kept"
+              hint="History keeps this many finished runs. When a new run starts, older ones move to the trash folder in the workspace (they are not erased), and a run that is still going is never moved."
+              error={fieldError(serverError, "keep_runs")}
+            >
+              <Select
+                value={String(draft.keep_runs ?? DEFAULT_KEEP_RUNS)}
+                onChange={(e) => setDraft({ ...draft, keep_runs: Number(e.target.value) })}
+                className="settings-select num"
+              >
+                {[...new Set([...KEEP_RUNS, draft.keep_runs ?? DEFAULT_KEEP_RUNS])]
+                  .sort((a, b) => a - b)
+                  .map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+              </Select>
+            </Field>
             <Switch
               checked={draft.confirm_delete}
               onChange={(v) => setDraft({ ...draft, confirm_delete: v })}
@@ -135,7 +162,7 @@ export default function SettingsScreen() {
               hint={
                 caps.data?.gromacs.found
                   ? `Found now: ${caps.data.gromacs.path ?? "gmx"}${caps.data.gromacs.version ? `, ${caps.data.gromacs.version}` : ""}. Leave empty to look for gmx on the PATH and in the Homebrew folders.`
-                  : "The absolute path of a gmx executable. Leave empty to look for gmx on the PATH and in the Homebrew folders."
+                  : `The absolute path of a gmx executable, named gmx, gmx_mpi, gmx_d or gmx_ and a suffix. It is run only when you save or press Check GROMACS. Leave empty to look for gmx on the PATH and in the Homebrew folders.${caps.data?.gromacs.reason ? ` ${caps.data.gromacs.reason}` : ""}`
               }
               error={fieldError(serverError, "gromacs_path")}
             >
@@ -148,6 +175,22 @@ export default function SettingsScreen() {
                 onChange={(e) => setDraft({ ...draft, gromacs_path: e.target.value.trim() === "" ? null : e.target.value })}
               />
             </Field>
+            <div>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={checking}
+                onClick={() => {
+                  setChecking(true);
+                  void refreshGromacs()
+                    .then(() => client.invalidateQueries({ queryKey: ["capabilities"] }))
+                    .catch((e: unknown) => notify("failed", "GROMACS was not checked", { description: describeError(e).message }))
+                    .finally(() => setChecking(false));
+                }}
+              >
+                {checking ? "Checking" : "Check GROMACS"}
+              </button>
+            </div>
             {serverError && !serverError.field ? <ErrorState error={serverError} /> : null}
             {save.isError && !serverError ? <ErrorState error={save.error} /> : null}
             <FormActions>

@@ -51,6 +51,11 @@ export function probeNetwork(): Promise<Capabilities> {
   return apiJson<Capabilities>("/api/capabilities?probe=network", {}, CapabilitiesSchema);
 }
 
+/** Runs the chosen gmx now (CONTRACT.md 7): the only request that does. Answers the capabilities. */
+export function refreshGromacs(): Promise<Capabilities> {
+  return apiJson<Capabilities>("/api/capabilities/refresh", { method: "POST", body: "{}" }, CapabilitiesSchema);
+}
+
 export function useRunList(query: ListRunsQuery = {}, enabled = true) {
   return useQuery({
     queryKey: ["runs", "list", query],

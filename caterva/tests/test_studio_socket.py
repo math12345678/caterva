@@ -209,3 +209,85 @@ def test_the_self_test_passes(tmp_path):
     assert any(line.startswith("ok   /api/health: 200") for line in lines)
     assert lines[-1] == "ok   stop: the server stopped cleanly"
     assert not (tmp_path / "Library").exists()  # the self-test never touches the user's data folder
+
+
+def _raw(app, payload: bytes = b"", timeout: float = 10.0) -> socket.socket:
+    sock = socket.create_connection(("127.0.0.1", app.guard.port), timeout=timeout)
+    if payload:
+        sock.sendall(payload)
+    return sock
+
+
+def test_a_connection_over_the_ceiling_is_answered_503_with_retry_after(monkeypatch, tmp_path):
+    from caterva.studio import limits
+
+    monkeypatch.setattr(limits, "MAX_CONNECTIONS", 3)
+    stop = threading.Event()
+    ready = threading.Event()
+    holder: List[Any] = []
+
+    def run():
+        studio_main.main(["--port", "0", "--no-browser", "--data-dir", str(tmp_path / "data")], stop=stop,
+                         on_serving=lambda app: (holder.append(app), ready.set()))
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    assert ready.wait(120)
+    app = holder[0]
+    held = []
+    try:
+        for _ in range(3):  # three idle connections, each holding a handler waiting for its request line
+            held.append(_raw(app))
+        time.sleep(0.3)
+        extra = _raw(app)
+        extra.settimeout(10)
+        answer = extra.recv(4096)
+        extra.close()
+        assert answer.startswith(b"HTTP/1.1 503") and b"Retry-After: 2" in answer
+    finally:
+        for sock in held:
+            sock.close()
+        stop.set()
+        thread.join(60)
+
+
+def test_a_request_dripped_in_slowly_is_cut_off_by_its_total_deadline(monkeypatch, tmp_path):
+    from caterva.studio import limits
+
+    monkeypatch.setattr(limits, "HEADER_DEADLINE_S", 1.0)
+    stop = threading.Event()
+    ready = threading.Event()
+    holder: List[Any] = []
+
+    def run():
+        studio_main.main(["--port", "0", "--no-browser", "--data-dir", str(tmp_path / "data")], stop=stop,
+                         on_serving=lambda app: (holder.append(app), ready.set()))
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    assert ready.wait(120)
+    app = holder[0]
+    started = time.monotonic()
+    sock = _raw(app, f"GET /api/health HTTP/1.1\r\nHost: 127.0.0.1:{app.guard.port}\r\n".encode())
+    closed = False
+    try:
+        for _ in range(40):  # a header byte every 0.3 s, each well inside the idle limit
+            time.sleep(0.3)
+            try:
+                sock.sendall(b"X")
+            except OSError:
+                closed = True
+                break
+            sock.settimeout(0.01)
+            try:
+                if sock.recv(1) == b"":
+                    closed = True
+                    break
+            except (socket.timeout, BlockingIOError):
+                pass
+    finally:
+        sock.close()
+        stop.set()
+        thread.join(60)
+    assert closed and time.monotonic() - started < 8
+

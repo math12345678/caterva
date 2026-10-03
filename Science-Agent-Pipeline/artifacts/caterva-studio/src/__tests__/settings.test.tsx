@@ -48,4 +48,33 @@ describe("Settings", () => {
       gromacs_path: "/opt/homebrew/bin/gmx",
     });
   });
+
+  it("keeps the runs kept setting only when it is changed, and checks GROMACS only when asked", async () => {
+    setSessionToken("token");
+    window.history.replaceState(null, "", "/settings");
+    const { seen } = mockServer((req) => {
+      if (req.url === "/api/health") return health;
+      if (req.url === "/api/capabilities/refresh" && req.method === "POST") return capabilities;
+      if (req.url.startsWith("/api/capabilities")) return capabilities;
+      if (req.url === "/api/settings" && req.method === "PUT") return json(200, req.body);
+      if (req.url === "/api/settings") return settings;
+      if (req.url.startsWith("/api/runs")) return runsEmpty;
+      return undefined;
+    });
+    render(<App />);
+    await screen.findByRole("switch", { name: /Offline mode/ });
+    expect(seen.some((r) => r.url === "/api/capabilities/refresh")).toBe(false);
+    await userEvent.click(screen.getByRole("button", { name: "Check GROMACS" }));
+    await vi.waitFor(() => expect(seen.some((r) => r.url === "/api/capabilities/refresh" && r.method === "POST")).toBe(true));
+    expect(seen.find((r) => r.url === "/api/capabilities/refresh")!.body).toEqual({});
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: /Runs kept/ }), "500");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    const put = await vi.waitFor(() => {
+      const p = seen.find((r) => r.method === "PUT" && r.url === "/api/settings");
+      if (!p) throw new Error("no PUT yet");
+      return p;
+    });
+    expect(put.body).toEqual({ ...settings.body, keep_runs: 500 });
+  });
 });
+

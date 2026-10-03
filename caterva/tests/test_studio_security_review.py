@@ -389,7 +389,7 @@ def test_s2_every_value_in_run_sh_is_quoted_and_a_hostile_one_runs_nothing(tmp_p
     from caterva.md.setup import Conditions, MdSetup
 
     victim = tmp_path / "PWNED"
-    hostile = f"x'; touch {victim}; echo '"
+    hostile = f"x$(touch {victim})`touch {victim}`; touch {victim} #"
     setup = MdSetup("1I10", "A", Conditions(), force_field=hostile, water=hostile, replicas=1)
     script = tmp_path / "run.sh"
     script.write_text(setup.files()["run.sh"])
@@ -1027,6 +1027,22 @@ def test_s7_a_connection_over_the_ceiling_is_answered_503_and_closed(tmp_path):
     assert quiet.connections.count == 1
 
 
+class _Drip:
+    """A connection whose bytes arrive one at a time, `step` seconds apart, on a fake clock."""
+
+    def __init__(self, data: bytes, now, step: float) -> None:
+        self.data, self.pos, self.now, self.step = data, 0, now, step
+
+    def peek(self, n=1):
+        self.now[0] += self.step
+        return self.data[self.pos:self.pos + 1]
+
+    def read(self, n=-1):
+        chunk = self.data[self.pos:self.pos + n]
+        self.pos += len(chunk)
+        return chunk
+
+
 def test_s7_a_request_that_drips_in_is_cut_off_by_its_total_deadline_not_its_pauses():
     import socket as socket_module
 
@@ -1039,33 +1055,41 @@ def test_s7_a_request_that_drips_in_is_cut_off_by_its_total_deadline_not_its_pau
         def settimeout(self, value):
             timeouts.append(value)
 
-    class Raw:
-        def __init__(self, lines):
-            self.lines = list(lines)
-
-        def readline(self, size=-1):
-            now[0] += 6.0  # every line takes six seconds, each inside the idle limit
-            return self.lines.pop(0)
-
-        def read(self, size=-1):
-            now[0] += 6.0
-            return b"x" * size
-
-    reader = DeadlineReader(Raw([b"GET / HTTP/1.1\r\n", b"Host: x\r\n", b"X-A: 1\r\n", b"\r\n"]), FakeSock(),
-                            idle_s=60.0, header_s=10.0, clock=lambda: now[0])
+    # One byte a second, never a newline in the header line: every pause is far inside the 60 s idle limit.
+    raw = _Drip(b"GET / HTTP/1.1\r\n" + b"X-Slow: " + b"a" * 500, now, 1.0)
+    reader = DeadlineReader(raw, FakeSock(), idle_s=60.0, header_s=10.0, clock=lambda: now[0])
     reader.begin()
-    assert reader.readline() == b"GET / HTTP/1.1\r\n"  # idle wait, then the 10 s header clock starts
-    assert reader.readline() == b"Host: x\r\n"
-    assert reader.readline() == b"X-A: 1\r\n"  # 6 s of the 10 s are gone: this read may wait only 4 more
+    assert reader.readline() == b"GET / HTTP/1.1\r\n"  # 16 s of idle time: the header clock starts after it
     with pytest.raises(socket_module.timeout):
-        reader.readline()  # 12 s into the headers: over the deadline, though no single pause was long
-    assert max(timeouts) == 60.0 and min(timeouts) <= 4.0  # the per-read wait shrank to what was left
+        reader.readline()
+    assert 10.0 <= now[0] - 16.0 <= 12.0  # cut off about ten seconds in, though the line never ended
+    assert min(timeouts) <= 1.0 and max(timeouts) == 60.0  # each wait shrank to the time that was left
+
+
+def test_s7_a_body_that_drips_in_is_cut_off_the_same_way():
+    import socket as socket_module
+
+    from caterva.studio.limits import DeadlineReader
+
+    now = [0.0]
+
+    class FakeSock:
+        def settimeout(self, value):
+            pass
+
+    reader = DeadlineReader(_Drip(b"x" * 1000, now, 2.0), FakeSock(), idle_s=60.0, clock=lambda: now[0])
     reader.begin()
     reader.arm(30.0)
-    now[0] = 100.0
     with pytest.raises(socket_module.timeout):
-        reader.read(3)
+        reader.read(1000)
+    assert 30.0 <= now[0] <= 33.0
     reader.disarm()
+    now[0] = 0.0
+    quick = DeadlineReader(_Drip(b"hello world", now, 0.1), FakeSock(), idle_s=60.0, clock=lambda: now[0])
+    quick.begin()
+    quick.arm(30.0)
+    assert quick.read(5) == b"hello"
+    assert quick.read(6) == b" world"
 
 
 def test_s7_the_ceilings_are_the_stated_ones():
@@ -1218,3 +1242,96 @@ def test_s10_a_data_folder_outside_the_home_folder_is_written_as_a_placeholder(t
         assert "<data dir>/Desktop/out" in files["command.txt"]
     finally:
         app.close()
+
+
+# ---------------------------------------------------------------------------
+# S11: the macOS shell (the sources are read as text; `swiftc -typecheck` is run by the guard
+# scripts/build_studio_app.py and by hand with the flags in the contract)
+# ---------------------------------------------------------------------------
+
+SWIFT_DIR = Path(__file__).resolve().parents[2] / "macos" / "Sources"
+
+
+def _swift(name: str) -> str:
+    return (SWIFT_DIR / name).read_text(encoding="utf-8")
+
+
+def test_s11_development_variables_count_only_in_a_development_build_with_an_explicit_switch():
+    source = _swift("StudioServer.swift")
+    assert "#if CATERVA_DEVELOPMENT" in source
+    body = source[source.index("static func developmentEnabled"):source.index("let executable: URL")]
+    assert "return false" in body and 'environment[developmentKey] == "1"' in body and "markerExists" in body
+    resolve = source[source.index("static func resolve("):source.index("/// Caterva.app/Contents/Resources")]
+    # the command and data-directory variables are read only behind that switch
+    assert "let development = developmentEnabled(environment: environment)" in resolve
+    assert "development, let raw = environment[commandKey]" in resolve and "development\n" in resolve
+    env = source[source.index("func environment("):source.index("final class StudioServer")]
+    for prefix in ("PYTHON", "DYLD_", "CATERVA_STUDIO_"):
+        assert f'hasPrefix("{prefix}")' in env
+
+
+def test_s11_only_a_development_app_is_compiled_with_the_flag_and_sets_the_switch(tmp_path):
+    import sys
+
+    scripts = Path(__file__).resolve().parents[2] / "scripts"
+    sys.path.insert(0, str(scripts))
+    try:
+        import build_studio_app as studio_app
+    finally:
+        sys.path.remove(str(scripts))
+    release = studio_app.swiftc_command([Path("a.swift")], Path("out"), "arm64", Path("cache"))
+    development = studio_app.swiftc_command([Path("a.swift")], Path("out"), "arm64", Path("cache"), development=True)
+    assert "CATERVA_DEVELOPMENT" not in " ".join(release) and "CATERVA_DEVELOPMENT" in " ".join(development)
+    python = tmp_path / "python"
+    python.write_text("#!/bin/sh\n")
+    python.chmod(0o755)
+    assert studio_app.dev_environment(python, Path(__file__).resolve().parents[2], None)["CATERVA_STUDIO_DEV"] == "1"
+
+
+def test_s11_reveal_is_limited_to_the_data_folder_and_what_the_person_chose():
+    source = _swift("WebBridge.swift")
+    assert "WebBridge.isRevealable(path, roots: revealRoots)" in source
+    assert "resolvingSymlinksInPath()" in source and "hasPrefix(base.hasSuffix" in source
+    assert "self?.revealRoots.append(url)" in source
+    assert "controller.allowReveal(Paths.dataFolder(command))" in _swift("AppDelegate.swift")
+
+
+def test_s11_only_https_and_mailto_leave_the_page():
+    source = _swift("StudioWindowController.swift")
+    assert '["https", "mailto"].contains' in source and '"http", "https"' not in source
+
+
+def test_s11_the_web_store_does_not_outlive_the_launch_and_the_token_is_never_kept_or_logged():
+    window = _swift("StudioWindowController.swift")
+    assert "configuration.websiteDataStore = .nonPersistent()" in window and ".default()" not in window
+    assert "self.baseURL = StudioServer.withoutFragment(url)" in window
+    assert "components.fragment = nil   // never keep a fragment" in window
+    server = _swift("StudioServer.swift")
+    assert 'writeLog("listening at \\(StudioServer.withoutFragment(url).absoluteString)\\n")' in server
+    assert 'writeLog("listening at \\(url.absoluteString)' not in server
+
+
+def test_s11_the_smoke_checks_the_token_arrangement_over_a_real_socket():
+    source = _swift("Smoke.swift")
+    for needle in ('"/api/health"', '"X-Caterva-Session"', "refusedStatus != 401", "answered != 200",
+                   "html.contains(token)", 'static let fragmentKey = "token"'):
+        assert needle in source or needle.replace('"', "") in source, needle
+
+
+def test_s11_swift_typechecks_with_the_build_flags(tmp_path):
+    """Opt in with CATERVA_TEST_SWIFT=1 (it takes a couple of minutes); the DMG workflow compiles the
+    same sources with the same flags on every release."""
+    import platform
+    import shutil
+    import subprocess
+
+    if os.environ.get("CATERVA_TEST_SWIFT") != "1":
+        pytest.skip("set CATERVA_TEST_SWIFT=1 to typecheck the Swift sources")
+    if platform.system() != "Darwin" or shutil.which("xcrun") is None:
+        pytest.skip("swiftc is only on macOS")
+    sources = sorted(str(p) for p in SWIFT_DIR.glob("*.swift"))
+    for flags in ([], ["-D", "CATERVA_DEVELOPMENT"]):
+        done = subprocess.run(["xcrun", "swiftc", "-typecheck", "-swift-version", "5", "-target",
+                               "arm64-apple-macos12.0", "-module-cache-path", str(tmp_path / "modules"), *flags,
+                               *sources], capture_output=True, text=True, timeout=900)
+        assert done.returncode == 0, done.stderr[-2000:]

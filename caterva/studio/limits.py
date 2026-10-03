@@ -249,17 +249,39 @@ class DeadlineReader:
             wait = min(wait, remaining)
         self._sock.settimeout(wait)
 
+    def _take(self, stop_at_newline: bool, size: int) -> bytes:
+        """Up to `size` bytes (a line when `stop_at_newline`), one wait at a
+        time. A buffered reader's own `readline` and `read` call the socket
+        again and again, each call with a fresh timeout, so a client that
+        sends a byte every few seconds would never run any of them out; here
+        every wait is for the time that is left."""
+        out = bytearray()
+        while size < 0 or len(out) < size:
+            self._limit()
+            peeked = self._raw.peek(1)
+            if not peeked:
+                break  # end of the stream
+            take = len(peeked)
+            if stop_at_newline:
+                newline = peeked.find(b"\n")
+                if newline >= 0:
+                    take = newline + 1
+            if size >= 0:
+                take = min(take, size - len(out))
+            out += self._raw.read(take)
+            if stop_at_newline and out.endswith(b"\n"):
+                break
+        return bytes(out)
+
     def readline(self, size: int = -1) -> bytes:
-        self._limit()
-        line = self._raw.readline(size)
+        line = self._take(True, -1 if size is None else size)
         if self._first_line and line:
             self._first_line = False
             self.arm(self._header_s)
         return line
 
     def read(self, size: int = -1) -> bytes:
-        self._limit()
-        return self._raw.read(size)
+        return self._take(False, -1 if size is None else size)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._raw, name)

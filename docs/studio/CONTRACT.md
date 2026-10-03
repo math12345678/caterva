@@ -22,7 +22,7 @@ the session token. 5 Development: the dev origin and the Vite proxy.
 Capabilities. 11 The workspace on disk. 12 Adapters. 13 Kinds, one by one.
 14 Gaps. 15 User paths. 16 The desktop shell. 17 The page: screens, themes,
 provenance as the visual system. 18 Ownership map. 19 How to install in a
-new worktree. 20 Verification and guards. 21 Amending this contract.
+new worktree. 20 Verification and guards. 21 Amending this contract. 22 SECURITY: the token bootstrap, validation, limits.
 
 ---
 
@@ -239,7 +239,7 @@ Every error response has body `ErrorBody` `{"error": {"code", "message",
 | 409 | `conflict` | result of a run not finished; cancelling a finished run; deleting a running run | none |
 | 413 | `too_large` | body over 1 MiB | none |
 | 415 | `unsupported_media_type` | POST/PUT without `application/json` | none |
-| 503 | `unavailable` | the kind or adapter endpoint cannot run in this installation (`contract.Unavailable`: literature layer absent, module not built, `rates` not integrated), with the reason in `message` | the CLI's refusal to start ("needs the source checkout") |
+| 503 | `unavailable` | the kind or adapter endpoint cannot run in this installation (`contract.Unavailable`: literature layer absent, module not built, `rates` not integrated), with the reason in `message`; also a limit of section 22 (too many connections, event streams or queued runs, or a finder search over its time budget), which carries a `Retry-After` header | the CLI's refusal to start ("needs the source checkout") |
 | 500 | `crash` | a handler raised something undeclared; the message names the exception type; the traceback goes to stderr and `studio.log`, not to the page | exit 1 |
 
 Three outcomes of a science question are kept apart all the way to the
@@ -423,8 +423,10 @@ command line in this version (the Md screen says so and shows the command).
 ```
 queued -> running -> done        (outcome: produced | refused | negative)
                   -> failed      (error: a crash)
-                  -> cancelled
-queued|running -> interrupted    (found at startup: the server stopped mid-run)
+                  -> cancelling -> cancelled    (a cancel was asked for; the thread stopped)
+                                -> abandoned    (it did not stop within the grace period)
+queued -> cancelled              (cancelled before it started)
+queued|running|cancelling -> interrupted   (found at startup: the server stopped mid-run)
 ```
 
 - A run id is `yyyymmdd-hhmmss-<kind with . as ->-<8 hex>` in UTC
@@ -434,12 +436,21 @@ queued|running -> interrupted    (found at startup: the server stopped mid-run)
   (compose, sim: they drive roadrunner, antimony and libsbml, none of which
   documents concurrent calls from two threads as supported) also take one process-wide engine lock, so two of them
   never run at once, while network-bound kinds run beside them.
-- **Cancel** is cooperative: `POST .../cancel` sets a flag;
-  `Progress.check_cancelled()` raises `adapters.Cancelled` at the adapter's
-  next check (every stage boundary, and inside loops the adapter drives,
-  such as per analysis section). A library call already running finishes
-  first; the page says "cancelling" until the `cancelled` status arrives. A
-  cancelled run keeps no result.
+- **Cancel** is cooperative: `POST .../cancel` sets a flag and the run's status
+  becomes `cancelling` (not terminal). `Progress.check_cancelled()` raises
+  `adapters.Cancelled` at the adapter's next check (every stage boundary, and
+  inside loops the adapter drives, such as per analysis section), and a library
+  loop that polls `Progress.is_cancelled()` (the SSA's `should_stop`) stops inside
+  the call. Only when the thread has really stopped is the status `cancelled`. A
+  library call that never checks finishes first. If the run has not stopped within
+  20 s the status is `abandoned`, never `cancelled`: its `error` is `{type:
+  "Abandoned", message}` saying the call may still be running in the background,
+  and its result is discarded if it ever returns. A cancelled or abandoned run keeps
+  no result.
+- **Timeouts** are per kind (`jobs.KIND_TIMEOUTS_S`): constants, sim, bind,
+  structure and md.setup 10 minutes; prepare 15; compose, md.summarise, fep.status,
+  complex.check and rates 30; analyze 2 hours. A run past its bound is asked to stop
+  and then abandoned, and ends `failed` with error type `TimedOut`.
 - **Interrupted**: at startup every run whose `run.json` says `queued` or
   `running` is marked `interrupted` with `finished_at` = now and error
   `{type: "Interrupted", message: "the studio stopped while this run was in
@@ -1070,3 +1081,90 @@ touches. The integrator applies amendments to `contract.py`, `types.ts`,
 `routes.py` and this document in one commit, and bumps
 contract.STUDIO_API_VERSION when a page built against the old shapes would
 misread the new ones.
+
+---
+
+## 22. SECURITY: the token bootstrap, validation and limits
+
+The rules of section 3 keep web pages out. These keep out the rest of what can
+reach a loopback port (another user's process, a sandboxed app scanning ports) and
+bound what a request, a folder name or a file can make the server do. Every item
+has a regression test in `caterva/tests/test_studio_security_review.py`.
+
+**22.1 The token is in no served document.** Section 4: it travels in the URL
+fragment (`#token=...`) of the address `--print-url` prints and the launcher opens.
+`GET /` gives every caller the same bytes. A browser started by `caterva studio` is
+given a one-use `file:` page (mode 0600, deleted after 30 s) that forwards to that
+address, so the token is never an argument of any process. The development endpoint
+`GET /api/dev/session` (only with `--dev-origin`) is the one place a local process
+can still ask for it; the app never enables it.
+
+**22.2 `gromacs_path`** is the absolute path of a program the server will run, so it
+is checked as one: no `..`; named `gmx`, `gmx_mpi`, `gmx_d` or `gmx_<suffix>`, both as
+given and after links are resolved (a link named `gmx` to another program is
+refused); a regular file the current user can execute, owned by that user or root;
+neither the file nor, unless sticky, its folder writable by everyone. It is run
+(`gmx --version`, argument list, 5 s, no shell) only when the setting is saved, at
+start-up when one is saved, and by `POST /api/capabilities/refresh`; it is validated
+again immediately before each run. `GET /api/capabilities` never runs it.
+
+**22.3 Nothing from a request reaches a shell as code.**
+- `md.setup`: `pdb` must be `^[0-9][A-Za-z0-9]{3}$` and `chain` `^[A-Za-z0-9]{1,4}$`,
+  ASCII only, no surrounding space or newline, in the `caterva md` library, so the
+  command line and the studio agree; `ns`, `ionic_strength_m`, `temperature_k` and
+  `ph` must be finite and bounded, `seed` 0 to 2^31-1, `replicas` 1 to 50. Every
+  value written into `run.sh` and the complex `build.sh` is quoted with
+  `shlex.quote` (awk receives names as `-v` variables), and comments are flattened to
+  one line.
+- `analyze`: a replica folder is `rep<number>` (`^rep[0-9]+$`); any other folder
+  matching `rep*` is refused with a plain message. Every selection is
+  `shlex.quote`d in `analyze.sh`, and GROMACS steps run as argument lists with no
+  shell (`analyze.command_argv`).
+- `md.setup` writes into a new staging folder beside the target and moves the files
+  into place; a symbolic link anywhere inside an existing setup folder is refused
+  (`UnsafeOutput`, exit 3, `Malformed` on field `out` in the studio) and nothing is
+  written through it.
+- A ChimeraX script (`caterva/structure/chimerax.py`) has control characters and line
+  or paragraph separators removed from every free-text field, and only ASCII letters
+  and digits in an id that stands in a command.
+
+**22.4 Limits** (all refuse with `503 unavailable` and `Retry-After` unless noted):
+
+| what | limit |
+|---|---|
+| connections served at once | 64 (`limits.MAX_CONNECTIONS`), refused on the socket before a thread is spent |
+| event streams at once | 16 (`limits.MAX_STREAMS`) |
+| runs waiting in the queue | 32 (`jobs.MAX_PENDING`), `Retry-After: 30` |
+| finished runs kept | `settings.keep_runs`, 10 to 5000, default 200; older ones move to `trash/` when a run is accepted; Settings says so |
+| a request line and headers | 10 s from the first byte (`limits.HEADER_DEADLINE_S`) |
+| a request body | 30 s from the start of the body (`limits.BODY_DEADLINE_S`) |
+| an idle kept-alive connection | 60 s |
+| `sim` | at most `contract.MAX_SSA_EVENTS` (200,000) expected reaction events, else 400 on `a0` with the number in the message; the loop also stops at 1.25 times that |
+| enzyme finder | 2 searches at once, answers kept by normalised query (NFKC, case-folded, spacing collapsed), 4 s per request, then `Retry-After: 2` while the search finishes and is kept |
+
+**22.5 Bundles.** `GET /api/runs/{id}/bundle` takes `redact_paths` (default `true`)
+and `diagnostics` (default `false`), each `true` or `false`, else 400. By default the
+home folder is written `~` and a data folder outside it `<data dir>` in every text
+file of the zip, and an error's `traceback` is `null` (its type and message stay).
+`diagnostics=true` keeps the traceback, with paths still redacted when `redact_paths`
+is on. `README.txt` states which was done.
+
+**22.6 The macOS shell.** `CATERVA_STUDIO_COMMAND`, `_CWD`, `_DATA_DIR` and
+`PYTHONPATH` are ignored in a release build. They count only in a build made with
+`-D CATERVA_DEVELOPMENT` (`scripts/build_studio_app.py --dev`) AND with
+`CATERVA_STUDIO_DEV=1` set or `~/Library/Application Support/Caterva/development-marker`
+present; a release build also drops every `PYTHON*`, `DYLD_*` and
+`CATERVA_STUDIO_*` variable from the server's environment. The `reveal` message shows
+only paths inside the data folder or ones the person chose in a panel this launch.
+Links open in the default browser only when they are `https` or `mailto`. The web
+view's data store is non-persistent, so a reused random port cannot inherit another
+launch's storage, and the printed address is logged and kept without its fragment.
+
+**22.7 `--dev-origin`** must be the whole of `http://127.0.0.1:<port>` or
+`http://localhost:<port>` with a port from 1 to 65535 (`fullmatch`: a trailing newline,
+port 0 and port 99999 are exit 2).
+
+**22.8 Not covered.** A process running as the same user can read the launcher's
+pipe, the page's memory and the workspace itself; the token does not claim to stop
+it. Nothing in the studio verifies that a `gmx` is GROMACS beyond its name, owner,
+permissions and the `GROMACS version:` line it prints.
