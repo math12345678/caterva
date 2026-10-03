@@ -1,0 +1,55 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/2.7.1.1?organism=human"
+ },
+ "status": 200,
+ "body": {
+  "ec": "2.7.1.1",
+  "name": "hexokinase",
+  "alternative_names": [
+   "hexokinase type I",
+   "hexokinase type II",
+   "hexokinase type III",
+   "hexokinase type IV (glucokinase)"
+  ],
+  "reaction": "a D-hexose + ATP = a D-hexose 6-phosphate + ADP + H(+).",
+  "class_path": "Transferases > transferring phosphorus-containing groups > phosphotransferases with an alcohol group as acceptor",
+  "status": "active",
+  "superseded_by": [],
+  "release": "02-Sep-2026",
+  "isozymes": {
+   "organism": "HUMAN",
+   "organism_label": "human",
+   "count": 5,
+   "proteins": [
+    {
+     "accession": "Q2TB90",
+     "entry_name": "HKDC1_HUMAN",
+     "symbol": "HKDC1"
+    },
+    {
+     "accession": "P19367",
+     "entry_name": "HXK1_HUMAN",
+     "symbol": "HXK1"
+    },
+    {
+     "accession": "P52789",
+     "entry_name": "HXK2_HUMAN",
+     "symbol": "HXK2"
+    },
+    {
+     "accession": "P52790",
+     "entry_name": "HXK3_HUMAN",
+     "symbol": "HXK3"
+    },
+    {
+     "accession": "P35557",
+     "entry_name": "HXK4_HUMAN",
+     "symbol": "HXK4"
+    }
+   ],
+   "organism_known": true
+  }
+ }
+}

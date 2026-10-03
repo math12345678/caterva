@@ -1,0 +1,24 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=9.9.9.9"
+ },
+ "status": 200,
+ "body": {
+  "query": "9.9.9.9",
+  "organism": null,
+  "organism_code": null,
+  "organism_label": null,
+  "release": "02-Sep-2026",
+  "outcome": "none",
+  "resolved_ec": null,
+  "how": null,
+  "cautions": [],
+  "reason": "EC 9.9.9.9 is not in the enzyme nomenclature (ExPASy ENZYME release 02-Sep-2026). Check the number.",
+  "recommended_ec": null,
+  "candidates_total": 0,
+  "candidates": [],
+  "fallback": null,
+  "fallback_unavailable": "the network is not known to be reachable (check it from the status bar), so UniProt was not asked"
+ }
+}

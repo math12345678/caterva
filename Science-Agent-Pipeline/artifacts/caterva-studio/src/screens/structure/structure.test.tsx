@@ -27,6 +27,7 @@ import type {
   CoordinatesResponse,
   FindingRow,
   MdSetupResult,
+  NameRefusal,
   Outcome,
   PrepareResult,
   RunKind,
@@ -34,6 +35,8 @@ import type {
 } from "@/api/types";
 import type { RunState } from "@/api/useRun";
 import { mockServer, setSessionToken } from "@/__tests__/helpers";
+
+import { NameRefusalChoices } from "@/components/enzyme/NameRefusal";
 
 import { AnalyzeResultView } from "../Analyze";
 import { SetupResultView, tabOfRun } from "../Md";
@@ -182,21 +185,27 @@ describe("Structures", () => {
     expect(screen.queryByRole("table", { name: /PDB entries/ })).toBeNull();
   });
 
-  it("offers each EC number a refused name could be, as a search", async () => {
-    const r = namesFixture.result as unknown as StructureResult;
+  it("offers each enzyme a refused name could be, by name, and sends nothing until one is chosen", async () => {
     expect(namesFixture.outcome.meaning).toBe("refused");
-    const asked: string[] = [];
-    wrap(<StructureResultView result={r} runId={null} onCandidate={(ec) => asked.push(ec)} />);
-    for (const ec of r.candidates!) expect(screen.getByRole("button", { name: `EC ${ec}` })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: `EC ${r.candidates![1]}` }));
-    expect(asked).toEqual([r.candidates![1]]);
+    expect(namesFixture.result).toBeNull();
+    const refusal = namesFixture.outcome.name_refusal as unknown as NameRefusal;
+    const chosen: string[] = [];
+    wrap(<NameRefusalChoices refusal={refusal} onChoose={(ec) => chosen.push(ec)} />);
+    for (const c of refusal.named_candidates) {
+      expect(screen.getByText(c.name)).toBeInTheDocument();
+      expect(screen.getByText(`EC ${c.ec}`)).toBeInTheDocument();
+    }
+    const second = refusal.named_candidates[1];
+    await userEvent.click(screen.getByRole("button", { name: `Use EC ${second.ec}` }));
+    expect(chosen).toEqual([second.ec]);
   });
 
   it("says which EC number a name was resolved to, and offers the ChimeraX script the run kept", () => {
     const r = byNameFixture.result as unknown as StructureResult;
     mockServer(() => new Promise<Response>(() => {}));
     wrap(<StructureResultView result={r} runId="20260930-120000-structure-0badc0de" />);
-    expect(screen.getByText(new RegExp(`is EC ${r.ec.replace(/\./g, "\\.")}: the one EC number`))).toBeInTheDocument();
+    expect(r.subject_notes?.length).toBeGreaterThan(0);
+    expect(screen.getByText(r.subject_notes![0])).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Download the ChimeraX script" })).toBeInTheDocument();
   });
 });

@@ -1,0 +1,66 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=1.1.1.109"
+ },
+ "status": 200,
+ "body": {
+  "query": "1.1.1.109",
+  "organism": null,
+  "organism_code": null,
+  "organism_label": null,
+  "release": "02-Sep-2026",
+  "outcome": "resolved",
+  "resolved_ec": "1.3.1.28",
+  "how": "EC 1.1.1.109 was transferred in the enzyme nomenclature; it is now EC 1.3.1.28 (2,3-dihydro-2,3-dihydroxybenzoate dehydrogenase), so EC 1.3.1.28 is used",
+  "cautions": [
+   "EC 1.1.1.109 was transferred in the enzyme nomenclature; it is now EC 1.3.1.28 (2,3-dihydro-2,3-dihydroxybenzoate dehydrogenase), so EC 1.3.1.28 is used."
+  ],
+  "reason": null,
+  "recommended_ec": null,
+  "candidates_total": 2,
+  "candidates": [
+   {
+    "ec": "1.1.1.109",
+    "name": "",
+    "why": "you gave this EC number, which was transferred: EC 1.3.1.28",
+    "tier": 0,
+    "reaction": "",
+    "class_path": "Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor",
+    "alternative_names": [],
+    "organism": null,
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "transferred",
+    "superseded_by": [
+     "1.3.1.28"
+    ],
+    "partial_match": false,
+    "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.109 --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "1.3.1.28",
+    "name": "2,3-dihydro-2,3-dihydroxybenzoate dehydrogenase",
+    "why": "replaces EC 1.1.1.109, which was transferred to it",
+    "tier": 0,
+    "reaction": "(2S,3S)-2,3-dihydroxy-2,3-dihydrobenzoate + NAD(+) = 2,3-dihydroxybenzoate + NADH + H(+).",
+    "class_path": "Oxidoreductases > acting on the CH-CH group of donors > with NAD(+) or NADP(+) as acceptor",
+    "alternative_names": [],
+    "organism": null,
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "compose": "caterva compose \"Michaelis Menten\" --subject 1.3.1.28 --substrate <substrate>",
+    "recommended": false,
+    "caution": "EC 1.1.1.109 was transferred in the enzyme nomenclature; it is now EC 1.3.1.28 (2,3-dihydro-2,3-dihydroxybenzoate dehydrogenase), so EC 1.3.1.28 is used."
+   }
+  ],
+  "fallback": null
+ }
+}

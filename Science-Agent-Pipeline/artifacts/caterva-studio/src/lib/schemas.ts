@@ -194,6 +194,7 @@ export const CapabilitiesSchema = z
         hosts: z.record(z.boolean().nullable()),
         checked_at: z.string().nullable(),
         reason: z.string().nullable(),
+        source: z.string().nullable().default(null),
       })
       .passthrough(),
     gromacs: z

@@ -11,10 +11,11 @@
  */
 import { useState } from "react";
 
+import { isCompleteEc, subjectFields } from "@/api/enzymes";
 import type { ConstantsRequest } from "@/api/types";
 import { useRun } from "@/api/useRun";
 import { Checkbox, Field, fieldError, NumberInput, parseNumber, TextInput } from "@/components/forms/Field";
-import { Segmented } from "@/components/forms/Segmented";
+import { EnzymeFinder } from "@/components/enzyme/EnzymeFinder";
 import { Screen } from "@/components/screen/Screen";
 import { Loading } from "@/components/states/Loading";
 import { EmptyState, ErrorState } from "@/components/states/States";
@@ -31,8 +32,10 @@ const QUANTITIES = [
 ] as const;
 
 export interface ConstantsForm {
-  by: "ec" | "enzyme";
-  who: string;
+  /** The chosen enzyme's EC number; the request carries nothing else. */
+  ec: string;
+  /** A name a link or an older run carried, to start the finder from; never sent. */
+  ecSeed: string;
   organism: string;
   substrate: string;
   quantities: Record<string, boolean>;
@@ -43,8 +46,8 @@ export interface ConstantsForm {
 }
 
 export const EMPTY_CONSTANTS: ConstantsForm = {
-  by: "ec",
-  who: "",
+  ec: "",
+  ecSeed: "",
   organism: "",
   substrate: "",
   quantities: { km: true },
@@ -63,7 +66,7 @@ function num(t: string): number | undefined {
 
 export function constantsRequest(f: ConstantsForm): ConstantsRequest {
   const request: ConstantsRequest = { substrate: f.substrate.trim() };
-  if (f.who.trim()) request[f.by] = f.who.trim();
+  if (isCompleteEc(f.ec)) request.ec = f.ec.trim();
   if (f.organism.trim()) request.organism = f.organism.trim();
   const quantities = QUANTITIES.filter((q) => f.quantities[q.key]).map((q) => q.key);
   if (quantities.length) request.quantities = quantities;
@@ -81,9 +84,10 @@ export function constantsForm(request: Record<string, unknown>): ConstantsForm {
   const r = request as Partial<ConstantsRequest>;
   const quantities: Record<string, boolean> = {};
   for (const q of r.quantities ?? ["km"]) quantities[q] = true;
+  const { subject, subjectSeed } = subjectFields(text(r.ec ?? r.enzyme));
   return {
-    by: r.enzyme ? "enzyme" : "ec",
-    who: text(r.enzyme ?? r.ec),
+    ec: subject,
+    ecSeed: subjectSeed,
     organism: text(r.organism),
     substrate: text(r.substrate),
     quantities,
@@ -110,7 +114,10 @@ export default function ConstantsScreen() {
     reopened,
     linked,
     (request) => setForm(constantsForm(request)),
-    (fields) => setForm({ ...EMPTY_CONSTANTS, by: fields.enzyme ? "enzyme" : "ec", who: fields.enzyme ?? fields.ec ?? "", organism: fields.organism ?? "", substrate: fields.substrate ?? "" }),
+    (fields) => {
+      const { subject, subjectSeed } = subjectFields(fields.ec ?? fields.enzyme ?? "");
+      setForm({ ...EMPTY_CONSTANTS, ec: subject, ecSeed: subjectSeed, organism: fields.organism ?? "", substrate: fields.substrate ?? "" });
+    },
   );
   useRunAddress("/constants", run.run, reopened);
 
@@ -123,25 +130,14 @@ export default function ConstantsScreen() {
       running={running}
       onCancel={() => void run.cancel()}
     >
-      <div className="field">
-        <span className="field-label">Enzyme given as</span>
-        <Segmented
-          label="Enzyme given as"
-          value={form.by}
-          options={[
-            { value: "ec", label: "EC number" },
-            { value: "enzyme", label: "Name" },
-          ]}
-          onChange={(v) => set("by", v)}
-        />
-      </div>
-      <Field
-        label={form.by === "ec" ? "EC number" : "Enzyme name"}
-        hint={form.by === "enzyme" ? "Looked up in UniProt, and refused if it names more than one enzyme." : "Four numbers, as 2.7.1.1."}
-        error={err(form.by)}
-      >
-        <TextInput mono={form.by === "ec"} value={form.who} onChange={(e) => set("who", e.target.value)} />
-      </Field>
+      <EnzymeFinder
+        value={form.ec}
+        onChange={(ec) => setForm((f) => ({ ...f, ec, ecSeed: "" }))}
+        organism={form.organism}
+        seed={form.ecSeed}
+        hint="A name, an abbreviation or an EC number. Choose one from the list: the lookup is made for its EC number."
+        error={err("ec") ?? err("enzyme")}
+      />
       <Field label="Organism" hint="Required: the organism is never inferred." error={err("organism")}>
         <TextInput value={form.organism} onChange={(e) => set("organism", e.target.value)} />
       </Field>
@@ -202,6 +198,7 @@ export default function ConstantsScreen() {
               path="/constants"
               exports={() => [{ label: "JSON", artifact: "result.json", description: "the result exactly as the studio API sent it" }]}
               onRetry={() => void run.submit(constantsRequest(form))}
+              onChooseEnzyme={(ec) => setForm((f) => ({ ...f, ec, ecSeed: "" }))}
               idle={
                 <EmptyState title="Name an enzyme, an organism and a substrate">
                   <p>

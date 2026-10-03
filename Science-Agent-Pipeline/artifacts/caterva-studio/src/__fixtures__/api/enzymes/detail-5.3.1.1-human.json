@@ -1,0 +1,35 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/5.3.1.1?organism=human"
+ },
+ "status": 200,
+ "body": {
+  "ec": "5.3.1.1",
+  "name": "triose-phosphate isomerase",
+  "alternative_names": [
+   "phosphotriose isomerase",
+   "triosephosphate isomerase",
+   "triosephosphate mutase",
+   "triose phosphoisomerase"
+  ],
+  "reaction": "D-glyceraldehyde 3-phosphate = dihydroxyacetone phosphate.",
+  "class_path": "Isomerases > intramolecular oxidoreductases > interconverting aldoses and ketoses",
+  "status": "active",
+  "superseded_by": [],
+  "release": "02-Sep-2026",
+  "isozymes": {
+   "organism": "HUMAN",
+   "organism_label": "human",
+   "count": 1,
+   "proteins": [
+    {
+     "accession": "P60174",
+     "entry_name": "TPIS_HUMAN",
+     "symbol": "TPIS"
+    }
+   ],
+   "organism_known": true
+  }
+ }
+}

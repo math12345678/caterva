@@ -38,6 +38,12 @@ What each one read:
   `caterva/tests/fixtures/structure/uniprot_ec_by_name.json` (recorded
   2026-10-01, the recording test_studio_structure.py uses). The second is
   the refusal of a name that is six EC numbers, with the candidates.
+  Both were captured again on 2026-10-03 by
+  `caterva/tests/capture_studio_enzyme_fixtures.py` (see `../enzymes/README.md`),
+  because the one name policy (`caterva.enzymes.policy`, the enzyme finder's)
+  now reads the name before UniProt does: the first prints "Read '...' as EC
+  1.1.1.27" and carries `subject_notes`; the second is a refusal with no
+  `result` and an `outcome.name_refusal` naming each candidate.
 - `md-setup-1AKI.json`: `caterva md --pdb 1AKI --chain A --replicas 3 --out
   <run dir>/md-setup`; no network (no `--subject`). The paths in it are the
   temporary folder the script wrote into. `md-setup-1I10-chosen.json` is

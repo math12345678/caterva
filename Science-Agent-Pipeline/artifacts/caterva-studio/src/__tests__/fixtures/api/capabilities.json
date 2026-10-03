@@ -21,7 +21,8 @@
         "eutils.ncbi.nlm.nih.gov": null
       },
       "checked_at": null,
-      "reason": "not checked: probing contacts third-party hosts, so it is done only when asked"
+      "reason": "not checked: probing contacts third-party hosts, so it is done only when asked",
+      "source": null
     },
     "gromacs": {
       "found": true,

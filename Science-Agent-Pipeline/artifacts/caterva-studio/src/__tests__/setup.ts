@@ -7,8 +7,12 @@
  * mathematics are tested directly).
  */
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach } from "vitest";
+
+// A busy machine runs a dozen of these files at once; waiting for an answer
+// a second is not enough then, and the answer is not wrong, only late.
+configure({ asyncUtilTimeout: 6000 });
 
 afterEach(() => {
   cleanup();

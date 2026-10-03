@@ -270,6 +270,7 @@
   color: var(--danger);
 }
 .k-verdict-licence,
+.k-verdict-qualified,
 .k-verdict-behaviour,
 .k-verdict-next {
   margin: 0;
@@ -277,6 +278,15 @@
 }
 .k-verdict-next {
   font-weight: 500;
+}
+.k-verdict-qualified {
+  color: var(--fg);
+}
+.k-worst[data-source="isozymes"] {
+  border-color: color-mix(in oklch, var(--signal) 55%, var(--rule));
+}
+.k-worst[data-source="isozymes"] .k-eyebrow {
+  color: var(--signal-deep);
 }
 .k-worst {
   display: grid;
@@ -809,4 +819,22 @@
 }
 .k-result {
   scroll-margin-top: 1rem;
+}
+
+/* ---------------------------------------- solutions that cannot occur */
+
+.k-nonphysical {
+  margin: 0.75rem 0 0.25rem;
+  max-width: 72ch;
+  color: var(--fg-soft);
+}
+.k-nonphysical-labels {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.25rem;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }

@@ -26,6 +26,7 @@ import unrecognised from "@/__fixtures__/api/kinetics/compose-unrecognised.json"
 import constants from "@/__fixtures__/api/kinetics/constants-hexokinase.json";
 import simAssociation from "@/__fixtures__/api/kinetics/sim-association.json";
 import simDecay from "@/__fixtures__/api/kinetics/sim-decay.json";
+import ldhDetail from "@/__fixtures__/api/enzymes/detail-1.1.1.27-human.json";
 import capabilities from "@/__fixtures__/api/workspace/capabilities.json";
 import { frame, json, mockServer, setSessionToken, sseResponse } from "@/__tests__/helpers";
 import { resetRunStreamsForTests } from "@/api/runs";
@@ -336,13 +337,15 @@ describe("Compose screen", () => {
       if (req.url === `/api/runs/${run.id}/result`) return json(200, fixture.result);
       if (req.url === `/api/runs/${run.id}/events`) return replay(fixture);
       if (req.url === "/api/compose/shapes") return json(200, shapes);
+      if (req.url.startsWith(`/api/enzymes/${String(run.request.subject)}`)) return json(200, ldhDetail.body);
       return undefined;
     });
     render(withApp(`/compose?run=${run.id}`, <ComposeScreen />));
     const result = cap<ComposeResult>(fixture.result);
     expect(await screen.findByRole("region", { name: result.verdict!.verdict })).toBeInTheDocument();
     expect(screen.getByLabelText("Mechanism")).toHaveValue(String(run.request.description));
-    expect(screen.getByLabelText(/^Enzyme/)).toHaveValue(String(run.request.subject));
+    // The enzyme is the finder's summary of the EC number the run was asked about.
+    expect(screen.getByRole("group", { name: /^Enzyme/ })).toHaveTextContent(`EC ${String(run.request.subject)}`);
     expect(screen.getByLabelText(/^Inhibitor/)).toHaveValue(String(run.request.inhibitor));
   });
 
@@ -484,7 +487,7 @@ describe("Binding", () => {
 
   it("sends a computed value with its unit and σ, and reads a stored request back", () => {
     expect(
-      bindRequest({ mode: "inhibitor", ec: "1.1.1.27", organism: "human", inhibitor: "gossypol", state: "free", isoform: "", computed: "-7.9", error: "0.4", unit: "kcal" }),
+      bindRequest({ mode: "inhibitor", ec: "1.1.1.27", ecSeed: "", organism: "human", inhibitor: "gossypol", state: "free", isoform: "", computed: "-7.9", error: "0.4", unit: "kcal" }),
     ).toEqual({ ec: "1.1.1.27", mode: "inhibitor", organism: "human", inhibitor: "gossypol", computed: { value: -7.9, unit: "kcal", error: 0.4 } });
     const stored = (bindDisagrees.run as RunRecord).request;
     expect(bindRequest(bindForm(stored))).toMatchObject(stored);
@@ -499,11 +502,12 @@ describe("Binding", () => {
       if (req.url === `/api/runs/${run.id}/result`) return json(200, fixture.result);
       if (req.url === `/api/runs/${run.id}/events`) return replay(fixture);
       if (req.url === "/api/capabilities") return json(200, capabilities);
+      if (req.url.startsWith(`/api/enzymes/${String(run.request.ec)}`)) return json(200, ldhDetail.body);
       return undefined;
     });
     render(withApp(`/bind?run=${run.id}`, <BindScreen />));
     expect(await screen.findByRole("region", { name: /^The computed value / })).toBeInTheDocument();
-    expect(screen.getByLabelText("EC number")).toHaveValue(String(run.request.ec));
+    expect(screen.getByRole("group", { name: /^Enzyme/ })).toHaveTextContent(`EC ${String(run.request.ec)}`);
     expect(screen.getByRole("button", { name: "Judge" })).toBeInTheDocument();
   });
 });

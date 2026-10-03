@@ -1,0 +1,107 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=glucokinase"
+ },
+ "status": 200,
+ "body": {
+  "query": "glucokinase",
+  "organism": null,
+  "organism_code": null,
+  "organism_label": null,
+  "release": "02-Sep-2026",
+  "outcome": "resolved",
+  "resolved_ec": "2.7.1.2",
+  "how": "accepted name matches exactly",
+  "cautions": [],
+  "reason": null,
+  "recommended_ec": null,
+  "candidates_total": 4,
+  "candidates": [
+   {
+    "ec": "2.7.1.2",
+    "name": "glucokinase",
+    "why": "accepted name matches exactly",
+    "tier": 1,
+    "reaction": "D-glucose + ATP = D-glucose 6-phosphate + ADP + H(+).",
+    "class_path": "Transferases > transferring phosphorus-containing groups > phosphotransferases with an alcohol group as acceptor",
+    "alternative_names": [],
+    "organism": null,
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "compose": "caterva compose \"Michaelis Menten\" --subject 2.7.1.2 --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "2.7.1.1",
+    "name": "hexokinase",
+    "why": "your query is a phrase inside another name for this enzyme: 'hexokinase type IV (glucokinase)'",
+    "tier": 6,
+    "reaction": "a D-hexose + ATP = a D-hexose 6-phosphate + ADP + H(+).",
+    "class_path": "Transferases > transferring phosphorus-containing groups > phosphotransferases with an alcohol group as acceptor",
+    "alternative_names": [
+     "hexokinase type IV (glucokinase)"
+    ],
+    "organism": null,
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": true,
+    "compose": "caterva compose \"Michaelis Menten\" --subject 2.7.1.1 --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "2.7.1.147",
+    "name": "ADP-specific glucose/glucosamine kinase",
+    "why": "your query is a phrase inside another name for this enzyme: 'ADP-dependent glucokinase'",
+    "tier": 6,
+    "reaction": "(1) D-glucose + ADP = D-glucose 6-phosphate + AMP + H(+). (2) D-glucosamine + ADP = D-glucosamine 6-phosphate + AMP + H(+).",
+    "class_path": "Transferases > transferring phosphorus-containing groups > phosphotransferases with an alcohol group as acceptor",
+    "alternative_names": [
+     "ADP-dependent glucokinase",
+     "ADP-specific glucokinase"
+    ],
+    "organism": null,
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": true,
+    "compose": "caterva compose \"Michaelis Menten\" --subject 2.7.1.147 --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "2.7.1.63",
+    "name": "polyphosphate--glucose phosphotransferase",
+    "why": "your query is a phrase inside another name for this enzyme: 'polyphosphate glucokinase'",
+    "tier": 6,
+    "reaction": "[phosphate](n) + D-glucose = [phosphate](n-1) + D-glucose 6-phosphate + H(+).",
+    "class_path": "Transferases > transferring phosphorus-containing groups > phosphotransferases with an alcohol group as acceptor",
+    "alternative_names": [
+     "polyphosphate glucokinase"
+    ],
+    "organism": null,
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": true,
+    "compose": "caterva compose \"Michaelis Menten\" --subject 2.7.1.63 --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   }
+  ],
+  "fallback": null
+ }
+}

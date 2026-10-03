@@ -11,10 +11,12 @@
  */
 import { useState } from "react";
 
+import { isCompleteEc, subjectFields } from "@/api/enzymes";
 import type { BindRequest } from "@/api/types";
 import { useRun } from "@/api/useRun";
 import { Field, fieldError, NumberInput, parseNumber, TextInput } from "@/components/forms/Field";
 import { Segmented } from "@/components/forms/Segmented";
+import { EnzymeFinder } from "@/components/enzyme/EnzymeFinder";
 import { Screen } from "@/components/screen/Screen";
 import { EmptyState } from "@/components/states/States";
 
@@ -24,7 +26,10 @@ import "./kinetics/kinetics.css";
 
 export interface BindForm {
   mode: BindRequest["mode"];
+  /** The chosen enzyme's EC number; the request carries nothing else. */
   ec: string;
+  /** A name a link carried, to start the finder from; never sent. */
+  ecSeed: string;
   organism: string;
   inhibitor: string;
   state: "free" | "ternary";
@@ -37,6 +42,7 @@ export interface BindForm {
 export const EMPTY_BIND: BindForm = {
   mode: "inhibitor",
   ec: "",
+  ecSeed: "",
   organism: "",
   inhibitor: "",
   state: "free",
@@ -54,7 +60,7 @@ function num(t: string): number | undefined {
 }
 
 export function bindRequest(f: BindForm): BindRequest {
-  const request: BindRequest = { ec: f.ec.trim(), mode: f.mode };
+  const request: BindRequest = { ec: isCompleteEc(f.ec) ? f.ec.trim() : "", mode: f.mode };
   if (f.organism.trim()) request.organism = f.organism.trim();
   if (f.state !== "free") request.state = f.state;
   if (f.mode === "inhibitor") {
@@ -74,7 +80,8 @@ export function bindForm(request: Record<string, unknown>): BindForm {
   const r = request as Partial<BindRequest>;
   return {
     mode: r.mode ?? "inhibitor",
-    ec: text(r.ec),
+    ec: subjectFields(text(r.ec)).subject,
+    ecSeed: subjectFields(text(r.ec)).subjectSeed,
     organism: text(r.organism),
     inhibitor: text(r.inhibitor),
     state: r.state === "ternary" ? "ternary" : "free",
@@ -94,7 +101,11 @@ export default function BindScreen() {
   const err = (field: string) => fieldError(run.requestError, field);
   const running = run.submitting || run.status === "queued" || run.status === "running";
 
-  usePrefill(run.run, reopened, linked, (request) => setForm(bindForm(request)), (fields) => setForm({ ...EMPTY_BIND, ...fields }));
+  usePrefill(run.run, reopened, linked, (request) => setForm(bindForm(request)), (fields) => {
+      const { ec, ...rest } = fields;
+      const { subject, subjectSeed } = subjectFields(ec ?? "");
+      setForm({ ...EMPTY_BIND, ...rest, ec: subject, ecSeed: subjectSeed });
+    });
   useRunAddress("/bind", run.run, reopened);
 
   const pick = (compound: string) => {
@@ -121,14 +132,17 @@ export default function BindScreen() {
           onChange={(v) => set("mode", v)}
         />
       </div>
-      <div className="k-row2">
-        <Field label="EC number" hint="Four numbers, as 1.1.1.27." error={err("ec")}>
-          <TextInput mono value={form.ec} onChange={(e) => set("ec", e.target.value)} />
-        </Field>
-        <Field label="Organism" optional error={err("organism")}>
-          <TextInput value={form.organism} onChange={(e) => set("organism", e.target.value)} />
-        </Field>
-      </div>
+      <EnzymeFinder
+        value={form.ec}
+        onChange={(ec) => setForm((f) => ({ ...f, ec, ecSeed: "" }))}
+        organism={form.organism}
+        seed={form.ecSeed}
+        hint="A name, an abbreviation or an EC number. Choose one from the list: the binding data are read for its EC number."
+        error={err("ec")}
+      />
+      <Field label="Organism" optional error={err("organism")}>
+        <TextInput value={form.organism} onChange={(e) => set("organism", e.target.value)} />
+      </Field>
       {form.mode === "inhibitor" ? (
         <>
           <Field label="Inhibitor" hint="As BRENDA names it. Ask which compounds have a Ki to choose from the list." error={err("inhibitor")}>

@@ -1,0 +1,13 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/9.9.9.9"
+ },
+ "status": 404,
+ "body": {
+  "error": {
+   "code": "not_found",
+   "message": "EC 9.9.9.9 is not in the enzyme nomenclature (ExPASy ENZYME release 02-Sep-2026). Check the number."
+  }
+ }
+}

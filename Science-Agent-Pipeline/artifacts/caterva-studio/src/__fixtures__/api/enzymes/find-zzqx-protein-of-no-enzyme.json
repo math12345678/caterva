@@ -1,0 +1,24 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=zzqx%20protein%20of%20no%20enzyme"
+ },
+ "status": 200,
+ "body": {
+  "query": "zzqx protein of no enzyme",
+  "organism": null,
+  "organism_code": null,
+  "organism_label": null,
+  "release": "02-Sep-2026",
+  "outcome": "none",
+  "resolved_ec": null,
+  "how": null,
+  "cautions": [],
+  "reason": "no enzyme name in the nomenclature (ExPASy ENZYME release 02-Sep-2026) matches 'zzqx protein of no enzyme'.",
+  "recommended_ec": null,
+  "candidates_total": 0,
+  "candidates": [],
+  "fallback": null,
+  "fallback_unavailable": "the network is not known to be reachable (check it from the status bar), so UniProt was not asked"
+ }
+}

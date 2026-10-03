@@ -17,8 +17,9 @@
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 
-import type { ComposeResult as Result, Concern, RunRecord, SourcedValue, StructuredSection } from "@/api/types";
+import type { ComposeResult as Result, Concern, FixedPointView, RunRecord, SourcedValue, StabilityView, StructuredSection } from "@/api/types";
 import { TimeCourseChart } from "@/components/charts/TimeCourseChart";
+import { NameRefusalChoices } from "@/components/enzyme/NameRefusal";
 import { Disclosure } from "@/components/forms/Disclosure";
 import { Citation } from "@/components/provenance/Citation";
 import { countKinds, ProvenanceLegend } from "@/components/provenance/ProvenanceLegend";
@@ -69,7 +70,7 @@ function ConcernLine({ c }: { c: Concern }) {
 }
 
 /** The refused sections a partly refused compose run names, linked to where each says why. */
-function PartRefusal({ result, run }: { result: Result; run: RunRecord }) {
+function PartRefusal({ result, run, onChooseEnzyme }: { result: Result; run: RunRecord; onChooseEnzyme?: (ec: string) => void }) {
   const refused = result.sections.filter((s) => s.status !== "answered");
   const outcome = run.outcome;
   if (!outcome || outcome.meaning !== "refused") return null;
@@ -77,6 +78,7 @@ function PartRefusal({ result, run }: { result: Result; run: RunRecord }) {
     <div className="k-part-refusal" role="note">
       <span className="state-kicker">Refused in part</span>
       <p className="k-part-refusal-reason">{outcome.reason}</p>
+      {outcome.name_refusal ? <NameRefusalChoices refusal={outcome.name_refusal} onChoose={onChooseEnzyme} /> : null}
       {refused.length ? (
         <ul className="k-anchors">
           {refused.map((s) => (
@@ -93,18 +95,21 @@ function PartRefusal({ result, run }: { result: Result; run: RunRecord }) {
   );
 }
 
-export function Verdict({ result, run }: { result: Result; run: RunRecord }) {
+export function Verdict({ result, run, onChooseEnzyme }: { result: Result; run: RunRecord; onChooseEnzyme?: (ec: string) => void }) {
   const v = result.verdict;
   if (!v) {
     return (
       <section className="k-verdict" aria-label="Verdict">
         <p className="k-eyebrow">Verdict</p>
         <p className="k-verdict-licence">The command gave no verdict for this request (its stability analysis or simulation was switched off).</p>
-        <PartRefusal result={result} run={run} />
+        <PartRefusal result={result} run={run} onChooseEnzyme={onChooseEnzyme} />
       </section>
     );
   }
-  const [worst, ...rest] = v.concerns;
+  const isozymes = v.concerns.find((c) => c.source === "isozymes");
+  const qualified = v.concerns.filter((c) => c.qualifier);
+  const [worst, ...allRest] = v.concerns;
+  const rest = allRest.filter((c) => c !== isozymes);
   const checked = Object.entries(v.consulted);
   const unexamined = Object.entries(v.unavailable);
   return (
@@ -118,6 +123,20 @@ export function Verdict({ result, run }: { result: Result; run: RunRecord }) {
       <p className="k-verdict-licence">
         <span className="k-label-inline">What it supports</span> {v.licence}
       </p>
+      {qualified.map((c) => (
+        <p className="k-verdict-qualified" key={`${c.source}-q`}>
+          <span className="k-label-inline">Qualified</span> {c.qualifier}.
+        </p>
+      ))}
+      {isozymes && isozymes !== worst ? (
+        <div className="k-worst" data-severity={isozymes.severity} data-source="isozymes">
+          <p className="k-eyebrow">Which isozyme</p>
+          <p className="k-worst-detail">
+            <span>{isozymes.detail}</span>
+            {isozymes.remedy ? <span className="k-remedy">{isozymes.remedy}</span> : null}
+          </p>
+        </div>
+      ) : null}
       {worst ? (
         <div className="k-worst" data-severity={worst.severity}>
           <p className="k-eyebrow">The worst thing wrong with it</p>
@@ -136,7 +155,7 @@ export function Verdict({ result, run }: { result: Result; run: RunRecord }) {
           <span className="k-label-inline">Do this next</span> {v.next_step}
         </p>
       ) : null}
-      <PartRefusal result={result} run={run} />
+      <PartRefusal result={result} run={run} onChooseEnzyme={onChooseEnzyme} />
       {rest.length || checked.length || unexamined.length ? (
         <div className="k-verdict-more">
           {rest.length ? (
@@ -455,57 +474,98 @@ function Influence({ result }: { result: Result }) {
   );
 }
 
+/**
+ * The steady states the search found. Only physical ones are states: a
+ * solution with a negative amount solves the equations and cannot occur, so
+ * it is not listed as a found state. The report prints the same split ("10
+ * more at negative concentrations, which the equations have and the system
+ * cannot reach"); this says it once, in the same words, and keeps those
+ * solutions behind a disclosure with the engine's own labels.
+ */
+function FixedPointTable({ result, points }: { result: Result; points: FixedPointView[] }) {
+  const st = result.stability as StabilityView;
+  return (
+    <div className="table-wrap">
+      <table className="table">
+        <thead>
+          <tr>
+            <th scope="col">State</th>
+            {st.species.map((sp) => (
+              <th scope="col" key={sp} data-align="end" className="font-mono">
+                {sp}
+              </th>
+            ))}
+            <th scope="col" data-align="end">
+              Slowest timescale (s)
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {points.map((fp, i) => (
+            <tr key={i}>
+              <th scope="row">
+                <span className="k-state-class" data-stable={fp.stable ? "true" : "false"}>
+                  {fp.classification}
+                </span>
+              </th>
+              {st.species.map((sp) => (
+                <td key={sp} data-align="end" data-numeric="true">
+                  {fp.state[sp] === null || fp.state[sp] === undefined ? "none" : formatNumber(fp.state[sp] as number)}
+                </td>
+              ))}
+              <td data-align="end" data-numeric="true">
+                {fp.slowest_timescale === null ? "none" : formatNumber(fp.slowest_timescale)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function SteadyStates({ result }: { result: Result }) {
   const st = result.stability;
   if (!st) return null;
+  const physical = st.fixed_points.filter((fp) => fp.physical);
+  const unphysical = st.fixed_points.filter((fp) => !fp.physical);
   return (
     <Section
       title="Steady states"
       id="k-steady"
       aside={
         <span className="font-mono">
-          {st.fixed_points.length} found from {st.starts_tried} starts
+          {physical.length} found from {st.starts_tried} starts
         </span>
       }
     >
-      {st.fixed_points.length ? (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th scope="col">State</th>
-                {st.species.map((sp) => (
-                  <th scope="col" key={sp} data-align="end" className="font-mono">
-                    {sp}
-                  </th>
-                ))}
-                <th scope="col" data-align="end">
-                  Slowest timescale (s)
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {st.fixed_points.map((fp, i) => (
-                <tr key={i}>
-                  <th scope="row">
-                    <span className="k-state-class" data-stable={fp.stable ? "true" : "false"}>
-                      {fp.classification}
-                    </span>
-                    {!fp.physical ? <span className="text-caution"> not physical</span> : null}
-                  </th>
-                  {st.species.map((sp) => (
-                    <td key={sp} data-align="end" data-numeric="true">
-                      {fp.state[sp] === null || fp.state[sp] === undefined ? "none" : formatNumber(fp.state[sp] as number)}
-                    </td>
-                  ))}
-                  <td data-align="end" data-numeric="true">
-                    {fp.slowest_timescale === null ? "none" : formatNumber(fp.slowest_timescale)}
-                  </td>
-                </tr>
+      {physical.length ? (
+        <FixedPointTable result={result} points={physical} />
+      ) : (
+        <p className="k-invariants">
+          {st.fixed_points.length
+            ? "No steady state with non-negative amounts was found."
+            : `No steady state was found from ${st.starts_tried} starting points. That is not proof there is none: a root find reports where it converged.`}
+        </p>
+      )}
+      {unphysical.length ? (
+        <>
+          <p className="k-nonphysical" data-testid="nonphysical-sentence">
+            {unphysical.length} more {unphysical.length === 1 ? "solution is" : "solutions are"} at negative concentrations, which
+            the equations have and the system cannot reach. {unphysical.length === 1 ? "It is" : "They are"} not listed as steady
+            states.
+          </p>
+          <Disclosure title={`The ${unphysical.length} solutions at negative concentrations`} aside={<span className="font-mono">not states</span>}>
+            <FixedPointTable result={result} points={unphysical} />
+            <ul className="k-nonphysical-labels">
+              {unphysical.map((fp, i) => (
+                <li key={i} className="font-mono">
+                  {fp.description ?? `${fp.classification}: negative concentrations, not physically reachable`}
+                </li>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </ul>
+          </Disclosure>
+        </>
       ) : null}
       <p className="k-invariants muted">
         Amounts in {result.model.concentration_unit}, computed by Caterva
@@ -551,11 +611,11 @@ function AnalysisSection({ section }: { section: StructuredSection }) {
   );
 }
 
-export function ComposeResultView({ result, run }: { result: Result; run: RunRecord }) {
+export function ComposeResultView({ result, run, onChooseEnzyme }: { result: Result; run: RunRecord; onChooseEnzyme?: (ec: string) => void }) {
   const refusedExports = Object.entries(result.exports).filter(([, e]) => !e.available);
   return (
     <>
-      <Verdict result={result} run={run} />
+      <Verdict result={result} run={run} onChooseEnzyme={onChooseEnzyme} />
       <p className="k-reading">
         Read <span className="font-mono">{result.query}</span> as {result.recognition.reading}{" "}
         <span className="muted font-mono">({result.recognition.rule})</span>

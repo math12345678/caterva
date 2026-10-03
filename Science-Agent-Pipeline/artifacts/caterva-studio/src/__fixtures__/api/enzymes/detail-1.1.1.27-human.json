@@ -1,0 +1,53 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/1.1.1.27?organism=human"
+ },
+ "status": 200,
+ "body": {
+  "ec": "1.1.1.27",
+  "name": "L-lactate dehydrogenase",
+  "alternative_names": [
+   "L-lactic acid dehydrogenase",
+   "L-lactic dehydrogenase"
+  ],
+  "reaction": "(S)-lactate + NAD(+) = pyruvate + NADH + H(+).",
+  "class_path": "Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor",
+  "status": "active",
+  "superseded_by": [],
+  "release": "02-Sep-2026",
+  "isozymes": {
+   "organism": "HUMAN",
+   "organism_label": "human",
+   "count": 5,
+   "proteins": [
+    {
+     "accession": "Q6ZMR3",
+     "entry_name": "LDH6A_HUMAN",
+     "symbol": "LDH6A"
+    },
+    {
+     "accession": "Q9BYZ2",
+     "entry_name": "LDH6B_HUMAN",
+     "symbol": "LDH6B"
+    },
+    {
+     "accession": "P00338",
+     "entry_name": "LDHA_HUMAN",
+     "symbol": "LDHA"
+    },
+    {
+     "accession": "P07195",
+     "entry_name": "LDHB_HUMAN",
+     "symbol": "LDHB"
+    },
+    {
+     "accession": "P07864",
+     "entry_name": "LDHC_HUMAN",
+     "symbol": "LDHC"
+    }
+   ],
+   "organism_known": true
+  }
+ }
+}

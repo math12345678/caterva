@@ -1,0 +1,160 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/capabilities"
+ },
+ "status": 200,
+ "body": {
+  "version": "0.4.0",
+  "api_version": 1,
+  "python": "3.12.13",
+  "platform": "darwin",
+  "frozen": false,
+  "literature": {
+   "available": true,
+   "reason": null
+  },
+  "network": {
+   "checked": false,
+   "reachable": null,
+   "hosts": {
+    "www.brenda-enzymes.org": null,
+    "rest.uniprot.org": null,
+    "search.rcsb.org": null,
+    "files.rcsb.org": null,
+    "eutils.ncbi.nlm.nih.gov": null
+   },
+   "checked_at": null,
+   "source": null,
+   "reason": "not checked: probing contacts third-party hosts, so it is done only when asked"
+  },
+  "gromacs": {
+   "found": false,
+   "path": null,
+   "version": null,
+   "reason": "GROMACS was not found (looked for gmx on PATH, $GMX, /opt/homebrew/bin/gmx and /usr/local/bin/gmx); setting up a simulation still works, running it needs GROMACS"
+  },
+  "rates": {
+   "available": false,
+   "reason": "no adapter registered the rates kind"
+  },
+  "ui": {
+   "built": false,
+   "static_dir": "/tmp/claude-501/caterva-enzyme-fixtures-7zo_zztb/no-build",
+   "reason": "the page has not been built: /tmp/claude-501/caterva-enzyme-fixtures-7zo_zztb/no-build/index.html does not exist. Build it with `pnpm --filter @workspace/caterva-studio run build` from Science-Agent-Pipeline/"
+  },
+  "data_dir": {
+   "path": "/tmp/claude-501/caterva-enzyme-fixtures-7zo_zztb/data",
+   "writable": true,
+   "runs": 0,
+   "reason": null
+  },
+  "kinds": {
+   "compose": {
+    "available": true,
+    "title": "Compose a model",
+    "command": "compose",
+    "needs": [
+     "network",
+     "literature"
+    ],
+    "reason": null
+   },
+   "constants": {
+    "available": true,
+    "title": "Measured constants",
+    "command": "cite",
+    "needs": [
+     "network",
+     "literature"
+    ],
+    "reason": null
+   },
+   "sim": {
+    "available": true,
+    "title": "Stochastic simulation",
+    "command": "sim",
+    "needs": [],
+    "reason": null
+   },
+   "bind": {
+    "available": true,
+    "title": "Binding free energy target",
+    "command": "bind",
+    "needs": [
+     "network",
+     "literature"
+    ],
+    "reason": null
+   },
+   "structure": {
+    "available": true,
+    "title": "Find structures",
+    "command": "structure",
+    "needs": [
+     "network",
+     "literature"
+    ],
+    "reason": null
+   },
+   "prepare": {
+    "available": true,
+    "title": "Audit an entry",
+    "command": "prepare",
+    "needs": [
+     "network"
+    ],
+    "reason": null
+   },
+   "md.setup": {
+    "available": true,
+    "title": "Write a GROMACS setup",
+    "command": "md",
+    "needs": [
+     "network",
+     "literature"
+    ],
+    "reason": null
+   },
+   "md.summarise": {
+    "available": true,
+    "title": "Summarise replicas",
+    "command": "md",
+    "needs": [],
+    "reason": null
+   },
+   "analyze": {
+    "available": true,
+    "title": "Analyse replicas",
+    "command": "analyze",
+    "needs": [
+     "network",
+     "gromacs"
+    ],
+    "reason": null
+   },
+   "fep.status": {
+    "available": true,
+    "title": "FEP status",
+    "command": "fep",
+    "needs": [],
+    "reason": null
+   },
+   "complex.check": {
+    "available": true,
+    "title": "Check the complex's pose",
+    "command": "complex",
+    "needs": [],
+    "reason": null
+   },
+   "rates": {
+    "available": false,
+    "title": "caterva rates",
+    "command": "caterva rates",
+    "needs": [],
+    "reason": "not built yet in this version of Caterva Studio"
+   }
+  },
+  "dev_origin": null
+ }
+}

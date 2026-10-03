@@ -1,0 +1,69 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=hexokinase&organism=human"
+ },
+ "status": 200,
+ "body": {
+  "query": "hexokinase",
+  "organism": "human",
+  "organism_code": "HUMAN",
+  "organism_label": "human",
+  "release": "02-Sep-2026",
+  "outcome": "resolved",
+  "resolved_ec": "2.7.1.1",
+  "how": "accepted name matches exactly",
+  "cautions": [],
+  "reason": null,
+  "recommended_ec": null,
+  "candidates_total": 1,
+  "candidates": [
+   {
+    "ec": "2.7.1.1",
+    "name": "hexokinase",
+    "why": "accepted name matches exactly",
+    "tier": 1,
+    "reaction": "a D-hexose + ATP = a D-hexose 6-phosphate + ADP + H(+).",
+    "class_path": "Transferases > transferring phosphorus-containing groups > phosphotransferases with an alcohol group as acceptor",
+    "alternative_names": [],
+    "organism": "HUMAN",
+    "organism_proteins": [
+     {
+      "accession": "Q2TB90",
+      "entry_name": "HKDC1_HUMAN",
+      "symbol": "HKDC1"
+     },
+     {
+      "accession": "P19367",
+      "entry_name": "HXK1_HUMAN",
+      "symbol": "HXK1"
+     },
+     {
+      "accession": "P52789",
+      "entry_name": "HXK2_HUMAN",
+      "symbol": "HXK2"
+     },
+     {
+      "accession": "P52790",
+      "entry_name": "HXK3_HUMAN",
+      "symbol": "HXK3"
+     },
+     {
+      "accession": "P35557",
+      "entry_name": "HXK4_HUMAN",
+      "symbol": "HXK4"
+     }
+    ],
+    "organism_protein_count": 5,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "compose": "caterva compose \"Michaelis Menten\" --subject 2.7.1.1 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   }
+  ],
+  "fallback": null
+ }
+}

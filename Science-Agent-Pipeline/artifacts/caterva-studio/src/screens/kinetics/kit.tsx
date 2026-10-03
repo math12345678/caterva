@@ -314,6 +314,7 @@ export function KineticsRun<K extends RunKind>({
   idle,
   exports,
   onRetry,
+  onChooseEnzyme,
   children,
 }: {
   state: RunState<K> & { cancel: () => Promise<void> };
@@ -322,6 +323,8 @@ export function KineticsRun<K extends RunKind>({
   idle: ReactNode;
   exports?: (result: RunResults[K], run: RunRecord) => ExportChoice[];
   onRetry?: () => void;
+  /** Sets the form's enzyme when the person picks one of the candidates a refused name was given. */
+  onChooseEnzyme?: (ec: string) => void;
   children: (result: RunResults[K], run: RunRecord) => ReactNode;
 }) {
   const top = useRef<HTMLDivElement>(null);
@@ -346,7 +349,7 @@ export function KineticsRun<K extends RunKind>({
     return (
       <>
         <div ref={top} className="k-anchor" />
-        <RunPanel state={state} onCancel={() => void state.cancel()} onRetry={onRetry} idle={idle}>
+        <RunPanel state={state} onCancel={() => void state.cancel()} onRetry={onRetry} onChooseEnzyme={onChooseEnzyme} idle={idle}>
           {() => null}
         </RunPanel>
       </>

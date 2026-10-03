@@ -5,9 +5,10 @@
  * with the catalytic residues `caterva prepare` places on it.
  *
  * One run of `caterva structure` (kind `structure`). The enzyme is an EC
- * number or a name; a name is looked up by the command, and one that names
- * several enzymes is refused with each candidate, which the screen offers
- * as a search. An EC number that is several proteins is refused too (the
+ * number, chosen with the enzyme finder, which sends the EC number; a name
+ * that still arrives (a link, an older run) is read by the command's one
+ * name policy, and one that names several enzymes is refused with each
+ * candidate named, which the run panel offers as a choice. An EC number that is several proteins is refused too (the
  * command will not choose LDHA for you when you asked for LDH), and the
  * screen shows the protein table with a choice per protein, which asks the
  * same question again with that protein's gene, as the command's own hint
@@ -17,9 +18,11 @@ import { ExternalLink } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 
+import { isCompleteEc, subjectFields } from "@/api/enzymes";
 import type { ProteinRow, StructureRequest, StructureResult, StructureRow } from "@/api/types";
 import { useRun } from "@/api/useRun";
 import { useRunAddress } from "@/lib/runAddress";
+import { EnzymeFinder } from "@/components/enzyme/EnzymeFinder";
 import { Checkbox, Field, fieldError, NumberInput, parseNumber, TextInput } from "@/components/forms/Field";
 import { Disclosure } from "@/components/forms/Disclosure";
 import { Citation } from "@/components/provenance/Citation";
@@ -35,7 +38,10 @@ import { ArtifactButton, Own, RunScreen, sentenceCase, text, useParam, useRefill
 import "./structure/structure.css";
 
 interface Form {
+  /** The chosen enzyme's EC number; the request carries nothing else. */
   subject: string;
+  /** A name a link carried, to start the finder from; never sent. */
+  subjectSeed: string;
   organism: string;
   gene: string;
   uniprot: string;
@@ -46,7 +52,7 @@ interface Form {
 
 /** The request for a form. A number the page cannot read is sent as typed, so the server names it. */
 export function structureRequest(f: Form): StructureRequest {
-  const r: StructureRequest = { subject: f.subject.trim() };
+  const r: StructureRequest = { subject: isCompleteEc(f.subject) ? f.subject.trim() : "" };
   for (const key of ["organism", "gene", "uniprot", "ligand"] as const) if (f[key].trim()) r[key] = f[key].trim();
   if (f.top.trim()) r.top = (parseNumber(f.top) ?? f.top.trim()) as number;
   if (f.chimerax) r.chimerax = true;
@@ -59,7 +65,7 @@ export default function StructureScreen() {
   useRunAddress("/structure", run.run, reopened);
   const caps = useCapabilities();
   const [form, setForm] = useState<Form>({
-    subject: useParam("subject") ?? "",
+    ...subjectFields(useParam("subject") ?? ""),
     organism: useParam("organism") ?? "",
     gene: "",
     uniprot: "",
@@ -70,7 +76,7 @@ export default function StructureScreen() {
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
   useRefill(reopened, run.run, (r) =>
     setForm({
-      subject: text(r.subject),
+      ...subjectFields(text(r.subject)),
       organism: text(r.organism),
       gene: text(r.gene),
       uniprot: text(r.uniprot),
@@ -96,22 +102,25 @@ export default function StructureScreen() {
         id="structure"
         formLabel="Search the PDB"
         action="Search"
-        canSubmit={Boolean(form.subject.trim())}
+        canSubmit={isCompleteEc(form.subject)}
+        onChooseEnzyme={(ec) => setForm((f) => ({ ...f, subject: ec, subjectSeed: "", gene: "", uniprot: "" }))}
         onSubmit={() => void run.submit(structureRequest(form))}
         run={run}
         form={
           <>
-            <Field
-              label="Enzyme"
+            <EnzymeFinder
+              autoFocus
+              value={form.subject}
+              onChange={(ec) => setForm((f) => ({ ...f, subject: ec, subjectSeed: "", gene: ec === f.subject ? f.gene : "", uniprot: ec === f.subject ? f.uniprot : "" }))}
+              organism={form.organism}
+              seed={form.subjectSeed}
               error={err("subject")}
               hint={
                 literature && !literature.available
-                  ? "An EC number. Looking up a name needs the literature layer, which this installation does not have."
-                  : "An EC number (1.1.1.27) or a name (hexokinase). A name that is several enzymes is refused with each one named."
+                  ? "A name, an abbreviation or an EC number. The nomenclature resolves names offline; a protein name that is not an enzyme name needs the literature layer, which this installation does not have."
+                  : "A name, an abbreviation or an EC number. Choose one from the list: the search is made for its EC number."
               }
-            >
-              <TextInput mono autoFocus value={form.subject} onChange={(e) => set("subject", e.target.value)} />
-            </Field>
+            />
             <Field label="Organism" optional error={err("organism")} hint="Latin or common name; left out, every organism.">
               <TextInput value={form.organism} onChange={(e) => set("organism", e.target.value)} />
             </Field>
@@ -163,7 +172,6 @@ export default function StructureScreen() {
             runId={run.run?.id ?? null}
             busy={run.status === "queued" || run.status === "running"}
             onChoose={(p) => ask({ ...form, gene: p.gene ?? "", uniprot: p.gene ? "" : p.accession })}
-            onCandidate={(ec) => ask({ ...form, subject: ec, gene: "", uniprot: "" })}
           />
         )}
       </RunScreen>
@@ -175,35 +183,16 @@ export function StructureResultView({
   result,
   runId,
   onChoose,
-  onCandidate,
   busy = false,
 }: {
   result: StructureResult;
   runId: string | null;
   onChoose?: (protein: ProteinRow) => void;
-  onCandidate?: (ec: string) => void;
   busy?: boolean;
 }) {
   const [open, setOpen] = useState<string | null>(result.entries[0]?.pdb_id ?? null);
   useEffect(() => setOpen(result.entries[0]?.pdb_id ?? null), [result]);
   const chosen = result.proteins.find((p) => p.chosen) ?? null;
-
-  if (result.candidates?.length) {
-    return (
-      <Section title="Which enzyme did you mean?" aside={`${result.candidates.length} EC numbers`}>
-        <p className="st-prose">
-          UniProt's reviewed entries file <q>{result.subject_name}</q> under each of these. Search one:
-        </p>
-        <div className="st-candidates">
-          {result.candidates.map((ec) => (
-            <button key={ec} type="button" className="btn font-mono" disabled={busy} onClick={() => onCandidate?.(ec)}>
-              EC {ec}
-            </button>
-          ))}
-        </div>
-      </Section>
-    );
-  }
 
   return (
     <>
@@ -223,11 +212,11 @@ export function StructureResultView({
             </>
           ) : null}
         </h2>
-        {result.subject_name ? (
-          <p className="st-prose">
-            <q>{result.subject_name}</q> is EC {result.ec}: the one EC number UniProt's reviewed entries give that name.
+        {(result.subject_notes ?? []).map((note) => (
+          <p className="st-prose" key={note}>
+            {note}
           </p>
-        ) : null}
+        ))}
         {result.organism_note ? <p className="st-prose">{result.organism_note}</p> : null}
       </div>
 

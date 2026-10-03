@@ -21,6 +21,7 @@
 import { type KeyboardEvent, type ReactNode, useId, useMemo, useState } from "react";
 import { Link } from "wouter";
 
+import { isCompleteEc, subjectFields } from "@/api/enzymes";
 import type {
   ComplexCheckResult,
   ConvergenceResult,
@@ -31,6 +32,7 @@ import type {
   SourcedValue,
 } from "@/api/types";
 import { useRun } from "@/api/useRun";
+import { EnzymeFinder } from "@/components/enzyme/EnzymeFinder";
 import { Disclosure } from "@/components/forms/Disclosure";
 import { Field, fieldError, NumberInput, parseNumber, TextInput } from "@/components/forms/Field";
 import { Citation } from "@/components/provenance/Citation";
@@ -145,7 +147,10 @@ interface SetupForm {
   pdb: string;
   chain: string;
   out: string;
+  /** The chosen enzyme's EC number; the request carries nothing else. */
   subject: string;
+  /** A name a link or an older run carried, to start the finder from; never sent. */
+  subjectSeed: string;
   organism: string;
   substrate: string;
   temperature_k: string;
@@ -159,7 +164,8 @@ interface SetupForm {
 /** The request for the form; a number the page cannot read is sent as typed, so the server names it. */
 export function setupRequest(f: SetupForm): MdSetupRequest {
   const r: MdSetupRequest = { pdb: f.pdb.trim() };
-  for (const k of ["chain", "out", "subject", "organism", "substrate"] as const) if (f[k].trim()) r[k] = f[k].trim();
+  for (const k of ["chain", "out", "organism", "substrate"] as const) if (f[k].trim()) r[k] = f[k].trim();
+  if (isCompleteEc(f.subject)) r.subject = f.subject.trim();
   for (const k of ["temperature_k", "ph", "ns", "ionic_strength_m", "seed", "replicas"] as const) {
     if (f[k].trim()) r[k] = (parseNumber(f[k]) ?? f[k].trim()) as number;
   }
@@ -191,6 +197,7 @@ function SetupPanel({ runId, onSummarise, active }: { runId: string | null; onSu
     chain: useParam("chain") ?? "",
     out: "",
     subject: "",
+    subjectSeed: "",
     organism: "",
     substrate: "",
     temperature_k: "",
@@ -206,7 +213,7 @@ function SetupPanel({ runId, onSummarise, active }: { runId: string | null; onSu
     // The default folder is the run's own; asking again writes a new run's.
     const own = run.run && out.includes(`/runs/${run.run.id}/`);
     setF({
-      pdb: text(r.pdb), chain: text(r.chain), out: own ? "" : out, subject: text(r.subject), organism: text(r.organism),
+      pdb: text(r.pdb), chain: text(r.chain), out: own ? "" : out, ...subjectFields(text(r.subject)), organism: text(r.organism),
       substrate: text(r.substrate), temperature_k: text(r.temperature_k), ph: text(r.ph), ns: text(r.ns),
       ionic_strength_m: text(r.ionic_strength_m), seed: text(r.seed), replicas: text(r.replicas),
     });
@@ -227,6 +234,7 @@ function SetupPanel({ runId, onSummarise, active }: { runId: string | null; onSu
       action="Write setup"
       canSubmit={Boolean(f.pdb.trim())}
       onSubmit={() => void run.submit(setupRequest(f))}
+      onChooseEnzyme={(ec) => setF((s) => ({ ...s, subject: ec, subjectSeed: "" }))}
       run={run}
       form={
         <>
@@ -252,9 +260,14 @@ function SetupPanel({ runId, onSummarise, active }: { runId: string | null; onSu
           />
           <fieldset className="st-fieldset">
             <legend>Conditions from the measured kinetics</legend>
-            <Field label="Enzyme (EC number)" optional error={err("subject")}>
-              <TextInput mono value={f.subject} onChange={(e) => set("subject")(e.target.value)} />
-            </Field>
+            <EnzymeFinder
+              optional
+              value={f.subject}
+              onChange={(ec) => setF((s) => ({ ...s, subject: ec, subjectSeed: "" }))}
+              organism={f.organism}
+              seed={f.subjectSeed}
+              error={err("subject")}
+            />
             <div className="st-row2">
               <Field label="Organism" optional error={err("organism")}>
                 <TextInput value={f.organism} onChange={(e) => set("organism")(e.target.value)} />

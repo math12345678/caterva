@@ -17,10 +17,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 
 import { apiJson, apiPost } from "@/api/client";
+import { isCompleteEc, subjectFields } from "@/api/enzymes";
 import type { ComposeAnalyses, ComposeRequest, NormaliseOrganismResponse, ShapesResponse } from "@/api/types";
 import { useRun } from "@/api/useRun";
 import { Disclosure } from "@/components/forms/Disclosure";
 import { Checkbox, Field, fieldError, NumberInput, parseNumber, TextInput } from "@/components/forms/Field";
+import { EnzymeFinder } from "@/components/enzyme/EnzymeFinder";
+import { IsoformChooser } from "@/components/enzyme/IsoformChooser";
 import { Screen } from "@/components/screen/Screen";
 import { EmptyState } from "@/components/states/States";
 
@@ -42,7 +45,10 @@ export const ANALYSES: { key: keyof ComposeAnalyses & string; label: string; hin
 
 export interface ComposeForm {
   description: string;
+  /** The enzyme's EC number once one is chosen; the request never carries anything else. */
   subject: string;
+  /** A name a link carried, to start the finder's search from; never sent. */
+  subjectSeed: string;
   organism: string;
   substrate: string;
   inhibitor: string;
@@ -69,6 +75,7 @@ export interface ComposeForm {
 export const EMPTY_COMPOSE: ComposeForm = {
   description: "",
   subject: "",
+  subjectSeed: "",
   organism: "",
   substrate: "",
   inhibitor: "",
@@ -105,9 +112,11 @@ function num(textValue: string): number | undefined {
 /** The request for a form. */
 export function composeRequest(f: ComposeForm): ComposeRequest {
   const request: ComposeRequest = { description: f.description.trim() };
-  for (const key of ["subject", "organism", "substrate", "inhibitor", "isoform"] as const) {
+  for (const key of ["organism", "substrate", "inhibitor", "isoform"] as const) {
     if (f[key].trim()) request[key] = f[key].trim();
   }
+  // The engine is sent the EC number the person chose, never the text they typed.
+  if (isCompleteEc(f.subject)) request.subject = f.subject.trim();
   if (f.any_mode) request.any_mode = true;
   if (f.no_simulate) request.no_simulate = true;
   if (f.no_analysis) request.no_analysis = true;
@@ -146,7 +155,7 @@ export function composeForm(request: Record<string, unknown>): ComposeForm {
   return {
     ...EMPTY_COMPOSE,
     description: text(r.description),
-    subject: text(r.subject),
+    ...subjectFields(text(r.subject)),
     organism: text(r.organism),
     substrate: text(r.substrate),
     inhibitor: text(r.inhibitor),
@@ -188,7 +197,10 @@ export default function ComposeScreen() {
     reopened,
     linked,
     (request) => setForm(composeForm(request)),
-    (fields) => setForm({ ...EMPTY_COMPOSE, ...fields }),
+    (fields) => {
+      const { subject, ...rest } = fields;
+      setForm({ ...EMPTY_COMPOSE, ...rest, ...subjectFields(subject ?? "") });
+    },
   );
   useRunAddress("/compose", run.run, reopened);
 
@@ -200,6 +212,7 @@ export default function ComposeScreen() {
       () => setOrganismNote(null),
     );
   };
+  const chooseEnzyme = (ec: string) => setForm((f) => ({ ...f, subject: ec, subjectSeed: "", isoform: "" }));
   const chosen = ANALYSES.filter((a) => form.analyses[a.key]).length + (form.robustness ? 1 : 0) + (form.stochastic ? 1 : 0);
 
   const formPane = (
@@ -229,14 +242,15 @@ export default function ComposeScreen() {
       />
 
       <FieldGroup title="Constants from the literature">
-        <Field
-          label="Enzyme"
+        <EnzymeFinder
           optional
-          hint="An EC number (1.1.1.27) or a name. With one, Km, kcat and Ki are searched in BRENDA; without one the model keeps labelled placeholders."
+          value={form.subject}
+          onChange={(ec) => setForm((f) => ({ ...f, subject: ec, subjectSeed: "", ...(ec === f.subject ? {} : { isoform: "" }) }))}
+          organism={form.organism}
+          seed={form.subjectSeed}
+          hint="A name, an abbreviation or an EC number. With one chosen, Km, kcat and Ki are searched in BRENDA; without one the model keeps labelled placeholders."
           error={err("subject")}
-        >
-          <TextInput mono value={form.subject} onChange={(e) => set("subject", e.target.value)} />
-        </Field>
+        />
         <Field label="Organism" optional hint={organismNote ?? "Never inferred; a measurement in another organism is never substituted."} error={err("organism")}>
           <TextInput
             value={form.organism}
@@ -248,14 +262,18 @@ export default function ComposeScreen() {
            
           />
         </Field>
-        <div className="k-row2">
-          <Field label="Substrate" optional error={err("substrate")}>
-            <TextInput value={form.substrate} onChange={(e) => set("substrate", e.target.value)} />
-          </Field>
-          <Field label="Isoform" optional error={err("isoform")}>
-            <TextInput value={form.isoform} onChange={(e) => set("isoform", e.target.value)} />
-          </Field>
-        </div>
+        <Field label="Substrate" optional error={err("substrate")}>
+          <TextInput value={form.substrate} onChange={(e) => set("substrate", e.target.value)} />
+        </Field>
+        <Field
+          label="Isoform"
+          optional
+          hint="As the papers write it (LDH-A, HK-1). Each constant is then taken from a row that measured it."
+          error={err("isoform")}
+        >
+          <TextInput value={form.isoform} onChange={(e) => set("isoform", e.target.value)} />
+        </Field>
+        <IsoformChooser ec={form.subject} organism={form.organism} value={form.isoform} onChange={(v) => set("isoform", v)} />
         <Field label="Inhibitor" optional error={err("inhibitor")}>
           <TextInput value={form.inhibitor} onChange={(e) => set("inhibitor", e.target.value)} />
         </Field>
@@ -349,6 +367,7 @@ export default function ComposeScreen() {
             path="/compose"
             exports={composeExports}
             onRetry={() => void run.submit(composeRequest(form))}
+            onChooseEnzyme={chooseEnzyme}
             idle={
               <EmptyState title="Describe a mechanism, not a pathway">
                 <p>
@@ -362,7 +381,7 @@ export default function ComposeScreen() {
               </EmptyState>
             }
           >
-            {(result, record) => <ComposeResultView result={result} run={record} />}
+            {(result, record) => <ComposeResultView result={result} run={record} onChooseEnzyme={chooseEnzyme} />}
           </KineticsRun>
         }
       />

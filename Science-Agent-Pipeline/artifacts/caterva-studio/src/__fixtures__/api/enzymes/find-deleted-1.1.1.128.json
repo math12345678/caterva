@@ -1,0 +1,44 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=1.1.1.128"
+ },
+ "status": 200,
+ "body": {
+  "query": "1.1.1.128",
+  "organism": null,
+  "organism_code": null,
+  "organism_label": null,
+  "release": "02-Sep-2026",
+  "outcome": "none",
+  "resolved_ec": null,
+  "how": null,
+  "cautions": [],
+  "reason": "EC 1.1.1.128 was deleted from the enzyme nomenclature and has no replacement (ExPASy ENZYME release 02-Sep-2026). Check the number.",
+  "recommended_ec": null,
+  "candidates_total": 1,
+  "candidates": [
+   {
+    "ec": "1.1.1.128",
+    "name": "",
+    "why": "you gave this EC number, which the nomenclature has deleted",
+    "tier": 0,
+    "reaction": "",
+    "class_path": "Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor",
+    "alternative_names": [],
+    "organism": null,
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "deleted",
+    "superseded_by": [],
+    "partial_match": false,
+    "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.128 --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   }
+  ],
+  "fallback": null,
+  "fallback_unavailable": "the network is not known to be reachable (check it from the status bar), so UniProt was not asked"
+ }
+}

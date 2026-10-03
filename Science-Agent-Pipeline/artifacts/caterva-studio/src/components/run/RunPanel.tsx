@@ -15,6 +15,7 @@ import { isTerminal } from "@/api/runs";
 import type { RunKind, RunResults } from "@/api/types";
 import type { RunState } from "@/api/useRun";
 import { Disclosure } from "@/components/forms/Disclosure";
+import { NameRefusalChoices } from "@/components/enzyme/NameRefusal";
 import { CommandSlab } from "@/components/report/Report";
 import { Loading } from "@/components/states/Loading";
 import { EmptyState, ErrorState, OutcomeNotice, RunFailedState } from "@/components/states/States";
@@ -88,12 +89,15 @@ export function RunPanel<K extends RunKind>({
   state,
   onCancel,
   onRetry,
+  onChooseEnzyme,
   idle,
   children,
 }: {
   state: RunState<K>;
   onCancel?: () => void;
   onRetry?: () => void;
+  /** Sets the form's enzyme when the person picks one of the candidates a refused name was given. */
+  onChooseEnzyme?: (ec: string) => void;
   /** Shown before anything was submitted. */
   idle?: ReactNode;
   /** The screen's drawing of a finished result. */
@@ -142,7 +146,9 @@ export function RunPanel<K extends RunKind>({
     default:
       return (
         <div className="run-finished">
-          <OutcomeNotice outcome={state.outcome} />
+          <OutcomeNotice outcome={state.outcome}>
+            {state.outcome?.name_refusal ? <NameRefusalChoices refusal={state.outcome.name_refusal} onChoose={onChooseEnzyme} /> : null}
+          </OutcomeNotice>
           {state.result !== null ? children(state.result) : null}
           {command}
         </div>

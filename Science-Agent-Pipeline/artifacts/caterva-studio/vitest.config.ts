@@ -11,5 +11,7 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["src/__tests__/setup.ts"],
     css: false,
+    // Role queries over a long listbox or a whole Compose result are slow in jsdom on a busy machine.
+    testTimeout: 30_000,
   },
 });

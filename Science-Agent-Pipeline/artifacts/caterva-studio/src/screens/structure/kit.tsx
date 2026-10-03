@@ -80,6 +80,7 @@ export function RunScreen<K extends RunKind>({
   formLabel,
   firstSize = 30,
   active = true,
+  onChooseEnzyme,
 }: {
   /** The run's kind; it fixes the result type the children draw. */
   kind: K;
@@ -96,6 +97,8 @@ export function RunScreen<K extends RunKind>({
   firstSize?: number;
   /** False while the screen shows another of its panels (Dynamics' tabs): no hotkey, no palette entry. */
   active?: boolean;
+  /** Sets the form's enzyme when the person picks one of the candidates a refused name was given. */
+  onChooseEnzyme?: (ec: string) => void;
 }) {
   const working = busy(run);
   const submit = () => {
@@ -141,7 +144,7 @@ export function RunScreen<K extends RunKind>({
       }
       second={
         <div className="st-result" aria-live="polite">
-          <RunPanel state={run} onCancel={() => void run.cancel()} onRetry={submit} idle={idle}>
+          <RunPanel state={run} onCancel={() => void run.cancel()} onRetry={submit} onChooseEnzyme={onChooseEnzyme} idle={idle}>
             {(result) => children(result)}
           </RunPanel>
         </div>
