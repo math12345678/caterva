@@ -146,3 +146,13 @@ def test_the_compose_line_quotes_an_organism_with_spaces():
     assert compose_line("1.1.1.27", "Homo sapiens") == (
         "caterva compose \"Michaelis Menten\" --subject 1.1.1.27 --organism 'Homo sapiens' --substrate <substrate>")
     assert compose_line("1.1.1.27", None).endswith("--subject 1.1.1.27 --substrate <substrate>")
+
+
+def test_fragments_of_longer_names_are_listed_with_exit_zero_and_called_partial(capsys):
+    code, out = run(capsys, "LDH", "--organism", "human", "--json", "--limit", "2")
+    data = json.loads(out)
+    assert data["outcome"] == "partial" and code == 0
+    assert {c["ec"] for c in data["candidates"]} == {"1.1.1.436", "1.1.1.27"}
+    assert all(c["partial_match"] for c in data["candidates"])
+    code, text = run(capsys, "LDH", "--organism", "human", "--limit", "2")
+    assert code == 0 and "Did you mean one of these?" in text and "only part of one enzyme's name" in text

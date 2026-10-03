@@ -39,7 +39,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 from .finder import (
     Ambiguous, Candidate, Resolved, find, read_ec, recommend, refusal_text, resolve,
 )
-from .index import ACTIVE, load_index
+from .index import load_index
 
 #: A complete EC number, as UniProt writes it. `1.1.98.-` is a class.
 _COMPLETE_EC = re.compile(r"^\d+\.\d+\.\d+\.(?:n?\d+)$")

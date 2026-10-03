@@ -24,7 +24,7 @@ import sys
 from typing import Any, Dict, List, Optional, Sequence
 
 from .finder import (
-    DEFAULT_LIMIT, TIER_TYPO, Ambiguous, Candidate, Resolved, find, resolve,
+    DEFAULT_LIMIT, TIER_TYPO, Candidate, Resolved, find, resolve,
 )
 from .index import load_index, organism_code, organism_label
 
@@ -77,13 +77,15 @@ def compose_line(ec: str, organism: Optional[str]) -> str:
 
 
 def _outcome(result: Any) -> str:
+    """resolved, ambiguous (a choice), partial (only fragments of longer
+    names or protein symbols), suggestions (close spellings only), or none."""
     if isinstance(result, Resolved):
         return "resolved"
+    if not result.candidates:
+        return "none"
     if result.suggestions_only:
-        return "suggestions"
-    if result.candidates:
-        return "ambiguous"
-    return "none"
+        return "suggestions" if all(c.tier == TIER_TYPO for c in result.candidates) else "partial"
+    return "ambiguous"
 
 
 def _card(rank: int, candidate: Candidate, organism: Optional[str], recommended: bool) -> List[str]:
@@ -93,7 +95,7 @@ def _card(rank: int, candidate: Candidate, organism: Optional[str], recommended:
     lines = [head, f"      why: {candidate.why}"]
     if candidate.status != "active":
         lines.append(f"      status: {candidate.status}"
-                     + (f"; now " + ", ".join(f"EC {e}" for e in candidate.superseded_by)
+                     + ("; now " + ", ".join(f"EC {e}" for e in candidate.superseded_by)
                         if candidate.superseded_by else ""))
     if candidate.reaction:
         lines.append(f"      reaction: {candidate.reaction}")
@@ -137,7 +139,7 @@ def _text(query: str, organism: Optional[str], result: Any, shown: Sequence[Cand
             out.append(f"Recommended: EC {recommended_ec} ({result.recommended.name}), the only one with a "
                        "protein from the organism you gave. Confirm it with --subject "
                        f"{recommended_ec}.")
-    elif outcome == "suggestions":
+    elif outcome in ("suggestions", "partial"):
         out.append(f"Not resolved: {result.reason.rstrip('.')}. Did you mean one of these?")
     else:
         out.append(f"Nothing matched: {result.reason}")
@@ -191,7 +193,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva enzyme") -> 
         print(json.dumps(_json(query, args.organism, result, shown, len(ranked)), indent=2))
     else:
         print(_text(query, args.organism, result, shown, len(ranked)), end="")
-    return 3 if _outcome(result) in ("none", "suggestions") else 0
+    return 3 if _outcome(result) in ("none", "suggestions") else 0  # a partial match lists real names
 
 
 def console_main() -> int:

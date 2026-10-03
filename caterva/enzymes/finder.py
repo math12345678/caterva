@@ -29,6 +29,8 @@ number is a stronger match:
     5  your query is a phrase inside the accepted name, on word boundaries
     6  your query is a phrase inside another name
     7  every word of your query is in one name, in any order
+       (tiers 5 to 7 are fragments of a longer name: listed, never resolved
+       to on their own)
     8  your query is the symbol of a UniProt entry listed under the enzyme
        (LDHA from LDHA_HUMAN), or the start of one
     9  a typo-tolerant match, offered only when nothing above matched, and
@@ -58,7 +60,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -214,10 +216,11 @@ class Candidate:
     superseded_by: Tuple[str, ...] = ()
     #: Edit distance, for a typo match; 0 otherwise.
     distance: int = 0
-    #: True when the query matched only a fragment of a longer name (fewer
-    #: than three quarters of its words) or only the start of a protein symbol. A
-    #: fragment is shown but never resolved to: "LDH" is a word inside the
-    #: name of an electron-bifurcating complex, and is not that enzyme.
+    #: True when the query matched only a fragment of a longer name (a
+    #: phrase or some words inside it) or a protein symbol that is not the
+    #: requested organism's own. A fragment is shown but never resolved to:
+    #: "LDH" is a word inside the name of an electron-bifurcating complex,
+    #: and is not that enzyme.
     partial: bool = False
 
     @property
@@ -450,10 +453,13 @@ def _search(query: str, code: Optional[str], index: EnzymeIndex) -> List[Candida
                 held[2].append(alt)
             held[3] = held[3] and partial
 
+    # A phrase inside a longer name, or words spread over one, is by
+    # construction a fragment of that name. "angiotensin converting enzyme"
+    # is the start of "angiotensin-converting enzyme 2", a different enzyme
+    # from the one anybody means by it, and "PFK" is half of "ADP-PFK". So
+    # these tiers are listed and ranked but never resolved to on their own.
     def fragment(name: _Name) -> bool:
-        # Fewer than three quarters of the name's words: "PFK" is half of
-        # "ADP-PFK", a different enzyme from the one anybody means by PFK.
-        return len(q_words) * 4 < len(name.words) * 3
+        return True
 
     phrase = f" {q_loose} "
     for name in tables.names:

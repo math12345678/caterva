@@ -359,3 +359,23 @@ def test_the_candidate_carries_everything_the_command_prints():
     as_dict = candidate.to_dict()
     assert as_dict["ec"] == "1.1.1.27" and as_dict["has_organism_protein"] is True
     assert as_dict["organism_proteins"][0]["accession"]
+
+
+def test_a_phrase_inside_a_longer_name_is_listed_but_never_resolved_to():
+    """Found by running the names a lab types: "angiotensin converting enzyme"
+    is the start of the accepted name of ACE2 (EC 3.4.17.23). ACE, the enzyme
+    people mean, is EC 3.4.15.1, whose own alternative name matches by words.
+    Resolving to the only phrase match would have cited the wrong protein."""
+    result = resolve("angiotensin converting enzyme", "human")
+    assert isinstance(result, Ambiguous) and result.suggestions_only
+    assert ecs(result.candidates[:2]) == ["3.4.17.23", "3.4.15.1"]
+    assert all(c.partial for c in result.candidates)
+    # The tier machinery still ranks them; it just does not decide.
+    assert [c.tier for c in result.candidates] == [5, 7]
+
+
+def test_a_unique_name_inside_a_longer_one_is_not_resolved_either():
+    for name in ("glutathione S-transferase", "NADH dehydrogenase", "PFK"):
+        result = resolve(name, "human")
+        assert isinstance(result, Ambiguous), name
+        assert result.suggestions_only or len(result.candidates) > 1, name
