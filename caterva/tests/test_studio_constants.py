@@ -10,6 +10,7 @@ cite.py's stderr, word for word.
 """
 from __future__ import annotations
 
+import re
 import sys
 
 import pytest
@@ -19,6 +20,18 @@ from caterva.studio.adapters import constants as adapter
 from studio_kinetics_offline import Recorder, context, hexokinase_offline, run_cli
 
 HEXOKINASE = {"ec": "2.7.1.1", "organism": "human", "substrate": "glucose"}
+
+#: The document says when it was made, to the minute ("| Generated | 2026-10-03
+#: 14:07 UTC |", Tests/lab_report.py). Two documents made a moment apart can
+#: straddle a minute and differ in that one cell, so documents are compared
+#: with the cell's time replaced by a fixed word.
+_GENERATED = re.compile(r"(\| Generated \| )\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC( \|)")
+
+
+def same_document(a: str, b: str) -> bool:
+    """Whether two documents are the same apart from the minute they say they were generated."""
+    assert _GENERATED.search(a) and _GENERATED.search(b), "the Generated row is gone: this helper is now comparing nothing special"
+    return _GENERATED.sub(r"\1<minute>\2", a) == _GENERATED.sub(r"\1<minute>\2", b)
 
 
 def cite_main():
@@ -42,7 +55,7 @@ def test_the_kind_is_available_in_a_source_checkout():
 def test_the_document_is_what_cite_prints(hexokinase):
     code, out, err, outcome, _ = hexokinase
     assert code == outcome.exit_code == 0
-    assert outcome.result["document_markdown"] == out
+    assert same_document(outcome.result["document_markdown"], out)
     # cite.py tells stderr how it read "human"; the studio keeps the note.
     assert outcome.result["organism_note"] == err.strip()
 
@@ -80,7 +93,7 @@ def test_a_supplied_value_is_chosen_by_the_user(tmp_path):
     with hexokinase_offline():
         code, out, _ = run_cli(cite_main(), adapter.argv(request))
         outcome = adapter.run(request, context(tmp_path))
-    assert code == outcome.exit_code == 0 and outcome.result["document_markdown"] == out
+    assert code == outcome.exit_code == 0 and same_document(outcome.result["document_markdown"], out)
     supplied = {v["id"]: v for v in outcome.result["supplied"]}
     assert supplied["s0"]["value"] == 2.5
     assert supplied["s0"]["provenance"] == {"kind": "chosen", "by": "user", "reason": "the tube held 2.5 mM"}
@@ -158,3 +171,9 @@ def test_a_refusal_that_is_not_a_name_carries_no_name_refusal(tmp_path):
     with hexokinase_offline():
         outcome = adapter.run(request, context(tmp_path))
     assert outcome.exit_code == 3 and outcome.name_refusal is None
+
+
+def test_two_documents_a_minute_apart_compare_equal_but_a_real_difference_does_not():
+    base = "x\n| Generated | 2026-10-03 14:07 UTC |\ny\n"
+    assert same_document(base, base.replace("14:07", "14:08"))
+    assert not same_document(base, base.replace("y\n", "z\n"))

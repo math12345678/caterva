@@ -29,6 +29,34 @@ BASE = ["Michaelis Menten", "--subject", "2.7.1.1", "--substrate", "glucose",
         "--no-simulate", "--no-ranking"]
 
 
+@pytest.fixture(autouse=True)
+def no_network(monkeypatch):
+    """Every request these tests make is answered from a recording, or the test fails.
+
+    The literature layer's GETs go through httpx (Tests/http_retry.py), which
+    is replaced here by a function that records the URL and refuses, so an
+    organism or enzyme the recordings do not cover cannot reach UniProt, NCBI
+    or PubChem and pass or fail with their mood. Every proxy points at a
+    closed port as well, for any client that does not go through httpx. The
+    test then asserts that nothing was attempted.
+    """
+    import httpx
+
+    attempted: list[str] = []
+
+    def refuse(url, *args, **kwargs):
+        attempted.append(str(url))
+        raise httpx.ConnectError(f"no recording answers {url}; this test does not go live")
+
+    monkeypatch.setattr(httpx, "get", refuse)
+    for name in ("HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "all_proxy"):
+        monkeypatch.setenv(name, "http://127.0.0.1:9")
+    monkeypatch.setenv("NO_PROXY", "")
+    monkeypatch.setenv("no_proxy", "")
+    yield attempted
+    assert attempted == [], f"a request had no recording and was refused: {attempted}"
+
+
 @pytest.fixture()
 def compose(monkeypatch, capsys):
     monkeypatch.setenv("CATERVA_BRENDA_RECORDED", str(RECORDED))
@@ -83,10 +111,13 @@ def test_it_does_not_fire_when_an_isoform_is_given(compose):
     assert "VERDICT: GROUNDED" in _verdict_block(out)
 
 
-def test_it_does_not_fire_when_the_organism_has_one_protein_for_the_ec(compose):
-    # The nomenclature lists one pig protein for EC 2.7.1.1, and the recorded
-    # page holds a pig Km.
-    code, out = compose("--organism", "pig")
+def test_it_does_not_fire_when_the_nomenclature_lists_no_protein_for_the_organism(compose):
+    # The nomenclature's UniProt entries for EC 2.7.1.1 name no E. coli
+    # protein, so there is no isozyme to name; the recorded page holds an
+    # E. coli Km, and the recorded NCBI and UniProt answers cover E. coli.
+    # (A pig case used here needed a UniProt query no recording holds; the
+    # one-protein case is pinned below on the function itself.)
+    code, out = compose("--organism", "Escherichia coli")
     assert code == 0
     assert "resolved from the literature: reaction_Km" in out
     assert "isozyme" not in out and "Qualified:" not in out
