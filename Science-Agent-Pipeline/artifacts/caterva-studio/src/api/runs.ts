@@ -108,9 +108,17 @@ export function downloadArtifact(id: string, name: string): Promise<string> {
   return downloadFrom(`${runPath(id)}/artifacts/${encodeURIComponent(name)}`, name);
 }
 
-/** Save a run as caterva-<id>.zip: the record, request, result, events, artifacts and the command. */
-export function downloadBundle(id: string): Promise<string> {
-  return downloadFrom(`${runPath(id)}/bundle`, `caterva-${id}.zip`);
+/**
+ * Save a run as caterva-<id>.zip: the record, request, result, events, artifacts and the command.
+ * By default the home folder is written as ~ and a crash's traceback is left out; `diagnostics`
+ * keeps the traceback, `redactPaths: false` keeps every path as it was.
+ */
+export function downloadBundle(id: string, options: { diagnostics?: boolean; redactPaths?: boolean } = {}): Promise<string> {
+  const query = new URLSearchParams();
+  if (options.diagnostics) query.set("diagnostics", "true");
+  if (options.redactPaths === false) query.set("redact_paths", "false");
+  const suffix = query.size ? `?${query.toString()}` : "";
+  return downloadFrom(`${runPath(id)}/bundle${suffix}`, `caterva-${id}.zip`);
 }
 
 /** Parse one SSE block ("event: x\nid: n\ndata: {...}") into a checked RunEvent. */

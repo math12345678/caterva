@@ -96,7 +96,8 @@ ROUTES: Tuple[Route, ...] = (
     Route("GET", "/api/runs/{id}/artifacts/{name}", "get_artifact", "<artifact media type>",
           summary="a file the run produced, by its recorded name"),
     Route("GET", "/api/runs/{id}/bundle", "get_bundle", "application/zip",
-          summary="run.json, request.json, result.json, events.jsonl and artifacts"),
+          summary="run.json, request.json, result.json, events.jsonl and artifacts; ?redact_paths=true (default) "
+                  "writes the home folder as ~, ?diagnostics=false (default) leaves out tracebacks"),
     Route("GET", "/api/dev/session", "dev_session", "DevSession",
           token=False, dev_only=True,
           summary="the session token for the Vite dev server's index.html (--dev-origin only)"),

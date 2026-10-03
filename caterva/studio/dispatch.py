@@ -597,11 +597,20 @@ class App:
         ]), data)
 
     def _h_get_bundle(self, call: _Call) -> Response:
-        _only(call.query, ())
+        _only(call.query, ("redact_paths", "diagnostics"))
         run_id = call.params["id"]
         self._record(run_id)
+        flags = {}
+        for key, default in (("redact_paths", True), ("diagnostics", False)):
+            value = call.query.get(key)
+            if value is None:
+                flags[key] = default
+            elif value in ("true", "false"):
+                flags[key] = value == "true"
+            else:
+                raise ApiFailure(400, "malformed", f"{key} takes true or false", field=key)
         try:
-            data = self.ws.bundle(run_id)
+            data = self.ws.bundle(run_id, **flags)
         except RunNotFound:
             raise ApiFailure(404, "not_found", "there is no run with that id") from None
         return Response(200, _with_security([

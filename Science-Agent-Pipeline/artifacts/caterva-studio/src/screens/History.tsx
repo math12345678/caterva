@@ -169,8 +169,9 @@ function RunDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
     setConfirming(false);
     onDeleted();
   };
+  const [withDiagnostics, setWithDiagnostics] = useState(false);
   const exportBundle = useMutation({
-    mutationFn: () => downloadBundle(id),
+    mutationFn: () => downloadBundle(id, { diagnostics: withDiagnostics }),
     onError: (e) => notify("failed", "The bundle was not exported", { description: describeError(e).message }),
   });
 
@@ -218,6 +219,10 @@ function RunDetail({ id, onDeleted }: { id: string; onDeleted: () => void }) {
           <FileDown size={13} aria-hidden="true" />
           Export bundle
         </button>
+        <label style={{ display: "inline-flex", gap: "0.4rem", alignItems: "center", fontSize: "0.85rem" }} title="Adds the error details of a crash. Paths on this computer are still written as ~.">
+          <input type="checkbox" checked={withDiagnostics} onChange={(e) => setWithDiagnostics(e.target.checked)} />
+          Include diagnostics
+        </label>
         {confirming ? (
           <span className="confirm-inline" role="group" aria-label="Confirm deleting this run">
             <span>Move this run and its files to the workspace&apos;s trash folder? Undo stays offered for a few seconds.</span>

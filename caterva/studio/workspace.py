@@ -638,12 +638,52 @@ class Workspace:
             self._summaries.pop(run_id, None)
         return target
 
-    def bundle(self, run_id: str) -> bytes:
-        """The run as a zip: what History shows, and the command that reproduces it."""
+    def bundle(self, run_id: str, *, redact_paths: bool = True, diagnostics: bool = False,
+               home: Optional[str] = None) -> bytes:
+        """The run as a zip: what History shows, and the command that reproduces it.
+
+        A run's files hold where it ran: the home folder and the data folder
+        in its command line, its request, its events, its artifacts, and in
+        the traceback of a crash. An export leaves the machine, so by default
+        (`redact_paths`) the home folder is written as `~` and the data
+        folder, when it is elsewhere, as `<data dir>` in every text file, and
+        (unless `diagnostics`) a crash's traceback is left out: its type and
+        message stay. `diagnostics=True` keeps the traceback, still with
+        paths redacted when `redact_paths` is on. README.txt says which was
+        done."""
         run_dir = self.run_dir(run_id)
         if not run_dir.is_dir():
             raise RunNotFound(run_id)
         record = self.record_or_unreadable(run_id)
+        home_dir = os.path.expanduser("~") if home is None else home
+        replacements = _path_replacements(home_dir, str(self.root)) if redact_paths else []
+
+        def clean(text: str) -> str:
+            for old, new in replacements:
+                text = text.replace(old, new)
+            return text
+
+        def tidy_json(text: str) -> str:
+            if diagnostics:
+                return clean(text)
+            try:
+                value = json.loads(text)
+            except ValueError:
+                return clean(text)
+            return clean(json.dumps(_without_traceback(value), indent=2, ensure_ascii=False) + "\n")
+
+        def tidy_events(text: str) -> str:
+            lines = []
+            for line in text.splitlines():
+                if not diagnostics:
+                    try:
+                        line = json.dumps(_without_traceback(json.loads(line)), ensure_ascii=False,
+                                          separators=(",", ":"))
+                    except ValueError:
+                        pass
+                lines.append(clean(line))
+            return "\n".join(lines) + ("\n" if lines else "")
+
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             names: List[str] = []
@@ -658,20 +698,67 @@ class Workspace:
             for filename in ("run.json", "request.json", "result.json", "events.jsonl"):
                 path = run_dir / filename
                 if path.is_file():
-                    add(filename, path.read_bytes(), path)
+                    text = path.read_bytes().decode("utf-8", errors="replace")
+                    text = tidy_events(text) if filename == "events.jsonl" else tidy_json(text)
+                    add(filename, text.encode("utf-8"), path)
             for artifact in record.get("artifacts") or []:
                 name = artifact.get("name") if isinstance(artifact, dict) else None
                 if not isinstance(name, str) or not _ARTIFACT_NAME.fullmatch(name):
                     continue
                 path = run_dir / "artifacts" / name
                 if path.is_file():
-                    add(f"artifacts/{name}", path.read_bytes(), path)
+                    data = path.read_bytes()
+                    if replacements and _is_text(artifact.get("content_type")):
+                        data = clean(data.decode("utf-8", errors="replace")).encode("utf-8")
+                    add(f"artifacts/{name}", data, path)
             cli = record.get("cli") if isinstance(record.get("cli"), list) else []
-            command = shlex.join(str(part) for part in cli) + "\n" if cli else ""
+            command = clean(shlex.join(str(part) for part in cli)) + "\n" if cli else ""
             if command:
                 add("command.txt", command.encode("utf-8"))
-            add("README.txt", bundle_readme(record, names, command).encode("utf-8"))
+            add("README.txt", bundle_readme(_for_readme(record, clean, diagnostics), names, command,
+                                            redact_paths=redact_paths, diagnostics=diagnostics).encode("utf-8"))
         return buffer.getvalue()
+
+
+def _path_replacements(home: str, data_dir: str) -> List[Tuple[str, str]]:
+    """(what to find, what to write) for paths of this machine, longest first."""
+    pairs: List[Tuple[str, str]] = []
+    home = home.rstrip("/\\")
+    data_dir = data_dir.rstrip("/\\")
+    if data_dir and home and not (data_dir == home or data_dir.startswith(home + os.sep)):
+        pairs.append((data_dir, "<data dir>"))
+    if home and home not in ("/", "~"):
+        pairs.append((home, "~"))
+    out: List[Tuple[str, str]] = []
+    for old, new in pairs:
+        out.append((old, new))
+        escaped = json.dumps(old)[1:-1]
+        if escaped != old:
+            out.append((escaped, new))
+    return sorted(out, key=lambda pair: -len(pair[0]))
+
+
+def _without_traceback(value: Any) -> Any:
+    """`value` with every `traceback` key of an error set to null."""
+    if isinstance(value, dict):
+        return {k: (None if k == "traceback" else _without_traceback(v)) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_without_traceback(v) for v in value]
+    return value
+
+
+def _is_text(content_type: Any) -> bool:
+    kind = str(content_type or "").split(";")[0].strip().lower()
+    return kind.startswith("text/") or kind in ("application/json", "application/xml", "application/x-ndjson") \
+        or kind.endswith("+xml") or kind.endswith("+json")
+
+
+def _for_readme(record: Mapping[str, Any], clean: Any, diagnostics: bool) -> Dict[str, Any]:
+    """The record as the README shows it: paths cleaned in the error line."""
+    shown = dict(record)
+    if isinstance(shown.get("error"), dict):
+        shown["error"] = {**shown["error"], "message": clean(str(shown["error"].get("message")))}
+    return shown
 
 
 def _zip_time(source: Optional[Path]) -> Tuple[int, int, int, int, int, int]:
@@ -696,8 +783,10 @@ _FILE_MEANINGS = {
 }
 
 
-def bundle_readme(record: Mapping[str, Any], names: List[str], command: str) -> str:
-    """The README.txt of an exported run: what each file in the zip is."""
+def bundle_readme(record: Mapping[str, Any], names: List[str], command: str, *, redact_paths: bool = False,
+                  diagnostics: bool = True) -> str:
+    """The README.txt of an exported run: what each file in the zip is, and
+    what was taken out of it before it left this computer."""
     lines = [
         f"Caterva Studio run {record.get('id')}",
         "",
@@ -729,6 +818,13 @@ def bundle_readme(record: Mapping[str, Any], names: List[str], command: str) -> 
         else:
             lines.append(f"  {name}\n      {_FILE_MEANINGS.get(name, '')}")
     lines.append("  README.txt\n      this file")
+    lines += ["", "What was left out:", ""]
+    lines.append("  Paths on the computer that made this bundle: the home folder is written as ~ and the data "
+                 "folder as <data dir>." if redact_paths else
+                 "  Nothing: paths on the computer that made this bundle are written as they were.")
+    lines.append("  Error tracebacks are included (diagnostics were asked for)." if diagnostics else
+                 "  Error tracebacks: the error's type and message are kept; its traceback is not. Export again "
+                 "with diagnostics included to add it.")
     return "\n".join(lines) + "\n"
 
 

@@ -1074,3 +1074,147 @@ def test_s7_the_ceilings_are_the_stated_ones():
 
     assert (limits.MAX_CONNECTIONS, limits.MAX_STREAMS, MAX_PENDING) == (64, 16, 32)
     assert limits.HEADER_DEADLINE_S <= 15 and limits.BODY_DEADLINE_S <= 60
+
+
+# ---------------------------------------------------------------------------
+# S9: nothing from the PDB or a request can end a ChimeraX comment
+# ---------------------------------------------------------------------------
+
+
+def _structure(title="Lactate dehydrogenase", name="L-lactate dehydrogenase A chain", component="OXM",
+               bound_name="OXAMIC ACID"):
+    from caterva.structure.search import BoundMolecule, Citation, Protein, Structure
+
+    citation = Citation(title=title, journal="Biochemistry", year=2001, doi="10.1021/bi010000x", pubmed=None,
+                        first_author="Read")
+    structure = Structure(pdb_id="1I10", title=title, method="X-RAY DIFFRACTION", resolution=2.1,
+                          organisms=("Homo sapiens",), uniprot=("P00338",),
+                          bound=(BoundMolecule(component, bound_name, "ligand"),), citation=citation)
+    return structure, Protein(accession="P00338", gene="LDHA", name=name, organism="Homo sapiens")
+
+
+@pytest.mark.parametrize("evil", ["a\nopen https://example.org/x.cxc", "a\rrun /bin/sh", "a close", "a close",
+                                  "a\x00b\x1bc", "a\x85b", "a\x0bb\x0cc"])
+def test_s9_no_field_can_start_a_command_line(evil):
+    from caterva.structure.chimerax import script
+
+    structure, protein = _structure(title=evil, name=evil, bound_name=evil)
+    text = script(structure, protein, focus=evil)
+    for line in text.splitlines():
+        if not line.startswith("#"):
+            assert line.split(" ")[0] in ("open", "hide", "cartoon", "color", "set", "lighting", "graphics", "show",
+                                          "style", "label", "view"), line
+    assert not any(c in text for c in "\r\x00\x1b\x85  \x0b\x0c")
+    assert "open https://example.org" not in [line for line in text.splitlines() if not line.startswith("#")]
+
+
+def test_s9_an_id_that_stands_in_a_command_is_ascii_letters_and_digits_only():
+    from caterva.structure.chimerax import identifier, one_line
+
+    assert identifier("OXM; open x") == "OXMopenx" and identifier("1i10\n") == "1i10" and identifier("é") == ""
+    structure, protein = _structure(component="OXM\nopen x")
+    text = __import__("caterva.structure.chimerax", fromlist=["script"]).script(structure, protein)
+    assert "show :OXMopenx" in text and "\nopen x" not in text
+    assert one_line("a\n\n b\tc") == "a b c"
+
+
+def test_s9_an_ordinary_script_is_unchanged():
+    from caterva.structure.chimerax import script
+
+    structure, protein = _structure()
+    text = script(structure, protein)
+    assert "# Caterva: L-lactate dehydrogenase A chain (LDHA, UniProt P00338), Homo sapiens" in text
+    assert "open 1i10" in text and "show :OXM" in text and "color :OXM orange" in text
+
+
+# ---------------------------------------------------------------------------
+# S10: an exported bundle does not carry this computer's paths or tracebacks
+# ---------------------------------------------------------------------------
+
+
+def _crashed_run(app: App, home: str):
+    from caterva.studio.contract import RUN_RECORD_SCHEMA
+    from caterva.studio.jobs import make_run_id
+    from caterva.studio.workspace import iso, utc_now
+
+    run_id = make_run_id("compose")
+    now = iso(utc_now())
+    trace = f'Traceback (most recent call last):\n  File "{home}/work/caterva/x.py", line 3, in run\nValueError: bad'
+    record = {"schema": RUN_RECORD_SCHEMA, "id": run_id, "kind": "compose", "title": "t", "status": "failed",
+              "created_at": now, "started_at": now, "finished_at": now, "caterva_version": "0",
+              "cli": ["caterva", "compose", "--out", f"{home}/Desktop/out"], "request": {"out": f"{home}/Desktop/out"},
+              "outcome": None, "error": {"type": "ValueError", "message": f"bad file {home}/data.csv",
+                                         "traceback": trace},
+              "artifacts": [{"name": "report.md", "content_type": "text/markdown; charset=utf-8", "bytes": 10,
+                             "description": "d"}], "progress": None}
+    run_dir = app.ws.create_run(record, record["request"], owner=None)
+    (run_dir / "artifacts").mkdir()
+    (run_dir / "artifacts" / "report.md").write_text(f"made in {home}/Desktop/out\n")
+    app.ws.append_event(run_id, "error", {"run_id": run_id, "seq": 1, "at": now, "error": record["error"]})
+    return run_id, trace
+
+
+def _zip_texts(data: bytes):
+    import zipfile
+
+    archive = zipfile.ZipFile(io.BytesIO(data))
+    return {name: archive.read(name).decode("utf-8") for name in archive.namelist()}
+
+
+def test_s10_a_bundle_defaults_to_no_home_folder_and_no_traceback(tmp_path):
+    home = os.path.expanduser("~")
+    app = make_app(tmp_path)
+    try:
+        run_id, trace = _crashed_run(app, home)
+        response = req(app, "GET", f"/api/runs/{run_id}/bundle")
+        assert response.status == 200
+        files = _zip_texts(response.body)
+        everything = "\n".join(files.values())
+        assert home not in everything and "Traceback" not in everything and "x.py" not in everything
+        assert "~/Desktop/out" in files["command.txt"] and "~/Desktop/out" in files["artifacts/report.md"]
+        assert json.loads(files["run.json"])["error"]["traceback"] is None
+        assert json.loads(files["run.json"])["error"]["type"] == "ValueError"
+        events = [json.loads(line) for line in files["events.jsonl"].splitlines()]
+        assert events[0]["data"]["error"]["traceback"] is None
+        readme = files["README.txt"]
+        assert "home folder is written as ~" in readme and "traceback is not" in readme
+    finally:
+        app.close()
+
+
+def test_s10_ticking_diagnostics_keeps_the_traceback_with_paths_still_redacted(tmp_path):
+    home = os.path.expanduser("~")
+    app = make_app(tmp_path)
+    try:
+        run_id, trace = _crashed_run(app, home)
+        files = _zip_texts(req(app, "GET", f"/api/runs/{run_id}/bundle?diagnostics=true").body)
+        record = json.loads(files["run.json"])
+        assert "ValueError: bad" in record["error"]["traceback"] and home not in "\n".join(files.values())
+        assert "~/work/caterva/x.py" in record["error"]["traceback"]
+        assert "tracebacks are included" in files["README.txt"].lower()
+    finally:
+        app.close()
+
+
+def test_s10_redaction_can_be_turned_off_explicitly_and_says_so(tmp_path):
+    home = os.path.expanduser("~")
+    app = make_app(tmp_path)
+    try:
+        run_id, _ = _crashed_run(app, home)
+        files = _zip_texts(req(app, "GET", f"/api/runs/{run_id}/bundle?redact_paths=false&diagnostics=true").body)
+        assert home in files["command.txt"] and "written as they were" in files["README.txt"]
+        for bad in ("redact_paths=yes", "diagnostics=1", "x=1"):
+            assert req(app, "GET", f"/api/runs/{run_id}/bundle?{bad}").status == 400
+    finally:
+        app.close()
+
+
+def test_s10_a_data_folder_outside_the_home_folder_is_written_as_a_placeholder(tmp_path):
+    app = make_app(tmp_path)
+    try:
+        run_id, _ = _crashed_run(app, str(app.ws.root))  # paths inside the data folder
+        files = _zip_texts(app.ws.bundle(run_id, home="/not/this/home"))
+        assert str(app.ws.root) not in "\n".join(files.values())
+        assert "<data dir>/Desktop/out" in files["command.txt"]
+    finally:
+        app.close()
