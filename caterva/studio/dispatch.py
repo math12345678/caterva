@@ -16,7 +16,7 @@ thing over a real port where one can be bound.
 THE ORDER THE RULES RUN IN (docs/studio/CONTRACT.md section 3)
 --------------------------------------------------------------
 Host (403), then Origin and Sec-Fetch-Site (403), for every path, static
-files included, because index.html carries the token. Then, for /api/:
+files included (the page itself holds no token: static_files.py). Then, for /api/:
 the session token (401), the body rules (415, 413, 400), and only then the
 route (404, 405), so a request without the token learns nothing about
 which paths exist. A handler runs last, and anything it raises that is not
@@ -45,7 +45,7 @@ from caterva.studio.contract import (
     MAX_BODY_BYTES, RUN_KINDS, RUN_STATUSES, SESSION_HEADER, STUDIO_API_VERSION, Malformed, NotFound, Unavailable,
 )
 from caterva.studio.jobs import Conflict, JobManager
-from caterva.studio.security import ARTIFACT_CSP, BASE_HEADERS, CSP, Guard, mint_token, url_for
+from caterva.studio.security import ARTIFACT_CSP, BASE_HEADERS, CSP, Guard, bootstrap_url, mint_token, url_for
 from caterva.studio.static_files import NotFromThisPackage, StaticSite
 from caterva.studio.workspace import (
     DEFAULT_LIMIT, MAX_LIMIT, TERMINAL_STATUSES, RunNotFound, Workspace, iso, summary_of, utc_now, validate_settings,
@@ -210,7 +210,14 @@ class App:
 
     @property
     def url(self) -> str:
+        """The server's address, without the token: safe to log."""
         return url_for(self.guard.host, self.guard.port)
+
+    @property
+    def bootstrap_url(self) -> str:
+        """The address a launcher opens: `url` and the token in the URL
+        fragment. Never logged."""
+        return bootstrap_url(self.guard.host, self.guard.port, self.token)
 
     def settings(self) -> Dict[str, Any]:
         with self._settings_lock:
@@ -225,6 +232,9 @@ class App:
         swept = self.manager.sweep_interrupted()
         if apply_environment:
             self.capabilities.apply_gromacs_to_environment()
+            if self.settings().get("gromacs_path"):
+                threading.Thread(target=self.capabilities.refresh_gromacs, name="caterva-gmx-check",
+                                 daemon=True).start()
         return swept
 
     def close(self) -> None:
@@ -274,7 +284,7 @@ class App:
             return error_response(405, "method_not_allowed", f"{method} is not served for the page",
                                   headers=[("Allow", "GET, HEAD")])
         try:
-            answer = self.static.serve(path, self.token)
+            answer = self.static.serve(path)
         except NotFromThisPackage as exc:
             log.error("%s", exc)
             return error_response(500, "crash", str(exc))
@@ -296,7 +306,7 @@ class App:
             if not self.guard.token_matches(request.header_all(SESSION_HEADER)):
                 return error_response(
                     401, "unauthorized",
-                    f"this request needs the session token of the page `caterva studio` served, in the "
+                    f"this request needs the session token from the address `caterva studio` printed, in the "
                     f"{SESSION_HEADER} header",
                 )
         if route is not None and route.handler == "dev_session":
@@ -395,6 +405,12 @@ class App:
             raise ApiFailure(400, "malformed", "probe takes one value: network", field="probe")
         return json_response(self.capabilities.snapshot(probe_network=probe == "network"))
 
+    def _h_refresh_capabilities(self, call: _Call) -> Response:
+        _only(call.query, ())
+        if call.body != {}:
+            raise ApiFailure(400, "malformed", "refreshing takes an empty object: {}")
+        return json_response(self.capabilities.snapshot(refresh_gromacs=True))
+
     def _h_get_settings(self, call: _Call) -> Response:
         _only(call.query, ())
         return json_response(self.settings())
@@ -409,6 +425,8 @@ class App:
             self.ws.save_settings(settings)
             self._settings = settings
         self.capabilities.apply_gromacs_to_environment()
+        if settings.get("gromacs_path"):
+            self.capabilities.refresh_gromacs()
         self.manager.pump()
         return json_response(settings)
 

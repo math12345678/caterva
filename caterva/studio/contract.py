@@ -74,12 +74,16 @@ STUDIO_API_VERSION = 1
 #: The request header that carries the per-launch session token.
 SESSION_HEADER = "X-Caterva-Session"
 
-#: The <meta name="..."> the server writes the token into, in index.html.
-SESSION_META_NAME = "caterva-session"
+#: The key of the URL fragment that carries the session token to the page:
+#: `http://127.0.0.1:<port>/#token=<token>`. A fragment is never sent to a
+#: server, so no document or log the server produces holds the token.
+TOKEN_FRAGMENT_KEY = "token"
 
-#: What index.html carries in that meta tag until the server replaces it.
-#: A page that still shows this string was not served by the studio server.
-TOKEN_PLACEHOLDER = "__CATERVA_SESSION_TOKEN__"
+#: The <meta name="..."> index.html carries so the server can tell the page
+#: it serves was built from this package, and its required content. The
+#: page holds no token (docs/studio/CONTRACT.md, section 4).
+PAGE_MARKER_NAME = "caterva-studio-page"
+PAGE_MARKER_CONTENT = "token-in-url-fragment"
 
 #: The one line `caterva studio --print-url` writes to stdout once serving.
 URL_LINE_PREFIX = "CATERVA_STUDIO_URL="
@@ -2026,8 +2030,9 @@ MIRRORED_UNIONS: Mapping[str, Tuple[str, ...]] = {
 MIRRORED_CONSTANTS: Mapping[str, Any] = {
     "STUDIO_API_VERSION": STUDIO_API_VERSION,
     "SESSION_HEADER": SESSION_HEADER,
-    "SESSION_META_NAME": SESSION_META_NAME,
-    "TOKEN_PLACEHOLDER": TOKEN_PLACEHOLDER,
+    "TOKEN_FRAGMENT_KEY": TOKEN_FRAGMENT_KEY,
+    "PAGE_MARKER_NAME": PAGE_MARKER_NAME,
+    "PAGE_MARKER_CONTENT": PAGE_MARKER_CONTENT,
     "MAX_BODY_BYTES": MAX_BODY_BYTES,
     "MAX_VIEWER_ATOMS": MAX_VIEWER_ATOMS,
     "SERIES_ROW_LIMIT": SERIES_ROW_LIMIT,

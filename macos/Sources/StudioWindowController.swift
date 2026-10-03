@@ -4,7 +4,8 @@
 //
 // Rules the window keeps (docs/studio/CONTRACT.md, section 16):
 // - Only the server's own origin loads in the web view. A link anywhere else
-//   (a citation, PubMed, RCSB) opens in the default browser.
+//   (a citation, PubMed, RCSB) opens in the default browser when it is https
+//   or mailto, and is not followed otherwise.
 // - <input type=file> gets the system open panel; an export the page builds
 //   (a Blob with a download name, or an attachment from the server) goes
 //   through a save panel as a WKDownload.
@@ -87,11 +88,18 @@ final class StudioWindowController: NSWindowController, NSWindowDelegate, WKNavi
         window?.makeFirstResponder(view)
     }
 
+    /// The folder the page may ask to see in Finder (WebBridge.revealRoots).
+    func allowReveal(_ folder: URL) {
+        if !bridge.revealRoots.contains(folder) { bridge.revealRoots.append(folder) }
+    }
+
     /// Load the page from a freshly started server, at `route` if it is one.
     func openPage(_ url: URL, route: String?) {
         guard let origin = ServerOrigin(url) else { return }
         self.origin = origin
-        self.baseURL = url
+        // The address carries the session token in its fragment: it is loaded
+        // once, and what is kept is the address without it.
+        self.baseURL = StudioServer.withoutFragment(url)
         bridge.origin = origin
         (overlay as? LoadingView)?.message = "Opening the page"
         let web = webView ?? makeWebView()
@@ -99,8 +107,10 @@ final class StudioWindowController: NSWindowController, NSWindowDelegate, WKNavi
         showingPage = false
         var target = url
         if let route = route ?? pendingRoute, StudioWindowController.isRoute(route),
-           let routed = URL(string: route, relativeTo: url)?.absoluteURL, origin.contains(routed) {
-            target = routed
+           let routed = URL(string: route, relativeTo: url)?.absoluteURL, origin.contains(routed),
+           var parts = URLComponents(url: routed, resolvingAgainstBaseURL: false) {
+            parts.fragment = url.fragment   // the token, and nothing a saved route held
+            target = parts.url ?? url
         }
         pendingRoute = nil
         web.load(URLRequest(url: target))
@@ -113,6 +123,7 @@ final class StudioWindowController: NSWindowController, NSWindowDelegate, WKNavi
         components.scheme = nil
         components.host = nil
         components.port = nil
+        components.fragment = nil   // never keep a fragment: it could be the session token
         let route = components.string ?? "/"
         return StudioWindowController.isRoute(route) ? route : nil
     }
@@ -172,7 +183,9 @@ final class StudioWindowController: NSWindowController, NSWindowDelegate, WKNavi
                                               forMainFrameOnly: true, in: AppearanceMirror.world))
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = controller
-        configuration.websiteDataStore = .default()
+        // Nothing the page stores outlives this launch: the port is random
+        // and may be reused, and another run's storage must not be inherited.
+        configuration.websiteDataStore = .nonPersistent()
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         configuration.applicationNameForUserAgent = "CatervaStudio/\(version)"
@@ -260,8 +273,10 @@ final class StudioWindowController: NSWindowController, NSWindowDelegate, WKNavi
         }
     }
 
+    /// Links that leave the page open in the default browser: https and
+    /// mailto only. A plain http link is not followed.
     static func opensOutside(_ url: URL) -> Bool {
-        ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "")
+        ["https", "mailto"].contains(url.scheme?.lowercased() ?? "")
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse,

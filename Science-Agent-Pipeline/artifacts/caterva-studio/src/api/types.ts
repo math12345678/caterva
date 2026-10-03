@@ -16,8 +16,9 @@
 
 export const STUDIO_API_VERSION = 1;
 export const SESSION_HEADER = "X-Caterva-Session";
-export const SESSION_META_NAME = "caterva-session";
-export const TOKEN_PLACEHOLDER = "__CATERVA_SESSION_TOKEN__";
+export const TOKEN_FRAGMENT_KEY = "token";
+export const PAGE_MARKER_NAME = "caterva-studio-page";
+export const PAGE_MARKER_CONTENT = "token-in-url-fragment";
 export const MAX_BODY_BYTES = 1048576;
 export const MAX_VIEWER_ATOMS = 60000;
 

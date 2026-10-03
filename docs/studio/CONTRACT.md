@@ -74,8 +74,8 @@ caterva studio [--host 127.0.0.1] [--port N] [--no-browser] [--dev-origin URL]
 | `--no-browser` | do not open the default browser (the macOS shell and CI pass it). |
 | `--dev-origin URL` | also accept requests whose `Origin` is exactly `URL` and serve `GET /api/dev/session`. Development only. `URL` must be `http://127.0.0.1:<port>` or `http://localhost:<port>`; anything else is exit 2. |
 | `--data-dir PATH` | where runs and settings live; default in section 11. Created (mode 0700) if absent; not writable is exit 3 with the reason. |
-| `--print-url` | once the socket is listening, print exactly one line `CATERVA_STUDIO_URL=<url>` to stdout and flush. `<url>` is `http://127.0.0.1:<port>/` (or `http://[::1]:<port>/`, `http://localhost:<port>/`). Nothing else is ever printed to stdout; logs go to stderr and `<data dir>/studio.log`. |
-| `--self-test` | start on a free port, request `/api/health` (with the token) and `/` over a real socket, check the health body and that `/` is either the built page with the token injected or the "not built" page, print one line per check to stdout, stop, exit 0 or 1. Used by the frozen-app checks and CI. |
+| `--print-url` | once the socket is listening, print exactly one line `CATERVA_STUDIO_URL=<url>#token=<token>` to stdout and flush. `<url>` is `http://127.0.0.1:<port>/` (or `http://[::1]:<port>/`, `http://localhost:<port>/`); the session token is in the URL fragment (section 4), which no server ever receives. Nothing else is ever printed to stdout; logs go to stderr and `<data dir>/studio.log`, and neither holds the token. |
+| `--self-test` | start on a free port, request `/api/health` (with the token, and without it: 401) and `/` over a real socket, check the health body and that `/` is either the built page (holding no token) or the "not built" page, check that the address printed for the app carries the token in its fragment, print one line per check to stdout, stop, exit 0 or 1. Used by the frozen-app checks and CI. |
 
 Exit codes follow the rest of Caterva: 0 served and stopped cleanly (Ctrl-C,
 SIGTERM, or the shell quitting) or a self-test passed; 1 a crash or a failed
@@ -84,7 +84,8 @@ writable, port in use). The parser is already in `caterva/studio/__main__.py`;
 core replaces `main`, not the flags.
 
 The macOS shell launches `caterva studio --port 0 --no-browser --print-url`,
-reads stdout until the `CATERVA_STUDIO_URL=` line, and loads that URL. The
+reads stdout until the `CATERVA_STUDIO_URL=` line, and loads that URL as it is
+(fragment included). It never logs the part after `#`. The
 server stops when its stdin closes (the shell's pipe) as well as on SIGTERM,
 so a crashed shell never leaves an orphan server behind.
 
@@ -101,7 +102,7 @@ handler runs, in this order:
    `localhost:P`; for `::1`, `[::1]:P` or `localhost:P`; for `localhost`,
    `localhost:P` or `127.0.0.1:P`. Anything else (a rebinding attacker's
    `evil.example:P`, a missing Host) is 403 `forbidden`. This applies to
-   static files too, because index.html carries the token.
+   static files too.
 3. **Origin.** A request carrying `Origin` must have exactly the server's own
    origin (`http://` + an allowed Host) or the `--dev-origin` value; else 403.
    A request with `Sec-Fetch-Site: cross-site` is 403 whatever its Origin.
@@ -112,7 +113,8 @@ handler runs, in this order:
    per-launch token, compared with `hmac.compare_digest`. Missing or wrong is
    401 `unauthorized`. The token is `secrets.token_urlsafe(32)`, minted at
    start, held in memory only, never written to disk, never logged, never
-   accepted from a query string or cookie. Static files need no token.
+   accepted from a query string or cookie, and it is in NO document the server
+   serves (section 4). Static files need no token and contain none.
 5. **Bodies.** `POST` and `PUT` must send `Content-Type: application/json`
    (a form cannot, so a cross-site form post is refused even before the
    token check matters): else 415 `unsupported_media_type`. Bodies over
@@ -152,11 +154,18 @@ loopback; the studio binds no fixed port.
 ## 4. Static serving and the session token
 
 - `GET /` and every non-`/api/` path that is not a file under `static/`
-  answer with `static/index.html`, after replacing the one occurrence of
-  contract.TOKEN_PLACEHOLDER (`__CATERVA_SESSION_TOKEN__`) inside
-  `<meta name="caterva-session" content="...">` with the token. If the
-  placeholder is absent the page was not built from this package: 500
-  `crash` with that sentence, not a page without a token.
+  answer with `static/index.html`, byte for byte, the same to every caller.
+  **The token is never in a document the server serves.** It reaches the page
+  in the URL fragment of the address the launcher opens:
+  `http://127.0.0.1:<port>/#token=<token>` (`security.bootstrap_url`). A browser
+  never sends a fragment to a server, so it is in no request, log or response.
+  Anyone who can only make requests (another user's process, a sandboxed app
+  scanning loopback ports) cannot learn it from the server.
+- `index.html` carries `<meta name="caterva-studio-page" content="token-in-url-fragment">`
+  (contract.PAGE_MARKER_NAME and PAGE_MARKER_CONTENT). If it is missing the
+  directory holds a page not built from this package (one that expects a token
+  written into it): 500 `crash` with that sentence, not a page that cannot talk to
+  the server. Capabilities reports `ui.built: false` for it.
 - Files under `static/assets/` are served with their `mimetypes` type
   (`.js` as `text/javascript`, `.woff2` as `font/woff2`, `.svg` as
   `image/svg+xml`) and `Cache-Control: public, max-age=31536000, immutable`
@@ -167,10 +176,23 @@ loopback; the studio binds no fixed port.
   (`pnpm --filter @workspace/caterva-studio run build` from
   `Science-Agent-Pipeline/`); and that the API is running. Capabilities
   reports `ui.built: false` with the same reason.
-- The page reads the token from the meta tag (`src/api/client.ts`,
-  `sessionToken()`), sends it as a header on every `/api/` request, and never
-  puts it in a URL. A page whose tag still holds the placeholder says it was
-  not served by `caterva studio`.
+- **The page** (`src/api/client.ts`, `sessionToken()`) reads `location.hash` once,
+  before anything renders; keeps the token in memory and in the tab's
+  `sessionStorage` (so a reload of the same tab works); at once rewrites the
+  address with `history.replaceState` so the fragment is not in the address bar,
+  history or a copied link; and sends the token in the `X-Caterva-Session` header
+  on every `/api/` request, never in a path or query string. A `401` makes it
+  forget the token. A page opened with no fragment and nothing remembered says it
+  was opened without a session token and asks for the address `caterva studio`
+  printed.
+- **Launching a browser.** A process's arguments are readable by every user, so
+  `caterva studio` does not pass the token-bearing address to the browser as an
+  argument: it writes a one-use page (`<data dir>/.open-studio-<random>.html`, mode
+  0600, created exclusively, deleted after 30 s) that forwards to the address, and
+  opens that file's `file:` URL. When no browser can be opened it logs the address
+  without the token and says to use `--print-url`.
+- **The macOS shell** loads the printed URL with its fragment and keeps and logs
+  only the address without it; its web view uses a non-persistent data store.
 
 ## 5. Development: the dev origin and the Vite proxy
 
@@ -192,9 +214,13 @@ STUDIO_API=http://127.0.0.1:18740 PORT=18741 node node_modules/vite/bin/vite.js 
   server's own Node `fetch` sends neither, and a web page cannot avoid
   sending them. It answers `DevSession` `{token, api_version}`.
 - The Vite plugin `caterva-studio-dev-session` fetches it when index.html is
-  served and writes the token into the same meta tag, so the page reads it
-  the same way in both modes. If the backend is not up yet, the placeholder
-  stays and the page says so; reload once the backend is running.
+  served and writes the token into a development-only meta tag
+  (`caterva-dev-session`), which `client.ts` reads only in a development build
+  (`import.meta.env.DEV`); the production page and a build never contain it. This
+  endpoint hands the token to any local process that asks and exists only with
+  `--dev-origin`: it is for development and is never enabled by the app. If the
+  backend is not up yet, the page says it has no token; reload once the backend is
+  running.
 - `studio-packaged` serves the built page from `caterva/studio/static` with
   no dev origin: that is the configuration that proves the release shape.
 
@@ -255,13 +281,21 @@ number. Must answer in milliseconds: imports nothing of the engine.
 10.2 and fills `network`; without `probe` it never does. Other query keys:
 400.
 
+`POST /api/capabilities/refresh` with `{}` -> `Capabilities`, after running the
+chosen `gmx` (`--version`, argument list, 5 s) and storing what it answered. It
+is the only request that runs the program the `gromacs_path` setting names; a
+`GET /api/capabilities` never does (section 10).
+
 `GET /api/settings` -> `Settings`. `PUT /api/settings` with a full
 `Settings` -> the stored `Settings`. Keys: `theme` (`system` | `light` |
 `dark`, default `system`), `max_parallel_runs` (1..8, default 2),
 `confirm_delete` (default true). Two optional keys (amended by core): a
 PUT without one keeps its stored value; GET always returns both.
 `gromacs_path` (absolute path of an executable `gmx`, or null to look for
-it as section 10 says; it also sets `$GMX` for the runs) and `offline`
+it as section 10 says; it also sets `$GMX` for the runs; validated as the
+SECURITY section says: named `gmx`, `gmx_mpi`, `gmx_d` or `gmx_<suffix>`, a regular
+executable owned by you or root, not world-writable, no `..`, and not a link to a
+program of another name) and `offline`
 (default false; when true the network probe contacts nothing and a run
 whose request needs `network` is 503 with that reason: the adapter's
 `needs_for(request)` when it has one, else every `needs` of its kind, so a
@@ -524,9 +558,9 @@ its mark. Section 17.3.
 | `version`, `api_version`, `python`, `platform`, `frozen` | `caterva.__version__`, contract.STUDIO_API_VERSION, `platform.python_version()`, `sys.platform`, `getattr(sys, "frozen", False)` |
 | `literature` `{available, reason}` | `caterva.checkout.literature_module("fallback_logic")` imports; else `available: false` and `LiteratureLayerUnavailable`'s message. Cached for the process. |
 | `network` `{checked, reachable, hosts, checked_at, reason, source}` | `checked: false`, `source: null` and nulls until something happens. Two things make it happen. The explicit re-check, `?probe=network` (the status bar's popover and Settings call it): one HTTPS HEAD (5 s timeout, `urllib.request`) to each of `www.brenda-enzymes.org`, `rest.uniprot.org`, `search.rcsb.org`, `files.rcsb.org`, `eutils.ncbi.nlm.nih.gov`; `hosts` maps each to true/false; `reachable` is true when all are; `source: "probe"`. And real network use, noted through `caterva.netuse` with nothing extra contacted: a BRENDA, UniProt, NCBI or RCSB request that was answered (any HTTP status) sets `reachable: true`, one that could not be made (refused, no DNS, timed out) sets `reachable: false` with `reason`; that host's entry in `hosts` follows; `checked_at` is the time; `source: "use"`. The newest event decides `reachable`. Never contacts a host unasked; offline mode notes nothing. |
-| `gromacs` `{found, path, version, reason}` | `$GMX` if set, else `gmx`, through `shutil.which` (and `/opt/homebrew/bin/gmx`, `/usr/local/bin/gmx` if not on PATH: a GUI app's PATH is short); version from the first line of `gmx --version` matching `GROMACS version:`, 5 s timeout. Run once per process and on each capabilities request after a failure. |
+| `gromacs` `{found, path, version, reason}` | the `gromacs_path` setting, else `$GMX` if set, else `gmx`, through `shutil.which` (and `/opt/homebrew/bin/gmx`, `/usr/local/bin/gmx` if not on PATH: a GUI app's PATH is short); version from the first line of `gmx --version` matching `GROMACS version:`, 5 s timeout, argument list. A gmx from the environment is run on a capabilities request until it is found. The program the SETTING names is never run by a GET: it is run when the setting is saved, at start-up when one is saved, and by `POST /api/capabilities/refresh`; until then `found` is false and `reason` says it has not been checked. |
 | `rates` `{available, reason}` | `importlib.util.find_spec("caterva.rates")` is not None AND an adapter registered kind `rates`; else false with which of the two is missing. |
-| `ui` `{built, static_dir, reason}` | `static/index.html` exists and holds the placeholder. |
+| `ui` `{built, static_dir, reason}` | `static/index.html` exists and carries the page marker (section 4). |
 | `data_dir` `{path, writable, runs, reason}` | the resolved data dir, a write probe, the number of run directories. |
 | `kinds` | kind -> `KindCapability` `{available, title, command, needs, reason}` for every RunKind: not registered -> "not built yet"; registered -> the adapter's `unavailable()`. |
 | `dev_origin` | the `--dev-origin` value or null. |

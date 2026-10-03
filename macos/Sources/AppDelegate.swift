@@ -78,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             return
         }
         self.command = command
+        controller.allowReveal(Paths.dataFolder(command))
         controller.showLoading(command.isDevelopment ? "Starting the studio server (development)" : "Starting the studio server")
         let server = StudioServer(callbackQueue: .main)
         server.onURL = { [weak self, weak controller] url in

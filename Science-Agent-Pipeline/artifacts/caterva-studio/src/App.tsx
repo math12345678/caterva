@@ -82,7 +82,7 @@ function Shell() {
           error={{
             code: "unauthorized",
             message:
-              "It carries no session token, so the server would refuse every request. Start it with `caterva studio` (or open Caterva.app) and use the address it prints.",
+              "It carries no session token, so the server would refuse every request. Start it with `caterva studio` (or open Caterva.app) and open the whole address it prints, including the part after the #.",
           }}
         />
       </ShellMessage>

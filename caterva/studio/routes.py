@@ -64,6 +64,8 @@ ROUTES: Tuple[Route, ...] = (
           summary="liveness, version and api_version"),
     Route("GET", "/api/capabilities", "capabilities", "Capabilities",
           summary="what this installation can do; ?probe=network checks the hosts"),
+    Route("POST", "/api/capabilities/refresh", "refresh_capabilities", "Capabilities",
+          summary="run the chosen gmx now and answer capabilities; the only request that runs it (body {})"),
     Route("GET", "/api/settings", "get_settings", "Settings"),
     Route("PUT", "/api/settings", "put_settings", "Settings",
           summary="replace the settings; unknown keys are malformed"),

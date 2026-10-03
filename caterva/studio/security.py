@@ -25,11 +25,13 @@ So, in the order docs/studio/CONTRACT.md section 3 gives them:
    accepted from a URL or a cookie, where a browser would attach it to a
    foreign page's requests on its own.
 
-The token is written into the served index.html, which a foreign page
-cannot read (no CORS, and CORP same-origin), so only the studio's own page
-learns it. Any process running as the same user can read it too; that
-process could read the workspace directly, so the token does not pretend
-to stop it.
+The token is in no document the server serves: it travels to the page in
+the URL fragment of the address the launcher opens (`bootstrap_url`), and a
+fragment is never sent to a server. So another user's process, or a
+sandboxed app that scans loopback ports, cannot fetch it from `GET /`.
+A process running as the same user that can read the launcher's pipe or
+the page's memory could read the workspace directly, so the token does not
+pretend to stop that.
 
 WHAT THIS MODULE DOES NOT DO
 ----------------------------
@@ -44,7 +46,7 @@ import secrets
 from dataclasses import dataclass, field
 from typing import FrozenSet, Optional, Sequence, Tuple
 
-from caterva.studio.contract import SESSION_HEADER
+from caterva.studio.contract import SESSION_HEADER, TOKEN_FRAGMENT_KEY
 
 #: The Content Security Policy on every HTML response (CONTRACT.md 3.8).
 #: The built page has no inline script or style element, so nothing here is
@@ -87,8 +89,9 @@ _HOST_NAMES = {
 def mint_token() -> str:
     """A fresh session token: 32 random bytes, URL-safe base64, no padding.
 
-    URL-safe so it can sit in an HTML attribute and a header without
-    escaping; it is still never put in a URL."""
+    URL-safe so it can sit in a header and a URL fragment without escaping.
+    It is put in a URL fragment only (`bootstrap_url`), never in a path or
+    query string."""
     return secrets.token_urlsafe(32)
 
 
@@ -106,9 +109,16 @@ def authorities(host: str, port: int) -> FrozenSet[str]:
 
 
 def url_for(host: str, port: int) -> str:
-    """The address the studio prints and opens: http://127.0.0.1:<port>/."""
+    """The server's address, without the token: http://127.0.0.1:<port>/."""
     name = "[::1]" if host == "::1" else host
     return f"http://{name}:{port}/"
+
+
+def bootstrap_url(host: str, port: int, token: str) -> str:
+    """The address the launcher opens: the server's address and the token in
+    the fragment, http://127.0.0.1:<port>/#token=<token>. The fragment stays
+    in the browser; the server never receives it."""
+    return f"{url_for(host, port)}#{TOKEN_FRAGMENT_KEY}={token}"
 
 
 @dataclass(frozen=True)
@@ -170,4 +180,4 @@ class Guard:
 
 
 __all__ = ["ARTIFACT_CSP", "BASE_HEADERS", "CSP", "Guard", "SESSION_HEADER", "authorities",
-           "mint_token", "url_for"]
+           "bootstrap_url", "mint_token", "url_for"]

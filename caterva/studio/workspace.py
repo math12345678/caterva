@@ -60,6 +60,7 @@ import json
 import os
 import re
 import shlex
+import stat
 import sys
 import tempfile
 import threading
@@ -239,7 +240,21 @@ def validate_settings(body: Any, stored: Mapping[str, Any]) -> Dict[str, Any]:
             "offline": offline}
 
 
-def _validate_gromacs_path(value: Any) -> str:
+#: What the program a gromacs_path names may be called: `gmx`, `gmx_mpi`,
+#: `gmx_d`, or `gmx_` and a suffix. Anything else (a script called
+#: evil.sh, a link named gmx that leads to one) is not accepted.
+GMX_NAME = re.compile(r"gmx(?:_[A-Za-z0-9][A-Za-z0-9_.+-]{0,30})?", re.ASCII)
+
+
+def validate_gromacs_path(value: Any) -> Path:
+    """The absolute, resolved path of a GROMACS program, or Malformed.
+
+    The setting names a program the server will run, so it is checked like
+    one: an absolute path with no `..`; a name from GMX_NAME, both as given
+    and after links are resolved (a link named gmx to another program is
+    refused); a regular file the current user can execute, owned by this
+    user or root; neither the file nor, unless sticky, its folder writable
+    by everyone."""
     if not isinstance(value, str) or not value.strip():
         raise Malformed("gromacs_path must be the absolute path of the gmx program, or null", field="gromacs_path")
     if "\x00" in value or len(value) > 4096:
@@ -247,13 +262,38 @@ def _validate_gromacs_path(value: Any) -> str:
     path = Path(value)
     if not path.is_absolute():
         raise Malformed("gromacs_path must be an absolute path", field="gromacs_path")
+    if ".." in path.parts:
+        raise Malformed("gromacs_path must not contain `..`", field="gromacs_path")
+    if not GMX_NAME.fullmatch(path.name):
+        raise Malformed("gromacs_path must name the GROMACS program: gmx, gmx_mpi, gmx_d or gmx_<suffix>",
+                        field="gromacs_path")
     try:
         resolved = path.resolve(strict=True)
     except (OSError, RuntimeError):
         raise Malformed(f"gromacs_path {value!r} does not exist", field="gromacs_path") from None
-    if not resolved.is_file() or not os.access(resolved, os.X_OK):
+    if not GMX_NAME.fullmatch(resolved.name):
+        raise Malformed("gromacs_path is a link to a program that is not named gmx, gmx_mpi, gmx_d or gmx_<suffix>",
+                        field="gromacs_path")
+    try:
+        info = resolved.stat()
+        folder = resolved.parent.stat()
+    except OSError:
+        raise Malformed(f"gromacs_path {value!r} cannot be read", field="gromacs_path") from None
+    if not stat.S_ISREG(info.st_mode) or not os.access(resolved, os.X_OK):
         raise Malformed(f"gromacs_path {value!r} is not an executable file", field="gromacs_path")
-    return str(path)
+    if hasattr(os, "getuid") and info.st_uid not in (os.getuid(), 0):
+        raise Malformed("gromacs_path must be owned by you or by root", field="gromacs_path")
+    if info.st_mode & stat.S_IWOTH:
+        raise Malformed("gromacs_path is writable by every user, so it is not run", field="gromacs_path")
+    if folder.st_mode & stat.S_IWOTH and not folder.st_mode & stat.S_ISVTX:
+        raise Malformed("the folder holding gromacs_path is writable by every user, so it is not run",
+                        field="gromacs_path")
+    return resolved
+
+
+def _validate_gromacs_path(value: Any) -> str:
+    validate_gromacs_path(value)
+    return str(Path(value))
 
 
 # ---------------------------------------------------------------------------

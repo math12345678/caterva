@@ -110,7 +110,7 @@ def test_the_page_or_the_not_built_page_over_the_wire(served):
     assert status == 200 and "content-security-policy" in headers
     built, _ = served.static.built()
     if built:
-        assert f'content="{served.token}"'.encode() in body
+        assert served.token.encode() not in body and b'name="caterva-studio-page"' in body
     else:
         assert b"the page is not built" in body
 
