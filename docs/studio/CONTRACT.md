@@ -228,6 +228,19 @@ page, because the CLI keeps them apart in its exit code:
   measured conditions were asked for and not found), or none (compose's
   UnrecognisedShape): then `GET /api/runs/{id}/result` is 404 and the page
   shows the reason.
+- **an upstream outage** (`outcome.meaning = "network"`): a run whose
+  refusal text is a database not answering (a timeout, a connection that
+  was never made, an HTTP error status from UniProt, the RCSB, BRENDA or
+  NCBI). It exits 3 like a refusal, but an outage is not Caterva declining
+  the question, so `contract.outcome_for` classifies it from the exception
+  signature in the text (`contract.network_failure`) and carries the host
+  and status in `outcome.network` (`NetworkFailure` `{host, status,
+  timed_out}`). `outcome.reason` stays the raw text; the page shows a
+  plain sentence ("UniProt did not answer") with a retry and keeps the raw
+  text in a disclosure. A refusal that only mentions the network (offline
+  mode) stays `refused`. `outcome.has_result` is `false` when the run
+  finished without a result, so the page never requests a `/result` that
+  would be 404.
 - **a crash** (exit 1): status `failed`, `RunRecord.error` `{type, message,
   traceback}`. The traceback is kept for the report-a-bug path; the page
   shows type and message.

@@ -80,7 +80,12 @@ def test_a_gene_circuit_is_not_told_to_name_an_enzyme() -> None:
 
     concerns, _ = _provenance_concerns(compose("two genes repressing each other"))
     assert "name the enzyme" not in concerns[0].remedy
-    assert "not kept in an enzyme database" in concerns[0].remedy
+    # Why an enzyme does not apply is said once, in the detail; the remedy
+    # does not then tell the reader the thing it asked for is pointless.
+    assert "not kept in an enzyme database" in concerns[0].detail
+    assert "would not find" not in concerns[0].remedy
+    assert "enzyme database" not in concerns[0].remedy
+    assert "no enzyme was named" not in concerns[0].detail
 
 
 def test_an_enzyme_shape_still_is() -> None:
