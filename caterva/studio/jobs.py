@@ -994,7 +994,8 @@ def _prepare(kind: str, outcome: Any) -> Tuple[Optional[bytes], Tuple[Artifact, 
         raise TypeError(f"run() returned {type(outcome).__name__}, not an AdapterOutcome")
     if not isinstance(outcome.summary, str):
         raise TypeError("the summary is not text")
-    verdict = outcome_for(kind, outcome.exit_code, outcome.summary, outcome.refusal, outcome.name_refusal)
+    verdict = outcome_for(kind, outcome.exit_code, outcome.summary, outcome.refusal, outcome.name_refusal,
+                          has_result=outcome.result is not None)
     result_bytes: Optional[bytes] = None
     if outcome.result is not None:
         if not isinstance(outcome.result, Mapping):

@@ -253,7 +253,7 @@ def test_a_run_goes_queued_running_done_with_its_events_in_order(manager, gate):
 
     final = manager.record(run_id)
     assert final["outcome"] == {"exit_code": 0, "meaning": "produced", "summary": "the test adapter answered",
-                                "reason": None}
+                                "reason": None, "has_result": True}
     assert final["artifacts"] == [{"name": "note.txt", "content_type": "text/plain; charset=utf-8", "bytes": 7,
                                    "description": "a file the test adapter wrote"}]
     assert json.loads(manager.ws.result_path(run_id).read_text()) == {"said": "hello"}
