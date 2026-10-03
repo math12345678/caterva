@@ -4,7 +4,7 @@
 WHY THIS EXISTS
 ---------------
 A review of the Studio branch found a person's home directory
-(`/Users/<name>/...`), an agent's worktree (`/tmp/claude-.../wt-...`) and
+(`/Users/<name>/...`), a development worktree (`/tmp/claude-.../wt-...`) and
 scratch folders from captures (`/private/tmp/...`) in documentation, test
 fixtures and a fixtures README. A path like that is private information in a
 public repository, it is a command nobody else can paste, and in a captured
@@ -15,7 +15,7 @@ WHAT IT CHECKS
 Every tracked text file, line by line, for
 
     /Users/<name>/        a macOS home directory
-    /tmp/claude-          a scratch or worktree folder of the development agents
+    /tmp/claude-          a scratch or worktree folder of the development tooling
     /private/tmp/         macOS's spelling of /tmp, which a capture records
 
 A hit fails unless the file is on ALLOWED below with a reason. The list is
