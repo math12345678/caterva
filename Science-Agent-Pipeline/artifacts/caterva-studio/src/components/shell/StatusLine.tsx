@@ -133,7 +133,7 @@ export function StatusLine({
           href="/history"
         />
         {c?.dev_origin ? (
-          <Item state="unknown" label="development" reason={`The server also accepts ${c.dev_origin} (--dev-origin). Development only.`} />
+          <Item state="unknown" label="development" reason={`The server also accepts requests from ${c.dev_origin}. Development only.`} />
         ) : null}
       </footer>
     </Tooltip.Provider>

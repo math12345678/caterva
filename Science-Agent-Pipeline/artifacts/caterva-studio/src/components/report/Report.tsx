@@ -13,6 +13,7 @@ import MarkdownIt from "markdown-it";
 import { useMemo } from "react";
 
 import { cn } from "@/lib/cn";
+import { plainMarkdown } from "@/lib/copy";
 
 const md = new MarkdownIt({ html: false, linkify: true, typographer: false, breaks: false });
 
@@ -28,8 +29,13 @@ export function renderMarkdown(source: string): string {
   return md.render(source);
 }
 
-export function MarkdownReport({ source, className }: { source: string; className?: string }) {
-  const html = useMemo(() => renderMarkdown(source), [source]);
+/**
+ * `prose` rewrites the document's sentences (flags, dashes, plurals) for the
+ * window and leaves code untouched; without it the document is exactly what
+ * the terminal prints.
+ */
+export function MarkdownReport({ source, className, prose = false }: { source: string; className?: string; prose?: boolean }) {
+  const html = useMemo(() => renderMarkdown(prose ? plainMarkdown(source) : source), [source, prose]);
   return <div className={cn("report", className)} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 

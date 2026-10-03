@@ -11,6 +11,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { NetworkCapability } from "@/api/types";
 
+import { hostLabel, plain, withoutUrls } from "./copy";
 import { formatDateTime } from "./format";
 import { CAPABILITIES_KEY, probeNetwork } from "./queries";
 
@@ -22,19 +23,30 @@ export interface NetworkReading {
   label: string;
   /** One honest sentence about what is known and from where. */
   sentence: string;
+  /** The server's own text for a failure, for a disclosure; null when there is none. */
+  detail: string | null;
 }
 
-const HOST_NAMES: Record<string, string> = {
-  "www.brenda-enzymes.org": "BRENDA",
-  "rest.uniprot.org": "UniProt",
-  "search.rcsb.org": "the RCSB search",
-  "files.rcsb.org": "the RCSB files",
-  "data.rcsb.org": "the RCSB data",
-  "eutils.ncbi.nlm.nih.gov": "NCBI",
-};
-
 export function hostName(host: string): string {
-  return HOST_NAMES[host] ?? host;
+  return hostLabel(host);
+}
+
+/**
+ * What a recorded reason says, in words: a host that "could not be reached"
+ * with an exception after it is a host that did not answer; the exception
+ * text itself stays in `NetworkReading.detail` for a disclosure and is never
+ * part of a sentence or an accessible name.
+ */
+export function describeReason(reason: string | null, fallback: string): string {
+  if (!reason) return fallback;
+  const one = /^(\S+) could not be reached: /.exec(reason);
+  if (one) return `${hostLabel(one[1])} did not answer`;
+  const many = /^not reachable from this computer: (.+)$/s.exec(reason);
+  if (many) {
+    const hosts = many[1].split("; ").map((entry) => /^(\S+?): /.exec(entry)?.[1]).filter((h): h is string => Boolean(h));
+    if (hosts.length) return `${hosts.map(hostLabel).join(", ")} did not answer`;
+  }
+  return plain(withoutUrls(reason));
 }
 
 /** The hosts whose latest outcome was `answered`, named. */
@@ -50,6 +62,7 @@ export function readNetwork(net: NetworkCapability): NetworkReading {
       state: "unknown",
       label: "network not checked",
       sentence: "Nothing has contacted a database since this studio started, so there is nothing to report yet. Check it to find out.",
+      detail: null,
     };
   }
   const when = net.checked_at ? formatDateTime(net.checked_at) : "";
@@ -60,22 +73,25 @@ export function readNetwork(net: NetworkCapability): NetworkReading {
         state: "ok",
         label: "network reachable",
         sentence: `${who || "A database"} answered the last real request (${when}). That was a lookup you ran, not a check of every host; check to test them all.`,
+        detail: null,
       };
     }
     return {
       state: "off",
       label: "network unreachable",
-      sentence: `${net.reason ?? "A database could not be reached."} (${when}). That was a lookup you ran; check to test every host again.`,
+      sentence: `${describeReason(net.reason, "A database could not be reached")} (${when}). That was a lookup you ran; check to test every host again.`,
+      detail: net.reason,
     };
   }
   if (net.reachable) {
-    return { state: "ok", label: "network reachable", sentence: `Every database host answered a check (${when}).` };
+    return { state: "ok", label: "network reachable", sentence: `Every database host answered a check (${when}).`, detail: null };
   }
   const failing = named(net.hosts, false);
   return {
     state: "off",
     label: "network unreachable",
-    sentence: `${failing.length ? `${failing.join(", ")} did not answer a check` : (net.reason ?? "A check failed")} (${when}).`,
+    sentence: `${failing.length ? `${failing.join(", ")} did not answer a check` : describeReason(net.reason, "A check failed")} (${when}).`,
+    detail: net.reason,
   };
 }
 

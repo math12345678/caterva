@@ -9,6 +9,7 @@ import { ProvenanceDetail } from "@/components/provenance/ProvenanceDetail";
 import { countKinds, ProvenanceLegend } from "@/components/provenance/ProvenanceLegend";
 import { PROVENANCE_LABEL, ProvenanceMark } from "@/components/provenance/ProvenanceMark";
 import { Value, valueAccessibleName } from "@/components/provenance/Value";
+import { placeholderRowReason, readPlaceholder } from "@/lib/copy";
 
 const searched = fixture.searched.parameters as SourcedValue[];
 const structureOnly = fixture.structure_only.parameters as SourcedValue[];
@@ -78,7 +79,10 @@ describe("Value, over the real contract fixture", () => {
     render(<Value v={placeholder} />);
     expect(screen.getByRole("button")).toHaveAttribute("data-kind", "placeholder");
     await userEvent.click(screen.getByRole("button"));
-    expect(await screen.findByText(placeholder.provenance.reason!)).toBeInTheDocument();
+    // The boilerplate is read into the one reason this constant has; the rest is said once, above a table.
+    const reading = readPlaceholder(placeholder.provenance.reason!);
+    expect(reading).not.toBeNull();
+    expect(await screen.findByText(placeholderRowReason(reading!))).toBeInTheDocument();
   });
 
   it("opens from the keyboard and closes with Escape", async () => {
@@ -119,5 +123,50 @@ describe("ProvenanceLegend", () => {
     const legend = screen.getByRole("list", { name: "What the marks mean" });
     expect(within(legend).getByText(/measured, cited/)).toHaveTextContent(`measured, cited ${counts.measured}`);
     expect(counts.measured).toBe(searched.filter((v) => v.provenance.kind === "measured").length);
+  });
+});
+
+describe("ProvenanceMark shapes, at the size they are read", () => {
+  const draw = (provenance: { kind: ProvenanceKind; by?: "user" | "default" }) => {
+    const { container, unmount } = render(<ProvenanceMark provenance={provenance} />);
+    const svg = container.querySelector("svg")!;
+    const out = { html: svg.innerHTML, width: Number(svg.getAttribute("width")), svg };
+    unmount();
+    return out;
+  };
+
+  it("draws every mark at 12 px or more, even when asked for less", () => {
+    for (const kind of ["measured", "fitted", "computed", "placeholder", "chosen"] as ProvenanceKind[]) {
+      expect(draw({ kind }).width).toBeGreaterThanOrEqual(12);
+    }
+    const { container } = render(<ProvenanceMark provenance={{ kind: "measured" }} size={8} />);
+    expect(Number(container.querySelector("svg")!.getAttribute("width"))).toBe(12);
+  });
+
+  it("gives a choice and a default different shapes, not different colours", () => {
+    const chosen = draw({ kind: "chosen", by: "user" });
+    const def = draw({ kind: "chosen", by: "default" });
+    // A filled diamond against an outlined diamond that carries a tick.
+    expect(chosen.svg.querySelector("polygon")!.getAttribute("fill")).not.toBe("none");
+    expect(chosen.svg.querySelector("path")).toBeNull();
+    expect(def.svg.querySelector("polygon")!.getAttribute("fill")).toBe("none");
+    expect(def.svg.querySelector("path")).not.toBeNull();
+    expect(chosen.html).not.toBe(def.html);
+  });
+
+  it("tells a dashed placeholder ring from a solid fitted ring by its stroke, not its colour", () => {
+    const placeholder = draw({ kind: "placeholder" }).svg.querySelector("circle")!;
+    const fitted = draw({ kind: "fitted" }).svg.querySelector("circle")!;
+    expect(placeholder.getAttribute("stroke-dasharray")).toBeTruthy();
+    expect(fitted.getAttribute("stroke-dasharray")).toBeNull();
+    // Four coarse dashes round the ring: each dash is at least 1.5 units long.
+    const [dash] = placeholder.getAttribute("stroke-dasharray")!.split(" ").map(Number);
+    expect(dash).toBeGreaterThanOrEqual(2.5);
+  });
+
+  it("keeps the legend naming every mark", () => {
+    render(<ProvenanceLegend layout="stack" />);
+    const legend = screen.getByRole("list", { name: "What the marks mean" });
+    expect(within(legend).getAllByRole("listitem")).toHaveLength(5);
   });
 });

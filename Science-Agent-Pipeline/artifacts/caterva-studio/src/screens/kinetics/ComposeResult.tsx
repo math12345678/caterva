@@ -27,7 +27,8 @@ import { ProvenanceMark } from "@/components/provenance/ProvenanceMark";
 import { Value } from "@/components/provenance/Value";
 import { MarkdownReport } from "@/components/report/Report";
 import { Section } from "@/components/screen/Screen";
-import { RefusalState } from "@/components/states/States";
+import { NetworkState, RefusalState } from "@/components/states/States";
+import { networkFailureOf, plural, PLACEHOLDER_SHARED, plain, placeholderRowReason, readPlaceholder, withoutUrls } from "@/lib/copy";
 import { formatNumber } from "@/lib/format";
 
 import type { ExportChoice } from "./kit";
@@ -63,8 +64,8 @@ export function composeExports(result: Result, run: RunRecord): ExportChoice[] {
 function ConcernLine({ c }: { c: Concern }) {
   return (
     <>
-      <span className="chip chip-mono">{c.source}</span> <span>{c.detail}</span>
-      {c.remedy ? <span className="k-remedy">{c.remedy}</span> : null}
+      <span className="chip chip-mono">{c.source}</span> <span>{plain(c.detail)}</span>
+      {c.remedy ? <span className="k-remedy">{plain(c.remedy)}</span> : null}
     </>
   );
 }
@@ -73,11 +74,14 @@ function ConcernLine({ c }: { c: Concern }) {
 function PartRefusal({ result, run, onChooseEnzyme }: { result: Result; run: RunRecord; onChooseEnzyme?: (ec: string) => void }) {
   const refused = result.sections.filter((s) => s.status !== "answered");
   const outcome = run.outcome;
+  if (outcome?.meaning === "network") {
+    return <NetworkState failure={outcome.network ?? networkFailureOf(outcome.reason)} raw={outcome.reason ?? undefined} again="run it again" inset={false} />;
+  }
   if (!outcome || outcome.meaning !== "refused") return null;
   return (
     <div className="k-part-refusal" role="note">
       <span className="state-kicker">Refused in part</span>
-      <p className="k-part-refusal-reason">{outcome.reason}</p>
+      <p className="k-part-refusal-reason">{plain(withoutUrls(outcome.reason ?? ""))}</p>
       {outcome.name_refusal ? <NameRefusalChoices refusal={outcome.name_refusal} onChoose={onChooseEnzyme} /> : null}
       {refused.length ? (
         <ul className="k-anchors">
@@ -121,19 +125,19 @@ export function Verdict({ result, run, onChooseEnzyme }: { result: Result; run: 
         </h2>
       </div>
       <p className="k-verdict-licence">
-        <span className="k-label-inline">What it supports</span> {v.licence}
+        <span className="k-label-inline">What it supports</span> {plain(v.licence)}
       </p>
       {qualified.map((c) => (
         <p className="k-verdict-qualified" key={`${c.source}-q`}>
-          <span className="k-label-inline">Qualified</span> {c.qualifier}.
+          <span className="k-label-inline">Qualified</span> {plain(c.qualifier ?? "")}.
         </p>
       ))}
       {isozymes && isozymes !== worst ? (
         <div className="k-worst" data-severity={isozymes.severity} data-source="isozymes">
           <p className="k-eyebrow">Which isozyme</p>
           <p className="k-worst-detail">
-            <span>{isozymes.detail}</span>
-            {isozymes.remedy ? <span className="k-remedy">{isozymes.remedy}</span> : null}
+            <span>{plain(isozymes.detail)}</span>
+            {isozymes.remedy ? <span className="k-remedy">{plain(isozymes.remedy)}</span> : null}
           </p>
         </div>
       ) : null}
@@ -147,12 +151,12 @@ export function Verdict({ result, run, onChooseEnzyme }: { result: Result; run: 
       ) : null}
       {v.behaviour ? (
         <p className="k-verdict-behaviour">
-          <span className="k-label-inline">What it does</span> {v.behaviour}
+          <span className="k-label-inline">What it does</span> {plain(v.behaviour)}
         </p>
       ) : null}
       {v.next_step && v.next_step !== worst?.remedy ? (
         <p className="k-verdict-next">
-          <span className="k-label-inline">Do this next</span> {v.next_step}
+          <span className="k-label-inline">Do this next</span> {plain(v.next_step)}
         </p>
       ) : null}
       <PartRefusal result={result} run={run} onChooseEnzyme={onChooseEnzyme} />
@@ -182,13 +186,13 @@ export function Verdict({ result, run, onChooseEnzyme }: { result: Result; run: 
                 {checked.map(([k, why]) => (
                   <div key={k}>
                     <dt className="font-mono">{k}</dt>
-                    <dd>{why}</dd>
+                    <dd>{plain(why)}</dd>
                   </div>
                 ))}
                 {unexamined.map(([k, why]) => (
                   <div key={k} data-state="unexamined">
                     <dt className="font-mono">{k}</dt>
-                    <dd>{why}</dd>
+                    <dd>{plain(why)}</dd>
                   </div>
                 ))}
               </dl>
@@ -209,7 +213,7 @@ function Clamp({ children }: { children: string }) {
       <span className="k-clamp-text">{children}</span>
       {long ? (
         <button type="button" className="k-clamp-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          {open ? "less" : "all of it"}
+          {open ? "show less" : "show all"}
         </button>
       ) : null}
     </span>
@@ -255,40 +259,42 @@ export function Origin({ v }: { v: SourcedValue }) {
           {p.scope?.length ? (
             <ul className="k-scope" aria-label="Where this could be the wrong number for this model">
               {p.scope.map((s) => (
-                <li key={s}>{s}</li>
+                <li key={s}>{plain(s)}</li>
               ))}
             </ul>
           ) : null}
           {p.spread ? (
             <p className="k-spread">
-              <Clamp>{p.spread.sentence}</Clamp>
+              <Clamp>{plain(p.spread.sentence)}</Clamp>
             </p>
           ) : null}
           {p.chosen_because ? (
             <p className="k-spread">
               <span className="muted">Chosen because </span>
-              {p.chosen_because}
+              {plain(p.chosen_because)}
             </p>
           ) : null}
         </div>
       );
-    case "placeholder":
+    case "placeholder": {
+      const reading = p.reason ? readPlaceholder(p.reason) : null;
       return (
         <div className="k-origin">
-          <p className="k-origin-reason">
-            <Clamp>{p.reason ?? "no reason was recorded"}</Clamp>
+          <p className="k-origin-reason" title={reading?.identifier}>
+            {reading ? placeholderRowReason(reading) : <Clamp>{plain(p.reason ?? "no reason was recorded")}</Clamp>}
           </p>
-          {p.table ? (
+          {p.table && !reading ? (
             <p className="k-spread muted">
               The measurement that would replace it is in BRENDA&apos;s <span className="font-mono">{p.table}</span> table.
             </p>
           ) : null}
         </div>
       );
+    }
     case "computed":
       return (
         <div className="k-origin">
-          <p className="k-origin-reason">{p.method ?? "computed by Caterva"}</p>
+          <p className="k-origin-reason">{plain(p.method ?? "computed by Caterva")}</p>
           {p.inputs?.length ? <p className="k-spread muted font-mono">from {p.inputs.join(", ")}</p> : null}
         </div>
       );
@@ -298,7 +304,7 @@ export function Origin({ v }: { v: SourcedValue }) {
       return (
         <p className="k-origin-reason">
           {p.by === "user" ? "Chosen by you in this request" : "A stated default of the command"}
-          {p.reason ? <span className="muted">: {p.reason}</span> : null}
+          {p.reason ? <span className="muted">: {plain(p.reason)}</span> : null}
         </p>
       );
   }
@@ -342,6 +348,7 @@ export function NumbersLedger({ result }: { result: Result }) {
   const { parameters, species, concentration_unit } = result.model;
   const all = [...parameters, ...species.map((s) => s.initial)];
   const counts = countKinds(all);
+  const sharedPlaceholder = all.some((v) => v.provenance.kind === "placeholder" && v.provenance.reason && readPlaceholder(v.provenance.reason));
   return (
     <Section
       title="Where the numbers come from"
@@ -352,6 +359,11 @@ export function NumbersLedger({ result }: { result: Result }) {
         Activate a number for its paper, its assay conditions and the source row&apos;s own words, or for the reason it is
         a placeholder. Concentrations are in <span className="font-mono">{concentration_unit}</span>.
       </p>
+      {sharedPlaceholder ? (
+        <p className="k-shared-note">
+          <ProvenanceMark provenance={{ kind: "placeholder" }} decorative /> {PLACEHOLDER_SHARED}
+        </p>
+      ) : null}
       <LedgerRows name="Constant" values={parameters.map((p) => ({ key: p.id ?? p.label ?? "", name: p.id ?? p.label ?? "", v: p }))} />
       {species.length ? (
         <Disclosure title="Starting amounts" aside={<span className="font-mono">{species.length}</span>}>
@@ -383,7 +395,7 @@ function Search({ result }: { result: Result }) {
         <span className="font-mono">{s.measured}</span> measured, <span className="font-mono">{s.placeholders}</span> still
         placeholders{s.refused ? "; the search could not run" : ""}.
       </p>
-      {s.note ? <p className="muted">{s.note}</p> : null}
+      {s.note ? <p className="muted">{plain(s.note)}</p> : null}
     </div>
   );
 }
@@ -405,7 +417,7 @@ function TimeCourse({ result }: { result: Result }) {
       {t.invariants.length ? (
         <p className={broken.length ? "k-invariants text-caution" : "k-invariants muted"}>
           {broken.length
-            ? `${broken.length} conservation law(s) did not hold over the run: ${broken.map((i) => i.law).join("; ")}`
+            ? `${plural(broken.length, "conservation law")} did not hold over the run: ${broken.map((i) => i.law).join("; ")}`
             : `Every conservation law held over the run: ${t.invariants.map((i) => i.law).join("; ")}.`}
         </p>
       ) : null}
@@ -570,10 +582,10 @@ function SteadyStates({ result }: { result: Result }) {
       <p className="k-invariants muted">
         Amounts in {result.model.concentration_unit}, computed by Caterva
         <ProvenanceMark provenance={{ kind: "computed" }} />.
-        {st.notes.length ? ` ${st.notes.join(" ")}` : ""}
+        {st.notes.length ? ` ${plain(st.notes.join(" "))}` : ""}
       </p>
       <Disclosure title="As the report prints it">
-        <pre className="report-text">{st.text}</pre>
+        <pre className="report-text">{plain(st.text)}</pre>
       </Disclosure>
     </Section>
   );
@@ -606,7 +618,7 @@ function AnalysisSection({ section }: { section: StructuredSection }) {
         </p>
       ) : null}
       <SectionFigure section={section} />
-      {section.status !== "refused" || !section.refusals.length ? <MarkdownReport source={section.text} className="k-analysis-text" /> : null}
+      {section.status !== "refused" || !section.refusals.length ? <MarkdownReport source={section.text} className="k-analysis-text" prose /> : null}
     </section>
   );
 }
@@ -643,7 +655,7 @@ export function ComposeResultView({ result, run, onChooseEnzyme }: { result: Res
         <Section title="Notes" id="k-notes">
           <ul className="k-notes">
             {result.notes.map((n) => (
-              <li key={n}>{n}</li>
+              <li key={n}>{plain(n)}</li>
             ))}
           </ul>
         </Section>
@@ -653,13 +665,13 @@ export function ComposeResultView({ result, run, onChooseEnzyme }: { result: Res
           <ul className="k-notes">
             {refusedExports.map(([format, e]) => (
               <li key={format}>
-                <span className="font-mono">{format}</span> {e.refused}
+                <span className="font-mono">{format}</span> {plain(e.refused ?? "")}
               </li>
             ))}
           </ul>
         </Section>
       ) : null}
-      <Disclosure title="The report caterva compose prints">
+      <Disclosure title="The report as the command prints it">
         <MarkdownReport source={result.report_markdown} />
       </Disclosure>
     </>

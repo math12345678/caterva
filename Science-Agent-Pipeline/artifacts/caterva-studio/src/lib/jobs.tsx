@@ -22,6 +22,8 @@ import { cancelRun, isTerminal, listRuns, type RunEvent, subscribeToRun } from "
 import type { Outcome, RunError, RunKind, RunRecord, RunStatus, RunSummary } from "@/api/types";
 import { routeForKind } from "@/routes";
 
+import { networkFailureOf, networkSentence, plain } from "./copy";
+import { pollInterval } from "./polling";
 import { describeError } from "./errors";
 import { notify } from "./toast";
 
@@ -105,11 +107,17 @@ export function announcement(job: Job): { tone: "done" | "refused" | "negative" 
   switch (job.status) {
     case "done": {
       const meaning = job.outcome?.meaning ?? "produced";
+      if (meaning === "network")
+        return {
+          tone: "failed",
+          title: `Did not finish: ${job.title}`,
+          description: networkSentence(job.outcome?.network ?? networkFailureOf(job.outcome?.reason)),
+        };
       if (meaning === "refused")
-        return { tone: "refused", title: `Refused: ${job.title}`, description: firstLine(job.outcome?.reason) };
+        return { tone: "refused", title: `Refused: ${job.title}`, description: plain(firstLine(job.outcome?.reason)) };
       if (meaning === "negative")
-        return { tone: "negative", title: `Negative finding: ${job.title}`, description: firstLine(job.outcome?.reason) };
-      return { tone: "done", title: `Finished: ${job.title}`, description: firstLine(job.outcome?.summary) };
+        return { tone: "negative", title: `Negative finding: ${job.title}`, description: plain(firstLine(job.outcome?.reason)) };
+      return { tone: "done", title: `Finished: ${job.title}`, description: plain(firstLine(job.outcome?.summary)) };
     }
     case "failed":
       return {
@@ -126,7 +134,7 @@ export function announcement(job: Job): { tone: "done" | "refused" | "negative" 
   }
 }
 
-const FOUND_POLL_MS = 15_000;
+const FOUND_POLL_MS = 30_000;
 const KEEP_FINISHED = 8;
 
 export function JobsProvider({ children }: { children: ReactNode }) {
@@ -264,7 +272,7 @@ export function JobsProvider({ children }: { children: ReactNode }) {
       ]);
       return [...running.runs, ...queued.runs];
     },
-    refetchInterval: FOUND_POLL_MS,
+    refetchInterval: pollInterval(FOUND_POLL_MS),
     refetchIntervalInBackground: false,
     // Without a session every request is refused; the shell says why instead.
     enabled: sessionToken() !== null,

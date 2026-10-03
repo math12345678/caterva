@@ -6,6 +6,9 @@ import { Link } from "wouter";
 
 import type { RunSummary } from "@/api/types";
 import { RunStatusMark, runStatusLabel } from "@/components/shell/RunStatusMark";
+
+import { Identified } from "./Identified";
+import { networkFailureOf, networkSentence, plain } from "@/lib/copy";
 import { formatWhen } from "@/lib/format";
 import { runHref } from "@/lib/jobs";
 
@@ -18,12 +21,13 @@ import { runHref } from "@/lib/jobs";
 export function outcomeLine(run: Pick<RunSummary, "status" | "outcome">): string {
   if (run.outcome) {
     const { summary, reason, meaning } = run.outcome;
-    if (meaning === "produced" || !reason) return summary;
+    if (meaning === "network") return networkSentence(run.outcome.network ?? networkFailureOf(reason));
+    if (meaning === "produced" || !reason) return plain(summary);
     const first = reason.split("\n")[0].trim();
     const said = summary.trim();
-    if (!said || said.includes(first)) return said || first;
-    if (first.includes(said)) return first;
-    return `${said}: ${first}`;
+    if (!said || said.includes(first)) return plain(said || first);
+    if (first.includes(said)) return plain(first);
+    return plain(`${said}: ${first}`);
   }
   return runStatusLabel(run.status, null);
 }
@@ -44,7 +48,9 @@ export function RunRow({
       <span className="run-row-mark">
         <RunStatusMark status={run.status} meaning={run.outcome?.meaning ?? null} />
       </span>
-      <span className="run-row-title">{run.title}</span>
+      <span className="run-row-title">
+        <Identified text={run.title} />
+      </span>
       <span className="run-row-time">{formatWhen(run.created_at)}</span>
       <span className="run-row-sub">
         <span className="font-mono">{run.kind}</span> · {outcomeLine(run)}

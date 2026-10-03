@@ -151,7 +151,12 @@ export default function SettingsScreen() {
             {serverError && !serverError.field ? <ErrorState error={serverError} /> : null}
             {save.isError && !serverError ? <ErrorState error={save.error} /> : null}
             <FormActions>
-              <button type="submit" className="btn btn-primary" disabled={!dirty || save.isPending}>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={!dirty || save.isPending}
+                aria-describedby={!dirty || save.isPending ? "settings-save-why" : undefined}
+              >
                 {save.isPending ? "Saving" : "Save"}
               </button>
               {dirty ? (
@@ -160,6 +165,11 @@ export default function SettingsScreen() {
                 </button>
               ) : null}
             </FormActions>
+            {!dirty || save.isPending ? (
+              <p className="form-why" id="settings-save-why">
+                {save.isPending ? "Saving the settings." : "Change a setting first; there is nothing to save yet."}
+              </p>
+            ) : null}
           </form>
         )}
       </Section>

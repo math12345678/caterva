@@ -11,9 +11,18 @@
 import { ApiRequestError } from "@/api/client";
 import type { ApiError, ErrorCode } from "@/api/types";
 
+import { networkFailureOf, networkSentence, plain, withoutUrls } from "./copy";
+
 export interface ReadableError {
   title: string;
+  /**
+   * What happened, in plain words: request URLs named by their host, flags
+   * named by their field, an upstream outage as "UniProt did not answer".
+   * Safe to use as an accessible name or a toast.
+   */
   message: string;
+  /** The server's or the browser's own text before it was reworded (a disclosure's content, never a name). */
+  raw: string;
   /** What to do about it, when the page knows. */
   hint: string | null;
   /** The request field the server named (400 malformed). */
@@ -42,10 +51,17 @@ const HINTS: Partial<Record<ErrorCode, string>> = {
   crash: "The traceback is in studio.log in the workspace folder (Settings shows where).",
 };
 
+/** The sentence for a failure's text: an outage says so, anything else is reworded for the window. */
+function plainMessage(text: string): string {
+  const outage = networkFailureOf(text);
+  return outage ? networkSentence(outage) : plain(withoutUrls(text));
+}
+
 export function describeApiError(error: ApiError, status = 0): ReadableError {
   return {
     title: TITLES[error.code] ?? "The request failed",
-    message: error.message,
+    message: plainMessage(error.message),
+    raw: error.message,
     hint: HINTS[error.code] ?? null,
     field: error.field ?? null,
     code: error.code,
@@ -59,6 +75,7 @@ export function describeError(e: unknown): ReadableError {
       return {
         title: "The studio server is not answering",
         message: e.error.message,
+        raw: e.error.message,
         hint: "It may have stopped. In Caterva.app, choose Restart; in a terminal, run `caterva studio` again and open the address it prints.",
         field: null,
         code: "network",
@@ -69,6 +86,7 @@ export function describeError(e: unknown): ReadableError {
       return {
         title: "This page was not opened by the studio server",
         message: e.error.message,
+        raw: e.error.message,
         hint: "Start it with `caterva studio`, then open the address it prints (it includes a fresh session).",
         field: null,
         code: "session",
@@ -79,6 +97,7 @@ export function describeError(e: unknown): ReadableError {
       return {
         title: "The server's answer did not match this page",
         message: e.error.message,
+        raw: e.error.message,
         hint: "The page and the server were built from different checkouts. Rebuild the page (`pnpm --filter @workspace/caterva-studio run build`) from the same checkout as the server.",
         field: e.error.field ?? null,
         code: "contract",
@@ -88,9 +107,10 @@ export function describeError(e: unknown): ReadableError {
     return describeApiError(e.error, e.status);
   }
   if (e instanceof Error) {
-    return { title: "The page failed", message: `${e.name}: ${e.message}`, hint: null, field: null, code: "page", status: 0 };
+    const raw = `${e.name}: ${e.message}`;
+    return { title: "The page failed", message: plainMessage(raw), raw, hint: null, field: null, code: "page", status: 0 };
   }
-  return { title: "The page failed", message: String(e), hint: null, field: null, code: "page", status: 0 };
+  return { title: "The page failed", message: String(e), raw: String(e), hint: null, field: null, code: "page", status: 0 };
 }
 
 /** The ApiError a component that takes one should show for any failure. */

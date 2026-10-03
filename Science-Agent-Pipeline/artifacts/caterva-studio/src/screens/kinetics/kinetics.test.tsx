@@ -40,6 +40,8 @@ import BindScreen, { bindForm, bindRequest } from "../Bind";
 import ComposeScreen, { composeForm, composeRequest, EMPTY_COMPOSE } from "../Compose";
 import { simForm, simRequest } from "../Sim";
 import { BindResultView } from "./BindResult";
+import { humaniseStage, plain, withoutUrls } from "@/lib/copy";
+
 import { composeExports, ComposeResultView } from "./ComposeResult";
 import { composeHref, ConstantsResultView } from "./ConstantsResult";
 import { KineticsRun } from "./kit";
@@ -100,11 +102,11 @@ describe("Compose result", () => {
   it("says the verdict first, with the worst concern the library named", () => {
     render(<ComposeResultView result={result} run={run} />);
     const verdict = screen.getByRole("region", { name: result.verdict!.verdict });
-    expect(within(verdict).getByText(result.verdict!.licence)).toBeInTheDocument();
+    expect(within(verdict).getByText(plain(result.verdict!.licence))).toBeInTheDocument();
     const worst = result.verdict!.concerns[0];
     expect(within(verdict).getByText("The worst thing wrong with it")).toBeInTheDocument();
-    expect(within(verdict).getByText(worst.detail)).toBeInTheDocument();
-    expect(within(verdict).getByText(worst.remedy)).toBeInTheDocument();
+    expect(within(verdict).getByText(plain(worst.detail))).toBeInTheDocument();
+    expect(within(verdict).getByText(plain(worst.remedy ?? ""))).toBeInTheDocument();
     // The verdict precedes the table of where the numbers come from.
     const table = screen.getByRole("region", { name: "Where the numbers come from" });
     expect(verdict.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -117,7 +119,7 @@ describe("Compose result", () => {
     const table = screen.getByRole("region", { name: "Where the numbers come from" });
     // Inline in the ledger: the row's commentary and every scope concern, verbatim.
     expect(within(table).getByText(ki.provenance.commentary!)).toBeInTheDocument();
-    for (const s of ki.provenance.scope!) expect(within(table).getByText(s)).toBeInTheDocument();
+    for (const s of ki.provenance.scope!) expect(within(table).getByText(plain(s))).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: new RegExp(`^${ki.label}, ${formatValue(ki)} `) }));
     const popover = await screen.findByRole("dialog");
     const link = within(popover).getByRole("link", { name: new RegExp(`^${escape(ki.provenance.citation!.text)}(,|$)`) });
@@ -129,10 +131,10 @@ describe("Compose result", () => {
     expect(kcat.provenance.kind).toBe("placeholder");
     render(<ComposeResultView result={result} run={run} />);
     const table = screen.getByRole("region", { name: "Where the numbers come from" });
-    expect(within(table).getByText(kcat.provenance.reason!)).toBeInTheDocument();
+    expect(within(table).getByText(plain(kcat.provenance.reason!))).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /^kcat, .*placeholder, not measured$/ }));
     const popover = await screen.findByRole("dialog");
-    expect(within(popover).getByText(kcat.provenance.reason!)).toBeInTheDocument();
+    expect(within(popover).getByText(plain(kcat.provenance.reason!))).toBeInTheDocument();
   });
 
   it("says why a noncompetitive model carries the noncompetitive row", () => {
@@ -154,9 +156,9 @@ describe("Compose result", () => {
     }
     const refused = r.sections.find((s) => s.status === "refused")!;
     const region = screen.getByRole("region", { name: refused.title });
-    expect(within(region).getByRole("region", { name: "Refused, and why" })).toHaveTextContent(refused.refusals[0].slice(0, 60));
+    expect(within(region).getByRole("region", { name: "Refused, and why" })).toHaveTextContent(plain(refused.refusals[0]).slice(0, 60));
     expect(screen.getByRole("link", { name: refused.title })).toHaveAttribute("href", `#k-section-${refused.key}`);
-    expect(screen.getByText(record.outcome!.reason!)).toBeInTheDocument();
+    expect(screen.getByText(plain(withoutUrls(record.outcome!.reason!)))).toBeInTheDocument();
   });
 
   it("draws a figure for each analysis that has one, from the section's own data", () => {
@@ -243,9 +245,9 @@ describe("A kinetics run", () => {
         {() => null}
       </KineticsRun>,
     );
-    expect(screen.getAllByText(last.label).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(humaniseStage(last.label)).length).toBeGreaterThan(0);
     const list = screen.getByRole("list", { name: "Stages so far" });
-    for (const s of stages) expect(within(list).getByText(s.label)).toBeInTheDocument();
+    for (const s of stages) expect(within(list).getByText(humaniseStage(s.label))).toBeInTheDocument();
     expect(stages.some((s) => s.label.startsWith("Looking up "))).toBe(true);
   });
 
@@ -409,7 +411,7 @@ describe("Constants", () => {
       expect(v.provenance.by).toBe("default");
       expect(screen.getByRole("button", { name: new RegExp(`^${v.id}, .*a stated default$`) })).toBeInTheDocument();
     }
-    for (const r of result.refusals) expect(screen.getByText(r)).toBeInTheDocument();
+    for (const r of result.refusals) expect(screen.getByText(plain(r))).toBeInTheDocument();
   });
 });
 

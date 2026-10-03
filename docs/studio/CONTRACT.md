@@ -837,10 +837,14 @@ colour second so it survives greyscale:
 | kind | mark |
 |---|---|
 | measured | solid signal dot (the mark's own signal dot); the number is a button: one click opens the citation (text, registry, reference, commentary, conditions, scope, spread, link) |
-| fitted | ring |
+| fitted | heavy solid ring |
 | computed | small square; hover/focus shows method and inputs |
-| placeholder | hollow dashed dot in the caution colour; hover/focus shows the reason |
-| chosen | short bar; caution when a default chose it, ink when the user did |
+| placeholder | lighter ring in four coarse dashes, in the caution colour; hover/focus shows the reason |
+| chosen | filled diamond (ink) when the user chose it; outlined diamond with a tick, in the caution colour, when a stated default did |
+
+Marks are drawn at 12 px at the least (`MARK_SIZE`), the smallest size at
+which a dashed ring and a solid ring, and a filled and an outlined diamond,
+still differ.
 
 A number is formatted for display only by `src/lib/format.ts`, from the
 value the API sent; the full-precision value is one hover away and is what

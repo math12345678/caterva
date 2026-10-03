@@ -108,13 +108,16 @@
   --prov-placeholder: var(--caution);
   --prov-chosen: var(--fg);
 
-  /* Chart series (charts/theme.tsx), each 3:1 or better on the surface. */
-  --series-1: oklch(0.479 0.038 226.3);
-  --series-2: oklch(0.297 0.015 269.2);
-  --series-3: oklch(0.544 0.101 71.7);
-  --series-4: oklch(0.5 0.09 330);
-  --series-5: oklch(0.52 0.08 150);
-  --series-6: oklch(0.506 0.14 27.5);
+  /* Chart series (charts/theme.tsx). Odd series are dark and even ones mid,
+     so neighbours differ by 3:1 or more in luminance as well as in hue, and
+     every series is 3:1 or better against the surface; asserted by
+     src/__tests__/seriesContrast.test.ts, which reads these lines. */
+  --series-1: oklch(0.309 0.055 240);
+  --series-2: oklch(0.605 0.13 72);
+  --series-3: oklch(0.325 0.11 330);
+  --series-4: oklch(0.586 0.12 150);
+  --series-5: oklch(0.325 0.12 27);
+  --series-6: oklch(0.591 0.09 215);
 
   --shadow-overlay: 0 1px 2px oklch(0.297 0.015 269.2 / 0.06), 0 12px 32px -8px oklch(0.297 0.015 269.2 / 0.16);
 
@@ -165,12 +168,12 @@
     --on-slab-muted: oklch(0.744 0.011 267.3);
     --slab-signal: oklch(0.766 0.034 226.5);
     --slab-rule: oklch(0.3 0.013 269);
-    --series-1: oklch(0.766 0.034 226.5);
-    --series-2: oklch(0.9 0.012 84);
-    --series-3: oklch(0.773 0.099 77);
-    --series-4: oklch(0.76 0.08 330);
-    --series-5: oklch(0.76 0.08 150);
-    --series-6: oklch(0.721 0.107 27.2);
+    --series-1: oklch(0.883 0.06 226);
+    --series-2: oklch(0.57 0.12 72);
+    --series-3: oklch(0.896 0.07 330);
+    --series-4: oklch(0.551 0.12 150);
+    --series-5: oklch(0.893 0.05 27);
+    --series-6: oklch(0.557 0.09 215);
     --shadow-overlay: 0 1px 2px oklch(0.12 0.01 269 / 0.4), 0 16px 40px -8px oklch(0.12 0.01 269 / 0.55);
   }
 }
@@ -201,12 +204,12 @@
   --on-slab-muted: oklch(0.744 0.011 267.3);
   --slab-signal: oklch(0.766 0.034 226.5);
   --slab-rule: oklch(0.3 0.013 269);
-  --series-1: oklch(0.766 0.034 226.5);
-  --series-2: oklch(0.9 0.012 84);
-  --series-3: oklch(0.773 0.099 77);
-  --series-4: oklch(0.76 0.08 330);
-  --series-5: oklch(0.76 0.08 150);
-  --series-6: oklch(0.721 0.107 27.2);
+  --series-1: oklch(0.883 0.06 226);
+  --series-2: oklch(0.57 0.12 72);
+  --series-3: oklch(0.896 0.07 330);
+  --series-4: oklch(0.551 0.12 150);
+  --series-5: oklch(0.893 0.05 27);
+  --series-6: oklch(0.557 0.09 215);
   --shadow-overlay: 0 1px 2px oklch(0.12 0.01 269 / 0.4), 0 16px 40px -8px oklch(0.12 0.01 269 / 0.55);
 }
 
@@ -544,7 +547,8 @@ a.status-item:hover {
 
 .screen {
   padding: 1.75rem clamp(1.25rem, 2.6vw, 2.75rem) 3rem;
-  max-width: 96rem;
+  max-width: 108rem;
+  margin-inline: auto;
 }
 .screen-header {
   display: flex;
@@ -1252,7 +1256,7 @@ kbd,
   overflow: hidden;
 }
 .palette::backdrop {
-  background: oklch(0.297 0.015 269.2 / 0.28);
+  background: oklch(0.297 0.015 269.2 / 0.45);
   animation: fade-in var(--dur-state) var(--ease-out-expo);
 }
 .palette [cmdk-root] {
@@ -2602,6 +2606,193 @@ button.run-row {
   .mark-loader[data-mode="determinate"] .ml-dot[data-next="true"] .ml-signal {
     opacity: 0.6;
   }
+}
+
+/* ------------------------------------------------- design review fixes */
+
+/* Engine text can be any length with no break in it (a request URL, a
+   chain of IUPAC names). Every container that can receive it wraps
+   anywhere rather than widening its column, and a grid or flex item that
+   holds it may shrink below its content. */
+.state > *,
+.k-verdict > *,
+.k-origin > *,
+.run-detail-summary,
+.net-panel > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.state-reason,
+.state-body,
+.state-change,
+.state-raw pre,
+.state-field,
+.k-verdict-licence,
+.k-verdict-qualified,
+.k-verdict-behaviour,
+.k-verdict-next,
+.k-worst-detail,
+.k-remedy,
+.k-concerns,
+.k-consulted dd,
+.k-part-refusal-reason,
+.k-origin,
+.k-origin-reason,
+.k-row-says,
+.k-scope,
+.k-spread,
+.k-cell-prose,
+.k-notes,
+.k-invariants,
+.k-search,
+.report,
+.report-text,
+.run-log,
+.run-detail-summary,
+.run-row-sub,
+.net-sentence,
+.host-list li,
+.field-error,
+.field-hint,
+.palette-error,
+.prov-detail,
+.compound-button {
+  overflow-wrap: anywhere;
+}
+
+.state-change {
+  margin: 0;
+  color: var(--fg-soft);
+}
+.state-raw {
+  max-width: 100%;
+  font-size: var(--text-sm);
+}
+.state-raw summary {
+  cursor: pointer;
+  color: var(--signal-deep);
+  font-weight: 700;
+  min-height: 1.5rem;
+}
+.state-raw pre {
+  margin: 0.375rem 0 0;
+  padding: 0.625rem 0.75rem;
+  white-space: pre-wrap;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-control);
+  font-size: var(--text-xs);
+  color: var(--fg-soft);
+  max-height: 14rem;
+  overflow: auto;
+}
+.state-network .state-kicker {
+  color: var(--fg-soft);
+}
+
+/* A panel's contents are never clipped by the panel, so the action bar can
+   stick to the edge of the screen's own scroller (react-resizable-panels
+   sets overflow:hidden on every panel, and a sticky box cannot escape it). */
+.split-pane {
+  overflow: visible !important;
+}
+.k-form .form-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  padding: 0.75rem 0;
+  background: var(--surface);
+  border-top: 1px solid var(--rule);
+}
+.k-form .form-bar .form-actions {
+  position: static;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.form-why {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--fg-soft);
+}
+.st-form .form-why {
+  margin-top: 0.375rem;
+}
+
+.loading-mark {
+  display: inline-flex;
+  flex: none;
+}
+
+.compound-choices {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 40rem;
+}
+.compound-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+.compound-button {
+  max-width: 100%;
+  min-height: 1.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  text-align: left;
+}
+
+.k-shared-note {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  max-width: 72ch;
+  font-size: var(--text-sm);
+  color: var(--fg-soft);
+}
+.k-origin-reason {
+  max-width: 68ch;
+}
+
+.chart-end-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Hit targets: nothing a pointer must hit is under 24 px either way. */
+.segmented[data-size="sm"] .segmented-item {
+  min-height: 1.5rem;
+  min-width: 1.75rem;
+  justify-content: center;
+}
+.licence-list a,
+.about-docs a,
+.about-source a,
+.state-raw summary {
+  min-height: 1.5rem;
+}
+.licence-list a {
+  display: inline-flex;
+  align-items: center;
+}
+/* A control sizes to its content in a form, never to the column. */
+.field > .segmented {
+  justify-self: start;
+  width: fit-content;
+}
+
+/* Identifiers in a title: tabular figures, with the weight of the words round them. */
+.ident {
+  font-size: 0.94em;
 }
 
 /* Laptop widths: a narrower rail, and the palette trigger shrinks to its key. */

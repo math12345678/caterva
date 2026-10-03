@@ -32,7 +32,13 @@ export function ProvenanceLegend({
         <li key={kind}>
           <ProvenanceMark provenance={{ kind, by: kind === "chosen" ? "user" : undefined }} decorative />
           <span>
-            {kind === "chosen" ? "chosen" : provenanceLabel({ kind })}
+            {kind === "chosen" ? (
+              <>
+                chosen by you <ProvenanceMark provenance={{ kind, by: "default" }} decorative /> stated default
+              </>
+            ) : (
+              provenanceLabel({ kind })
+            )}
             {counts && counts[kind] !== undefined ? (
               <span className="font-mono legend-count"> {counts[kind]}</span>
             ) : null}

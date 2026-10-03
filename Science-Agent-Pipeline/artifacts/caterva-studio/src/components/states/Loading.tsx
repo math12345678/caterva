@@ -29,20 +29,25 @@ export function Loading({
 }) {
   const counted = fraction !== null && Number.isFinite(fraction);
   const percent = counted ? Math.round((fraction as number) * 100) : null;
+  // Only the sentence is a live region, so a stage change is announced and the
+  // counter beside it, which changes every second, is not.
   return (
-    <div
-      className={cn("loading", className)}
-      role={counted ? "progressbar" : "status"}
-      aria-live="polite"
-      aria-label={label}
-      aria-valuemin={counted ? 0 : undefined}
-      aria-valuemax={counted ? 100 : undefined}
-      aria-valuenow={percent ?? undefined}
-      aria-valuetext={counted ? `${label}, ${percent}%` : undefined}
-    >
-      <MarkLoader size={size} fraction={fraction} />
+    <div className={cn("loading", className)}>
+      <span
+        className="loading-mark"
+        role={counted ? "progressbar" : undefined}
+        aria-label={counted ? label : undefined}
+        aria-valuemin={counted ? 0 : undefined}
+        aria-valuemax={counted ? 100 : undefined}
+        aria-valuenow={percent ?? undefined}
+        aria-valuetext={counted ? `${label}, ${percent}%` : undefined}
+      >
+        <MarkLoader size={size} fraction={fraction} />
+      </span>
       <span className="loading-text">
-        <span className="loading-label">{label}</span>
+        <span className="loading-label" role="status" aria-label={label}>
+          {label}
+        </span>
         {counted || detail ? (
           <span className="loading-sub">
             {counted ? `${percent}%` : null}

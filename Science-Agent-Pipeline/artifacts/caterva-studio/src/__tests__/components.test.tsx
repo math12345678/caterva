@@ -18,6 +18,7 @@ import { DataTable, sortRows } from "@/components/table/DataTable";
 import { outcomeLine } from "@/components/run/RunRow";
 import { ErrorState, OutcomeNotice } from "@/components/states/States";
 import { Loading } from "@/components/states/Loading";
+import { readCompoundList } from "@/lib/copy";
 
 import { parseCsv } from "./helpers";
 
@@ -44,12 +45,18 @@ describe("states", () => {
   it("says a refusal's first sentence once when the reason repeats the summary (bind, recorded)", () => {
     const outcome = bindNoRows.run.outcome as Outcome;
     const first = outcome.summary;
-    const rest = (outcome.reason ?? "").split("\n").slice(1).join("\n");
-    render(<OutcomeNotice outcome={outcome} />);
+    const compounds = readCompoundList(outcome.reason ?? "")!.compounds;
+    render(<OutcomeNotice outcome={outcome} onChooseCompound={() => {}} />);
     const notice = screen.getByRole("region", { name: first });
     expect(within(notice).getByRole("heading", { name: first })).toBeInTheDocument();
-    expect(notice.textContent?.split(first).length).toBe(2);
-    expect(notice).toHaveTextContent(rest);
+    // The sentence is on the page once; the engine's whole text, which repeats it, is behind a disclosure.
+    const shown = notice.cloneNode(true) as HTMLElement;
+    shown.querySelector(".state-raw")?.remove();
+    expect(shown.textContent?.split(first).length).toBe(2);
+    // The compounds are a list to choose from, not a paragraph.
+    const list = within(notice).getByRole("list", { name: "Compounds with a measured Ki" });
+    expect(within(list).getAllByRole("button").map((b) => b.textContent)).toEqual(compounds);
+    expect(notice).toHaveTextContent(`${compounds.length} compounds do have one.`);
     expect(outcomeLine(bindNoRows.run as never)).toBe(first);
   });
 
@@ -170,7 +177,8 @@ describe("charts", () => {
       />,
     );
     const figure = screen.getByRole("figure", { name: "A to B, seed 7" });
-    expect(within(figure).getByRole("img", { name: "A to B, seed 7" })).toBeInTheDocument();
+    // The plot has its own name: the title, then what it holds.
+    expect(within(figure).getByRole("img", { name: /^A to B, seed 7\. 2 series \(a, b\) over \d+ time points$/ })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /The numbers as a table/ }));
     const table = screen.getByRole("table", { name: `A to B, seed 7: ${SSA.series.time.length} time points` });
     expect(within(table).getAllByRole("row")).toHaveLength(SSA.series.time.length + 1);

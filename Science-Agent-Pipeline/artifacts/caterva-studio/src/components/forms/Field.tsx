@@ -27,8 +27,11 @@ import {
   type ReactNode,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
+  useCallback,
   useContext,
   useId,
+  useMemo,
+  useState,
 } from "react";
 
 import type { ApiError } from "@/api/types";
@@ -39,9 +42,51 @@ interface FieldIds {
   hint: string | undefined;
   error: string | undefined;
   invalid: boolean;
+  required: boolean;
 }
 
 const FieldContext = createContext<FieldIds | null>(null);
+
+/**
+ * The fields a form refused to send because a required one was empty. A
+ * form (RunForm) provides it; a Field whose control is listed shows its own
+ * message and marks the control invalid, so nothing is requested until the
+ * question can be asked.
+ */
+interface Validity {
+  missing: ReadonlySet<string>;
+}
+
+const ValidityContext = createContext<Validity>({ missing: new Set() });
+
+/** The controls a form must not submit empty: `required` or `aria-required`, with an id. */
+const REQUIRED_CONTROLS = "input[required], input[aria-required='true'], select[required], select[aria-required='true'], textarea[required], textarea[aria-required='true']";
+
+export function useRequiredCheck(): {
+  missing: ReadonlySet<string>;
+  provider: (children: ReactNode) => ReactNode;
+  /** Looks at the form's required controls; returns true when all have a value. */
+  check: (form: HTMLFormElement | null) => boolean;
+  clear: (id: string) => void;
+} {
+  const [missing, setMissing] = useState<ReadonlySet<string>>(new Set());
+  const check = useCallback((form: HTMLFormElement | null) => {
+    if (!form) return true;
+    const empty = Array.from(form.querySelectorAll<HTMLInputElement>(REQUIRED_CONTROLS)).filter(
+      (c) => c.id && c.value.trim() === "",
+    );
+    setMissing(new Set(empty.map((c) => c.id)));
+    if (empty.length) empty[0].focus();
+    return empty.length === 0;
+  }, []);
+  const clear = useCallback((id: string) => setMissing((m) => (m.has(id) ? new Set([...m].filter((x) => x !== id)) : m)), []);
+  const value = useMemo(() => ({ missing }), [missing]);
+  const provider = useCallback(
+    (children: ReactNode) => <ValidityContext.Provider value={value}>{children}</ValidityContext.Provider>,
+    [value],
+  );
+  return { missing, provider, check, clear };
+}
 
 /** The message of a 400 that names this field (or one of its sub-keys), else null. */
 export function fieldError(error: ApiError | null | undefined, name: string): string | null {
@@ -57,6 +102,7 @@ export function Field({
   hint,
   error,
   optional = false,
+  required = false,
   children,
   className,
 }: {
@@ -64,15 +110,22 @@ export function Field({
   hint?: ReactNode;
   error?: string | null;
   optional?: boolean;
+  /** The form will not send this empty: the control is aria-required and the form says so inline. */
+  required?: boolean;
   children: ReactNode;
   className?: string;
 }) {
   const id = useId();
+  const validity = useContext(ValidityContext);
+  const control = `${id}-control`;
+  const emptyRequired = validity.missing.has(control);
+  const shown = error ?? (emptyRequired ? requiredMessage(label) : null);
   const ids: FieldIds = {
-    control: `${id}-control`,
+    control,
     hint: hint ? `${id}-hint` : undefined,
-    error: error ? `${id}-error` : undefined,
-    invalid: Boolean(error),
+    error: shown ? `${id}-error` : undefined,
+    invalid: Boolean(shown),
+    required,
   };
   return (
     <FieldContext.Provider value={ids}>
@@ -87,9 +140,9 @@ export function Field({
             {hint}
           </p>
         ) : null}
-        {error ? (
+        {shown ? (
           <p className="field-error" id={ids.error} role="alert">
-            {error}
+            {shown}
           </p>
         ) : null}
       </div>
@@ -97,7 +150,18 @@ export function Field({
   );
 }
 
-function useControlProps(own: { id?: string; "aria-describedby"?: string; "aria-invalid"?: AriaAttributes["aria-invalid"] }) {
+/** "Organism is required." for a label that is text; a generic sentence otherwise. */
+function requiredMessage(label: ReactNode): string {
+  return typeof label === "string" ? `${label} is required: fill it in to continue.` : "This field is required: fill it in to continue.";
+}
+
+function useControlProps(own: {
+  id?: string;
+  required?: boolean;
+  "aria-describedby"?: string;
+  "aria-invalid"?: AriaAttributes["aria-invalid"];
+  "aria-required"?: AriaAttributes["aria-required"];
+}) {
   const ids = useContext(FieldContext);
   if (!ids) return own;
   const described = [own["aria-describedby"], ids.hint, ids.error].filter(Boolean).join(" ") || undefined;
@@ -105,6 +169,7 @@ function useControlProps(own: { id?: string; "aria-describedby"?: string; "aria-
     id: own.id ?? ids.control,
     "aria-describedby": described,
     "aria-invalid": own["aria-invalid"] ?? (ids.invalid ? true : undefined),
+    "aria-required": own["aria-required"] ?? (ids.required || own.required ? true : undefined),
   };
 }
 
