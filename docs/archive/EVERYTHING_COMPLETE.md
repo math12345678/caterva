@@ -40,7 +40,7 @@
 
 ### Start the System
 ```bash
-cd /Users/smyan/Desktop/Coding/Caterva
+cd path/to/caterva
 npm run web:start
 ```
 
@@ -453,7 +453,7 @@ You have built a **complete, production-ready scientific simulation platform** t
 
 ### Start Using It Today
 ```bash
-cd /Users/smyan/Desktop/Coding/Caterva
+cd path/to/caterva
 npm run web:start
 # Open http://localhost:3000
 ```

@@ -82,7 +82,7 @@ src/cli/
 
 ### Start (30 seconds)
 ```bash
-cd /Users/smyan/Desktop/Coding/Caterva
+cd path/to/caterva
 npm run web:start
 # http://localhost:3000
 ```

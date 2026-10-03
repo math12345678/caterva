@@ -36,11 +36,11 @@
     },
     "ui": {
       "built": true,
-      "static_dir": "/private/tmp/claude-501/wt-core/caterva/studio/static",
+      "static_dir": "/tmp/caterva-checkout/caterva/studio/static",
       "reason": null
     },
     "data_dir": {
-      "path": "/tmp/claude-501/studio-capture-gwj0sbwi",
+      "path": "/tmp/caterva-studio-capture",
       "writable": true,
       "runs": 0,
       "reason": null

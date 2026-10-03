@@ -7,7 +7,7 @@ than editing a file.
 ## `api/*.json`: answers from the studio server's dispatch layer
 
 Captured 2026-09-30 from core's dispatch layer (`caterva/studio/dispatch.py`,
-`App.dispatch`, branch `studio/core`, worktree `/tmp/claude-501/wt-core`, its
+`App.dispatch`, branch `studio/core`, in a git worktree of this repository, its
 uncommitted state at that time), in-process, with no socket, a fresh
 temporary data directory, port 18740 and the server's own session token.
 Each file is `{"status": <HTTP status>, "body": <the JSON body>}`:
@@ -70,3 +70,12 @@ python -m caterva.app sim ssa --a0 200 --k 0.5 --end 10 --seed 7 --out sim-ssa-a
 
 A first-order decay A -> B simulated with Gillespie's direct method: 198
 events, the time course the chart tests draw.
+
+## Paths in these files
+
+Every captured response that names a directory on the machine it ran on had a
+throwaway path of the form `/tmp/<scratch folder>/...` or a worktree path.
+Those prefixes were rewritten to neutral ones (`/tmp/caterva-checkout`,
+`/tmp/caterva-studio-capture`) after capture, so that no file in the
+repository names a person's home or scratch folder. Only that prefix was
+changed: every other byte is what the server answered.

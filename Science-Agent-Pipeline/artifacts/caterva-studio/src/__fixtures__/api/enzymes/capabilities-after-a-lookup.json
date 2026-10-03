@@ -40,11 +40,11 @@
   },
   "ui": {
    "built": false,
-   "static_dir": "/tmp/claude-501/caterva-enzyme-fixtures-7zo_zztb/no-build",
-   "reason": "the page has not been built: /tmp/claude-501/caterva-enzyme-fixtures-7zo_zztb/no-build/index.html does not exist. Build it with `pnpm --filter @workspace/caterva-studio run build` from Science-Agent-Pipeline/"
+   "static_dir": "/tmp/caterva-enzyme-fixtures/no-build",
+   "reason": "the page has not been built: /tmp/caterva-enzyme-fixtures/no-build/index.html does not exist. Build it with `pnpm --filter @workspace/caterva-studio run build` from Science-Agent-Pipeline/"
   },
   "data_dir": {
-   "path": "/tmp/claude-501/caterva-enzyme-fixtures-7zo_zztb/data",
+   "path": "/tmp/caterva-enzyme-fixtures/data",
    "writable": true,
    "runs": 5,
    "reason": null

@@ -252,6 +252,8 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_no_disabled_tests": ("verify_build",),
     "check_no_generated_files_tracked": ("verify_build",),
     "check_no_orphan_modules": ("verify_build",),
+    # Wired 2026-10-03: CI step and a pytest wrapper that also proves it matches.
+    "check_no_machine_paths": ("ci", "pytest"),
     "check_no_silent_skips": ("ci",),
     "check_no_vacuous_tests": ("verify_build",),
     "check_plausibility_constants": ("verify_build", "pytest"),

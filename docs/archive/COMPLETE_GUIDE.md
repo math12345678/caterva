@@ -20,7 +20,7 @@ A **production-ready scientific enzyme kinetics simulation system** with:
 ### Option 1: Web Interface (Recommended)
 
 ```bash
-cd /Users/smyan/Desktop/Coding/Caterva
+cd path/to/caterva
 npm run web:start
 # Opens web interface at http://localhost:3000
 ```

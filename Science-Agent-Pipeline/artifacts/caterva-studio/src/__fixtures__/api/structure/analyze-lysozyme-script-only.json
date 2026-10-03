@@ -1,19 +1,19 @@
 {
  "kind": "analyze",
  "request": {
-  "directory": "/tmp/claude-501/caterva-fixtures-fi2et7n_/lyso-md",
+  "directory": "/tmp/caterva-fixtures/lyso-md",
   "mode": "script_only"
  },
  "cli": [
   "caterva",
   "analyze",
-  "/private/tmp/claude-501/caterva-fixtures-fi2et7n_/lyso-md",
+  "/tmp/caterva-fixtures/lyso-md",
   "--script-only"
  ],
  "outcome": {
   "exit_code": 0,
   "meaning": "produced",
-  "summary": "Wrote /private/tmp/claude-501/caterva-fixtures-fi2et7n_/lyso-md/analyze.sh (15 catalytic distances, 24 angles, the faces of 24, water at 6 residues, pocket of 34 residues).",
+  "summary": "Wrote /tmp/caterva-fixtures/lyso-md/analyze.sh (15 catalytic distances, 24 angles, the faces of 24, water at 6 residues, pocket of 34 residues).",
   "reason": null
  },
  "result": {
@@ -100,11 +100,11 @@
   "water": null,
   "faces": null,
   "script_written": true,
-  "report_markdown": "Wrote /private/tmp/claude-501/caterva-fixtures-fi2et7n_/lyso-md/analyze.sh (15 catalytic distances, 24 angles, the faces of 24, water at 6 residues, pocket of 34 residues).\n",
+  "report_markdown": "Wrote /tmp/caterva-fixtures/lyso-md/analyze.sh (15 catalytic distances, 24 angles, the faces of 24, water at 6 residues, pocket of 34 residues).\n",
   "measured": false,
   "written": [
-   "/private/tmp/claude-501/caterva-fixtures-fi2et7n_/lyso-md/analyze.sh",
-   "/private/tmp/claude-501/caterva-fixtures-fi2et7n_/lyso-md/chi1.ndx"
+   "/tmp/caterva-fixtures/lyso-md/analyze.sh",
+   "/tmp/caterva-fixtures/lyso-md/chi1.ndx"
   ],
   "extra": {}
  }

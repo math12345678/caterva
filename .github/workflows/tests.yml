@@ -147,6 +147,13 @@ jobs:
       - name: Dependency-licence guard
         run: python scripts/check_dependency_licenses.py
 
+      # No tracked file names a person's home directory or a scratch folder.
+      - name: Machine-path guard (self-check)
+        run: python scripts/check_no_machine_paths.py --selftest
+
+      - name: Machine-path guard
+        run: python scripts/check_no_machine_paths.py
+
       # Every pinned version exists on PyPI. Written after CI failed on six
       # consecutive pushes and the pin was "fixed" by misreading pip: `from
       # versions: 2.7.0` means "for this interpreter on this architecture",

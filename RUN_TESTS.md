@@ -10,7 +10,7 @@
 
 ### 1. Run All Tests (Complete System)
 ```bash
-cd /Users/smyan/Desktop/Coding/Caterva/Science-Agent-Pipeline/artifacts/api-server
+cd Science-Agent-Pipeline/artifacts/api-server
 npm test
 ```
 
@@ -194,7 +194,7 @@ npm test -- metrics.test.ts --reporter=verbose
 
 ### Start Fresh
 ```bash
-cd /Users/smyan/Desktop/Coding/Caterva/Science-Agent-Pipeline/artifacts/api-server
+cd Science-Agent-Pipeline/artifacts/api-server
 npm install
 npm test
 ```

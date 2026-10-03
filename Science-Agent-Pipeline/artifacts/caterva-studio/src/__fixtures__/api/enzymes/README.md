@@ -66,3 +66,10 @@ the answer before anything had happened (`checked: false`, `source: null`).
 `../structure/structure-name-several-enzymes.json` were written again by the same
 script, because the name policy changed what the engine answers to those two
 requests (the second is now a refusal with no result and a `name_refusal`).
+
+## Paths
+
+A response that names a directory on the machine it was captured on carried a
+throwaway scratch or worktree path. After capture, only that prefix was
+rewritten, to `/tmp/caterva-enzyme-fixtures` (`caterva/tests/capture_studio_enzyme_fixtures.py` now does this itself when it writes a file), so that no file in the repository names a person's
+home or scratch folder; every other byte is what the server answered.

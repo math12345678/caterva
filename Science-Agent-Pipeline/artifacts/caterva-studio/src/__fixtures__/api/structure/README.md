@@ -159,3 +159,10 @@ run("md.summarise", {"directory": str(lyso)}, "md-summarise-not-run")
 run("fep.status", {"directory": str(lyso)}, "fep-status-not-fep")
 print("work dir", work)
 ```
+
+## Paths
+
+A response that names a directory on the machine it was captured on carried a
+throwaway scratch or worktree path. After capture, only that prefix was
+rewritten, to `/tmp/caterva-fixtures`, so that no file in the repository names a person's
+home or scratch folder; every other byte is what the server answered.

@@ -126,7 +126,7 @@ Storage Layer
 
 ### Start Server
 ```bash
-cd /Users/smyan/Desktop/Coding/Caterva
+cd path/to/caterva
 npm run web:start
 # http://localhost:3000
 ```
