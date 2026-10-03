@@ -33,6 +33,7 @@ import { Screen, Section } from "@/components/screen/Screen";
 import { SkeletonRows } from "@/components/states/Loading";
 import { ErrorState } from "@/components/states/States";
 import { plural } from "@/lib/copy";
+import { describeReason } from "@/lib/network";
 import { describeError } from "@/lib/errors";
 import { runHref, useJobActionsOptional } from "@/lib/jobs";
 import { useCapabilities, useRunList } from "@/lib/queries";
@@ -238,7 +239,7 @@ export function machineSentences(caps: Capabilities, offline: boolean): { key: s
       : caps.network.checked
         ? caps.network.reachable
           ? "Every database host answered when the network was last checked."
-          : `Some database hosts did not answer: ${caps.network.reason ?? "see About for which"}.`
+          : `${describeReason(caps.network.reason, "Some database hosts did not answer")}. About lists each host.`
         : "The network has not been checked; About checks it when you ask.",
   });
   out.push({

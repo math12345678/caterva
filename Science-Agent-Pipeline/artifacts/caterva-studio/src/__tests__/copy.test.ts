@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  describeSource,
   humaniseIdentifier,
   humaniseStage,
   networkFailureOf,
@@ -14,6 +15,8 @@ import {
   plural,
   readPlaceholder,
   placeholderRowReason,
+  plainMarkdown,
+  readCompoundList,
   withoutUrls,
 } from "@/lib/copy";
 
@@ -205,5 +208,53 @@ describe("the placeholder boilerplate", () => {
 
   it("returns null for a reason the engine wrote for this constant alone", () => {
     expect(readPlaceholder("no value in the organism requested; measurements exist in other organisms")).toBeNull();
+  });
+});
+
+describe("markdown prose", () => {
+  it("rewrites sentences and leaves code exactly as written", () => {
+    const source = [
+      "Not run -- pass --validate (or `validation=`) for the check.",
+      "",
+      "```",
+      "caterva compose \"x\" --organism human --robustness",
+      "```",
+      "",
+      "Re-run with `--seed 7` -- the table says so.",
+    ].join("\n");
+    expect(plainMarkdown(source)).toBe(
+      [
+        "Not run. Pass Cross-checks (or `validation=`) for the check.",
+        "",
+        "```",
+        "caterva compose \"x\" --organism human --robustness",
+        "```",
+        "",
+        "Re-run with `--seed 7`. The table says so.",
+      ].join("\n"),
+    );
+  });
+});
+
+describe("compounds with a Ki", () => {
+  it("reads bind's refusal into its sentence and its compounds", () => {
+    const reason =
+      "No Ki for 'oxamate' with EC 1.1.1.27 in Homo sapiens.\nCompounds that do have one: 3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid; gossypol";
+    expect(readCompoundList(reason)).toEqual({
+      lead: "No Ki for 'oxamate' with EC 1.1.1.27 in Homo sapiens.",
+      compounds: ["3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid", "gossypol"],
+    });
+  });
+
+  it("leaves any other refusal alone", () => {
+    expect(readCompoundList("Refused: nothing")).toBeNull();
+  });
+});
+
+describe("resolver source tokens", () => {
+  it("says what the engine says each outcome means, and never guesses an unknown one", () => {
+    expect(describeSource("brenda_exact")).toBe("found in BRENDA, in the organism asked for");
+    expect(describeSource("cross_species_withheld")).toBe("exists in another organism, which you did not allow");
+    expect(describeSource("some_new_token")).toBe("some new token");
   });
 });
