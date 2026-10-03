@@ -170,7 +170,7 @@ exclude = ["caterva.tests", "caterva.tests.*"]
 [tool.setuptools.package-data]
 # Two data files the engine reads at import (docs/data-sources.json and the
 # identifiers.org capture) as packaged copies; see caterva/core/data/README.md.
-caterva = ["core/data/*.json", "core/data/README.md"]
+caterva = ["core/data/*.json", "core/data/README.md", "enzymes/data/enzyme_index.json.gz", "enzymes/data/NOTICE.txt"]
 
 [tool.setuptools.exclude-package-data]
 caterva = ["conftest.py", "pytest.ini", ".coverage"]

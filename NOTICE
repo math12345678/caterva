@@ -434,6 +434,39 @@ publication — see https://www.brenda-enzymes.org/references.php. Citing
 Caterva is not a substitute for citing BRENDA.
 
 
+ExPASy ENZYME — the enzyme nomenclature
+---------------------------------------
+
+`caterva/enzymes/data/enzyme_index.json.gz` is derived from the ENZYME
+nomenclature database (https://enzyme.expasy.org/), which distributes the
+IUBMB enzyme nomenclature. It is copyrighted by the SIB Swiss Institute of
+Bioinformatics and distributed under the Creative Commons Attribution 4.0
+International licence (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/).
+The release the index was built from, "Release of 02-Sep-2026", is recorded
+inside the index and in `caterva/enzymes/data/NOTICE.txt`.
+
+Creator: the SIB Swiss Institute of Bioinformatics (ExPASy ENZYME database, Bridge and Axelsen), which distributes the IUBMB enzyme nomenclature.
+
+MODIFICATIONS (CC BY 4.0 §3(a)(1)(B)). Caterva reduced the two files
+`enzyme.dat` and `enzclass.txt` to accepted names, alternative names,
+reactions, status (active, transferred with the new number, or deleted),
+enzyme-class names and the UniProt entry names listed per EC number. The
+comment lines are dropped. UniProt entries are kept as a count per organism
+and, in full, for 13 organisms. `scripts/build_enzyme_index.py` does this,
+deterministically, and states it again in the index itself.
+
+The index is used to find which EC number a name means. It is not used to
+produce a measured value, and Caterva's reading of it (which name matched,
+and how well) is Caterva's, not the SIB's. Nothing here states or implies
+that the SIB Swiss Institute of Bioinformatics endorses Caterva.
+
+CITATION
+
+If you use the nomenclature in scientific work, cite the ENZYME database —
+see https://enzyme.expasy.org/. Citing Caterva is not a substitute for
+citing it.
+
+
 CORE — queried live, and UNRESOLVED
 ----------------------------------
 

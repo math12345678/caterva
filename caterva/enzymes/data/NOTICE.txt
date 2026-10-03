@@ -1,0 +1,28 @@
+enzyme_index.json.gz -- attribution
+
+This index is derived from the ENZYME nomenclature database
+(https://enzyme.expasy.org/), which distributes the IUBMB enzyme
+nomenclature.
+
+Release:    Release of 02-Sep-2026 (as printed in the header of enzyme.dat)
+Creator:    the SIB Swiss Institute of Bioinformatics (ExPASy ENZYME database,
+            Bridge and Axelsen), which distributes the IUBMB enzyme
+            nomenclature
+Copyright:  SIB Swiss Institute of Bioinformatics
+Licence:    Creative Commons Attribution 4.0 International (CC BY 4.0),
+            https://creativecommons.org/licenses/by/4.0/
+Source:     https://ftp.expasy.org/databases/enzyme/enzyme.dat
+            https://ftp.expasy.org/databases/enzyme/enzclass.txt
+
+Modifications (CC BY 4.0 section 3(a)(1)(B)): reduced to accepted names,
+alternative names, reactions, status (active, transferred with the new number,
+or deleted), enzyme-class names and the UniProt entry names listed per EC
+number. Comment lines are dropped. UniProt entries are kept as a count per
+organism code and, in full, for HUMAN, MOUSE, RAT, YEAST, ECOLI, BOVIN, PIG,
+CHICK, ARATH, BACSU, DROME, CAEEL and RABIT. scripts/build_enzyme_index.py
+makes the reduction, and the same facts are stored inside the index.
+
+Nothing here states or implies that the SIB Swiss Institute of Bioinformatics
+endorses Caterva. If you use the nomenclature in scientific work, cite the
+ENZYME database (https://enzyme.expasy.org/). To rebuild this index from a
+newer release: make enzyme-index.

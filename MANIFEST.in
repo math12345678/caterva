@@ -16,3 +16,4 @@ prune caterva/.hypothesis
 exclude caterva/conftest.py caterva/pytest.ini caterva/.coverage
 global-exclude __pycache__ *.py[cod] .DS_Store
 include caterva/core/data/*.json caterva/core/data/README.md
+include caterva/enzymes/data/enzyme_index.json.gz caterva/enzymes/data/NOTICE.txt

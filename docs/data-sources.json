@@ -45,6 +45,16 @@
       "modifications": "the XML wrapper around each fixture is reconstructed to match NCBI's eFetch shape; the lineage content is captured unaltered.",
       "notice_uri": "see NOTICE in the Caterva repository",
       "citation_request": null
+    },
+    {
+      "tokens": ["expasy", "enzyme nomenclature"],
+      "creator": "the SIB Swiss Institute of Bioinformatics (ExPASy ENZYME database, Bridge and Axelsen), which distributes the IUBMB enzyme nomenclature",
+      "source_uri": "https://enzyme.expasy.org/",
+      "licence": "CC BY 4.0",
+      "licence_uri": "https://creativecommons.org/licenses/by/4.0/",
+      "modifications": "reduced to accepted names, alternative names, reactions, status, enzyme-class names and the UniProt entry names listed per EC number; comments dropped; UniProt entries kept as counts per organism, and in full only for 13 organisms",
+      "notice_uri": "see NOTICE in the Caterva repository",
+      "citation_request": "cite the ENZYME database -- https://enzyme.expasy.org/"
     }
   ]
 }
