@@ -15,6 +15,7 @@ import type { Settings } from "@/api/types";
 import { Field, fieldError, FormActions, Select, Switch, TextInput } from "@/components/forms/Field";
 import { useCommand } from "@/components/palette/commands";
 import { Screen, Section } from "@/components/screen/Screen";
+import { NetworkPanel } from "@/components/shell/NetworkPanel";
 import { ThemeSwitch } from "@/components/shell/ThemeSwitch";
 import { Loading } from "@/components/states/Loading";
 import { ErrorState } from "@/components/states/States";
@@ -160,6 +161,16 @@ export default function SettingsScreen() {
               ) : null}
             </FormActions>
           </form>
+        )}
+      </Section>
+
+      <Section title="Network">
+        {caps.isPending ? (
+          <Loading label="Asking the server" />
+        ) : caps.isError ? (
+          <ErrorState error={caps.error} />
+        ) : (
+          <NetworkPanel net={caps.data.network} />
         )}
       </Section>
 

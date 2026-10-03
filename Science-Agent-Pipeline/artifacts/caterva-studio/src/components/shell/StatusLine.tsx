@@ -1,12 +1,15 @@
 /**
  * The status line along the bottom: what this installation can reach right
- * now. The server and its version, the literature layer, the network (not
- * probed until the reader asks, because probing contacts five third-party
- * hosts), GROMACS, and the workspace. Each item's dot uses the same
+ * now. The server and its version, the literature layer, the network (what
+ * a real lookup last found, or what an explicit check found; "not checked"
+ * only before either has happened, and the popover checks again on request,
+ * because probing contacts five third-party hosts), GROMACS, and the
+ * workspace. Each item's dot uses the same
  * vocabulary (signal: available; caution ring: off, with the reason;
  * dashed: not checked; danger: failing) and each says its reason on
  * hover or focus, in the server's words.
  */
+import * as Popover from "@radix-ui/react-popover";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import type { ReactNode } from "react";
 import { Link } from "wouter";
@@ -14,6 +17,9 @@ import { Link } from "wouter";
 import type { Capabilities, Health } from "@/api/types";
 import { describeError } from "@/lib/errors";
 import { formatCount } from "@/lib/format";
+import { readNetwork } from "@/lib/network";
+
+import { NetworkPanel } from "./NetworkPanel";
 
 type DotState = "ok" | "off" | "unknown" | "bad";
 
@@ -55,6 +61,28 @@ function Item({
   );
 }
 
+/**
+ * The network, with a popover that says what is known and from where, and
+ * checks again when asked. A button, not a link: the explanation and the
+ * check are right here.
+ */
+function NetworkItem({ net }: { net: Capabilities["network"] }) {
+  const reading = readNetwork(net);
+  return (
+    <Popover.Root>
+      <Popover.Trigger className="status-item" aria-label={`${reading.label}. ${reading.sentence}`}>
+        <span className="status-dot" data-state={reading.state} aria-hidden="true" />
+        {reading.label}
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content className="overlay popover net-popover" side="top" align="start" sideOffset={6} collisionPadding={12} aria-label="The network">
+          <NetworkPanel net={net} />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
 export function StatusLine({
   health,
   healthError,
@@ -87,23 +115,11 @@ export function StatusLine({
           label="literature"
           reason={c ? (c.literature.available ? "The literature layer is installed: BRENDA, UniProt, NCBI and PubMed lookups can run." : (c.literature.reason ?? "not available")) : capsReason}
         />
-        <Item
-          state={c ? (!c.network.checked ? "unknown" : c.network.reachable ? "ok" : "off") : "unknown"}
-          label={c?.network.checked ? "network" : "network not checked"}
-          reason={
-            c
-              ? c.network.checked
-                ? c.network.reachable
-                  ? `Every database host answered (checked ${c.network.checked_at ?? ""}).`
-                  : `Not reachable: ${Object.entries(c.network.hosts)
-                      .filter(([, ok]) => ok === false)
-                      .map(([h]) => h)
-                      .join(", ") || (c.network.reason ?? "unknown")}`
-                : `${c.network.reason ?? "Not checked."} Check it from About.`
-              : capsReason
-          }
-          href="/about"
-        />
+        {c ? (
+          <NetworkItem net={c.network} />
+        ) : (
+          <Item state="unknown" label="network not checked" reason={capsReason} />
+        )}
         <Item
           state={c ? (c.gromacs.found ? "ok" : "off") : "unknown"}
           label={c?.gromacs.found ? `GROMACS ${c.gromacs.version ?? ""}`.trim() : "GROMACS"}
