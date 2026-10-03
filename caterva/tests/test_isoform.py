@@ -72,14 +72,14 @@ class TestSelect:
         assert "unknown" in out.notes[0]
 
     def test_a_constant_only_measured_on_other_isoforms_is_refused(self):
-        out = select_isoform({"reaction_Ki": gossypol_ki()}, "LDH-X")
+        out = select_isoform({"reaction_Ki": gossypol_ki()}, "LDH-Z")
         assert "reaction_Ki" not in out.measured
         assert "LDH-A, LDH-B, LDH-C" in out.refused["reaction_Ki"]
         assert "different protein" in out.refused["reaction_Ki"]
 
     def test_a_row_naming_no_isoform_beats_a_known_wrong_one(self):
         rows = ROWS + ({"value": 0.0025, "unit": "mM", "reference_id": "999", "conditions": "pH 7.4"},)
-        out = select_isoform({"reaction_Ki": gossypol_ki(alternatives=rows)}, "LDH-X")
+        out = select_isoform({"reaction_Ki": gossypol_ki(alternatives=rows)}, "LDH-Z")
         ki = out.measured["reaction_Ki"]
         assert ki.value == 0.0025 and "naming no isoform" in ki.chosen_because
 

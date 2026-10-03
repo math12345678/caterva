@@ -118,14 +118,22 @@ UNSTATED_T_RANGE_C = (4.0, 37.0)
 # ("HK-1" and "HXK-1") stay two names. The API server's rowScopeFlags
 # applies this same rule (queryResolver.ts).
 #
-# WHAT IS NOT EQUATED. Spelling is normalised; nomenclature is not. "HK-I"
-# and "HK-1" stay two names, as do "glucokinase" and "HK-IV", "HK-B" (the
-# A-D naming) and "HK-II", and LDH's "H4", "LDH-B4" and "LDH-1", although each
-# pair can name one protein. Which numbering a paper used is a claim about
-# that paper, and a reader that equated them would be asserting it; a request
-# spelled in another numbering is refused naming the isoforms BRENDA holds,
-# which says what to ask for instead. Tissue words ("enzyme from heart") and
-# oligomeric states ("tetrameric enzyme form") are not read as isoforms.
+# WHAT IS EQUATED BEYOND SPELLING. Spelling is normalised; nomenclature is
+# equated only where UniProtKB itself names one protein both ways, and only for
+# the proteins the enzyme index lists with others of their EC number in human,
+# mouse, yeast and E. coli K-12 (caterva/enzymes/isoforms.py, from
+# caterva/enzymes/data/protein_names.json.gz). So "HK2", "HXK2", "HK II",
+# "hexokinase type II" and "hexokinase-2" are one isoform, human hexokinase 2,
+# and a request for any of them finds the row that says "hexokinase II"; "GCK",
+# "HK-IV" and "glucokinase" are one, human hexokinase 4. That is UniProtKB's
+# naming of the protein, not a claim about which numbering a paper used, and
+# the rows compared are still one EC number's. Names no protein carries are
+# still compared by spelling alone: "HK-I" and "HK-1" stay two names unless a
+# protein carries both, "HK-B" (the A-D naming) and "HK-II" stay two, and LDH's
+# "H4", "LDH-B4" and "LDH-1" stay unequated. A request spelled in a numbering
+# no row uses is refused naming the isoforms BRENDA holds, which says what to
+# ask for instead. Tissue words ("enzyme from heart") and oligomeric states
+# ("tetrameric enzyme form") are not read as isoforms.
 #
 # The whole committed corpus is read by caterva/tests/test_isoform_reader.py,
 # which holds the expected reading of every row, checked by hand.
@@ -361,8 +369,19 @@ def _compared_as(name: str) -> tuple:
     return tuple(out)
 
 
+def _one_protein(a: str, b: str) -> bool:
+    """Whether UniProtKB names one protein both ways (caterva/enzymes/isoforms.py)."""
+    try:
+        from caterva.enzymes.isoforms import equivalent
+    except ImportError:  # pragma: no cover - flat layout
+        return False
+    return equivalent(a, b)
+
+
 def _one(x: tuple, y: tuple) -> bool:
     if x[0] == y[0]:
+        return True
+    if _one_protein(x[0], y[0]):
         return True
     # A code alone and the same code after an abbreviation; never two
     # abbreviations ("HK-1" and "HXK-1"), which the keys already compared.

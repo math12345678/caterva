@@ -34,9 +34,11 @@ hand against the row. Every other commentary must read as naming none.
 with why.
 
 The expected readings spell each isoform one way (an abbreviation, a hyphen,
-the code), so that rows naming one isoform read alike; they do not equate
-two numberings of one protein ("HK-I" and "HK-1", "glucokinase" and "HK-IV",
-"H4" and "LDH-B4"). caterva/bind/core.py says why.
+the code), so that rows naming one isoform read alike; they equate two
+numberings of one protein ("HK-I" and "HK-1", "glucokinase" and "HK-IV") only
+where UniProtKB itself names one protein both ways (test_isoform_names.py,
+caterva/enzymes/isoforms.py), and not otherwise ("H4" and "LDH-B4").
+caterva/bind/core.py says why.
 """
 from __future__ import annotations
 
@@ -473,13 +475,13 @@ class TestTheComparison:
 
     @pytest.mark.parametrize("a, b", [
         ("MAO-A", "MAO-B"), ("I and II", "III"), (None, "LDH-A"), (None, None),
-        # Two numberings are not one spelling (caterva/bind/core.py).
-        ("HK-I", "HK-1"), ("glucokinase", "HK-IV"), ("H4", "LDH-B4"),
+        # Two numberings are not one spelling (caterva/bind/core.py), unless UniProtKB
+        # names one protein both ways: "HK-I" and "HK-1" and "glucokinase" and "HK-IV" are
+        # then one, and test_isoform_names.py holds those.
+        ("H4", "LDH-B4"), ("HK-I", "HK-2"), ("LDH-A", "LDH-B"),
         # A code alone is not another numbering's code either, nor another
         # letter's.
         ("HK-2", "II"), ("HK-II", "2"), ("MAO-A", "B"),
-        # Two abbreviations with one code stay two names.
-        ("HK-1", "HXK-1"),
         # An enzyme name with no code names no isoform.
         ("HK-2", "hexokinase"),
     ])
@@ -492,7 +494,7 @@ class TestTheComparison:
 
         assert isoform.same_isoform is same_isoform
         fallback_logic = literature_module("fallback_logic")
-        for a, b in [("MAO B", "MAO-B"), ("I and II", "II"), ("HK-I", "HK-1"), ("HK-2", "2"),
+        for a, b in [("MAO B", "MAO-B"), ("I and II", "II"), ("HK-I", "HK-1"), ("HK-2", "2"), ("HK2", "hexokinase II"),
                      ("HK-2", "hexokinase 2"), ("HK-2", "II")]:
             assert fallback_logic._same_isoform(a, b) == same_isoform(a, b)
 

@@ -833,8 +833,10 @@ def _cautions(index: EnzymeIndex, chosen: Candidate, ranked: Sequence[Candidate]
     out: List[str] = []
     code = chosen.organism
     if code and not chosen.has_organism_protein:
-        label = organism_scope(code)
-        text = f"EC {chosen.ec} ({chosen.name}) lists no {label} protein in the nomenclature"
+        scope = organism_scope(code)
+        label = organism_label(code)
+        absent = f"{label} protein" if scope == label else f"protein from {scope}"
+        text = f"EC {chosen.ec} ({chosen.name}) lists no {absent} in the nomenclature"
         others = [c for c in ranked if c.ec != chosen.ec and c.has_organism_protein][:3]
         if others:
             text += "; " + "; ".join(
@@ -988,7 +990,8 @@ def resolve(
                 return Ambiguous(
                     query=text, candidates=tuple(ranked), recommended=recommended,
                     reason=(f"{text!r} is a name of EC {only.ec} ({only.name}), which lists no "
-                            f"{organism_scope(code)} protein, and also matches "
+                            + (f"{label} protein" if organism_scope(code) == label else f"protein from {organism_scope(code)}")
+                            + ", and also matches "
                             + ", ".join(f"EC {c.ec} ({c.name}), which lists {label} "
                                         f"{', '.join(p.label for p in c.organism_proteins[:4])}" for c in rivals[:3])),
                     organism=code, release=release)

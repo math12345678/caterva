@@ -1171,6 +1171,12 @@ def _search_resolved(
     withheld: Dict[str, str] = chosen.withheld
     not_found.update(withheld)
     selection_notes = chosen.notes
+    if getattr(args, "isoform", None):
+        from caterva.enzymes.isozyme import describe_isoform
+
+        reading = describe_isoform(ec, args.organism, args.isoform)
+        if reading:
+            selection_notes = [reading, *selection_notes]
     failures = [
         run for branch in getattr(search, "branches", ())
         for record in getattr(branch.build.run, "rounds", ())

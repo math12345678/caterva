@@ -454,7 +454,8 @@ def _prediction_concerns(
 
 
 def _isozyme_concerns(model: Any) -> Tuple[List[Concern], Optional[str]]:
-    """The enzyme is several proteins in the organism and no isoform was named.
+    """The enzyme is several proteins in the organism and no isoform was named,
+    or one was named and a cited constant's own row does not state it.
 
     NOT A FAULT AND NOT A DOWNGRADE. GROUNDED is earned by provenance: every
     constant was measured and cited. It does not say WHICH protein was
@@ -467,7 +468,6 @@ def _isozyme_concerns(model: Any) -> Tuple[List[Concern], Optional[str]]:
     without changing what GROUNDED licenses.
     """
     try:
-        from caterva.enzymes.index import organism_label
         from caterva.enzymes.isozyme import notice_for_model
     except ImportError:  # pragma: no cover - flat layout
         return [], None
@@ -477,7 +477,7 @@ def _isozyme_concerns(model: Any) -> Tuple[List[Concern], Optional[str]]:
     return (
         [Concern(source="isozymes", severity=GROUNDED, detail=notice.detail,
                  remedy=notice.remedy, qualifier=notice.headline)],
-        f"EC {notice.ec} is {notice.count} proteins in {organism_label(notice.organism)}, none chosen",
+        notice.summary,
     )
 
 
