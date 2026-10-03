@@ -603,3 +603,474 @@ def test_s4_a_second_setup_over_a_previous_one_replaces_its_files_and_keeps_run_
     assert os.access(out / "run.sh", os.X_OK) and not (out / "run.sh").is_symlink()
     assert "nsteps          = 2500000" in (out / "md.mdp").read_text()
     assert not [p for p in tmp_path.iterdir() if p.name.startswith(".caterva-md-")]
+
+
+# ---------------------------------------------------------------------------
+# S5: a run's work is bounded and a cancel reaches the loop
+# ---------------------------------------------------------------------------
+
+
+def _sim_registry():
+    from caterva.studio.adapters import load_registry
+
+    return load_registry()
+
+
+@pytest.mark.parametrize("request_", [
+    {"seed": 1, "a0": 10**12, "k": 0.5, "end": 1.0},
+    {"seed": 1, "a0": 2_000_000, "k": 0.5, "end": 50.0},
+    {"seed": 1, "a0": 300_000, "k": 1.0, "end": 100.0},
+    {"seed": 1, "bimolecular": True, "a0": 5_000_000, "b0": 5_000_000, "k": 1.0, "end": 10.0},
+])
+def test_s5_a_request_expected_to_make_too_many_events_is_refused_with_the_limit(request_):
+    from caterva.studio import contract
+    from caterva.studio.adapters import sim
+
+    with pytest.raises(contract.Malformed) as refused:
+        sim.argv(request_)
+    assert f"{contract.MAX_SSA_EVENTS:,}" in str(refused.value) and refused.value.field == "a0"
+
+
+def test_s5_a_run_inside_the_limit_is_accepted():
+    from caterva.studio.adapters import sim
+
+    assert sim.argv({"seed": 1, "a0": 100, "k": 0.5, "end": 10.0})[0] == "ssa"
+    assert sim.argv({"seed": 1, "a0": 10**12, "k": 1e-15, "end": 1.0})[0] == "ssa"  # few events: cheap
+    assert sim.argv({"seed": 1, "bimolecular": True, "a0": 10, "b0": 10**9, "k": 1e-9, "end": 5.0})[0] == "ssa"
+
+
+def test_s5_a_request_over_the_limit_is_a_400_through_the_dispatch_layer(tmp_path):
+    from caterva.studio.adapters import load_registry
+
+    app = make_app(tmp_path, registry=load_registry())
+    try:
+        refused = req(app, "POST", "/api/runs", {"kind": "sim", "request": {"seed": 1, "a0": 10**12, "k": 0.5,
+                                                                               "end": 1.0}})
+        assert refused.status == 400 and "200,000" in refused.json()["error"]["message"]
+    finally:
+        app.close()
+
+
+def test_s5_the_loop_polls_the_flag_and_stops_within_a_few_events():
+    import time
+
+    from caterva.discrete.gillespie_ssa import (STOP_CHECK_EVERY, SimulationCancelled, SimulationTooLong,
+                                                simulate_gillespie_ssa, simulate_gillespie_ssa_bimolecular)
+
+    polls = []
+
+    def stop_on_third():
+        polls.append(1)
+        return len(polls) >= 3
+
+    started = time.monotonic()
+    with pytest.raises(SimulationCancelled):
+        simulate_gillespie_ssa(a0=3_000_000, k=1.0, end=50.0, seed=1, should_stop=stop_on_third)
+    assert time.monotonic() - started < 2.0 and len(polls) == 3
+    with pytest.raises(SimulationCancelled):
+        simulate_gillespie_ssa_bimolecular(a0=3_000_000, b0=3_000_000, k=1e-3, end=50.0, seed=1,
+                                           should_stop=lambda: True)
+    with pytest.raises(SimulationTooLong):
+        simulate_gillespie_ssa(a0=100_000, k=1.0, end=50.0, seed=1, max_events=500)
+    assert STOP_CHECK_EVERY <= 1024
+
+
+def test_s5_no_stop_flag_leaves_the_trajectory_exactly_as_it_was():
+    from caterva.discrete.gillespie_ssa import simulate_gillespie_ssa
+
+    plain = simulate_gillespie_ssa(500, 0.4, 5.0, seed=11)
+    polled = simulate_gillespie_ssa(500, 0.4, 5.0, seed=11, should_stop=lambda: False, max_events=10**6)
+    assert plain.data == polled.data
+
+
+def test_s5_a_cancelled_sim_run_stops_inside_the_loop_and_is_cancelling_until_it_has(tmp_path, monkeypatch):
+    import time
+
+    from caterva.studio import contract
+    from caterva.studio.adapters import load_registry
+    from caterva.studio.jobs import JobManager
+
+    monkeypatch.setattr(contract, "MAX_SSA_EVENTS", 10**9)  # lets a run long enough to cancel be asked for
+    ws = Workspace(tmp_path / "data")
+    ws.ensure()
+    ws.claim("0123456789abcdef")
+    manager = JobManager(ws, load_registry(), instance_id="0123456789abcdef", tick_s=0.02, keepalive_s=0.2)
+    try:
+        run_id = manager.submit("sim", {"seed": 5, "a0": 40_000_000, "k": 1.0, "end": 50.0})["id"]
+        deadline = time.monotonic() + 30
+        while manager.record(run_id)["status"] != "running" and time.monotonic() < deadline:
+            time.sleep(0.01)
+        time.sleep(0.3)
+        started = time.monotonic()
+        assert manager.cancel(run_id)["status"] == "cancelling"
+        while manager.record(run_id)["status"] == "cancelling" and time.monotonic() < deadline:
+            time.sleep(0.01)
+        record = manager.record(run_id)
+        assert record["status"] == "cancelled" and time.monotonic() - started < 10  # not abandoned, not run out
+        assert not manager.ws.result_path(run_id).exists()
+        names = [t.name for t in threading.enumerate() if t.name == f"caterva-run-{run_id}"]
+        deadline = time.monotonic() + 5
+        while names and time.monotonic() < deadline:
+            time.sleep(0.01)
+            names = [t.name for t in threading.enumerate() if t.name == f"caterva-run-{run_id}"]
+        assert names == []  # the thread really ended
+    finally:
+        manager.shutdown()
+
+
+def test_s5_timeouts_are_per_kind_and_sane():
+    from caterva.studio.contract import RUN_KINDS
+    from caterva.studio.jobs import KIND_TIMEOUTS_S, RUN_TIMEOUT_S
+
+    assert set(KIND_TIMEOUTS_S) == set(RUN_KINDS)
+    assert KIND_TIMEOUTS_S["sim"] <= 15 * 60 and KIND_TIMEOUTS_S["md.setup"] <= 15 * 60
+    assert max(KIND_TIMEOUTS_S.values()) <= 2 * 60 * 60 and RUN_TIMEOUT_S <= 60 * 60
+    assert KIND_TIMEOUTS_S["analyze"] > KIND_TIMEOUTS_S["sim"]
+
+
+# ---------------------------------------------------------------------------
+# S6: the enzyme finder cannot be asked for unbounded CPU
+# ---------------------------------------------------------------------------
+
+
+def test_s6_at_most_two_searches_run_at_once_and_the_rest_are_told_to_wait():
+    from caterva.studio.limits import Busy, SearchGuard
+
+    guard = SearchGuard(concurrent=2, budget_s=5.0, queue_wait_s=0.05)
+    release = threading.Event()
+    running, peak, lock = [0], [0], threading.Lock()
+
+    def slow():
+        with lock:
+            running[0] += 1
+            peak[0] = max(peak[0], running[0])
+        release.wait(5)
+        with lock:
+            running[0] -= 1
+        return {"ok": True}
+
+    outcomes: List[Any] = []
+
+    def ask(i):
+        try:
+            outcomes.append(guard.run(("q", i), slow))
+        except Busy as exc:
+            outcomes.append(exc)
+
+    threads = [threading.Thread(target=ask, args=(i,)) for i in range(6)]
+    for thread in threads:
+        thread.start()
+    deadline = 50
+    while sum(isinstance(o, Busy) for o in outcomes) < 4 and deadline:
+        threading.Event().wait(0.05)
+        deadline -= 1
+    assert peak[0] == 2 and sum(isinstance(o, Busy) for o in outcomes) == 4
+    release.set()
+    for thread in threads:
+        thread.join(10)
+    assert sum(o == {"ok": True} for o in outcomes) == 2
+
+
+def test_s6_one_normalised_query_is_searched_once_whatever_its_spelling(tmp_path):
+    from caterva.studio.adapters import Registry
+
+    calls: List[str] = []
+    registry = Registry()
+    registry.add_endpoint("find_enzymes", lambda r: calls.append(r.query["q"]) or {"candidates": [r.query["q"]]},
+                          owner="compose")
+    app = make_app(tmp_path, registry=registry)
+    try:
+        for q in ("Alcohol+Dehydrogenase", "alcohol%20%20dehydrogenase", "ALCOHOL%09DEHYDROGENASE",
+                  "%EF%BC%A1lcohol+dehydrogenase"):  # the last begins with a full-width A
+            assert req(app, "GET", f"/api/enzymes/find?q={q}").status == 200
+        assert len(calls) == 1 and app.finder.started == 1
+        assert req(app, "GET", "/api/enzymes/find?q=lactate+dehydrogenase").status == 200
+        assert len(calls) == 2
+    finally:
+        app.close()
+
+
+def test_s6_a_search_over_its_budget_is_a_503_with_retry_after_and_its_answer_is_kept(tmp_path):
+    from caterva.studio.adapters import Registry
+    from caterva.studio.limits import SearchGuard
+
+    release = threading.Event()
+    calls: List[int] = []
+
+    def slow(request):
+        calls.append(1)
+        release.wait(10)
+        return {"candidates": ["late"]}
+
+    registry = Registry()
+    registry.add_endpoint("find_enzymes", slow, owner="compose")
+    app = make_app(tmp_path, registry=registry)
+    app.finder = SearchGuard(budget_s=0.1)
+    try:
+        first = req(app, "GET", "/api/enzymes/find?q=slowly")
+        assert first.status == 503 and first.header("Retry-After") == "2"
+        release.set()
+        deadline = 100
+        while app.finder.started and not app.finder._cache and deadline:
+            threading.Event().wait(0.05)
+            deadline -= 1
+        again = req(app, "GET", "/api/enzymes/find?q=Slowly")
+        assert again.status == 200 and again.json() == {"candidates": ["late"]} and len(calls) == 1
+    finally:
+        release.set()
+        app.close()
+
+
+def test_s6_a_search_that_raises_gives_every_waiter_the_same_refusal(tmp_path):
+    from caterva.studio.adapters import Registry
+    from caterva.studio.contract import Malformed
+
+    registry = Registry()
+
+    def bad(request):
+        raise Malformed("q is not searchable", field="q")
+
+    registry.add_endpoint("find_enzymes", bad, owner="compose")
+    app = make_app(tmp_path, registry=registry)
+    try:
+        refused = req(app, "GET", "/api/enzymes/find?q=x")
+        assert refused.status == 400 and refused.json()["error"]["field"] == "q"
+    finally:
+        app.close()
+
+
+def test_s6_the_cache_is_an_lru_of_bounded_size():
+    from caterva.studio.limits import SearchGuard
+
+    guard = SearchGuard(cache_size=2)
+    for key in ("a", "b", "a", "c"):
+        guard.run(key, lambda key=key: key)
+    assert guard.started == 3  # "a" was answered from the cache the second time
+    guard.run("b", lambda: "b")  # evicted when "c" arrived
+    assert guard.started == 4
+
+
+# ---------------------------------------------------------------------------
+# S7: connections, streams, queued runs, kept runs, slow requests
+# ---------------------------------------------------------------------------
+
+
+def _finished_run_record(app: App, kind: str = "compose") -> str:
+    from caterva.studio.contract import RUN_RECORD_SCHEMA
+    from caterva.studio.jobs import make_run_id
+    from caterva.studio.workspace import iso, utc_now
+
+    run_id = make_run_id(kind)
+    now = iso(utc_now())
+    record = {"schema": RUN_RECORD_SCHEMA, "id": run_id, "kind": kind, "title": "t", "status": "done",
+              "created_at": now, "started_at": now, "finished_at": now, "caterva_version": "0", "cli": [],
+              "request": {}, "outcome": None, "error": None, "artifacts": [], "progress": None}
+    app.ws.create_run(record, {}, owner=None)
+    return run_id
+
+
+def test_s7_no_more_than_sixteen_event_streams_and_a_closed_one_frees_its_slot(tmp_path):
+    from caterva.studio.limits import MAX_STREAMS
+
+    app = make_app(tmp_path)
+    try:
+        run_id = _finished_run_record(app)
+        open_streams = []
+        for _ in range(MAX_STREAMS):
+            response = req(app, "GET", f"/api/runs/{run_id}/events")
+            assert response.status == 200 and response.stream is not None
+            open_streams.append(response)
+        refused = req(app, "GET", f"/api/runs/{run_id}/events")
+        assert refused.status == 503 and refused.header("Retry-After") == "2"
+        assert "event streams" in refused.json()["error"]["message"]
+        open_streams[0].stream.close()
+        open_streams[0].stream.close()  # closing twice gives back one slot, not two
+        taken = req(app, "GET", f"/api/runs/{run_id}/events")
+        assert taken.status == 200
+        assert req(app, "GET", f"/api/runs/{run_id}/events").status == 503
+        # A stream read to its end gives its slot back too.
+        list(open_streams[1].stream)
+        assert req(app, "GET", f"/api/runs/{run_id}/events").status == 200
+        del taken
+    finally:
+        app.close()
+
+
+def test_s7_a_stream_that_was_never_started_still_gives_its_slot_back(tmp_path):
+    from caterva.studio.limits import Gate, GuardedStream
+
+    gate = Gate(1)
+    assert gate.enter()
+    stream = GuardedStream((b"x" for _ in range(3)), gate)  # a generator never advanced
+    stream.close()
+    assert gate.count == 0 and gate.enter()
+
+
+def test_s7_too_many_waiting_runs_are_refused_with_retry_after(tmp_path):
+    from caterva.studio.adapters import AdapterOutcome, AdapterSpec, Registry
+    from caterva.studio.jobs import JobManager, QueueFull
+
+    release = threading.Event()
+
+    def run(request, ctx):
+        release.wait(20)
+        return AdapterOutcome(0, {}, "done")
+
+    registry = Registry()
+    registry.register(AdapterSpec(kind="compose", title="t", command="compose", needs=(), argv=lambda r: [],
+                                  run=run, cli_prefix=("caterva", "compose")))
+    ws = Workspace(tmp_path / "data")
+    ws.ensure()
+    ws.claim("0123456789abcdef")
+    manager = JobManager(ws, registry, instance_id="0123456789abcdef", parallel=lambda: 1, max_pending=2,
+                         tick_s=0.02)
+    try:
+        for _ in range(3):  # one running, two waiting
+            manager.submit("compose", {})
+        with pytest.raises(QueueFull) as refused:
+            manager.submit("compose", {})
+        assert "at most 2" in str(refused.value) and refused.value.retry_after_s == 30
+    finally:
+        release.set()
+        manager.shutdown()
+
+
+def test_s7_the_queue_refusal_is_a_503_with_retry_after_over_dispatch(tmp_path):
+    from caterva.studio.adapters import AdapterOutcome, AdapterSpec, Registry
+
+    release = threading.Event()
+    registry = Registry()
+    registry.register(AdapterSpec(kind="compose", title="t", command="compose", needs=(), argv=lambda r: [],
+                                  run=lambda r, c: release.wait(20) and AdapterOutcome(0, {}, "x"),
+                                  cli_prefix=("caterva", "compose")))
+    app = make_app(tmp_path, registry=registry, job_options={"max_pending": 1})
+    app.settings()  # the settings are the defaults: two runs at once
+    try:
+        statuses = [req(app, "POST", "/api/runs", {"kind": "compose", "request": {}}).status for _ in range(4)]
+        assert statuses[:3] == [202, 202, 202] and statuses[3] == 503
+        last = req(app, "POST", "/api/runs", {"kind": "compose", "request": {}})
+        assert last.header("Retry-After") == "30"
+    finally:
+        release.set()
+        app.close()
+
+
+def test_s7_finished_runs_beyond_keep_runs_go_to_the_trash_and_a_live_one_never_does(tmp_path):
+    from caterva.studio.adapters import AdapterOutcome, AdapterSpec, Registry
+    from caterva.studio.jobs import JobManager
+
+    registry = Registry()
+    registry.register(AdapterSpec(kind="compose", title="t", command="compose", needs=(), argv=lambda r: [],
+                                  run=lambda r, c: AdapterOutcome(0, {}, "x"), cli_prefix=("caterva", "compose")))
+    ws = Workspace(tmp_path / "data")
+    ws.ensure()
+    ws.claim("0123456789abcdef")
+    manager = JobManager(ws, registry, instance_id="0123456789abcdef", keep_runs=lambda: 3, tick_s=0.02)
+    try:
+        import time
+
+        for _ in range(6):
+            run_id = manager.submit("compose", {})["id"]
+            deadline = time.monotonic() + 20
+            while manager.record(run_id)["status"] != "done" and time.monotonic() < deadline:
+                time.sleep(0.01)
+            time.sleep(0.01)  # run ids sort by second: keep them distinct and ordered
+            threading.Event().wait(1.01)
+        assert len(ws.run_ids()) == 4  # the three kept, and the one accepted last
+        assert len(list((tmp_path / "data" / "trash").iterdir())) == 2  # runs 5 and 6 each moved one out
+    finally:
+        manager.shutdown()
+
+
+@pytest.mark.parametrize("value,ok", [(10, True), (5000, True), (9, False), (5001, False), (True, False),
+                                      (2.5, False), ("200", False)])
+def test_s7_keep_runs_is_a_setting_with_a_range(app, value, ok):
+    body = {"theme": "system", "max_parallel_runs": 2, "confirm_delete": True, "keep_runs": value}
+    response = req(app, "PUT", "/api/settings", body)
+    assert (response.status == 200) is ok
+    if not ok:
+        assert response.json()["error"]["field"] == "keep_runs"
+    # A page that does not know the key leaves it alone.
+    kept = req(app, "PUT", "/api/settings", {"theme": "dark", "max_parallel_runs": 2, "confirm_delete": True})
+    assert kept.json()["keep_runs"] == (value if ok else 200)
+
+
+def test_s7_a_connection_over_the_ceiling_is_answered_503_and_closed(tmp_path):
+    from caterva.studio import server as server_module
+
+    class Quiet(server_module.StudioHTTPServer):
+        def __init__(self):  # no socket: the sandbox cannot bind
+            self.connections = server_module.limits.Gate(1)
+
+        def shutdown_request(self, request):
+            request.closed = True
+
+    class FakeSocket:
+        def __init__(self):
+            self.sent = b""
+            self.closed = False
+
+        def settimeout(self, seconds):
+            pass
+
+        def sendall(self, data):
+            self.sent += data
+
+    quiet = Quiet()
+    assert quiet.connections.enter()  # the one allowed connection is taken
+    refused = FakeSocket()
+    quiet.process_request(refused, ("127.0.0.1", 1))
+    head, _, body = refused.sent.partition(b"\r\n\r\n")
+    assert head.startswith(b"HTTP/1.1 503") and b"Retry-After: 2" in head and b"Connection: close" in head
+    assert b"X-Content-Type-Options: nosniff" in head
+    assert json.loads(body)["error"]["code"] == "unavailable" and refused.closed
+    assert quiet.connections.count == 1
+
+
+def test_s7_a_request_that_drips_in_is_cut_off_by_its_total_deadline_not_its_pauses():
+    import socket as socket_module
+
+    from caterva.studio.limits import DeadlineReader
+
+    now = [0.0]
+    timeouts: List[float] = []
+
+    class FakeSock:
+        def settimeout(self, value):
+            timeouts.append(value)
+
+    class Raw:
+        def __init__(self, lines):
+            self.lines = list(lines)
+
+        def readline(self, size=-1):
+            now[0] += 6.0  # every line takes six seconds, each inside the idle limit
+            return self.lines.pop(0)
+
+        def read(self, size=-1):
+            now[0] += 6.0
+            return b"x" * size
+
+    reader = DeadlineReader(Raw([b"GET / HTTP/1.1\r\n", b"Host: x\r\n", b"X-A: 1\r\n", b"\r\n"]), FakeSock(),
+                            idle_s=60.0, header_s=10.0, clock=lambda: now[0])
+    reader.begin()
+    assert reader.readline() == b"GET / HTTP/1.1\r\n"  # idle wait, then the 10 s header clock starts
+    assert reader.readline() == b"Host: x\r\n"
+    assert reader.readline() == b"X-A: 1\r\n"  # 6 s of the 10 s are gone: this read may wait only 4 more
+    with pytest.raises(socket_module.timeout):
+        reader.readline()  # 12 s into the headers: over the deadline, though no single pause was long
+    assert max(timeouts) == 60.0 and min(timeouts) <= 4.0  # the per-read wait shrank to what was left
+    reader.begin()
+    reader.arm(30.0)
+    now[0] = 100.0
+    with pytest.raises(socket_module.timeout):
+        reader.read(3)
+    reader.disarm()
+
+
+def test_s7_the_ceilings_are_the_stated_ones():
+    from caterva.studio import limits
+    from caterva.studio.jobs import MAX_PENDING
+
+    assert (limits.MAX_CONNECTIONS, limits.MAX_STREAMS, MAX_PENDING) == (64, 16, 32)
+    assert limits.HEADER_DEADLINE_S <= 15 and limits.BODY_DEADLINE_S <= 60

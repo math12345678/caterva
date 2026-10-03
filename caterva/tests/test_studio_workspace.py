@@ -239,7 +239,7 @@ def test_settings_default_and_round_trip(ws):
     ws.save_settings(stored)
     assert ws.load_settings() == (stored, None)
     assert stored == {"theme": "dark", "max_parallel_runs": 3, "confirm_delete": False, "gromacs_path": None,
-                      "offline": True}
+                      "offline": True, "keep_runs": 200}
 
 
 @pytest.mark.parametrize("body,field", [

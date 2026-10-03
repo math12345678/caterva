@@ -35,9 +35,24 @@ def _package_path_missing(exc: ModuleNotFoundError) -> bool:
 
 
 import math
-from typing import List
+from typing import Callable, List, Optional
 
 import numpy as np
+
+#: How many reaction events pass between two looks at `should_stop`: often
+#: enough that a cancel is seen within a few milliseconds of simulating,
+#: seldom enough that the look costs nothing.
+STOP_CHECK_EVERY = 1024
+
+
+class SimulationCancelled(Exception):
+    """`should_stop` returned true: the caller asked the simulation to stop,
+    and it did, keeping no result."""
+
+
+class SimulationTooLong(Exception):
+    """The trajectory passed `max_events` reaction events, the bound the
+    caller put on the work. Nothing is returned for it."""
 
 try:
     from caterva.core.data_structures import (
@@ -66,15 +81,31 @@ except ModuleNotFoundError as _exc:  # flat mode: caterva/ on sys.path, no repo 
     )
 
 
-def _run_first_order_once(a0: int, k: float, end: float, rng) -> List[List[float]]:
-    """One first-order SSA trajectory (columns time, a, b) from a given RNG."""
+def _check_stop(events: int, should_stop: Optional[Callable[[], bool]], max_events: Optional[int]) -> None:
+    """Called once per event: raises when the caller asked to stop (looked at
+    every STOP_CHECK_EVERY events) or the event bound is passed."""
+    if max_events is not None and events > max_events:
+        raise SimulationTooLong(f"the trajectory passed {max_events:,} reaction events")
+    if should_stop is not None and events % STOP_CHECK_EVERY == 0 and should_stop():
+        raise SimulationCancelled("the simulation was asked to stop")
+
+
+def _run_first_order_once(a0: int, k: float, end: float, rng, should_stop: Optional[Callable[[], bool]] = None,
+                          max_events: Optional[int] = None) -> List[List[float]]:
+    """One first-order SSA trajectory (columns time, a, b) from a given RNG.
+
+    `should_stop` is polled every STOP_CHECK_EVERY events (SimulationCancelled);
+    `max_events` bounds the work (SimulationTooLong). Both default to none."""
     a = int(a0)
     b = 0
     t = 0.0
     data: List[List[float]] = [[0.0, float(a), float(b)]]
+    if should_stop is not None and should_stop():
+        raise SimulationCancelled("the simulation was asked to stop")
 
     # k == 0: propensity is identically zero, no reaction ever fires.
     while t < end and a > 0 and k > 0:
+        _check_stop(len(data), should_stop, max_events)
         propensity = k * a
         tau = -math.log(rng.uniform(0.0, 1.0)) / propensity
         if t + tau > end:
@@ -91,17 +122,23 @@ def _run_first_order_once(a0: int, k: float, end: float, rng) -> List[List[float
 
 
 def _run_bimolecular_once(
-    a0: int, b0: int, k: float, end: float, rng
+    a0: int, b0: int, k: float, end: float, rng, should_stop: Optional[Callable[[], bool]] = None,
+    max_events: Optional[int] = None,
 ) -> List[List[float]]:
-    """One bimolecular SSA trajectory (columns time, a, b, c) from an RNG."""
+    """One bimolecular SSA trajectory (columns time, a, b, c) from an RNG.
+
+    `should_stop` and `max_events` as for the first-order trajectory."""
     a = int(a0)
     b = int(b0)
     c = 0
     t = 0.0
     data: List[List[float]] = [[0.0, float(a), float(b), float(c)]]
+    if should_stop is not None and should_stop():
+        raise SimulationCancelled("the simulation was asked to stop")
 
     # k == 0 or either species exhausted: propensity is zero, no event.
     while t < end and a > 0 and b > 0 and k > 0:
+        _check_stop(len(data), should_stop, max_events)
         propensity = k * a * b
         tau = -math.log(rng.uniform(0.0, 1.0)) / propensity
         if t + tau > end:
@@ -121,6 +158,8 @@ def simulate_gillespie_ssa(
     k: float,
     end: float,
     seed: int | None = None,
+    should_stop: Optional[Callable[[], bool]] = None,
+    max_events: Optional[int] = None,
 ) -> SimulationResult:
     """Simulate first-order decay ``A -> B`` with the exact SSA.
 
@@ -129,6 +168,10 @@ def simulate_gillespie_ssa(
         k: first-order rate constant, per molecule per time unit (>= 0)
         end: simulation time horizon
         seed: RNG seed for the trajectory (ADR 0005)
+        should_stop: optional; called every STOP_CHECK_EVERY events, and
+            when it returns true the run raises SimulationCancelled
+        max_events: optional bound on the reaction events; passing it
+            raises SimulationTooLong
 
     Returns:
         SimulationResult with columns ["time", "a", "b"], one row per
@@ -143,7 +186,7 @@ def simulate_gillespie_ssa(
     validation.raise_if_invalid()
 
     rng = np.random.default_rng(seed)
-    data = _run_first_order_once(int(a0), k, end, rng)
+    data = _run_first_order_once(int(a0), k, end, rng, should_stop, max_events)
 
     return SimulationResult(
         colnames=["time", "a", "b"],
@@ -159,6 +202,8 @@ def simulate_gillespie_ssa_bimolecular(
     k: float,
     end: float,
     seed: int | None = None,
+    should_stop: Optional[Callable[[], bool]] = None,
+    max_events: Optional[int] = None,
 ) -> SimulationResult:
     """Simulate bimolecular association ``A + B -> C`` with the exact SSA.
 
@@ -168,6 +213,10 @@ def simulate_gillespie_ssa_bimolecular(
         k: second-order rate constant, per molecule pair per time unit (>= 0)
         end: simulation time horizon
         seed: RNG seed for the trajectory (ADR 0005)
+        should_stop: optional; called every STOP_CHECK_EVERY events, and
+            when it returns true the run raises SimulationCancelled
+        max_events: optional bound on the reaction events; passing it
+            raises SimulationTooLong
 
     Returns:
         SimulationResult with columns ["time", "a", "b", "c"], one row per
@@ -182,7 +231,7 @@ def simulate_gillespie_ssa_bimolecular(
     validation.raise_if_invalid()
 
     rng = np.random.default_rng(seed)
-    data = _run_bimolecular_once(int(a0), int(b0), k, end, rng)
+    data = _run_bimolecular_once(int(a0), int(b0), k, end, rng, should_stop, max_events)
 
     return SimulationResult(
         colnames=["time", "a", "b", "c"],
@@ -250,6 +299,7 @@ def simulate_gillespie_ssa_replicates(
     n_replicates: int,
     seed: int | None = None,
     b0: float | None = None,
+    should_stop: Optional[Callable[[], bool]] = None,
 ) -> SimulationResult:
     """Simulate the SSA ensemble view: ``n_replicates`` independent runs.
 
@@ -314,7 +364,7 @@ def simulate_gillespie_ssa_replicates(
     for rep_seed in replicate_seeds:
         rep_rng = np.random.default_rng(rep_seed)
         if b0 is None:
-            rows = _run_first_order_once(int(a0), k, end, rep_rng)
+            rows = _run_first_order_once(int(a0), k, end, rep_rng, should_stop)
             finals = [rows[-1][1]]
             replicate_data.append(finals)
             times = np.array([row[0] for row in rows])
@@ -323,7 +373,7 @@ def simulate_gillespie_ssa_replicates(
             mean_a += _step_sample(times, a_col, grid)
             mean_b += _step_sample(times, b_col, grid)
         else:
-            rows = _run_bimolecular_once(int(a0), int(b0), k, end, rep_rng)
+            rows = _run_bimolecular_once(int(a0), int(b0), k, end, rep_rng, should_stop)
             replicate_data.append([rows[-1][1], rows[-1][2], rows[-1][3]])
             times = np.array([row[0] for row in rows])
             a_col = np.array([row[1] for row in rows])

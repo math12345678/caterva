@@ -58,7 +58,16 @@ export const RunKindSchema = z.enum([
   "complex.check",
   "rates",
 ]);
-export const RunStatusSchema = z.enum(["queued", "running", "done", "failed", "cancelled", "interrupted"]);
+export const RunStatusSchema = z.enum([
+  "queued",
+  "running",
+  "cancelling",
+  "done",
+  "failed",
+  "cancelled",
+  "abandoned",
+  "interrupted",
+]);
 export const OutcomeMeaningSchema = z.enum(["produced", "refused", "negative"]);
 export const ProvenanceKindSchema = z.enum(["measured", "fitted", "computed", "placeholder", "chosen"]);
 export const ErrorCodeSchema = z.enum([

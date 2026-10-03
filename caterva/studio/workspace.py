@@ -85,7 +85,7 @@ _INSTANCE_ID = re.compile(r"[0-9a-f]{16}")
 #: Kind as written in a run id ("md-setup") -> the RunKind ("md.setup").
 _KIND_BY_SLUG = {kind.replace(".", "-"): kind for kind in RUN_KINDS}
 
-TERMINAL_STATUSES = frozenset({"done", "failed", "cancelled", "interrupted"})
+TERMINAL_STATUSES = frozenset({"done", "failed", "cancelled", "abandoned", "interrupted"})
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
     "theme": "system",
@@ -93,10 +93,13 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "confirm_delete": True,
     "gromacs_path": None,
     "offline": False,
+    "keep_runs": 200,
 }
 MAX_PARALLEL_RUNS = (1, 8)
 _REQUIRED_SETTINGS = ("theme", "max_parallel_runs", "confirm_delete")
-_OPTIONAL_SETTINGS = ("gromacs_path", "offline")
+_OPTIONAL_SETTINGS = ("gromacs_path", "offline", "keep_runs")
+#: The most and fewest finished runs History may be set to keep.
+KEEP_RUNS = (10, 5000)
 
 #: The page's history list shows this many runs unless asked for another
 #: number, and never more than the maximum in one answer.
@@ -236,8 +239,12 @@ def validate_settings(body: Any, stored: Mapping[str, Any]) -> Dict[str, Any]:
     offline = body["offline"] if "offline" in body else stored.get("offline", False)
     if not isinstance(offline, bool):
         raise Malformed("offline must be true or false", field="offline")
+    keep = body["keep_runs"] if "keep_runs" in body else stored.get("keep_runs", DEFAULT_SETTINGS["keep_runs"])
+    low_keep, high_keep = KEEP_RUNS
+    if isinstance(keep, bool) or not isinstance(keep, int) or not low_keep <= keep <= high_keep:
+        raise Malformed(f"keep_runs must be a whole number from {low_keep} to {high_keep}", field="keep_runs")
     return {"theme": theme, "max_parallel_runs": parallel, "confirm_delete": confirm, "gromacs_path": gromacs,
-            "offline": offline}
+            "offline": offline, "keep_runs": keep}
 
 
 #: What the program a gromacs_path names may be called: `gmx`, `gmx_mpi`,

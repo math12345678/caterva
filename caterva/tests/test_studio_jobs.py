@@ -457,10 +457,11 @@ def test_cancelling_a_running_run_stops_it_at_its_next_check_and_keeps_no_result
     run_id = manager.submit("compose", {})["id"]
     gate.started.wait(30)
     record = manager.cancel(run_id)
-    assert record["status"] == "running"  # cooperative: it stops at its next check
+    assert record["status"] == "cancelling"  # cooperative: it is not `cancelled` until it has stopped
     wait_for(lambda: manager.record(run_id)["status"] == "cancelled")
     assert not manager.ws.result_path(run_id).exists()
     events = events_on_disk(manager, run_id)
+    assert [d["status"] for n, d in events if n == "status"] == ["queued", "running", "cancelling", "cancelled"]
     lines = [d["line"] for n, d in events if n == "log"]
     assert "Cancel requested: the run stops at its next check." in lines
     assert lines[-1] == "Cancelled: the run stopped at its next check and keeps no result."
@@ -500,9 +501,12 @@ def test_a_run_that_cannot_stop_is_abandoned_and_says_so(tmp_path):
         run_id = manager.submit("sim", {})["id"]
         gate.started.wait(30)
         manager.cancel(run_id)
-        wait_for(lambda: manager.record(run_id)["status"] == "cancelled")
+        wait_for(lambda: manager.record(run_id)["status"] == "abandoned")
         lines = [d["line"] for n, d in events_on_disk(manager, run_id) if n == "log"]
         assert "abandoned" in lines[-1] and "Waiting for the test" in lines[-1]
+        assert lines[-1].startswith("Abandoned, not stopped:")
+        error = manager.record(run_id)["error"]
+        assert error["type"] == "Abandoned" and "finishes in the background" in error["message"]
         assert "the next engine run waits for it" in lines[-1]
         # The engine is still busy: a second serial run waits for the call to return.
         waiting = manager.submit("compose", {})["id"]
@@ -513,7 +517,7 @@ def test_a_run_that_cannot_stop_is_abandoned_and_says_so(tmp_path):
         # What the abandoned call returned was discarded.
         assert not manager.ws.result_path(run_id).exists()
         assert not manager.ws.artifact_path(run_id, "note.txt").exists()
-        assert manager.record(run_id)["status"] == "cancelled"
+        assert manager.record(run_id)["status"] == "abandoned"  # never reported as stopped
     finally:
         gate.release.set()
         manager.shutdown()

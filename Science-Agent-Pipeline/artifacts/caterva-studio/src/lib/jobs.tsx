@@ -18,7 +18,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { useLocation } from "wouter";
 
 import { ApiRequestError, sessionToken } from "@/api/client";
-import { cancelRun, isTerminal, listRuns, type RunEvent, subscribeToRun } from "@/api/runs";
+import { cancelRun, isTerminal, listRuns, liveStatus, type RunEvent, subscribeToRun } from "@/api/runs";
 import type { Outcome, RunError, RunKind, RunRecord, RunStatus, RunSummary } from "@/api/types";
 import { routeForKind } from "@/routes";
 
@@ -83,14 +83,14 @@ function fromRun(run: RunRecord | RunSummary, origin: "here" | "found"): Job {
     id: run.id,
     kind: run.kind,
     title: run.title,
-    status: run.status,
+    status: liveStatus(run.status),
     stage: progress ? { label: progress.label, fraction: progress.fraction } : null,
     outcome: run.outcome,
     error: "error" in run ? run.error : null,
     createdAt: run.created_at,
     finishedAt: run.finished_at,
     origin,
-    cancelling: false,
+    cancelling: run.status === "cancelling",
   };
 }
 
@@ -119,6 +119,12 @@ export function announcement(job: Job): { tone: "done" | "refused" | "negative" 
       };
     case "cancelled":
       return { tone: "stopped", title: `Cancelled: ${job.title}`, description: "" };
+    case "abandoned":
+      return {
+        tone: "stopped",
+        title: `Abandoned: ${job.title}`,
+        description: "It did not stop when asked and may still be running in the background.",
+      };
     case "interrupted":
       return { tone: "stopped", title: `Interrupted: ${job.title}`, description: firstLine(job.error?.message) };
     default:
@@ -182,7 +188,12 @@ export function JobsProvider({ children }: { children: ReactNode }) {
       const onEvent = (e: RunEvent) => {
         switch (e.event) {
           case "status":
-            update(id, (j) => ({ ...j, status: e.data.status, outcome: e.data.outcome ?? j.outcome }));
+            update(id, (j) => ({
+              ...j,
+              status: liveStatus(e.data.status),
+              cancelling: e.data.status === "cancelling" ? true : j.cancelling,
+              outcome: e.data.outcome ?? j.outcome,
+            }));
             break;
           case "stage":
             update(id, (j) => ({ ...j, stage: { label: e.data.label, fraction: e.data.fraction } }));
@@ -258,11 +269,12 @@ export function JobsProvider({ children }: { children: ReactNode }) {
   const live = useQuery({
     queryKey: ["runs", "live"],
     queryFn: async () => {
-      const [running, queued] = await Promise.all([
+      const [running, queued, cancelling] = await Promise.all([
         listRuns({ status: "running", limit: 50 }),
         listRuns({ status: "queued", limit: 50 }),
+        listRuns({ status: "cancelling", limit: 50 }),
       ]);
-      return [...running.runs, ...queued.runs];
+      return [...running.runs, ...queued.runs, ...cancelling.runs];
     },
     refetchInterval: FOUND_POLL_MS,
     refetchIntervalInBackground: false,

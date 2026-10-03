@@ -116,8 +116,14 @@ RUN_KINDS: Tuple[str, ...] = (
 #: A run's place in its life. `interrupted` is a run the server was stopped
 #: during; it is never resumed, because a half-finished search resumed
 #: later would mix two days' database answers in one result.
-RunStatus = Literal["queued", "running", "done", "failed", "cancelled", "interrupted"]
-RUN_STATUSES: Tuple[str, ...] = ("queued", "running", "done", "failed", "cancelled", "interrupted")
+#: `cancelling` is a run that was asked to stop and whose thread has not
+#: stopped yet; it is never terminal. `cancelled` means the thread really
+#: stopped. `abandoned` is a run asked to stop that did not stop within the
+#: grace period: the server gave up waiting, and its library call may still
+#: be running in the background (its error says so).
+RunStatus = Literal["queued", "running", "cancelling", "done", "failed", "cancelled", "abandoned", "interrupted"]
+RUN_STATUSES: Tuple[str, ...] = ("queued", "running", "cancelling", "done", "failed", "cancelled", "abandoned",
+                                 "interrupted")
 
 #: What a finished run's CLI exit code means. 2 (malformed) never becomes a
 #: run: it is a 400 at submission. 1 (a crash) is status `failed`.
@@ -421,6 +427,10 @@ class Settings(_SettingsRequired, total=False):
     #: probe answers without probing) and refuses to start a run of any kind
     #: whose `needs` include "network", with that reason (503). Default False.
     offline: bool
+    #: How many finished runs the studio keeps in History; older ones are
+    #: moved to <data dir>/trash/ when a new run is accepted (10 to 5000,
+    #: default 200). Never a run that is still going.
+    keep_runs: int
 
 
 class NormaliseOrganismRequest(TypedDict):
@@ -764,6 +774,12 @@ class StructuredSection(TypedDict):
 #: (`rows`, `every`): each row sent is one the run held, never an
 #: interpolation, and the full table is the CLI's (or the CSV artefact).
 SERIES_ROW_LIMIT = 20_000
+
+#: The most reaction events a `sim` run may be expected to make. The table
+#: holds one row per event, in memory, and the run cannot be stopped inside
+#: a single library call, so a request whose expected event count passes
+#: this is refused at submission with this number in the message.
+MAX_SSA_EVENTS = 200_000
 
 
 class _SweepRequestRequired(TypedDict):
@@ -2036,4 +2052,5 @@ MIRRORED_CONSTANTS: Mapping[str, Any] = {
     "MAX_BODY_BYTES": MAX_BODY_BYTES,
     "MAX_VIEWER_ATOMS": MAX_VIEWER_ATOMS,
     "SERIES_ROW_LIMIT": SERIES_ROW_LIMIT,
+    "MAX_SSA_EVENTS": MAX_SSA_EVENTS,
 }

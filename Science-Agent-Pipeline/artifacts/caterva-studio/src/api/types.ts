@@ -21,6 +21,7 @@ export const PAGE_MARKER_NAME = "caterva-studio-page";
 export const PAGE_MARKER_CONTENT = "token-in-url-fragment";
 export const MAX_BODY_BYTES = 1048576;
 export const MAX_VIEWER_ATOMS = 60000;
+export const MAX_SSA_EVENTS = 200000;
 
 // ---------------------------------------------------------------------------
 // String unions
@@ -39,7 +40,15 @@ export type RunKind =
   | "fep.status"
   | "complex.check"
   | "rates";
-export type RunStatus = "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted";
+export type RunStatus =
+  | "queued"
+  | "running"
+  | "cancelling"
+  | "done"
+  | "failed"
+  | "cancelled"
+  | "abandoned"
+  | "interrupted";
 export type OutcomeMeaning = "produced" | "refused" | "negative";
 export type ProvenanceKind = "measured" | "fitted" | "computed" | "placeholder" | "chosen";
 export type ChosenBy = "user" | "default";
@@ -239,6 +248,8 @@ export interface Settings {
   gromacs_path?: string | null;
   /** True: no network probe, and runs of kinds that need the network are refused (503). */
   offline?: boolean;
+  /** How many finished runs History keeps (10 to 5000, default 200); older ones go to the trash folder. */
+  keep_runs?: number;
 }
 
 export interface NormaliseOrganismRequest {

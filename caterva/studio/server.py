@@ -29,6 +29,17 @@ WHAT THE STANDARD LIBRARY WOULD OTHERWISE DO, AND IS STOPPED FROM DOING
   Nothing here can log the session token: it travels only in a header,
   and headers are not logged.
 
+WHAT IT REFUSES TO HOLD OPEN
+----------------------------
+At most limits.MAX_CONNECTIONS connections are served at once: one more is
+answered at once with a 503 and a Retry-After and closed, before a thread
+is spent on it. A request must arrive within limits.HEADER_DEADLINE_S of its
+first byte and its body within limits.BODY_DEADLINE_S of the start of the
+body (limits.DeadlineReader): a client that sends one byte every few
+seconds is cut off, where a per-read timeout alone would let it hold a
+thread forever. Event streams are capped in the dispatch layer
+(limits.MAX_STREAMS).
+
 HOW A CLOSED PAGE IS NOTICED
 ----------------------------
 An event stream is written to until the page goes away. A write to a
@@ -49,7 +60,9 @@ import threading
 from email.utils import formatdate
 from typing import Any, List, Optional, Tuple
 
-from caterva.studio.dispatch import App, Request, Response, error_response
+from caterva.studio import limits
+from caterva.studio.dispatch import App, Request, Response, error_response, json_body
+from caterva.studio.security import BASE_HEADERS
 
 log = logging.getLogger("caterva.studio.server")
 
@@ -60,6 +73,18 @@ IDLE_TIMEOUT_S = 60.0
 
 #: What a socket raises when the other end has gone: never a fault of the server's.
 PEER_GONE = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, socket.timeout)
+
+
+def busy_response() -> bytes:
+    """The whole answer to a connection refused for being over the ceiling."""
+    body = json_body({"error": {"code": "unavailable", "message": (
+        f"the studio is already serving {limits.MAX_CONNECTIONS} connections, the most it will; "
+        "try again in a moment")}})
+    head = ["HTTP/1.1 503 Service Unavailable", "Content-Type: application/json; charset=utf-8",
+            "Cache-Control: no-store", f"Retry-After: {limits.RETRY_AFTER_S}", f"Content-Length: {len(body)}",
+            "Connection: close"]
+    head += [f"{k}: {v}" for k, v in BASE_HEADERS]
+    return ("\r\n".join(head) + "\r\n\r\n").encode("ascii") + body
 
 
 def bind_address(host: str) -> Tuple[socket.AddressFamily, str]:
@@ -82,11 +107,39 @@ class StudioHTTPServer(http.server.ThreadingHTTPServer):
     #: Restarting the app at once must not fail on a port still in TIME_WAIT.
     allow_reuse_address = True
 
-    def __init__(self, host: str, port: int) -> None:
+    def __init__(self, host: str, port: int, *, max_connections: int = limits.MAX_CONNECTIONS) -> None:
         family, address = bind_address(host)
         self.address_family = family
         self.app: Optional[App] = None
+        self.connections = limits.Gate(max_connections)
         super().__init__((address, port), StudioRequestHandler, bind_and_activate=True)
+
+    def process_request(self, request: Any, client_address: Any) -> None:
+        if not self.connections.enter():
+            self._refuse_busy(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self.connections.leave()
+            raise
+
+    def process_request_thread(self, request: Any, client_address: Any) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self.connections.leave()
+
+    def _refuse_busy(self, request: Any) -> None:
+        """Answer a connection over the ceiling with a 503 and close it,
+        without spending a thread on it."""
+        try:
+            request.settimeout(1.0)
+            request.sendall(busy_response())
+        except OSError:
+            pass
+        finally:
+            self.shutdown_request(request)
 
     def server_bind(self) -> None:
         # HTTPServer.server_bind would call socket.getfqdn (module docstring).
@@ -116,6 +169,17 @@ class StudioRequestHandler(http.server.BaseHTTPRequestHandler):
     server: StudioHTTPServer
     protocol_version = "HTTP/1.1"
     timeout = IDLE_TIMEOUT_S
+
+    def setup(self) -> None:
+        super().setup()
+        self.rfile = limits.DeadlineReader(  # type: ignore[assignment]
+            self.rfile, self.connection, idle_s=IDLE_TIMEOUT_S, header_s=limits.HEADER_DEADLINE_S)
+
+    def handle_one_request(self) -> None:
+        reader = self.rfile
+        if isinstance(reader, limits.DeadlineReader):
+            reader.begin()
+        super().handle_one_request()
 
     def version_string(self) -> str:
         return "caterva-studio"
@@ -178,8 +242,13 @@ class StudioRequestHandler(http.server.BaseHTTPRequestHandler):
             consumed[0] += len(data)
             return data
 
+        reader = self.rfile
+        if isinstance(reader, limits.DeadlineReader):
+            reader.arm(limits.BODY_DEADLINE_S)
         request = Request(self.command, self.path, list(self.headers.items()), read)
         response = app.dispatch(request)
+        if isinstance(reader, limits.DeadlineReader):
+            reader.disarm()
         if declared and consumed[0] != declared:
             self.close_connection = True
         self._write(response, head=self.command == "HEAD")
@@ -191,9 +260,15 @@ class StudioRequestHandler(http.server.BaseHTTPRequestHandler):
         for name, value in headers:
             self.send_header(name, value)
         if response.stream is not None:
-            self.send_header("Connection", "close")
-            self.end_headers()
-            self.close_connection = True
+            try:
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.close_connection = True
+            except BaseException:
+                close = getattr(response.stream, "close", None)
+                if callable(close):
+                    close()
+                raise
             self._stream(response)
             return
         self.send_header("Content-Length", str(len(response.body)))

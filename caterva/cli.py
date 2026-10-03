@@ -55,14 +55,19 @@ def _build_ssa_parser(sub: argparse._SubParsersAction) -> None:
     p.set_defaults(func=_cmd_ssa)
 
 
-def simulate(args: argparse.Namespace):
+def simulate(args: argparse.Namespace, should_stop=None, max_events=None):
     """The SSA run `args` asks for: the engine's SimulationResult.
 
-    Raises ModelBuildError for parameters the engine refuses."""
+    `should_stop` (a function returning true to stop) and `max_events` bound
+    the work; the command line passes neither. Raises ModelBuildError for
+    parameters the engine refuses, SimulationCancelled when `should_stop`
+    said stop, SimulationTooLong past `max_events`."""
     if args.bimolecular:
         return simulate_gillespie_ssa_bimolecular(
-            a0=args.a0, b0=args.b0, k=args.k, end=args.end, seed=args.seed)
-    return simulate_gillespie_ssa(a0=args.a0, k=args.k, end=args.end, seed=args.seed)
+            a0=args.a0, b0=args.b0, k=args.k, end=args.end, seed=args.seed,
+            should_stop=should_stop, max_events=max_events)
+    return simulate_gillespie_ssa(a0=args.a0, k=args.k, end=args.end, seed=args.seed,
+                                  should_stop=should_stop, max_events=max_events)
 
 
 def expectation(args: argparse.Namespace, result) -> Dict[str, Any]:

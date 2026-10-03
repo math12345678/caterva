@@ -38,13 +38,13 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
 from urllib.parse import parse_qsl, unquote, urlsplit
 
-from caterva.studio import routes
+from caterva.studio import limits, routes
 from caterva.studio.adapters import EndpointRequest, load_registry
 from caterva.studio.capabilities import NOT_BUILT_YET, CapabilityProbe
 from caterva.studio.contract import (
     MAX_BODY_BYTES, RUN_KINDS, RUN_STATUSES, SESSION_HEADER, STUDIO_API_VERSION, Malformed, NotFound, Unavailable,
 )
-from caterva.studio.jobs import Conflict, JobManager
+from caterva.studio.jobs import Conflict, JobManager, QueueFull
 from caterva.studio.security import ARTIFACT_CSP, BASE_HEADERS, CSP, Guard, bootstrap_url, mint_token, url_for
 from caterva.studio.static_files import NotFromThisPackage, StaticSite
 from caterva.studio.workspace import (
@@ -199,7 +199,12 @@ class App:
         self._settings, self.settings_note = workspace.load_settings()
         self.manager = JobManager(workspace, self.registry, instance_id=self.instance_id,
                                   parallel=lambda: self.settings()["max_parallel_runs"],
-                                  offline=lambda: bool(self.settings().get("offline")), **dict(job_options or {}))
+                                  offline=lambda: bool(self.settings().get("offline")),
+                                  keep_runs=lambda: int(self.settings().get("keep_runs") or 200),
+                                  **dict(job_options or {}))
+        #: The bounds on work a request can start (limits.py), one set per server.
+        self.finder = limits.SearchGuard()
+        self.streams = limits.Gate(limits.MAX_STREAMS)
         self.capabilities = CapabilityProbe(registry=self.registry, workspace=workspace, static_site=self.static,
                                             dev_origin=dev_origin, settings=self.settings,
                                             **dict(capability_options or {}))
@@ -372,15 +377,24 @@ class App:
         if fn is None:
             return error_response(503, "unavailable",
                                   f"{call.route.method} {call.route.path}: {NOT_BUILT_YET}")
+        endpoint_request = EndpointRequest(params=call.params, query=call.query, body=call.body,
+                                           data_dir=self.ws.root, capabilities=self._what_is_known)
         try:
-            answer = fn(EndpointRequest(params=call.params, query=call.query, body=call.body,
-                                        data_dir=self.ws.root, capabilities=self._what_is_known))
+            if call.route.handler == "find_enzymes":
+                # The finder spends CPU on every string it has not seen: at most a few at once, answers
+                # kept by normalised query, and a time budget per request (limits.py).
+                key = (limits.normalise_text(call.query.get("q")), limits.normalise_text(call.query.get("organism")),
+                       call.query.get("limit"))
+                answer = self.finder.run(key, lambda: fn(endpoint_request))
+            else:
+                answer = fn(endpoint_request)
         except Malformed as exc:
             return error_response(400, "malformed", str(exc), field=exc.field)
         except NotFound as exc:
             return error_response(404, "not_found", str(exc))
         except Unavailable as exc:
-            return error_response(503, "unavailable", str(exc))
+            ask = limits.retry_after(exc)
+            return error_response(503, "unavailable", str(exc), headers=[ask] if ask else ())
         return json_response(answer)
 
     def _what_is_known(self) -> Dict[str, Any]:
@@ -457,6 +471,9 @@ class App:
             record = self.manager.submit(kind, request, title.strip() if title else None)
         except Malformed as exc:
             raise ApiFailure(400, "malformed", str(exc), field=exc.field) from None
+        except QueueFull as exc:
+            raise ApiFailure(503, "unavailable", str(exc),
+                             headers=[("Retry-After", str(exc.retry_after_s))]) from None
         except Unavailable as exc:
             raise ApiFailure(503, "unavailable", str(exc)) from None
         return json_response({"run": record}, status=202)
@@ -533,7 +550,17 @@ class App:
             after = int(text)
         headers = _with_security([("Content-Type", "text/event-stream; charset=utf-8"),
                                   ("Cache-Control", "no-store"), ("X-Accel-Buffering", "no")])
-        return Response(200, headers, stream=self.manager.events(run_id, after))
+        if not self.streams.enter():
+            raise ApiFailure(503, "unavailable",
+                             f"{self.streams.ceiling} event streams are already open (the most the studio serves "
+                             "at once); close a tab or wait a moment",
+                             headers=[("Retry-After", str(limits.RETRY_AFTER_S))])
+        try:
+            frames = self.manager.events(run_id, after)
+        except BaseException:
+            self.streams.leave()
+            raise
+        return Response(200, headers, stream=limits.GuardedStream(frames, self.streams))
 
     def _h_cancel_run(self, call: _Call) -> Response:
         _only(call.query, ())

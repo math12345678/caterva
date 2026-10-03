@@ -14,12 +14,16 @@ export function runStatusLabel(status: RunStatus, meaning: OutcomeMeaning | null
       return "queued";
     case "running":
       return "running";
+    case "cancelling":
+      return "cancelling";
     case "done":
       return meaning === "refused" ? "refused" : meaning === "negative" ? "negative finding" : "finished";
     case "failed":
       return "failed";
     case "cancelled":
       return "cancelled";
+    case "abandoned":
+      return "abandoned";
     case "interrupted":
       return "interrupted";
   }
@@ -27,7 +31,7 @@ export function runStatusLabel(status: RunStatus, meaning: OutcomeMeaning | null
 
 export function RunStatusMark({ status, meaning }: { status: RunStatus; meaning: OutcomeMeaning | null }) {
   const label = runStatusLabel(status, meaning);
-  if (status === "queued" || status === "running") {
+  if (status === "queued" || status === "running" || status === "cancelling") {
     return (
       <span className="run-status-mark" role="img" aria-label={label}>
         <MarkLoader size={13} still={status === "queued"} />

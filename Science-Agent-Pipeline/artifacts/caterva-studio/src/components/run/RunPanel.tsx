@@ -134,6 +134,20 @@ export function RunPanel<K extends RunKind>({
           <p>The run was stopped before it finished, so it kept no result.</p>
         </EmptyState>
       );
+    case "abandoned":
+      return (
+        <ErrorState
+          inset
+          title="Abandoned, not stopped"
+          error={{
+            code: "unavailable",
+            message:
+              state.runError?.message ??
+              "The run was asked to stop and did not. It may still be running in the background; its result was discarded.",
+          }}
+          action={retry}
+        />
+      );
     case "interrupted":
       return (
         <ErrorState

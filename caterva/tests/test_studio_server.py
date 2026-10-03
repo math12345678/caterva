@@ -110,7 +110,7 @@ def test_settings_read_replace_and_refuse(app, tmp_path):
     new = {"theme": "dark", "max_parallel_runs": 4, "confirm_delete": False}
     stored = call(app, "PUT", "/api/settings", new)
     assert stored.status == 200
-    assert stored.json() == {**new, "gromacs_path": None, "offline": False}
+    assert stored.json() == {**new, "gromacs_path": None, "offline": False, "keep_runs": 200}
     assert json.loads((tmp_path / "data" / "settings.json").read_text()) == stored.json()
     refused = call(app, "PUT", "/api/settings", {**new, "max_parallel_runs": 0})
     assert refused.status == 400 and refused.json()["error"]["field"] == "max_parallel_runs"

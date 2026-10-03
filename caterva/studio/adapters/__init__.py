@@ -65,6 +65,11 @@ class Progress(Protocol):
 
     def check_cancelled(self) -> None: ...
 
+    def is_cancelled(self) -> bool:
+        """Whether a cancel was asked for. For library calls that poll a flag
+        (the SSA loop's `should_stop`) rather than raise from a check."""
+        ...
+
 
 @dataclass(frozen=True)
 class Artifact:

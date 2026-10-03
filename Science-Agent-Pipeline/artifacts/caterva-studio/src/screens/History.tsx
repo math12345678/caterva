@@ -84,7 +84,7 @@ export function matchesFilter(run: RunSummary, filter: Filter): boolean {
     case "negative":
       return run.status === "done" && run.outcome?.meaning === "negative";
     case "failed":
-      return run.status === "failed" || run.status === "interrupted";
+      return run.status === "failed" || run.status === "interrupted" || run.status === "abandoned";
   }
 }
 

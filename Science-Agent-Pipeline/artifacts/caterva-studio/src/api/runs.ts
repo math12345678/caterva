@@ -50,7 +50,13 @@ export type RunEvent =
 const EVENT_NAMES: readonly EventName[] = ["status", "stage", "log", "result", "error", "end"];
 
 /** A run that will not change again. */
-export const TERMINAL: ReadonlySet<RunStatus> = new Set(["done", "failed", "cancelled", "interrupted"]);
+export const TERMINAL: ReadonlySet<RunStatus> = new Set(["done", "failed", "cancelled", "abandoned", "interrupted"]);
+
+/** What a screen treats a run's status as: "cancelling" is a run still working, so it stays "running"
+ * (the screens' own `cancelling` flag says a stop was asked for). */
+export function liveStatus(status: RunStatus): RunStatus {
+  return status === "cancelling" ? "running" : status;
+}
 
 export function isTerminal(status: RunStatus | "idle"): boolean {
   return status !== "idle" && TERMINAL.has(status);
