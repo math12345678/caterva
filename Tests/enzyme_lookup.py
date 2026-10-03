@@ -459,18 +459,82 @@ class EnzymeNameNotResolved(ValueError):
     Carries the candidates so a caller can render them. A refusal that
     cannot say what it refused leaves the choice unexercisable, which is the
     shape every other refusal in this project has (ADR 0024, ADR 0118).
+
+    `candidates` is the list of EC numbers, as it always was. `named_candidates`
+    is the same candidates as dictionaries (`ec`, `name`, `label`, `why`,
+    `organism_proteins`, ...) from the enzyme finder, so a caller can show
+    "EC 1.1.1.27 L-lactate dehydrogenase (human: LDHA, LDHB, LDHC)" instead
+    of a bare number. `kind` is one of `ambiguous`, `suggestions`, `none`,
+    `lookup_failed`, `unknown_ec`.
     """
 
-    def __init__(self, message: str, candidates: list[str] | None = None):
+    def __init__(
+        self,
+        message: str,
+        candidates: list[str] | None = None,
+        named_candidates: list[dict] | None = None,
+        kind: str = "none",
+        recommended: str | None = None,
+        rerun: str = "--subject {ec}",
+    ):
         super().__init__(message)
+        self.recommended = recommended
+        self.rerun = rerun
+        #: The refusal as plain data (`caterva.enzymes.policy.refusal_view`),
+        #: set when the policy raised it; None for one raised here.
+        self.view: dict | None = None
         self.candidates = candidates or []
+        self.named_candidates = named_candidates or []
+        self.kind = kind
+
+
+def resolve_name(
+    enzyme_name: str,
+    taxon_id: str | None = None,
+    *,
+    organism: str | None = None,
+    fetch=None,
+    rerun: str = "--subject {ec}",
+    allow_unlisted_ec: bool = False,
+):
+    """The enzyme this name identifies, with how and what to read beside it.
+
+    Returns a `caterva.enzymes.policy.NameResolution` (`.ec`, `.how`,
+    `.cautions`), or raises `EnzymeNameNotResolved` naming the candidates.
+    The decision is `caterva.enzymes.policy.resolve_enzyme_name`; this adds
+    only the UniProt lookup that policy asks for when the enzyme nomenclature
+    has no enzyme of that name, and converts its refusal to this module's
+    exception. See `ec_number_for_name`.
+    """
+    from caterva.enzymes.policy import NameNotResolved, refusal_view, resolve_enzyme_name
+
+    lookup = fetch or fetch_ec_numbers_by_name
+
+    def uniprot(name: str) -> list[str]:
+        try:
+            return lookup(name, taxon_id)
+        except EnzymeNameNotResolved as exc:
+            raise NameNotResolved(str(exc), exc.candidates, exc.named_candidates, exc.kind) from exc
+
+    try:
+        return resolve_enzyme_name(
+            str(enzyme_name), organism, uniprot=uniprot, rerun=rerun,
+            allow_unlisted_ec=allow_unlisted_ec,
+        )
+    except NameNotResolved as exc:
+        refused = EnzymeNameNotResolved(
+            str(exc), exc.candidates, exc.named, exc.kind, exc.recommended, exc.rerun)
+        refused.view = refusal_view(exc)
+        raise refused from exc
 
 
 def ec_number_for_name(
     enzyme_name: str,
     taxon_id: str | None = None,
     *,
+    organism: str | None = None,
     fetch=None,
+    rerun: str = "--subject {ec}",
 ) -> str:
     """The ONE EC number this name identifies, or a refusal naming the rest.
 
@@ -496,36 +560,26 @@ def ec_number_for_name(
     score (ADR 0027), a codegen probe (ADR 0036) and a request validator
     (ADR 0086). So it moved here, and both commands call it.
 
+    THE NOMENCLATURE FIRST, UNIPROT SECOND
+    --------------------------------------
+    The name is looked up in the IUBMB enzyme nomenclature that ships with
+    Caterva (`caterva.enzymes`). That lookup knows which name is an accepted
+    name and which is a passing mention, ranks by it, and names every
+    candidate. UniProt's phrase search is asked only when the nomenclature
+    has no enzyme of that name (a protein name that is not an enzyme name).
+    Before this the only source was that phrase search: it returned bare EC
+    numbers in relevance order, "pyruvate kinase" came back with two protein
+    kinases that merely mention it, and a refusal showed numbers and no
+    names, so the person it refused could not choose.
+
     `fetch` is injectable for tests ONLY. It defaults to the real UniProt
     call; a test that had to reach the network to check a refusal message
-    would fail for reasons unrelated to the refusal.
+    would fail for reasons unrelated to the refusal. `organism` ranks the
+    candidates and names their proteins; it is never assumed.
     """
-    lookup = fetch or fetch_ec_numbers_by_name
-    try:
-        candidates = lookup(str(enzyme_name), taxon_id)
-    except EnzymeNameNotResolved:
-        raise
-    except Exception as exc:  # noqa: BLE001 - reported, never a traceback
-        raise EnzymeNameNotResolved(
-            f"Could not look up {enzyme_name!r} in UniProt: {exc}"
-        ) from exc
-
-    if not candidates:
-        raise EnzymeNameNotResolved(
-            f"UniProt indexes no reviewed enzyme named {enzyme_name!r} with "
-            "an EC number. Check the spelling, or pass the EC number "
-            "directly if you know it."
-        )
-    if len(candidates) > 1:
-        raise EnzymeNameNotResolved(
-            f"{enzyme_name!r} names more than one enzyme: "
-            + ", ".join(candidates)
-            + ". These are different proteins, so Caterva will not pick one "
-            "for you — a wrong EC number is a citation for the wrong enzyme, "
-            "not merely a wrong value. Re-run with the one you meant.",
-            candidates,
-        )
-    return candidates[0]
+    return resolve_name(
+        enzyme_name, taxon_id, organism=organism, fetch=fetch, rerun=rerun,
+    ).ec
 
 
 def parse_ec_number_search(data: dict) -> str | None:
@@ -541,10 +595,11 @@ def parse_ec_number_search(data: dict) -> str | None:
     # about what UniProt's response contains. Two parsers of one document
     # drift, and this project has the scars (ADR 0003).
     #
-    # It still returns the FIRST candidate, so callers keep their current
-    # behaviour. That is a silent pick when there is more than one, and it
-    # is a known gap rather than a solved problem -- `catalog` refuses and
-    # names the candidates instead, and the runner path does not yet.
+    # It still returns the FIRST candidate. That is a silent pick when there
+    # is more than one, which is why no command resolves a name through it:
+    # `resolve_name` above is the policy, and it refuses and names the
+    # candidates. This and `fetch_ec_number_by_name` remain only as the
+    # single-answer parser their own tests pin.
     candidates = parse_ec_number_candidates(data)
     return candidates[0] if candidates else None
 

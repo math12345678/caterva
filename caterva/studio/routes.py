@@ -13,7 +13,7 @@ editing this file; adding or changing one means amending the contract.
 
 Paths are matched after percent-decoding and never with a trailing slash.
 `{id}` is a run id (RUN_ID_PATTERN), `{name}` an artifact name
-(ARTIFACT_NAME_PATTERN), `{pdb_id}` a four-character PDB id; anything else
+(ARTIFACT_NAME_PATTERN), `{pdb_id}` a four-character PDB id, `{ec}` a complete EC number; anything else
 in those positions is 404, not 400, so the table never echoes a path back.
 """
 from __future__ import annotations
@@ -32,6 +32,10 @@ RUN_ID_PATTERN = r"[0-9]{8}-[0-9]{6}-[a-z]+(?:-[a-z]+)?-[0-9a-f]{8}"
 ARTIFACT_NAME_PATTERN = r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}"
 
 PDB_ID_PATTERN = r"[0-9][A-Za-z0-9]{3}"
+
+#: A complete EC number, preliminary ones included ("3.2.1.n3"). Anything
+#: else in that position is 404, so a path is never echoed back.
+EC_PATTERN = r"[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,3}\.(?:n?[0-9]{1,4})"
 
 
 @dataclass(frozen=True)
@@ -67,6 +71,11 @@ ROUTES: Tuple[Route, ...] = (
           summary="grammar.shapes(), the mechanisms compose can build", owner="compose"),
     Route("POST", "/api/organisms/normalise", "normalise_organism", "NormaliseOrganismResponse",
           summary="compose.organisms.normalise_organism, for form hints", owner="compose"),
+    Route("GET", "/api/enzymes/find", "find_enzymes", "EnzymeFindResponse",
+          summary="?q=&organism=&limit= the enzyme finder's ranked candidates (offline index; UniProt only "
+                  "when nothing is found and the network is reachable)", owner="compose"),
+    Route("GET", "/api/enzymes/{ec}", "enzyme_detail", "EnzymeDetail",
+          summary="one enzyme of the nomenclature, with ?organism= its isozymes", owner="compose"),
     Route("GET", "/api/structure/{pdb_id}/coordinates", "structure_coordinates", "CoordinatesResponse",
           summary="atoms for the 3D viewer, from the entry's mmCIF (network, cached)", owner="structure"),
     Route("POST", "/api/runs", "create_run", "RunCreated",
@@ -94,7 +103,7 @@ ROUTES: Tuple[Route, ...] = (
 
 def compile_path(path: str) -> "re.Pattern[str]":
     """The regular expression a route's path matches, placeholders typed."""
-    patterns = {"id": RUN_ID_PATTERN, "name": ARTIFACT_NAME_PATTERN, "pdb_id": PDB_ID_PATTERN}
+    patterns = {"id": RUN_ID_PATTERN, "name": ARTIFACT_NAME_PATTERN, "pdb_id": PDB_ID_PATTERN, "ec": EC_PATTERN}
 
     def placeholder(match: "re.Match[str]") -> str:
         name = match.group(1)
@@ -122,5 +131,5 @@ def find(method: str, path: str, *, dev: bool) -> Tuple[Optional[Route], dict, b
     return None, {}, matched_path
 
 
-__all__ = ["ARTIFACT_NAME_PATTERN", "PDB_ID_PATTERN", "ROUTES", "RUN_ID_PATTERN", "Route",
+__all__ = ["ARTIFACT_NAME_PATTERN", "EC_PATTERN", "PDB_ID_PATTERN", "ROUTES", "RUN_ID_PATTERN", "Route",
            "compile_path", "find"]

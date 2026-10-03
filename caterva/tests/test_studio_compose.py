@@ -277,6 +277,29 @@ def test_a_search_with_no_literature_answer_is_refused_and_still_reported(tmp_pa
     assert code == 3 and outcome.result["search"]["refused"] is True
 
 
+def test_a_name_that_is_several_enzymes_is_refused_with_named_candidates(tmp_path):
+    """The compose search reads --subject with the one name policy, and the outcome carries what it named."""
+    code, out, err, outcome = both(
+        {"description": "Michaelis Menten", "subject": "lactate dehydrogenase", "organism": "human",
+         "substrate": "pyruvate"}, tmp_path)
+    assert_parity(code, out, err, outcome)
+    assert code == outcome.exit_code == 3 and outcome.result["search"]["refused"] is True
+    refusal = outcome.name_refusal
+    assert refusal["kind"] == "ambiguous" and refusal["recommended"] == "1.1.1.27"
+    assert refusal["rerun_flag"] == "--subject {ec}" and refusal["message"] in outcome.result["search"]["note"]
+    named = {c["ec"]: c for c in refusal["named_candidates"]}
+    assert named["1.1.1.27"]["name"] == "L-lactate dehydrogenase"
+    assert {"LDHA", "LDHB", "LDHC"} <= {p["symbol"] for p in named["1.1.1.27"]["organism_proteins"]}
+    assert contract.outcome_for("compose", 3, outcome.summary, outcome.refusal, refusal)["name_refusal"] == refusal
+
+
+def test_a_name_goes_through_the_one_policy_not_a_copy_in_the_adapter():
+    from pathlib import Path
+
+    source = Path(adapter.__file__).read_text(encoding="utf-8")
+    assert "resolve_enzyme_name" not in source and "uniprot" not in source.lower().replace("uniprot's", "")
+
+
 # ---------------------------------------------------------------------------
 # with a literature search
 # ---------------------------------------------------------------------------

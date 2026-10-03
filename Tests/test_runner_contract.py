@@ -863,16 +863,16 @@ def test_missing_ec_number_exhausted_uniprot_lookup_reports_not_found(monkeypatc
     monkeypatch.setattr(sys, "stdout", stdout)
     science_agent_runner.main()
     result = json.loads(stdout.getvalue())
-    assert result == {
-        "ok": True,
-        "found": False,
-        "source": "ec_not_resolved",
-        "literatureCandidates": [],
-        "logs": [
-            ("Could not resolve an EC number for 'not a real enzyme name' via "
-             "UniProt; no BRENDA/KEGG/PubMed lookup is possible without one.")
-        ],
-    }
+    # The golden SHAPE: a name that matches nothing adds no candidate keys.
+    assert set(result) == {"ok", "found", "source", "literatureCandidates", "logs"}
+    assert result["ok"] is True and result["found"] is False
+    assert result["source"] == "ec_not_resolved"
+    assert result["literatureCandidates"] == []
+    # The runner asked the enzyme nomenclature, then UniProt, and says both.
+    (log,) = result["logs"]
+    assert log.startswith("Could not resolve an EC number for 'not a real enzyme name': ")
+    assert "enzyme nomenclature" in log and "UniProt" in log
+    assert log.endswith("No BRENDA/KEGG/PubMed lookup is possible without one.")
 
 
 def test_cross_species_withheld_output_shape(monkeypatch):
@@ -1217,14 +1217,51 @@ def test_an_ambiguous_enzyme_name_is_refused_and_the_candidates_named(monkeypatc
     assert result["source"] == "ec_ambiguous", (
         "an ambiguity reported as ec_not_resolved denies the answer exists"
     )
-    assert result["ecCandidates"] == ["1.1.1.27", "1.1.1.28"]
+    # The golden SHAPE of the refusal, which the TypeScript layer forwards
+    # and derives nothing from: the EC numbers, the same candidates named by
+    # the Python finder, and the sentence it wrote.
+    assert set(result) == {
+        "ok", "found", "source", "ecCandidates", "ecCandidateNames", "ecRefusal",
+        "literatureCandidates", "logs",
+    }
+    assert result["ecCandidates"][:2] == ["1.1.1.27", "1.1.1.28"]
+    first, second = result["ecCandidateNames"][:2]
+    assert (first["ec"], first["name"]) == ("1.1.1.27", "L-lactate dehydrogenase")
+    assert (second["ec"], second["name"]) == ("1.1.1.28", "D-lactate dehydrogenase")
+    assert set(first) >= {"ec", "name", "why", "label", "tier", "reaction", "class_path"}
 
     logs = " ".join(result["logs"])
-    assert "1.1.1.27" in logs and "1.1.1.28" in logs, (
+    assert "EC 1.1.1.27 L-lactate dehydrogenase" in logs, (
         "a refusal that cannot name what it refused leaves the choice "
         "unexercisable"
     )
+    assert "EC 1.1.1.28 D-lactate dehydrogenase" in logs
     assert "citation for the wrong enzyme" in logs
+    assert result["ecRefusal"] == result["logs"][0]
+    assert result["ecRefusal"].endswith("ecNumber 1.1.1.27")
+
+
+def test_a_misspelt_enzyme_name_forwards_the_did_you_mean(monkeypatch):
+    """A near-miss is `ec_not_resolved`, with the finder's suggestions attached.
+
+    Nothing is resolved: a typo match is a suggestion, never an answer.
+    """
+    import enzyme_lookup
+
+    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda organism: None)
+    monkeypatch.setattr(enzyme_lookup, "fetch_ec_numbers_by_name", lambda name, taxon_id: [])
+
+    stdout = io.StringIO()
+    monkeypatch.setattr(
+        sys, "stdin", io.StringIO(json.dumps({"enzymeName": "lactat dehydrogenase"}))
+    )
+    monkeypatch.setattr(sys, "stdout", stdout)
+    science_agent_runner.main()
+    result = json.loads(stdout.getvalue())
+
+    assert result["source"] == "ec_not_resolved"
+    assert result["ecCandidates"][:2] == ["1.1.1.27", "1.1.1.28"]
+    assert "Did you mean" in result["ecRefusal"]
 
 
 def test_one_candidate_is_not_an_ambiguity(monkeypatch):

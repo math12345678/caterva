@@ -104,6 +104,10 @@ class AdapterOutcome:
     #: For exit 3: what the CLI prints to stderr, verbatim. Required then.
     refusal: Optional[str] = None
     artifacts: Tuple[Artifact, ...] = ()
+    #: For exit 3 when the refusal was a name that is not exactly one enzyme:
+    #: `caterva.enzymes.policy.refusal_view` of the policy's refusal
+    #: (contract.NameRefusal), so the page can offer each candidate by name.
+    name_refusal: Optional[Mapping[str, Any]] = None
 
 
 @dataclass(frozen=True)
@@ -168,6 +172,10 @@ class EndpointRequest:
     #: The parsed JSON body, or None for a method without one.
     body: Any
     data_dir: Path
+    #: Asks what is known about this installation without probing: a dict
+    #: with `literature` and `network` (as in Capabilities) and `offline`.
+    #: None when the handler is called outside the server (a test).
+    capabilities: Optional[Callable[[], Mapping[str, Any]]] = None
 
 
 #: An adapter-owned route's handler: the JSON-ready response, or raises

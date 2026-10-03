@@ -288,6 +288,42 @@ citation. Over contract.MAX_VIEWER_ATOMS (60,000) atoms: only polymer and
 ligand atoms of the first model, `truncated: true`. Unknown id: 404 with the
 RCSB's words; no network: 503.
 
+`GET /api/enzymes/find?q=<text>&organism=<name>&limit=<n>` ->
+`EnzymeFindResponse` (owner: compose, the kinetics adapter, in
+`caterva/studio/adapters/enzymes.py`): the enzyme finder's ranked candidates
+for a name, an abbreviation, an EC number or a partial one.
+`caterva.enzymes` answers it from its in-memory index (loaded once, no file
+and no network at query time), and its `candidates` are the ones
+`caterva enzyme QUERY --json` prints (`caterva.enzymes.__main__.find_payload`
+is the one function for both; a parity test compares them for real queries).
+Each candidate carries `ec`, `name`, `why`, `tier`, `reaction`, `class_path`,
+`alternative_names`, `organism_proteins` (accession, entry name, symbol) with
+`organism_protein_count` and `has_organism_protein`, `status` (`active`,
+`transferred`, `deleted`) and `superseded_by`, and, added here,
+`recommended` (the finder's recommendation: the only tied candidate with a
+protein from the organism; never chosen for the person) and `caution`
+(what the finder says to check, on the candidate a query resolved to).
+`outcome` is `resolved`, `ambiguous`, `partial`, `suggestions` or `none`.
+`q` is required, at most 200 characters, no control characters; `organism`
+at most 100; `limit` 1 to 50 (default 12); any other key, or a repeated one,
+is 400. When the finder finds nothing (`outcome` `none`) and the capabilities
+say the network is reachable and the literature layer present, `fallback` is
+`{kind: "uniprot", suggestions, note}`: the EC numbers UniProt's protein-name
+search returned, read through `caterva.enzymes.policy.resolve_enzyme_name`
+with a 6 s timeout, never invented. Otherwise `fallback` is null and
+`fallback_unavailable` says why (offline mode, network not known to be
+reachable, no literature layer).
+
+`GET /api/enzymes/{ec}?organism=<name>` -> `EnzymeDetail` (owner: compose):
+one enzyme of the nomenclature (`name`, `alternative_names`, `reaction`,
+`class_path`, `status`, `superseded_by`, `release`) and `isozymes`, the
+organism's UniProt entries for that EC number (`caterva.enzymes.isozymes`):
+`proteins` (accession, entry name such as `HXK1_HUMAN`, symbol), `count`
+(can exceed the list for an organism the index keeps a count for) and
+`organism_known` (false: zero means "not known", not "none"). `{ec}` must be
+a complete EC number or the path matches no route (404); one the nomenclature
+does not list is 404 with the finder's words.
+
 ### Runs
 
 `POST /api/runs` with `CreateRunBody` `{kind, request, title?}` -> 202
@@ -383,13 +419,24 @@ queued|running -> interrupted    (found at startup: the server stopped mid-run)
 
 ### 8.3 Outcome
 
-`Outcome` `{exit_code, meaning, summary, reason}`: `exit_code` is what the
+`Outcome` `{exit_code, meaning, summary, reason, name_refusal?}`: `exit_code` is what the
 CLI exits with for the same request (0, 3 or 4; 2 never becomes a run, 1 is
 `failed`), `meaning` from contract.EXIT_MEANING, `summary` one line for
 History taken from the result (never invented), `reason` per section 6.
-Built only by `contract.outcome_for(kind, exit_code, summary, refusal)`,
-which refuses a 3 without the CLI's reason and a 4 from a kind whose command
-never exits 4.
+Built only by `contract.outcome_for(kind, exit_code, summary, refusal,
+name_refusal)`, which refuses a 3 without the CLI's reason and a 4 from a kind
+whose command never exits 4. `name_refusal` (`NameRefusal`) is present on a 3
+when the refusal was a name that is not exactly one enzyme, for compose,
+constants and structure alike: `{kind, message, named_candidates, recommended,
+rerun_flag}` is `caterva.enzymes.policy.refusal_view` of the refusal the one
+name policy raised (`resolve_enzyme_name`), so each candidate arrives with its
+enzyme name, why it matched and its proteins in the organism, `recommended` is
+the EC number the finder recommends or null (never chosen for the person), and
+`rerun_flag` is the flag that accepts a candidate (`--subject {ec}`, or
+`--ec {ec}` for constants). Never a bare list of EC numbers. The adapters do
+not decide any of it: compose, structure and constants resolve a name by
+calling the policy (`caterva.compose.__main__.read_subject`,
+`caterva.structure.__main__.subject_ec`, `scripts/report_lab.py`).
 
 ### 8.4 Server-Sent Events
 
@@ -476,7 +523,7 @@ its mark. Section 17.3.
 |---|---|
 | `version`, `api_version`, `python`, `platform`, `frozen` | `caterva.__version__`, contract.STUDIO_API_VERSION, `platform.python_version()`, `sys.platform`, `getattr(sys, "frozen", False)` |
 | `literature` `{available, reason}` | `caterva.checkout.literature_module("fallback_logic")` imports; else `available: false` and `LiteratureLayerUnavailable`'s message. Cached for the process. |
-| `network` `{checked, reachable, hosts, checked_at, reason}` | `checked: false` and nulls until `?probe=network`; then one HTTPS HEAD (5 s timeout, `urllib.request`) to each of `www.brenda-enzymes.org`, `rest.uniprot.org`, `search.rcsb.org`, `files.rcsb.org`, `eutils.ncbi.nlm.nih.gov`; `hosts` maps each to true/false; `reachable` is true when all are. |
+| `network` `{checked, reachable, hosts, checked_at, reason, source}` | `checked: false`, `source: null` and nulls until something happens. Two things make it happen. The explicit re-check, `?probe=network` (the status bar's popover and Settings call it): one HTTPS HEAD (5 s timeout, `urllib.request`) to each of `www.brenda-enzymes.org`, `rest.uniprot.org`, `search.rcsb.org`, `files.rcsb.org`, `eutils.ncbi.nlm.nih.gov`; `hosts` maps each to true/false; `reachable` is true when all are; `source: "probe"`. And real network use, noted through `caterva.netuse` with nothing extra contacted: a BRENDA, UniProt, NCBI or RCSB request that was answered (any HTTP status) sets `reachable: true`, one that could not be made (refused, no DNS, timed out) sets `reachable: false` with `reason`; that host's entry in `hosts` follows; `checked_at` is the time; `source: "use"`. The newest event decides `reachable`. Never contacts a host unasked; offline mode notes nothing. |
 | `gromacs` `{found, path, version, reason}` | `$GMX` if set, else `gmx`, through `shutil.which` (and `/opt/homebrew/bin/gmx`, `/usr/local/bin/gmx` if not on PATH: a GUI app's PATH is short); version from the first line of `gmx --version` matching `GROMACS version:`, 5 s timeout. Run once per process and on each capabilities request after a failure. |
 | `rates` `{available, reason}` | `importlib.util.find_spec("caterva.rates")` is not None AND an adapter registered kind `rates`; else false with which of the two is missing. |
 | `ui` `{built, static_dir, reason}` | `static/index.html` exists and holds the placeholder. |
@@ -725,12 +772,12 @@ red error.
 | route | purpose | primary action | endpoints | empty | loading | error | refusal / negative |
 |---|---|---|---|---|---|---|---|
 | `/` Home | what this installation can do and the runs opened last | open a recent run, or start one from a kind | health, capabilities, runs (limit 8) | no runs yet: the three first questions to ask, as real commands the forms prefill | mark + "Connecting to the studio server" | server not reachable: how to start it | capabilities that are off, each with its reason (no literature layer, no gmx) |
-| `/compose` | build a model from the shape of a mechanism; see where every number came from | Compose | compose/shapes, organisms/normalise, runs (kind compose), result, artifacts | description field with the shapes list one keystroke away | stage labels (search, dossier, each section) | request 400 under the field it names; crash with type and message | UnrecognisedShape's text; refused sections under their own headings |
-| `/constants` | an enzyme's measured constants, each with the paper | Look up | runs (constants) | the form; which fields are required | resolve, document | 503 when not a source checkout, with the reason | ambiguous enzyme name with every candidate named |
+| `/compose` | build a model from the shape of a mechanism; see where every number came from | Compose | compose/shapes, organisms/normalise, enzymes/find, enzymes/{ec}, runs (kind compose), result, artifacts | description field with the shapes list one keystroke away | stage labels (search, dossier, each section) | request 400 under the field it names; crash with type and message | UnrecognisedShape's text; refused sections under their own headings |
+| `/constants` | an enzyme's measured constants, each with the paper | Look up | runs (constants), enzyme finder | the form; which fields are required | resolve, document | 503 when not a source checkout, with the reason | ambiguous enzyme name with every candidate named (`name_refusal`) |
 | `/rates` | reserved for `caterva rates` | declared when integrated | capabilities | shown only when `rates.available` | | | |
 | `/sim` | exact stochastic kinetics, seeded | Simulate | runs (sim) | the form, seed prefilled and editable | simulate | 400 | none |
-| `/bind` | the measured binding free energy a simulation is held to | Build the target / Judge | runs (bind) | EC and organism; list compounds | fetch, rows, target | 503 without the literature layer | no Ki rows; none fits the state (with the other state suggested); negative: "disagrees" drawn as a verdict |
-| `/structure` | an enzyme's PDB entries, cited, with a 3D view | Search | runs (structure), structure coordinates, artifacts (.cxc) | EC, organism, gene | search, rank; viewer loading its atoms | no network | several proteins for one EC: choose gene or UniProt |
+| `/bind` | the measured binding free energy a simulation is held to | Build the target / Judge | runs (bind), enzymes/find | EC and organism; list compounds | fetch, rows, target | 503 without the literature layer | no Ki rows; none fits the state (with the other state suggested); negative: "disagrees" drawn as a verdict |
+| `/structure` | an enzyme's PDB entries, cited, with a 3D view | Search | runs (structure), enzymes/find, structure coordinates, artifacts (.cxc) | EC, organism, gene | search, rank; viewer loading its atoms | no network | a name that is several enzymes: each candidate named (`name_refusal`); several proteins for one EC: choose gene or UniProt |
 | `/prepare` | audit an entry before simulating it | Audit | runs (prepare) | PDB id or a chosen .cif | fetch, audit | 400 for a bad path | negative: every chain blocked, the blocking findings first |
 | `/md` | a GROMACS setup whose every parameter says where it came from; whether replicas converged; FEP and complex status | Write setup / Summarise / Check | runs (md.setup, md.summarise, fep.status, complex.check), capabilities (gromacs) | choose a PDB entry (from Structure or Prepare) | conditions, write | gmx not found: setup still works, running it needs GROMACS | measured conditions not found (files still written); negative: not converged, disagrees, left its pose |
 | `/analyze` | catalytic geometry across replicas, a result only when replicas agree | Analyze | runs (analyze) | choose a finished md directory | plan, measure | not a finished run, in the library's words | negative: which quantities are not results and why |

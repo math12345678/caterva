@@ -135,3 +135,26 @@ def test_cite_is_imported_by_path_once():
     module = adapter.cite_module()
     assert module is sys.modules["caterva_cite"] and module is adapter.cite_module()
     assert module.__file__ == str(adapter.CITE)
+
+
+def test_a_name_that_is_several_enzymes_is_refused_with_named_candidates(tmp_path):
+    """cite.py's refusal, and the same refusal as data from the one name policy."""
+    request = {"enzyme": "lactate dehydrogenase", "organism": "human", "substrate": "pyruvate"}
+    with hexokinase_offline():
+        code, out, err = run_cli(cite_main(), adapter.argv(request))
+        outcome = adapter.run(request, context(tmp_path))
+    assert code == outcome.exit_code == 3 and outcome.result is None
+    assert err.rstrip("\n").endswith(outcome.refusal)  # the organism note comes first on stderr
+    refusal = outcome.name_refusal
+    assert refusal["kind"] == "ambiguous" and refusal["recommended"] == "1.1.1.27"
+    assert refusal["rerun_flag"] == "--ec {ec}"
+    assert refusal["message"] in outcome.refusal
+    assert {"1.1.1.27", "1.1.1.28"} <= {c["ec"] for c in refusal["named_candidates"]}
+    assert all(c["name"] for c in refusal["named_candidates"])
+
+
+def test_a_refusal_that_is_not_a_name_carries_no_name_refusal(tmp_path):
+    request = {"ec": "2.7.1.1", "substrate": "glucose"}
+    with hexokinase_offline():
+        outcome = adapter.run(request, context(tmp_path))
+    assert outcome.exit_code == 3 and outcome.name_refusal is None

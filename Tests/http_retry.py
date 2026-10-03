@@ -368,6 +368,23 @@ def _record(key: dict, response: httpx.Response) -> None:
     os.replace(temporary, target / recording_name(key))
 
 
+def _live_get(url: str, kwargs: dict) -> httpx.Response:
+    """`httpx.get`, telling `caterva.netuse` whether the host answered, so a
+    status display can say the network was reached (or was not). A replayed
+    or remembered response never gets here."""
+    try:
+        from caterva import netuse
+    except ImportError:  # the literature layer run without the package
+        return httpx.get(url, **kwargs)
+    try:
+        response = httpx.get(url, **kwargs)
+    except httpx.TransportError as exc:
+        netuse.failed(url, exc)
+        raise
+    netuse.answered(url)
+    return response
+
+
 def retry_get(
     url: str,
     *,
@@ -416,7 +433,7 @@ def retry_get(
 
     for attempt in range(max_retries + 1):
         try:
-            r = httpx.get(url, **kwargs)
+            r = _live_get(url, kwargs)
             if r.status_code not in RETRYABLE_STATUSES:
                 if r.status_code < 500:
                     if len(_MEMO) < MEMO_MAX:

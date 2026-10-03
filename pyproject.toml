@@ -173,8 +173,9 @@ exclude = ["caterva.tests", "caterva.tests.*"]
 # Caterva Studio's built page (caterva/studio/static/, written by the Vite
 # build in Science-Agent-Pipeline/artifacts/caterva-studio and not
 # committed). Absent from a wheel built without it; `caterva studio` then
-# serves a page saying how to build it.
-caterva = ["core/data/*.json", "core/data/README.md", "studio/static/*", "studio/static/**/*"]
+# serves a page saying how to build it. The enzyme finder's packaged index
+# (caterva/enzymes/data) is read at query time.
+caterva = ["core/data/*.json", "core/data/README.md", "enzymes/data/enzyme_index.json.gz", "enzymes/data/NOTICE.txt", "studio/static/*", "studio/static/**/*"]
 
 [tool.setuptools.exclude-package-data]
 caterva = ["conftest.py", "pytest.ini", ".coverage"]

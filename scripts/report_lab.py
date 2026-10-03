@@ -449,8 +449,14 @@ def main() -> int:
     return 0 if result.get("ok") else 1
 
 
-def _failure(message: str) -> dict:
-    return {"ok": False, "error": message}
+def _failure(message: str, name_refusal: dict | None = None) -> dict:
+    """A refusal. `name_refusal` is the enzyme-name policy's refusal as data
+    (named candidates, kind, recommended EC, re-run flag) when the refusal
+    was a name that is not exactly one enzyme."""
+    out = {"ok": False, "error": message}
+    if name_refusal:
+        out["name_refusal"] = name_refusal
+    return out
 
 
 def run_payload(payload: dict) -> dict:
@@ -481,13 +487,15 @@ def run_payload(payload: dict) -> dict:
     #
     # The name is resolved through the SAME policy `catalog` uses, which
     # refuses rather than picking when a name maps to more than one enzyme.
-    # Resolving is not guessing: UniProt is asked, and one answer is an
-    # answer. Two answers is a refusal that names both.
+    # Resolving is not guessing: the enzyme nomenclature is asked, and one
+    # answer is an answer. Two answers is a refusal that names both.
     if not ec and payload.get("enzyme"):
         try:
-            ec = ec_number_for_name(str(payload["enzyme"]))
+            ec = ec_number_for_name(
+                str(payload["enzyme"]), organism=organism, rerun="--ec {ec}",
+            )
         except EnzymeNameNotResolved as exc:
-            return _failure(str(exc))
+            return _failure(str(exc), getattr(exc, "view", None))
 
     if not ec or not organism:
         return _failure(

@@ -107,6 +107,14 @@ def test_every_flag_and_shape_in_the_guide_still_exists(line: str):
             if path.startswith("examples/"):
                 assert (GUIDE.parents[1] / path).is_file(), f"the guide runs {path}, which is gone"
 
+    elif command == "enzyme":
+        from caterva.enzymes.__main__ import build_parser as enzyme_parser
+
+        known = {opt for action in enzyme_parser()._actions for opt in action.option_strings}
+        unknown = flags - known
+        assert not unknown, f"the guide uses {sorted(unknown)}, which `caterva enzyme` no longer defines"
+        assert positionals, f"`caterva enzyme` in the guide names no query: {line}"
+
     elif command == "sim":
         from caterva.cli import main as _engine_main  # noqa: F401 - import proves the module loads
 

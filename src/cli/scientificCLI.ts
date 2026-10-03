@@ -1893,8 +1893,8 @@ async function main() {
           '  scientific report --enzyme "alcohol dehydrogenase" \\\n' +
           '      --organism "Homo sapiens" --substrate ethanol \\\n' +
           '      --s0 10mM --vmax 0.25mM/s --out report.md\n\n' +
-          'The enzyme can be a name (looked up in UniProt, and refused if ' +
-          'it names more than one enzyme) or an EC number, --ec 1.1.1.27.\n\n' +
+          'The enzyme can be a name (looked up in the enzyme nomenclature, and ' +
+          'refused, with each candidate named, if it names more than one enzyme) or an EC number, --ec 1.1.1.27.\n\n' +
           'Run `scientific catalog --enzyme "alcohol dehydrogenase"` first ' +
           "to see the substrate labels BRENDA actually uses — its label for " +
           'lactate is "(S)-lactate", so a reasonable guess comes back empty.',

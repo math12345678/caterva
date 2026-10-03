@@ -37,6 +37,7 @@ from typing import Optional, Sequence
 COMMANDS = {
     "compose": ("caterva.compose.__main__", "the model builder and its analyses"),
     "rates": ("caterva.rates.__main__", "fit your own initial rates: constants, mechanism, and the cited values"),
+    "enzyme": ("caterva.enzymes.__main__", "which enzyme a name means: the EC number, why, and the compose line to use it"),
     "structure": ("caterva.structure.__main__", "an enzyme's PDB structures, cited, and a ChimeraX script"),
     "md": ("caterva.md.__main__", "a GROMACS setup whose every parameter is measured, chosen or cited"),
     "analyze": ("caterva.analyze.__main__", "catalytic geometry and active-site flexibility across replicas"),
@@ -92,7 +93,8 @@ REAL CONSTANTS, WITH REAL CITATIONS
 
   A value nobody measured stays a labelled placeholder, and the report says
   why: most often it exists in another organism, which it names. Find an
-  EC number by searching the enzyme on https://www.brenda-enzymes.org.
+  EC number with `caterva enzyme "lactate dehydrogenase" --organism human`,
+  which works offline and lists every enzyme that name could mean.
   The search needs the source checkout (git clone, then make setup); the
   downloaded app folder builds and simulates but cannot search, and says so.
 

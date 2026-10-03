@@ -337,15 +337,20 @@ def run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
     result = compose_result(composed, provenanced, markdown=markdown, exports=exports,
                             subject=args.subject)
     code = composed.code
+    name_refusal = None
     if code == 3:
         refusal = stderr.rstrip("\n")
         summary = _first_line(refusal)
+        if composed.name_refusal is not None:
+            from caterva.enzymes.policy import refusal_view
+
+            name_refusal = refusal_view(composed.name_refusal)
     else:
         refusal = None
         verdict = result["verdict"]
         summary = _first_line(verdict["text"]) if verdict else _first_line(markdown)
     return AdapterOutcome(exit_code=code, result=result, summary=summary, refusal=refusal,
-                          artifacts=tuple(artifacts))
+                          artifacts=tuple(artifacts), name_refusal=name_refusal)
 
 
 def _first_line(text: str) -> str:
@@ -453,8 +458,9 @@ def verdict_view(verdict: Any) -> Optional[contract.VerdictView]:
         "licence": LICENCE[verdict.verdict],
         "behaviour": verdict.behaviour,
         "conclusion": verdict.conclusion,
-        "concerns": [{"source": c.source, "severity": c.severity, "detail": c.detail,
-                      "remedy": c.remedy} for c in verdict.concerns],
+        "concerns": [dict({"source": c.source, "severity": c.severity, "detail": c.detail,
+                           "remedy": c.remedy}, **({"qualifier": c.qualifier} if c.qualifier else {}))
+                     for c in verdict.concerns],
         "next_step": verdict.next_step(),
         "consulted": {str(k): str(v) for k, v in verdict.consulted.items()},
         "unavailable": {str(k): str(v) for k, v in verdict.unavailable.items()},
@@ -484,6 +490,7 @@ def stability_view(stability: Any) -> Optional[contract.StabilityView]:
                 "stable": bool(point.stable),
                 "oscillatory": bool(point.oscillatory),
                 "slowest_timescale": contract.jsonable(point.slowest_timescale),
+                "description": point.describe(),
             }
             for point in stability.fixed_points
         ],
@@ -665,3 +672,6 @@ def register(registry: Any) -> None:
     registry.register(SPEC)
     registry.add_endpoint("compose_shapes", shapes_endpoint, owner="compose")
     registry.add_endpoint("normalise_organism", normalise_endpoint, owner="compose")
+    from caterva.studio.adapters.enzymes import register_endpoints
+
+    register_endpoints(registry, "compose")

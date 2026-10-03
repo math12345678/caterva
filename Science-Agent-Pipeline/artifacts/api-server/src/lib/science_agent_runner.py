@@ -35,12 +35,15 @@ therefore deliberately absent from RESOLVABLE_FIELDS -- resolvable and
 displayable, not yet wired to a simulation. See ADR 0019.
 
 "ecNumber" is optional. If omitted (or empty) and "enzymeName" is present,
-this script resolves an EC number live via UniProt's name search
-(enzyme_lookup.fetch_ec_number_by_name) before attempting BRENDA/KEGG/
-PubMed -- see resolve_ec_number() below. If UniProt has nothing indexed
-under that name, the result is an honest {"found": false}, never a
-fabricated EC number or Km/Ki. If BOTH "ecNumber" and "enzymeName" are
-missing, that's a hard error: there is nothing to search for at all.
+this script resolves an EC number from it with the same policy every
+Caterva command uses (enzyme_lookup.resolve_name: the enzyme nomenclature
+first, UniProt's name search only for a name it does not hold) before
+attempting BRENDA/KEGG/PubMed -- see resolve_enzyme() below. If the name
+identifies no enzyme, the result is an honest {"found": false}, never a
+fabricated EC number or Km/Ki; if it identifies several, the result is
+source "ec_ambiguous" with the candidates, named. If BOTH "ecNumber" and
+"enzymeName" are missing, that's a hard error: there is nothing to search
+for at all.
 
 Output JSON shape (success, quantity="km"):
     {
@@ -91,47 +94,55 @@ import popgen_resolver
 
 
 def resolve_ec_number(enzyme_name: str, organism: str) -> str | None:
-    """Live enzyme-name -> EC-number resolution via UniProt, used whenever
-    the caller didn't already supply one (e.g. an enzyme name outside the
-    small hardcoded pattern list in enzymes.ts, or a name guessed from free
-    text). Tries the query's stated organism first, then an unrestricted
-    search, so a mismatch between the caller's organism guess and what
-    UniProt actually has indexed doesn't sink an otherwise-real match.
-    Returns None -- never guesses -- if UniProt has nothing indexed under
-    this name at all.
+    """The EC number for an enzyme name, or None when the name does not
+    identify exactly one enzyme. Never guesses.
+
+    Kept for callers that only want the number; `resolve_enzyme` is the
+    function that says why when there is none."""
+    try:
+        return resolve_enzyme(enzyme_name, organism).ec
+    except enzyme_lookup.EnzymeNameNotResolved:
+        return None
+
+
+def resolve_enzyme(enzyme_name: str, organism: str):
+    """Enzyme name -> `NameResolution`, or `EnzymeNameNotResolved` naming the candidates.
+
+    THE SAME POLICY EVERY OTHER COMMAND USES, NOT A COPY OF IT
+    ----------------------------------------------------------
+    The decision is `enzyme_lookup.resolve_name`, which asks the enzyme
+    nomenclature first (the one `caterva enzyme` and `caterva compose` ask)
+    and UniProt's protein-name search only for a name the nomenclature does
+    not hold. This function adds only the way THIS caller asks UniProt: the
+    query's stated organism first, then an unrestricted search, so a
+    mismatch between the caller's organism guess and what UniProt has
+    indexed does not sink an otherwise-real match.
+
+    The TypeScript layer does not re-derive any of it. When the name is
+    several enzymes the exception carries the candidates, named, and the
+    runner forwards them (`ecCandidates`, `ecCandidateNames`, `ecRefusal`).
+
+    An EC number is not a parameter. It is the identity of the protein every
+    citation downstream refers to, so a name that is several enzymes
+    ("lactate dehydrogenase" is EC 1.1.1.27 and EC 1.1.1.28, among others)
+    is refused rather than resolved to the first (ADR 0126, ADR 0127).
 
     Referenced via the enzyme_lookup module (not imported by name) so
     tests can monkeypatch enzyme_lookup.fetch_taxon_id /
-    enzyme_lookup.fetch_ec_number_by_name and stay offline."""
-    candidates = resolve_ec_candidates(enzyme_name, organism)
-    return candidates[0] if len(candidates) == 1 else None
-
-
-def resolve_ec_candidates(enzyme_name: str, organism: str) -> list:
-    """EVERY EC number UniProt indexes under this name.
-
-    WHY THE PLURAL
-    --------------
-    `resolve_ec_number` used to take the first and say nothing. EC 1.1.1.27
-    is L-lactate dehydrogenase and EC 1.1.1.28 is D-lactate dehydrogenase:
-    different proteins on different stereoisomers, one common name -- and
-    "lactate dehydrogenase" is the example in this project's own CLI help.
-
-    An EC number is not a parameter. It is the identity of the protein
-    every citation downstream refers to, so picking one silently produces a
-    correctly formatted reference to the wrong enzyme, before any of the
-    machinery that prevents exactly that gets to run (ADR 0126).
-
-    The organism-first, then-unrestricted order is unchanged: a mismatch
-    between the caller's organism guess and what UniProt has indexed should
-    not sink an otherwise-real match.
+    enzyme_lookup.fetch_ec_numbers_by_name and stay offline.
     """
-    taxon_id = enzyme_lookup.fetch_taxon_id(organism) if organism else None
-    if taxon_id:
-        narrowed = enzyme_lookup.fetch_ec_numbers_by_name(enzyme_name, taxon_id)
-        if narrowed:
-            return narrowed
-    return enzyme_lookup.fetch_ec_numbers_by_name(enzyme_name, None)
+
+    def uniprot(name: str, _taxon_id: str | None) -> list:
+        taxon_id = enzyme_lookup.fetch_taxon_id(organism) if organism else None
+        if taxon_id:
+            narrowed = enzyme_lookup.fetch_ec_numbers_by_name(name, taxon_id)
+            if narrowed:
+                return narrowed
+        return enzyme_lookup.fetch_ec_numbers_by_name(name, None)
+
+    return enzyme_lookup.resolve_name(
+        enzyme_name, None, organism=organism, fetch=uniprot, rerun="ecNumber {ec}"
+    )
 
 
 def taxon_id_for(organism: str | None) -> str | None:
@@ -754,67 +765,75 @@ def main() -> None:
                 raise ValueError(  # noqa: TRY301
                     "enzymeName or ecNumber is required to resolve real enzyme parameters"
                 )
-            ec_candidates = resolve_ec_candidates(enzyme_name, organism)
-            if len(ec_candidates) > 1:
-                # NOT `ec_not_resolved`. UniProt resolved it fine — to more
-                # than one enzyme. Reporting that as "could not resolve"
-                # would be a worse message than the silent pick it
-                # replaces, because it denies the existence of the answer
-                # instead of asking which one was meant.
-                print(
-                    json.dumps(
-                        {
-                            "ok": True,
-                            "found": False,
-                            "source": "ec_ambiguous",
-                            "ecCandidates": ec_candidates,
-                            "literatureCandidates": [],
-                            "logs": [
-                                f"'{enzyme_name}' names more than one enzyme: "
-                                + ", ".join(ec_candidates)
-                                + ". These are different proteins, so no EC "
-                                "number was chosen — a wrong one is a citation "
-                                "for the wrong enzyme, not merely a wrong "
-                                "value. Re-run with the EC number you meant."
-                            ],
-                        }
+            try:
+                named = resolve_enzyme(enzyme_name, organism)
+            except enzyme_lookup.EnzymeNameNotResolved as exc:
+                if exc.kind == "lookup_failed":
+                    # UniProt could not be asked: an error, as it always was,
+                    # not a statement that the name matches nothing.
+                    raise
+                if exc.kind == "ambiguous":
+                    # NOT `ec_not_resolved`. The name resolved fine -- to
+                    # more than one enzyme. Reporting that as "could not
+                    # resolve" would be a worse message than the silent pick
+                    # it replaces, because it denies the existence of the
+                    # answer instead of asking which one was meant.
+                    #
+                    # The candidates are the ones the Python finder named;
+                    # the TypeScript layer forwards them and derives nothing.
+                    print(
+                        json.dumps(
+                            {
+                                "ok": True,
+                                "found": False,
+                                "source": "ec_ambiguous",
+                                "ecCandidates": exc.candidates,
+                                "ecCandidateNames": exc.named_candidates,
+                                "ecRefusal": str(exc),
+                                "literatureCandidates": [],
+                                "logs": [str(exc)],
+                            }
+                        )
                     )
-                )
+                    return
+                not_resolved: Dict[str, Any] = {
+                    "ok": True,
+                    "found": False,
+                    "source": "ec_not_resolved",
+                    "literatureCandidates": [],
+                    "logs": [
+                        f"Could not resolve an EC number for '{enzyme_name}': {exc} "
+                        "No BRENDA/KEGG/PubMed lookup is possible without one."
+                    ],
+                }
+                if exc.candidates:
+                    # Close spellings the finder offers as "did you mean".
+                    # Forwarded as the Python wrote them.
+                    not_resolved["ecCandidates"] = exc.candidates
+                    not_resolved["ecCandidateNames"] = exc.named_candidates
+                    not_resolved["ecRefusal"] = str(exc)
+                print(json.dumps(not_resolved))
                 return
 
-            ec_number = ec_candidates[0] if ec_candidates else ""
-            if ec_number:
-                resolution_log.append(
-                    f"Resolved EC {ec_number} for '{enzyme_name}' via UniProt name search."
-                )
-                if not substrate:
-                    kegg_substrate = resolve_substrate_from_kegg(ec_number)
-                    if kegg_substrate:
-                        substrate = kegg_substrate
-                        resolution_log.append(
-                            f"Resolved substrate '{substrate}' for EC {ec_number} via KEGG."
-                        )
-                    else:
-                        resolution_log.append(
-                            f"No KEGG substrate found for EC {ec_number}; "
-                            "BRENDA lookup will be unfiltered by substrate."
-                        )
-            else:
-                print(
-                    json.dumps(
-                        {
-                            "ok": True,
-                            "found": False,
-                            "source": "ec_not_resolved",
-                            "literatureCandidates": [],
-                            "logs": [
-                                f"Could not resolve an EC number for '{enzyme_name}' via "
-                                "UniProt; no BRENDA/KEGG/PubMed lookup is possible without one."
-                            ],
-                        }
+            ec_number = named.ec
+            resolution_log.append(
+                f"Resolved EC {ec_number} for '{enzyme_name}' via "
+                + ("UniProt name search." if named.source == "uniprot"
+                   else "the enzyme nomenclature: " + named.how + ".")
+            )
+            resolution_log.extend(named.cautions)
+            if not substrate:
+                kegg_substrate = resolve_substrate_from_kegg(ec_number)
+                if kegg_substrate:
+                    substrate = kegg_substrate
+                    resolution_log.append(
+                        f"Resolved substrate '{substrate}' for EC {ec_number} via KEGG."
                     )
-                )
-                return
+                else:
+                    resolution_log.append(
+                        f"No KEGG substrate found for EC {ec_number}; "
+                        "BRENDA lookup will be unfiltered by substrate."
+                    )
 
         result = resolve_kinetic_value(
             enzyme_name, substrate, organism, ec_number,

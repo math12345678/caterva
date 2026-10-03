@@ -6,20 +6,13 @@
         --ligand oxamate --chimerax ldha.cxc
 
 Exit codes follow the rest of Caterva: 0 produced what was asked, 2 a
-malformed question, 3 refused and said why (an EC number that is several
-proteins, no structure, no network, a ChimeraX script for a protein with no
-entry to open, a name that is not exactly one enzyme), 1 a crash.
+malformed question, 3 refused and said why (an enzyme name that is several
+enzymes, an EC number that is several proteins, no structure, no network, a
+ChimeraX script for a protein with no entry to open), 1 a crash.
 
-A NAME IS LOOKED UP, NEVER GUESSED. `--subject` takes an EC number or an
-enzyme's name. A name goes through the literature layer's
-`enzyme_lookup.ec_number_for_name`, the one function `caterva compose` and
-the report commands already use, so the three commands cannot disagree on
-what "hexokinase" is. A name UniProt files under several EC numbers
-("lactate dehydrogenase" is L- and D-lactate dehydrogenase, and more) is
-refused with every candidate named, because a structure of the wrong
-enzyme is a correctly cited structure of a different protein. An input
-that reads as an EC number is used as one, exactly as before, so an EC
-search prints what it always printed.
+`--subject` takes an EC number or an enzyme name. The name is read by
+caterva.enzymes.policy, the same function `caterva compose` uses, so a name
+that is several enzymes is refused here with each candidate named.
 """
 from __future__ import annotations
 
@@ -31,45 +24,44 @@ from pathlib import Path
 from typing import List, Optional, Sequence, TextIO
 
 from caterva.compose.organisms import normalise_organism
+from caterva.enzymes.policy import NameNotResolved, literature_uniprot_lookup, refusal_view, resolve_enzyme_name
 from caterva.methods import METHODS
 from caterva.structure.search import Structure, StructureSearch, StructureSearchError, find_structures
 
 ROLES = ("ligand", "cofactor", "metal", "additive")
 
-#: What reads as an EC number (complete, partial or preliminary, "3.2.1.n3"):
-#: used as given. Anything else is a name to look up.
+#: What reads as an EC number (complete, partial or preliminary, "3.2.1.n3").
+#: Anything else is a name, which may need the literature layer's UniProt
+#: fallback; the policy itself reads both.
 EC_LIKE = re.compile(r"\s*\d+(\.(\d+|n\d*|-)){0,3}\.?\s*")
 
 
 @dataclass
 class Subject:
-    """What `--subject` named: the EC number searched, and, when it was a
-    name, the name and how it was resolved. `refusal` and `candidates` say
-    why a name gave no EC number (several enzymes, none, no literature
-    layer)."""
+    """What `--subject` named: the EC number searched, or why there is none.
+
+    `notes` are the sentences the policy wants read (a name read as an EC
+    number, a transferred number); `refusal` is the policy's refusal as the
+    command prints it and `view` the same refusal as data, each candidate
+    named (`caterva.enzymes.policy.refusal_view`)."""
 
     ec: Optional[str]
     name: Optional[str] = None
     refusal: Optional[str] = None
-    candidates: List[str] = field(default_factory=list)
+    view: Optional[dict] = None
+    notes: List[str] = field(default_factory=list)
 
 
-def subject_ec(subject: str) -> Subject:
-    """The EC number to search for `--subject`, looked up when it is a name."""
-    if EC_LIKE.fullmatch(subject):
-        return Subject(subject.strip())
-    from caterva.checkout import LiteratureLayerUnavailable, literature_module
-
-    name = subject.strip()
+def subject_ec(subject: str, organism: Optional[str] = None) -> Subject:
+    """The EC number to search for `--subject`, by the one policy every
+    command uses to read an enzyme name."""
+    text = subject.strip()
     try:
-        lookup = literature_module("enzyme_lookup")
-    except LiteratureLayerUnavailable as exc:
-        return Subject(None, name, f"Refused: {name!r} is a name, and looking a name up needs the literature "
-                                   f"layer: {exc} Search by EC number instead.")
-    try:
-        return Subject(lookup.ec_number_for_name(name), name)
-    except Exception as exc:  # noqa: BLE001 - the resolver's refusal names the candidates
-        return Subject(None, name, f"Refused: {exc}", list(getattr(exc, "candidates", []) or []))
+        resolution = resolve_enzyme_name(
+            text, organism, uniprot=literature_uniprot_lookup(), allow_unlisted_ec=True)
+    except NameNotResolved as exc:
+        return Subject(None, text, f"Refused: {exc}", refusal_view(exc))
+    return Subject(resolution.ec, None if EC_LIKE.fullmatch(text) else text, notes=resolution.notes(text))
 
 
 def build_parser(prog: str = "caterva structure") -> argparse.ArgumentParser:
@@ -91,8 +83,8 @@ def build_parser(prog: str = "caterva structure") -> argparse.ArgumentParser:
         ),
     )
     p.add_argument("--subject", required=True,
-                   help="the enzyme, as an EC number (1.1.1.27) or a name (hexokinase), which is looked up in "
-                        "UniProt and refused when it names more than one enzyme")
+                   help="the enzyme, as an EC number (1.1.1.27) or a name (pyruvate kinase); a name that is "
+                        "several enzymes is refused with each one named")
     p.add_argument("--organism", help="Latin or common name (human, mouse, E. coli)")
     p.add_argument("--gene", help="which protein, by gene name (LDHA), when the EC number is several")
     p.add_argument("--uniprot", help="which protein, by UniProt accession (P00338)")
@@ -179,10 +171,12 @@ def run(args: argparse.Namespace, out: Optional[TextIO] = None, err: Optional[Te
     out = sys.stdout if out is None else out
     err = sys.stderr if err is None else err
     organism, organism_note = normalise_organism(args.organism)
-    subject = subject_ec(args.subject)
+    subject = subject_ec(args.subject, organism)
     if subject.ec is None:
         print(subject.refusal, file=err)
         return StructureRun(3, organism, organism_note, None, subject.refusal, subject=subject)
+    for line in subject.notes:
+        print(line + "\n", file=out)
     try:
         search = find_structures(subject.ec, organism=organism, gene=args.gene,
                                  uniprot=args.uniprot, ligand=args.ligand)
@@ -190,9 +184,6 @@ def run(args: argparse.Namespace, out: Optional[TextIO] = None, err: Optional[Te
         refusal = f"Refused: {exc}"
         print(refusal, file=err)
         return StructureRun(3, organism, organism_note, None, refusal, subject=subject)
-    if subject.name:
-        print(f"{subject.name!r} is EC {subject.ec}: the one EC number UniProt's reviewed entries give that "
-              "name.\n", file=out)
     if organism_note:
         print(organism_note + "\n", file=out)
     print("\n".join(_report(search, args.top)), file=out)

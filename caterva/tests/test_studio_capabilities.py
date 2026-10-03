@@ -93,6 +93,124 @@ def test_a_probe_that_raises_counts_as_unreachable(tmp_path):
     assert "RuntimeError: resolver broke" in network["reason"]
 
 
+def test_a_lookup_that_worked_makes_the_network_reachable_with_a_time(tmp_path):
+    """The status bar said "not checked" after a BRENDA lookup had just worked."""
+    from caterva import netuse
+
+    calls: List[str] = []
+    p = probe(tmp_path, head=lambda host, timeout: calls.append(host))
+    try:
+        assert p.snapshot()["network"]["checked"] is False
+        netuse.answered("https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27")
+        network = p.snapshot()["network"]
+        assert network["checked"] is True and network["reachable"] is True and network["source"] == "use"
+        assert network["checked_at"] == "2026-09-30T12:00:00.000Z" and network["reason"] is None
+        assert network["hosts"]["www.brenda-enzymes.org"] is True and network["hosts"]["rest.uniprot.org"] is None
+        assert calls == [], "noting use contacts nothing"
+    finally:
+        p.close()
+
+
+def test_a_request_that_could_not_be_made_marks_the_network_unreachable_with_why(tmp_path):
+    from caterva import netuse
+
+    p = probe(tmp_path)
+    try:
+        netuse.answered("https://rest.uniprot.org/uniprotkb/search")
+        netuse.failed("https://www.brenda-enzymes.org/enzyme.php", "name resolution failed")
+        network = p.snapshot()["network"]
+        assert network["reachable"] is False and network["source"] == "use"
+        assert network["hosts"]["www.brenda-enzymes.org"] is False and network["hosts"]["rest.uniprot.org"] is True
+        assert network["reason"] == "www.brenda-enzymes.org could not be reached: name resolution failed"
+        netuse.answered("https://www.brenda-enzymes.org/enzyme.php")
+        assert p.snapshot()["network"]["reachable"] is True, "the newest event decides"
+    finally:
+        p.close()
+
+
+def test_the_explicit_recheck_replaces_what_use_noted(tmp_path):
+    from caterva import netuse
+
+    p = probe(tmp_path, head=lambda host, timeout: "no answer within 5 s")
+    try:
+        netuse.answered("https://rest.uniprot.org/uniprotkb/search")
+        network = p.snapshot(probe_network=True)["network"]
+        assert network["source"] == "probe" and network["reachable"] is False
+        assert all(v is False for v in network["hosts"].values())
+    finally:
+        p.close()
+
+
+def test_offline_mode_notes_no_use(tmp_path):
+    from caterva import netuse
+
+    p = probe(tmp_path, settings={"offline": True})
+    try:
+        netuse.answered("https://rest.uniprot.org/uniprotkb/search")
+        network = p.snapshot()["network"]
+        assert network["checked"] is False and network["source"] is None
+    finally:
+        p.close()
+
+
+def test_a_closed_probe_stops_listening(tmp_path):
+    from caterva import netuse
+
+    p = probe(tmp_path)
+    p.close()
+    netuse.answered("https://rest.uniprot.org/uniprotkb/search")
+    assert p.snapshot()["network"]["checked"] is False
+
+
+def test_the_literature_layers_requests_note_their_outcome(tmp_path, monkeypatch):
+    """`retry_get` is the one place the literature layer reaches a host."""
+    import httpx
+
+    from caterva.checkout import literature_module
+
+    http_retry = literature_module("http_retry")
+    http_retry.clear_memo()
+    monkeypatch.delenv(http_retry.RECORDED_ENV, raising=False)
+    monkeypatch.delenv(http_retry.RECORD_ENV, raising=False)
+    p = probe(tmp_path)
+    try:
+        monkeypatch.setattr(httpx, "get", lambda url, **kw: httpx.Response(404, request=httpx.Request("GET", url)))
+        http_retry.retry_get("https://rest.uniprot.org/uniprotkb/search", params={"q": "x"})
+        assert p.network()["hosts"]["rest.uniprot.org"] is True, "an error status is still an answer"
+
+        def refuse(url, **kw):
+            raise httpx.ConnectError("name resolution failed")
+
+        monkeypatch.setattr(httpx, "get", refuse)
+        with pytest.raises(httpx.ConnectError):
+            http_retry.retry_get("https://www.brenda-enzymes.org/enzyme.php", max_retries=0)
+        network = p.network()
+        assert network["reachable"] is False and network["hosts"]["www.brenda-enzymes.org"] is False
+        assert "name resolution failed" in network["reason"]
+    finally:
+        p.close()
+        http_retry.clear_memo()
+
+
+def test_a_replayed_answer_touches_no_network_and_notes_nothing(tmp_path, monkeypatch):
+    import httpx
+
+    from caterva.checkout import literature_module
+
+    http_retry = literature_module("http_retry")
+    http_retry.clear_memo()
+    p = probe(tmp_path)
+    try:
+        monkeypatch.setattr(httpx, "get", lambda url, **kw: httpx.Response(200, request=httpx.Request("GET", url)))
+        http_retry.retry_get("https://rest.uniprot.org/uniprotkb/search", params={"q": "memo"})
+        p._network = dict(p._network, checked=False, reachable=None, source=None)
+        http_retry.retry_get("https://rest.uniprot.org/uniprotkb/search", params={"q": "memo"})  # the memo answers
+        assert p.network()["checked"] is False
+    finally:
+        p.close()
+        http_retry.clear_memo()
+
+
 def test_offline_mode_contacts_nothing_and_marks_network_kinds_unavailable(tmp_path):
     calls = []
     registry = Registry()

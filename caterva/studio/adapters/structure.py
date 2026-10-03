@@ -13,8 +13,8 @@ command's own stdout, captured; every row of the result is read from the
 same StructureSearch the report was printed from.
 
 Exit 3 has four causes, all the command's: a name that is not exactly one
-enzyme (the result is the candidates the resolver named, so the page can
-offer each as a search; nothing else), the search could not run (no
+enzyme (no result; the outcome's `name_refusal` carries the candidates the
+one name policy named, so the page can offer each as a search), the search could not run (no
 network: no result), the EC number is several proteins and none was chosen
 (the protein table is still a result, so the page can offer the choice),
 and a ChimeraX script was asked for a protein with no entry (a gap the
@@ -197,22 +197,17 @@ def structure_run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome
 
     argv = [a.replace(RUN_DIR_PLACEHOLDER, str(ctx.run_dir)) for a in structure_argv(request)]
     args = cli_parser(build_parser, PROG).parse_args(argv)
-    ctx.progress.stage("search", f"Searching UniProt and the PDB for EC {args.subject}"
+    ctx.progress.stage("search", f"Searching UniProt and the PDB for {'' if _named(request) else 'EC '}{args.subject}"
                        + (f" in {args.organism}" if args.organism else ""))
     ctx.progress.check_cancelled()
     out, err = io.StringIO(), io.StringIO()
     done = run_structure(args, out, err, write=False)
     named = done.subject.name if done.subject else None
-    if done.search is None and done.subject is not None and done.subject.candidates:
-        candidates: contract.StructureResult = {
-            "ec": "", "organism": done.organism, "ligand": args.ligand, "proteins": [], "chosen": None,
-            "undecided": done.refusal, "entries": [], "total": 0, "report_markdown": out.getvalue(),
-            "chimerax_artifact": None, "organism_note": done.organism_note, "top": args.top, "sources": [],
-            "subject_name": named, "candidates": list(done.subject.candidates),
-        }
-        return AdapterOutcome(3, candidates, first_line(done.refusal), done.refusal)
     if done.search is None:
-        return AdapterOutcome(3, None, first_line(done.refusal), done.refusal)
+        # A name that is not exactly one enzyme carries the policy's named
+        # candidates; any other refusal (no structure, no network) carries none.
+        view = done.subject.view if done.subject is not None else None
+        return AdapterOutcome(3, None, first_line(done.refusal), done.refusal, name_refusal=view)
     ctx.progress.stage("rank", "Ranking the chosen protein's entries by ligand, method and resolution")
     search = done.search
     ranked = search.ranked()
@@ -236,6 +231,7 @@ def structure_run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome
         "sources": [method_citation("pdb"),
                     {"text": "UniProt for the protein grouping", "registry": "UniProt", "url": None}],
         "subject_name": named,
+        "subject_notes": list(done.subject.notes) if done.subject else [],
     }
     if search.chosen is not None:
         who = f"{search.chosen.gene or search.chosen.accession} ({search.chosen.accession})"

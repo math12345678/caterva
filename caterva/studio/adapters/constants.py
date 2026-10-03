@@ -40,7 +40,9 @@ WHAT IS REFUSED
     --json and --fixture are never produced: the result is the structured
     form, and a saved page in place of BRENDA belongs to the test suite.
     A refusal (an ambiguous enzyme name, with every candidate named) is
-    exit 3 with cite.py's own words.
+    exit 3 with cite.py's own words, and the outcome's `name_refusal` carries
+    the one name policy's refusal as data: each candidate named, the kind,
+    the recommended EC number and the flag that re-runs with one.
 """
 from __future__ import annotations
 
@@ -185,7 +187,7 @@ def run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
     if not result.get("ok"):
         reason = cite.refusal(result)
         return AdapterOutcome(exit_code=3, result=None, summary=str(result.get("error", "")).split("\n")[0],
-                              refusal=reason)
+                              refusal=reason, name_refusal=result.get("name_refusal"))
 
     ctx.progress.stage("document", "Writing the document with a citation beside each number", None)
     out = constants_result(request, args, payload, result, organism_note)

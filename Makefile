@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow test-ts test-studio guards pr demo publish-check evidence cli clean release-artifacts release-app
+.PHONY: enzyme-index cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow test-ts test-studio guards pr demo publish-check evidence cli clean release-artifacts release-app
 
 help:
 	@echo "Caterva"
@@ -23,6 +23,7 @@ help:
 	@echo "  make demo       SEE A REAL REPORT -- 30s, no network, no account"
 	@echo "  make cite       REAL CONSTANTS WITH CITATIONS, for your own enzyme:"
 	@echo "                  make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM=\"Homo sapiens\""
+	@echo "  make enzyme-index  rebuild the enzyme-name index from the ExPASy ENZYME release"
 	@echo "  make setup      create .venv and install everything"
 	@echo "  make doctor     diagnose a setup that will not work"
 	@echo "  make check      verify the environment actually works"
@@ -433,6 +434,16 @@ cite: check-python
 		$(if $(ORGANISM),--organism "$(ORGANISM)",) \
 		$(if $(QUANTITY),--quantity "$(QUANTITY)",) \
 		$(if $(FIXTURE),--fixture "$(FIXTURE)",)
+
+# Rebuild the enzyme-name index (caterva/enzymes/data/enzyme_index.json.gz)
+# from the current ExPASy ENZYME release. The only thing here that downloads
+# the nomenclature; commit the result with the new release string it prints.
+# `make enzyme-index ENZYME_DAT=enzyme.dat ENZCLASS=enzclass.txt` reads local
+# copies of the two files instead.
+enzyme-index: check-python
+	@"$(PY)" scripts/build_enzyme_index.py \
+		$(if $(ENZYME_DAT),--dat "$(ENZYME_DAT)",) \
+		$(if $(ENZCLASS),--enzclass "$(ENZCLASS)",)
 
 cli: check-python
 	@"$(PY)" -m caterva.cli --help

@@ -231,6 +231,7 @@ class App:
         """After serving: unfinished runs are marked interrupted and every
         event stream ends."""
         self.manager.shutdown()
+        self.capabilities.close()
         self.ws.release()
 
     # -- dispatch ------------------------------------------------------------
@@ -363,7 +364,7 @@ class App:
                                   f"{call.route.method} {call.route.path}: {NOT_BUILT_YET}")
         try:
             answer = fn(EndpointRequest(params=call.params, query=call.query, body=call.body,
-                                        data_dir=self.ws.root))
+                                        data_dir=self.ws.root, capabilities=self._what_is_known))
         except Malformed as exc:
             return error_response(400, "malformed", str(exc), field=exc.field)
         except NotFound as exc:
@@ -371,6 +372,12 @@ class App:
         except Unavailable as exc:
             return error_response(503, "unavailable", str(exc))
         return json_response(answer)
+
+    def _what_is_known(self) -> Dict[str, Any]:
+        """What an adapter's endpoint may ask about this installation without
+        a probe: the literature layer and the network as last learned."""
+        return {"literature": self.capabilities.literature(), "network": self.capabilities.network(),
+                "offline": bool(self.settings().get("offline"))}
 
     # -- meta handlers -------------------------------------------------------
 

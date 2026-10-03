@@ -132,6 +132,14 @@ export interface ScienceAgentResult {
    *  than one. An EC number is the identity of the protein every citation
    *  refers to, so the runner refuses to pick and names them (ADR 0127). */
   ecCandidates?: string[];
+  /** The same candidates, named by the Python enzyme finder: `ec`, `name`,
+   *  `label` ("EC 1.1.1.27 L-lactate dehydrogenase (human: LDHA, LDHB)"),
+   *  `why` it matched and the organism's proteins. Forwarded as received;
+   *  this layer derives nothing from them. */
+  ecCandidateNames?: Array<{ ec: string; name: string; label: string; why: string }>;
+  /** The refusal sentence the Python finder wrote, ending with the exact
+   *  flag to re-run with. Shown to the person verbatim. */
+  ecRefusal?: string;
   /** Variant descriptors ("Y124C", "isozyme H4") for rows that WERE found
    * and were withheld because they measure a sequence variant rather than
    * the enzyme (ADR 0029). Populated only when

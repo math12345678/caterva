@@ -196,13 +196,24 @@ class Http:
 def live_http(timeout: float = 30.0) -> Http:
     import requests
 
+    from caterva import netuse
+
+    def reached(call: Callable[[], Any], url: str) -> Any:
+        try:
+            r = call()
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            netuse.failed(url, exc)
+            raise
+        netuse.answered(url)
+        return r
+
     def get_json(url: str, params: Dict[str, Any]) -> Any:
-        r = requests.get(url, params=params, timeout=timeout)
+        r = reached(lambda: requests.get(url, params=params, timeout=timeout), url)
         r.raise_for_status()
         return r.json()
 
     def post_json(url: str, body: Dict[str, Any]) -> Any:
-        r = requests.post(url, json=body, timeout=timeout)
+        r = reached(lambda: requests.post(url, json=body, timeout=timeout), url)
         if r.status_code == 204:  # RCSB: the query matched nothing
             return {}
         r.raise_for_status()

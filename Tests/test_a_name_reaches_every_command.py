@@ -33,6 +33,15 @@ refusal drift (ADR 0003, 0027, 0036, 0086).
 UniProt is injected throughout. A test that had to reach the network to
 check the wording of a refusal would fail for reasons unrelated to the
 refusal, which is how this session has already lost an hour once.
+
+THE NOMENCLATURE ANSWERS FIRST
+------------------------------
+`ec_number_for_name` asks the enzyme nomenclature that ships with Caterva
+(`caterva.enzymes`) before it asks UniProt, and asks UniProt only for a name
+the nomenclature does not hold. So the tests of the one-enzyme and the
+ambiguous cases below use real enzyme names and assert that the injected
+UniProt call was never made; the UniProt fallback is tested with a protein
+name that is not an enzyme name.
 """
 from __future__ import annotations
 
@@ -61,9 +70,24 @@ def uniprot_returning(*candidates):
 
 
 def test_a_name_matching_one_enzyme_resolves_to_it():
-    fetch = uniprot_returning("1.1.1.1")
+    fetch = uniprot_returning("9.9.9.9")
     assert ec_number_for_name("alcohol dehydrogenase", fetch=fetch) == "1.1.1.1"
-    assert fetch.calls == [("alcohol dehydrogenase", None)]
+    # The nomenclature answered; UniProt was not asked, and its (wrong, for
+    # this test) answer was never read.
+    assert fetch.calls == []
+
+
+def test_a_protein_name_that_is_not_an_enzyme_name_falls_back_to_uniprot():
+    fetch = uniprot_returning("2.7.1.2")
+    assert ec_number_for_name("glucokinase regulatory protein", fetch=fetch) == "2.7.1.2"
+    assert fetch.calls == [("glucokinase regulatory protein", None)]
+
+
+def test_uniprot_incomplete_ec_numbers_are_classes_not_answers():
+    """`1.1.98.-` and `1.1.-.-` came back for "lactate dehydrogenase" once.
+    A class is not an enzyme, so it is never the answer."""
+    fetch = uniprot_returning("1.1.98.-", "1.1.-.-", "2.7.1.2")
+    assert ec_number_for_name("glucokinase regulatory protein", fetch=fetch) == "2.7.1.2"
 
 
 # ---------------------------------------------------------------------------
@@ -72,16 +96,27 @@ def test_a_name_matching_one_enzyme_resolves_to_it():
 
 
 def test_an_ambiguous_name_refuses_rather_than_picking():
+    fetch = uniprot_returning("1.1.98.-")
     with pytest.raises(EnzymeNameNotResolved) as raised:
-        ec_number_for_name("lactate dehydrogenase", fetch=uniprot_returning(*LDH_BOTH))
+        ec_number_for_name("lactate dehydrogenase", fetch=fetch)
 
     message = str(raised.value)
-    # BOTH must appear. A refusal that cannot say what it refused leaves the
-    # choice unexercisable, and the student cannot re-run with "the one you
-    # meant" if the tool will not say what the options were.
-    assert "1.1.1.27" in message
-    assert "1.1.1.28" in message
-    assert raised.value.candidates == LDH_BOTH
+    # BOTH must appear, NAMED. A refusal that cannot say what it refused
+    # leaves the choice unexercisable, and the student cannot re-run with
+    # "the one you meant" if the tool will not say what the options were.
+    assert "EC 1.1.1.27 L-lactate dehydrogenase" in message
+    assert "EC 1.1.1.28 D-lactate dehydrogenase" in message
+    assert raised.value.candidates[:2] == LDH_BOTH
+    assert raised.value.kind == "ambiguous"
+    assert [c["name"] for c in raised.value.named_candidates[:2]] == [
+        "L-lactate dehydrogenase", "D-lactate dehydrogenase"]
+    assert fetch.calls == [], "the nomenclature named the candidates; UniProt was not needed"
+
+
+def test_the_ambiguity_refusal_ends_with_the_flag_to_re_run_with():
+    with pytest.raises(EnzymeNameNotResolved) as raised:
+        ec_number_for_name("lactate dehydrogenase", fetch=uniprot_returning())
+    assert str(raised.value).endswith("--subject 1.1.1.27")
 
 
 def test_the_ambiguity_refusal_says_why_it_matters():
@@ -94,7 +129,7 @@ def test_the_ambiguity_refusal_says_why_it_matters():
     with pytest.raises(EnzymeNameNotResolved) as raised:
         ec_number_for_name("lactate dehydrogenase", fetch=uniprot_returning(*LDH_BOTH))
 
-    assert "different proteins" in str(raised.value)
+    assert "different enzymes" in str(raised.value)
     assert "citation for the wrong enzyme" in str(raised.value)
 
 
@@ -119,12 +154,13 @@ def test_a_network_failure_is_not_reported_as_an_unknown_enzyme():
         raise ConnectionError("connection reset")
 
     with pytest.raises(EnzymeNameNotResolved) as raised:
-        ec_number_for_name("lactate dehydrogenase", fetch=explodes)
+        ec_number_for_name("glucokinase regulatory protein", fetch=explodes)
 
     message = str(raised.value)
     assert "Could not look up" in message
     assert "connection reset" in message
     assert "no reviewed enzyme" not in message
+    assert raised.value.kind == "lookup_failed"
 
 
 # ---------------------------------------------------------------------------

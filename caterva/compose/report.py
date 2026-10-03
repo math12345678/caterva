@@ -244,6 +244,7 @@ class ModelDossier:
                 f"about the library's value, not about this enzyme.",
             ]
         lines += self._row_scope_lines(measured, by_id)
+        lines += self._isozyme_lines()
         lines += self._condition_lines(measured)
         lines += self._disagreement_lines(measured)
         return lines
@@ -279,6 +280,19 @@ class ModelDossier:
         if not notes:
             return []
         return ["", "What each value's own row says it measured:", ""] + [f"- {n}" for n in notes]
+
+    def _isozyme_lines(self) -> List[str]:
+        """The enzyme is several proteins in this organism and none was named.
+
+        The same notice the verdict page carries (`enzymes.isozyme`), placed
+        beside the constants it is about.
+        """
+        from caterva.enzymes.isozyme import notice_for_model
+
+        notice = notice_for_model(self.model)
+        if notice is None:
+            return []
+        return ["", "### Which isozyme", "", notice.text]
 
     def _condition_lines(self, measured: dict) -> List[str]:
         """The pH, temperature and buffer each value was measured under.

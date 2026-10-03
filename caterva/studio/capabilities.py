@@ -22,6 +22,13 @@ HOW EACH IS DECIDED, AND WHAT IS NEVER DONE UNASKED
   with a 5 s timeout, all at once, so the answer takes at most about 5 s;
   any HTTP answer, even an error status, means the host is reachable. The
   last probe is kept and shown until the next one.
+  The studio also notes the outcome of REAL network use (`caterva.netuse`:
+  a BRENDA, UniProt, NCBI or RCSB request that was answered marks the
+  network reachable, one that could not be made marks it unreachable, each
+  with the time), so the status bar does not say "not checked" after a
+  lookup has just worked. `source` says which of the two the answer is
+  from ("use" or "probe"); it is None, and `checked` False, only while
+  nothing has happened yet. Noting use contacts nothing.
 - gromacs: the settings' `gromacs_path`, else `$GMX`, else `gmx` on PATH,
   else the two places Homebrew puts it (a GUI app's PATH does not include
   them). The version is the `GROMACS version:` line of `gmx --version`
@@ -49,6 +56,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Dict, Mapping, MutableMapping, Optional, Sequence, Tuple
 
+from caterva import netuse
 from caterva.studio.contract import RUN_KINDS, STUDIO_API_VERSION
 
 #: The services the literature layer reads (CONTRACT.md 10).
@@ -163,8 +171,10 @@ class CapabilityProbe:
         self._gromacs: Optional[Dict[str, Any]] = None
         self._network: Dict[str, Any] = {
             "checked": False, "reachable": None, "hosts": {h: None for h in self._hosts},
-            "checked_at": None, "reason": "not checked: probing contacts third-party hosts, so it is done only when asked",
+            "checked_at": None, "source": None,
+            "reason": "not checked: probing contacts third-party hosts, so it is done only when asked",
         }
+        self._unsubscribe = netuse.subscribe(self.observe_network_use)
         #: $GMX as the server found it, before a setting or a Homebrew
         #: location was put there (apply_gromacs_to_environment).
         self._original_gmx = environ.get("GMX")
@@ -184,7 +194,7 @@ class CapabilityProbe:
             "platform": sys.platform,
             "frozen": bool(getattr(sys, "frozen", False)),
             "literature": self.literature(),
-            "network": dict(self._network, hosts=dict(self._network["hosts"])),
+            "network": self.network(),
             "gromacs": self.gromacs(),
             "rates": self.rates(),
             "ui": {"built": built, "static_dir": str(self.static_site.root), "reason": ui_reason},
@@ -208,13 +218,45 @@ class CapabilityProbe:
                                         "reason": f"the literature layer failed to load: {type(exc).__name__}: {exc}"}
             return dict(self._literature)
 
+    def close(self) -> None:
+        """Stop noting network use (the server is stopping)."""
+        self._unsubscribe()
+
+    def observe_network_use(self, host: str, reached: bool, reason: Optional[str]) -> None:
+        """A real request was answered (`reached`) or could not be made.
+
+        Called from whichever thread made the request (`caterva.netuse`).
+        The newest event decides `reachable`; `hosts` keeps each host's
+        latest outcome, so one that failed beside one that answered is
+        visible. Nothing is contacted."""
+        if self._settings().get("offline"):
+            return
+        stamp = self._clock()
+        with self._lock:
+            hosts = dict(self._network["hosts"])
+            hosts[host] = reached
+            self._network = {
+                "checked": True,
+                "reachable": reached,
+                "hosts": hosts,
+                "checked_at": stamp,
+                "source": "use",
+                "reason": None if reached else f"{host} could not be reached: {reason or 'no reason given'}",
+            }
+
+    def network(self) -> Dict[str, Any]:
+        """The network capability as last learned, without probing."""
+        with self._lock:
+            return dict(self._network, hosts=dict(self._network["hosts"]))
+
     def probe_network(self) -> Dict[str, Any]:
         if self._settings().get("offline"):
             # Nothing is contacted; the last real probe, if any, is not shown
             # as current either.
-            self._network = {"checked": False, "reachable": None, "hosts": {h: None for h in self._hosts},
-                             "checked_at": None, "reason": OFFLINE_REASON}
-            return dict(self._network)
+            with self._lock:
+                self._network = {"checked": False, "reachable": None, "hosts": {h: None for h in self._hosts},
+                                 "checked_at": None, "source": None, "reason": OFFLINE_REASON}
+            return self.network()
         with self._probe_lock:
             results: Dict[str, Optional[str]] = {}
             threads = []
@@ -241,14 +283,16 @@ class CapabilityProbe:
                     hosts[host] = False
                     failures.append(f"{host}: {results[host]}")
             reachable = not failures
-            self._network = {
-                "checked": True,
-                "reachable": reachable,
-                "hosts": hosts,
-                "checked_at": self._clock(),
-                "reason": None if reachable else "not reachable from this computer: " + "; ".join(failures),
-            }
-            return dict(self._network)
+            with self._lock:
+                self._network = {
+                    "checked": True,
+                    "reachable": reachable,
+                    "hosts": hosts,
+                    "checked_at": self._clock(),
+                    "source": "probe",
+                    "reason": None if reachable else "not reachable from this computer: " + "; ".join(failures),
+                }
+            return self.network()
 
     def gromacs_candidate(self) -> Tuple[Optional[str], str]:
         """(the gmx to try, where that choice came from)."""

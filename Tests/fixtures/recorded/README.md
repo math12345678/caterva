@@ -45,10 +45,10 @@ NCBI or PubChem was slow.
 | service | host | what is recorded | licence |
 |---|---|---|---|
 | NCBI Taxonomy | eutils.ncbi.nlm.nih.gov | esearch for Homo sapiens, Escherichia coli, Saccharomyces cerevisiae (`[Scientific Name]`) and "lymphocytes" | US Government work, public domain within the US |
-| UniProt | rest.uniprot.org | the reviewed-accession search for EC 2.7.1.1 in taxa 9606, 562 and 4932. Only 9606 returns one (P19367). The other two return `{"results":[]}`: the reviewed yeast hexokinases (P04806, P04807) are filed under the strain taxon 559292, not 4932, and no reviewed E. coli entry carries EC 2.7.1.1 under any E. coli taxon (both checked 2026-09-30 with `taxonomy_id:`, which includes strains); name searches for "hexokinase" (reviewed, taxon 9606) and for the eight non-enzyme names the tests send, which return no results | CC BY 4.0 (https://www.uniprot.org/help/license); cite The UniProt Consortium, Nucleic Acids Res. 53:D609 (2025), doi:10.1093/nar/gkae1010 |
+| UniProt | rest.uniprot.org | the reviewed-accession search for EC 2.7.1.1 in taxa 9606, 562 and 4932. Only 9606 returns one (P19367). The other two return `{"results":[]}`: the reviewed yeast hexokinases (P04806, P04807) are filed under the strain taxon 559292, not 4932, and no reviewed E. coli entry carries EC 2.7.1.1 under any E. coli taxon (both checked 2026-09-30 with `taxonomy_id:`, which includes strains); name searches for the eight non-enzyme names the tests send, which return no results. (A name search for "hexokinase" was recorded too and is gone: the runner now resolves enzyme names in the enzyme nomenclature that ships with Caterva, and asks UniProt only for a name that does not hold, so no request was made for it) | CC BY 4.0 (https://www.uniprot.org/help/license); cite The UniProt Consortium, Nucleic Acids Res. 53:D609 (2025), doi:10.1093/nar/gkae1010 |
 | PubChem | pubchem.ncbi.nlm.nih.gov | name-to-CID for 13 names (eight of them 404, "No CID found") and parent-CID for 5 CIDs (one 404) | public domain within the US; NOTICE |
 
-42 files, 15,672 bytes, all fetched 2026-09-30 (UTC); UniProt release
+41 files, 14,660 bytes, all fetched 2026-09-30 (UTC); UniProt release
 2026_03 was current. The per-file detail is in the files themselves.
 
 **Format.** One gzipped JSON file per request, named by the sha256 of the

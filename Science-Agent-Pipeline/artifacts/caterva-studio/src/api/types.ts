@@ -173,6 +173,12 @@ export interface NetworkCapability {
   hosts: Record<string, boolean | null>;
   checked_at: string | null;
   reason: string | null;
+  /**
+   * Where the answer came from: "use" (a real BRENDA, UniProt, NCBI or RCSB
+   * request just worked or failed), "probe" (the explicit check), or null
+   * while nothing has happened yet (`checked` is false only then).
+   */
+  source: string | null;
 }
 
 export interface GromacsCapability {
@@ -253,6 +259,115 @@ export interface DevSession {
 }
 
 // ---------------------------------------------------------------------------
+// The enzyme finder (GET /api/enzymes/find, GET /api/enzymes/{ec})
+// ---------------------------------------------------------------------------
+
+/** One UniProt entry the enzyme nomenclature lists under an EC number. */
+export interface EnzymeProteinView {
+  accession: string;
+  /** HXK1_HUMAN */
+  entry_name: string;
+  /** The entry name without its organism suffix: HXK1. */
+  symbol: string;
+}
+
+/** A finder candidate; the required keys are what `caterva enzyme --json` prints. */
+export interface EnzymeCandidate {
+  ec: string;
+  name: string;
+  /** One plain line: why this enzyme is in the list. */
+  why: string;
+  /** Lower is stronger. */
+  tier: number;
+  reaction: string;
+  class_path: string;
+  alternative_names: string[];
+  /** The organism code the proteins are for (HUMAN), or null. */
+  organism: string | null;
+  organism_proteins: EnzymeProteinView[];
+  organism_protein_count: number;
+  has_organism_protein: boolean;
+  /** active, transferred or deleted. */
+  status: string;
+  superseded_by: string[];
+  partial_match: boolean;
+  /** "EC 1.1.1.27 L-lactate dehydrogenase (human: LDHA, LDHB, LDHC)"; on a refusal's candidates. */
+  label?: string;
+  /** The `caterva compose` command that would use this enzyme. */
+  compose?: string;
+  /** The finder's recommendation. Never chosen for the person. */
+  recommended?: boolean;
+  /** What the finder says to check, on the candidate a query resolved to. */
+  caution?: string | null;
+}
+
+export interface UniprotSuggestion {
+  ec: string;
+  name: string | null;
+}
+
+/** UniProt's protein-name search, asked only when the finder found nothing and the network was reachable. */
+export interface EnzymeFallback {
+  kind: string;
+  suggestions: UniprotSuggestion[];
+  note: string;
+}
+
+export interface EnzymeFindResponse {
+  query: string;
+  organism: string | null;
+  organism_code: string | null;
+  organism_label: string | null;
+  release: string;
+  /** resolved, ambiguous, partial, suggestions or none. */
+  outcome: string;
+  resolved_ec: string | null;
+  how: string | null;
+  cautions: string[];
+  reason: string | null;
+  recommended_ec: string | null;
+  candidates_total: number;
+  candidates: EnzymeCandidate[];
+  fallback: EnzymeFallback | null;
+  /** Why no fallback was offered when it could have been. */
+  fallback_unavailable?: string;
+}
+
+export interface IsozymeList {
+  organism: string | null;
+  organism_label: string | null;
+  count: number;
+  proteins: EnzymeProteinView[];
+  /** False for an organism the finder does not know: zero proteins then means "not known". */
+  organism_known: boolean;
+}
+
+export interface EnzymeDetail {
+  ec: string;
+  name: string;
+  alternative_names: string[];
+  reaction: string;
+  class_path: string;
+  status: string;
+  superseded_by: string[];
+  release: string;
+  isozymes: IsozymeList;
+}
+
+/** A name that is not exactly one enzyme, refused by the one policy, as data. */
+export interface NameRefusal {
+  /** ambiguous, suggestions, none, lookup_failed or unknown_ec. */
+  kind: string;
+  /** The policy's own sentence, as the CLI prints it. */
+  message: string;
+  named_candidates: EnzymeCandidate[];
+  /** The EC number the finder recommends, or null. */
+  recommended: string | null;
+  /** The flag that accepts a candidate, with {ec}: "--subject {ec}". */
+  rerun_flag: string;
+}
+
+// ---------------------------------------------------------------------------
 // Runs, jobs and events
 // ---------------------------------------------------------------------------
 
@@ -268,6 +383,8 @@ export interface Outcome {
   summary: string;
   /** refused: the CLI's stderr text, verbatim; negative: NEGATIVE_MEANING[kind]; produced: null. */
   reason: string | null;
+  /** Present on a refusal that was a name that is not exactly one enzyme. */
+  name_refusal?: NameRefusal;
 }
 
 export interface RunError {
@@ -487,6 +604,8 @@ export interface Concern {
   severity: string;
   detail: string;
   remedy: string;
+  /** The "Qualified:" sentence of the verdict, on a concern that narrows what it licenses (the isozyme notice). */
+  qualifier?: string;
 }
 
 export interface VerdictView {
@@ -515,6 +634,8 @@ export interface FixedPointView {
   stable: boolean;
   oscillatory: boolean;
   slowest_timescale: number | null;
+  /** The engine's own line for this point, as the report prints it. */
+  description?: string;
 }
 
 export interface StabilityView {
@@ -795,8 +916,8 @@ export interface StructureResult {
   sources?: Citation[];
   /** The name `subject` was, when it was a name; `ec` is what it resolved to. */
   subject_name?: string | null;
-  /** The EC numbers a refused name could be (exit 3; `ec` is then "" and nothing was searched). */
-  candidates?: string[];
+  /** The sentences the one name policy wants read before the report, as the command prints them. */
+  subject_notes?: string[];
 }
 
 export interface AtomColumns {

@@ -426,6 +426,28 @@ numberings of one protein are not taken as one: ask for "HK-I" where the
 rows write "hexokinase I", not "HK1" or "1", and a refusal names the
 isoforms BRENDA holds, spelled as it will match them.
 
+### When one EC number is several human proteins
+
+`--subject 2.7.1.1 --organism human` is hexokinase, and the nomenclature lists
+five human proteins under that one number (HKDC1, HXK1, HXK2, HXK3, HXK4).
+BRENDA files their measurements under the one number too, and the resolver
+ranks rows, not proteins. A search that names no `--isoform` can therefore
+return a Km from one isozyme and a kcat from another, and say GROUNDED. So
+the report says it:
+
+```
+Qualified: EC 2.7.1.1 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them.
+
+1 concern(s), worst first:
+  - [isozymes] EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HXK1, HXK2, HXK3, HXK4) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with the isoform's name as the papers write it (for example --isoform LDH-A) to take each constant from a row that measured it
+```
+
+The verdict is still GROUNDED: every constant is measured and cited. The
+notice says what that does not tell you. It appears when the organism has two
+or more proteins for the EC number and `--isoform` is not given, and not
+otherwise. It does not read isozymes out of BRENDA's reference titles and it
+does not change a constant.
+
 ### A Ki from a row of the model's own inhibition mode
 
 ```bash
@@ -665,7 +687,10 @@ rows.
 caterva structure --subject 1.1.1.27 --organism human
 ```
 
-EC 1.1.1.27 in human is five proteins (LDHA, LDHB, LDHC and two LDHAL6),
+`--subject` takes an EC number or an enzyme name; a name is read by the same
+function `compose` uses (see `caterva enzyme` above), so a name that is
+several enzymes is refused with each one named. EC 1.1.1.27 in human is five
+proteins (LDHA, LDHB, LDHC and two LDHAL6),
 with 55 PDB entries between them. A structure belongs to one protein, so
 this lists them and refuses (exit 3) to pick one for you. Choose:
 
@@ -1304,13 +1329,123 @@ python3 scripts/cite.py --ec 3.1.1.7 --organism "Homo sapiens" \
 ```
 
 **A name is not an enzyme.** `--enzyme "lactate dehydrogenase"` is refused,
-naming all six EC numbers it could mean, because a wrong EC number is a
-citation for the wrong protein rather than merely a wrong value. Ask
-UniProt, pick one, pass `--ec`.
+naming each enzyme it could mean (EC number, enzyme name, and your
+organism's proteins), because a wrong EC number is a citation for the wrong
+protein rather than merely a wrong value. Pick one, pass `--ec`. The next
+section is the command that does the looking.
 
 **No network, no account:** `--fixture Tests/fixtures/brenda_ldh_fixture.html`
 reads a saved page, and the document then says no search was run. `make
 demo` is that path end to end.
+
+### Finding the enzyme: `caterva enzyme`
+
+Every command that takes an enzyme (`compose --subject`, `structure
+--subject`, `catalog`, `report`, `cite --enzyme`) turns a name into an EC
+number the same way, and `caterva enzyme` shows you that step. It looks the
+name up in the IUBMB enzyme nomenclature (the ExPASy ENZYME database, shipped
+inside Caterva, so it works offline), ranks every enzyme whose *name*
+matches, and says why each one did:
+
+```bash
+caterva enzyme "pyruvate kinase" --organism human --limit 2
+```
+
+```
+Enzyme finder: 'pyruvate kinase' (ExPASy ENZYME release 02-Sep-2026, human)
+
+Resolved: EC 2.7.1.40 (pyruvate kinase) -- accepted name matches exactly.
+
+ 1. EC 2.7.1.40  pyruvate kinase
+      why: accepted name matches exactly
+      reaction: pyruvate + ATP = phosphoenolpyruvate + ADP + H(+).
+      class: Transferases > transferring phosphorus-containing groups > phosphotransferases with an alcohol group as acceptor
+      human proteins (2): KPYM (P14618), KPYR (P30613)
+      use: caterva compose "Michaelis Menten" --subject 2.7.1.40 --organism human --substrate <substrate>
+
+ 2. EC 3.1.3.49  [pyruvate kinase]-phosphatase
+      why: your query is a phrase inside the accepted name
+      reaction: [pyruvate kinase] phosphate + H2O = [pyruvate kinase] + phosphate.
+      class: Hydrolases > acting on ester bonds > phosphoric monoester hydrolases
+      human proteins: none listed
+      use: caterva compose "Michaelis Menten" --subject 3.1.3.49 --organism human --substrate <substrate>
+
+3 more; raise --limit to see them.
+```
+
+The accepted name is an exact match for exactly one enzyme, so it resolved.
+The second entry is there because the phrase sits inside its name, and it is
+a phosphatase: nothing is chosen by relevance alone. A name that is several
+enzymes is not resolved:
+
+```bash
+caterva enzyme "lactate dehydrogenase" --organism human --limit 2
+```
+
+```
+Enzyme finder: 'lactate dehydrogenase' (ExPASy ENZYME release 02-Sep-2026, human)
+
+Not resolved: 'lactate dehydrogenase' names 2 enzymes. Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value.
+Recommended: EC 1.1.1.27 (L-lactate dehydrogenase), the only one with a protein from the organism you gave. Confirm it with --subject 1.1.1.27.
+
+ 1. EC 1.1.1.27  L-lactate dehydrogenase   <- recommended
+      why: accepted name matches once stereo labels (L-, D-, (S)-) and Greek letters are set aside
+      reaction: (S)-lactate + NAD(+) = pyruvate + NADH + H(+).
+      class: Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor
+      human proteins (5): LDH6A (Q6ZMR3), LDH6B (Q9BYZ2), LDHA (P00338), LDHB (P07195), LDHC (P07864)
+      use: caterva compose "Michaelis Menten" --subject 1.1.1.27 --organism human --substrate <substrate>
+
+ 2. EC 1.1.1.28  D-lactate dehydrogenase
+      why: accepted name matches once stereo labels (L-, D-, (S)-) and Greek letters are set aside
+      reaction: (R)-lactate + NAD(+) = pyruvate + NADH + H(+).
+      class: Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor
+      human proteins: none listed
+      use: caterva compose "Michaelis Menten" --subject 1.1.1.28 --organism human --substrate <substrate>
+
+10 more; raise --limit to see them.
+```
+
+"Recommended" is shown only when exactly one tied enzyme has a protein from
+the organism you gave and the others have none. It is never applied for you:
+you confirm it with `--subject 1.1.1.27`. A misspelling gets a did-you-mean
+and exit code 3:
+
+```bash
+caterva enzyme "hexokinse" --organism human --limit 2
+```
+
+```
+Enzyme finder: 'hexokinse' (ExPASy ENZYME release 02-Sep-2026, human)
+
+Not resolved: no enzyme is named 'hexokinse'; these are close. Did you mean one of these?
+
+ 1. EC 2.7.1.1  hexokinase
+      why: close to the accepted name: did you mean?
+      reaction: a D-hexose + ATP = a D-hexose 6-phosphate + ADP + H(+).
+      class: Transferases > transferring phosphorus-containing groups > phosphotransferases with an alcohol group as acceptor
+      human proteins (5): HKDC1 (Q2TB90), HXK1 (P19367), HXK2 (P52789), HXK3 (P52790), HXK4 (P35557)
+      use: caterva compose "Michaelis Menten" --subject 2.7.1.1 --organism human --substrate <substrate>
+```
+
+What it reads, in order of strength: an EC number (`1.1.1.27`, `EC 1.1.1.27`,
+or a class like `1.1.1.-`); the accepted name; another name for the enzyme
+(`aldehyde reductase`); the same once stereo labels (`L-`, `(S)-`) and Greek
+letters are set aside; a phrase inside a name; every word of your query in
+a name; a protein symbol (`HXK1` with `--organism human`); and last, only
+when nothing else matched, a close spelling. A number the nomenclature has
+transferred resolves to its replacement and says so; a deleted one is
+refused. Options: `--organism` (human, mouse, rat, yeast, E. coli and others;
+or a Latin name), `--limit N`, `--json`. Exit codes: 0 resolved or candidates
+listed, 3 nothing matched (suggestions still printed), 2 malformed command.
+
+Two things to know. It lists proteins by UniProt entry name for 13 organisms
+(human, mouse, rat, yeast, E. coli, cow, pig, chicken, Arabidopsis, B.
+subtilis, fruit fly, C. elegans, rabbit) and counts them for every other.
+And a resolved name can still be the wrong organism's enzyme: `glucokinase`
+resolves to EC 2.7.1.2, which lists no human protein, while human glucokinase
+is filed under EC 2.7.1.1 (hexokinase, as "hexokinase type IV"). The report
+says so beside the resolution; `caterva enzyme glucokinase --organism human`
+shows both.
 
 ### A model whose constants are sourced
 

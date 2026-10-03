@@ -50,8 +50,15 @@ def _cache_dir() -> Path:
 def live_fetch(timeout: float = 60.0) -> Callable[[str], str]:
     import requests
 
+    from caterva import netuse
+
     def get(url: str) -> str:
-        r = requests.get(url, timeout=timeout)
+        try:
+            r = requests.get(url, timeout=timeout)
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            netuse.failed(url, exc)
+            raise
+        netuse.answered(url)
         if r.status_code == 404:
             raise PrepareError(f"not found: {url}")
         r.raise_for_status()

@@ -344,6 +344,11 @@ class NetworkCapability(TypedDict):
     hosts: Dict[str, Optional[bool]]
     checked_at: Optional[str]
     reason: Optional[str]
+    #: Where the answer came from: "use" (a real BRENDA, UniProt, NCBI or
+    #: RCSB request just worked or failed, which contacts nothing extra),
+    #: "probe" (the explicit check, `?probe=network`), or None while nothing
+    #: has happened yet. `checked` is False only then.
+    source: Optional[str]
 
 
 class GromacsCapability(TypedDict):
@@ -436,6 +441,159 @@ class DevSession(TypedDict):
 
 
 # ---------------------------------------------------------------------------
+# The enzyme finder (owner: sci-kinetics; GET /api/enzymes/find, /api/enzymes/{ec})
+# ---------------------------------------------------------------------------
+
+
+class EnzymeProteinView(TypedDict):
+    """One UniProt entry the enzyme nomenclature lists under an EC number."""
+
+    accession: str
+    #: HXK1_HUMAN
+    entry_name: str
+    #: The entry name without its organism suffix: HXK1.
+    symbol: str
+
+
+class _EnzymeCandidateRequired(TypedDict):
+    ec: str
+    name: str
+    #: One plain line: why this enzyme is in the list.
+    why: str
+    #: Lower is stronger (caterva/enzymes/finder.py, "Tiers").
+    tier: int
+    reaction: str
+    class_path: str
+    #: The alternative names that matched the query.
+    alternative_names: List[str]
+    #: The organism code the proteins are for (HUMAN), or None.
+    organism: Optional[str]
+    organism_proteins: List[EnzymeProteinView]
+    #: Can exceed len(organism_proteins) for an organism the index keeps a
+    #: count for and no list.
+    organism_protein_count: int
+    has_organism_protein: bool
+    #: active, transferred or deleted.
+    status: str
+    superseded_by: List[str]
+    #: True when the query matched only a fragment of a longer name.
+    partial_match: bool
+
+
+class EnzymeCandidate(_EnzymeCandidateRequired, total=False):
+    """A finder candidate. The required keys are `Candidate.to_dict()`, the
+    same dictionaries `caterva enzyme --json` prints."""
+
+    #: `EC 1.1.1.27 L-lactate dehydrogenase (human: LDHA, LDHB, LDHC)`; on a
+    #: refusal's candidates.
+    label: str
+    #: The `caterva compose` command that would use this enzyme; on a find
+    #: response's candidates, as in the command's JSON.
+    compose: str
+    #: True for the one candidate the finder recommends (the only tied one
+    #: with a protein from the organism). A recommendation is never chosen
+    #: for the person.
+    recommended: bool
+    #: What the finder says to check before using this enzyme, when it says
+    #: anything (an enzyme with no protein from the organism asked about; a
+    #: transferred number).
+    caution: Optional[str]
+
+
+class UniprotSuggestion(TypedDict):
+    ec: str
+    #: The nomenclature's name for the EC number, or None when it holds none.
+    name: Optional[str]
+
+
+class EnzymeFallback(TypedDict):
+    """What UniProt's protein-name search returned when the nomenclature had
+    nothing: EC numbers UniProt files reviewed proteins of that name under,
+    read through the same policy a run uses. Present only when the network
+    was known to be reachable; never invented."""
+
+    kind: str
+    suggestions: List[UniprotSuggestion]
+    #: In words, including a UniProt search that failed or found nothing.
+    note: str
+
+
+class _EnzymeFindResponseRequired(TypedDict):
+    query: str
+    #: The organism text asked about, or None.
+    organism: Optional[str]
+    #: The organism code the finder read it as (HUMAN), or None when it
+    #: knows no such organism (nothing is then ranked by organism).
+    organism_code: Optional[str]
+    organism_label: Optional[str]
+    #: ExPASy ENZYME release.
+    release: str
+    #: resolved, ambiguous, partial, suggestions or none.
+    outcome: str
+    #: The EC number the query resolved to when `outcome` is "resolved"
+    #: (a transferred number resolves to its successor).
+    resolved_ec: Optional[str]
+    how: Optional[str]
+    cautions: List[str]
+    #: Why it did not resolve, in words.
+    reason: Optional[str]
+    recommended_ec: Optional[str]
+    candidates_total: int
+    candidates: List[EnzymeCandidate]
+    #: "uniprot" suggestions when the finder found nothing and the network is
+    #: reachable; None otherwise.
+    fallback: Optional[EnzymeFallback]
+
+
+class EnzymeFindResponse(_EnzymeFindResponseRequired, total=False):
+    #: Why no fallback was offered when it could have been (offline mode, the
+    #: network not known to be reachable, no literature layer).
+    fallback_unavailable: str
+
+
+class IsozymeList(TypedDict):
+    organism: Optional[str]
+    organism_label: Optional[str]
+    #: Entries the nomenclature lists for the organism; can exceed
+    #: len(proteins) when the index keeps only a count.
+    count: int
+    proteins: List[EnzymeProteinView]
+    #: False for an organism the finder does not know: zero proteins then
+    #: means "not known", not "none".
+    organism_known: bool
+
+
+class EnzymeDetail(TypedDict):
+    ec: str
+    name: str
+    alternative_names: List[str]
+    reaction: str
+    class_path: str
+    status: str
+    superseded_by: List[str]
+    release: str
+    isozymes: IsozymeList
+
+
+class NameRefusal(TypedDict):
+    """A name that is not exactly one enzyme, refused by the one policy
+    (`caterva.enzymes.policy.resolve_enzyme_name`), as data. Carried by
+    `Outcome.name_refusal` of a refused compose, constants or structure run;
+    never a bare list of EC numbers."""
+
+    #: ambiguous, suggestions, none, lookup_failed or unknown_ec.
+    kind: str
+    #: The policy's own sentence, as the CLI prints it.
+    message: str
+    named_candidates: List[EnzymeCandidate]
+    #: The EC number the finder recommends, or None. Never chosen for the person.
+    recommended: Optional[str]
+    #: The flag that accepts a candidate, with `{ec}` for its number:
+    #: "--subject {ec}" (compose, structure), "--ec {ec}" (constants).
+    rerun_flag: str
+
+
+# ---------------------------------------------------------------------------
 # Runs, jobs and their events
 # ---------------------------------------------------------------------------
 
@@ -451,7 +609,7 @@ class CreateRunBody(_CreateRunBodyRequired, total=False):
     title: str
 
 
-class Outcome(TypedDict):
+class _OutcomeRequired(TypedDict):
     exit_code: int
     meaning: OutcomeMeaning
     #: One line for the history list, from the result (never invented).
@@ -461,6 +619,13 @@ class Outcome(TypedDict):
     #: can show the reason even when the run produced no result. For
     #: `negative`: NEGATIVE_MEANING[kind]. None for `produced`.
     reason: Optional[str]
+
+
+class Outcome(_OutcomeRequired, total=False):
+    #: Present when a refusal was a name that is not exactly one enzyme
+    #: (compose, constants, structure): the named candidates, the kind, the
+    #: recommended EC number and the flag that re-runs with one.
+    name_refusal: NameRefusal
 
 
 class _RunErrorRequired(TypedDict):
@@ -705,11 +870,18 @@ class SearchSummary(TypedDict):
     placeholders: int
 
 
-class Concern(TypedDict):
+class _ConcernRequired(TypedDict):
     source: str
     severity: str
     detail: str
     remedy: str
+
+
+class Concern(_ConcernRequired, total=False):
+    #: The sentence the verdict prints under "What this supports" when the
+    #: concern narrows what it licenses without lowering it ("Qualified: ...").
+    #: Present, and non-empty, only on such a concern (the isozyme notice).
+    qualifier: str
 
 
 class VerdictView(TypedDict):
@@ -730,7 +902,7 @@ class ComplexNumber(TypedDict):
     im: float
 
 
-class FixedPointView(TypedDict):
+class _FixedPointRequired(TypedDict):
     state: Dict[str, Optional[float]]
     residual: Optional[float]
     eigenvalues: List[ComplexNumber]
@@ -739,6 +911,13 @@ class FixedPointView(TypedDict):
     stable: bool
     oscillatory: bool
     slowest_timescale: Optional[float]
+
+
+class FixedPointView(_FixedPointRequired, total=False):
+    #: The engine's own line for this point (`FixedPoint.describe()`), as the
+    #: report prints it, including "NEGATIVE concentrations -- not physically
+    #: reachable" for a point that is not physical.
+    description: str
 
 
 class StabilityView(TypedDict):
@@ -1076,9 +1255,9 @@ class StructureResult(_StructureResultRequired, total=False):
     #: The name `subject` was, when it was a name and not an EC number;
     #: `ec` is then the EC number the literature layer resolved it to.
     subject_name: Optional[str]
-    #: The EC numbers a name could be, when it was refused for naming more
-    #: than one (exit 3; `ec` is then "" and nothing was searched).
-    candidates: List[str]
+    #: The sentences the one name policy wants read before the report (a name
+    #: read as an EC number, a transferred number), as the command prints them.
+    subject_notes: List[str]
 
 
 class AtomColumns(TypedDict):
@@ -1793,7 +1972,8 @@ def _maybe_float(value: Any) -> Optional[float]:
     return finite(value)[0]
 
 
-def outcome_for(kind: str, exit_code: int, summary: str, refusal: Optional[str] = None) -> Outcome:
+def outcome_for(kind: str, exit_code: int, summary: str, refusal: Optional[str] = None,
+                name_refusal: Optional[Mapping[str, Any]] = None) -> Outcome:
     """The Outcome for a finished run's CLI-equivalent exit code.
 
     `refusal` is the CLI's own refusal text and is required for exit 3: a
@@ -1813,8 +1993,11 @@ def outcome_for(kind: str, exit_code: int, summary: str, refusal: Optional[str] 
         if kind not in NEGATIVE_MEANING:
             raise ValueError(f"{kind}: the command it mirrors never exits 4")
         reason = NEGATIVE_MEANING[kind]
-    return {"exit_code": exit_code, "meaning": EXIT_MEANING[exit_code],  # type: ignore[typeddict-item]
-            "summary": summary, "reason": reason}
+    outcome: Outcome = {"exit_code": exit_code, "meaning": EXIT_MEANING[exit_code],  # type: ignore[typeddict-item]
+                        "summary": summary, "reason": reason}
+    if name_refusal is not None and exit_code == 3:
+        outcome["name_refusal"] = dict(name_refusal)  # type: ignore[typeddict-item]
+    return outcome
 
 
 #: Every TypedDict the page mirrors, by name. The mirror test walks this.

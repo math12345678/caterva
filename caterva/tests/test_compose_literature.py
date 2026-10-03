@@ -63,10 +63,11 @@ def test_the_requests_carry_what_brenda_requires():
 def test_only_an_ec_number_is_treated_as_one(subject, expected):
     """A NAME IS NOT AN ENZYME.
 
-    'lactate dehydrogenase' is EC 1.1.1.27 and 1.1.1.28 and four more.
+    'lactate dehydrogenase' is EC 1.1.1.27 and 1.1.1.28 among others.
     Resolving it here would attach a citation to the wrong protein, so a
-    name returns None and the caller asks the literature layer, which
-    refuses ambiguity by naming every candidate.
+    name returns None and the caller asks the enzyme finder
+    (caterva.enzymes.policy), which refuses ambiguity by naming every
+    candidate.
     """
     assert compose(QUERY, subject=subject or None).ec_number == expected
 
@@ -550,7 +551,33 @@ class TestTheExitCodeWhenASearchIsRefused:
 
     def test_an_unreachable_literature_layer_is_a_refusal(self, monkeypatch):
         """From a wheel there is no Tests/ directory, and that is a refusal
-        rather than a crash three frames down."""
+        rather than a crash three frames down.
+
+        The name is one the enzyme nomenclature settles on its own, so what
+        is refused is the SEARCH, for the layer's absence. The layer is made
+        unreachable where the search reaches for it (`compose_and_parameterise`
+        raises what `literature_module` raises from a wheel), because a patch
+        on `literature_module` alone is skipped once an earlier test in the
+        session has imported the layer.
+        """
+        import caterva.checkout as checkout
+        from caterva.compose import pipeline
+
+        def unavailable(*args, **kwargs):
+            raise checkout.LiteratureLayerUnavailable("no Tests/ here")
+
+        monkeypatch.setattr(pipeline, "compose_and_parameterise", unavailable)
+        model = compose(QUERY, subject="pyruvate kinase", substrate="pyruvate")
+        _, note, refused = self._search(model, subject="pyruvate kinase")
+        assert refused is True
+        assert "no Tests/ here" in note
+        assert "Read 'pyruvate kinase' as EC 2.7.1.40" in note
+
+    def test_a_name_that_is_several_enzymes_is_refused_even_without_the_literature_layer(
+        self, monkeypatch,
+    ):
+        """The nomenclature ships in the package, so the installed app names
+        the choices too; only the UniProt fallback needs the checkout."""
         import caterva.checkout as checkout
 
         def unavailable(name):
@@ -560,7 +587,9 @@ class TestTheExitCodeWhenASearchIsRefused:
         model = compose(QUERY, subject="lactate dehydrogenase", substrate="pyruvate")
         _, note, refused = self._search(model, subject="lactate dehydrogenase")
         assert refused is True
-        assert "no Tests/ here" in note
+        assert "EC 1.1.1.27 L-lactate dehydrogenase" in note
+        assert "EC 1.1.1.28 D-lactate dehydrogenase" in note
+        assert "no Tests/ here" not in note
 
     def test_a_search_that_ran_and_found_nothing_is_not_a_refusal(
         self, monkeypatch

@@ -154,8 +154,9 @@ def test_a_name_is_looked_up_and_searched_as_its_ec_number(tmp_path, recorded_na
     got, (code, out, err), _ = _both(tmp_path, request)
     assert got.exit_code == code == 0 and err == ""
     assert got.result["report_markdown"] == out
-    assert out.startswith("'L-lactate dehydrogenase A chain' is EC 1.1.1.27:")
+    assert out.startswith("Read 'L-lactate dehydrogenase A chain' as EC 1.1.1.27 (L-lactate dehydrogenase)")
     assert got.result["ec"] == "1.1.1.27" and got.result["subject_name"] == "L-lactate dehydrogenase A chain"
+    assert got.result["subject_notes"] and out.startswith(got.result["subject_notes"][0])
     by_ec, _, _ = _both(tmp_path / "ec", {**request, "subject": "1.1.1.27"})
     assert [e["pdb_id"] for e in got.result["entries"]] == [e["pdb_id"] for e in by_ec.result["entries"]]
     assert by_ec.result["subject_name"] is None
@@ -163,16 +164,30 @@ def test_a_name_is_looked_up_and_searched_as_its_ec_number(tmp_path, recorded_na
     assert adapter._needs({"subject": "1.1.1.27"}) == ("network",)
 
 
-def test_a_name_that_is_several_enzymes_is_refused_with_every_candidate(tmp_path, recorded_names):
+def test_a_name_that_is_several_enzymes_is_refused_with_every_candidate_named(tmp_path):
+    """The one name policy refuses, offline, and the outcome carries its named candidates."""
     got, (code, out, err), _ = _both(tmp_path, {"subject": "lactate dehydrogenase"})
-    assert got.exit_code == code == 3 and out == ""
-    assert got.refusal == err.strip() and "names more than one enzyme" in got.refusal
-    from caterva.checkout import literature_module
+    assert got.exit_code == code == 3 and out == "" and got.result is None
+    assert got.refusal == err.strip() and "names 2 enzymes" in got.refusal
+    refusal = got.name_refusal
+    assert refusal["kind"] == "ambiguous" and refusal["rerun_flag"] == "--subject {ec}"
+    assert refusal["recommended"] is None and refusal["message"] in got.refusal
+    named = {c["ec"]: c for c in refusal["named_candidates"]}
+    assert named["1.1.1.27"]["name"] == "L-lactate dehydrogenase" and named["1.1.1.28"]["name"] == "D-lactate dehydrogenase"
+    assert all(c["name"] and c["why"] for c in refusal["named_candidates"]), "never a bare list of EC numbers"
+    outcome = contract.outcome_for("structure", got.exit_code, got.summary, got.refusal, got.name_refusal)
+    assert outcome["meaning"] == "refused" and outcome["name_refusal"]["named_candidates"] == refusal["named_candidates"]
 
-    expected = literature_module("enzyme_lookup").parse_ec_number_candidates(NAMES["lactate dehydrogenase"])
-    assert got.result["candidates"] == expected and "1.1.1.27" in expected and len(expected) > 1
-    assert got.result["ec"] == "" and got.result["entries"] == [] and got.result["proteins"] == []
-    assert contract.outcome_for("structure", got.exit_code, got.summary, got.refusal)["meaning"] == "refused"
+
+def test_the_recommended_enzyme_is_named_when_the_organism_has_one_protein_set(tmp_path):
+    got, _, _ = _both(tmp_path, {"subject": "lactate dehydrogenase", "organism": "human"})
+    assert got.exit_code == 3 and got.name_refusal["recommended"] == "1.1.1.27"
+    assert got.name_refusal["named_candidates"][0]["has_organism_protein"] is True
+
+
+def test_a_refusal_that_is_not_a_name_carries_no_name_refusal(tmp_path):
+    got, _, _ = _both(tmp_path, {"subject": "1.1.1.27", "organism": "human"})
+    assert got.exit_code == 3 and got.name_refusal is None
 
 
 def test_no_network_is_a_refusal_with_no_result(tmp_path, monkeypatch):

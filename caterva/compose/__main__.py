@@ -957,16 +957,109 @@ def compounds_from(args) -> Dict[str, str]:
     return out
 
 
+def read_subject(model: Any, args: Any) -> Tuple[Any, Optional[str], Optional[str], Optional[Any]]:
+    """Turn `--subject` into an EC number: `(model, what it was read as, a refusal, why)`.
+
+    `why` is the policy's `NameNotResolved` when a name was refused, so a
+    caller that renders the candidates (the studio) has them NAMED rather
+    than parsed back out of the refusal's sentence; None otherwise.
+
+    ONE POLICY, NOT A COPY. The name goes to `caterva.enzymes.policy`, the
+    function every command that takes an enzyme name uses: the enzyme
+    nomenclature first, UniProt's protein-name search only for a name the
+    nomenclature does not hold. A name that is several enzymes is refused
+    here with each candidate NAMED and the flag that would accept one, and
+    nothing is searched. An EC number is read by the same function, so one
+    the nomenclature has transferred is replaced by its successor and the
+    report says so; one it has deleted is refused; one it does not list is
+    used as given, because BRENDA may know a number this release does not.
+
+    The second element is a sentence for the report when the subject was
+    changed or needs a caveat (a name read as an EC number, a transferred
+    number, an enzyme with no protein from the organism asked about), and
+    None when nothing was.
+    """
+    from caterva.enzymes.policy import NameNotResolved, literature_uniprot_lookup, resolve_enzyme_name
+
+    subject = args.subject
+    if re.fullmatch(r"\s*\d+(\.\d+){0,2}\.?\s*", subject or "") and model.ec_number is None:
+        # "2.7.1" is an EC class, not an enzyme, and looking it up in
+        # UniProt as a NAME produced "no reviewed enzyme named '2.7.1'".
+        return model, None, (
+            f"No search was run: {subject.strip()!r} is an incomplete EC "
+            f"number, which names a class of enzymes rather than one. A full "
+            f"EC number has four parts, like 2.7.1.1 (hexokinase)"
+        ), None
+    try:
+        # Without the literature layer (the installed app) the nomenclature
+        # still resolves the name; only the UniProt fallback for a protein
+        # name that is not an enzyme name is missing, and the search says so.
+        resolution = resolve_enzyme_name(
+            subject, getattr(args, "organism", None), uniprot=literature_uniprot_lookup(),
+            allow_unlisted_ec=True)
+    except NameNotResolved as exc:
+        return model, None, f"No search was run: {exc}", exc
+    note = " ".join(resolution.notes(subject)) or None
+    if resolution.ec != (model.subject or "").strip():
+        model = replace(model, subject=resolution.ec)
+    return model, note, None, None
+
+
+def _resolve_subject(model: Any, args: Any) -> Tuple[Any, Optional[str], Optional[str]]:
+    """`read_subject` without the policy's refusal object."""
+    model, read_as, refusal, _ = read_subject(model, args)
+    return model, read_as, refusal
+
+
+@dataclass
+class LiteratureSearch:
+    """What `--subject` and the literature search came to.
+
+    `refused` is `search_the_literature`'s third value; `name_refusal` is
+    the policy's `NameNotResolved` when the refusal was a name that is not
+    exactly one enzyme (several enzymes, none, a deleted number)."""
+
+    model: Any
+    note: Optional[str]
+    refused: bool
+    name_refusal: Optional[Any] = None
+
+
+def search_literature(
+    model: Any, args: Any, *, resolve: Optional[Callable[..., Any]] = None,
+) -> LiteratureSearch:
+    """Resolve `--subject` to an EC number, then search the literature.
+
+    The subject is read by the one policy (`read_subject`), then
+    `_search_resolved` searches; what the subject was read as goes in front
+    of the search's own note. `resolve` replaces the resolver
+    `compose_and_parameterise` would build (`agents.scouts.brenda_resolver()`);
+    the studio passes that same resolver wrapped so it can say which
+    constant is being looked up.
+    """
+    model, read_as, refusal, why = read_subject(model, args)
+    if refusal is not None:
+        return LiteratureSearch(model, refusal, True, why)
+    model, note, refused = _search_resolved(model, args, resolve=resolve)
+    if read_as:
+        note = f"{read_as} {note}" if note else read_as
+    return LiteratureSearch(model, note, refused)
+
+
 def search_the_literature(
     model: Any, args: Any, *, resolve: Optional[Callable[..., Any]] = None,
 ) -> Tuple[Any, Optional[str], bool]:
-    """Resolve this model's constants from the literature.
+    """`search_literature` as `(model, note, refused)`: the form `caterva md`
+    and the tests import, under its old private name `_search_the_literature`
+    too. `refused` is True when the search could not be RUN."""
+    found = search_literature(model, args, resolve=resolve)
+    return found.model, found.note, found.refused
 
-    `resolve` replaces the resolver `compose_and_parameterise` would build
-    (`agents.scouts.brenda_resolver()`); the studio passes that same
-    resolver wrapped so it can say which constant is being looked up.
-    `caterva md` and the tests import this under its old private name,
-    `_search_the_literature`, which is kept.
+
+def _search_resolved(
+    model: Any, args: Any, *, resolve: Optional[Callable[..., Any]] = None,
+) -> Tuple[Any, Optional[str], bool]:
+    """Resolve this model's constants from the literature.
 
     Returns `(model, note, refused)`. `refused` is True when the search
     could not be RUN -- an ambiguous enzyme name, a missing substrate, no
@@ -993,10 +1086,10 @@ def search_the_literature(
     0178). What it must never do is leave the reader unable to tell that no
     search happened, which is why every branch returns a sentence.
 
-    A NAME IS NOT AN ENZYME. `--subject "lactate dehydrogenase"` is six EC
-    numbers; the resolver refuses and names all six rather than picking,
-    because a wrong EC number is a citation for the wrong protein rather
-    than merely a wrong value.
+    A NAME IS NOT AN ENZYME. `--subject "lactate dehydrogenase"` is the
+    L- and the D-lactate dehydrogenases, among others; `read_subject`
+    refuses and names each rather than picking, because a wrong EC number is
+    a citation for the wrong protein rather than merely a wrong value.
 
     THE RESOLVER IS TOLD WHAT THE MODEL IS OF. Its evidence grades cannot
     tell LDH-A's row from LDH-B's, or a competitive Ki from a noncompetitive
@@ -1012,31 +1105,11 @@ def search_the_literature(
     the resolver or a selection refuses is a placeholder whose reason says
     so, never one described as not found.
     """
-    from caterva.checkout import LiteratureLayerUnavailable, literature_module
+    from caterva.checkout import LiteratureLayerUnavailable
 
-    subject = args.subject
     if getattr(args, "isoform", None):
         model = replace(model, isoform=args.isoform)
     ec = model.ec_number
-    if ec is None and re.fullmatch(r"\s*\d+(\.\d+){0,2}\.?\s*", subject or ""):
-        # "2.7.1" is an EC class, not an enzyme, and looking it up in
-        # UniProt as a NAME produced "no reviewed enzyme named '2.7.1'".
-        return model, (
-            f"No search was run: {subject.strip()!r} is an incomplete EC "
-            f"number, which names a class of enzymes rather than one. A full "
-            f"EC number has four parts, like 2.7.1.1 (hexokinase)"
-        ), True
-    if ec is None:
-        try:
-            lookup = literature_module("enzyme_lookup")
-        except LiteratureLayerUnavailable as exc:
-            return model, str(exc), True
-        try:
-            ec = lookup.ec_number_for_name(subject)
-        except Exception as exc:  # noqa: BLE001 - the refusal names the candidates
-            return model, f"No search was run: {exc}", True
-        model = replace(model, subject=ec)
-
     # Only constants measured on the primary substrate need --substrate;
     # an inhibitor's Ki needs the inhibitor instead (see unsearched()).
     needs_substrate = sorted(
@@ -1405,6 +1478,9 @@ class ComposedReport:
     search_note: Optional[str]
     search_refused: bool
     code: int
+    #: The policy's `NameNotResolved` when `--subject` was refused as a name
+    #: that is not exactly one enzyme; None otherwise.
+    name_refusal: Optional[Any] = None
 
 
 def _quiet_stage(key: str, label: str, fraction: Optional[float] = None) -> None:
@@ -1457,14 +1533,15 @@ def compose_report(
                     compounds=compounds_from(args))
     search_note = None
     search_refused = False
+    name_refusal = None
     if args.subject:
         # The search runs BEFORE the analyses, so every section below --
         # stability, sensitivity, the time course, the verdict -- reads
         # the literature's numbers rather than the library's (ADR 0178).
         at("search", f"Searching the literature for {args.subject}")
-        model, search_note, search_refused = search_the_literature(
-            model, args, resolve=_announcing_resolver(progress),
-        )
+        found = search_literature(model, args, resolve=_announcing_resolver(progress))
+        model, search_note, search_refused = found.model, found.note, found.refused
+        name_refusal = found.name_refusal
         if search_refused and not model.searched and model.search_refused is None:
             model = replace(model, search_refused=search_note)
     if args.validate or args.robustness is not None:
@@ -1516,7 +1593,7 @@ def compose_report(
     return ComposedReport(
         model=report.model, dossier=report, precomputed=precomputed,
         sections=sections, search_note=search_note,
-        search_refused=search_refused, code=code,
+        search_refused=search_refused, code=code, name_refusal=name_refusal,
     )
 
 
@@ -1670,7 +1747,7 @@ __all__ = [
     "ComposedReport", "SectionRecord", "Sections", "build_parser",
     "check_request", "compose_report", "export_texts", "main",
     "precompute_for_verdict", "provenanced_for_export", "run_analyses",
-    "search_the_literature",
+    "search_the_literature", "search_literature", "read_subject", "LiteratureSearch",
 ]
 
 
