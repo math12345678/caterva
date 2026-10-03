@@ -134,8 +134,9 @@ def _run_pyinstaller(launcher: Path, work: Path, stage: Path) -> None:
         "--distpath", str(stage),
         "--specpath", str(work),
         # --collect-all, not --collect-submodules: the two JSON files under
-        # caterva/core/data/ are package data, and submodule collection alone
-        # would leave them out of _internal/, failing the SBML export smoke.
+        # caterva/core/data/ and the enzyme index under caterva/enzymes/data/
+        # are package data, and submodule collection alone would leave them
+        # out of _internal/, failing the SBML export and enzyme-finder smokes.
         "--collect-all", "caterva",
     ]
     for pkg in COLLECT_ALL:
@@ -502,6 +503,9 @@ def _smoke(bundle: Path, version: str) -> None:
             (("compose", "reversible binding of a ligand to a receptor", "--no-ranking"), ("VERDICT:", "Integrated to t=")),
             (("compose", "reversible binding of a ligand to a receptor", "--export", "sbml"), ("<?xml", "<sbml")),
             (("compose", "two stage gene expression", "--no-analysis", "--no-simulate", "--no-ranking"), ("VERDICT:",)),
+            # The enzyme finder reads a packaged data file and nothing else:
+            # a folder missing it would resolve no name.
+            (("enzyme", "pyruvate kinase"), ("EC 2.7.1.40", "Resolved:")),
         )
         for args, markers in checks:
             r = run(*args)
@@ -512,8 +516,8 @@ def _smoke(bundle: Path, version: str) -> None:
                     f"'no time course' present: {'no time course' in r.stdout}; "
                     f"stdout tail {r.stdout[-300:]!r}, stderr {r.stderr[-600:]!r}"
                 )
-        print("smoke  : --version, sim --help, a simulated time course, an SBML export and an")
-        print("         expansion-library shape all ran from an empty directory")
+        print("smoke  : --version, sim --help, a simulated time course, an SBML export, an")
+        print("         expansion-library shape and an enzyme-name lookup all ran from an empty directory")
 
 
 def _archive(bundle: Path, out_dir: Path, version: str, tag: str) -> Path:
