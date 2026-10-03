@@ -5,8 +5,13 @@
         --ligand oxamate --chimerax ldha.cxc
 
 Exit codes follow the rest of Caterva: 0 produced what was asked, 2 a
-malformed question, 3 refused and said why (an EC number that is several
-proteins, no structure, no network), 1 a crash.
+malformed question, 3 refused and said why (an enzyme name that is several
+enzymes, an EC number that is several proteins, no structure, no network),
+1 a crash.
+
+`--subject` takes an EC number or an enzyme name. The name is read by
+caterva.enzymes.policy, the same function `caterva compose` uses, so a name
+that is several enzymes is refused here with each candidate named.
 """
 from __future__ import annotations
 
@@ -16,6 +21,7 @@ from pathlib import Path
 from typing import List, Optional, Sequence
 
 from caterva.compose.organisms import normalise_organism
+from caterva.enzymes.policy import NameNotResolved, literature_uniprot_lookup, resolve_enzyme_name
 from caterva.methods import METHODS
 from caterva.structure.search import StructureSearchError, find_structures
 
@@ -40,7 +46,9 @@ def build_parser(prog: str = "caterva structure") -> argparse.ArgumentParser:
             "\nExit codes: 0 produced, 2 malformed question, 3 refused and said why, 1 a crash."
         ),
     )
-    p.add_argument("--subject", required=True, help="the enzyme, as an EC number (1.1.1.27)")
+    p.add_argument("--subject", required=True,
+                   help="the enzyme, as an EC number (1.1.1.27) or a name (pyruvate kinase); a name that is "
+                        "several enzymes is refused with each one named")
     p.add_argument("--organism", help="Latin or common name (human, mouse, E. coli)")
     p.add_argument("--gene", help="which protein, by gene name (LDHA), when the EC number is several")
     p.add_argument("--uniprot", help="which protein, by UniProt accession (P00338)")
@@ -96,7 +104,17 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva structure") 
     args = build_parser(prog).parse_args(argv)
     organism, organism_note = normalise_organism(args.organism)
     try:
-        search = find_structures(args.subject, organism=organism, gene=args.gene,
+        # The same function every command uses to read an enzyme name; an EC
+        # number passes through it, a name is looked up in the nomenclature.
+        resolution = resolve_enzyme_name(
+            args.subject, organism, uniprot=literature_uniprot_lookup(), allow_unlisted_ec=True)
+    except NameNotResolved as exc:
+        print(f"Refused: {exc}", file=sys.stderr)
+        return 3
+    for line in resolution.notes(args.subject):
+        print(line + "\n")
+    try:
+        search = find_structures(resolution.ec, organism=organism, gene=args.gene,
                                  uniprot=args.uniprot, ligand=args.ligand)
     except StructureSearchError as exc:
         print(f"Refused: {exc}", file=sys.stderr)

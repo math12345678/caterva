@@ -6,7 +6,8 @@ WHY THIS EXISTS
 This is the thing Caterva is for, and until now you could not type it.
 
 `scripts/report_lab.py` has produced literature-backed documents since
-ADR 0149: it asks UniProt which enzyme a name means, refuses to pick when
+ADR 0149: it asks the enzyme nomenclature which enzyme a name means (UniProt
+only for a protein name the nomenclature does not hold), refuses to pick when
 the name is ambiguous, reads BRENDA, ranks the rows by how well evidenced
 they are, carries the disagreement between papers through the model, and
 prints the citation for every number it used. It reads a JSON payload on

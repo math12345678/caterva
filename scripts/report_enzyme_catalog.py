@@ -64,7 +64,9 @@ def main() -> int:
         # `report` needs the identical policy and two copies of one refusal
         # drift (ADR 0126, ADR 0137).
         try:
-            ec_number = ec_number_for_name(str(enzyme_name))
+            ec_number = ec_number_for_name(
+                str(enzyme_name), organism=payload.get("organism"), rerun="--ec {ec}",
+            )
         except EnzymeNameNotResolved as exc:
             return _fail(str(exc))
 

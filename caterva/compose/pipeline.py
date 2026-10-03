@@ -298,10 +298,10 @@ class ComposedModel:
         """The subject as an EC number, or None when it is not one.
 
         An EC number given directly is used as given. A NAME is not resolved
-        here: "lactate dehydrogenase" is EC 1.1.1.27 and 1.1.1.28 and four
-        more, and picking one would attach a citation to the wrong protein.
-        The caller resolves a name through the literature layer's
-        `ec_number_for_name`, which refuses ambiguity by naming every
+        here: "lactate dehydrogenase" is EC 1.1.1.27 and 1.1.1.28 among
+        others, and picking one would attach a citation to the wrong protein.
+        The caller resolves a name through `caterva.enzymes.policy.
+        resolve_enzyme_name`, which refuses ambiguity by naming every
         candidate, and passes the answer as the subject.
         """
         if self.subject is None:

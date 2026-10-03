@@ -70,6 +70,23 @@ describe("a failure at the enzyme-identity step says so", () => {
     expect(note).toMatch(/citation to an enzyme you did not ask about/);
   });
 
+  it("shows the Python finder's refusal as it was written, not a rewording of it", () => {
+    // The finder names each candidate and ends with the flag that would
+    // accept one. This layer forwards that text and derives nothing from
+    // the bare EC numbers beside it.
+    const refusal =
+      "'amylase' names 2 enzymes. Best matches first:\n" +
+      "  EC 3.2.1.1 alpha-amylase\n  EC 3.2.1.2 beta-amylase\n" +
+      "Re-run with the one you meant, for example ecNumber 3.2.1.1";
+    const note = build(
+      "km", "ec_ambiguous", undefined, undefined, undefined,
+      ["3.2.1.1", "3.2.1.2"], undefined, refusal,
+    ).note ?? "";
+    expect(note).toContain(refusal);
+    expect(note).toContain("BRENDA, KEGG and PubMed were never asked");
+    expect(note).not.toContain("Could not resolve a real KM value from");
+  });
+
   it("still works when the candidates did not travel", () => {
     // The message must degrade to something true rather than to "()" or a
     // dangling list. A refusal that renders badly is still the only thing

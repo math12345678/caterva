@@ -606,6 +606,7 @@ function buildUnresolvedKineticProvenance(
   substratesAvailable?: string[],
   ecCandidates?: string[],
   modelMode?: InhibitionMode,
+  ecRefusal?: string,
 ): ParameterProvenance {
   const K = key.toUpperCase();
 
@@ -742,6 +743,20 @@ function buildUnresolvedKineticProvenance(
   // that as "the literature has no value for my enzyme" and goes looking
   // for a different problem than the one they have. Naming the stage that
   // actually failed is the difference between a dead end and a next step.
+  // THE REFUSAL IS THE PYTHON FINDER'S, FORWARDED. It names each candidate
+  // enzyme and ends with the flag that would accept one. Re-deriving a
+  // sentence here from the bare EC numbers is what this layer used to do,
+  // and it could say only "EC 1.1.1.27 and EC 1.1.1.28" for every name.
+  if ((reason === "ec_ambiguous" || reason === "ec_not_resolved") && ecRefusal) {
+    return {
+      origin: "default",
+      unresolvedReason: reason,
+      note:
+        `The enzyme name you gave does not identify one enzyme, so no ${K} ` +
+        `was looked up — BRENDA, KEGG and PubMed were never asked. ${ecRefusal}`,
+    };
+  }
+
   if (reason === "ec_ambiguous") {
     const named = ecCandidates && ecCandidates.length > 0
       ? ecCandidates.join(", ")
@@ -929,6 +944,8 @@ async function applyKineticResolution(
           undefined,
           undefined,
           agentResult.ecCandidates,
+          undefined,
+          agentResult.ecRefusal,
         );
       } else {
         provenanceUpdates[key] = buildUnresolvedKineticProvenance(

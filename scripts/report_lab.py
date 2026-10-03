@@ -461,11 +461,13 @@ def main() -> int:
     #
     # The name is resolved through the SAME policy `catalog` uses, which
     # refuses rather than picking when a name maps to more than one enzyme.
-    # Resolving is not guessing: UniProt is asked, and one answer is an
-    # answer. Two answers is a refusal that names both.
+    # Resolving is not guessing: the enzyme nomenclature is asked, and one
+    # answer is an answer. Two answers is a refusal that names both.
     if not ec and payload.get("enzyme"):
         try:
-            ec = ec_number_for_name(str(payload["enzyme"]))
+            ec = ec_number_for_name(
+                str(payload["enzyme"]), organism=organism, rerun="--ec {ec}",
+            )
         except EnzymeNameNotResolved as exc:
             return _fail(str(exc))
 
