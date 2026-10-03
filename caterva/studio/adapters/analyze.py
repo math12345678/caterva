@@ -46,10 +46,21 @@ chosen by the command with the sentence that says what it decides, so the
 page can put each verdict beside the number it was judged against. None is
 re-stated here as a literal.
 
+SOLVENT EXPOSURE AND PRINCIPAL MOTIONS
+--------------------------------------
+`exposure` is the solvent-accessible area of each catalytic residue (the
+Analysis's `sasa`): at the start and per replica with its SD and middle-95%
+range, each with the relative area where the residue type has a maximum,
+the verdict and the verdict as the report prints it (`exposure_reported`).
+`exposure_not_measured` is the reason it was not measured, when it was not.
+`motions` is the principal-motion analysis: eigenvalues and shares per
+replica and pooled, the RMSIP of each pair of replicas, each replica's
+cosine content, and the library's own verdict for each (`pca.rmsip_verdict`,
+`pca.cosine_verdict`); `consistent` is the part of the exit code it owns.
+
 SECTIONS ADDED LATER
 --------------------
-An Analysis may carry sections this adapter does not name (principal
-motions and solvent exposure arrive on other branches). They are passed
+An Analysis may carry sections this adapter does not name. They are passed
 through `extra`, by field name, with `contract.jsonable`, rather than
 dropped: the report still prints them, and the page can show that it has
 more than it draws.
@@ -80,7 +91,7 @@ GMX_FALLBACKS = ("/opt/homebrew/bin/gmx", "/usr/local/bin/gmx")
 
 #: The Analysis fields this adapter draws; any other is passed through `extra`.
 NAMED_FIELDS = ("pdb", "chain", "source", "plan", "distances", "flexibility", "hbonds", "rotamers", "angles",
-                "water", "faces")
+                "water", "faces", "sasa", "sasa_route", "sasa_not_measured", "motions")
 
 
 def find_gmx() -> Optional[str]:
@@ -263,7 +274,7 @@ def rotamer_rows(a: Any) -> Optional[List[Dict[str, Any]]]:
 
 
 def face_rows(a: Any) -> Optional[List[Dict[str, Any]]]:
-    from caterva.analyze.__main__ import FACE_STANDS, as_reported
+    from caterva.analyze.__main__ import face_reported
     from caterva.analyze.faces import face_name, face_verdict
 
     if a.faces is None:
@@ -283,7 +294,7 @@ def face_rows(a: Any) -> Optional[List[Dict[str, Any]]]:
                              "other": None if f.crystal_side == 0 or math.isnan(o) else
                              _fraction(o, "fraction of frames on the other face", n, f"{f.label} other, {n}")}
                             for n, k, o in f.per_replica],
-            "verdict": verdict, "reported": as_reported(verdict, a, FACE_STANDS)})
+            "verdict": verdict, "reported": face_reported(f, a)})
     return rows
 
 
@@ -310,9 +321,102 @@ def water_rows(a: Any) -> Optional[List[Dict[str, Any]]]:
     return rows
 
 
+def _number(value: float, unit: str, method: str, inputs: Sequence[str], label: str
+            ) -> Optional[contract.SourcedValue]:
+    """A computed value; None for a NaN (a replica with no frames), never a number made up."""
+    return None if value is None or math.isnan(value) else computed_value(value, unit, method, inputs, label=label)
+
+
+def exposure_rows(a: Any) -> Optional[List[Dict[str, Any]]]:
+    from caterva.analyze.__main__ import exposure_reported
+    from caterva.analyze.sasa import BURIED, EXPOSED, PROBE_NM, exposure_verdict, state
+
+    if a.sasa is None:
+        return None
+    method = (f"solvent-accessible area of the residue, whole protein as the surface, {PROBE_NM:g} nm probe "
+              f"({a.sasa_route} route)")
+    rows = []
+    for e in a.sasa:
+        rel = e.relative(e.at_start)
+        per = []
+        for n, mean, sd, low, high in e.per_replica:
+            r = e.relative(mean)
+            per.append({
+                "replica": n,
+                "mean": _number(mean, "nm²", method + ", mean over frames", [n], f"{e.label} area, {n}"),
+                "sd": _number(sd, "nm²", method + ", SD over frames", [n], f"{e.label} area SD, {n}"),
+                "low": _number(low, "nm²", method + ", 2.5th percentile of frames", [n], f"{e.label} area low, {n}"),
+                "high": _number(high, "nm²", method + ", 97.5th percentile of frames", [n],
+                                f"{e.label} area high, {n}"),
+                "relative": None if r is None else _number(
+                    r, "", "mean area / the largest area the residue type can have (Tien et al. 2013)", [n],
+                    f"{e.label} relative area, {n}"),
+            })
+        rows.append({
+            "label": e.label, "resname": e.resname, "in_chain": e.in_chain,
+            "max_area": None if e.max_area is None else computed_value(
+                e.max_area, "nm²", "largest possible area of the residue type, Tien et al. (2013) Table 1 "
+                "(theoretical, ALLOWED)", [], label=f"{e.label} largest possible area"),
+            "at_start": _number(e.at_start, "nm²", method + ", in em.gro", ["em.gro"], f"{e.label} area at start"),
+            "relative_at_start": None if rel is None else _number(
+                rel, "", "area at start / the largest area the residue type can have", ["em.gro"],
+                f"{e.label} relative area at start"),
+            "state_at_start": None if rel is None else state(round(rel, 2)),
+            "per_replica": per,
+            "verdict": exposure_verdict(e), "reported": exposure_reported(e, a)})
+    return rows
+
+
+def _modes_row(r: Any, k: int) -> Dict[str, Any]:
+    from caterva.analyze import pca
+
+    return {
+        "name": r.name, "frames": r.frames, "moved": r.moved,
+        "eigenvalues": [computed_value(v, "nm²", "eigenvalue of the covariance of the superposed frames "
+                                       "(mean-square fluctuation along the mode)", [r.name],
+                                       label=f"{r.name} PC{i + 1}") for i, v in enumerate(r.eigenvalues)],
+        "total": computed_value(r.trace, "nm²", "sum of every eigenvalue", [r.name], label=f"{r.name} total"),
+        "share_pc1": _number(r.share(1), "", "PC1 eigenvalue / total", [r.name], f"{r.name} share in PC1"),
+        "share_modes": _number(r.share(k), "", f"sum of the first {k} eigenvalues / total", [r.name],
+                               f"{r.name} share in PC1-{k}"),
+        "cosine": None if r.cosine is None else [
+            _number(c, "", f"cosine content of the projection on PC{i + 1}", [r.name], f"{r.name} PC{i + 1} cosine")
+            for i, c in enumerate(r.cosine)],
+        "cosine_verdict": None if r.cosine is None else pca.cosine_verdict(r)}
+
+
+def motions_view(a: Any) -> Optional[Dict[str, Any]]:
+    from caterva.analyze import pca
+
+    m = a.motions
+    if m is None:
+        return None
+    k = pca.RMSIP_MODES
+    view: Dict[str, Any] = {
+        "atoms": m.atoms, "residues": list(m.residues), "not_measured": m.not_measured,
+        "too_short": [{"replica": n, "frames": f} for n, f in m.too_short],
+        "min_frames": pca.MIN_PCA_FRAMES, "modes_compared": k, "consistent": m.consistent,
+        "replicas": [_modes_row(r, k) for r in m.replicas],
+        "pooled": None if m.pooled is None else _modes_row(m.pooled, k),
+        "between": None if m.between is None else _number(
+            m.between, "", "share of the pooled total that is the spread of the replicas' mean structures",
+            [r.name for r in m.replicas], "between replicas"),
+        "overlaps": [], "diffusive_at": pca.DIFFUSIVE,
+    }
+    if m.dim > 0:
+        view["dim"] = m.dim
+    for x, y, v in m.overlaps:
+        view["overlaps"].append({
+            "a": x, "b": y,
+            "rmsip": _number(v, "", f"RMSIP of the first {k} modes of the two replicas", [x, y], f"RMSIP {x}-{y}"),
+            "rmsip2": _number(v * v, "", "RMSIP squared", [x, y], f"RMSIP² {x}-{y}"),
+            "verdict": pca.rmsip_verdict(v, m.dim)})
+    return view
+
+
 def thresholds() -> Dict[str, List[contract.SourcedValue]]:
     """The library's verdict thresholds, by the section they judge."""
-    from caterva.analyze import faces, hbonds, rotamers, water
+    from caterva.analyze import faces, hbonds, pca, rotamers, sasa, water
     from caterva.analyze.__main__ import KEPT, LOST, FORMED, MOVED_NM, SPLIT
     from caterva.analyze.angles import MOVED_DEG
     from caterva.md import convergence as conv
@@ -360,6 +464,15 @@ def thresholds() -> Dict[str, List[contract.SourcedValue]]:
             t(water.DRY, "", "dry at most", "at most this fraction of frames with a water, every replica"),
             t(water.SPLIT, "", "replicas disagree beyond", "the replicas' fractions differ by more than this"),
         ],
+        "exposure": [
+            t(sasa.BURIED, "", "buried below", "a share of the largest possible area below this is buried"),
+            t(sasa.EXPOSED, "", "exposed at least", "a share of the largest possible area at or above this is exposed"),
+        ],
+        "motions": [
+            t(pca.SAME_RMSIP2, "", "same motions, RMSIP² at least", "two replicas' first modes span the same directions"),
+            t(pca.CHANCE_SD, "", "chance, within this many SD", "RMSIP² this close to the random-subspace value is no more alike than chance"),
+            t(pca.DIFFUSIVE, "", "diffusion-like at", "PC1 or PC2 cosine content this high looks like random diffusion"),
+        ],
     }
 
 
@@ -376,7 +489,7 @@ def extra_sections(a: Any) -> Dict[str, Any]:
 
 
 def _written(d: Path, measured: bool) -> List[str]:
-    names = ["analyze.sh"] + (["chi1.ndx"] if (d / "chi1.ndx").exists() else [])
+    names = ["analyze.sh"] + [n for n in ("chi1.ndx", "pca.ndx") if (d / n).exists()]
     if measured:
         names.append("ANALYSIS.md")
     return [str(d / n) for n in names]
@@ -414,11 +527,11 @@ def analyze_run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
         "gmx": gmx,
     }
     if done.analysis is None:
-        text = cli.script_line(d, p) + "\n"
+        text = cli.script_line(d, p, done.pca_atoms) + "\n"
         result: contract.AnalyzeResult = {
             **base, "all_consistent": False, "distances_consistent": False, "distances": [],
             "flexibility": None, "hbonds": None, "rotamers": None, "angles": [], "water": None, "faces": None,
-            "script_written": True, "report_markdown": text, "measured": False, "written": _written(d, False),
+            "exposure": None, "motions": None, "script_written": True, "report_markdown": text, "measured": False, "written": _written(d, False),
             "extra": {},
         }
         return AdapterOutcome(0, result, first_line(text))
@@ -436,6 +549,9 @@ def analyze_run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
         "angles": [angle_row(t) for t in a.angles],
         "water": water_rows(a),
         "faces": face_rows(a),
+        "exposure": exposure_rows(a),
+        "exposure_not_measured": a.sasa_not_measured,
+        "motions": motions_view(a),
         "script_written": True,
         "report_markdown": text,
         "measured": True,
@@ -464,4 +580,5 @@ def register(registry) -> None:
 
 
 __all__ = ["GMX_FALLBACKS", "MODES", "PROG", "analyze_argv", "analyze_run", "angle_row", "distance_row",
-           "extra_sections", "find_gmx", "thresholds", "flexibility_view", "register"]
+           "exposure_rows", "extra_sections", "find_gmx", "motions_view", "thresholds", "flexibility_view",
+           "register"]

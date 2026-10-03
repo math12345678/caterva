@@ -1362,6 +1362,14 @@ class _AnalyzeResultRequired(TypedDict):
 class AnalyzeResult(_AnalyzeResultRequired, total=False):
     #: The route that measured: native, gromacs, no_run, script_only.
     mode: str
+    #: Solvent-accessible area of each catalytic residue (the Analysis's
+    #: `sasa`); None when it was not measured, with the reason in
+    #: `exposure_not_measured`.
+    exposure: Optional[List[Dict[str, Any]]]
+    exposure_not_measured: Optional[str]
+    #: Principal motions of the catalytic residues' heavy atoms; None when
+    #: they were not measured.
+    motions: Optional[Dict[str, Any]]
     #: False for script_only, which plans and writes analyze.sh only.
     measured: bool
     #: Files written into the run's directory, as the command writes them.
@@ -1380,7 +1388,7 @@ class AnalyzeResult(_AnalyzeResultRequired, total=False):
     extra: Dict[str, Any]
     #: The library's verdict thresholds by the section they judge
     #: ("replicas", "distances", "angles", "hbonds", "rotamers", "faces",
-    #: "water"), each a value chosen by the command, labelled, with the
+    #: "water", "exposure", "motions"), each a value chosen by the command, labelled, with the
     #: sentence that says what it decides.
     thresholds: Dict[str, List[SourcedValue]]
 

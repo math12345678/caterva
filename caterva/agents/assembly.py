@@ -27,7 +27,7 @@ try:
     from .critics import COMPATIBILITY_KEY, STRUCTURE_KEY, CoherenceCritic, StructureCritic
     from .protocol import Agent, AgentResult
     from .scheduler import RunReport, Scheduler
-    from .scouts import ParameterScout, param_key
+    from .scouts import ParameterScout, frontier_row, param_key
     from .adapters import UnitMismatch, UnresolvedQuantity, with_resolved_values
 except ImportError:  # pragma: no cover - flat import
     from blackboard import View  # type: ignore[no-redef]
@@ -37,7 +37,7 @@ except ImportError:  # pragma: no cover - flat import
     )
     from protocol import Agent, AgentResult  # type: ignore[no-redef]
     from scheduler import RunReport, Scheduler  # type: ignore[no-redef]
-    from scouts import ParameterScout, param_key  # type: ignore[no-redef]
+    from scouts import ParameterScout, frontier_row, param_key  # type: ignore[no-redef]
     from adapters import (  # type: ignore[no-redef]
         UnitMismatch, UnresolvedQuantity, with_resolved_values,
     )
@@ -279,10 +279,11 @@ class ModelBuild:
                 # keeping the organism is condition re-selection (ADR 0171).
                 # Reported like the organism move above -- the plain
                 # resolver cannot say this at all.
+                now, was = _substrates_if_moved(has, had)
                 rejected.append(
                     f"{quantity}: re-selected to {has.value} "
-                    f"{has.unit or ''} at {_conditions_of(has)} under an "
-                    f"assay window, replacing {had.value} {had.unit or ''} "
+                    f"{has.unit or ''}{now} at {_conditions_of(has)} under an "
+                    f"assay window, replacing {had.value} {had.unit or ''}{was} "
                     f"at {_conditions_of(had)}"
                 )
         return tuple(rejected)
@@ -517,6 +518,24 @@ class ModelSearch:
                 "organism you choose: " + ", ".join(gaps) + "."
             )
         return " ".join(lines)
+
+
+def _substrates_if_moved(has: Any, had: Any) -> Tuple[str, str]:
+    """(" for NAD+", " for pyruvate"): the substrate of each source's row,
+    for the re-selection line, when their frontier rows state different
+    ones; ("", "") otherwise.
+
+    A re-selection moves between rows of one frontier, and those differ in
+    substrate only when the request named none (`fallback_logic.
+    _score_frontier`). Neither `ParameterSource` has a substrate, so each
+    row is found in the frontier by its value and commentary
+    (`scouts.frontier_row`), which works for the re-selected row because it
+    carries its own commentary."""
+    now = (frontier_row(has) or {}).get("substrate")
+    was = (frontier_row(had) or {}).get("substrate")
+    if now and was and now != was:
+        return f" for {now}", f" for {was}"
+    return "", ""
 
 
 def _conditions_of(source: Any) -> str:

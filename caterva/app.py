@@ -36,6 +36,7 @@ from typing import Optional, Sequence
 #: proof that the native libraries load.)
 COMMANDS = {
     "compose": ("caterva.compose.__main__", "the model builder and its analyses"),
+    "rates": ("caterva.rates.__main__", "fit your own initial rates: constants, mechanism, and the cited values"),
     "structure": ("caterva.structure.__main__", "an enzyme's PDB structures, cited, and a ChimeraX script"),
     "md": ("caterva.md.__main__", "a GROMACS setup whose every parameter is measured, chosen or cited"),
     "analyze": ("caterva.analyze.__main__", "catalytic geometry and active-site flexibility across replicas"),

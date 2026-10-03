@@ -131,11 +131,40 @@ def test_the_native_route_on_real_frames_matches_the_command(tmp_path, lysozyme_
     for row in r["rotamers"]:
         assert f"| {row['reported']} |" in out
     assert r["replicas"] == ["rep1", "rep2"] and r["mode"] == "native" and r["measured"] is True
-    assert r["written"] == [str(d / "analyze.sh"), str(d / "chi1.ndx"), str(d / "ANALYSIS.md")]
+    assert r["written"] == [str(d / "analyze.sh"), str(d / "chi1.ndx"), str(d / "pca.ndx"), str(d / "ANALYSIS.md")]
     assert r["extra"] == {}
+    _the_exposure_and_motions_are_the_librarys(r, a, out)
     _the_rmsf_profile_is_the_librarys(r["flexibility"], a)
     _the_thresholds_are_the_librarys(r["thresholds"])
     json.dumps(r, allow_nan=False)
+
+
+def _the_exposure_and_motions_are_the_librarys(r, a, out):
+    """Solvent exposure and principal motions are sent as the library measured
+    them, with each verdict the one the report prints."""
+    from caterva.analyze import pca
+    from caterva.analyze.sasa import exposure_verdict
+
+    assert a.sasa and r["exposure_not_measured"] is None and len(r["exposure"]) == len(a.sasa)
+    for row, e in zip(r["exposure"], a.sasa):
+        assert row["label"] == e.label and row["verdict"] == exposure_verdict(e)
+        assert row["at_start"]["value"] == e.at_start and row["at_start"]["provenance"]["kind"] == "computed"
+        assert [p["mean"]["value"] for p in row["per_replica"]] == e.means
+        assert (row["max_area"] or {}).get("value") == e.max_area
+        assert f"| {row['reported']} |" in out
+    m = a.motions
+    sent = r["motions"]
+    assert m is not None and sent["atoms"] == m.atoms and sent["residues"] == m.residues
+    assert sent["consistent"] is m.consistent
+    assert [x["name"] for x in sent["replicas"]] == [x.name for x in m.replicas]
+    for row, x in zip(sent["replicas"], m.replicas):
+        assert [v["value"] for v in row["eigenvalues"]] == x.eigenvalues and row["total"]["value"] == x.trace
+        assert row["cosine_verdict"] == pca.cosine_verdict(x)
+    assert [(o["a"], o["b"], o["verdict"]) for o in sent["overlaps"]] == [
+        (x, y, pca.rmsip_verdict(v, m.dim)) for x, y, v in m.overlaps]
+    assert (sent["pooled"] is None) == (m.pooled is None)
+    assert {"exposure", "motions"} <= set(r["thresholds"])
+    assert "## Solvent exposure of the catalytic residues" in out and "## Principal motions" in out
 
 
 def _the_thresholds_are_the_librarys(sent):
@@ -222,7 +251,10 @@ def _xvg_run(tmp_path, means, n=4000, phi=0.5, sd=0.005):
                                                    for i, v in enumerate(_ar1(rng, n, phi, mu, sd))))
         (rep / "rmsf.xvg").write_text("10 0.05\n20 0.05\n30 0.06\n90 0.20\n")
         (rep / "water.xvg").write_text("0.000 2.000 0.000\n0.001 3.000 1.000\n")
+        # gmx sasa -o: the protein's total area, then each catalytic residue's (made-up areas).
+        (rep / "sasa.xvg").write_text("@ title\n0.000 12.000 0.400 0.100\n0.001 12.100 0.500 0.100\n")
     (d / "water_start.xvg").write_text("0.000 2.000 1.000\n")
+    (d / "sasa_start.xvg").write_text("0.000 12.000 0.400 0.100\n")
     return d
 
 
@@ -245,6 +277,7 @@ def test_the_no_run_route_matches_the_command(tmp_path, monkeypatch, means, kwar
     r = got.result
     assert r["report_markdown"] == out.getvalue()
     assert r["hbonds"] is None and r["rotamers"] == []
+    assert [e["label"] for e in r["exposure"]] == ["His10", "Asp20"] and r["motions"] is None
     flex = r["flexibility"]
     a = cli.analyse(d, no_run=True, catalytic=_two).analysis
     assert [x["pocket"]["value"] for x in flex["per_replica"]] == [p for _, p, _ in a.flexibility.per_replica]

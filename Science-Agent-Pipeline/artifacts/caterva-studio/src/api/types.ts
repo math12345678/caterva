@@ -1010,6 +1010,11 @@ export interface AnalyzeResult {
   script_written: boolean;
   report_markdown: string;
   mode?: string;
+  /** Solvent-accessible area of each catalytic residue; null when not measured (see exposure_not_measured). */
+  exposure?: Record<string, unknown>[] | null;
+  exposure_not_measured?: string | null;
+  /** Principal motions of the catalytic residues' heavy atoms; null when not measured. */
+  motions?: Record<string, unknown> | null;
   measured?: boolean;
   written?: string[];
   replicas?: string[];

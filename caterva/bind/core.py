@@ -391,9 +391,24 @@ def same_isoform(a: Optional[str], b: Optional[str]) -> bool:
 #: model could not tell the glucose Ki from the MgATP2- one. Of the 766 Ki
 #: rows parsed from the hexokinase (recorded), LDH and monoamine oxidase
 #: pages on 2026-09-29, those two are the only readings the word changes.
+#:
+#: "competitive to ATP" and "noncompetitive to glucose" are read the same
+#: way (Trypanosoma cruzi hexokinase and ADP, ref 640216: 1.5 mM
+#: "competitive to ATP", 7 mM "noncompetitive to glucose"). Before "to"
+#: was accepted, both read as measured against nothing, so a competitive
+#: model of glucose carried the ATP row as if it might be the glucose one
+#: and never saw the 7 mM row as evidence against its mechanism. "to" is
+#: not taken when a mode word follows it: "mixed to non-competitive
+#: inhibitors against ATP" names a range of modes, not a molecule. Of the
+#: same 766 Ki rows (2026-10-01), "to" changes four readings, all on the
+#: hexokinase page: those two, and two rabbit erythrocyte rows (ATP
+#: "competitive to MgATP2-", N-acetyl-D-glucosamine "competitive to
+#: glucose").
+_MODE_WORD = r"non-?competitive|uncompetitive|competitive|mixed(?:-type)?|partial(?:ly)?\s+\w+"
 _MODE = re.compile(
-    r"\b(non-?competitive|uncompetitive|competitive|mixed(?:-type)?|partial(?:ly)?\s+\w+)\b"
-    r"(?:\s+(?:inhibit(?:ion|or)\s+)?(?:versus|vs\.?|with respect to)\s+([^,;]+))?",
+    rf"\b({_MODE_WORD})\b"
+    r"(?:\s+(?:inhibit(?:ion|or)\s+)?"
+    rf"(?:versus|vs\.?|with respect to|to(?!\s+(?:{_MODE_WORD})\b))\s+([^,;]+))?",
     re.I,
 )
 

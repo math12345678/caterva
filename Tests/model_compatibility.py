@@ -115,7 +115,9 @@ class ParameterSource:
     #: Every alternative row the resolver returned for this quantity, as the
     #: plain dicts `KineticResult.ensemble_candidates` carries them: value,
     #: unit, organism, reference_id, conditions, and -- since the assay
-    #: window work -- ph and temperature_c on each row.
+    #: window work -- ph and temperature_c on each row; since 2026-09-30
+    #: also substrate, the parser's label for the row (the request's name
+    #: when it named one, the row's compound when it did not).
     #:
     #: Deliberately Optional rather than "falsy and gone": the coercion
     #: result and the registry row carry no frontier AT ALL, which is a
@@ -135,6 +137,12 @@ class ParameterSource:
     #: compose` to say which row the request replaced and why; not a
     #: candidate for this value, which `candidates` holds.
     evidence_only: Tuple[Any, ...] = ()
+    #: `KineticResult.mode_default`, as a plain dict (mode, model_substrate,
+    #: row, modes_available): when the resolver was asked for no mode with a
+    #: model's mode to compare, what it would have returned asked for that
+    #: mode. None otherwise. Read by `caterva compose --any-mode` to name the
+    #: row its default carries; like `evidence_only`, not a candidate.
+    mode_default: Optional[Any] = None
 
     @property
     def conditions_stated(self) -> bool:

@@ -110,6 +110,17 @@ evidence_only  # Added 2026-09-30. What the resolver would have returned had
                # show an answer the resolver was not asked for, so there is no
                # replaced row for them to name. If either comes to say "the
                # mode moved the value from X", this is where X is.
+mode_default   # Added 2026-09-30. The same question the other way round: a
+               # Ki asked for no mode, with the model's mode as `compare_mode`,
+               # carries what the call asked for that mode would have returned
+               # (its row, or the modes the rows state when it would refuse).
+               # `caterva compose --any-mode` sends `compare_mode` and reads
+               # this through ParameterSource.mode_default, so its report can
+               # name the row its default carries (caterva/compose/narrowed.py).
+               # Neither the runner nor either front end sends `compare_mode`:
+               # the API always asks with its model's mode, and the CLI's
+               # `scientific resolve` without `--mode` prints the stated mode
+               # of the row it returns. So it is never set on their path.
 
 # ---------------------------------------------------------------------------
 selected_form.value  # Prose-carried, verified by reading `selectedFormFlags`:

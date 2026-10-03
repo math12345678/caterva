@@ -216,7 +216,7 @@ def test_both_routes_give_the_same_water_and_angles_on_real_frames(tmp_path):
     order = [48, 50, 46, 59, 52, 35]      # M-CSA's order, as the lysozyme run had it
     p = plan(protein, [(r, next(a.resname for a in protein if a.resnr == r)) for r in order])
     assert len(p.angles) == 24
-    _, _, _, _, angles, water, _ = measure_native(tmp_path, p, [rep])
+    angles, water = measure_native(tmp_path, p, [rep])[4:6]
 
     reference = gmx_water()
     (tmp_path / "water_start.xvg").write_text(
@@ -275,7 +275,9 @@ def test_one_catalytic_residue_says_why_no_verdict_can_be_a_result(tmp_path, cap
         (d / "md.tpr").write_text("")
         (d / "rmsf.xvg").write_text("30 0.05\n90 0.20\n")
         (d / "water.xvg").write_text("0.0 1\n0.5 2\n")
+        (d / "sasa.xvg").write_text("0.0 9.0 0.4\n0.5 9.0 0.5\n")  # gmx sasa -o; made-up areas
     (tmp_path / "water_start.xvg").write_text("0.0 1\n")
+    (tmp_path / "sasa_start.xvg").write_text("0.0 9.0 0.4\n")
     code = main([str(tmp_path), "--no-run"], catalytic=lambda pdb, chain: ([(30, "SER")], "a test mapping"))
     out = capsys.readouterr().out
     assert code == EXIT_NOT_A_RESULT

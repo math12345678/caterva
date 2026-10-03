@@ -34,7 +34,9 @@ the resolver's choice stands, and the note says so.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field, replace
+from types import SimpleNamespace
 from typing import Any, Callable, List, Optional, Tuple
 
 try:
@@ -47,7 +49,7 @@ try:
     from .blackboard import View
     from .constraints import ANY_SUBJECT, Constraint
     from .protocol import AgentResult
-    from .adapters import to_parameter_source
+    from .adapters import citation_text, to_parameter_source
 except ImportError:  # pragma: no cover - flat import
     from assay_window import (  # type: ignore[no-redef]
         candidate_distance,
@@ -58,7 +60,7 @@ except ImportError:  # pragma: no cover - flat import
     from blackboard import View  # type: ignore[no-redef]
     from constraints import ANY_SUBJECT, Constraint  # type: ignore[no-redef]
     from protocol import AgentResult  # type: ignore[no-redef]
-    from adapters import to_parameter_source  # type: ignore[no-redef]
+    from adapters import citation_text, to_parameter_source  # type: ignore[no-redef]
 
 #: Blackboard key for a resolved quantity. One namespace so the critics can
 #: declare their reads from the model's quantity list without knowing which
@@ -88,6 +90,31 @@ def _row_description(source: Any) -> str:
         parts.append(f"in {source.buffer}")
     conditions = ", ".join(parts) or "conditions unstated"
     return f"{source.value} {source.unit or ''} @ {conditions}".strip()
+
+
+def _row_citation(resolver_citation: Optional[str], reference_id: Any) -> str:
+    """The citation of a row the assay window re-selected, in the form the
+    adapter cites the resolver's own row (`citation_text`): "BRENDA ref
+    670748". The source is read off the resolver's citation, since both rows
+    come from one table; the title is never carried, because it is the
+    other row's paper. Until 2026-09-30 this was "reference_id:670748", so a
+    reader could tell from the citation alone which path had produced it,
+    which `citation_text` exists to prevent."""
+    found = re.match(r"\s*(\S+) ref \S", resolver_citation or "")
+    return citation_text(SimpleNamespace(source=found.group(1) if found else None,
+                                         reference_id=str(reference_id)))
+
+
+def frontier_row(source: Any) -> Optional[dict]:
+    """The frontier row a `ParameterSource` carries: the one among its
+    `candidates` with its value and its commentary. The resolver's pick, or
+    since 2026-09-30 the row an assay window re-selected, whose commentary
+    is now its own. None when no row has both, as for a stand-in resolver
+    that states no commentary."""
+    commentary = getattr(source, "commentary", None) or None
+    return next((row for row in getattr(source, "candidates", ()) or ()
+                 if row.get("value") == source.value
+                 and (row.get("conditions") or None) == commentary), None)
 
 
 def _describe_windows(
@@ -240,6 +267,25 @@ class ParameterScout:
         was satisfied without a change; when no frontier row satisfies the
         window, the default stands too -- re-selecting an outside row would
         be manufacturing an answer the literature does not support.
+
+        A re-selected row is carried as the row it is: its value and unit,
+        pH, temperature, buffer, commentary, reference and organism, each
+        from its own frontier dict. What stays is what belongs to the
+        resolver's answer rather than to one row: the frontier itself
+        (`candidates`, which the spread is taken over, and which holds the
+        new row), `evidence_only` and `mode_default`.
+
+        The substrate is the one per-row field with nowhere to go:
+        `ParameterSource` has none, nor has the Measurement compose builds,
+        because a request names one. A request that names none gets rows of
+        every substrate the table holds, and the row nearest the window can
+        be another substrate's: on the committed LDH turnover page kcat
+        moves from 21.1 1/s, a pyruvate row, to 32.0 1/s, an NAD+ row. So
+        when the frontier's labels differ (`_score_frontier`'s "substrate")
+        the scout's note names both, and so does the line the search's
+        summary prints for the re-selection (`ModelBuild.rejected_values`).
+        A request that names a substrate labels every row with it, and
+        nothing is said.
         """
         refs = []
         for window in windows:
@@ -294,7 +340,13 @@ class ParameterScout:
         # the resolver on the question the window leaves open.
         best = min(eligible, key=lambda c: (rank(c), value_of(c)))
 
-        if best["value"] == source.value:
+        # The row carried now, found by value and commentary. By value alone
+        # a row of the same value at another pH would read as the one
+        # carried, and keep the carried row's pH and commentary. Only a
+        # source whose commentary matches no frontier row (a stand-in that
+        # states none) falls back to the value.
+        current = frontier_row(source)
+        if best == current or (current is None and best["value"] == source.value):
             return (
                 source,
                 reason,
@@ -306,6 +358,7 @@ class ParameterScout:
         chosen = replace(
             source,
             value=value_of(best),
+            unit=best.get("unit") or source.unit,
             ph=_number(best.get("ph")),
             temperature_c=_number(best.get("temperature_c")),
             # The row's own parsed buffer, exactly as the frontier carries it
@@ -314,10 +367,20 @@ class ParameterScout:
             # unknown" -- rather than the old winner's buffer carried forward.
             buffer=best.get("buffer") or None,
             citation=(
-                f"reference_id:{best['reference_id']}"
+                _row_citation(source.citation, best["reference_id"])
                 if best.get("reference_id")
                 else source.citation
             ),
+            # The row's own commentary, verbatim. Everything downstream reads
+            # what a row measured from this field: `row_scope` its isoform,
+            # inhibition mode, what it was measured versus and the
+            # preparation, and every export's SOURCE ROW line and CSV
+            # columns. Kept from the resolver's pick, as it was until
+            # 2026-09-30, it described a row that was not carried: LDH's
+            # turnover number re-selected to 32.0 1/s at pH 8 still read
+            # "pH 6.0, 25°C, ... in presence of fructose 1,6-bisphosphate",
+            # the 21.1 1/s row it replaced.
+            commentary=best.get("conditions") or None,
             # The re-selected row is a different measurement; the frontier
             # dict carries the conditions axes (ph, temperature_c, buffer)
             # but not the winner's explicitly_unreported claims, so none are
@@ -341,6 +404,18 @@ class ParameterScout:
             f"of {len(source.candidates)} frontier row(s) fall outside the "
             f"window"
         )
+        # Which substrate each row is for, when the frontier's labels say
+        # they differ (docstring above): nothing downstream carries it.
+        was = (frontier_row(source) or {}).get("substrate")
+        now = best.get("substrate")
+        if was and now and was != now:
+            new_reason += (
+                f"; the row chosen is for {now}, the resolver's default for "
+                f"{was}"
+                + ("" if self.request.substrate else
+                   ": the request named no substrate, so its rows are of "
+                   "every substrate the table holds")
+            )
         return chosen, new_reason, new_reason
 
 
@@ -371,9 +446,11 @@ def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
         # substrate, over every row BRENDA holds, before it chooses one.
         # `caterva compose` fills these (ComposedModel.parameter_requests);
         # a request without them is ranked on evidence alone, as before.
+        # `compare_mode` ranks nothing: the resolver answers as with no mode
+        # and says what the mode would have returned (compose --any-mode).
         asked = {
             name: getattr(request, name, None)
-            for name in ("isoform", "inhibition_mode", "model_substrate")
+            for name in ("isoform", "inhibition_mode", "model_substrate", "compare_mode")
             if getattr(request, name, None)
         }
         return resolve_kinetic_value(
@@ -389,4 +466,4 @@ def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
     return resolve
 
 
-__all__ = ["ParameterScout", "param_key", "PARAM_PREFIX", "brenda_resolver"]
+__all__ = ["ParameterScout", "param_key", "PARAM_PREFIX", "brenda_resolver", "frontier_row"]

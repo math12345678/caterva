@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "116 test files -- kinetics & Michaelis-Menten correctness, " +
+          "124 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -197,7 +197,10 @@ export const TEST_SUITES: TestSuite[] = [
         // (2026-09-30) gave 3226 passed, 1 skipped, 432 s: 3226. Then the
         // isoform-reader and compose-asks-the-resolver tests: a full run on
         // the merged tree (2026-09-30) gave 3355 passed, 1 skipped: 3355.
-        passed: 3355,
+        // Plus round five: caterva rates (110), solvent exposure, principal
+        // motions and the gap fixes: a full run on the merged tree
+        // (2026-10-01) gave 3592 passed, 1 skipped: 3592.
+        passed: 3592,
         skipped: 0,
         failed: 0,
       },
@@ -237,7 +240,12 @@ export const TEST_SUITES: TestSuite[] = [
         // a full run after merging them gave 1365 passed, 1 skipped: 1365.
         // Then the isoform-reader, simulate and mechanism-evidence tests: a
         // full run on the merged tree (2026-09-30): 1422 passed, 1 skipped.
-        passed: 1422,
+        // Plus the assay-window and "<mode> to X" fixes: a full run on the
+        // merged tree (2026-10-01) gave 1570 passed, 1 skipped. 21 of those
+        // are test_popgen_resolver.py, which skips without stdpopsim; CI does
+        // not install it, so the figure CI collects and runs is 1549 passed
+        // of 1550: 1549.
+        passed: 1549,
         skipped: 1,
         failed: 0,
       },

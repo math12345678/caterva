@@ -90,6 +90,25 @@ is on this one short run, and a threshold fitted to one run is not a
 threshold.
 
 Every frame is counted, as for the hydrogen bonds, rotamers and water.
+
+IN PLANE IN THE CRYSTAL
+-----------------------
+When the crystal's own four points are within FLAT_DEG of flat, the crystal
+has no face, and the question "did the partner keep it" has no answer. Until
+2026-09-30 such a row printed n/a for every replica, and the fractions
+behind it were counted against a face of 0 and were always zero. The
+replicas' own frames are as well defined there as anywhere. Taking the
+minimised structure the 21-frame lysozyme replica above starts from as the
+crystal, as the tests of both routes do (fixtures/md, em.gro's atoms), 5
+of the 24 angles are within the band (Ser50-Asp48-Asn59 at 2.1 degrees out
+of flat, Asp48-Asn59-Asn46 at 5.8), and whether a partner leaves the plane
+in simulation, and to which face, is what such a row can show. So for these
+rows the fractions are counted on the clockwise face and on the
+anticlockwise face, the rest are flat, and the verdict says what the
+replicas did: stayed in plane, left it for one face, or neither, by the
+thresholds the other rows use. Clockwise stands where the crystal's face
+would, which is a convention, not a finding: the crystal favours neither
+face.
 """
 from __future__ import annotations
 
@@ -111,9 +130,14 @@ FLAT = math.sin(math.radians(FLAT_DEG))
 #: table; the numbers the rotamer and water verdicts use.
 KEPT, SPLIT = 0.8, 0.5
 
-#: The verdict of an angle whose four points are flat in the crystal: there
-#: is no face to keep or leave.
-FLAT_IN_CRYSTAL = "flat in the crystal, no face to keep"
+#: How the verdict of an angle whose four points are flat in the crystal
+#: begins: there is no face to keep or leave, and what follows says what the
+#: replicas did (`face_verdict`).
+FLAT_IN_CRYSTAL = "in plane in the crystal"
+
+#: What the replicas of such an angle did, after FLAT_IN_CRYSTAL.
+STAYED_IN_PLANE = "stayed in plane"
+LEFT_FOR = "left it for the {} face"
 
 
 def elevation_deg(pa: np.ndarray, pv: np.ndarray, pb: np.ndarray, pr: np.ndarray,
@@ -176,13 +200,19 @@ def elevation_series(traj, ia: Sequence[int], iv: Sequence[int], ib: Sequence[in
 def face_fractions(name: str, angles: Sequence[float], elevations: Sequence[float],
                    crystal_side: int) -> Tuple[str, float, float]:
     """(replica, fraction of frames on the crystal's face, fraction on the
-    other face); the rest are flat. NaN for a replica with no frames."""
+    other face); the rest are flat. NaN for a replica with no frames.
+
+    With the crystal in plane (`crystal_side` 0) there is no crystal's face,
+    and the two fractions are on the clockwise face and on the anticlockwise
+    one (module docstring). Counted against a face of 0, as until
+    2026-09-30, both were zero whatever the frames did."""
     n = len(elevations)
     if not n:
         return name, float("nan"), float("nan")
+    reference = crystal_side or 1
     sides = [side(polar_sine(t, e)) for t, e in zip(angles, elevations)]
-    return (name, sum(1 for s in sides if s and s == crystal_side) / n,
-            sum(1 for s in sides if s and s == -crystal_side) / n)
+    return (name, sum(1 for s in sides if s and s == reference) / n,
+            sum(1 for s in sides if s and s == -reference) / n)
 
 
 @dataclass
@@ -209,16 +239,34 @@ class Face:
 
     @property
     def kept(self) -> List[float]:
+        """Per replica, the fraction on the crystal's face; on the clockwise
+        face when the crystal is in plane (`face_fractions`)."""
         return [s for _, s, _ in self.per_replica]
 
     @property
     def other(self) -> List[float]:
+        """Per replica, the fraction on the other face; on the anticlockwise
+        face when the crystal is in plane."""
         return [o for _, _, o in self.per_replica]
+
+    @property
+    def flat(self) -> List[float]:
+        """Per replica, the fraction of frames on neither face. Clamped at
+        zero, because the two fractions are counts over one n and their sum
+        can pass 1 only by rounding in the last binary digit, which would
+        print as -0.00."""
+        return [max(0.0, 1.0 - k - o) for _, k, o in self.per_replica]
 
 
 def face_verdict(f: Face) -> str:
-    if f.crystal_side == 0:
-        return FLAT_IN_CRYSTAL
+    """What the replicas did with the crystal's face, or, for an angle in
+    plane in the crystal, "in plane in the crystal; " and what they did
+    with the plane. The same thresholds and the same order either way."""
+    replicas = _replicas_did(f)
+    return replicas if f.crystal_side else f"{FLAT_IN_CRYSTAL}; {replicas}"
+
+
+def _replicas_did(f: Face) -> str:
     kept, other = f.kept, f.other
     # A replica with no frames has NaN fractions, and every comparison with
     # NaN is False: without this it would fall through to "partial".
@@ -228,13 +276,47 @@ def face_verdict(f: Face) -> str:
         return "one replica"
     if max(kept) - min(kept) > SPLIT or max(other) - min(other) > SPLIT:
         return "replicas disagree"
+    if f.crystal_side == 0:
+        # No face to keep: in plane is where the crystal was, and either
+        # face is somewhere it went.
+        if min(f.flat) >= KEPT:
+            return STAYED_IN_PLANE
+        if min(kept) >= KEPT:
+            return LEFT_FOR.format(face_name(1))
+        if min(other) >= KEPT:
+            return LEFT_FOR.format(face_name(-1))
+        return "partial"
     if min(kept) >= KEPT:
         return "kept its face"
     if min(other) >= KEPT:
         return "changed face"
-    if min(1.0 - k - o for k, o in zip(kept, other)) >= KEPT:
+    if min(f.flat) >= KEPT:
         return "went flat"
     return "partial"
+
+
+#: Verdicts that are not a judgement of the replicas, so never "not yet a
+#: result" (the report marks the others so while the distances are not).
+UNJUDGED = ("one replica", "no frames")
+
+
+def face_cells(f: Face) -> List[str]:
+    """Each replica's cell in the report's face table. A row with a crystal
+    face: the fraction on it and, in brackets, on the other face. A row in
+    plane in the crystal: the fractions on the clockwise face, on the
+    anticlockwise face and flat, named, since there is no crystal's face
+    for the first number to be. "n/a" for a replica with no frames. Both
+    routes render through this, so their tables can be compared cell for
+    cell (scripts/md_smoke.py)."""
+    cells = []
+    for (_, k, o), flat in zip(f.per_replica, f.flat):
+        if math.isnan(k) or math.isnan(o):
+            cells.append("n/a")
+        elif f.crystal_side:
+            cells.append(f"{k:.2f} ({o:.2f})")
+        else:
+            cells.append(f"{face_name(1)} {k:.2f}, {face_name(-1)} {o:.2f}, flat {flat:.2f}")
+    return cells
 
 
 def face_name(s: int) -> str:
@@ -243,5 +325,6 @@ def face_name(s: int) -> str:
     return {1: "clockwise", -1: "anticlockwise"}.get(s, "flat")
 
 
-__all__ = ["FLAT_DEG", "FLAT", "KEPT", "SPLIT", "FLAT_IN_CRYSTAL", "Face", "elevation_deg",
-           "elevation_series", "face_fractions", "face_name", "face_verdict", "from_gangle", "polar_sine", "side"]
+__all__ = ["FLAT_DEG", "FLAT", "KEPT", "SPLIT", "FLAT_IN_CRYSTAL", "STAYED_IN_PLANE", "LEFT_FOR",
+           "UNJUDGED", "Face", "elevation_deg", "elevation_series", "face_cells", "face_fractions",
+           "face_name", "face_verdict", "from_gangle", "polar_sine", "side"]

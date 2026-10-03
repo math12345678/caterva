@@ -89,6 +89,24 @@ def test_every_flag_and_shape_in_the_guide_still_exists(line: str):
             action = next(a for a in build_parser()._actions if "--export" in a.option_strings)
             assert fmt in (action.choices or []), f"--export {fmt} is no longer offered; {action.choices}"
 
+    elif command == "rates":
+        from caterva.rates.__main__ import build_parser as rates_parser
+
+        parser = rates_parser()
+        known = {opt for action in parser._actions for opt in action.option_strings}
+        unknown = flags - known
+        assert not unknown, f"the guide uses {sorted(unknown)}, which `caterva rates` no longer defines"
+        for flag in flags:
+            action = next(a for a in parser._actions if flag in a.option_strings)
+            if action.choices:
+                value = rest[rest.index(flag) + 1]
+                assert value in action.choices, f"{flag} {value} is no longer offered; {action.choices}"
+        # A file the guide runs from the repository must be in it; a name
+        # like my_rates.csv is the reader's own.
+        for path in positionals:
+            if path.startswith("examples/"):
+                assert (GUIDE.parents[1] / path).is_file(), f"the guide runs {path}, which is gone"
+
     elif command == "sim":
         from caterva.cli import main as _engine_main  # noqa: F401 - import proves the module loads
 

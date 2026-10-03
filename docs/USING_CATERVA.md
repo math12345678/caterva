@@ -515,12 +515,36 @@ Trypanosoma cruzi hexokinase has four Ki rows for ADP: 0.13 mM, 1.3 mM ("at
 pH 7.5"), 1.5 mM ("competitive to ATP") and 7.0 mM ("noncompetitive to
 glucose"). The evidence alone keeps 1.3 mM, the one row reporting a pH,
 which states no mode; a competitive model now carries 1.5 mM in compose as
-in the API, and the report says it replaced 1.3 mM and why. With
-`--any-mode` compose still chooses as it did, so there it carries 1.3 mM
-without saying that the default would carry 1.5 mM. A Ki every row of which
-states another mode is refused there too, with the modes named. The API
-always sends its model's mode. The CLI has no `--any-mode`: leaving `--mode`
-out keeps the resolver's pick, with its stated mode printed beside it.
+in the API, and the report says it replaced 1.3 mM and why. A Ki every row
+of which states another mode is refused there too, with the modes named.
+The API always sends its model's mode. The CLI has no `--any-mode`: leaving
+`--mode` out keeps the resolver's pick, with its stated mode printed beside
+it.
+
+`--any-mode` asks the resolver the question the CLI asks with no `--mode`,
+and carries its answer: 1.3 mM for Trypanosoma cruzi and ADP, the row the
+CLI returns. It also sends the model's mode as one to compare with, and the
+resolver, from the same rows and without fetching the page again, says what
+it would have returned asked for it. The report names that row and why the
+two differ: "--any-mode kept the resolver's pick (1.3 mM, BRENDA ref
+640265), which states no inhibition mode; without it the row stating
+competitive inhibition versus ATP (1.5 mM, BRENDA ref 640216), this model's
+mechanism though not its substrate (glucose), would be used". Until
+2026-09-30 `--any-mode` worked out the default's row from the rows its
+answer held, which lack 1.5 mM, so it said nothing there. The value and
+reference carried are the no-mode answer's. The rows printed beside it are
+not quite: the default's row is added to the carried constant's
+alternatives, so the spread is 1.3 to 1.5 mM either way, where the no-mode
+answer's own candidates hold 1.3 mM alone.
+
+"Competitive to ATP" is read as measured versus ATP. Until 2026-10-01 the
+row reader took only "versus", "vs." and "with respect to", so this row
+read as measured against nothing and was carried for a glucose model with
+no remark; the 7 mM row, "noncompetitive to glucose", is now also read as
+measured versus glucose, and the API and the CLI return it as
+`mechanismEvidence` against a competitive model of glucose. Compose's report
+says the 1.5 mM row was measured versus ATP, not glucose, but does not name
+the 7 mM row: the resolver's answer does not give compose that row.
 
 The API sends its model's substrate with the mode; the CLI takes it as
 `--model-substrate`, because `--substrate` names the inhibitor for a Ki.
@@ -540,9 +564,11 @@ only competitive row, and the API's `provenance.flags` and `scientific
 resolve` both name 0.00252 mM "noncompetitive versus pyruvate": measured
 against pyruvate the inhibitor is not competitive, and no choice of row
 fixes that. The runner sends the row as `mechanismEvidence`, found by the
-function in `ki_mode.py` that compose's note comes from. Only a row saying
-"versus X" is read as measured against X, so the Trypanosoma cruzi ADP
-rows above ("competitive to ATP", "noncompetitive to glucose") are not.
+function in `ki_mode.py` that compose's note comes from. A row saying
+"versus X", "vs. X", "with respect to X" or "<mode> to X" is read as
+measured against X, so for a competitive model of glucose the Trypanosoma
+cruzi ADP row 7 mM "noncompetitive to glucose" is sent as
+`mechanismEvidence` against the 1.5 mM "competitive to ATP" row returned.
 
 `scientific simulate --resolve --model competitive|noncompetitive|product`
 looks its Ki up the same way, and needs `--inhibitor NAME` to do it. Until
@@ -845,11 +871,19 @@ frames that are on a face and skipping the flat frames between them, the
 face changed 6 times, each to or from a lone frame just past the band; the
 two counts are of different things, and only 2 of the 6 fall on strictly
 consecutive frames. Each angle is reported with how far
-its crystal arms are from flat, the crystal's face (or flat, with no face
-to keep), and per replica the fraction of frames on the crystal's face and
-on the other; it is called kept its face, changed face, went flat, partial
-or replicas disagree, with the thresholds printed, and like the rotamers
-and water it is a result only when the distances are. Because the Cα is the
+its crystal arms are from flat, the crystal's face, and per replica the
+fraction of frames on the crystal's face and on the other; it is called
+kept its face, changed face, went flat, partial or replicas disagree, with
+the thresholds printed, and like the rotamers and water it is a result only
+when the distances are. When the crystal's own arms are within 7.5 degrees
+of flat there is no face to keep, and the row says "in plane in the
+crystal"; each replica's cell then gives the fractions of frames on the
+clockwise face, on the anticlockwise face and flat, and the verdict says
+whether the replicas stayed in plane or left it for one face, by the same
+thresholds. Until 2026-09-30 those rows printed n/a for every replica. On
+the 21-frame lysozyme replica, taking its minimised starting structure as
+the crystal, 5 of the 24 angles are in plane there, and Ser50-Asn46-Asn59
+is on the anticlockwise face in 8 of the 21 frames. Because the Cα is the
 vertex's own, a side chain that turns over under its partners changes face
 too, which the rotamer table will show. On 21 frames of a lysozyme replica
 every elevation equals `gmx gangle -g1 plane -g2 vector`'s to 0.001 degree,
@@ -877,9 +911,138 @@ translated across the periodic box, and both are tests. The GROMACS route
 runs `gmx select`, and CI checks that the two routes' water tables are
 identical.
 
+It also measures how much of each catalytic residue solvent can reach:
+its solvent-accessible surface area (Lee & Richards' surface, measured
+on Caterva's own route with Shrake & Rupley's points: 2,000 per atom, a
+0.14 nm probe, and Bondi's radii exactly as GROMACS's `vdwradii.dat`
+lists them, hydrogens included). The surface is the whole protein in every frame, because a
+residue's exposure is set by its neighbours; water and ions are not part
+of it, and `caterva md` simulates no ligand. The protein is made whole
+first and its periodic images are not counted. Each residue is reported
+in `em.gro` (the structure every replica began from; the crystal's
+`protein.pdb` has no hydrogens, so set against an all-atom surface a
+change would be only the hydrogens) and per replica as the mean ± SD over
+every frame, with the range the middle 95% of frames fall in. An area
+alone does not say buried or exposed, since a fully exposed glycine has
+less surface than a buried tryptophan, so each is also given as a share
+of the largest area its residue type can have (Tien et al. 2013, PLoS ONE
+8:e80635, Table 1). Those maxima are DSSP's heavy-atom areas with other
+radii, so the share is a guide rather than a value on their scale; on
+the minimised structures of hen lysozyme and T4 lysozyme no residue's
+all-atom area exceeds its maximum (chain ends aside; the largest share is
+0.96). A residue
+is called buried below 20% of it, exposed at 40% or above, and partly
+exposed in between (chosen thresholds, printed with the table), at the
+start and in each replica: "buried throughout", "buried at the start,
+exposed in every replica", or which replicas left the starting state when
+they disagree. A mean near a threshold can fall on either side of it in
+another run of the same system (lysozyme's Asn46 was at 19% in one smoke
+run and 20% in the next), so a replica whose mean crosses a threshold
+while the middle 95% of its frames still reaches back into the starting
+state is reported as "buried in rep2 by its mean, with frames still partly
+exposed", not as having left that state, and does not make the replicas
+disagree. The start is one structure, so a start near a threshold is only
+as firm as the share printed beside it. A residue without a peptide bond on
+both sides in `em.gro` (either end of the chain, or beside a break) has
+no maximum and no verdict, and with one replica there is no verdict. A
+residue number that belongs to two residues (two chains simulated, which
+`caterva md` does by default, or an insertion code, which `.gro` files
+drop) has no area of its own: on both routes the section then says "Not
+measured" and why, and the rest of the report is written as before. Like
+the water, the verdict is a result only when the distances are, and it
+does not set the exit code.
+
+2,000 points per atom is a choice between accuracy and time. On eight
+lysozyme smoke runs (not committed), one structure's residue areas were
+within 0.0098 to 0.0157 nm² of the same areas with 20,000 points, so the
+area at the start can be off by one or two in its last printed digit
+(0.01 nm²); over only five frames a replica's mean was within 0.0052.
+4,000 points would roughly halve the error for about 1.4 times the time.
+
+Every frame is measured, with no stride, and the areas are the largest
+cost of the native route: about 0.25 to 0.4 s a frame for lysozyme (1,960
+protein atoms) and T4 lysozyme (2,603), timed on a heavily loaded machine
+(`caterva/analyze/sasa.py`), so the 1,000 frames a replica of the default
+10 ns run writes add several minutes per replica, and more for a larger
+protein or a longer run (a 100 ns replica at the same output rate, about
+an hour). `--gromacs` measures with `gmx sasa` in `analyze.sh` instead.
+
+The GROMACS route runs `gmx sasa`, which places its points differently
+(Eisenhaber et al.'s double cubic lattice), with the same probe, radii
+and surface (`-surface Protein -nopbc`) and `-ndots 2000`, which it rounds
+up to 2,252 points per atom (its tessellation's next size); the section
+names the method that produced its numbers. Its `-or` file has every
+residue's mean area, for the rest of the protein. The two converge on
+the same surface: on T4 lysozyme, `gmx sasa -ndots 10000` and Caterva at
+10,000 points agree to 0.0044 nm² on all 162 residues. As the routes run
+(2,000 points against 2,252) they differ by the two point sets' errors
+added, which grow with the area a residue exposes: over 11,514 residue
+areas (every residue of 88 structures from eight lysozyme smoke runs,
+which are not committed, and of T4 lysozyme) the root mean square
+difference was about 0.0047 √area nm² (area in nm²) and the largest
+0.0205 nm², on an arginine with 1.80 nm² exposed. The routes are held to
+0.03 √area nm², and at least 0.0075, a margin chosen over those
+measurements: none of them came nearer than 0.71 of it. The tests check
+an isolated atom and two overlapping atoms against the areas worked out
+by hand; every residue of T4 lysozyme against `gmx sasa` at 10,000
+points and at 2,000; the six catalytic residues of 21 committed lysozyme
+frames against `gmx sasa` frame by frame, and two replicas made from
+those frames, which get the same verdicts on both routes; and the same
+frames moved so that the active site straddles the periodic box, which
+give the same areas. CI compares the two routes' tables on every run, to
+that bound plus 0.01 nm² for the rounding of the two printed values, and
+their verdicts: a verdict may differ only where an area rounds into
+another state on each route, which the smoke run reports by name.
+
+And the principal motions of the active site: every heavy atom of the
+catalytic residues (backbone and side chain, 47 atoms on lysozyme), each
+frame superposed on the same atoms of `em.gro`, and the covariance of
+their coordinates split into modes, per replica and with every replica's
+frames pooled. The report gives the three largest eigenvalues (the
+mean-square fluctuation along each mode, nm²), the total, the share of it
+in the first mode and in the first ten, and, from the pooled analysis, the
+share that is the replicas sitting in different places rather than moving
+about them. Two questions are answered from it. Do the replicas move the
+same way? The root-mean-square inner product (RMSIP) of each pair's first
+ten modes (Amadei, Ceruso & Di Nola 1999) is set beside what two random
+ten-dimensional subspaces of the 3N - 6 directions the fit leaves would
+give (RMSIP² = 10/(3N - 6), 0.074 with standard deviation 0.010 on
+lysozyme; derived exactly, and checked against random subspaces), and
+called same motions (RMSIP² at least 0.5), no more alike than chance
+(within three standard deviations of that) or partly shared. Is a
+replica's largest motion only diffusion? The cosine content of its
+projection on PC1 and PC2 (Hess 2000, 2002) is 1 when the projection has
+the shape random diffusion gives that mode: a half cosine for PC1 (a drift
+one way with no return), a full cosine for PC2 (one excursion out and
+back); at 0.5 or more (a stated choice: the cosine is then at least half of
+the projection's mean square) the replica is called diffusion-like, not
+converged. Frames with no correlation in time would give PC1 0.05 at 21
+frames, and would be called diffusion-like (PC1 or PC2 at 0.5 or more)
+with probability at most 0.0007, and the report prints both beside the
+values. A low cosine content does not show convergence: a
+replica can sample one basin thoroughly and never find the next. A
+replica whose total fluctuation is below 1e-8 nm² (every atom within 1e-4
+nm RMS, a tenth of what an xtc records) is called no motion, and its
+cosine contents and RMSIP are not reported. A diffusion-like replica, or a pair no more alike than chance, makes the exit
+code 4. Fewer than 21 frames per replica is refused rather than reported:
+the ten modes compared must be at most half of the directions the frames
+can span. On the 21 frames of a lysozyme replica the first ten eigenvalues
+agree with `gmx covar`'s to within 6e-6 relative (three of them differ by
+one in the sixth digit it prints), the projections agree with
+`gmx anaeig`'s to the 1e-5 nm it prints (up to each mode's sign), the
+cosine contents agree with `gmx analyze -cc`'s to 7e-6 once its
+normalisation is converted (it prints (n + 1)/n times the bounded value,
+so a pure cosine reads 1.048 there at 21 frames), and the RMSIP² between
+the replica's two halves equals `gmx anaeig -over`'s to the 0.001 it
+prints; all four are tests. That replica's PC1 has a cosine content of
+0.77 over its 10 ps. The GROMACS route runs `gmx covar`, `gmx anaeig` and
+`gmx analyze` (the atoms are written to `pca.ndx`), and CI compares the
+two routes' tables.
+
 `--gromacs --no-run` on a run whose `analyze.sh` was written before the
-angle, face and water tables existed is refused, naming the missing file,
-rather than reporting without them: run `analyze.sh` again first.
+angle, face, water and solvent-exposure tables or the principal motions
+existed is refused, naming the missing file, rather than reporting
+without them: run `analyze.sh` again first.
 
 Each catalytic distance now carries the 95% confidence interval of its
 mean across replicas (Student's t, which is 12.7 for two replicas), and
@@ -1276,6 +1439,201 @@ recorded as one rather than papered over.
 
 ---
 
+## Your own rates: `caterva rates`
+
+Everything above asks the literature for a constant. `caterva rates` is the
+other door: you measured initial rates yourself, at several substrate
+concentrations and perhaps several inhibitor concentrations, and want the
+constants, how well your data determine them, which mechanisms they rule
+out, and how they compare with the values BRENDA cites. It runs from the app
+folder; only the literature comparison needs the source checkout.
+
+**The file** is a CSV whose header names each column and its unit:
+
+```
+substrate (mM),rate (uM/min),sigma (uM/min),inhibitor (uM),group
+```
+
+Only `substrate` and `rate` are required; `--substrate-column` and its
+siblings name columns called something else. Lines starting with `#` are
+comments. Rows with identical conditions are replicates. A unit it cannot
+read is refused with the column named; an arbitrary readout that needs no
+conversion (`counts/min/min`, `A340/min`, `ppm`) is accepted, and then the
+literature comparison is refused for it, because a Km in ppm cannot be
+compared with one in mM without a molar mass.
+
+**The error bars are never invented.** Give exactly one of: a `sigma` column;
+`--sigma-from replicates` (the pooled spread of your replicates, with its
+degrees of freedom; add `--error-model proportional` when the noise grows
+with the rate); or `--sigma-from residuals` (ordinary least squares, sigma
+from the fit's own scatter, which is what R's `nls` reports and which
+assumes the rate law is right, so no goodness-of-fit chi-square is printed
+for it). With none of these it refuses, names the three, and exits 3. With
+`--group` and `--sigma-from replicates`, one sigma is pooled across all the
+groups' replicates, which assumes every group was measured with the same
+precision; the report says so.
+
+### A worked example, on real data
+
+`examples/rates/puromycin.csv` is Treloar's 1974 galactosyltransferase data,
+published in Bates & Watts (1988), *Nonlinear Regression Analysis and Its
+Applications*, Appendix A1.3, and shipped with R as `datasets::Puromycin`:
+rates from puromycin-treated and untreated cells, in duplicate except the
+untreated cells' highest concentration (1.10 ppm, measured once), substrate
+in parts per million and rate in counts per minute per minute.
+
+```
+caterva rates examples/rates/puromycin.csv --sigma-from residuals --group state --model michaelis-menten
+```
+
+The verdict comes first (real output; this is the whole of it):
+
+```
+- [treated] Michaelis-Menten, the law asked for (--model michaelis-menten); no other law was fitted or tested.
+- [treated] Michaelis-Menten: Vmax 212.7 (197.3 to 229.3 counts/min/min), Km 0.06412 (0.04692 to 0.08616 ppm) (95% profile intervals).
+- [untreated] Michaelis-Menten, the law asked for (--model michaelis-menten); no other law was fitted or tested.
+- [untreated] Michaelis-Menten: Vmax 160.3 (145.6 to 176.5 counts/min/min), Km 0.04771 (0.03137 to 0.07006 ppm) (95% profile intervals).
+- Between groups: Vmax differs between treated and untreated: sharing it fits worse than separate values (F(1, 19) = 25.5, p = 7.08e-05).
+- Between groups: Km: no difference between treated and untreated detectable by these data (F(1, 19) = 1.72, p = 0.206); the shared fit gives Km = 0.05797 (0.04599 to 0.07234). Not detected is not the same as equal.
+```
+
+then each group's fit, here the treated one in full:
+
+```
+| constant | estimate | standard error | 95% profile interval | unit |
+|---|---|---|---|---|
+| Vmax | 212.7 | 6.947 | 197.3 to 229.3 | counts/min/min |
+| Km | 0.06412 | 0.008281 | 0.04692 to 0.08616 | ppm |
+
+- Residual standard error 10.93 counts/min/min on 10 degrees of freedom. No goodness-of-fit chi-square is given: sigma was estimated from these residuals, so the chi-square is 10 by construction and cannot test the law it was computed from.
+- Correlations of the estimates: Vmax-Km +0.765.
+- Starts: 6 of 6 reached this minimum; no start found a different one.
+- Condition number of the weighted Jacobian (log constants): 6.38.
+- Lack of fit: lack of fit F = 1.07 on 4 and 6 degrees of freedom, p = 0.447: no departure from this law's shape beyond the replicates' own scatter.
+- Substrate range: Your 6 substrate concentration(s) span 0.31 to 17 times Km (below Km: 2; above: 4; in the guideline range of 0.2 to 5 times Km: 4). The Assay Guidance Manual asks for 8 or more in that range, with several on each side of Km.
+- Substrate range: The range brackets Km with fewer than 8 concentrations in the guideline range. Eight concentrations evenly spaced on a log scale from 0.2 times the lowest to 5 times the highest Km in its interval would satisfy the guideline wherever Km lies: 0.0094, 0.016, 0.028, 0.048, 0.084, 0.14, 0.25, 0.43 ppm.
+```
+
+and the test between groups:
+
+```
+| shared constant | statistic | p | verdict |
+|---|---|---|---|
+| Vmax | F(1, 19) = 25.52 | 7.08e-05 | differs |
+| Km | F(1, 19) = 1.718 | 0.206 | no difference detected |
+| all | F(2, 19) = 24.14 | 6.07e-06 | the groups differ |
+```
+
+These are R's numbers. R 4.6.0's `nls` on `datasets::Puromycin` gives Vm
+212.7 (standard error 6.947), K 0.06412 (0.008281) and a residual standard
+error of 10.93 on 10 degrees of freedom for the treated cells, and `confint`
+the same profile intervals, 197.3 to 229.3 and 0.04692 to 0.08616; the tests
+hold the command to them (`caterva/tests/test_rates_puromycin.py`). The
+interval for Km is asymmetric, 0.0172 below the estimate and 0.0220 above,
+which a +-2 SE interval cannot be. The shared-Km row is Bates & Watts' own
+question of these data, whether puromycin changes Vm only; its F of 1.718 on
+1 and 19 degrees of freedom is R's `anova` of the same two fits, and the
+test also recomputes it with `scipy.optimize.curve_fit`, sharing no code with
+the command.
+
+Without `--model`, rates with no inhibitor are also tested against substrate
+inhibition and the Hill law, and on this file the untreated group says:
+
+```
+- [untreated] The data reject Michaelis-Menten in favour of the Hill law (p = 0.0232).
+- [untreated] The Hill exponent is below 1 (n = 0.621): the rate rises more gradually with [S] than Michaelis-Menten allows. Negative cooperativity, a mixture of enzyme forms with different Km, or an error that changes with [S] all do this, and the exponent cannot say which.
+- [untreated] Two alternatives were tested, each at 0.05, so the chance that at least one rejects a true Michaelis-Menten law is up to 0.0975.
+- [untreated] Hill: Vmax 195.1 (160.1 to 399 counts/min/min), K0.5 0.08241 (0.04204 to 2.583 ppm), n 0.6207 (0.3334 to 0.9288) (95% profile intervals).
+```
+
+That F test is R's too (`anova` of the two `nls` fits gives F 7.84 on 1 and
+8, p 0.0232), and so are the Hill estimates and standard errors. R's
+`confint` cannot profile this fit (it stops at its iteration limit), so the
+Hill intervals are held instead to an independent profile, computed in the
+tests with the other two constants refitted without bounds. Whether the
+departure matters is a judgement about the experiment the command cannot
+make for you; it reports the finding and what it can and cannot mean. The
+groups' verdicts now differ, so the comparison between groups uses
+Michaelis-Menten for both and a note says so.
+
+### Inhibitors: which mechanism, and what would decide it
+
+With an inhibitor column, the default fits competitive, uncompetitive,
+noncompetitive and mixed inhibition, and tests each simpler one against
+mixed. Competitive (Ki' going to infinity) and uncompetitive (Ki going to
+infinity) are restrictions on the boundary of the parameter space, and are
+tested against the 50:50 mixture of chi-square(0) and chi-square(1), half
+the ordinary p-value (Self & Liang 1987); noncompetitive (Ki = Ki') is an
+ordinary one-degree-of-freedom test. Competitive against uncompetitive is not
+a test at all, and the report says so, printing their fit statistics and
+AICc side by side as a description. The verdict names what the data rule
+out, what they cannot tell apart, and the measurement that would: inhibited
+rates at [S] of 5 Km or more separate competitive from the rest, and at 0.2
+Km or less separate uncompetitive.
+
+Ki is the dissociation constant of the inhibitor from free enzyme (Kic) and
+Ki' from the enzyme-substrate complex (Kiu); a noncompetitive inhibitor has
+one constant that is both.
+
+### What the data determine
+
+A constant the data cannot bound is never printed as a number. Rates taken
+only far below Km determine Vmax/Km and neither constant alone, and the
+report says exactly that, with the interval of the ratio and a one-sided
+bound on each ("Km > [the bound]: the data do not determine an upper bound"),
+instead of an estimate with an absurd interval. For the Hill law the
+combination the low-[S] rates fix is Vmax/K0.5^n, not Vmax/K0.5, and the
+report names it without an interval, since its exponent is itself fitted.
+It also says whether your substrate range brackets Km, against the Assay
+Guidance Manual's design range of 0.2 to 5 Km with 8 or more concentrations,
+and lists concentrations that would (above, for the puromycin rates, whose
+lowest concentration is a third of Km).
+
+### Against the literature
+
+From the source checkout, name the enzyme, the organism and the compounds:
+
+```
+caterva rates my_rates.csv --sigma-from replicates --ec 1.1.1.27 --organism human --substrate pyruvate --inhibitor oxamate
+```
+
+The fitted Km is compared with the Km BRENDA cites for the substrate, and
+the fitted inhibition constant with the Ki BRENDA files under the inhibitor
+for the mechanism your data support, chosen by the same resolver
+`caterva compose` asks (`--isoform` narrows both). Each comparison prints the
+cited value, its BRENDA reference and commentary, what the commentary says
+about isoform, mode and construct, the spread of equally good rows, whether
+your interval contains the cited value, and the ratio, with units converted.
+When your data do not determine the constant (rates far below Km, say), no
+fitted value or ratio is printed: only the one-sided bound is held against
+the cited value.
+A mixed fit's two constants are not compared, because a database row does
+not say which of the two it measured. From the app folder the fit is
+reported and the comparison is refused, with exit code 3.
+
+### For teaching, and for papers
+
+`--show-linearizations` prints the Lineweaver-Burk, Eadie-Hofstee and
+Hanes-Woolf points and the Km and Vmax each straight line gives, beside the
+nonlinear fit, with one sentence on why they differ. They are never the
+reported estimate. For the treated cells (points left out here):
+
+```
+| Lineweaver-Burk | 1/[S] | 1/v | ... | 195.8 | 0.04841 |
+| Eadie-Hofstee | v/[S] | v | ... | 193.9 | 0.04352 |
+| Hanes-Woolf | [S] | [S]/v | ... | 216.2 | 0.06791 |
+| nonlinear fit (michaelis-menten) | | | | 212.7 | 0.06412 |
+```
+
+`--json` prints everything; `--export csv` the constants with units and
+intervals; `--export curves` the fitted curves on a grid, with the measured
+rates, one row per point and units in the headers; `--export methods` a
+methods paragraph naming the law, the weighting, the interval method, the
+references and the software versions. Exit codes are compose's: `0` done,
+`2` malformed question, `3` refused and said why, `1` a crash.
+
+---
+
 ## What it refuses to do
 
 These are decisions, not gaps, and each refusal says why:
@@ -1304,6 +1662,7 @@ If you find Caterva doing any of these, that is a bug worth reporting.
 | `Not built.` + "is a named pathway" | Needs a pathway database Caterva does not read. Describe the steps you want. |
 | `Not exported.` | The export refused and the reason is printed above it. The report still ran. |
 | Exit code 3 | Something refused and said why; the rest of the report is still there and still valid. A **refused literature search** is one of these: an enzyme name that means more than one enzyme, or a model needing a Km with no `--substrate`. A search that ran and found nothing is *not* a refusal — it produced its answer, and the provenance table states it per constant. |
+| `caterva rates`: "no uncertainty was given for the rates" | Exit 3. Add a `sigma` column, or pass `--sigma-from replicates` or `--sigma-from residuals`; the refusal names all three and what each assumes. |
 | Exit code 2 | The question was not well formed. |
 | macOS: "cannot be opened because the developer cannot be verified" | The folder is unsigned. `xattr -dr com.apple.quarantine .` inside the folder. "Open Anyway" in System Settings clears one file, not the libraries, so it will not work. |
 | Windows: "Windows protected your PC" | SmartScreen. More info > Run anyway. Run `.\caterva.exe` from a terminal. |
