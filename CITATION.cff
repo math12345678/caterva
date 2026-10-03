@@ -29,6 +29,8 @@ repository-code: "https://github.com/math12345678/caterva"
 # used" resolves to a real tag. package.json said 1.0.0 until 2026-08-29;
 # 0.1.0 was the source-only release of that date; 0.2.0 the first with
 # built artifacts (2026-09-19); 0.3.0 the first on GitHub's Releases page
-# with app folders (2026-09-21); 0.3.1 adds the user's guide (2026-09-22).
-version: 0.4.0
-date-released: 2026-09-27
+# with app folders (2026-09-21); 0.3.1 adds the user's guide (2026-09-22);
+# 0.4.0 is the rename to Caterva (2026-09-27); 0.5.0 adds Caterva Studio and
+# the enzyme finder.
+version: 0.5.0
+date-released: 2026-10-03

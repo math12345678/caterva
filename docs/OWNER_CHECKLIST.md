@@ -39,7 +39,7 @@ source .venv/bin/activate
 caterva --version
 ```
 
-You should see `caterva 0.4.0`. Then the real-data check:
+You should see `caterva 0.5.0`. Then the real-data check:
 
 ```bash
 caterva compose "Michaelis Menten" --subject 2.7.1.1 --organism human --substrate glucose
@@ -99,7 +99,7 @@ GitHub does not let this be set from the command line.
 ## Step 4 — Check the release (2 minutes)
 
 Open **<https://github.com/math12345678/caterva/releases>**. **Caterva
-v0.4.0** should be at the top, marked "Latest", with downloads for Mac,
+v0.5.0** should be at the top, marked "Latest", with downloads for Mac,
 Linux and Windows. If it is not there, open
 **<https://github.com/math12345678/caterva/actions/workflows/release.yml>**,
 and if the newest row has a red cross, click it, copy the last 40 lines of
@@ -108,13 +108,14 @@ the red job, and paste them to Claude.
 To try the Mac download:
 
 ```bash
-cd ~/Downloads && tar xzf caterva-0.4.0-macos-arm64.tar.gz && cd caterva
+cd ~/Downloads && tar xzf caterva-0.5.0-macos-arm64.tar.gz && cd caterva
 xattr -dr com.apple.quarantine .
 ./caterva compose "a toggle switch between two repressors"
 ```
 
-(The downloaded app builds and simulates models but cannot search the
-literature; the copy from Step 1 can. The app says so if you try.)
+(Since v0.5.0 the downloaded folder carries the literature search too:
+`./caterva compose "Michaelis Menten" --subject 2.7.1.1 --organism human
+--substrate glucose` cites BRENDA and needs a network connection.)
 
 ---
 
