@@ -118,6 +118,9 @@ class Concern:
     #: What to do about it, concretely. A concern with no action is a
     #: complaint.
     remedy: str = ""
+    #: A sentence for the line under "What this supports", when the concern
+    #: narrows what the verdict licenses without lowering it. Empty for most.
+    qualifier: str = ""
 
     def describe(self) -> str:
         text = f"[{self.source}] {self.detail}"
@@ -176,6 +179,10 @@ class Verdict:
             "",
             f"What this supports: {LICENCE[self.verdict]}",
         ]
+        for concern in self.concerns:
+            if concern.qualifier:
+                lines.append("")
+                lines.append(f"Qualified: {concern.qualifier}.")
 
         if self.behaviour:
             lines.append("")
@@ -444,6 +451,34 @@ def _prediction_concerns(
             f"state(s) are amounts a cell could hold{aside}"
         )
     return concerns, note
+
+
+def _isozyme_concerns(model: Any) -> Tuple[List[Concern], Optional[str]]:
+    """The enzyme is several proteins in the organism and no isoform was named.
+
+    NOT A FAULT AND NOT A DOWNGRADE. GROUNDED is earned by provenance: every
+    constant was measured and cited. It does not say WHICH protein was
+    measured, and for an EC number that is four or five human proteins the
+    constants may belong to any of them -- hexokinase's cited Km and kcat came
+    from glucokinase papers while hexokinase I's rows sit 80 to 190 times
+    lower. So this adds a concern of GROUNDED severity: it sorts below every
+    broken and structural problem, appears as the worst thing wrong when
+    nothing outranks it, and puts a qualifier under "What this supports"
+    without changing what GROUNDED licenses.
+    """
+    try:
+        from caterva.enzymes.index import organism_label
+        from caterva.enzymes.isozyme import notice_for_model
+    except ImportError:  # pragma: no cover - flat layout
+        return [], None
+    notice = notice_for_model(model)
+    if notice is None:
+        return [], None
+    return (
+        [Concern(source="isozymes", severity=GROUNDED, detail=notice.detail,
+                 remedy=notice.remedy, qualifier=notice.headline)],
+        f"EC {notice.ec} is {notice.count} proteins in {organism_label(notice.organism)}, none chosen",
+    )
 
 
 def _grounding(model: Any) -> Tuple[int, int, bool]:
@@ -804,6 +839,11 @@ def form(
     provenance_concerns, provenance_note = _provenance_concerns(model, influence)
     concerns += provenance_concerns
     consulted["provenance"] = provenance_note
+
+    isozyme_concerns, isozyme_note = _isozyme_concerns(model)
+    concerns += isozyme_concerns
+    if isozyme_note:
+        consulted["isozymes"] = isozyme_note
 
     try:
         from .assumptions import check as check_assumptions
