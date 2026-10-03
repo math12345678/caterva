@@ -1,0 +1,2068 @@
+{
+ "about": "Hand-verified expectations for the enzyme finder, for the 169 names a reviewer ran on 2026-10-03 against 4 organisms (human, mouse, yeast, E. coli), plus the names of its 'right' list and of the wrong resolutions it found. `verified` is the set of EC numbers a name may legitimately resolve to or be recommended as, from the IUBMB nomenclature (ExPASy ENZYME) and UniProtKB; `expect` is the outcome class: resolved (one enzyme, `ec`), candidates (never resolved; the listed ECs include `include` and none of `exclude`), none-honest (nothing resolved and nothing listed outside `verified`), suggestions-only (nothing resolved, every candidate a fragment or did-you-mean), unresolved (nothing resolved, nothing else asserted), resolved-or-candidates (`ec` resolved or offered). `by_organism` replaces the expectation for one organism.",
+ "organisms": [
+  "human",
+  "mouse",
+  "yeast",
+  "E. coli"
+ ],
+ "names": [
+  {
+   "query": "GAPDH",
+   "verified": [
+    "1.2.1.12",
+    "1.2.1.13",
+    "1.2.1.59"
+   ],
+   "expect": "resolved",
+   "ec": "1.2.1.12"
+  },
+  {
+   "query": "PFK",
+   "verified": [
+    "2.7.1.11",
+    "2.7.1.90",
+    "2.7.1.146",
+    "2.7.1.56"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.1.11"
+   ]
+  },
+  {
+   "query": "PK",
+   "verified": [
+    "2.7.1.40"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.1.40"
+   ]
+  },
+  {
+   "query": "LDH",
+   "verified": [
+    "1.1.1.27",
+    "1.1.1.28",
+    "1.1.1.436"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.1.1.27",
+    "1.1.1.28"
+   ]
+  },
+  {
+   "query": "MDH",
+   "verified": [
+    "1.1.1.37",
+    "1.1.1.82",
+    "1.1.1.38",
+    "1.1.1.39",
+    "1.1.1.40",
+    "1.1.5.4"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.1.1.37"
+   ]
+  },
+  {
+   "query": "ADH",
+   "verified": [
+    "1.1.1.1",
+    "1.1.1.2",
+    "1.1.1.71"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.1.1.1"
+   ]
+  },
+  {
+   "query": "ALDH",
+   "verified": [
+    "1.2.1.3",
+    "1.2.1.4",
+    "1.2.1.5",
+    "1.2.1.36",
+    "1.2.1.46",
+    "1.2.1.10",
+    "1.2.1.19",
+    "1.2.1.24",
+    "1.2.1.28"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.2.1.3"
+   ]
+  },
+  {
+   "query": "CK",
+   "verified": [
+    "2.7.3.2"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.3.2"
+   ]
+  },
+  {
+   "query": "HK",
+   "verified": [
+    "2.7.1.1",
+    "2.7.1.2",
+    "2.7.13.3"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.1.1",
+    "2.7.13.3"
+   ]
+  },
+  {
+   "query": "G6PD",
+   "verified": [
+    "1.1.1.49",
+    "1.1.1.363"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.1.1.49"
+   ]
+  },
+  {
+   "query": "COX",
+   "verified": [
+    "7.1.1.9",
+    "1.14.99.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "7.1.1.9",
+    "1.14.99.1"
+   ]
+  },
+  {
+   "query": "SOD",
+   "verified": [
+    "1.15.1.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.15.1.1"
+   ]
+  },
+  {
+   "query": "ACHE",
+   "verified": [
+    "3.1.1.7"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.1.1.7"
+   ]
+  },
+  {
+   "query": "BCHE",
+   "verified": [
+    "3.1.1.8"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.1.1.8"
+   ]
+  },
+  {
+   "query": "DHFR",
+   "verified": [
+    "1.5.1.3"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.5.1.3"
+   ]
+  },
+  {
+   "query": "TS",
+   "verified": [
+    "2.1.1.45",
+    "2.1.1.148"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.1.1.45"
+   ]
+  },
+  {
+   "query": "HMGCR",
+   "verified": [
+    "1.1.1.34",
+    "1.1.1.88"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.1.1.34"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "ACE",
+   "verified": [
+    "3.4.15.1"
+   ],
+   "expect": "resolved",
+   "ec": "3.4.15.1"
+  },
+  {
+   "query": "PDE5",
+   "verified": [
+    "3.1.4.35"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.1.4.35"
+   ]
+  },
+  {
+   "query": "CYP3A4",
+   "verified": [
+    "1.14.14.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.14.14.1"
+   ],
+   "by_organism": {
+    "mouse": {
+     "expect": "unresolved"
+    },
+    "yeast": {
+     "expect": "unresolved"
+    },
+    "E. coli": {
+     "expect": "unresolved"
+    }
+   }
+  },
+  {
+   "query": "COMT",
+   "verified": [
+    "2.1.1.6"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.1.1.6"
+   ]
+  },
+  {
+   "query": "MAOA",
+   "verified": [
+    "1.4.3.4",
+    "1.4.3.21"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.4.3.4"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "MAOB",
+   "verified": [
+    "1.4.3.4",
+    "1.4.3.21"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.4.3.4"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "PARP1",
+   "verified": [
+    "2.4.2.30"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.4.2.30"
+   ]
+  },
+  {
+   "query": "trypsin",
+   "verified": [
+    "3.4.21.4"
+   ],
+   "expect": "resolved",
+   "ec": "3.4.21.4"
+  },
+  {
+   "query": "thrombin",
+   "verified": [
+    "3.4.21.5"
+   ],
+   "expect": "resolved",
+   "ec": "3.4.21.5"
+  },
+  {
+   "query": "elastase",
+   "verified": [
+    "3.4.21.36",
+    "3.4.21.37",
+    "3.4.21.71",
+    "3.4.21.11",
+    "3.4.24.65"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.4.21.36",
+    "3.4.21.37"
+   ]
+  },
+  {
+   "query": "cathepsin B",
+   "verified": [
+    "3.4.22.1"
+   ],
+   "expect": "resolved",
+   "ec": "3.4.22.1"
+  },
+  {
+   "query": "caspase-3",
+   "verified": [
+    "3.4.22.56"
+   ],
+   "expect": "resolved",
+   "ec": "3.4.22.56"
+  },
+  {
+   "query": "HIV protease",
+   "verified": [
+    "3.4.23.16"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.4.23.16"
+   ]
+  },
+  {
+   "query": "beta-lactamase",
+   "verified": [
+    "3.5.2.6"
+   ],
+   "expect": "resolved",
+   "ec": "3.5.2.6"
+  },
+  {
+   "query": "lysozyme",
+   "verified": [
+    "3.2.1.17"
+   ],
+   "expect": "resolved",
+   "ec": "3.2.1.17"
+  },
+  {
+   "query": "RNase A",
+   "verified": [
+    "4.6.1.18"
+   ],
+   "expect": "resolved",
+   "ec": "4.6.1.18"
+  },
+  {
+   "query": "T4 lysozyme",
+   "verified": [
+    "3.2.1.17"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.2.1.17"
+   ]
+  },
+  {
+   "query": "luciferase",
+   "verified": [
+    "1.13.12.5",
+    "1.13.12.6",
+    "1.13.12.7",
+    "1.13.12.8",
+    "1.13.12.3",
+    "1.13.12.4",
+    "1.14.14.3"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.13.12.7"
+   ]
+  },
+  {
+   "query": "CAT",
+   "verified": [
+    "1.11.1.6",
+    "2.3.1.28"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.11.1.6",
+    "2.3.1.28"
+   ]
+  },
+  {
+   "query": "GST",
+   "verified": [
+    "2.5.1.18"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.5.1.18"
+   ]
+  },
+  {
+   "query": "LDHA",
+   "verified": [
+    "1.1.1.27"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.1.1.27"
+   ],
+   "exclude": [
+    "1.1.1.28"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "candidates",
+     "include": [
+      "1.1.1.28"
+     ],
+     "exclude": [
+      "1.1.1.27"
+     ]
+    }
+   },
+   "verified_by_organism": {
+    "E. coli": [
+     "1.1.1.28"
+    ]
+   }
+  },
+  {
+   "query": "PKM2",
+   "verified": [
+    "2.7.1.40"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.1.40"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "ENO1",
+   "verified": [
+    "4.2.1.11"
+   ],
+   "expect": "candidates",
+   "include": [
+    "4.2.1.11"
+   ],
+   "by_organism": {
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "IDH1",
+   "verified": [
+    "1.1.1.42"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.1.1.42"
+   ],
+   "exclude": [
+    "1.1.1.41"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "candidates",
+     "include": [
+      "1.1.1.41"
+     ],
+     "exclude": [
+      "1.1.1.42"
+     ]
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   },
+   "verified_by_organism": {
+    "yeast": [
+     "1.1.1.41"
+    ]
+   }
+  },
+  {
+   "query": "glutaminase",
+   "verified": [
+    "3.5.1.2"
+   ],
+   "expect": "resolved",
+   "ec": "3.5.1.2"
+  },
+  {
+   "query": "urease",
+   "verified": [
+    "3.5.1.5"
+   ],
+   "expect": "resolved",
+   "ec": "3.5.1.5"
+  },
+  {
+   "query": "nitrogenase",
+   "verified": [
+    "1.18.6.1"
+   ],
+   "expect": "resolved",
+   "ec": "1.18.6.1"
+  },
+  {
+   "query": "rubisco",
+   "verified": [
+    "4.1.1.39"
+   ],
+   "expect": "resolved",
+   "ec": "4.1.1.39"
+  },
+  {
+   "query": "DNA ligase",
+   "verified": [
+    "6.5.1.1",
+    "6.5.1.2",
+    "6.5.1.6",
+    "6.5.1.7"
+   ],
+   "expect": "candidates",
+   "include": [
+    "6.5.1.1",
+    "6.5.1.2"
+   ]
+  },
+  {
+   "query": "Taq",
+   "verified": [
+    "2.7.7.7"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.7.7"
+   ]
+  },
+  {
+   "query": "topoisomerase",
+   "verified": [
+    "5.6.2.1",
+    "5.6.2.2"
+   ],
+   "expect": "candidates",
+   "include": [
+    "5.6.2.1",
+    "5.6.2.2"
+   ]
+  },
+  {
+   "query": "helicase",
+   "verified": [
+    "3.6.4.12",
+    "3.6.4.13",
+    "5.6.2.3",
+    "5.6.2.4"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.6.4.12",
+    "3.6.4.13"
+   ]
+  },
+  {
+   "query": "hexokinase II",
+   "verified": [
+    "2.7.1.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.1.1"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "glucokinase",
+   "verified": [
+    "2.7.1.1",
+    "2.7.1.2"
+   ],
+   "expect": "resolved",
+   "ec": "2.7.1.2"
+  },
+  {
+   "query": "aldolase B",
+   "verified": [
+    "4.1.2.13"
+   ],
+   "expect": "candidates",
+   "include": [
+    "4.1.2.13"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "citrate synthase",
+   "verified": [
+    "2.3.3.1",
+    "2.3.3.3",
+    "2.3.3.8",
+    "2.3.3.16"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.3.3.1"
+   ]
+  },
+  {
+   "query": "carbonic anhydrase II",
+   "verified": [
+    "4.2.1.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "4.2.1.1"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "hexokinase",
+   "verified": [
+    "2.7.1.1"
+   ],
+   "expect": "resolved",
+   "ec": "2.7.1.1"
+  },
+  {
+   "query": "lactate dehydrogenase",
+   "verified": [
+    "1.1.1.27",
+    "1.1.1.28"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.1.1.27",
+    "1.1.1.28"
+   ]
+  },
+  {
+   "query": "pyruvate kinase",
+   "verified": [
+    "2.7.1.40"
+   ],
+   "expect": "resolved",
+   "ec": "2.7.1.40"
+  },
+  {
+   "query": "alcohol dehydrogenase",
+   "verified": [
+    "1.1.1.1"
+   ],
+   "expect": "resolved",
+   "ec": "1.1.1.1"
+  },
+  {
+   "query": "catalase",
+   "verified": [
+    "1.11.1.6"
+   ],
+   "expect": "resolved",
+   "ec": "1.11.1.6"
+  },
+  {
+   "query": "superoxide dismutase",
+   "verified": [
+    "1.15.1.1"
+   ],
+   "expect": "resolved",
+   "ec": "1.15.1.1"
+  },
+  {
+   "query": "acetylcholinesterase",
+   "verified": [
+    "3.1.1.7"
+   ],
+   "expect": "resolved",
+   "ec": "3.1.1.7"
+  },
+  {
+   "query": "monoamine oxidase",
+   "verified": [
+    "1.4.3.4"
+   ],
+   "expect": "resolved",
+   "ec": "1.4.3.4"
+  },
+  {
+   "query": "alpha-amylase",
+   "verified": [
+    "3.2.1.1"
+   ],
+   "expect": "resolved",
+   "ec": "3.2.1.1"
+  },
+  {
+   "query": "DNA polymerase",
+   "verified": [
+    "2.7.7.7",
+    "2.7.7.49",
+    "2.7.7.6"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.7.7"
+   ]
+  },
+  {
+   "query": "RNA polymerase",
+   "verified": [
+    "2.7.7.6",
+    "2.7.7.48",
+    "2.7.11.23",
+    "2.7.7.49"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.7.6"
+   ]
+  },
+  {
+   "query": "PGK",
+   "verified": [
+    "2.7.2.3"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.2.3"
+   ]
+  },
+  {
+   "query": "TPI",
+   "verified": [
+    "5.3.1.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "5.3.1.1"
+   ]
+  },
+  {
+   "query": "triosephosphate isomerase",
+   "verified": [
+    "5.3.1.1"
+   ],
+   "expect": "resolved",
+   "ec": "5.3.1.1"
+  },
+  {
+   "query": "phosphoglycerate kinase",
+   "verified": [
+    "2.7.2.3"
+   ],
+   "expect": "resolved",
+   "ec": "2.7.2.3"
+  },
+  {
+   "query": "enolase",
+   "verified": [
+    "4.2.1.11"
+   ],
+   "expect": "resolved",
+   "ec": "4.2.1.11"
+  },
+  {
+   "query": "aconitase",
+   "verified": [
+    "4.2.1.3"
+   ],
+   "expect": "resolved",
+   "ec": "4.2.1.3"
+  },
+  {
+   "query": "fumarase",
+   "verified": [
+    "4.2.1.2"
+   ],
+   "expect": "resolved",
+   "ec": "4.2.1.2"
+  },
+  {
+   "query": "malate dehydrogenase",
+   "verified": [
+    "1.1.1.37"
+   ],
+   "expect": "resolved",
+   "ec": "1.1.1.37"
+  },
+  {
+   "query": "glutathione S-transferase",
+   "verified": [
+    "2.5.1.18"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.5.1.18"
+   ]
+  },
+  {
+   "query": "glucose oxidase",
+   "verified": [
+    "1.1.3.4"
+   ],
+   "expect": "resolved",
+   "ec": "1.1.3.4"
+  },
+  {
+   "query": "HRP",
+   "verified": [
+    "1.11.1.7"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.11.1.7"
+   ]
+  },
+  {
+   "query": "horseradish peroxidase",
+   "verified": [
+    "1.11.1.7"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.11.1.7"
+   ]
+  },
+  {
+   "query": "alkaline phosphatase",
+   "verified": [
+    "3.1.3.1"
+   ],
+   "expect": "resolved",
+   "ec": "3.1.3.1"
+  },
+  {
+   "query": "ALP",
+   "verified": [
+    "3.1.3.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.1.3.1"
+   ]
+  },
+  {
+   "query": "PTP1B",
+   "verified": [
+    "3.1.3.48"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.1.3.48"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "Src",
+   "verified": [
+    "2.7.10.2"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.10.2"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "suggestions-only"
+    },
+    "E. coli": {
+     "expect": "suggestions-only"
+    }
+   }
+  },
+  {
+   "query": "EGFR",
+   "verified": [
+    "2.7.10.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.10.1"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "ATP synthase",
+   "verified": [
+    "7.1.2.2"
+   ],
+   "expect": "resolved",
+   "ec": "7.1.2.2"
+  },
+  {
+   "query": "NOS",
+   "verified": [
+    "1.14.13.39",
+    "1.14.14.47"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.14.13.39"
+   ]
+  },
+  {
+   "query": "nitric oxide synthase",
+   "verified": [
+    "1.14.13.39",
+    "1.14.14.47"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.14.13.39",
+    "1.14.14.47"
+   ]
+  },
+  {
+   "query": "COX-2",
+   "verified": [
+    "1.14.99.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.14.99.1"
+   ]
+  },
+  {
+   "query": "cyclooxygenase",
+   "verified": [
+    "1.14.99.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.14.99.1"
+   ]
+  },
+  {
+   "query": "lipase",
+   "verified": [
+    "3.1.1.3"
+   ],
+   "expect": "resolved",
+   "ec": "3.1.1.3"
+  },
+  {
+   "query": "chymotrypsin",
+   "verified": [
+    "3.4.21.1"
+   ],
+   "expect": "resolved",
+   "ec": "3.4.21.1"
+  },
+  {
+   "query": "pepsin",
+   "verified": [
+    "3.4.23.1"
+   ],
+   "expect": "resolved",
+   "ec": "3.4.23.1"
+  },
+  {
+   "query": "papain",
+   "verified": [
+    "3.4.22.2"
+   ],
+   "expect": "resolved",
+   "ec": "3.4.22.2"
+  },
+  {
+   "query": "proteinase K",
+   "verified": [
+    "3.4.21.64"
+   ],
+   "expect": "resolved",
+   "ec": "3.4.21.64"
+  },
+  {
+   "query": "subtilisin",
+   "verified": [
+    "3.4.21.62"
+   ],
+   "expect": "resolved",
+   "ec": "3.4.21.62"
+  },
+  {
+   "query": "xylose isomerase",
+   "verified": [
+    "5.3.1.5"
+   ],
+   "expect": "resolved",
+   "ec": "5.3.1.5"
+  },
+  {
+   "query": "glucose isomerase",
+   "verified": [
+    "5.3.1.5"
+   ],
+   "expect": "suggestions-only"
+  },
+  {
+   "query": "chitinase",
+   "verified": [
+    "3.2.1.14"
+   ],
+   "expect": "resolved",
+   "ec": "3.2.1.14"
+  },
+  {
+   "query": "cellulase",
+   "verified": [
+    "3.2.1.4"
+   ],
+   "expect": "resolved",
+   "ec": "3.2.1.4"
+  },
+  {
+   "query": "invertase",
+   "verified": [
+    "3.2.1.26"
+   ],
+   "expect": "resolved",
+   "ec": "3.2.1.26"
+  },
+  {
+   "query": "beta-galactosidase",
+   "verified": [
+    "3.2.1.23"
+   ],
+   "expect": "resolved",
+   "ec": "3.2.1.23"
+  },
+  {
+   "query": "lacZ",
+   "verified": [
+    "3.2.1.23"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.2.1.23"
+   ]
+  },
+  {
+   "query": "tyrosinase",
+   "verified": [
+    "1.14.18.1"
+   ],
+   "expect": "resolved",
+   "ec": "1.14.18.1"
+  },
+  {
+   "query": "PLA2",
+   "verified": [
+    "3.1.1.4"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.1.1.4"
+   ]
+  },
+  {
+   "query": "ribonuclease A",
+   "verified": [
+    "4.6.1.18"
+   ],
+   "expect": "candidates",
+   "include": [
+    "4.6.1.18"
+   ]
+  },
+  {
+   "query": "DPP4",
+   "verified": [
+    "3.4.14.5"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.4.14.5"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "DPP-4",
+   "verified": [
+    "3.4.14.5"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.4.14.5"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "renin",
+   "verified": [
+    "3.4.23.15"
+   ],
+   "expect": "resolved",
+   "ec": "3.4.23.15"
+  },
+  {
+   "query": "neuraminidase",
+   "verified": [
+    "3.2.1.18"
+   ],
+   "expect": "resolved",
+   "ec": "3.2.1.18"
+  },
+  {
+   "query": "HIV reverse transcriptase",
+   "verified": [
+    "2.7.7.49"
+   ],
+   "expect": "none-honest"
+  },
+  {
+   "query": "BACE1",
+   "verified": [
+    "3.4.23.46"
+   ],
+   "expect": "resolved",
+   "ec": "3.4.23.46"
+  },
+  {
+   "query": "CDK2",
+   "verified": [
+    "2.7.11.22"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.11.22"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "MMP9",
+   "verified": [
+    "3.4.24.35"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.4.24.35"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "PKA",
+   "verified": [
+    "2.7.11.11"
+   ],
+   "expect": "resolved",
+   "ec": "2.7.11.11"
+  },
+  {
+   "query": "PKC",
+   "verified": [
+    "2.7.11.13"
+   ],
+   "expect": "resolved",
+   "ec": "2.7.11.13"
+  },
+  {
+   "query": "AKT1",
+   "verified": [
+    "2.7.11.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.11.1"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "mTOR",
+   "verified": [
+    "2.7.11.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.11.1"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "HDAC",
+   "verified": [
+    "3.5.1.98"
+   ],
+   "expect": "resolved",
+   "ec": "3.5.1.98"
+  },
+  {
+   "query": "DNMT1",
+   "verified": [
+    "2.1.1.37"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.1.1.37"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "IDO1",
+   "verified": [
+    "1.13.11.52"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.13.11.52"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "ARG1",
+   "verified": [
+    "3.5.3.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.5.3.1"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "candidates",
+     "include": [
+      "6.3.4.5"
+     ],
+     "exclude": [
+      "3.5.3.1"
+     ]
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   },
+   "verified_by_organism": {
+    "yeast": [
+     "6.3.4.5"
+    ]
+   }
+  },
+  {
+   "query": "arginase",
+   "verified": [
+    "3.5.3.1"
+   ],
+   "expect": "resolved",
+   "ec": "3.5.3.1"
+  },
+  {
+   "query": "ODC",
+   "verified": [
+    "4.1.1.17"
+   ],
+   "expect": "candidates",
+   "include": [
+    "4.1.1.17"
+   ]
+  },
+  {
+   "query": "ornithine decarboxylase",
+   "verified": [
+    "4.1.1.17"
+   ],
+   "expect": "resolved",
+   "ec": "4.1.1.17"
+  },
+  {
+   "query": "ATCase",
+   "verified": [
+    "2.1.3.2"
+   ],
+   "expect": "resolved",
+   "ec": "2.1.3.2"
+  },
+  {
+   "query": "PEPCK",
+   "verified": [
+    "4.1.1.32",
+    "4.1.1.49"
+   ],
+   "expect": "candidates",
+   "include": [
+    "4.1.1.32",
+    "4.1.1.49"
+   ]
+  },
+  {
+   "query": "FBPase",
+   "verified": [
+    "3.1.3.11"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.1.3.11"
+   ]
+  },
+  {
+   "query": "fructose-1,6-bisphosphatase",
+   "verified": [
+    "3.1.3.11"
+   ],
+   "expect": "resolved",
+   "ec": "3.1.3.11"
+  },
+  {
+   "query": "G6Pase",
+   "verified": [
+    "3.1.3.9"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.1.3.9"
+   ]
+  },
+  {
+   "query": "glycogen phosphorylase",
+   "verified": [
+    "2.4.1.1"
+   ],
+   "expect": "resolved",
+   "ec": "2.4.1.1"
+  },
+  {
+   "query": "glycogen synthase",
+   "verified": [
+    "2.4.1.11"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.4.1.11"
+   ],
+   "by_organism": {
+    "E. coli": {
+     "expect": "resolved",
+     "ec": "2.4.1.21"
+    }
+   },
+   "verified_by_organism": {
+    "E. coli": [
+     "2.4.1.21"
+    ]
+   }
+  },
+  {
+   "query": "PDH",
+   "verified": [
+    "1.2.4.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.2.4.1"
+   ]
+  },
+  {
+   "query": "pyruvate dehydrogenase",
+   "verified": [
+    "1.2.4.1",
+    "1.2.5.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.2.4.1"
+   ]
+  },
+  {
+   "query": "IDH2",
+   "verified": [
+    "1.1.1.42"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.1.1.42"
+   ],
+   "exclude": [
+    "1.1.1.41"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "candidates",
+     "include": [
+      "1.1.1.41"
+     ],
+     "exclude": [
+      "1.1.1.42"
+     ]
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   },
+   "verified_by_organism": {
+    "yeast": [
+     "1.1.1.41"
+    ]
+   }
+  },
+  {
+   "query": "SDH",
+   "verified": [
+    "1.3.5.1",
+    "1.1.1.14"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.3.5.1",
+    "1.1.1.14"
+   ]
+  },
+  {
+   "query": "succinate dehydrogenase",
+   "verified": [
+    "1.3.5.1"
+   ],
+   "expect": "resolved",
+   "ec": "1.3.5.1"
+  },
+  {
+   "query": "cytochrome c oxidase",
+   "verified": [
+    "7.1.1.9"
+   ],
+   "expect": "resolved",
+   "ec": "7.1.1.9"
+  },
+  {
+   "query": "thymidylate synthase",
+   "verified": [
+    "2.1.1.45"
+   ],
+   "expect": "resolved",
+   "ec": "2.1.1.45"
+  },
+  {
+   "query": "dihydrofolate reductase",
+   "verified": [
+    "1.5.1.3"
+   ],
+   "expect": "resolved",
+   "ec": "1.5.1.3"
+  },
+  {
+   "query": "HMG-CoA reductase",
+   "verified": [
+    "1.1.1.34",
+    "1.1.1.88"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.1.1.34",
+    "1.1.1.88"
+   ]
+  },
+  {
+   "query": "angiotensin converting enzyme",
+   "verified": [
+    "3.4.15.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.4.15.1"
+   ]
+  },
+  {
+   "query": "catechol-O-methyltransferase",
+   "verified": [
+    "2.1.1.6"
+   ],
+   "expect": "resolved",
+   "ec": "2.1.1.6"
+  },
+  {
+   "query": "poly(ADP-ribose) polymerase 1",
+   "verified": [
+    "2.4.2.30"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.4.2.30"
+   ]
+  },
+  {
+   "query": "xanthine oxidase",
+   "verified": [
+    "1.17.3.2"
+   ],
+   "expect": "resolved",
+   "ec": "1.17.3.2"
+  },
+  {
+   "query": "XO",
+   "verified": [
+    "1.17.3.2"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.17.3.2"
+   ]
+  },
+  {
+   "query": "uricase",
+   "verified": [
+    "1.7.3.3"
+   ],
+   "expect": "resolved",
+   "ec": "1.7.3.3"
+  },
+  {
+   "query": "ADA",
+   "verified": [
+    "3.5.4.4"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.5.4.4"
+   ]
+  },
+  {
+   "query": "adenosine deaminase",
+   "verified": [
+    "3.5.4.4"
+   ],
+   "expect": "resolved",
+   "ec": "3.5.4.4"
+  },
+  {
+   "query": "purine nucleoside phosphorylase",
+   "verified": [
+    "2.4.2.1"
+   ],
+   "expect": "resolved",
+   "ec": "2.4.2.1"
+  },
+  {
+   "query": "PNP",
+   "verified": [
+    "2.4.2.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.4.2.1"
+   ]
+  },
+  {
+   "query": "hexokinase 1",
+   "verified": [
+    "2.7.1.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.1.1"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "HK2",
+   "verified": [
+    "2.7.1.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.1.1"
+   ]
+  },
+  {
+   "query": "GCK",
+   "verified": [
+    "2.7.1.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.1.1"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "LDHB",
+   "verified": [
+    "1.1.1.27"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.1.1.27"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "LDH-A",
+   "verified": [
+    "1.1.1.27"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.1.1.27"
+   ],
+   "exclude": [
+    "1.1.1.28"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "candidates",
+     "include": [
+      "1.1.1.28"
+     ],
+     "exclude": [
+      "1.1.1.27"
+     ]
+    }
+   },
+   "verified_by_organism": {
+    "E. coli": [
+     "1.1.1.28"
+    ]
+   }
+  },
+  {
+   "query": "PKM1",
+   "verified": [
+    "2.7.1.40"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.1.40"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "PKLR",
+   "verified": [
+    "2.7.1.40"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.1.40"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "L-lactate dehydrogenase",
+   "verified": [
+    "1.1.1.27"
+   ],
+   "expect": "resolved",
+   "ec": "1.1.1.27"
+  },
+  {
+   "query": "D-lactate dehydrogenase",
+   "verified": [
+    "1.1.1.28"
+   ],
+   "expect": "resolved",
+   "ec": "1.1.1.28"
+  },
+  {
+   "query": "ethanol dehydrogenase",
+   "verified": [
+    "1.1.1.1"
+   ],
+   "expect": "none-honest"
+  },
+  {
+   "query": "CA2",
+   "verified": [
+    "4.2.1.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "4.2.1.1"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "CA II",
+   "verified": [
+    "4.2.1.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "4.2.1.1"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "carbonic anhydrase",
+   "verified": [
+    "4.2.1.1"
+   ],
+   "expect": "resolved",
+   "ec": "4.2.1.1"
+  },
+  {
+   "query": "SOD1",
+   "verified": [
+    "1.15.1.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.15.1.1"
+   ],
+   "by_organism": {
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "CYP2D6",
+   "verified": [
+    "1.14.14.1"
+   ],
+   "expect": "none-honest"
+  },
+  {
+   "query": "CYP2C9",
+   "verified": [
+    "1.14.14.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.14.14.1"
+   ],
+   "by_organism": {
+    "mouse": {
+     "expect": "none-honest"
+    },
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "cytochrome P450",
+   "verified": [
+    "1.14.14.1"
+   ],
+   "expect": "resolved-or-candidates",
+   "ec": "1.14.14.1"
+  },
+  {
+   "query": "P450",
+   "verified": [
+    "1.14.14.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "1.14.14.1"
+   ]
+  },
+  {
+   "query": "AChE",
+   "verified": [
+    "3.1.1.7"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.1.1.7"
+   ]
+  },
+  {
+   "query": "BuChE",
+   "verified": [
+    "3.1.1.8"
+   ],
+   "expect": "candidates",
+   "include": [
+    "3.1.1.8"
+   ]
+  },
+  {
+   "query": "DHFR E coli",
+   "verified": [
+    "1.5.1.3"
+   ],
+   "expect": "none-honest"
+  },
+  {
+   "query": "creatine kinase",
+   "verified": [
+    "2.7.3.2"
+   ],
+   "expect": "resolved",
+   "ec": "2.7.3.2",
+   "right_list": true
+  },
+  {
+   "query": "HK1",
+   "verified": [
+    "2.7.1.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.1.1"
+   ]
+  },
+  {
+   "query": "HK3",
+   "verified": [
+    "2.7.1.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.1.1"
+   ]
+  },
+  {
+   "query": "AST",
+   "verified": [
+    "2.6.1.1"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.6.1.1"
+   ]
+  },
+  {
+   "query": "SYK",
+   "verified": [
+    "2.7.10.2"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.10.2"
+   ],
+   "by_organism": {
+    "yeast": {
+     "expect": "none-honest"
+    },
+    "E. coli": {
+     "expect": "none-honest"
+    }
+   }
+  },
+  {
+   "query": "PEPC",
+   "verified": [
+    "4.1.1.31"
+   ],
+   "expect": "candidates",
+   "include": [
+    "4.1.1.31"
+   ]
+  },
+  {
+   "query": "AK",
+   "verified": [
+    "2.7.4.3",
+    "2.7.1.20"
+   ],
+   "expect": "candidates",
+   "include": [
+    "2.7.4.3",
+    "2.7.1.20"
+   ]
+  },
+  {
+   "query": "GPI",
+   "verified": [
+    "5.3.1.9"
+   ],
+   "expect": "candidates",
+   "include": [
+    "5.3.1.9"
+   ]
+  }
+ ]
+}

@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: enzyme-index cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow test-ts test-studio guards pr demo publish-check evidence cli clean release-artifacts release-app
+.PHONY: enzyme-index enzyme-symbols cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow test-ts test-studio guards pr demo publish-check evidence cli clean release-artifacts release-app
 
 help:
 	@echo "Caterva"
@@ -24,6 +24,7 @@ help:
 	@echo "  make cite       REAL CONSTANTS WITH CITATIONS, for your own enzyme:"
 	@echo "                  make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM=\"Homo sapiens\""
 	@echo "  make enzyme-index  rebuild the enzyme-name index from the ExPASy ENZYME release"
+	@echo "  make enzyme-symbols  rebuild the gene-symbol table and protein names from UniProtKB"
 	@echo "  make setup      create .venv and install everything"
 	@echo "  make doctor     diagnose a setup that will not work"
 	@echo "  make check      verify the environment actually works"
@@ -444,6 +445,13 @@ enzyme-index: check-python
 	@"$(PY)" scripts/build_enzyme_index.py \
 		$(if $(ENZYME_DAT),--dat "$(ENZYME_DAT)",) \
 		$(if $(ENZCLASS),--enzclass "$(ENZCLASS)",)
+
+# Rebuild the gene-symbol table and the protein-name file the enzyme finder
+# reads (caterva/enzymes/data/symbols.json, protein_names.json.gz) from
+# UniProtKB, through the EBI Proteins API. Run by a person refreshing the data,
+# never by a test or the application; commit the result with the date it prints.
+enzyme-symbols: check-python
+	@"$(PY)" scripts/build_enzyme_symbols.py $(if $(SYMBOLS_CACHE),--cache "$(SYMBOLS_CACHE)",)
 
 cli: check-python
 	@"$(PY)" -m caterva.cli --help

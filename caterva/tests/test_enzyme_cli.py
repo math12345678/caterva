@@ -45,7 +45,7 @@ def test_a_resolved_name_prints_the_card_and_the_compose_line(capsys):
     assert "why: accepted name matches exactly" in out
     assert "reaction: pyruvate + ATP = phosphoenolpyruvate + ADP + H(+)." in out
     assert "class: Transferases > transferring phosphorus-containing groups" in out
-    assert "human proteins (2): KPYM (P14618), KPYR (P30613)" in out
+    assert "human proteins (2): PKM (P14618), PKLR (P30613)" in out
     assert 'use: caterva compose "Michaelis Menten" --subject 2.7.1.40 --organism human --substrate <substrate>' in out
     assert "ExPASy ENZYME release 02-Sep-2026, human" in out
 
@@ -149,10 +149,20 @@ def test_the_compose_line_quotes_an_organism_with_spaces():
 
 
 def test_fragments_of_longer_names_are_listed_with_exit_zero_and_called_partial(capsys):
-    code, out = run(capsys, "LDH", "--organism", "human", "--json", "--limit", "2")
+    code, out = run(capsys, "glucose isomerase", "--organism", "human", "--json")
     data = json.loads(out)
     assert data["outcome"] == "partial" and code == 0
-    assert {c["ec"] for c in data["candidates"]} == {"1.1.1.436", "1.1.1.27"}
+    assert [c["ec"] for c in data["candidates"]] == ["5.3.1.9"]
     assert all(c["partial_match"] for c in data["candidates"])
-    code, text = run(capsys, "LDH", "--organism", "human", "--limit", "2")
+    code, text = run(capsys, "glucose isomerase", "--organism", "human")
     assert code == 0 and "Did you mean one of these?" in text and "only part of one enzyme's name" in text
+
+
+def test_an_abbreviation_lists_what_it_can_mean_and_never_resolves(capsys):
+    code, out = run(capsys, "LDH", "--organism", "human", "--json", "--limit", "2")
+    data = json.loads(out)
+    assert code == 0 and data["outcome"] == "ambiguous" and data["confirm_only"] is True
+    assert [c["ec"] for c in data["candidates"]] == ["1.1.1.27", "1.1.1.28"]
+    assert data["recommended_ec"] is None and all(c["matched_by"] == "abbreviation" for c in data["candidates"])
+    code, text = run(capsys, "LDH", "--organism", "human", "--limit", "2")
+    assert "abbreviation or symbol, not an enzyme name" in text and "Recommended:" not in text

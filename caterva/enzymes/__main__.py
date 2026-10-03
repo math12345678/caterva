@@ -104,7 +104,7 @@ def _card(rank: int, candidate: Candidate, organism: Optional[str], recommended:
     if candidate.organism:
         label = organism_label(candidate.organism)
         if candidate.organism_proteins:
-            symbols = ", ".join(f"{p.symbol} ({p.accession})" for p in candidate.organism_proteins)
+            symbols = ", ".join(f"{p.label} ({p.accession})" for p in candidate.organism_proteins)
             lines.append(f"      {label} proteins ({candidate.organism_protein_count}): {symbols}")
         elif candidate.organism_protein_count:
             lines.append(f"      {label} proteins: {candidate.organism_protein_count} UniProt entries "
@@ -136,8 +136,8 @@ def _text(query: str, organism: Optional[str], result: Any, shown: Sequence[Cand
                    "citation for the wrong enzyme, not merely a wrong value.")
         if result.recommended is not None:
             recommended_ec = result.recommended.ec
-            out.append(f"Recommended: EC {recommended_ec} ({result.recommended.name}), the only one with a "
-                       "protein from the organism you gave. Confirm it with --subject "
+            out.append(f"Recommended: EC {recommended_ec} ({result.recommended.name}), the only enzyme matched "
+                       "that has a protein from the organism you gave. Confirm it with --subject "
                        f"{recommended_ec}.")
     elif outcome in ("suggestions", "partial"):
         out.append(f"Not resolved: {result.reason.rstrip('.')}. Did you mean one of these?")
@@ -153,6 +153,16 @@ def _text(query: str, organism: Optional[str], result: Any, shown: Sequence[Cand
     if outcome == "none":
         out.append("Check the spelling, or give an EC number. `caterva enzyme 1.1.1.-` lists a class.")
     return "\n".join(out).rstrip() + "\n"
+
+
+def with_recommendation(shown: Sequence[Candidate], ranked: Sequence[Candidate], result: Any) -> List[Candidate]:
+    """`shown`, plus the recommended enzyme when the limit cut it off, so what the
+    page says about the recommendation can be seen on the page."""
+    out = list(shown)
+    recommended = getattr(result, "recommended", None)
+    if recommended is not None and all(c.ec != recommended.ec for c in out):
+        out.append(next(c for c in ranked if c.ec == recommended.ec))
+    return out
 
 
 def _json(query: str, organism: Optional[str], result: Any, shown: Sequence[Candidate], total: int) -> Dict[str, Any]:
@@ -173,6 +183,7 @@ def _json(query: str, organism: Optional[str], result: Any, shown: Sequence[Cand
         payload.update(
             reason=result.reason,
             recommended_ec=result.recommended.ec if result.recommended else None,
+            confirm_only=bool(getattr(result, "confirm_only", False)),
         )
     return payload
 
@@ -186,7 +197,7 @@ def find_payload(query: str, organism: Optional[str] = None, limit: int = DEFAUL
     query = " ".join(query.split())
     result = resolve(query, organism)
     ranked = find(query, organism, limit=None)
-    return _json(query, organism, result, ranked[:limit], len(ranked))
+    return _json(query, organism, result, with_recommendation(ranked[:limit], ranked, result), len(ranked))
 
 
 def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva enzyme") -> int:
@@ -200,7 +211,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva enzyme") -> 
         return 2
     result = resolve(query, args.organism)
     ranked = find(query, args.organism, limit=None)
-    shown = ranked[: args.limit]
+    shown = with_recommendation(ranked[: args.limit], ranked, result)
     if args.json:
         print(json.dumps(_json(query, args.organism, result, shown, len(ranked)), indent=2))
     else:

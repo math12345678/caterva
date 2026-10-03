@@ -26,3 +26,26 @@ Nothing here states or implies that the SIB Swiss Institute of Bioinformatics
 endorses Caterva. If you use the nomenclature in scientific work, cite the
 ENZYME database (https://enzyme.expasy.org/). To rebuild this index from a
 newer release: make enzyme-index.
+
+
+symbols.json and protein_names.json.gz -- attribution
+
+These two files are read from UniProtKB (https://www.uniprot.org/), through
+the EBI Proteins API (https://www.ebi.ac.uk/proteins/api), by
+scripts/build_enzyme_symbols.py on the date each file records in `fetched`.
+
+Creator:    the UniProt Consortium (UniProtKB/Swiss-Prot reviewed entries)
+Licence:    Creative Commons Attribution 4.0 International (CC BY 4.0),
+            https://creativecommons.org/licenses/by/4.0/
+Source:     https://www.ebi.ac.uk/proteins/api/proteins
+
+Modifications: protein_names.json.gz keeps, for the proteins the enzyme index
+lists for HUMAN, MOUSE, YEAST and ECOLI, only the gene symbol and the names
+(recommended name, short names, alternative names up to 60 characters, gene
+synonyms). symbols.json keeps, for the gene symbols and abbreviations it lists,
+the accession of the reviewed entry, its EC numbers and the source of each
+reading; its abbreviation rows were chosen by hand and each states its basis.
+
+Nothing here states or implies that the UniProt Consortium endorses Caterva.
+If you use these names in scientific work, cite UniProt. To rebuild the files:
+make enzyme-symbols.

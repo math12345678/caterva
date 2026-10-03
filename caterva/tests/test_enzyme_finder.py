@@ -83,18 +83,21 @@ def test_l_lactate_dehydrogenase_resolves_to_the_l_enzyme():
     assert result.how == "accepted name matches exactly"
 
 
-def test_ldh_is_not_resolved_because_the_data_only_ever_uses_it_inside_a_longer_name():
-    """What the data really says: "LDH" is an alternative-name FRAGMENT of
-    EC 1.1.1.436 ("electron bifurcating LDH/Etf complex") and a UniProt
-    symbol (LDH_BACSU) under EC 1.1.1.27. No name is "LDH". It must not
-    resolve to the one that happens to contain the letters."""
+def test_ldh_is_an_abbreviation_so_it_is_listed_for_the_person_and_never_resolved():
+    """What the data says: no name is "LDH". It is the abbreviation table's reading
+    of L- and D-lactate dehydrogenase, an alternative-name FRAGMENT of EC 1.1.1.436
+    ("electron bifurcating LDH/Etf complex"), and nothing else. It lists the two
+    lactate dehydrogenases first, as readings to confirm, and the fragment after
+    them, flagged as one. It must not resolve to the one that holds the letters."""
     result = resolve("LDH", "human")
     assert isinstance(result, Ambiguous)
-    assert result.suggestions_only
+    assert result.confirm_only and not result.suggestions_only and result.recommended is None
     by_ec = {c.ec: c for c in result.candidates}
-    assert by_ec["1.1.1.436"].partial and by_ec["1.1.1.27"].partial
-    assert "LDH/Etf" in by_ec["1.1.1.436"].why
+    assert ecs(result.candidates[:2]) == ["1.1.1.27", "1.1.1.28"]
+    assert by_ec["1.1.1.27"].via == "abbreviation" and not by_ec["1.1.1.27"].partial
+    assert by_ec["1.1.1.436"].partial and "LDH/Etf" in by_ec["1.1.1.436"].why
     assert all(c.name for c in result.candidates)
+    assert "not an enzyme name" in result.reason and "does not resolve one by itself" in result.reason
 
 
 def test_pyruvate_kinase_resolves_and_ranks_first_with_no_protein_kinase_above_it():
@@ -113,7 +116,9 @@ def test_hexokinase_resolves_to_2_7_1_1_and_names_its_five_human_proteins():
     assert isinstance(result, Resolved) and result.ec == "2.7.1.1"
     found = isozymes("2.7.1.1", "human")
     assert found.count == 5
-    assert set(found.symbols) == {"HKDC1", "HXK1", "HXK2", "HXK3", "HXK4"}
+    # The mnemonics UniProt files them under, and the gene symbols people type.
+    assert set(found.mnemonics) == {"HKDC1", "HXK1", "HXK2", "HXK3", "HXK4"}
+    assert set(found.symbols) == {"HKDC1", "HK1", "HK2", "HK3", "GCK"}
 
 
 def test_glucokinase_resolves_to_the_enzyme_named_that_and_warns_it_has_no_human_protein():
@@ -125,7 +130,7 @@ def test_glucokinase_resolves_to_the_enzyme_named_that_and_warns_it_has_no_human
     assert result.candidate.organism_protein_count == 0
     (caution,) = result.cautions
     assert "lists no human protein" in caution
-    assert "EC 2.7.1.1 (hexokinase)" in caution and "HXK4" in caution
+    assert "EC 2.7.1.1 (hexokinase)" in caution and "GCK" in caution
     ranked = find("glucokinase", "human")
     by_ec = {c.ec: c for c in ranked}
     assert by_ec["2.7.1.1"].alternative_names == ("hexokinase type IV (glucokinase)",)
@@ -275,8 +280,13 @@ def test_a_typo_is_offered_only_when_nothing_better_matched():
 
 
 def test_a_short_abbreviation_is_never_offered_close_spellings():
+    # DHFR is dihydrofolate reductase by the table; the close spellings the old
+    # finder would have offered for a four-letter word are never offered.
     result = resolve("DHFR", "human")
-    assert isinstance(result, Ambiguous) and not result.candidates
+    assert isinstance(result, Ambiguous) and ecs(result.candidates) == ["1.5.1.3"]
+    assert all(c.tier != TIER_TYPO for c in result.candidates)
+    unknown = resolve("DHFQ", "human")
+    assert isinstance(unknown, Ambiguous) and not unknown.candidates
 
 
 def test_nothing_matching_says_so_and_offers_nothing():
@@ -364,14 +374,17 @@ def test_the_candidate_carries_everything_the_command_prints():
 def test_a_phrase_inside_a_longer_name_is_listed_but_never_resolved_to():
     """Found by running the names a lab types: "angiotensin converting enzyme"
     is the start of the accepted name of ACE2 (EC 3.4.17.23). ACE, the enzyme
-    people mean, is EC 3.4.15.1, whose own alternative name matches by words.
-    Resolving to the only phrase match would have cited the wrong protein."""
+    people mean, is EC 3.4.15.1. Resolving to the only phrase match would have
+    cited the wrong protein. The abbreviation table now offers ACE first, as a
+    reading to confirm, and the phrase match stays below it, flagged."""
     result = resolve("angiotensin converting enzyme", "human")
-    assert isinstance(result, Ambiguous) and result.suggestions_only
-    assert ecs(result.candidates[:2]) == ["3.4.17.23", "3.4.15.1"]
-    assert all(c.partial for c in result.candidates)
-    # The tier machinery still ranks them; it just does not decide.
-    assert [c.tier for c in result.candidates] == [5, 7]
+    assert isinstance(result, Ambiguous) and result.confirm_only
+    assert ecs(result.candidates[:2]) == ["3.4.15.1", "3.4.17.23"]
+    assert [c.partial for c in result.candidates[:2]] == [False, True]
+    # A phrase with nothing else beside it is only ever a suggestion.
+    only = resolve("kinase C", "human")
+    assert isinstance(only, Ambiguous) and only.suggestions_only
+    assert ecs(only.candidates) == ["2.7.11.13"] and only.candidates[0].partial and only.candidates[0].tier == 5
 
 
 def test_a_unique_name_inside_a_longer_one_is_not_resolved_either():

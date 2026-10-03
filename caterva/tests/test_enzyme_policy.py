@@ -202,10 +202,29 @@ def test_a_failure_with_suggestions_in_hand_still_shows_them():
 
 def test_a_fragment_of_a_longer_name_is_a_suggestion_even_when_it_is_the_only_match():
     with pytest.raises(NameNotResolved) as raised:
-        resolve_enzyme_name("LDH", "human")
+        resolve_enzyme_name("glucose isomerase", "human")
     assert raised.value.kind == SUGGESTIONS
-    assert "EC 1.1.1.27 L-lactate dehydrogenase" in str(raised.value)
+    assert "EC 5.3.1.9 glucose-6-phosphate isomerase" in str(raised.value)
     assert str(raised.value).endswith("--subject <its EC number>")
+
+
+def test_an_abbreviation_is_a_refusal_naming_what_it_can_mean_and_uniprot_is_not_asked():
+    asked = []
+
+    def uniprot(name):
+        asked.append(name)
+        return ["3.4.21.4"]
+
+    for name in ("LDH", "HK1", "ACHE", "SDH"):
+        with pytest.raises(NameNotResolved) as raised:
+            resolve_enzyme_name(name, "human", uniprot=uniprot)
+        assert raised.value.kind == AMBIGUOUS and raised.value.confirm_only, name
+        assert raised.value.named and "will not choose for you" in str(raised.value)
+        assert raised.value.recommended is None
+    assert asked == [], "the candidates the table lists are the choices; UniProt is not consulted"
+    with pytest.raises(NameNotResolved) as raised:
+        resolve_enzyme_name("ACHE", "human", rerun="--ec {ec}")
+    assert str(raised.value).endswith("re-run with --ec 3.1.1.7")
 
 
 def test_the_literature_lookup_is_available_in_a_checkout():

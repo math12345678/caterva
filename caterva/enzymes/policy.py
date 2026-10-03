@@ -19,7 +19,11 @@ THE POLICY
    protein from the organism asked about).
 3. Several: refuse, naming each candidate with its enzyme name and the
    proteins it lists for the organism, and end with the exact flag that
-   would accept one. Nothing is picked.
+   would accept one. Nothing is picked. An abbreviation or gene symbol (HK1,
+   SDH, AK, ACHE) is always this case, even when only one enzyme goes by it:
+   it is listed for a person to confirm and UniProt is not asked, because
+   the candidates the curated table lists are the choices (finder.py says
+   when an abbreviation may resolve and when it never does).
 4. Nothing, or only typo suggestions: ask the optional UniProt lookup, which
    covers a protein name that is not an enzyme name. One complete EC number
    from UniProt is returned; several are refused as in step 3; none is
@@ -65,9 +69,10 @@ class NameNotResolved(ValueError):
     def __init__(
         self, message: str, candidates: Optional[Sequence[str]] = None,
         named: Optional[Sequence[Dict[str, object]]] = None, kind: str = NONE_FOUND,
-        recommended: Optional[str] = None, rerun: str = "--subject {ec}",
+        recommended: Optional[str] = None, rerun: str = "--subject {ec}", confirm_only: bool = False,
     ):
         super().__init__(message)
+        self.confirm_only = confirm_only
         self.recommended = recommended
         self.rerun = rerun
         self.candidates: List[str] = list(candidates or [])
@@ -112,6 +117,7 @@ def _refuse(ambiguous: Ambiguous, rerun: str, kind: str) -> NameNotResolved:
         kind,
         recommended=ambiguous.recommended.ec if ambiguous.recommended is not None else None,
         rerun=rerun,
+        confirm_only=ambiguous.confirm_only,
     )
 
 
@@ -129,6 +135,7 @@ def refusal_view(exc: NameNotResolved) -> Dict[str, object]:
         "named_candidates": [dict(n) for n in exc.named],
         "candidates": list(exc.candidates),
         "recommended": exc.recommended,
+        "confirm_only": exc.confirm_only,
         "rerun_flag": exc.rerun,
     }
 

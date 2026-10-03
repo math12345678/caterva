@@ -27,6 +27,8 @@ from __future__ import annotations
 
 import gzip
 import json
+import re
+import unicodedata
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -41,50 +43,81 @@ DELETED = "deleted"
 #: code -> (binomial, short label used in messages, other names people type).
 #: One species each, as in caterva/compose/organisms.py: "monkey" or "bacteria"
 #: are many species and are not here. The first thirteen are the organisms
-#: the index lists proteins for; the rest have counts only.
+#: the index lists proteins for; the rest have counts only. Names are
+#: compared after `_norm`, so "H. sapiens", "h sapiens" and "H.sapiens" are
+#: one spelling.
 ORGANISMS: Dict[str, Tuple[str, str, Tuple[str, ...]]] = {
-    "HUMAN": ("Homo sapiens", "human", ("humans",)),
-    "MOUSE": ("Mus musculus", "mouse", ()),
-    "RAT": ("Rattus norvegicus", "rat", ()),
-    "YEAST": ("Saccharomyces cerevisiae", "yeast", ("baker's yeast", "budding yeast")),
-    "ECOLI": ("Escherichia coli", "E. coli", ("e.coli", "ecoli")),
-    "BOVIN": ("Bos taurus", "cow", ("bovine", "cattle")),
-    "PIG": ("Sus scrofa", "pig", ("porcine",)),
-    "CHICK": ("Gallus gallus", "chicken", ()),
-    "ARATH": ("Arabidopsis thaliana", "Arabidopsis", ("arabidopsis",)),
+    "HUMAN": ("Homo sapiens", "human", ("humans", "h. sapiens", "man")),
+    "MOUSE": ("Mus musculus", "mouse", ("mice", "m. musculus")),
+    "RAT": ("Rattus norvegicus", "rat", ("rats", "r. norvegicus")),
+    "YEAST": ("Saccharomyces cerevisiae", "yeast", (
+        "baker's yeast", "bakers yeast", "budding yeast", "brewer's yeast", "s. cerevisiae",
+        "s. cerevisiae s288c", "saccharomyces cerevisiae s288c")),
+    "ECOLI": ("Escherichia coli", "E. coli", (
+        "e.coli", "ecoli", "e. coli k-12", "e. coli k12", "escherichia coli k-12",
+        "escherichia coli k12", "e. coli mg1655", "e. coli k-12 mg1655",
+        "escherichia coli str. k-12 substr. mg1655")),
+    "BOVIN": ("Bos taurus", "cow", ("bovine", "cattle", "b. taurus")),
+    "PIG": ("Sus scrofa", "pig", ("porcine", "s. scrofa")),
+    "CHICK": ("Gallus gallus", "chicken", ("g. gallus",)),
+    "ARATH": ("Arabidopsis thaliana", "Arabidopsis", ("arabidopsis", "a. thaliana")),
     "BACSU": ("Bacillus subtilis", "B. subtilis", ("b. subtilis",)),
-    "DROME": ("Drosophila melanogaster", "fruit fly", ("fruit fly", "drosophila")),
+    "DROME": ("Drosophila melanogaster", "fruit fly", ("fruit fly", "drosophila", "d. melanogaster")),
     "CAEEL": ("Caenorhabditis elegans", "C. elegans", ("c. elegans",)),
-    "RABIT": ("Oryctolagus cuniculus", "rabbit", ()),
-    "SCHPO": ("Schizosaccharomyces pombe", "fission yeast", ("fission yeast",)),
-    "DANRE": ("Danio rerio", "zebrafish", ()),
-    "XENLA": ("Xenopus laevis", "Xenopus laevis", ("xenopus",)),
+    "RABIT": ("Oryctolagus cuniculus", "rabbit", ("o. cuniculus",)),
+    "SCHPO": ("Schizosaccharomyces pombe", "fission yeast", ("fission yeast", "s. pombe")),
+    "DANRE": ("Danio rerio", "zebrafish", ("d. rerio",)),
+    "XENLA": ("Xenopus laevis", "Xenopus laevis", ("xenopus", "x. laevis")),
     "MYCTU": ("Mycobacterium tuberculosis", "M. tuberculosis", ("m. tuberculosis",)),
-    "HORSE": ("Equus caballus", "horse", ()),
-    "SHEEP": ("Ovis aries", "sheep", ()),
+    "HORSE": ("Equus caballus", "horse", ("e. caballus",)),
+    "SHEEP": ("Ovis aries", "sheep", ("o. aries",)),
 }
+
+#: What a code covers when it is narrower than the name people type for it.
+#: UniProt files each E. coli strain under its own code; ENZYME's ECOLI is
+#: K-12, so an EC with proteins only in another strain has "no E. coli
+#: protein" here and nowhere else.
+ORGANISM_SCOPE: Dict[str, str] = {
+    "ECOLI": "E. coli K-12 (UniProt code ECOLI; proteins of other E. coli strains are filed under other "
+             "codes and are not counted)",
+}
+
+
+def _norm(text: str) -> str:
+    """Case, punctuation and spacing set aside: "E. coli K-12" is "e coli k 12"."""
+    return " ".join(re.sub(r"[^0-9a-z]+", " ", unicodedata.normalize("NFKC", str(text)).lower()).split())
+
 
 _NAME_TO_CODE: Dict[str, str] = {}
 for _code, (_binomial, _label, _aliases) in ORGANISMS.items():
     for _name in (_binomial, _label, _code, *_aliases):
-        _NAME_TO_CODE[" ".join(_name.lower().split())] = _code
+        _NAME_TO_CODE[_norm(_name)] = _code
 
 
 def organism_code(text: Optional[str]) -> Optional[str]:
     """The UniProt organism code for what a person typed, or None.
 
     None means "not recognised", never "assume human": the caller then ranks
-    without an organism and may say so.
+    without an organism and may say so. The one normaliser every caller
+    shares, so "H. sapiens", "Homo sapiens", "human", "S. cerevisiae",
+    "yeast" and "E. coli K-12" are read the same way everywhere.
     """
     if not text:
         return None
-    return _NAME_TO_CODE.get(" ".join(str(text).lower().split()))
+    return _NAME_TO_CODE.get(_norm(text))
 
 
 def organism_label(code: str) -> str:
     """Short name for messages: `human`, `E. coli`; the code itself if unknown."""
     entry = ORGANISMS.get(code)
     return entry[1] if entry else code
+
+
+def organism_scope(code: Optional[str]) -> str:
+    """What `code` covers, for a sentence that claims a protein is absent."""
+    if not code:
+        return ""
+    return ORGANISM_SCOPE.get(code) or organism_label(code)
 
 
 @dataclass(frozen=True)
@@ -96,8 +129,33 @@ class Protein:
 
     @property
     def symbol(self) -> str:
-        """The entry name without its organism suffix: LDHA from LDHA_HUMAN."""
+        """The entry name without its organism suffix: HXK1 from HXK1_HUMAN.
+
+        This is UniProt's entry-name MNEMONIC, which is not the gene symbol
+        (ACES_HUMAN is the ACHE gene, KSYK_HUMAN is SYK, and SYK_HUMAN is a
+        lysine--tRNA ligase). Use `gene` for the gene symbol."""
         return self.entry_name.rpartition("_")[0] or self.entry_name
+
+    @property
+    def gene(self) -> Optional[str]:
+        """The gene symbol UniProt gives this entry (HK1 for HXK1_HUMAN), or None."""
+        from .protein_names import info
+
+        found = info(self.accession)
+        return found.gene if found else None
+
+    @property
+    def label(self) -> str:
+        """The name to show a person: the gene symbol when UniProt gives one, else the mnemonic."""
+        return self.gene or self.symbol
+
+    @property
+    def names(self) -> Tuple[str, ...]:
+        """The names UniProt gives the protein: its gene symbol, short names and other names."""
+        from .protein_names import info
+
+        found = info(self.accession)
+        return found.names if found else ()
 
 
 @dataclass(frozen=True)
@@ -183,5 +241,5 @@ def load_index(path: Optional[str] = None) -> EnzymeIndex:
 __all__ = [
     "ACTIVE", "TRANSFERRED", "DELETED", "ORGANISMS", "INDEX_PATH",
     "Protein", "EnzymeEntry", "EnzymeIndex",
-    "organism_code", "organism_label", "load_index",
+    "ORGANISM_SCOPE", "organism_code", "organism_label", "organism_scope", "load_index",
 ]
