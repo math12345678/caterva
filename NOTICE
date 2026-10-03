@@ -8,12 +8,33 @@ licensed under the Apache License, Version 2.0 (see LICENSE).
 THIRD-PARTY SOFTWARE
 ====================
 
-Caterva does not bundle, vendor or redistribute any of its dependencies.
+What Caterva distributes depends on the artifact. The source, the wheel and
+the sdist do not bundle, vendor or redistribute any Python dependency:
 `requirements.txt` names them; pip fetches them from PyPI onto the user's
 own machine. That fact does most of the work below, because almost every
 obligation in an open-source licence attaches on DISTRIBUTION, and
 distributing source that NAMES a dependency is not distributing the
 dependency.
+
+Two artifacts are different, and this file says so rather than saying
+"nothing is bundled":
+
+  * The app folders and Caterva.app (since v0.3.0 and v0.5.0) carry the
+    Python runtime and the Python libraries (see "WHAT IS ACTUALLY
+    DISTRIBUTED" below).
+  * Caterva Studio's page, which Caterva.app carries (and a checkout can
+    build), bundles JavaScript packages and three typefaces: React, d3,
+    Radix UI, markdown-it, lucide-react, Recharts and the rest of the 88
+    packages the build found in the page, under MIT, ISC, BSD, 0BSD and the
+    Unlicense, and the typefaces Spectral, Atkinson Hyperlegible Next and DM
+    Mono under the SIL Open Font License 1.1. Their licence texts are in
+    `licenses/THIRD-PARTY-NOTICES.txt`, written by the page's build from its
+    own module graph (the build fails if a bundled package has no licence
+    text or a licence outside that list), and the three typefaces' texts, copied
+    unmodified from their packages, sit beside it. Inside Caterva.app they
+    are under `Contents/Resources/caterva/_internal/caterva/studio/static/
+    licenses/`, and Help, Licences opens that folder, the Python
+    components' `licenses/` folder and this file.
 
 Verified 2026-08-15 by reading the licence metadata and licence files of the
 installed distributions, not from memory. Where the installed version
@@ -142,8 +163,13 @@ WHAT IS ACTUALLY DISTRIBUTED, AS OF v0.3.0 (2026-09-21)
   hypothetical.
 
   1. THE WHEEL AND THE SDIST (since v0.2.0). They contain Caterva's own
-  code (Apache-2.0), LICENSE, and this NOTICE. They contain NO third-party
-  library. They NAME python-libsbml (LGPL-2.1-or-later) as a dependency in
+  code (Apache-2.0), LICENSE, and this NOTICE. That includes
+  `caterva/_literature/` (since v0.5.0): copies of the literature layer's
+  modules from `Tests/`, which are Caterva's own code, written by
+  `scripts/vendor_literature.py`. No BRENDA page, recorded answer or other
+  fixture is in the wheel, the sdist, the app folders or Caterva.app; the
+  literature search reads BRENDA, NCBI, UniProt and PubChem live. They
+  contain NO third-party library. They NAME python-libsbml (LGPL-2.1-or-later) as a dependency in
   their metadata, and pip fetches it from PyPI onto the user's machine at
   install time, exactly as `requirements.txt` did before. Distributing a
   package that names a dependency is not conveying the dependency; the

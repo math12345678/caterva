@@ -4,7 +4,9 @@
  * Two modes, one page:
  *
  * - `vite build` writes the page into caterva/studio/static at the
- *   repository root, where `caterva studio` serves it and replaces the
+ *   repository root, with licenses/THIRD-PARTY-NOTICES.txt beside it (the
+ *   licence text of every package in the bundle; the build fails if one has
+ *   none: tools/thirdPartyNotices.ts), where `caterva studio` serves it and replaces the
  *   session-token placeholder in index.html (docs/studio/CONTRACT.md,
  *   "Static serving"). That directory is built at release time and is not
  *   committed.
@@ -27,6 +29,7 @@ import path from "node:path";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type Plugin, searchForWorkspaceRoot } from "vite";
+import { thirdPartyNotices } from "./tools/thirdPartyNotices";
 
 const TOKEN_PLACEHOLDER = "__CATERVA_SESSION_TOKEN__";
 const studioApi = process.env.STUDIO_API;
@@ -114,7 +117,7 @@ const devStub: DevStub = {
 
 export default defineConfig({
   base: "/",
-  plugins: [react(), tailwindcss(), studioDevSession(devStub), studioDevStub(devStub)],
+  plugins: [react(), tailwindcss(), thirdPartyNotices(import.meta.dirname), studioDevSession(devStub), studioDevStub(devStub)],
   resolve: {
     alias: { "@": path.resolve(import.meta.dirname, "src") },
     dedupe: ["react", "react-dom"],
