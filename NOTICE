@@ -54,6 +54,7 @@ differed from the pin, that is noted.
   beautifulsoup4   MIT
   lxml             BSD-3-Clause
   httpx            BSD-3-Clause
+  certifi          MPL-2.0                       its CA bundle, unmodified; ships in the app
   pydantic         MIT
   pytest           MIT                           dev only
   hypothesis       MPL-2.0                       dev only

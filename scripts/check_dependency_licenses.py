@@ -158,6 +158,11 @@ PERMISSION: dict[str, tuple[str, str]] = {
     # --- HTTP / parsing ---------------------------------------------------
     "requests": ("Apache-2.0", "Use, modify, redistribute, commercially; attribution."),
     "httpx": ("BSD-3-Clause", "Use, modify and redistribute with the notice retained."),
+    "certifi": (
+        "MPL-2.0",
+        "File-level copyleft over its certificate bundle. Caterva ships that bundle unmodified, so the "
+        "source of the file is the file itself, from the package of the same version on PyPI.",
+    ),
     "beautifulsoup4": ("MIT", "Use, copy, modify, distribute, sell."),
     "lxml": ("BSD-3-Clause", "Use, modify and redistribute with the notice retained."),
     "pydantic": ("MIT", "Use, copy, modify, distribute, sell."),
