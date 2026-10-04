@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "148 test files -- kinetics & Michaelis-Menten correctness, " +
+          "154 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -209,8 +209,19 @@ export const TEST_SUITES: TestSuite[] = [
         // job), 0 failed, and 8 errors at setup. The 8 are
         // tests/test_studio_socket.py, which binds a loopback port; the
         // sandbox this run was made in refuses to bind one, they run in CI,
-        // and they are NOT counted as passed here: 4320.
-        passed: 4320,
+        // and they are NOT counted as passed here: 4320. Then the Studio
+        // security, design and packaging work and the finder's per-host
+        // network status, merged: a full run of caterva/ on the merged tree
+        // (2026-10-03, .venv, JavaScript packages present) collected 6085
+        // tests and gave 6070 passed, 1 skipped, 3 failed and 10 errors at
+        // setup. The 10 are tests/test_studio_socket.py (the sandbox refuses
+        // to bind a port; run in CI, not counted). Of the 3 failures, one is
+        // the codegen selftest, which calls npm and could not write its log
+        // folder in the sandbox (not counted), and two were fixed and re-run
+        // (test_complex.py passed in full, 15; test_studio_enzymes.py passed
+        // in full, 51) with 2 tests added (one in test_complex.py, one in
+        // test_enzyme_source.py, both passing): 6074.
+        passed: 6074,
         skipped: 1,
         failed: 0,
       },
@@ -263,9 +274,15 @@ export const TEST_SUITES: TestSuite[] = [
         // and passes with them) and 1 failed, a scan of caterva/ that saw the
         // literature layer's build-time copies; the scan now skips them and
         // its file passes (16 passed with test_recorded_env_is_test_only.py):
-        // 1573.
-        passed: 1573,
-        skipped: 1,
+        // 1573. Then the merged Studio branches (2026-10-03, .venv, a full
+        // run of Tests/ with stdpopsim present and JavaScript packages
+        // installed): 1610 collected, 1609 passed and 1 failed, the investor
+        // figures test, which read stale counts and passes once they are
+        // current. The 21 test_popgen_resolver.py tests ran there and skip in
+        // CI, which does not install stdpopsim, so the figure CI collects is
+        // 1610 less 21: 1589.
+        passed: 1589,
+        skipped: 0,
         failed: 0,
       },
     ],
