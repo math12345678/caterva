@@ -24,7 +24,7 @@ OUT = ROOT / "md-smoke"
 if str(ROOT) not in sys.path:  # run as scripts/md_smoke.py, the checkout is not on the path
     sys.path.insert(0, str(ROOT))
 
-from caterva.analyze.sasa import routes_agree_nm2, state  # noqa: E402
+from caterva.analyze.sasa import BURIED, EXPOSED, routes_agree_nm2, state  # noqa: E402
 
 
 def _distance_rows(text: str) -> dict:
@@ -272,11 +272,15 @@ def _verdicts_differ(native: dict, gromacs: dict, rows_n: dict, rows_g: dict) ->
     """(explained, unexplained) residues whose verdicts differ between the
     routes. The areas agree only to a tolerance, so a share near 20% or 40%
     can round into a different state on each route, and the verdict with
-    it: that difference is explained when some pair of the routes' areas
-    (the start, a replica's mean or an end of its middle-95% range, all of
-    which the verdict reads) fall in different states. A difference in the
-    verdicts with every pair in the same state is the verdict logic
-    disagreeing with itself, which is a failure."""
+    it. The verdict reads the start, each replica's mean and its middle-95%
+    range, and also individual frames, whose shares lie between the lowest
+    and the highest of those areas. A difference is explained when some
+    pair of the routes' areas falls in different states, or when a
+    threshold lies within the routes' allowed disagreement of that span
+    (some frame can then sit either side of it on each route). A
+    difference in the verdicts for a residue whose areas are all clear of
+    both thresholds is the verdict logic disagreeing with itself, which is
+    a failure."""
     explained, unexplained = [], []
     for label in native:
         if native[label][1] == gromacs.get(label, (None, None))[1]:
@@ -285,6 +289,11 @@ def _verdicts_differ(native: dict, gromacs: dict, rows_n: dict, rows_g: dict) ->
         pairs = list(zip(rows_n.get(label, ()), rows_g.get(label, ())))
         near = largest is not None and any(state(round(a / largest, 2)) != state(round(b / largest, 2))
                                            for a, b in pairs)
+        if not near and largest and pairs:
+            areas = [x for pair in pairs for x in pair]
+            allowance = routes_agree_nm2(max(areas))
+            near = any(min(areas) - allowance <= share * largest <= max(areas) + allowance
+                       for share in (BURIED, EXPOSED))
         (explained if near else unexplained).append(label)
     return explained, unexplained
 

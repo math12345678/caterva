@@ -12,6 +12,7 @@ here and compared, with only the machine's version strings masked.
 from __future__ import annotations
 
 import io
+import math
 import json
 import re
 from contextlib import redirect_stderr, redirect_stdout
@@ -32,21 +33,29 @@ _VERSION = re.compile(r'"caterva": "[^"]*"')
 
 _FLOAT = re.compile(r"(?<![\w.])-?\d+\.\d+(?:[eE][+-]?\d+)?(?![\w.])")
 
-
-def _to_ten_digits(match: "re.Match[str]") -> str:
-    return format(float(match.group(0)), ".10g")
+#: Platform differences in a fit's last digits: the optimiser's own stopping
+#: tolerance (about 1e-8) differs between machines on poorly determined laws,
+#: so a result is the same to 1e-6 relative, and a refactor that changed one
+#: would change it by far more.
+REL_TOL = 1e-6
 
 
 def mask(text: str) -> str:
-    """The version lines, and every decimal number to 10 significant digits.
+    return _VERSION.sub('"caterva": "VERSION"', _SOFTWARE.sub("Caterva VERSION (caterva rates), Python X, NumPy X, SciPy X", text))
 
-    The golden output was captured on one machine and runs on others: the
-    profile-likelihood roots agree to about 15 digits and differ in the last
-    one or two between platforms, which says nothing about whether the
-    command's output changed. Ten digits still catches any real change.
+
+def assert_same_output(got: str, want: str) -> None:
+    """Equal text, with every decimal number equal to REL_TOL.
+
+    The golden output was captured on one machine and runs on others. All
+    that is not a decimal number must match exactly.
     """
-    text = _VERSION.sub('"caterva": "VERSION"', _SOFTWARE.sub("Caterva VERSION (caterva rates), Python X, NumPy X, SciPy X", text))
-    return _FLOAT.sub(_to_ten_digits, text)
+    got, want = mask(got), mask(want)
+    assert _FLOAT.sub("#", got) == _FLOAT.sub("#", want)
+    a, b = _FLOAT.findall(got), _FLOAT.findall(want)
+    assert len(a) == len(b)
+    for x, y in zip(a, b):
+        assert math.isclose(float(x), float(y), rel_tol=REL_TOL, abs_tol=1e-12), (x, y)
 
 
 def no_literature(**_kwargs):
@@ -68,5 +77,5 @@ def test_the_command_prints_what_it_printed_before(path, monkeypatch):
         except SystemExit as exc:  # argparse
             code = exc.code
     assert code == golden["exit"]
-    assert mask(out.getvalue()) == mask(golden["stdout"])
-    assert mask(err.getvalue()) == mask(golden["stderr"])
+    assert_same_output(out.getvalue(), golden["stdout"])
+    assert_same_output(err.getvalue(), golden["stderr"])

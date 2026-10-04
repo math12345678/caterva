@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "158 test files -- kinetics & Michaelis-Menten correctness, " +
+          "159 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -230,7 +230,10 @@ export const TEST_SUITES: TestSuite[] = [
         // per-shape cases for the new Rates shapes, all passing in focused
         // runs on the branch (2026-10-04):
         // 6235 as CI collects it with stdpopsim hidden.
-        passed: 6235,
+        // Then the md smoke run's verdict-explanation rule: 4 tests in
+        // test_md_smoke_verdicts.py, all passing in a focused run
+        // (2026-10-04): 6239.
+        passed: 6239,
         skipped: 1,
         failed: 0,
       },
