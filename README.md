@@ -118,7 +118,7 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 5,143 tests (3,593 engine + 1,550 literature)
+make test      # runs all 5,903 tests (4,329 engine + 1,574 literature)
 ```
 
 ### Or download the release
@@ -580,18 +580,18 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Caterva/
 ├── caterva/                  simulation engine (ODE + discrete/stochastic)
 │   ├── caterva_engine.py     public entry point (88 names)
-│   └── tests/                3,593 tests
+│   └── tests/                4,329 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1550 tests
+│   └── ...                   1574 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
 │   └── adr/                    176 decision records (and counting)
-├── scripts/                    76 guard scripts + build verification
+├── scripts/                    77 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
 │   └── ...                     see scripts/README.md for the full list
@@ -671,10 +671,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 5,143 tests
+make test        # run all 5,903 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (3,593 tests)
-make test-lit    # literature layer only (1550 tests)
-python3 scripts/verify_build.py --quick  # all 76 guard scripts, incl. TypeScript compile
+make test-sim    # simulation engine only (4,329 tests)
+make test-lit    # literature layer only (1574 tests)
+python3 scripts/verify_build.py --quick  # all 77 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```
