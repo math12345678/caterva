@@ -383,8 +383,13 @@ class App:
             if call.route.handler == "find_enzymes":
                 # The finder spends CPU on every string it has not seen: at most a few at once, answers
                 # kept by normalised query, and a time budget per request (limits.py).
+                # The answer also says whether UniProt may be asked, which follows what the studio last
+                # learned about the network, so what it learned is part of the key.
+                known = self._what_is_known()
+                asked = (bool(known["offline"]), (known["network"].get("hosts") or {}).get("rest.uniprot.org") is True,
+                         bool((known["literature"] or {}).get("available")))
                 key = (limits.normalise_text(call.query.get("q")), limits.normalise_text(call.query.get("organism")),
-                       call.query.get("limit"))
+                       call.query.get("limit"), asked)
                 answer = self.finder.run(key, lambda: fn(endpoint_request))
             else:
                 answer = fn(endpoint_request)

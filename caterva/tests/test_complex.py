@@ -117,7 +117,7 @@ def test_the_protein_keeps_its_chain_and_drops_every_hetatm():
 
 
 def test_the_command_writes_a_build_from_a_local_entry(tmp_path, capsys):
-    (tmp_path / "e.pdb").write_text("".join(
+    (tmp_path / "1abc.pdb").write_text("".join(
         f"HETATM{i:5d}  {n:<3} LIG A 400    {x * 10:8.3f}{y * 10:8.3f}{z * 10:8.3f}  1.00  0.00           {n[0]}\n"
         for i, (n, (x, y, z)) in enumerate(HEAVY.items(), 1)) + PDB.split("HETATM")[0])
     R, t = _rot([0, 1, 1], 0.7), np.array([2.0, 2.0, 2.0])
@@ -127,16 +127,26 @@ def test_the_command_writes_a_build_from_a_local_entry(tmp_path, capsys):
     (tmp_path / "lig.gro").write_text("\n".join(lines) + "\n   5.0 5.0 5.0\n")
     (tmp_path / "lig.itp").write_text("[ moleculetype ]\nLIG 3\n")
     out = tmp_path / "out"
-    code = cx.main(["--pdb", str(tmp_path / "e.pdb"), "--ligand", "LIG", "--ligand-itp", str(tmp_path / "lig.itp"),
+    code = cx.main(["--pdb", str(tmp_path / "1abc.pdb"), "--ligand", "LIG", "--ligand-itp", str(tmp_path / "lig.itp"),
                     "--ligand-coords", str(tmp_path / "lig.gro"), "--out", str(out)])
     assert code == 0
     for f in ("protein.pdb", "ligand.gro", "lig.itp", "build.sh", "BUILD.md", "em.mdp", "nvt.mdp", "npt.mdp"):
         assert (out / f).is_file(), f
     build = (out / "build.sh").read_text()
-    assert '#include \\"lig.itp\\"' in build and "genion" in build and "npt" in build
+    assert "'#include \"lig.itp\"'" in build and "genion" in build and "npt" in build
     assert "10.1107/S0567739476001873" in (out / "BUILD.md").read_text()
     # The gro rounds to 1e-3 nm, so the fit is exact to that, not to 1e-9.
     assert "RMSD 0.00" in capsys.readouterr().out
+
+
+def test_a_local_entry_not_named_by_a_pdb_id_is_refused_and_says_so(tmp_path, capsys):
+    (tmp_path / "e.pdb").write_text(PDB)
+    (tmp_path / "i.itp").write_text("[ moleculetype ]\nLIG 3\n")
+    (tmp_path / "l.gro").write_text("t\n    0\n   1.0 1.0 1.0\n")
+    code = cx.main(["--pdb", str(tmp_path / "e.pdb"), "--ligand", "LIG", "--ligand-itp", str(tmp_path / "i.itp"),
+                    "--ligand-coords", str(tmp_path / "l.gro"), "--out", str(tmp_path / "out")])
+    assert code == cx.EXIT_REFUSED
+    assert "is not a PDB id" in capsys.readouterr().err
 
 
 # --- did the ligand keep its pose through equilibration ------------------------

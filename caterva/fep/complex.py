@@ -36,7 +36,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from caterva.fep.setup import moleculetype_name
-from caterva.md.setup import Conditions, MdSetup
+from caterva.md.setup import Conditions, MdSetup, check_pdb_id
 from caterva.methods import METHODS
 
 EXIT_OK, EXIT_CRASH, EXIT_USAGE, EXIT_REFUSED = 0, 1, 2, 3
@@ -509,11 +509,17 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva complex") ->
             print(f"{prog}: {f} does not exist", file=sys.stderr)
             return EXIT_REFUSED
     local = Path(a.pdb)
+    pdb_id = local.stem if local.is_file() else a.pdb.upper()
+    try:
+        check_pdb_id(pdb_id)
+    except ValueError:
+        print(f"{prog}: {a.pdb} is not a PDB id, and a local entry is named by its id (1I10.pdb): "
+              "a PDB id is four characters, a digit then three letters or digits", file=sys.stderr)
+        return EXIT_REFUSED
     try:
         if local.is_file():
-            pdb_text, pdb_id = local.read_text(), local.stem
+            pdb_text = local.read_text()
         else:
-            pdb_id = a.pdb.upper()
             with urllib.request.urlopen(f"https://files.rcsb.org/download/{pdb_id}.pdb", timeout=30) as r:
                 pdb_text = r.read().decode()
     except Exception as e:
