@@ -60,6 +60,12 @@ describe("states", () => {
     expect(outcomeLine(bindNoRows.run as never)).toBe(first);
   });
 
+  it("says a run recorded before outages were named as one by its host, not by the exception", () => {
+    const reason = "Refused: the structure search could not run: HTTPError: 503 Server Error: Backend fetch failed for url: https://rest.uniprot.org/uniprotkb/search?query=x";
+    const line = outcomeLine({ status: "finished", outcome: { meaning: "refused", summary: reason, reason } } as never);
+    expect(line).toBe("UniProt did not answer. Check the network, then try again.");
+  });
+
   it("keeps a paragraph-long summary out of the heading and still prints it once (compose, recorded)", () => {
     const outcome = composeRefused.run.outcome as Outcome;
     render(<OutcomeNotice outcome={outcome} />);

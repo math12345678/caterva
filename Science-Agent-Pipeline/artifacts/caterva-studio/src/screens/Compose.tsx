@@ -18,6 +18,7 @@ import { useRef, useState } from "react";
 
 import { apiJson, apiPost } from "@/api/client";
 import { isCompleteEc, subjectFields } from "@/api/enzymes";
+import { plain } from "@/lib/copy";
 import type { ComposeAnalyses, ComposeRequest, NormaliseOrganismResponse, ShapesResponse } from "@/api/types";
 import { useRun } from "@/api/useRun";
 import { Disclosure } from "@/components/forms/Disclosure";
@@ -208,7 +209,7 @@ export default function ComposeScreen() {
     const name = form.organism.trim();
     if (!name) return setOrganismNote(null);
     apiPost<NormaliseOrganismResponse>("/api/organisms/normalise", { name }).then(
-      (r) => setOrganismNote(r.note),
+      (r) => setOrganismNote(r.note ? plain(r.note) : null),
       () => setOrganismNote(null),
     );
   };

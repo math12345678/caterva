@@ -31,6 +31,7 @@ import { MarkdownReport } from "@/components/report/Report";
 import { Screen, Section } from "@/components/screen/Screen";
 import { EmptyState } from "@/components/states/States";
 import { DataTable } from "@/components/table/DataTable";
+import { plain } from "@/lib/copy";
 import { useCapabilities } from "@/lib/queries";
 
 import { EntryView } from "./structure/EntryView";
@@ -216,10 +217,10 @@ export function StructureResultView({
         </h2>
         {(result.subject_notes ?? []).map((note) => (
           <p className="st-prose" key={note}>
-            {note}
+            {plain(note)}
           </p>
         ))}
-        {result.organism_note ? <p className="st-prose">{result.organism_note}</p> : null}
+        {result.organism_note ? <p className="st-prose">{plain(result.organism_note)}</p> : null}
       </div>
 
       <Section title="Proteins with this EC number" aside={chosen ? "isoforms kept apart" : "choose one to see its entries"}>

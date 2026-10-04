@@ -134,6 +134,29 @@ carries (NumPy 2.2.6, SciPy 1.15.3, libRoadRunner 2.8.0) are built for macOS
 `ProcessInfo` and shows a plain alert on an older macOS instead of starting a
 server that cannot import them.
 
+## Looking at the page while developing
+
+The session token is in the URL fragment of the address the server prints,
+never in a page it serves, so a browser opened at the bare address
+(`http://127.0.0.1:PORT`, which is all a preview pane opens) has no token and
+says so. Two routes work:
+
+- **The development origin.** Start the server with
+  `--dev-origin http://127.0.0.1:18711` and the Vite dev server
+  (`pnpm run dev` in `artifacts/caterva-studio`, `STUDIO_API` set to the
+  server's address, port 18711). Vite fetches `/api/dev/session` itself and
+  the page gets the token without a fragment (docs/studio/CONTRACT.md,
+  section 5). This shows the source, not the built page.
+- **The built page, with the fragment.** Build it
+  (`pnpm run build`), start the server with `--dev-origin` as above, open
+  `http://127.0.0.1:PORT/api/dev/session` as a top-level navigation (it
+  refuses any request that carries an `Origin`, so `fetch` from another page
+  is refused), copy the `token` it answers, and open
+  `http://127.0.0.1:PORT/#token=THAT_TOKEN`. The page reads the fragment,
+  removes it from the address and keeps the token for the tab. Without
+  `--dev-origin`, use `caterva studio --no-browser --print-url` and open the
+  address it prints.
+
 ## Things to know when running more than one server
 
 - **Settings are last-writer-wins.** Each server reads `settings.json` from

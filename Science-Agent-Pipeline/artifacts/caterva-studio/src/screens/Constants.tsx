@@ -100,6 +100,7 @@ export function constantsForm(request: Record<string, unknown>): ConstantsForm {
 
 export default function ConstantsScreen() {
   const [form, setForm] = useState<ConstantsForm>(EMPTY_CONSTANTS);
+  const [needsEnzyme, setNeedsEnzyme] = useState(false);
   const reopened = useReopenedRun();
   const linked = useLinkedQuestion(["ec", "enzyme", "organism", "substrate"]);
   const run = useRun("constants", reopened);
@@ -126,17 +127,24 @@ export default function ConstantsScreen() {
       id="constants.submit"
       label="Look up"
       hint="python3 scripts/cite.py, every row with its paper"
-      onSubmit={() => void run.submit(constantsRequest(form))}
+      onSubmit={() => {
+        const missing = !isCompleteEc(form.ec);
+        setNeedsEnzyme(missing);
+        if (!missing) void run.submit(constantsRequest(form));
+      }}
       running={running}
       onCancel={() => void run.cancel()}
     >
       <EnzymeFinder
         value={form.ec}
-        onChange={(ec) => setForm((f) => ({ ...f, ec, ecSeed: "" }))}
+        onChange={(ec) => {
+          setNeedsEnzyme(false);
+          setForm((f) => ({ ...f, ec, ecSeed: "" }));
+        }}
         organism={form.organism}
         seed={form.ecSeed}
         hint="A name, an abbreviation or an EC number. Choose one from the list: the lookup is made for its EC number."
-        error={err("ec") ?? err("enzyme")}
+        error={needsEnzyme ? "Choose an enzyme from the list first: the lookup is made for its EC number." : (err("ec") ?? err("enzyme"))}
       />
       <Field label="Organism" hint="Required: the organism is never inferred." error={err("organism")}>
         <TextInput value={form.organism} onChange={(e) => set("organism", e.target.value)} />

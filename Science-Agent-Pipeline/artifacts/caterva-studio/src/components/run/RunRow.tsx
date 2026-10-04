@@ -22,6 +22,9 @@ export function outcomeLine(run: Pick<RunSummary, "status" | "outcome">): string
   if (run.outcome) {
     const { summary, reason, meaning } = run.outcome;
     if (meaning === "network") return networkSentence(run.outcome.network ?? networkFailureOf(reason));
+    // A run recorded before the server named an outage as one: its reason still carries the exception.
+    const legacy = meaning === "refused" ? networkFailureOf(reason) : null;
+    if (legacy) return networkSentence(legacy);
     if (meaning === "produced" || !reason) return plain(summary);
     const first = reason.split("\n")[0].trim();
     const said = summary.trim();
