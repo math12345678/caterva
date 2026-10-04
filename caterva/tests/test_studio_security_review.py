@@ -51,8 +51,8 @@ def make_app(tmp_path: Path, *, run=None, registry=None, job_options=None, **kwa
     return app
 
 
-def req(app: App, method: str, target: str, body: Any = None, *, token: bool = True, extra=()):
-    headers = [HOST] + ([AUTH] if token else []) + list(extra)
+def req(app: App, method: str, target: str, body: Any = None, *, authed: bool = True, extra=()):
+    headers = [HOST] + ([AUTH] if authed else []) + list(extra)
     raw = None
     if body is not None:
         raw = json.dumps(body).encode()
@@ -80,14 +80,14 @@ def app(tmp_path):
 
 @pytest.mark.parametrize("path", ["/", "/compose", "/index.html", "/assets/index-abc.js", "/history/x"])
 def test_s1_no_document_the_server_serves_holds_the_token(app, path):
-    response = req(app, "GET", path, token=False)
+    response = req(app, "GET", path, authed=False)
     assert response.status in (200, 404)
     assert TOKEN.encode() not in response.body
     assert TOKEN not in json.dumps(response.headers)
 
 
 def test_s1_the_built_page_never_carries_a_placeholder_or_a_session_tag(app):
-    body = req(app, "GET", "/", token=False).body.decode()
+    body = req(app, "GET", "/", authed=False).body.decode()
     assert "__CATERVA_SESSION_TOKEN__" not in body and 'name="caterva-session"' not in body
 
 
@@ -97,12 +97,12 @@ def test_s1_a_stranger_with_only_a_valid_host_cannot_reach_a_gromacs_run(tmp_pat
     evil = program(tmp_path / "evil.sh")
     app = make_app(tmp_path, run=lambda *a, **k: ran.append(a))
     try:
-        assert req(app, "GET", "/", token=False).status == 200  # nothing in it to use
+        assert req(app, "GET", "/", authed=False).status == 200  # nothing in it to use
         refused = req(app, "PUT", "/api/settings", {"theme": "system", "max_parallel_runs": 2,
                                                     "confirm_delete": True, "gromacs_path": str(evil)},
-                      token=False)
+                      authed=False)
         assert refused.status == 401
-        assert req(app, "GET", "/api/capabilities", token=False).status == 401
+        assert req(app, "GET", "/api/capabilities", authed=False).status == 401
         assert ran == []
     finally:
         app.close()
@@ -279,7 +279,7 @@ def test_s1_reading_capabilities_never_runs_the_chosen_program(tmp_path):
             assert refreshed.status == 200 and refreshed.json()["gromacs"]["found"] is True
             assert len(ran) == 2
             assert req(again, "POST", "/api/capabilities/refresh", {"x": 1}).status == 400
-            assert req(again, "POST", "/api/capabilities/refresh", {}, token=False).status == 401
+            assert req(again, "POST", "/api/capabilities/refresh", {}, authed=False).status == 401
         finally:
             again.close()
     finally:

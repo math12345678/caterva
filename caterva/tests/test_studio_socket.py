@@ -15,6 +15,7 @@ never have been tested anywhere.
 from __future__ import annotations
 
 import http.client
+from urllib.parse import urlsplit
 import json
 import os
 import signal
@@ -149,9 +150,12 @@ def test_print_url_then_sigterm_stops_with_exit_0(tmp_path):
         cwd=REPO, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
         line = process.stdout.readline()
-        assert line.startswith(URL_LINE_PREFIX + "http://127.0.0.1:") and line.endswith("/\n")
+        assert line.startswith(URL_LINE_PREFIX + "http://127.0.0.1:") and line.endswith("\n")
         url = line[len(URL_LINE_PREFIX):].strip()
-        port = int(url.rsplit(":", 1)[1].rstrip("/"))
+        parts = urlsplit(url)
+        # The session token travels in the fragment, which a browser never sends to a server.
+        assert parts.path == "/" and parts.fragment.startswith("token=") and len(parts.fragment) > len("token=")
+        port = parts.port
         conn = http.client.HTTPConnection("127.0.0.1", port, timeout=30)
         conn.request("GET", "/")
         assert conn.getresponse().status == 200
