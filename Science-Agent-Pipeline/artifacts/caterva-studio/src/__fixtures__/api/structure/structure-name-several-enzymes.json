@@ -12,11 +12,11 @@
  "outcome": {
   "exit_code": 3,
   "meaning": "refused",
-  "summary": "Refused: 'lactate dehydrogenase' names 2 enzymes. Best matches first:",
-  "reason": "Refused: 'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. Re-run with the one you meant, for example --subject 1.1.1.27",
+  "summary": "Refused: 12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:",
+  "reason": "Refused: 12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. Re-run with the one you meant, for example --subject 1.1.1.27",
   "name_refusal": {
    "kind": "ambiguous",
-   "message": "'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. Re-run with the one you meant, for example --subject 1.1.1.27",
+   "message": "12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. Re-run with the one you meant, for example --subject 1.1.1.27",
    "named_candidates": [
     {
      "ec": "1.1.1.27",
@@ -33,6 +33,7 @@
      "status": "active",
      "superseded_by": [],
      "partial_match": false,
+     "matched_by": "name",
      "label": "EC 1.1.1.27 L-lactate dehydrogenase"
     },
     {
@@ -50,6 +51,7 @@
      "status": "active",
      "superseded_by": [],
      "partial_match": false,
+     "matched_by": "name",
      "label": "EC 1.1.1.28 D-lactate dehydrogenase"
     },
     {
@@ -69,6 +71,7 @@
      "status": "active",
      "superseded_by": [],
      "partial_match": false,
+     "matched_by": "name",
      "label": "EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)"
     },
     {
@@ -86,6 +89,7 @@
      "status": "active",
      "superseded_by": [],
      "partial_match": true,
+     "matched_by": "name",
      "label": "EC 1.1.5.12 D-lactate dehydrogenase (quinone)"
     },
     {
@@ -103,6 +107,7 @@
      "status": "active",
      "superseded_by": [],
      "partial_match": true,
+     "matched_by": "name",
      "label": "EC 1.1.99.6 D-lactate dehydrogenase (acceptor)"
     },
     {
@@ -120,6 +125,7 @@
      "status": "active",
      "superseded_by": [],
      "partial_match": true,
+     "matched_by": "name",
      "label": "EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)"
     },
     {
@@ -137,6 +143,7 @@
      "status": "active",
      "superseded_by": [],
      "partial_match": true,
+     "matched_by": "name",
      "label": "EC 1.1.2.4 D-lactate dehydrogenase (cytochrome)"
     },
     {
@@ -154,6 +161,7 @@
      "status": "active",
      "superseded_by": [],
      "partial_match": true,
+     "matched_by": "name",
      "label": "EC 1.1.1.111 3-(imidazol-5-yl)lactate dehydrogenase"
     },
     {
@@ -171,6 +179,7 @@
      "status": "active",
      "superseded_by": [],
      "partial_match": true,
+     "matched_by": "name",
      "label": "EC 1.1.1.436 lactate dehydrogenase (NAD(+),ferredoxin)"
     },
     {
@@ -188,6 +197,7 @@
      "status": "active",
      "superseded_by": [],
      "partial_match": true,
+     "matched_by": "name",
      "label": "EC 1.1.2.5 D-lactate dehydrogenase (cytochrome c-553)"
     },
     {
@@ -208,6 +218,7 @@
      "status": "active",
      "superseded_by": [],
      "partial_match": true,
+     "matched_by": "name",
      "label": "EC 1.1.1.110 aromatic 2-oxoacid reductase"
     },
     {
@@ -227,6 +238,7 @@
      "status": "active",
      "superseded_by": [],
      "partial_match": true,
+     "matched_by": "name",
      "label": "EC 1.1.1.375 L-2-hydroxycarboxylate dehydrogenase [NAD(P)(+)]"
     }
    ],
@@ -245,6 +257,7 @@
     "1.1.1.375"
    ],
    "recommended": null,
+   "confirm_only": false,
    "rerun_flag": "--subject {ec}"
   }
  },

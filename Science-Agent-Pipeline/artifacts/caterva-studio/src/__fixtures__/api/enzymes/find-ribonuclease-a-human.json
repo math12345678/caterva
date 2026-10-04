@@ -1,0 +1,60 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=ribonuclease%20A&organism=human"
+ },
+ "status": 200,
+ "body": {
+  "query": "ribonuclease A",
+  "organism": "human",
+  "organism_code": "HUMAN",
+  "organism_label": "human",
+  "release": "02-Sep-2026",
+  "outcome": "ambiguous",
+  "resolved_ec": null,
+  "how": null,
+  "cautions": [],
+  "reason": "'ribonuclease A' is an abbreviation or symbol, not an enzyme name, and Caterva does not resolve one by itself",
+  "recommended_ec": null,
+  "confirm_only": true,
+  "candidates_total": 1,
+  "candidates": [
+   {
+    "ec": "4.6.1.18",
+    "name": "pancreatic ribonuclease",
+    "why": "RNase A is a common abbreviation for pancreatic ribonuclease",
+    "tier": 2,
+    "reaction": "(1) an [RNA] containing cytidine + H2O = an [RNA]-3'-cytidine-3'-phosphate + a 5'-hydroxy-ribonucleotide-3'-[RNA]. (2) an [RNA] containing uridine + H2O = an [RNA]-3'-uridine-3'-phosphate + a 5'-hydroxy-ribonucleotide-3'-[RNA].",
+    "class_path": "Lyases > phosphorus-oxygen lyases > phosphorus-oxygen lyases",
+    "alternative_names": [],
+    "organism": "HUMAN",
+    "organism_proteins": [
+     {
+      "accession": "P07998",
+      "entry_name": "RNAS1_HUMAN",
+      "symbol": "RNAS1",
+      "gene": "RNASE1",
+      "label": "RNASE1"
+     },
+     {
+      "accession": "P10153",
+      "entry_name": "RNAS2_HUMAN",
+      "symbol": "RNAS2",
+      "gene": "RNASE2",
+      "label": "RNASE2"
+     }
+    ],
+    "organism_protein_count": 2,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "abbreviation",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 4.6.1.18 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   }
+  ],
+  "fallback": null
+ }
+}

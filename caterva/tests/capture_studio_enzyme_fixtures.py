@@ -27,7 +27,7 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
-from urllib.parse import quote
+from urllib.parse import quote, quote_plus
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
@@ -149,7 +149,8 @@ def main() -> None:
             ("COX", "E. coli"), ("ribonuclease A", "human"),
         ]:
             target = f"/api/enzymes/find?q={quote(query)}" + (f"&organism={quote(organism)}" if organism else "")
-            slug = "-".join(filter(None, [query.replace(" ", "-").replace(".", "-").lower(), organism]))
+            slug = "-".join(filter(None, [query.replace(" ", "-").replace(".", "-").lower(),
+                                          organism.replace(". ", "-").replace(" ", "-").lower() if organism else None]))
             write(ENZYMES / f"find-{slug}.json", get_json(app, target))
         # A transferred and a deleted number, from the nomenclature itself: the first of each in EC order.
         from caterva.enzymes import load_index
@@ -166,7 +167,7 @@ def main() -> None:
         # An EC number that is several proteins, a broad class, an E. coli (K-12) count, and the two retired kinds.
         write(ENZYMES / "detail-1.1.1.1-human.json", get_json(app, "/api/enzymes/1.1.1.1?organism=human"))
         write(ENZYMES / "detail-2.7.11.1-human.json", get_json(app, "/api/enzymes/2.7.11.1?organism=human"))
-        write(ENZYMES / "detail-1.1.1.1-e-coli.json", get_json(app, "/api/enzymes/1.1.1.1?organism=" + quote("E. coli")))
+        write(ENZYMES / "detail-1.1.1.1-e-coli.json", get_json(app, "/api/enzymes/1.1.1.1?organism=" + quote_plus("E. coli")))
         for status, need_one in (("transferred", True), ("deleted", False)):
             ec = next(e for e in sorted(entries) if entries[e].status == status
                       and (len(entries[e].superseded_by) == 1 if need_one else not entries[e].superseded_by))
@@ -188,6 +189,9 @@ def main() -> None:
                                  "substrate": "pyruvate"}, "compose-ldh-human-pyruvate")
             run(app, "compose", {"description": "Michaelis Menten", "subject": "lactate dehydrogenase",
                                  "organism": "human", "substrate": "pyruvate"}, "compose-name-several-enzymes")
+        # A line of equilibria: the count of steady states found depends on where the search started.
+        run(app, "compose", {"description": "two enzymes competing for the same substrate"},
+            "compose-two-enzymes-competing")
         with hexokinase_offline():
             run(app, "compose", {"description": "Michaelis Menten", "subject": "2.7.1.1", "organism": "human",
                                  "substrate": "glucose"}, "compose-hexokinase-human-glucose")
@@ -205,22 +209,32 @@ def main() -> None:
             run(app, "constants", {"ec": "2.7.1.1", "organism": "human", "substrate": "glucose"},
                 "constants-hexokinase-human-glucose")
 
-        # A REAL lookup, outside the recordings: UniProt's protein-name search for hexokinase. The server notes
-        # that it was answered, and says so in /api/capabilities. Nothing is written if it could not be made.
+        # A REAL lookup, outside the recordings: PubChem's compound-name search, through the HTTP layer the
+        # literature layer uses. The server notes that the host answered, and says so in /api/capabilities,
+        # for that host alone. Nothing is written if it could not be made.
         from caterva.checkout import literature_module
 
+        http_retry = literature_module("http_retry")
+        http_retry.clear_memo()
+        answer = http_retry.retry_get("https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/gossypol/cids/JSON",
+                                      timeout=20)
+        assert answer.status_code == 200, f"PubChem answered {answer.status_code}"
+        capabilities = get_json(app, "/api/capabilities")
+        network = capabilities["body"]["network"]
+        assert network["source"] == "use" and network["hosts"]["pubchem.ncbi.nlm.nih.gov"] is True
+        assert network["hosts"]["rest.uniprot.org"] is None, "one host's answer says nothing about another's"
+        write(ENZYMES / "capabilities-after-a-lookup.json", capabilities)
+
+        # A REAL request to UniProt: asked for hexokinase's EC numbers. With UniProt then known to be reachable, a
+        # name the nomenclature does not hold is asked of UniProt. If UniProt does not answer, the file that needs
+        # it is NOT rewritten and the script says so.
         try:
             answered = literature_module("enzyme_lookup").fetch_ec_numbers_by_name("hexokinase", None, timeout=20)
-        except Exception as exc:  # noqa: BLE001 - reported; the two files that need UniProt are then kept as they are
+        except Exception as exc:  # noqa: BLE001 - reported; the file is then kept as it was
             answered = None
-            print(f"UniProt did not answer ({type(exc).__name__}: {exc}); capabilities-after-a-lookup.json and "
-                  "find-pyruvate-kinase-pkm-human.json were NOT rewritten")
+            print(f"UniProt did not answer ({type(exc).__name__}); find-pyruvate-kinase-pkm-human.json was NOT rewritten")
         if answered:
-            capabilities = get_json(app, "/api/capabilities")
-            network = capabilities["body"]["network"]
-            assert network["source"] == "use" and network["hosts"]["rest.uniprot.org"] is True
-            write(ENZYMES / "capabilities-after-a-lookup.json", capabilities)
-            # With UniProt known to be reachable, a name the nomenclature does not hold is asked of UniProt.
+            assert get_json(app, "/api/capabilities")["body"]["network"]["hosts"]["rest.uniprot.org"] is True
             write(ENZYMES / "find-pyruvate-kinase-pkm-human.json",
                   get_json(app, f"/api/enzymes/find?q={quote('pyruvate kinase PKM')}&organism=human"))
 

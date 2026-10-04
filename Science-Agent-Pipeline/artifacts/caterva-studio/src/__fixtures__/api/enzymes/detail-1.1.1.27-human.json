@@ -7,6 +7,8 @@
  "body": {
   "ec": "1.1.1.27",
   "name": "L-lactate dehydrogenase",
+  "name_note": null,
+  "replaced_by": [],
   "alternative_names": [
    "L-lactic acid dehydrogenase",
    "L-lactic dehydrogenase"
@@ -24,30 +26,87 @@
     {
      "accession": "Q6ZMR3",
      "entry_name": "LDH6A_HUMAN",
-     "symbol": "LDH6A"
+     "symbol": "LDH6A",
+     "gene": "LDHAL6A",
+     "label": "LDHAL6A",
+     "names": [
+      "LDHAL6A",
+      "LDH6A",
+      "LDHL2",
+      "LDHA-like protein 6A",
+      "L-lactate dehydrogenase A-like 6A"
+     ],
+     "engine_matches": true
     },
     {
      "accession": "Q9BYZ2",
      "entry_name": "LDH6B_HUMAN",
-     "symbol": "LDH6B"
+     "symbol": "LDH6B",
+     "gene": "LDHAL6B",
+     "label": "LDHAL6B",
+     "names": [
+      "LDHAL6B",
+      "LDH6B",
+      "LDHAL6",
+      "LDHL",
+      "L-lactate dehydrogenase A-like 6B"
+     ],
+     "engine_matches": true
     },
     {
      "accession": "P00338",
      "entry_name": "LDHA_HUMAN",
-     "symbol": "LDHA"
+     "symbol": "LDHA",
+     "gene": "LDHA",
+     "label": "LDHA",
+     "names": [
+      "LDHA",
+      "LDH-A",
+      "LDH-M",
+      "LDH muscle subunit",
+      "Renal carcinoma antigen NY-REN-59"
+     ],
+     "engine_matches": true
     },
     {
      "accession": "P07195",
      "entry_name": "LDHB_HUMAN",
-     "symbol": "LDHB"
+     "symbol": "LDHB",
+     "gene": "LDHB",
+     "label": "LDHB",
+     "names": [
+      "LDHB",
+      "LDH-B",
+      "LDH-H",
+      "LDH heart subunit",
+      "Renal carcinoma antigen NY-REN-46"
+     ],
+     "engine_matches": true
     },
     {
      "accession": "P07864",
      "entry_name": "LDHC_HUMAN",
-     "symbol": "LDHC"
+     "symbol": "LDHC",
+     "gene": "LDHC",
+     "label": "LDHC",
+     "names": [
+      "LDHC",
+      "LDH3",
+      "LDHX",
+      "LDH-C",
+      "CT32",
+      "Cancer/testis antigen 32",
+      "LDH testis subunit",
+      "LDH-X"
+     ],
+     "engine_matches": true
     }
    ],
-   "organism_known": true
+   "organism_known": true,
+   "broad": false,
+   "note": "EC 1.1.1.27 has 5 human isozymes in the enzyme nomenclature's UniProt entries (LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat. Pass --isoform with one of these names (for example --isoform LDHAL6A) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused.",
+   "organism_scope": null,
+   "filed_elsewhere": null
   }
  }
 }

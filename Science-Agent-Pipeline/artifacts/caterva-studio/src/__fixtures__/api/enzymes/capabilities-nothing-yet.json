@@ -22,7 +22,46 @@
     "rest.uniprot.org": null,
     "search.rcsb.org": null,
     "files.rcsb.org": null,
-    "eutils.ncbi.nlm.nih.gov": null
+    "eutils.ncbi.nlm.nih.gov": null,
+    "pubchem.ncbi.nlm.nih.gov": null
+   },
+   "host_status": {
+    "www.brenda-enzymes.org": {
+     "reachable": null,
+     "checked_at": null,
+     "source": null,
+     "reason": null
+    },
+    "rest.uniprot.org": {
+     "reachable": null,
+     "checked_at": null,
+     "source": null,
+     "reason": null
+    },
+    "search.rcsb.org": {
+     "reachable": null,
+     "checked_at": null,
+     "source": null,
+     "reason": null
+    },
+    "files.rcsb.org": {
+     "reachable": null,
+     "checked_at": null,
+     "source": null,
+     "reason": null
+    },
+    "eutils.ncbi.nlm.nih.gov": {
+     "reachable": null,
+     "checked_at": null,
+     "source": null,
+     "reason": null
+    },
+    "pubchem.ncbi.nlm.nih.gov": {
+     "reachable": null,
+     "checked_at": null,
+     "source": null,
+     "reason": null
+    }
    },
    "checked_at": null,
    "source": null,
@@ -40,11 +79,11 @@
   },
   "ui": {
    "built": false,
-   "static_dir": "/tmp/claude-501/caterva-enzyme-fixtures-7zo_zztb/no-build",
-   "reason": "the page has not been built: /tmp/claude-501/caterva-enzyme-fixtures-7zo_zztb/no-build/index.html does not exist. Build it with `pnpm --filter @workspace/caterva-studio run build` from Science-Agent-Pipeline/"
+   "static_dir": "/tmp/claude-501/caterva-enzyme-fixtures-4_35k7r3/no-build",
+   "reason": "the page has not been built: /tmp/claude-501/caterva-enzyme-fixtures-4_35k7r3/no-build/index.html does not exist. Build it with `pnpm --filter @workspace/caterva-studio run build` from Science-Agent-Pipeline/"
   },
   "data_dir": {
-   "path": "/tmp/claude-501/caterva-enzyme-fixtures-7zo_zztb/data",
+   "path": "/tmp/claude-501/caterva-enzyme-fixtures-4_35k7r3/data",
    "writable": true,
    "runs": 0,
    "reason": null

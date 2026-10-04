@@ -1,0 +1,66 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=COX&organism=E.%20coli"
+ },
+ "status": 200,
+ "body": {
+  "query": "COX",
+  "organism": "E. coli",
+  "organism_code": "ECOLI",
+  "organism_label": "E. coli",
+  "release": "02-Sep-2026",
+  "outcome": "ambiguous",
+  "resolved_ec": null,
+  "how": null,
+  "cautions": [],
+  "reason": "'COX' is an abbreviation or symbol, not an enzyme name, and Caterva does not resolve one by itself; 2 enzymes go by it",
+  "recommended_ec": null,
+  "confirm_only": true,
+  "candidates_total": 2,
+  "candidates": [
+   {
+    "ec": "7.1.1.9",
+    "name": "cytochrome-c oxidase",
+    "why": "COX is a common abbreviation for cytochrome-c oxidase and, as COX-1 and COX-2, cyclooxygenase; it is also used for other enzymes, so the choice is yours",
+    "tier": 2,
+    "reaction": "4 Fe(II)-[cytochrome c] + O2 + 8 H(+)(in) = 4 Fe(III)-[cytochrome c] + 2 H2O + 4 H(+)(out).",
+    "class_path": "Translocases > catalysing the translocation of hydrons > hydron translocation or charge separation linked to oxidoreductase reactions",
+    "alternative_names": [],
+    "organism": "ECOLI",
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "abbreviation",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 7.1.1.9 --organism 'E. coli' --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "1.14.99.1",
+    "name": "prostaglandin-endoperoxide synthase",
+    "why": "COX is a common abbreviation for cytochrome-c oxidase and, as COX-1 and COX-2, cyclooxygenase; it is also used for other enzymes, so the choice is yours",
+    "tier": 2,
+    "reaction": "(5Z,8Z,11Z,14Z)-eicosatetraenoate + AH2 + 2 O2 = prostaglandin H2 + A + H2O.",
+    "class_path": "Oxidoreductases > acting on paired donors, with incorporation or reduction of molecular oxygen. The oxygen incorporated need not be derived from O2 > miscellaneous",
+    "alternative_names": [],
+    "organism": "ECOLI",
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "abbreviation",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 1.14.99.1 --organism 'E. coli' --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   }
+  ],
+  "fallback": null,
+  "organism_scope": "E. coli K-12 (UniProt code ECOLI; proteins of other E. coli strains are filed under other codes and are not counted)"
+ }
+}

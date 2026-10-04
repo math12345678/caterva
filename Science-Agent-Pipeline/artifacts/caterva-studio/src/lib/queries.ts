@@ -46,7 +46,7 @@ export function useCapabilities(enabled = true) {
   });
 }
 
-/** Contacts the five hosts of CONTRACT.md 10.2; only when the reader asks. */
+/** Contacts the database hosts of CONTRACT.md 10.2; only when the reader asks. */
 export function probeNetwork(): Promise<Capabilities> {
   return apiJson<Capabilities>("/api/capabilities?probe=network", {}, CapabilitiesSchema);
 }

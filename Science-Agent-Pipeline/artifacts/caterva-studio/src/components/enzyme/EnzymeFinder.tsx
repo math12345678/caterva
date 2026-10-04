@@ -92,6 +92,9 @@ export function summaryLine(answer: EnzymeFindResponse): string {
     case "resolved":
       return answer.candidates.length > 1 ? `${q} names one enzyme; the others listed also matched.` : `${q} names one enzyme.`;
     case "ambiguous":
+      if (answer.confirm_only) {
+        return `${q} is an abbreviation or gene symbol, so it is never chosen for you. ${total === 1 ? "This is what it can mean" : `${total} enzymes can be meant`}: choose the one you mean.`;
+      }
       return `${total} enzymes match ${q}. Choose the one you mean.`;
     case "partial":
       return `${q} matches only part of an enzyme name, or is a protein symbol. Choose one, or type more of the name.`;
@@ -133,6 +136,7 @@ function rowsOf(answer: EnzymeFindResponse | undefined): Row[] {
         status: "active",
         superseded_by: [],
         partial_match: false,
+        matched_by: "uniprot",
       },
     });
   }
@@ -157,6 +161,7 @@ function rowsOf(answer: EnzymeFindResponse | undefined): Row[] {
         status: "active",
         superseded_by: [],
         partial_match: false,
+        matched_by: "ec",
       },
     });
   }
@@ -178,6 +183,8 @@ function Option({
   active,
   organismLabel,
   organismAsked,
+  scope,
+  total,
   onChoose,
   onHover,
 }: {
@@ -186,13 +193,17 @@ function Option({
   active: boolean;
   organismLabel: string | null;
   organismAsked: boolean;
+  /** What the organism code covers when narrower than its name. */
+  scope: string | null;
+  /** How many enzymes the finder matched in all, listed or not. */
+  total: number;
   onChoose: () => void;
   onHover: () => void;
 }) {
   const c = row.candidate;
   const status = statusText(c);
   const proteins = c.organism_proteins;
-  const line = row.source === "nomenclature" ? organismLine(proteins, c.organism_protein_count, organismLabel, organismAsked) : null;
+  const line = row.source === "nomenclature" ? organismLine(proteins, c.organism_protein_count, organismLabel, organismAsked, scope) : null;
   const disabled = row.choose === null;
   return (
     <li
@@ -214,6 +225,8 @@ function Option({
         <span className="enz-ec font-mono">EC {c.ec}</span>
         {c.name ? <span className="enz-name">{c.name}</span> : null}
         {c.recommended ? <span className="chip" data-tone="signal">suggested</span> : null}
+        {c.matched_by === "abbreviation" ? <span className="chip">abbreviation or symbol</span> : null}
+        {c.matched_by === "mnemonic" ? <span className="chip">UniProt entry name</span> : null}
         {row.source === "uniprot" ? <span className="chip">from UniProt</span> : null}
         {row.source === "given" ? <span className="chip" data-tone="caution">use as given</span> : null}
         {status ? <span className="chip" data-tone="caution">{status}</span> : null}
@@ -230,7 +243,9 @@ function Option({
         </span>
       ) : null}
       {c.recommended ? (
-        <span className="enz-note">The only one of these with a {organismLabel ?? "listed"} protein. Suggested, not chosen: you choose.</span>
+        <span className="enz-note">
+          The only one of the {total} enzymes matched that has a {organismLabel ?? "listed"} protein. Suggested, not chosen: you choose.
+        </span>
       ) : null}
       {c.status === "transferred" && c.superseded_by.length === 1 ? (
         <span className="enz-note">Choosing this uses EC {c.superseded_by[0]}, which replaced it.</span>
@@ -391,6 +406,10 @@ export function EnzymeFinder({
               {shown?.name ? <span className="enz-name">{shown.name}</span> : detail.isPending ? <span className="muted">reading the nomenclature</span> : null}
             </span>
             {shown?.reaction ? <span className="enz-reaction">{shown.reaction}</span> : null}
+            {detail.data?.name_note ? <span className="enz-note">{detail.data.name_note}</span> : null}
+            {detail.data?.isozymes.organism_scope && organism.trim() ? (
+              <span className="enz-note">{detail.data.isozymes.organism_scope}</span>
+            ) : null}
             {detail.notListed ? (
               <span className="enz-note">
                 This number is not in the enzyme nomenclature release Caterva holds, so it is sent as given; BRENDA may still know it.
@@ -406,6 +425,7 @@ export function EnzymeFinder({
                   detail.data.isozymes.count,
                   detail.data.isozymes.organism_label,
                   true,
+                  detail.data.isozymes.organism_scope,
                 )}
               </span>
             ) : null}
@@ -506,6 +526,8 @@ export function EnzymeFinder({
               active={i === active}
               organismLabel={organismLabel}
               organismAsked={organismAsked}
+              scope={answer?.organism_scope ?? null}
+              total={answer?.candidates_total ?? rows.length}
               onChoose={() => choose(row)}
               onHover={() => setActive(i)}
             />
@@ -520,7 +542,8 @@ export function EnzymeFinder({
             ) : null}
             {answer.outcome === "ambiguous" && answer.recommended_ec ? (
               <p>
-                The finder suggests EC {answer.recommended_ec}, the only one with a {organismLabel} protein. It does not choose for you.
+                The finder suggests EC {answer.recommended_ec}, the only one of the {answer.candidates_total} enzymes matched that has a{" "}
+                {organismLabel} protein. It does not choose for you.
               </p>
             ) : null}
             {answer.cautions.map((c) => (

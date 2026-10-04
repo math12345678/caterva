@@ -384,6 +384,14 @@ function Search({ result }: { result: Result }) {
         placeholders{s.refused ? "; the search could not run" : ""}.
       </p>
       {s.note ? <p className="muted">{s.note}</p> : null}
+      {Object.keys(s.unused_compounds ?? {}).length ? (
+        <p className="muted" data-testid="unused-compounds">
+          Not used: {Object.entries(s.unused_compounds).map(([port, name]) => `${port.replace(/^@/, "")} ${name}`).join(", ")}.
+          This mechanism has no step that compound could belong to, so no constant was looked up for it. To search for an
+          inhibitor&apos;s Ki, ask for a mechanism with an inhibition step, such as competitive inhibition, and name the inhibitor
+          again.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -482,6 +490,19 @@ function Influence({ result }: { result: Result }) {
  * cannot reach"); this says it once, in the same words, and keeps those
  * solutions behind a disclosure with the engine's own labels.
  */
+/** A steady-state amount. A physical point's amount that is below zero by less than the search's tolerance is rounding: shown as 0, with what was reported. */
+function Amount({ value, tolerance, physical }: { value: number | null | undefined; tolerance: number; physical: boolean }) {
+  if (value === null || value === undefined) return <>none</>;
+  if (physical && value < 0 && value > -tolerance) {
+    return (
+      <span title={`Reported as ${formatNumber(value)}: rounds to zero within the search's tolerance (${formatNumber(tolerance)})`} data-rounded-to-zero="true">
+        0
+      </span>
+    );
+  }
+  return <>{formatNumber(value)}</>;
+}
+
 function FixedPointTable({ result, points }: { result: Result; points: FixedPointView[] }) {
   const st = result.stability as StabilityView;
   return (
@@ -510,7 +531,7 @@ function FixedPointTable({ result, points }: { result: Result; points: FixedPoin
               </th>
               {st.species.map((sp) => (
                 <td key={sp} data-align="end" data-numeric="true">
-                  {fp.state[sp] === null || fp.state[sp] === undefined ? "none" : formatNumber(fp.state[sp] as number)}
+                  <Amount value={fp.state[sp]} tolerance={st.rounding_tolerance} physical={fp.physical} />
                 </td>
               ))}
               <td data-align="end" data-numeric="true">
@@ -536,9 +557,15 @@ function SteadyStates({ result }: { result: Result }) {
       aside={
         <span className="font-mono">
           {physical.length} found from {st.starts_tried} starts
+          {st.count_caveat ? ": the count depends on where the starts fell" : ""}
         </span>
       }
     >
+      {st.count_caveat ? (
+        <p className="k-invariants" data-testid="count-caveat">
+          A line of equilibria. {st.count_caveat}
+        </p>
+      ) : null}
       {physical.length ? (
         <FixedPointTable result={result} points={physical} />
       ) : (
@@ -566,6 +593,12 @@ function SteadyStates({ result }: { result: Result }) {
             </ul>
           </Disclosure>
         </>
+      ) : null}
+      {physical.some((fp) => st.species.some((sp) => fp.state[sp] != null && (fp.state[sp] as number) < 0)) ? (
+        <p className="k-invariants muted" data-testid="rounded-to-zero">
+          An amount shown as 0 was reported as a negative number smaller than {formatNumber(st.rounding_tolerance)} in size: that is rounding within
+          the search&apos;s tolerance, and hovering it shows the value reported.
+        </p>
       ) : null}
       <p className="k-invariants muted">
         Amounts in {result.model.concentration_unit}, computed by Caterva

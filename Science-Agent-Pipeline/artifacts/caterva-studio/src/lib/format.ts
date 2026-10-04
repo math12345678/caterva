@@ -3,25 +3,32 @@
  * differently from another.
  *
  * The server sends the library's float unrounded. The page shows four
- * significant figures (exponent form outside 1e-3..1e5) and puts the full
- * stored value in the provenance detail, so nothing is hidden by the
- * display precision, and the full value is what a copy takes. It never
- * pads with zeros the library did not compute.
+ * significant figures, in plain decimals from 1e-4 up to (not including) 1e6
+ * and in exponent form outside that, so 0.00059 mM is written 0.00059 and
+ * never 5.9e-4 (a value that reads as a different order of magnitude beside a
+ * unit it does not carry). The full stored value is in the provenance detail,
+ * so nothing is hidden by the display precision, and the full value is what a
+ * copy takes. It never pads with zeros the library did not compute.
  *
  * The other helpers here write things that are not measurements (a count,
  * a byte size, a time, a duration) and are equally display-only.
  */
 import type { SourcedValue } from "@/api/types";
 
+/** Plain decimals from here (inclusive) up to PLAIN_HIGH (exclusive); exponent form outside. */
+const PLAIN_LOW = 1e-4;
+const PLAIN_HIGH = 1e6;
+
 export function formatNumber(value: number, significant = 4): string {
   if (value === 0) return "0";
   if (!Number.isFinite(value)) return value > 0 ? "∞" : value < 0 ? "−∞" : "not a number";
   const magnitude = Math.abs(value);
-  if (magnitude < 1e-3 || magnitude >= 1e5) {
+  if (magnitude < PLAIN_LOW || magnitude >= PLAIN_HIGH) {
     const [mantissa, exponent] = value.toExponential(significant - 1).split("e");
     return `${trimZeros(mantissa)}e${Number(exponent)}`;
   }
-  return trimZeros(value.toPrecision(significant));
+  // toPrecision falls back to exponent form for 5 or more integer digits at 4 figures; a plain decimal does not.
+  return String(Number(value.toPrecision(significant)));
 }
 
 function trimZeros(text: string): string {

@@ -1,0 +1,30 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/1.1.1.128"
+ },
+ "status": 200,
+ "body": {
+  "ec": "1.1.1.128",
+  "name": "Deleted entry",
+  "name_note": "EC 1.1.1.128 was deleted from the enzyme nomenclature and has no replacement; the nomenclature keeps no name for a deleted number",
+  "replaced_by": [],
+  "alternative_names": [],
+  "reaction": "",
+  "class_path": "Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor",
+  "status": "deleted",
+  "superseded_by": [],
+  "release": "02-Sep-2026",
+  "isozymes": {
+   "organism": null,
+   "organism_label": null,
+   "count": 0,
+   "proteins": [],
+   "organism_known": false,
+   "broad": false,
+   "note": null,
+   "organism_scope": null,
+   "filed_elsewhere": null
+  }
+ }
+}

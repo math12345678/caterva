@@ -7,6 +7,8 @@
  "body": {
   "ec": "2.7.1.1",
   "name": "hexokinase",
+  "name_note": null,
+  "replaced_by": [],
   "alternative_names": [
    "hexokinase type I",
    "hexokinase type II",
@@ -26,30 +28,87 @@
     {
      "accession": "Q2TB90",
      "entry_name": "HKDC1_HUMAN",
-     "symbol": "HKDC1"
+     "symbol": "HKDC1",
+     "gene": "HKDC1",
+     "label": "HKDC1",
+     "names": [
+      "HKDC1",
+      "Hexokinase domain-containing protein 1"
+     ],
+     "engine_matches": true
     },
     {
      "accession": "P19367",
      "entry_name": "HXK1_HUMAN",
-     "symbol": "HXK1"
+     "symbol": "HXK1",
+     "gene": "HK1",
+     "label": "HK1",
+     "names": [
+      "HK1",
+      "HXK1",
+      "HK I",
+      "Hexokinase type I",
+      "Hexokinase-A",
+      "Hexokinase-1"
+     ],
+     "engine_matches": true
     },
     {
      "accession": "P52789",
      "entry_name": "HXK2_HUMAN",
-     "symbol": "HXK2"
+     "symbol": "HXK2",
+     "gene": "HK2",
+     "label": "HK2",
+     "names": [
+      "HK2",
+      "HXK2",
+      "HK II",
+      "Hexokinase type II",
+      "Hexokinase-B",
+      "Hexokinase-2"
+     ],
+     "engine_matches": true
     },
     {
      "accession": "P52790",
      "entry_name": "HXK3_HUMAN",
-     "symbol": "HXK3"
+     "symbol": "HXK3",
+     "gene": "HK3",
+     "label": "HK3",
+     "names": [
+      "HK3",
+      "HXK3",
+      "HK III",
+      "Hexokinase type III",
+      "Hexokinase-C",
+      "Hexokinase-3"
+     ],
+     "engine_matches": true
     },
     {
      "accession": "P35557",
      "entry_name": "HXK4_HUMAN",
-     "symbol": "HXK4"
+     "symbol": "HXK4",
+     "gene": "GCK",
+     "label": "GCK",
+     "names": [
+      "GCK",
+      "HXK4",
+      "HK4",
+      "HK IV",
+      "Glucokinase",
+      "Hexokinase type IV",
+      "Hexokinase-D",
+      "Hexokinase-4"
+     ],
+     "engine_matches": true
     }
    ],
-   "organism_known": true
+   "organism_known": true,
+   "broad": false,
+   "note": "EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat. Pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused.",
+   "organism_scope": null,
+   "filed_elsewhere": null
   }
  }
 }

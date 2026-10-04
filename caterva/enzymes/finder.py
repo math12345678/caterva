@@ -993,7 +993,8 @@ def resolve(
                             + (f"{label} protein" if organism_scope(code) == label else f"protein from {organism_scope(code)}")
                             + ", and also matches "
                             + ", ".join(f"EC {c.ec} ({c.name}), which lists {label} "
-                                        f"{', '.join(p.label for p in c.organism_proteins[:4])}" for c in rivals[:3])),
+                                        f"{', '.join(p.label for p in c.organism_proteins[:4])}" for c in rivals[:2])
+                            + (f", and {len(rivals) - 2} more" if len(rivals) > 2 else "")),
                     organism=code, release=release)
         return Resolved(ec=only.ec, how=only.why, candidate=only, cautions=_cautions(index, only, ranked))
     kind = "a class of enzymes, not one enzyme" if best_tier == TIER_EC else None

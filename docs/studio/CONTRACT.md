@@ -297,30 +297,46 @@ and no network at query time), and its `candidates` are the ones
 `caterva enzyme QUERY --json` prints (`caterva.enzymes.__main__.find_payload`
 is the one function for both; a parity test compares them for real queries).
 Each candidate carries `ec`, `name`, `why`, `tier`, `reaction`, `class_path`,
-`alternative_names`, `organism_proteins` (accession, entry name, symbol) with
+`alternative_names`, `organism_proteins` (accession, entry name, symbol; and,
+where UniProt gives them, `gene`, `label`, `names`, `engine_matches`) with
 `organism_protein_count` and `has_organism_protein`, `status` (`active`,
-`transferred`, `deleted`) and `superseded_by`, and, added here,
-`recommended` (the finder's recommendation: the only tied candidate with a
-protein from the organism; never chosen for the person) and `caution`
-(what the finder says to check, on the candidate a query resolved to).
-`outcome` is `resolved`, `ambiguous`, `partial`, `suggestions` or `none`.
+`transferred`, `deleted`), `superseded_by` and `matched_by` (`name`,
+`abbreviation`, `mnemonic`, `typo`, `ec`, `class`), and, added here,
+`recommended` (the finder's recommendation: the only enzyme among EVERYTHING
+that matched, not just the best tier, with a protein from the organism, and
+matched by name; never made for an abbreviation, a gene symbol, an entry name
+or a typo, and never chosen for the person) and `caution` (what the finder
+says to check, on the candidate a query resolved to). `outcome` is `resolved`,
+`ambiguous`, `partial`, `suggestions` or `none`; `confirm_only` is true when the
+query is an abbreviation or symbol, whose candidates are what it can mean and
+are never resolved, even when there is one (`caterva/enzymes/finder.py` states
+the rules). `organism_scope` says what the organism code covers when narrower
+than its name (`E. coli` is K-12).
 `q` is required, at most 200 characters, no control characters; `organism`
 at most 100; `limit` 1 to 50 (default 12); any other key, or a repeated one,
 is 400. When the finder finds nothing (`outcome` `none`) and the capabilities
-say the network is reachable and the literature layer present, `fallback` is
+say UniProt's own host (`network.hosts["rest.uniprot.org"]`) is reachable and
+the literature layer present, `fallback` is
 `{kind: "uniprot", suggestions, note}`: the EC numbers UniProt's protein-name
 search returned, read through `caterva.enzymes.policy.resolve_enzyme_name`
 with a 6 s timeout, never invented. Otherwise `fallback` is null and
-`fallback_unavailable` says why (offline mode, network not known to be
+`fallback_unavailable` says why (offline mode, UniProt not known to be
 reachable, no literature layer).
 
 `GET /api/enzymes/{ec}?organism=<name>` -> `EnzymeDetail` (owner: compose):
 one enzyme of the nomenclature (`name`, `alternative_names`, `reaction`,
 `class_path`, `status`, `superseded_by`, `release`) and `isozymes`, the
 organism's UniProt entries for that EC number (`caterva.enzymes.isozymes`):
-`proteins` (accession, entry name such as `HXK1_HUMAN`, symbol), `count`
-(can exceed the list for an organism the index keeps a count for) and
-`organism_known` (false: zero means "not known", not "none"). `{ec}` must be
+`proteins` (accession, entry name such as `HXK1_HUMAN`, the mnemonic `symbol`
+HXK1, and the gene symbol `gene` HK1, `label` (the gene symbol, else the
+mnemonic: what to show and to put in the isoform field), `names` and
+`engine_matches`), `count` (can exceed the list for an organism the index keeps
+a count for), `organism_known` (false: zero means "not known", not "none"),
+`broad` (true above 12 proteins: a broad class, not isozymes of one enzyme),
+`note` (the isozyme notice in words), `organism_scope` and `filed_elsewhere`
+(family members the nomenclature files under other EC numbers, which this list
+may leave out). A transferred number's `name` is its replacements' (`replaced_by`
+names each) and a deleted one's is "Deleted entry"; `name_note` says why. `{ec}` must be
 a complete EC number or the path matches no route (404); one the nomenclature
 does not list is 404 with the finder's words.
 
@@ -523,7 +539,7 @@ its mark. Section 17.3.
 |---|---|
 | `version`, `api_version`, `python`, `platform`, `frozen` | `caterva.__version__`, contract.STUDIO_API_VERSION, `platform.python_version()`, `sys.platform`, `getattr(sys, "frozen", False)` |
 | `literature` `{available, reason}` | `caterva.checkout.literature_module("fallback_logic")` imports; else `available: false` and `LiteratureLayerUnavailable`'s message. Cached for the process. |
-| `network` `{checked, reachable, hosts, checked_at, reason, source}` | `checked: false`, `source: null` and nulls until something happens. Two things make it happen. The explicit re-check, `?probe=network` (the status bar's popover and Settings call it): one HTTPS HEAD (5 s timeout, `urllib.request`) to each of `www.brenda-enzymes.org`, `rest.uniprot.org`, `search.rcsb.org`, `files.rcsb.org`, `eutils.ncbi.nlm.nih.gov`; `hosts` maps each to true/false; `reachable` is true when all are; `source: "probe"`. And real network use, noted through `caterva.netuse` with nothing extra contacted: a BRENDA, UniProt, NCBI or RCSB request that was answered (any HTTP status) sets `reachable: true`, one that could not be made (refused, no DNS, timed out) sets `reachable: false` with `reason`; that host's entry in `hosts` follows; `checked_at` is the time; `source: "use"`. The newest event decides `reachable`. Never contacts a host unasked; offline mode notes nothing. |
+| `network` `{checked, reachable, hosts, host_status, checked_at, reason, source}` | `checked: false`, `source: null` and nulls until something happens. Two things make it happen. The explicit re-check, `?probe=network` (the status bar's popover and Settings call it): one HTTPS HEAD (5 s timeout, `urllib.request`) to each of `www.brenda-enzymes.org`, `rest.uniprot.org`, `search.rcsb.org`, `files.rcsb.org`, `eutils.ncbi.nlm.nih.gov`, `pubchem.ncbi.nlm.nih.gov` (and `rest.kegg.jp` only while `CATERVA_ENABLE_KEGG` is set), each at a path its own API serves (`capabilities.PROBE_PATHS`), not the host root; `source: "probe"`. And real network use, noted through `caterva.netuse` with nothing extra contacted: a request to one of those hosts that was answered (any HTTP status) marks THAT host reachable, one that could not be made (refused, no DNS, timed out) marks it unreachable with `reason`; `source: "use"`. Reachability is per host: `host_status` maps each host to `{reachable, checked_at, source, reason}` (its own latest outcome; `reachable: null` is never checked) and `hosts` to true/false/null; a BRENDA failure does not overwrite UniProt's answer, and a caller asks whether a host can be used by reading that host's entry, never the aggregate. `reachable` is the aggregate and says only what was checked: true when every host with an outcome answered, false when any did not, null when none has one; `reason` names the hosts that did not answer; `checked_at` and `source` are the newest host outcome's. Never contacts a host unasked; offline mode notes nothing. |
 | `gromacs` `{found, path, version, reason}` | `$GMX` if set, else `gmx`, through `shutil.which` (and `/opt/homebrew/bin/gmx`, `/usr/local/bin/gmx` if not on PATH: a GUI app's PATH is short); version from the first line of `gmx --version` matching `GROMACS version:`, 5 s timeout. Run once per process and on each capabilities request after a failure. |
 | `rates` `{available, reason}` | `importlib.util.find_spec("caterva.rates")` is not None AND an adapter registered kind `rates`; else false with which of the two is missing. |
 | `ui` `{built, static_dir, reason}` | `static/index.html` exists and holds the placeholder. |

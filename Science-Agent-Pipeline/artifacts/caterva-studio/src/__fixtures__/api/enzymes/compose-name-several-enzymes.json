@@ -10,13 +10,13 @@
  },
  "run": {
   "schema": "caterva.studio.run/1",
-  "id": "20261003-210100-compose-65a53643",
+  "id": "20261004-000637-compose-8f21858b",
   "kind": "compose",
   "title": "Michaelis Menten, lactate dehydrogenase, human, pyruvate",
   "status": "done",
-  "created_at": "2026-10-03T21:01:00.446Z",
-  "started_at": "2026-10-03T21:01:00.486Z",
-  "finished_at": "2026-10-03T21:01:07.871Z",
+  "created_at": "2026-10-04T00:06:37.787Z",
+  "started_at": "2026-10-04T00:06:37.805Z",
+  "finished_at": "2026-10-04T00:06:41.030Z",
   "caterva_version": "0.4.0",
   "cli": [
    "caterva",
@@ -42,7 +42,7 @@
    "reason": "1 refusal(s) in 1 section(s), each explained where it belongs in the report: the literature search.",
    "name_refusal": {
     "kind": "ambiguous",
-    "message": "'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)  <- recommended: the only one with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27",
+    "message": "12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)  <- recommended: the only enzyme matched with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27",
     "named_candidates": [
      {
       "ec": "1.1.1.27",
@@ -57,27 +57,37 @@
        {
         "accession": "Q6ZMR3",
         "entry_name": "LDH6A_HUMAN",
-        "symbol": "LDH6A"
+        "symbol": "LDH6A",
+        "gene": "LDHAL6A",
+        "label": "LDHAL6A"
        },
        {
         "accession": "Q9BYZ2",
         "entry_name": "LDH6B_HUMAN",
-        "symbol": "LDH6B"
+        "symbol": "LDH6B",
+        "gene": "LDHAL6B",
+        "label": "LDHAL6B"
        },
        {
         "accession": "P00338",
         "entry_name": "LDHA_HUMAN",
-        "symbol": "LDHA"
+        "symbol": "LDHA",
+        "gene": "LDHA",
+        "label": "LDHA"
        },
        {
         "accession": "P07195",
         "entry_name": "LDHB_HUMAN",
-        "symbol": "LDHB"
+        "symbol": "LDHB",
+        "gene": "LDHB",
+        "label": "LDHB"
        },
        {
         "accession": "P07864",
         "entry_name": "LDHC_HUMAN",
-        "symbol": "LDHC"
+        "symbol": "LDHC",
+        "gene": "LDHC",
+        "label": "LDHC"
        }
       ],
       "organism_protein_count": 5,
@@ -85,7 +95,8 @@
       "status": "active",
       "superseded_by": [],
       "partial_match": false,
-      "label": "EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)"
+      "matched_by": "name",
+      "label": "EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)"
      },
      {
       "ec": "1.1.1.28",
@@ -102,6 +113,7 @@
       "status": "active",
       "superseded_by": [],
       "partial_match": false,
+      "matched_by": "name",
       "label": "EC 1.1.1.28 D-lactate dehydrogenase"
      },
      {
@@ -121,6 +133,7 @@
       "status": "active",
       "superseded_by": [],
       "partial_match": false,
+      "matched_by": "name",
       "label": "EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)"
      },
      {
@@ -138,6 +151,7 @@
       "status": "active",
       "superseded_by": [],
       "partial_match": true,
+      "matched_by": "name",
       "label": "EC 1.1.5.12 D-lactate dehydrogenase (quinone)"
      },
      {
@@ -155,6 +169,7 @@
       "status": "active",
       "superseded_by": [],
       "partial_match": true,
+      "matched_by": "name",
       "label": "EC 1.1.99.6 D-lactate dehydrogenase (acceptor)"
      },
      {
@@ -172,6 +187,7 @@
       "status": "active",
       "superseded_by": [],
       "partial_match": true,
+      "matched_by": "name",
       "label": "EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)"
      },
      {
@@ -189,6 +205,7 @@
       "status": "active",
       "superseded_by": [],
       "partial_match": true,
+      "matched_by": "name",
       "label": "EC 1.1.2.4 D-lactate dehydrogenase (cytochrome)"
      },
      {
@@ -206,6 +223,7 @@
       "status": "active",
       "superseded_by": [],
       "partial_match": true,
+      "matched_by": "name",
       "label": "EC 1.1.1.111 3-(imidazol-5-yl)lactate dehydrogenase"
      },
      {
@@ -223,6 +241,7 @@
       "status": "active",
       "superseded_by": [],
       "partial_match": true,
+      "matched_by": "name",
       "label": "EC 1.1.1.436 lactate dehydrogenase (NAD(+),ferredoxin)"
      },
      {
@@ -240,6 +259,7 @@
       "status": "active",
       "superseded_by": [],
       "partial_match": true,
+      "matched_by": "name",
       "label": "EC 1.1.2.5 D-lactate dehydrogenase (cytochrome c-553)"
      },
      {
@@ -260,6 +280,7 @@
       "status": "active",
       "superseded_by": [],
       "partial_match": true,
+      "matched_by": "name",
       "label": "EC 1.1.1.110 aromatic 2-oxoacid reductase"
      },
      {
@@ -279,6 +300,7 @@
       "status": "active",
       "superseded_by": [],
       "partial_match": true,
+      "matched_by": "name",
       "label": "EC 1.1.1.375 L-2-hydroxycarboxylate dehydrogenase [NAD(P)(+)]"
      }
     ],
@@ -297,6 +319,7 @@
      "1.1.1.375"
     ],
     "recommended": "1.1.1.27",
+    "confirm_only": false,
     "rerun_flag": "--subject {ec}"
    }
   },
@@ -305,7 +328,7 @@
    {
     "name": "report.md",
     "content_type": "text/markdown; charset=utf-8",
-    "bytes": 7200,
+    "bytes": 7308,
     "description": "the report caterva compose prints for this request"
    },
    {
@@ -329,7 +352,7 @@
    {
     "name": "methods.md",
     "content_type": "text/markdown; charset=utf-8",
-    "bytes": 2956,
+    "bytes": 2992,
     "description": "a methods paragraph grouped by origin (caterva compose --export methods)"
    }
   ],
@@ -438,13 +461,14 @@
   "search": {
    "asked": true,
    "refused": true,
-   "note": "No search was run: 'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)  <- recommended: the only one with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27",
+   "note": "No search was run: 12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)  <- recommended: the only enzyme matched with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27",
    "subject": "lactate dehydrogenase",
    "ec": null,
    "organism": "Homo sapiens",
    "substrate": "pyruvate",
    "isoform": null,
    "compounds": {},
+   "unused_compounds": {},
    "measured": 0,
    "placeholders": 2
   },
@@ -458,10 +482,10 @@
      "source": "provenance",
      "severity": "structural",
      "detail": "all 2 rate constant(s) are the motif library's illustrative values, because the literature search for 'lactate dehydrogenase' could not run",
-     "remedy": "No search was run: 'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)  <- recommended: the only one with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27"
+     "remedy": "No search was run: 12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)  <- recommended: the only enzyme matched with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27"
     }
    ],
-   "next_step": "No search was run: 'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)  <- recommended: the only one with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27",
+   "next_step": "No search was run: 12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)  <- recommended: the only enzyme matched with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27",
    "consulted": {
     "units": "all 1 rate law(s) balance",
     "scale": "all 5 numbers examined are possible",
@@ -474,9 +498,11 @@
     "validate": "not run -- pass --validate (or `validation=`) for the cross-module consistency check",
     "robustness": "not run -- pass --robustness (or `robustness=`) to resample the placeholders"
    },
-   "text": "VERDICT: STRUCTURAL\n\nWhat this supports: Questions about the MECHANISM: can this shape oscillate, can it switch, which constants would matter if you measured them. Not questions about any particular enzyme or cell, because the constants are the library's illustrative values.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\n1 concern(s), worst first:\n  - [provenance] all 2 rate constant(s) are the motif library's illustrative values, because the literature search for 'lactate dehydrogenase' could not run -- No search was run: 'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)  <- recommended: the only one with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27\n\nDo this next: No search was run: 'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)  <- recommended: the only one with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27\n\nChecked: assumptions (0 violated, 1 undecided); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold (10 already non-physical, not re-counted here)); provenance (2 constant(s) unmeasured -- the search could not run); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 1 rate law(s) balance).\n\n2 check(s) did NOT run: robustness (not run -- pass --robustness (or `robustness=`) to resample the placeholders); validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point."
+   "text": "VERDICT: STRUCTURAL\n\nWhat this supports: Questions about the MECHANISM: can this shape oscillate, can it switch, which constants would matter if you measured them. Not questions about any particular enzyme or cell, because the constants are the library's illustrative values.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\n1 concern(s), worst first:\n  - [provenance] all 2 rate constant(s) are the motif library's illustrative values, because the literature search for 'lactate dehydrogenase' could not run -- No search was run: 12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)  <- recommended: the only enzyme matched with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27\n\nDo this next: No search was run: 12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)  <- recommended: the only enzyme matched with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27\n\nChecked: assumptions (0 violated, 1 undecided); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold (10 already non-physical, not re-counted here)); provenance (2 constant(s) unmeasured -- the search could not run); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 1 rate law(s) balance).\n\n2 check(s) did NOT run: robustness (not run -- pass --robustness (or `robustness=`) to resample the placeholders); validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point."
   },
   "stability": {
+   "rounding_tolerance": 1e-06,
+   "count_caveat": null,
    "starts_tried": 24,
    "species": [
     "reaction_S",
@@ -1582,9 +1608,9 @@
   "notes": [
    "one enzyme turning one substrate into one product, under the quasi-steady-state assumption",
    "Read --organism 'human' as Homo sapiens.",
-   "No search was run: 'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)  <- recommended: the only one with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27"
+   "No search was run: 12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)  <- recommended: the only enzyme matched with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27"
   ],
-  "report_markdown": "# michaelis_menten\n\n> Michaelis Menten\n\n## Verdict\n\n```\nVERDICT: STRUCTURAL\n\nWhat this supports: Questions about the MECHANISM: can this shape oscillate, can it switch, which constants would matter if you measured them. Not questions about any particular enzyme or cell, because the constants are the library's illustrative values.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\n1 concern(s), worst first:\n  - [provenance] all 2 rate constant(s) are the motif library's illustrative values, because the literature search for 'lactate dehydrogenase' could not run -- No search was run: 'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)  <- recommended: the only one with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27\n\nDo this next: No search was run: 'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)  <- recommended: the only one with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27\n\nChecked: assumptions (0 violated, 1 undecided); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold (10 already non-physical, not re-counted here)); provenance (2 constant(s) unmeasured -- the search could not run); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 1 rate law(s) balance).\n\n2 check(s) did NOT run: robustness (not run -- pass --robustness (or `robustness=`) to resample the placeholders); validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point.\n```\n\n## Structure\n\nRecognised as: **michaelis menten** (Michaelis-Menten).\n\n3 species, 1 reactions, 2 parameters.\n\n| reaction | rate law |\n|---|---|\n| `reaction_catalysis` | `reaction_kcat * reaction_E * reaction_S / (reaction_Km + reaction_S)` |\n\n- one enzyme turning one substrate into one product, under the quasi-steady-state assumption.\n- Read --organism 'human' as Homo sapiens.\n- No search was run: 'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)  <- recommended: the only one with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27.\n\n## Invariants\n\nThese are **derived**, not asserted: they are the left null space of this model's own stoichiometry matrix, computed exactly over rationals.\n\n- `reaction_S + reaction_P` is constant\n- `reaction_E` is constant\n\n## Dimensions\n\nAll 1 rate laws balance, in dimension and in scale. Checked before compilation: a law with the wrong dimensions integrates perfectly well and is wrong by whatever factor the mistake introduced.\n\n## Where the numbers come from\n\nSubject named (`lactate dehydrogenase`) but no search was run in this report.\n\n**Yours to set** (3): `reaction_S`, `reaction_P`, `reaction_E`. Starting amounts and any cooperativity — no paper supplies these, and they are recorded as your choices rather than as measurements.\n\n## Behaviour\n\n1 steady state(s) found from 24 starting points (10 more at negative concentrations, which the equations have and the system cannot reach):   - stable at reaction_E=0.001, reaction_P=1, reaction_S=-4.622e-18; settles over ~1 time units Some eigenvalues are zero, which is expected here: this network has 2 conservation law(s), and the dynamics do not move along a conserved direction at all. That is a structural zero rather than a marginal stability. These are numerical results from a root find, not derived facts. The conservation laws this model reports ARE derived; these are what a solver converged to, with the residuals shown.\n\n**These conclusions are about the model's SHAPE, not about any real system.** All 2 rate constants are the motif library's illustrative values, because no search has been run for 'lactate dehydrogenase'. Whether a real instance of this mechanism behaves this way depends on its actual constants, and this says nothing about that. What it does say is what the mechanism CAN do — which is the question a structural model is asked.\n\n## Time course\n\nIntegrated to t=4 in 201 points (4 x the slowest settling time (1), derived from the Jacobian's smallest non-zero eigenvalue). Final state: reaction_E=0.001, reaction_P=0.356, reaction_S=0.644. All 2 conservation law(s) survived the integration: `reaction_S + reaction_P` held to 4.44e-16; `reaction_E` held to 0.00e+00. The integrator does not know these exist, so this is an independent check that the numbers are right. 2 of these constants are the motif library's illustrative values, not measurements: reaction_kcat, reaction_Km. The SHAPE of this curve is a property of the mechanism; its scale is a property of numbers nobody measured.\n\nEvery species stays inside what a cell can hold for the whole run (3 examined, none skipped). A capacity check, not a claim the curve is right.\n\n---\n\nBuilt by Caterva's compositional model builder. The structure was recognised deterministically from the description — no language model was involved and no API key is required. Conservation laws are exact; steady states and sweeps are numerical, and say so where they appear.\n",
+  "report_markdown": "# michaelis_menten\n\n> Michaelis Menten\n\n## Verdict\n\n```\nVERDICT: STRUCTURAL\n\nWhat this supports: Questions about the MECHANISM: can this shape oscillate, can it switch, which constants would matter if you measured them. Not questions about any particular enzyme or cell, because the constants are the library's illustrative values.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\n1 concern(s), worst first:\n  - [provenance] all 2 rate constant(s) are the motif library's illustrative values, because the literature search for 'lactate dehydrogenase' could not run -- No search was run: 12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)  <- recommended: the only enzyme matched with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27\n\nDo this next: No search was run: 12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)  <- recommended: the only enzyme matched with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27\n\nChecked: assumptions (0 violated, 1 undecided); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold (10 already non-physical, not re-counted here)); provenance (2 constant(s) unmeasured -- the search could not run); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 1 rate law(s) balance).\n\n2 check(s) did NOT run: robustness (not run -- pass --robustness (or `robustness=`) to resample the placeholders); validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point.\n```\n\n## Structure\n\nRecognised as: **michaelis menten** (Michaelis-Menten).\n\n3 species, 1 reactions, 2 parameters.\n\n| reaction | rate law |\n|---|---|\n| `reaction_catalysis` | `reaction_kcat * reaction_E * reaction_S / (reaction_Km + reaction_S)` |\n\n- one enzyme turning one substrate into one product, under the quasi-steady-state assumption.\n- Read --organism 'human' as Homo sapiens.\n- No search was run: 12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)  <- recommended: the only enzyme matched with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27.\n\n## Invariants\n\nThese are **derived**, not asserted: they are the left null space of this model's own stoichiometry matrix, computed exactly over rationals.\n\n- `reaction_S + reaction_P` is constant\n- `reaction_E` is constant\n\n## Dimensions\n\nAll 1 rate laws balance, in dimension and in scale. Checked before compilation: a law with the wrong dimensions integrates perfectly well and is wrong by whatever factor the mistake introduced.\n\n## Where the numbers come from\n\nSubject named (`lactate dehydrogenase`) but no search was run in this report.\n\n**Yours to set** (3): `reaction_S`, `reaction_P`, `reaction_E`. Starting amounts and any cooperativity — no paper supplies these, and they are recorded as your choices rather than as measurements.\n\n## Behaviour\n\n1 steady state(s) found from 24 starting points (10 more at negative concentrations, which the equations have and the system cannot reach):   - stable at reaction_E=0.001, reaction_P=1, reaction_S=-4.622e-18; settles over ~1 time units Some eigenvalues are zero, which is expected here: this network has 2 conservation law(s), and the dynamics do not move along a conserved direction at all. That is a structural zero rather than a marginal stability. These are numerical results from a root find, not derived facts. The conservation laws this model reports ARE derived; these are what a solver converged to, with the residuals shown.\n\n**These conclusions are about the model's SHAPE, not about any real system.** All 2 rate constants are the motif library's illustrative values, because no search has been run for 'lactate dehydrogenase'. Whether a real instance of this mechanism behaves this way depends on its actual constants, and this says nothing about that. What it does say is what the mechanism CAN do — which is the question a structural model is asked.\n\n## Time course\n\nIntegrated to t=4 in 201 points (4 x the slowest settling time (1), derived from the Jacobian's smallest non-zero eigenvalue). Final state: reaction_E=0.001, reaction_P=0.356, reaction_S=0.644. All 2 conservation law(s) survived the integration: `reaction_S + reaction_P` held to 4.44e-16; `reaction_E` held to 0.00e+00. The integrator does not know these exist, so this is an independent check that the numbers are right. 2 of these constants are the motif library's illustrative values, not measurements: reaction_kcat, reaction_Km. The SHAPE of this curve is a property of the mechanism; its scale is a property of numbers nobody measured.\n\nEvery species stays inside what a cell can hold for the whole run (3 examined, none skipped). A capacity check, not a claim the curve is right.\n\n---\n\nBuilt by Caterva's compositional model builder. The structure was recognised deterministically from the description — no language model was involved and no API key is required. Conservation laws are exact; steady states and sweeps are numerical, and say so where they appear.\n",
   "exports": {
    "sbml": {
     "available": true,
@@ -1612,27 +1638,27 @@
   {
    "event": "status",
    "data": {
-    "run_id": "20261003-210100-compose-65a53643",
+    "run_id": "20261004-000637-compose-8f21858b",
     "seq": 1,
-    "at": "2026-10-03T21:01:00.468Z",
+    "at": "2026-10-04T00:06:37.801Z",
     "status": "queued"
    }
   },
   {
    "event": "status",
    "data": {
-    "run_id": "20261003-210100-compose-65a53643",
+    "run_id": "20261004-000637-compose-8f21858b",
     "seq": 2,
-    "at": "2026-10-03T21:01:00.487Z",
+    "at": "2026-10-04T00:06:37.817Z",
     "status": "running"
    }
   },
   {
    "event": "stage",
    "data": {
-    "run_id": "20261003-210100-compose-65a53643",
+    "run_id": "20261004-000637-compose-8f21858b",
     "seq": 3,
-    "at": "2026-10-03T21:01:00.968Z",
+    "at": "2026-10-04T00:06:37.835Z",
     "stage": "compose",
     "label": "Composing the model from its description",
     "fraction": null
@@ -1641,9 +1667,9 @@
   {
    "event": "stage",
    "data": {
-    "run_id": "20261003-210100-compose-65a53643",
+    "run_id": "20261004-000637-compose-8f21858b",
     "seq": 4,
-    "at": "2026-10-03T21:01:00.984Z",
+    "at": "2026-10-04T00:06:37.838Z",
     "stage": "search",
     "label": "Searching the literature for lactate dehydrogenase",
     "fraction": null
@@ -1652,9 +1678,9 @@
   {
    "event": "stage",
    "data": {
-    "run_id": "20261003-210100-compose-65a53643",
+    "run_id": "20261004-000637-compose-8f21858b",
     "seq": 5,
-    "at": "2026-10-03T21:01:02.423Z",
+    "at": "2026-10-04T00:06:37.863Z",
     "stage": "dossier",
     "label": "Building the dossier: stability, time course, influence ranking, sweeps, verdict",
     "fraction": null
@@ -1663,18 +1689,18 @@
   {
    "event": "log",
    "data": {
-    "run_id": "20261003-210100-compose-65a53643",
+    "run_id": "20261004-000637-compose-8f21858b",
     "seq": 6,
-    "at": "2026-10-03T21:01:07.809Z",
+    "at": "2026-10-04T00:06:40.910Z",
     "line": "1 refusal(s) in 1 section(s), each explained where it belongs in the report: the literature search."
    }
   },
   {
    "event": "stage",
    "data": {
-    "run_id": "20261003-210100-compose-65a53643",
+    "run_id": "20261004-000637-compose-8f21858b",
     "seq": 7,
-    "at": "2026-10-03T21:01:07.813Z",
+    "at": "2026-10-04T00:06:40.914Z",
     "stage": "exports",
     "label": "Writing the SBML, Antimony, CSV and methods exports",
     "fraction": null
@@ -1683,9 +1709,9 @@
   {
    "event": "result",
    "data": {
-    "run_id": "20261003-210100-compose-65a53643",
+    "run_id": "20261004-000637-compose-8f21858b",
     "seq": 8,
-    "at": "2026-10-03T21:01:07.871Z",
+    "at": "2026-10-04T00:06:41.030Z",
     "outcome": {
      "exit_code": 3,
      "meaning": "refused",
@@ -1693,7 +1719,7 @@
      "reason": "1 refusal(s) in 1 section(s), each explained where it belongs in the report: the literature search.",
      "name_refusal": {
       "kind": "ambiguous",
-      "message": "'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)  <- recommended: the only one with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27",
+      "message": "12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)  <- recommended: the only enzyme matched with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27",
       "named_candidates": [
        {
         "ec": "1.1.1.27",
@@ -1708,27 +1734,37 @@
          {
           "accession": "Q6ZMR3",
           "entry_name": "LDH6A_HUMAN",
-          "symbol": "LDH6A"
+          "symbol": "LDH6A",
+          "gene": "LDHAL6A",
+          "label": "LDHAL6A"
          },
          {
           "accession": "Q9BYZ2",
           "entry_name": "LDH6B_HUMAN",
-          "symbol": "LDH6B"
+          "symbol": "LDH6B",
+          "gene": "LDHAL6B",
+          "label": "LDHAL6B"
          },
          {
           "accession": "P00338",
           "entry_name": "LDHA_HUMAN",
-          "symbol": "LDHA"
+          "symbol": "LDHA",
+          "gene": "LDHA",
+          "label": "LDHA"
          },
          {
           "accession": "P07195",
           "entry_name": "LDHB_HUMAN",
-          "symbol": "LDHB"
+          "symbol": "LDHB",
+          "gene": "LDHB",
+          "label": "LDHB"
          },
          {
           "accession": "P07864",
           "entry_name": "LDHC_HUMAN",
-          "symbol": "LDHC"
+          "symbol": "LDHC",
+          "gene": "LDHC",
+          "label": "LDHC"
          }
         ],
         "organism_protein_count": 5,
@@ -1736,7 +1772,8 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": false,
-        "label": "EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)"
+        "matched_by": "name",
+        "label": "EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)"
        },
        {
         "ec": "1.1.1.28",
@@ -1753,6 +1790,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": false,
+        "matched_by": "name",
         "label": "EC 1.1.1.28 D-lactate dehydrogenase"
        },
        {
@@ -1772,6 +1810,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": false,
+        "matched_by": "name",
         "label": "EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)"
        },
        {
@@ -1789,6 +1828,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.5.12 D-lactate dehydrogenase (quinone)"
        },
        {
@@ -1806,6 +1846,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.99.6 D-lactate dehydrogenase (acceptor)"
        },
        {
@@ -1823,6 +1864,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)"
        },
        {
@@ -1840,6 +1882,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.2.4 D-lactate dehydrogenase (cytochrome)"
        },
        {
@@ -1857,6 +1900,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.1.111 3-(imidazol-5-yl)lactate dehydrogenase"
        },
        {
@@ -1874,6 +1918,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.1.436 lactate dehydrogenase (NAD(+),ferredoxin)"
        },
        {
@@ -1891,6 +1936,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.2.5 D-lactate dehydrogenase (cytochrome c-553)"
        },
        {
@@ -1911,6 +1957,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.1.110 aromatic 2-oxoacid reductase"
        },
        {
@@ -1930,6 +1977,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.1.375 L-2-hydroxycarboxylate dehydrogenase [NAD(P)(+)]"
        }
       ],
@@ -1948,6 +1996,7 @@
        "1.1.1.375"
       ],
       "recommended": "1.1.1.27",
+      "confirm_only": false,
       "rerun_flag": "--subject {ec}"
      }
     }
@@ -1956,9 +2005,9 @@
   {
    "event": "status",
    "data": {
-    "run_id": "20261003-210100-compose-65a53643",
+    "run_id": "20261004-000637-compose-8f21858b",
     "seq": 9,
-    "at": "2026-10-03T21:01:07.883Z",
+    "at": "2026-10-04T00:06:41.035Z",
     "status": "done",
     "outcome": {
      "exit_code": 3,
@@ -1967,7 +2016,7 @@
      "reason": "1 refusal(s) in 1 section(s), each explained where it belongs in the report: the literature search.",
      "name_refusal": {
       "kind": "ambiguous",
-      "message": "'lactate dehydrogenase' names 2 enzymes. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)  <- recommended: the only one with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27",
+      "message": "12 enzymes match 'lactate dehydrogenase'; these 2 match best. Best matches first:\n  EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)  <- recommended: the only enzyme matched with a protein from the organism you gave\n  EC 1.1.1.28 D-lactate dehydrogenase\nWeaker matches:\n  EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)\n  EC 1.1.5.12 D-lactate dehydrogenase (quinone)\n  EC 1.1.99.6 D-lactate dehydrogenase (acceptor)\n  EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)\n  and 6 more: `caterva enzyme 'lactate dehydrogenase'` lists them all\nThese are different enzymes, so Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value. To accept the recommendation, re-run with --subject 1.1.1.27",
       "named_candidates": [
        {
         "ec": "1.1.1.27",
@@ -1982,27 +2031,37 @@
          {
           "accession": "Q6ZMR3",
           "entry_name": "LDH6A_HUMAN",
-          "symbol": "LDH6A"
+          "symbol": "LDH6A",
+          "gene": "LDHAL6A",
+          "label": "LDHAL6A"
          },
          {
           "accession": "Q9BYZ2",
           "entry_name": "LDH6B_HUMAN",
-          "symbol": "LDH6B"
+          "symbol": "LDH6B",
+          "gene": "LDHAL6B",
+          "label": "LDHAL6B"
          },
          {
           "accession": "P00338",
           "entry_name": "LDHA_HUMAN",
-          "symbol": "LDHA"
+          "symbol": "LDHA",
+          "gene": "LDHA",
+          "label": "LDHA"
          },
          {
           "accession": "P07195",
           "entry_name": "LDHB_HUMAN",
-          "symbol": "LDHB"
+          "symbol": "LDHB",
+          "gene": "LDHB",
+          "label": "LDHB"
          },
          {
           "accession": "P07864",
           "entry_name": "LDHC_HUMAN",
-          "symbol": "LDHC"
+          "symbol": "LDHC",
+          "gene": "LDHC",
+          "label": "LDHC"
          }
         ],
         "organism_protein_count": 5,
@@ -2010,7 +2069,8 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": false,
-        "label": "EC 1.1.1.27 L-lactate dehydrogenase (human: LDH6A, LDH6B, LDHA, LDHB, LDHC)"
+        "matched_by": "name",
+        "label": "EC 1.1.1.27 L-lactate dehydrogenase (human: LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC)"
        },
        {
         "ec": "1.1.1.28",
@@ -2027,6 +2087,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": false,
+        "matched_by": "name",
         "label": "EC 1.1.1.28 D-lactate dehydrogenase"
        },
        {
@@ -2046,6 +2107,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": false,
+        "matched_by": "name",
         "label": "EC 1.1.5.10 D-2-hydroxyacid dehydrogenase (quinone)"
        },
        {
@@ -2063,6 +2125,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.5.12 D-lactate dehydrogenase (quinone)"
        },
        {
@@ -2080,6 +2143,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.99.6 D-lactate dehydrogenase (acceptor)"
        },
        {
@@ -2097,6 +2161,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.2.3 L-lactate dehydrogenase (cytochrome)"
        },
        {
@@ -2114,6 +2179,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.2.4 D-lactate dehydrogenase (cytochrome)"
        },
        {
@@ -2131,6 +2197,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.1.111 3-(imidazol-5-yl)lactate dehydrogenase"
        },
        {
@@ -2148,6 +2215,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.1.436 lactate dehydrogenase (NAD(+),ferredoxin)"
        },
        {
@@ -2165,6 +2233,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.2.5 D-lactate dehydrogenase (cytochrome c-553)"
        },
        {
@@ -2185,6 +2254,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.1.110 aromatic 2-oxoacid reductase"
        },
        {
@@ -2204,6 +2274,7 @@
         "status": "active",
         "superseded_by": [],
         "partial_match": true,
+        "matched_by": "name",
         "label": "EC 1.1.1.375 L-2-hydroxycarboxylate dehydrogenase [NAD(P)(+)]"
        }
       ],
@@ -2222,6 +2293,7 @@
        "1.1.1.375"
       ],
       "recommended": "1.1.1.27",
+      "confirm_only": false,
       "rerun_flag": "--subject {ec}"
      }
     }
@@ -2230,9 +2302,9 @@
   {
    "event": "end",
    "data": {
-    "run_id": "20261003-210100-compose-65a53643",
+    "run_id": "20261004-000637-compose-8f21858b",
     "seq": 10,
-    "at": "2026-10-03T21:01:07.884Z",
+    "at": "2026-10-04T00:06:41.035Z",
     "status": "done"
    }
   }

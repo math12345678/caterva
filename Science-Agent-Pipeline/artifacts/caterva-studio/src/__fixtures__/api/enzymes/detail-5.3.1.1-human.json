@@ -7,6 +7,8 @@
  "body": {
   "ec": "5.3.1.1",
   "name": "triose-phosphate isomerase",
+  "name_note": null,
+  "replaced_by": [],
   "alternative_names": [
    "phosphotriose isomerase",
    "triosephosphate isomerase",
@@ -26,10 +28,23 @@
     {
      "accession": "P60174",
      "entry_name": "TPIS_HUMAN",
-     "symbol": "TPIS"
+     "symbol": "TPIS",
+     "gene": "TPI1",
+     "label": "TPI1",
+     "names": [
+      "TPI1",
+      "TPIS",
+      "TPI",
+      "TIM"
+     ],
+     "engine_matches": false
     }
    ],
-   "organism_known": true
+   "organism_known": true,
+   "broad": false,
+   "note": null,
+   "organism_scope": null,
+   "filed_elsewhere": null
   }
  }
 }

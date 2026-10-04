@@ -167,10 +167,23 @@ export interface LiteratureCapability {
   reason: string | null;
 }
 
+/** One host's own latest outcome. */
+export interface HostStatus {
+  reachable: boolean | null;
+  checked_at: string | null;
+  /** "use" (a real request) or "probe" (the explicit check). */
+  source: string | null;
+  /** Why the host did not answer. */
+  reason: string | null;
+}
+
 export interface NetworkCapability {
   checked: boolean;
+  /** What was checked adds up to: every host with an outcome answered (true), one did not (false), none checked (null). */
   reachable: boolean | null;
   hosts: Record<string, boolean | null>;
+  /** Each host's own latest outcome; read a host's entry, not `reachable`, to know whether it can be asked. */
+  host_status: Record<string, HostStatus>;
   checked_at: string | null;
   reason: string | null;
   /**
@@ -267,8 +280,16 @@ export interface EnzymeProteinView {
   accession: string;
   /** HXK1_HUMAN */
   entry_name: string;
-  /** The entry name without its organism suffix: HXK1. */
+  /** The entry name without its organism suffix: HXK1. A UniProt mnemonic, which is not the gene symbol. */
   symbol: string;
+  /** The gene symbol (HK1 for HXK1_HUMAN), or null when UniProt gives none. */
+  gene?: string | null;
+  /** What to show and put in the isoform field: the gene symbol, else the mnemonic. */
+  label?: string;
+  /** The names UniProt gives the protein, gene symbol first. */
+  names?: string[];
+  /** True when the isoform engine knows this label (rows naming the isozyme in other words match it). */
+  engine_matches?: boolean;
 }
 
 /** A finder candidate; the required keys are what `caterva enzyme --json` prints. */
@@ -291,6 +312,8 @@ export interface EnzymeCandidate {
   status: string;
   superseded_by: string[];
   partial_match: boolean;
+  /** How it matched: name, abbreviation, mnemonic, typo, ec or class. */
+  matched_by: string;
   /** "EC 1.1.1.27 L-lactate dehydrogenase (human: LDHA, LDHB, LDHC)"; on a refusal's candidates. */
   label?: string;
   /** The `caterva compose` command that would use this enzyme. */
@@ -326,11 +349,15 @@ export interface EnzymeFindResponse {
   cautions: string[];
   reason: string | null;
   recommended_ec: string | null;
+  /** True when the query is an abbreviation or symbol: the candidates are what it can mean, even when there is one. */
+  confirm_only: boolean;
   candidates_total: number;
   candidates: EnzymeCandidate[];
   fallback: EnzymeFallback | null;
   /** Why no fallback was offered when it could have been. */
   fallback_unavailable?: string;
+  /** What the organism code covers when narrower than the name ("E. coli" is K-12). */
+  organism_scope?: string;
 }
 
 export interface IsozymeList {
@@ -340,11 +367,28 @@ export interface IsozymeList {
   proteins: EnzymeProteinView[];
   /** False for an organism the finder does not know: zero proteins then means "not known". */
   organism_known: boolean;
+  /** True above 12 proteins: a broad class of different proteins, not isozymes of one enzyme. */
+  broad: boolean;
+  /** The notice for this EC number and organism, in words, or null for one protein or none. */
+  note: string | null;
+  /** What the organism code covers when narrower than the name ("E. coli" is K-12), or null. */
+  organism_scope: string | null;
+  /** Proteins of this family filed under other EC numbers, which this list may leave out, or null. */
+  filed_elsewhere: string | null;
+}
+
+export interface EnzymeReplacement {
+  ec: string;
+  name: string;
 }
 
 export interface EnzymeDetail {
   ec: string;
+  /** The nomenclature's name; for a transferred number the replacement's, for a deleted one "Deleted entry". */
   name: string;
+  /** Why `name` is what it is for a transferred or deleted entry, else null. */
+  name_note: string | null;
+  replaced_by: EnzymeReplacement[];
   alternative_names: string[];
   reaction: string;
   class_path: string;
@@ -358,6 +402,8 @@ export interface EnzymeDetail {
 export interface NameRefusal {
   /** ambiguous, suggestions, none, lookup_failed or unknown_ec. */
   kind: string;
+  /** True when the name is an abbreviation or symbol: the candidates are what it can mean. */
+  confirm_only: boolean;
   /** The policy's own sentence, as the CLI prints it. */
   message: string;
   named_candidates: EnzymeCandidate[];
@@ -594,7 +640,10 @@ export interface SearchSummary {
   organism: string | null;
   substrate: string | null;
   isoform: string | null;
+  /** Compounds a constant of this mechanism was looked up under. */
   compounds: Record<string, string>;
+  /** Compounds the request named that the mechanism has no constant for; not searched. */
+  unused_compounds: Record<string, string>;
   measured: number;
   placeholders: number;
 }
@@ -639,6 +688,10 @@ export interface FixedPointView {
 }
 
 export interface StabilityView {
+  /** An amount below zero by less than this is rounding, not a negative amount. */
+  rounding_tolerance: number;
+  /** The engine's sentence that the count of points found is an artefact of where the starts fell; null when not a line of equilibria. */
+  count_caveat: string | null;
   starts_tried: number;
   species: string[];
   notes: string[];
@@ -747,6 +800,23 @@ export interface ConstantsResult {
   defensible: boolean;
   /** How cite.py read the organism typed, which it prints to stderr; null when used as typed. */
   organism_note?: string | null;
+  /** The isozyme notice compose carries, when the EC number is several proteins in the organism; null otherwise. */
+  isozyme_notice?: IsozymeNoticeView | null;
+}
+
+export interface IsozymeNoticeView {
+  ec: string;
+  organism: string;
+  organism_label: string;
+  count: number;
+  /** Gene symbols (or entry-name stems where UniProt gives none). */
+  symbols: string[];
+  /** True above 12 proteins: a broad class, not isozymes of one enzyme. */
+  broad: boolean;
+  headline: string;
+  detail: string;
+  remedy: string;
+  text: string;
 }
 
 export interface SimRequest {

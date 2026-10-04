@@ -16,6 +16,7 @@
   "cautions": [],
   "reason": "no enzyme is named 'hexokinse'; these are close",
   "recommended_ec": null,
+  "confirm_only": false,
   "candidates_total": 1,
   "candidates": [
    {
@@ -31,27 +32,37 @@
      {
       "accession": "Q2TB90",
       "entry_name": "HKDC1_HUMAN",
-      "symbol": "HKDC1"
+      "symbol": "HKDC1",
+      "gene": "HKDC1",
+      "label": "HKDC1"
      },
      {
       "accession": "P19367",
       "entry_name": "HXK1_HUMAN",
-      "symbol": "HXK1"
+      "symbol": "HXK1",
+      "gene": "HK1",
+      "label": "HK1"
      },
      {
       "accession": "P52789",
       "entry_name": "HXK2_HUMAN",
-      "symbol": "HXK2"
+      "symbol": "HXK2",
+      "gene": "HK2",
+      "label": "HK2"
      },
      {
       "accession": "P52790",
       "entry_name": "HXK3_HUMAN",
-      "symbol": "HXK3"
+      "symbol": "HXK3",
+      "gene": "HK3",
+      "label": "HK3"
      },
      {
       "accession": "P35557",
       "entry_name": "HXK4_HUMAN",
-      "symbol": "HXK4"
+      "symbol": "HXK4",
+      "gene": "GCK",
+      "label": "GCK"
      }
     ],
     "organism_protein_count": 5,
@@ -59,6 +70,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": false,
+    "matched_by": "typo",
     "compose": "caterva compose \"Michaelis Menten\" --subject 2.7.1.1 --organism human --substrate <substrate>",
     "recommended": false,
     "caution": null

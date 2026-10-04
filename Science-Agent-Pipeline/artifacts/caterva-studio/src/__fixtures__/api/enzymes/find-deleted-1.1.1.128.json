@@ -16,6 +16,7 @@
   "cautions": [],
   "reason": "EC 1.1.1.128 was deleted from the enzyme nomenclature and has no replacement (ExPASy ENZYME release 02-Sep-2026). Check the number.",
   "recommended_ec": null,
+  "confirm_only": false,
   "candidates_total": 1,
   "candidates": [
    {
@@ -33,12 +34,13 @@
     "status": "deleted",
     "superseded_by": [],
     "partial_match": false,
+    "matched_by": "ec",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.128 --substrate <substrate>",
     "recommended": false,
     "caution": null
    }
   ],
   "fallback": null,
-  "fallback_unavailable": "the network is not known to be reachable (check it from the status bar), so UniProt was not asked"
+  "fallback_unavailable": "UniProt is not known to be reachable (its own last outcome, from a lookup or a check; check the network from the status bar), so UniProt was not asked"
  }
 }

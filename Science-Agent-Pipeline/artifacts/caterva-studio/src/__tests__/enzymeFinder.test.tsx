@@ -14,6 +14,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import detailHexokinase from "@/__fixtures__/api/enzymes/detail-2.7.1.1-human.json";
 import detailTpi from "@/__fixtures__/api/enzymes/detail-5.3.1.1-human.json";
+import detailAdhEcoli from "@/__fixtures__/api/enzymes/detail-1.1.1.1-e-coli.json";
+import detailAdh from "@/__fixtures__/api/enzymes/detail-1.1.1.1-human.json";
+import detailKinase from "@/__fixtures__/api/enzymes/detail-2.7.11.1-human.json";
 import findUnlisted from "@/__fixtures__/api/enzymes/find-9-9-9-9.json";
 import detailLdh from "@/__fixtures__/api/enzymes/detail-1.1.1.27-human.json";
 import findEc from "@/__fixtures__/api/enzymes/find-1-1-1-27-human.json";
@@ -35,7 +38,7 @@ import { IsoformChooser } from "@/components/enzyme/IsoformChooser";
 type Recorded<T> = { request: { path: string }; status: number; body: T };
 
 const FINDS = [findEc, findNone, findHexokinase, findLdhHuman, findLdhAny, findPkm, findPyruvateKinase, findTypo, findTransferred, findDeleted, findUnlisted] as unknown as Recorded<EnzymeFindResponse>[];
-const DETAILS = [detailHexokinase, detailLdh, detailTpi] as unknown as Recorded<EnzymeDetail>[];
+const DETAILS = [detailHexokinase, detailLdh, detailTpi, detailAdh, detailAdhEcoli, detailKinase] as unknown as Recorded<EnzymeDetail>[];
 
 function asked(path: string): { q: string; organism: string } {
   const p = new URL(path, "http://studio").searchParams;
@@ -111,7 +114,7 @@ describe("the finder's pure rules", () => {
     const c = (findLdhHuman.body as unknown as EnzymeFindResponse).candidates[0];
     const line = organismLine(c.organism_proteins, c.organism_protein_count, "human", true)!;
     expect(line.startsWith("human: ")).toBe(true);
-    for (const p of c.organism_proteins.slice(0, 6)) expect(line).toContain(p.symbol);
+    for (const p of c.organism_proteins.slice(0, 6)) expect(line).toContain(p.label ?? p.symbol);
     expect(organismLine([], 0, "human", true)).toBe("no human protein recorded in the nomenclature; BRENDA may still hold measurements");
     expect(organismLine([], 0, null, false)).toBeNull();
   });
@@ -139,7 +142,7 @@ describe("the type-ahead", () => {
     // The first candidate's reaction and its human proteins are on the row.
     const first = answer.candidates[0];
     expect(within(options[0]).getByText(first.reaction)).toBeInTheDocument();
-    expect(within(options[0]).getByText(new RegExp(`^human: ${first.organism_proteins[0].symbol}`))).toBeInTheDocument();
+    expect(within(options[0]).getByText(new RegExp(`^human: ${first.organism_proteins[0].label}`))).toBeInTheDocument();
     // The EC number is set in DM Mono.
     expect(within(options[0]).getByText(`EC ${first.ec}`)).toHaveClass("font-mono");
   });
@@ -335,7 +338,7 @@ describe("the type-ahead", () => {
     await userEvent.click(screen.getByRole("combobox"));
     await waitFor(() => expect(seen.some((r) => r.url.includes("find") && r.url.includes("organism=human"))).toBe(true));
     const first = (findLdhHuman.body as unknown as EnzymeFindResponse).candidates[0];
-    await waitFor(() => expect(screen.getAllByRole("option")[0]).toHaveTextContent(new RegExp(`human: ${first.organism_proteins[0].symbol}`)));
+    await waitFor(() => expect(screen.getAllByRole("option")[0]).toHaveTextContent(new RegExp(`human: ${first.organism_proteins[0].label}`)));
   });
 
   it("sends the session header and a short, safe question", async () => {
@@ -384,7 +387,7 @@ describe("a chosen enzyme", () => {
     expect(await within(chip).findByText(d.name)).toBeInTheDocument();
     expect(within(chip).getByText("EC 2.7.1.1")).toHaveClass("font-mono");
     expect(within(chip).getByText(d.reaction)).toBeInTheDocument();
-    const symbols = d.isozymes.proteins.slice(0, 6).map((p) => p.symbol);
+    const symbols = d.isozymes.proteins.slice(0, 6).map((p) => p.label);
     expect(within(chip).getByText(`human: ${symbols.join(", ")}`)).toBeInTheDocument();
   });
 
@@ -399,25 +402,65 @@ describe("a chosen enzyme", () => {
 describe("the isoform chooser", () => {
   const d = detailHexokinase.body as unknown as EnzymeDetail;
 
-  it("offers the organism's entries by name and sets the isoform to the symbol", async () => {
+  it("offers the organism's proteins by gene symbol, not by UniProt mnemonic, and fills the field with it", async () => {
     setup();
     const onChange = vi.fn();
     mount(<IsoformChooser ec="2.7.1.1" organism="human" value="" onChange={onChange} />);
     const group = await screen.findByRole("group", { name: /Isoforms of EC 2\.7\.1\.1 in human/ });
-    for (const p of d.isozymes.proteins) expect(within(group).getByRole("button", { name: p.entry_name })).toBeInTheDocument();
-    expect(within(group).getByRole("button", { name: /^HXK1_HUMAN$/ })).toBeInTheDocument();
-    await userEvent.click(within(group).getByRole("button", { name: d.isozymes.proteins[0].entry_name }));
-    expect(onChange).toHaveBeenCalledWith(d.isozymes.proteins[0].symbol);
+    for (const p of d.isozymes.proteins) expect(within(group).getByRole("button", { name: p.label! })).toBeInTheDocument();
+    // HXK1 is the mnemonic UniProt files the entry under; HK1 is the gene symbol a paper writes.
+    expect(within(group).queryByRole("button", { name: /^HXK1(_HUMAN)?$/ })).toBeNull();
+    expect(within(group).getByRole("button", { name: "HK1" })).toBeInTheDocument();
+    await userEvent.click(within(group).getByRole("button", { name: d.isozymes.proteins[0].label! }));
+    expect(onChange).toHaveBeenCalledWith(d.isozymes.proteins[0].label);
+  });
+
+  it("says plainly what choosing did: the field, and the names compose matches rows on", async () => {
+    setup();
+    mount(<IsoformChooser ec="2.7.1.1" organism="human" value="HK2" onChange={() => {}} />);
+    const said = await screen.findByTestId("isoform-filled");
+    const hk2 = d.isozymes.proteins.find((p) => p.label === "HK2")!;
+    expect(said).toHaveTextContent("Filled the Isoform field with HK2");
+    expect(said).toHaveTextContent(hk2.accession);
+    expect(said).toHaveTextContent("a row whose commentary names it as any of:");
+    for (const name of hk2.names!.slice(0, 3)) expect(said).toHaveTextContent(name);
+    expect(said).toHaveTextContent("A constant whose rows name no isozyme is kept and flagged");
   });
 
   it("marks the chosen one and clears it when pressed again", async () => {
     setup();
     const onChange = vi.fn();
-    mount(<IsoformChooser ec="2.7.1.1" organism="human" value={d.isozymes.proteins[1].symbol} onChange={onChange} />);
-    const pressed = await screen.findByRole("button", { name: d.isozymes.proteins[1].entry_name });
+    mount(<IsoformChooser ec="2.7.1.1" organism="human" value={d.isozymes.proteins[1].label ?? ""} onChange={onChange} />);
+    const pressed = await screen.findByRole("button", { name: d.isozymes.proteins[1].label! });
     expect(pressed).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(pressed);
     expect(onChange).toHaveBeenCalledWith("");
+  });
+
+  it("offers no chooser for a broad class and says it is not isozymes of one enzyme", async () => {
+    setup();
+    const broad = detailKinase.body as unknown as EnzymeDetail;
+    expect(broad.isozymes.broad).toBe(true);
+    mount(<IsoformChooser ec="2.7.11.1" organism="human" value="" onChange={() => {}} />);
+    const group = await screen.findByRole("group", { name: /Proteins of EC 2\.7\.11\.1 in human/ });
+    expect(group).toHaveTextContent(`${broad.isozymes.count} different human proteins share EC 2.7.11.1 (a broad class)`);
+    expect(group).toHaveTextContent("not isozymes of one enzyme");
+    expect(within(group).queryAllByRole("button")).toHaveLength(0);
+  });
+
+  it("names the family the nomenclature files under another EC number, so the list is not read as complete", async () => {
+    setup();
+    mount(<IsoformChooser ec="1.1.1.1" organism="human" value="" onChange={() => {}} />);
+    const group = await screen.findByRole("group", { name: /Isoforms of EC 1\.1\.1\.1 in human/ });
+    expect(group).toHaveTextContent("ADH1B");
+    expect(group).toHaveTextContent("EC 1.1.1.105");
+  });
+
+  it("says what the organism code covers for E. coli, which is the K-12 strain", async () => {
+    setup();
+    mount(<IsoformChooser ec="1.1.1.1" organism="E. coli" value="" onChange={() => {}} />);
+    const group = await screen.findByRole("group", { name: /Isoforms of EC 1\.1\.1\.1 in E\. coli/ });
+    expect(group).toHaveTextContent("E. coli K-12 (UniProt code ECOLI; proteins of other E. coli strains are filed under other codes");
   });
 
   it("says nothing when the EC number is one protein in the organism", async () => {

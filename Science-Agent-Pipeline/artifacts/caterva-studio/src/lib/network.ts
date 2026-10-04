@@ -31,16 +31,18 @@ const HOST_NAMES: Record<string, string> = {
   "files.rcsb.org": "the RCSB files",
   "data.rcsb.org": "the RCSB data",
   "eutils.ncbi.nlm.nih.gov": "NCBI",
+  "pubchem.ncbi.nlm.nih.gov": "PubChem",
+  "rest.kegg.jp": "KEGG",
 };
 
 export function hostName(host: string): string {
   return HOST_NAMES[host] ?? host;
 }
 
-/** The hosts whose latest outcome was `answered`, named. */
-function named(hosts: Record<string, boolean | null>, answered: boolean): string[] {
+/** The hosts whose own latest outcome was `outcome` (true answered, false did not, null never checked), named. */
+function named(hosts: Record<string, boolean | null>, outcome: boolean | null): string[] {
   return Object.entries(hosts)
-    .filter(([, ok]) => ok === answered)
+    .filter(([, ok]) => ok === outcome)
     .map(([h]) => hostName(h));
 }
 
@@ -53,29 +55,30 @@ export function readNetwork(net: NetworkCapability): NetworkReading {
     };
   }
   const when = net.checked_at ? formatDateTime(net.checked_at) : "";
-  if (net.source === "use") {
-    if (net.reachable) {
-      const who = named(net.hosts, true).join(", ");
-      return {
-        state: "ok",
-        label: "network reachable",
-        sentence: `${who || "A database"} answered the last real request (${when}). That was a lookup you ran, not a check of every host; check to test them all.`,
-      };
-    }
-    return {
-      state: "off",
-      label: "network unreachable",
-      sentence: `${net.reason ?? "A database could not be reached."} (${when}). That was a lookup you ran; check to test every host again.`,
-    };
-  }
-  if (net.reachable) {
+  const answered = named(net.hosts, true);
+  const failing = named(net.hosts, false);
+  const unchecked = named(net.hosts, null);
+  const allFromChecks = Object.values(net.host_status ?? {}).every((s) => s.source === "probe");
+  // What each host's own latest outcome was, never more: one that failed does not make another unreachable.
+  const parts: string[] = [];
+  if (answered.length) parts.push(`${answered.join(", ")} answered`);
+  if (failing.length) parts.push(`${failing.join(", ")} did not answer`);
+  if (unchecked.length) parts.push(`${unchecked.join(", ")} not checked yet`);
+  if (!failing.length && !unchecked.length && allFromChecks) {
     return { state: "ok", label: "network reachable", sentence: `Every database host answered a check (${when}).` };
   }
-  const failing = named(net.hosts, false);
+  const tail = unchecked.length || !allFromChecks ? " Some of this is from lookups you ran; check to test every host." : "";
+  if (failing.length) {
+    return {
+      state: "off",
+      label: answered.length ? "some hosts unreachable" : "network unreachable",
+      sentence: `${parts.join("; ")} (${when}).${tail}`,
+    };
+  }
   return {
-    state: "off",
-    label: "network unreachable",
-    sentence: `${failing.length ? `${failing.join(", ")} did not answer a check` : (net.reason ?? "A check failed")} (${when}).`,
+    state: "ok",
+    label: unchecked.length ? "some hosts reachable" : "network reachable",
+    sentence: `${parts.join("; ")} (${when}).${tail}`,
   };
 }
 

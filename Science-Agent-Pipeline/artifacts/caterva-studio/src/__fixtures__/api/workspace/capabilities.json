@@ -16,11 +16,50 @@
    "rest.uniprot.org": null,
    "search.rcsb.org": null,
    "files.rcsb.org": null,
-   "eutils.ncbi.nlm.nih.gov": null
+   "eutils.ncbi.nlm.nih.gov": null,
+   "pubchem.ncbi.nlm.nih.gov": null
+  },
+  "host_status": {
+   "www.brenda-enzymes.org": {
+    "reachable": null,
+    "checked_at": null,
+    "source": null,
+    "reason": null
+   },
+   "rest.uniprot.org": {
+    "reachable": null,
+    "checked_at": null,
+    "source": null,
+    "reason": null
+   },
+   "search.rcsb.org": {
+    "reachable": null,
+    "checked_at": null,
+    "source": null,
+    "reason": null
+   },
+   "files.rcsb.org": {
+    "reachable": null,
+    "checked_at": null,
+    "source": null,
+    "reason": null
+   },
+   "eutils.ncbi.nlm.nih.gov": {
+    "reachable": null,
+    "checked_at": null,
+    "source": null,
+    "reason": null
+   },
+   "pubchem.ncbi.nlm.nih.gov": {
+    "reachable": null,
+    "checked_at": null,
+    "source": null,
+    "reason": null
+   }
   },
   "checked_at": null,
-  "reason": "not checked: probing contacts third-party hosts, so it is done only when asked",
-  "source": null
+  "source": null,
+  "reason": "not checked: probing contacts third-party hosts, so it is done only when asked"
  },
  "gromacs": {
   "found": true,

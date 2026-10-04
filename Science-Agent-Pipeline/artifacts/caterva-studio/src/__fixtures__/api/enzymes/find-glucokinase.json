@@ -16,6 +16,7 @@
   "cautions": [],
   "reason": null,
   "recommended_ec": null,
+  "confirm_only": false,
   "candidates_total": 4,
   "candidates": [
    {
@@ -33,6 +34,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": false,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 2.7.1.2 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -54,6 +56,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 2.7.1.1 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -76,6 +79,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 2.7.1.147 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -97,6 +101,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 2.7.1.63 --substrate <substrate>",
     "recommended": false,
     "caution": null

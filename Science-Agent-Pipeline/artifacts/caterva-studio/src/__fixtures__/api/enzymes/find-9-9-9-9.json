@@ -16,9 +16,10 @@
   "cautions": [],
   "reason": "EC 9.9.9.9 is not in the enzyme nomenclature (ExPASy ENZYME release 02-Sep-2026). Check the number.",
   "recommended_ec": null,
+  "confirm_only": false,
   "candidates_total": 0,
   "candidates": [],
   "fallback": null,
-  "fallback_unavailable": "the network is not known to be reachable (check it from the status bar), so UniProt was not asked"
+  "fallback_unavailable": "UniProt is not known to be reachable (its own last outcome, from a lookup or a check; check the network from the status bar), so UniProt was not asked"
  }
 }

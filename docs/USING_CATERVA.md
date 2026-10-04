@@ -422,14 +422,30 @@ What you ask for is read the same way, and a code alone is that code after
 the enzyme's abbreviation: for potato hexokinase, whose rows write "HK2" and
 "hexokinase 2", `--isoform 2`, `HK2`, `HK-2` and `"hexokinase 2"` all ask for
 those rows, and `--isoform B` on monoamine oxidase asks for MAO-B. Two
-numberings of one protein are not taken as one: ask for "HK-I" where the
-rows write "hexokinase I", not "HK1" or "1", and a refusal names the
-isoforms BRENDA holds, spelled as it will match them.
+numberings of one protein are taken as one only where UniProtKB itself names
+one protein both ways, for human, mouse, yeast and E. coli K-12 proteins that
+share an EC number with others: `HK2`, `HXK2`, `HK II` and `"hexokinase type
+II"` are human hexokinase 2, so `--isoform HK2` takes the row that says
+"hexokinase II" (on the recorded page of EC 2.7.1.1, Km 0.37 mM, BRENDA 702867,
+not 6.0 mM from a row that names no isozyme), and `GCK`, `HK-IV` and
+`glucokinase` are one protein. The report says what a label was read as ("read
+as HK2, human protein HXK2_HUMAN (UniProt P52789); a row is taken as measuring
+it when its commentary names it as any of: ...") or that it matched no protein
+and is compared as spelled. A refusal names the isoforms BRENDA holds, spelled
+as it will match them.
+
+`--isoform` takes a row that names the isozyme; it does not make a constant
+belong to it. Where no row names it, the constant comes from a row that names
+none and the report says whether it measured the isozyme is unknown; and the
+isozyme notice below stays, naming that constant, until every cited constant's
+own row states the isozyme.
 
 ### When one EC number is several human proteins
 
 `--subject 2.7.1.1 --organism human` is hexokinase, and the nomenclature lists
-five human proteins under that one number (HKDC1, HXK1, HXK2, HXK3, HXK4).
+five human proteins under that one number (HKDC1, HK1, HK2, HK3, GCK, by gene
+symbol; UniProt files them as HKDC1_HUMAN and HXK1 to HXK4, which are labels,
+not the symbols a paper uses).
 BRENDA files their measurements under the one number too, and the resolver
 ranks rows, not proteins. A search that names no `--isoform` can therefore
 return a Km from one isozyme and a kcat from another, and say GROUNDED. So
@@ -439,14 +455,24 @@ the report says it:
 Qualified: EC 2.7.1.1 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them.
 
 1 concern(s), worst first:
-  - [isozymes] EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HXK1, HXK2, HXK3, HXK4) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with the isoform's name as the papers write it (for example --isoform LDH-A) to take each constant from a row that measured it
+  - [isozymes] EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused
 ```
 
 The verdict is still GROUNDED: every constant is measured and cited. The
 notice says what that does not tell you. It appears when the organism has two
-or more proteins for the EC number and `--isoform` is not given, and not
-otherwise. It does not read isozymes out of BRENDA's reference titles and it
-does not change a constant.
+or more proteins for the EC number and `--isoform` is not given, and also when
+it is given and a cited constant's own row does not state it ("HK2 was asked
+for, but the row for `reaction_kcat` does not state which isozyme of EC 2.7.1.1
+it measured"); it goes quiet only when every cited constant's row states the
+isozyme. It does not read isozymes out of BRENDA's reference titles and it does
+not change a constant. Above 12 proteins an EC number is not isozymes of one
+enzyme but a broad class ("245 different human proteins share EC 2.7.11.1"),
+and the notice says that and lists none. The nomenclature files a protein under
+the EC numbers of its activities, so a list can leave one out: human ADH1B and
+ADH4 are filed under EC 1.1.1.105, not under EC 1.1.1.1, and the notice for
+EC 1.1.1.1 says so. `E. coli` means the K-12 strain (UniProt code `ECOLI`); an
+EC number whose E. coli proteins are all in another strain lists none for it,
+and says which strain it counted.
 
 ### A Ki from a row of the model's own inhibition mode
 
@@ -1360,7 +1386,7 @@ Resolved: EC 2.7.1.40 (pyruvate kinase) -- accepted name matches exactly.
       why: accepted name matches exactly
       reaction: pyruvate + ATP = phosphoenolpyruvate + ADP + H(+).
       class: Transferases > transferring phosphorus-containing groups > phosphotransferases with an alcohol group as acceptor
-      human proteins (2): KPYM (P14618), KPYR (P30613)
+      human proteins (2): PKM (P14618), PKLR (P30613)
       use: caterva compose "Michaelis Menten" --subject 2.7.1.40 --organism human --substrate <substrate>
 
  2. EC 3.1.3.49  [pyruvate kinase]-phosphatase
@@ -1385,14 +1411,14 @@ caterva enzyme "lactate dehydrogenase" --organism human --limit 2
 ```
 Enzyme finder: 'lactate dehydrogenase' (ExPASy ENZYME release 02-Sep-2026, human)
 
-Not resolved: 'lactate dehydrogenase' names 2 enzymes. Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value.
-Recommended: EC 1.1.1.27 (L-lactate dehydrogenase), the only one with a protein from the organism you gave. Confirm it with --subject 1.1.1.27.
+Not resolved: 12 enzymes match 'lactate dehydrogenase'; these 2 match best. Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value.
+Recommended: EC 1.1.1.27 (L-lactate dehydrogenase), the only enzyme matched that has a protein from the organism you gave. Confirm it with --subject 1.1.1.27.
 
  1. EC 1.1.1.27  L-lactate dehydrogenase   <- recommended
       why: accepted name matches once stereo labels (L-, D-, (S)-) and Greek letters are set aside
       reaction: (S)-lactate + NAD(+) = pyruvate + NADH + H(+).
       class: Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor
-      human proteins (5): LDH6A (Q6ZMR3), LDH6B (Q9BYZ2), LDHA (P00338), LDHB (P07195), LDHC (P07864)
+      human proteins (5): LDHAL6A (Q6ZMR3), LDHAL6B (Q9BYZ2), LDHA (P00338), LDHB (P07195), LDHC (P07864)
       use: caterva compose "Michaelis Menten" --subject 1.1.1.27 --organism human --substrate <substrate>
 
  2. EC 1.1.1.28  D-lactate dehydrogenase
@@ -1405,10 +1431,12 @@ Recommended: EC 1.1.1.27 (L-lactate dehydrogenase), the only one with a protein 
 10 more; raise --limit to see them.
 ```
 
-"Recommended" is shown only when exactly one tied enzyme has a protein from
-the organism you gave and the others have none. It is never applied for you:
-you confirm it with `--subject 1.1.1.27`. A misspelling gets a did-you-mean
-and exit code 3:
+"Recommended" is shown only when, across EVERYTHING that matched (here 12
+enzymes, of which the 2 shown match best), exactly one enzyme has a protein
+from the organism you gave, and it matched by name. It is never applied for
+you: you confirm it with `--subject 1.1.1.27`, and it is never made for an
+abbreviation, a gene symbol or a misspelling. A misspelling gets a
+did-you-mean and exit code 3:
 
 ```bash
 caterva enzyme "hexokinse" --organism human --limit 2
@@ -1423,24 +1451,100 @@ Not resolved: no enzyme is named 'hexokinse'; these are close. Did you mean one 
       why: close to the accepted name: did you mean?
       reaction: a D-hexose + ATP = a D-hexose 6-phosphate + ADP + H(+).
       class: Transferases > transferring phosphorus-containing groups > phosphotransferases with an alcohol group as acceptor
-      human proteins (5): HKDC1 (Q2TB90), HXK1 (P19367), HXK2 (P52789), HXK3 (P52790), HXK4 (P35557)
+      human proteins (5): HKDC1 (Q2TB90), HK1 (P19367), HK2 (P52789), HK3 (P52790), GCK (P35557)
       use: caterva compose "Michaelis Menten" --subject 2.7.1.1 --organism human --substrate <substrate>
+```
+
+An abbreviation or a gene symbol is not an enzyme name, and Caterva never
+resolves one by itself, because most are shared (HK is hexokinase and histidine
+kinase; AK is adenylate kinase and adenosine kinase; SDH is succinate
+dehydrogenase and sorbitol dehydrogenase) and a symbol is a different protein
+in each organism. It lists what the symbol can mean, from a small table that
+cites its source on every row (UniProtKB reviewed entries for the gene
+symbols, per organism; the accepted name of each EC number for the lab
+abbreviations), and you confirm one:
+
+```bash
+caterva enzyme "HK2" --organism human --limit 2
+```
+
+```
+Enzyme finder: 'HK2' (ExPASy ENZYME release 02-Sep-2026, human)
+
+Not resolved: 'HK2' is an abbreviation or symbol, not an enzyme name, and Caterva does not resolve one by itself. Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value.
+
+ 1. EC 2.7.1.1  hexokinase
+      why: HK2 is the human gene symbol of Hexokinase-2 (UniProtKB P52789), which UniProt files under this EC number
+      reaction: a D-hexose + ATP = a D-hexose 6-phosphate + ADP + H(+).
+      class: Transferases > transferring phosphorus-containing groups > phosphotransferases with an alcohol group as acceptor
+      human proteins (5): HKDC1 (Q2TB90), HK1 (P19367), HK2 (P52789), HK3 (P52790), GCK (P35557)
+      use: caterva compose "Michaelis Menten" --subject 2.7.1.1 --organism human --substrate <substrate>
+
+ 2. EC 2.7.13.1  protein-histidine pros-kinase
+      why: another name for this enzyme is written 'HK2', but the abbreviation table lists 'HK2' for other enzymes
+      reaction: L-histidyl-[protein] + ATP = N(pros)-phospho-L-histidyl-[protein] + ADP + H(+).
+      class: Transferases > transferring phosphorus-containing groups > protein-histidine kinases
+      human proteins: none listed
+      use: caterva compose "Michaelis Menten" --subject 2.7.13.1 --organism human --substrate <substrate>
+```
+
+The same rule keeps `SYK` from being the lysine--tRNA ligase whose UniProt
+entry name is `SYK_HUMAN` (an entry name is a label, not a gene symbol; the
+SYK gene is `KSYK_HUMAN`), and `IDH1` is EC 1.1.1.42 for human and mouse and
+EC 1.1.1.41 for yeast, never offered across organisms. A few abbreviations
+resolve, because the nomenclature itself lists them as another name of exactly
+one enzyme and the table agrees (`GAPDH`, `ACE`, `PKA`, `PKC`, `HDAC`). A name
+that is a full alternative name still resolves, unless the enzyme it names has
+no protein in your organism while another matching enzyme has one:
+
+```bash
+caterva enzyme "glycogen synthase" --organism human --limit 2
+```
+
+```
+Enzyme finder: 'glycogen synthase' (ExPASy ENZYME release 02-Sep-2026, human)
+
+Not resolved: 'glycogen synthase' is a name of EC 2.4.1.21 (starch synthase), which lists no human protein, and also matches EC 2.4.1.11 (glycogen(starch) synthase), which lists human GYS1, GYS2, EC 2.7.11.26 ([tau protein] kinase), which lists human PRKAA1, BRSK1, BRSK2, GSK3A. Caterva will not pick one for you: a wrong EC number is a citation for the wrong enzyme, not merely a wrong value.
+
+ 1. EC 2.4.1.21  starch synthase
+      why: listed as another name for this enzyme: 'glycogen synthase'
+      reaction: [(1->4)-alpha-D-glucosyl](n) + ADP-alpha-D-glucose = [(1->4)-alpha-D-glucosyl](n+1) + ADP + H(+).
+      class: Transferases > glycosyltransferases > hexosyltransferases
+      human proteins: none listed
+      use: caterva compose "Michaelis Menten" --subject 2.4.1.21 --organism human --substrate <substrate>
+
+ 2. EC 2.4.1.11  glycogen(starch) synthase
+      why: accepted name matches once a parenthesised alternative word in it is set aside
+      reaction: [(1->4)-alpha-D-glucosyl](n) + UDP-alpha-D-glucose = [(1->4)-alpha-D-glucosyl](n+1) + UDP + H(+).
+      class: Transferases > glycosyltransferases > hexosyltransferases
+      human proteins (2): GYS1 (P13807), GYS2 (P54840)
+      use: caterva compose "Michaelis Menten" --subject 2.4.1.11 --organism human --substrate <substrate>
+
+2 more; raise --limit to see them.
 ```
 
 What it reads, in order of strength: an EC number (`1.1.1.27`, `EC 1.1.1.27`,
 or a class like `1.1.1.-`); the accepted name; another name for the enzyme
 (`aldehyde reductase`); the same once stereo labels (`L-`, `(S)-`) and Greek
 letters are set aside; a phrase inside a name; every word of your query in
-a name; a protein symbol (`HXK1` with `--organism human`); and last, only
-when nothing else matched, a close spelling. A number the nomenclature has
+a name (two real words at least; a single letter must be a word of the name
+and not inside a parenthesis); an abbreviation or gene symbol from the table
+(always for you to confirm); a UniProt entry name of your organism, when the
+table does not know the symbol (listed, never chosen, never recommended); and
+last, only when nothing else matched, a close spelling (never for a word of
+five letters or fewer, a word with a digit, or a word that is itself part of an
+enzyme name). A number the nomenclature has
 transferred resolves to its replacement and says so; a deleted one is
-refused. Options: `--organism` (human, mouse, rat, yeast, E. coli and others;
-or a Latin name), `--limit N`, `--json`. Exit codes: 0 resolved or candidates
+refused. Options: `--organism` (human, mouse, rat, yeast, E. coli and others,
+or a Latin name or its abbreviation: `H. sapiens`, `S. cerevisiae`; `E. coli`
+means the K-12 strain), `--limit N`, `--json`. Exit codes: 0 resolved or candidates
 listed, 3 nothing matched (suggestions still printed), 2 malformed command.
 
-Two things to know. It lists proteins by UniProt entry name for 13 organisms
-(human, mouse, rat, yeast, E. coli, cow, pig, chicken, Arabidopsis, B.
-subtilis, fruit fly, C. elegans, rabbit) and counts them for every other.
+Two things to know. It lists proteins by gene symbol (UniProt's, where the
+names file has one for human, mouse, yeast and E. coli K-12; the UniProt entry
+name otherwise) for 13 organisms (human, mouse, rat, yeast, E. coli, cow, pig,
+chicken, Arabidopsis, B. subtilis, fruit fly, C. elegans, rabbit) and counts them
+for every other.
 And a resolved name can still be the wrong organism's enzyme: `glucokinase`
 resolves to EC 2.7.1.2, which lists no human protein, while human glucokinase
 is filed under EC 2.7.1.1 (hexokinase, as "hexokinase type IV"). The report

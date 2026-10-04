@@ -1,0 +1,101 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/1.1.1.1?organism=human"
+ },
+ "status": 200,
+ "body": {
+  "ec": "1.1.1.1",
+  "name": "alcohol dehydrogenase",
+  "name_note": null,
+  "replaced_by": [],
+  "alternative_names": [
+   "aldehyde reductase"
+  ],
+  "reaction": "(1) a primary alcohol + NAD(+) = an aldehyde + NADH + H(+). (2) a secondary alcohol + NAD(+) = a ketone + NADH + H(+).",
+  "class_path": "Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor",
+  "status": "active",
+  "superseded_by": [],
+  "release": "02-Sep-2026",
+  "isozymes": {
+   "organism": "HUMAN",
+   "organism_label": "human",
+   "count": 5,
+   "proteins": [
+    {
+     "accession": "P07327",
+     "entry_name": "ADH1A_HUMAN",
+     "symbol": "ADH1A",
+     "gene": "ADH1A",
+     "label": "ADH1A",
+     "names": [
+      "ADH1A",
+      "ADH1",
+      "Alcohol dehydrogenase 1A"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P00326",
+     "entry_name": "ADH1G_HUMAN",
+     "symbol": "ADH1G",
+     "gene": "ADH1C",
+     "label": "ADH1C",
+     "names": [
+      "ADH1C",
+      "ADH1G",
+      "ADH3",
+      "Alcohol dehydrogenase 1C"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P28332",
+     "entry_name": "ADH6_HUMAN",
+     "symbol": "ADH6",
+     "gene": "ADH6",
+     "label": "ADH6",
+     "names": [
+      "ADH6",
+      "Alcohol dehydrogenase 6"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P40394",
+     "entry_name": "ADH7_HUMAN",
+     "symbol": "ADH7",
+     "gene": "ADH7",
+     "label": "ADH7",
+     "names": [
+      "ADH7"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P11766",
+     "entry_name": "ADHX_HUMAN",
+     "symbol": "ADHX",
+     "gene": "ADH5",
+     "label": "ADH5",
+     "names": [
+      "ADH5",
+      "ADHX",
+      "FDH",
+      "FALDH",
+      "GSH-FDH",
+      "Alcohol dehydrogenase 5",
+      "Alcohol dehydrogenase class-III",
+      "Alcohol dehydrogenase class-3"
+     ],
+     "engine_matches": true
+    }
+   ],
+   "organism_known": true,
+   "broad": false,
+   "note": "EC 1.1.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (ADH1A, ADH1C, ADH6, ADH7, ADH5) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat. The nomenclature files ADH1B, ADH4 under EC 1.1.1.105 instead, so this list may leave out a protein papers measured under EC 1.1.1.1. Pass --isoform with one of these names (for example --isoform ADH1A) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused.",
+   "organism_scope": null,
+   "filed_elsewhere": "The nomenclature files ADH1B, ADH4 under EC 1.1.1.105 instead, so this list may leave out a protein papers measured under EC 1.1.1.1"
+  }
+ }
+}

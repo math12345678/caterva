@@ -10,13 +10,13 @@
  },
  "run": {
   "schema": "caterva.studio.run/1",
-  "id": "20261003-205523-compose-26dac066",
+  "id": "20261004-000623-compose-7031acd2",
   "kind": "compose",
   "title": "Michaelis Menten, EC 1.1.1.27, human, pyruvate",
   "status": "done",
-  "created_at": "2026-10-03T20:55:23.782Z",
-  "started_at": "2026-10-03T20:55:23.796Z",
-  "finished_at": "2026-10-03T21:01:00.118Z",
+  "created_at": "2026-10-04T00:06:23.790Z",
+  "started_at": "2026-10-04T00:06:23.793Z",
+  "finished_at": "2026-10-04T00:06:37.659Z",
   "caterva_version": "0.4.0",
   "cli": [
    "caterva",
@@ -46,7 +46,7 @@
    {
     "name": "report.md",
     "content_type": "text/markdown; charset=utf-8",
-    "bytes": 8371,
+    "bytes": 8593,
     "description": "the report caterva compose prints for this request"
    },
    {
@@ -215,6 +215,7 @@
    "substrate": "pyruvate",
    "isoform": null,
    "compounds": {},
+   "unused_compounds": {},
    "measured": 1,
    "placeholders": 1
   },
@@ -233,8 +234,8 @@
     {
      "source": "isozymes",
      "severity": "grounded",
-     "detail": "EC 1.1.1.27 has 5 human isozymes in the enzyme nomenclature's UniProt entries (LDH6A, LDH6B, LDHA, LDHB, LDHC) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat",
-     "remedy": "pass --isoform with the isoform's name as the papers write it (for example --isoform LDH-A) to take each constant from a row that measured it",
+     "detail": "EC 1.1.1.27 has 5 human isozymes in the enzyme nomenclature's UniProt entries (LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat",
+     "remedy": "pass --isoform with one of these names (for example --isoform LDHAL6A) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused",
      "qualifier": "EC 1.1.1.27 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them"
     }
    ],
@@ -252,9 +253,11 @@
     "validate": "not run -- pass --validate (or `validation=`) for the cross-module consistency check",
     "robustness": "not run -- pass --robustness (or `robustness=`) to resample the placeholders"
    },
-   "text": "VERDICT: STRUCTURAL\n\nWhat this supports: Questions about the MECHANISM: can this shape oscillate, can it switch, which constants would matter if you measured them. Not questions about any particular enzyme or cell, because the constants are the library's illustrative values.\n\nQualified: EC 1.1.1.27 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\n2 concern(s), worst first:\n  - [provenance] 1 constant(s) measured and 1 still the motif library's illustrative values -- re-run with --organism set to one the provenance table lists as holding a measurement, or supply the constants yourself -- start with the top of its influence ranking\n  - [isozymes] EC 1.1.1.27 has 5 human isozymes in the enzyme nomenclature's UniProt entries (LDH6A, LDH6B, LDHA, LDHB, LDHC) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with the isoform's name as the papers write it (for example --isoform LDH-A) to take each constant from a row that measured it\n\nDo this next: re-run with --organism set to one the provenance table lists as holding a measurement, or supply the constants yourself -- start with the top of its influence ranking\n\nChecked: assumptions (0 violated, 1 undecided); isozymes (EC 1.1.1.27 is 5 proteins in human, none chosen); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold (14 already non-physical, not re-counted here)); provenance (1 measured, 1 unmeasured); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 1 rate law(s) balance).\n\n2 check(s) did NOT run: robustness (not run -- pass --robustness (or `robustness=`) to resample the placeholders); validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point."
+   "text": "VERDICT: STRUCTURAL\n\nWhat this supports: Questions about the MECHANISM: can this shape oscillate, can it switch, which constants would matter if you measured them. Not questions about any particular enzyme or cell, because the constants are the library's illustrative values.\n\nQualified: EC 1.1.1.27 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\n2 concern(s), worst first:\n  - [provenance] 1 constant(s) measured and 1 still the motif library's illustrative values -- re-run with --organism set to one the provenance table lists as holding a measurement, or supply the constants yourself -- start with the top of its influence ranking\n  - [isozymes] EC 1.1.1.27 has 5 human isozymes in the enzyme nomenclature's UniProt entries (LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with one of these names (for example --isoform LDHAL6A) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nDo this next: re-run with --organism set to one the provenance table lists as holding a measurement, or supply the constants yourself -- start with the top of its influence ranking\n\nChecked: assumptions (0 violated, 1 undecided); isozymes (EC 1.1.1.27 is 5 proteins in human, none chosen); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold (14 already non-physical, not re-counted here)); provenance (1 measured, 1 unmeasured); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 1 rate law(s) balance).\n\n2 check(s) did NOT run: robustness (not run -- pass --robustness (or `robustness=`) to resample the placeholders); validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point."
   },
   "stability": {
+   "rounding_tolerance": 1e-06,
+   "count_caveat": null,
    "starts_tried": 24,
    "species": [
     "reaction_S",
@@ -1441,7 +1444,7 @@
    "Read --organism 'human' as Homo sapiens.",
    "1 constant(s) resolved from the literature: reaction_Km. 1 still the motif library's placeholder (reaction_kcat): the search ran and returned nothing for them, which is different from their not having been looked for"
   ],
-  "report_markdown": "# michaelis_menten\n\n> Michaelis Menten\n\n## Verdict\n\n```\nVERDICT: STRUCTURAL\n\nWhat this supports: Questions about the MECHANISM: can this shape oscillate, can it switch, which constants would matter if you measured them. Not questions about any particular enzyme or cell, because the constants are the library's illustrative values.\n\nQualified: EC 1.1.1.27 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\n2 concern(s), worst first:\n  - [provenance] 1 constant(s) measured and 1 still the motif library's illustrative values -- re-run with --organism set to one the provenance table lists as holding a measurement, or supply the constants yourself -- start with the top of its influence ranking\n  - [isozymes] EC 1.1.1.27 has 5 human isozymes in the enzyme nomenclature's UniProt entries (LDH6A, LDH6B, LDHA, LDHB, LDHC) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with the isoform's name as the papers write it (for example --isoform LDH-A) to take each constant from a row that measured it\n\nDo this next: re-run with --organism set to one the provenance table lists as holding a measurement, or supply the constants yourself -- start with the top of its influence ranking\n\nChecked: assumptions (0 violated, 1 undecided); isozymes (EC 1.1.1.27 is 5 proteins in human, none chosen); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold (14 already non-physical, not re-counted here)); provenance (1 measured, 1 unmeasured); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 1 rate law(s) balance).\n\n2 check(s) did NOT run: robustness (not run -- pass --robustness (or `robustness=`) to resample the placeholders); validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point.\n```\n\n## Structure\n\nRecognised as: **michaelis menten** (Michaelis-Menten).\n\n3 species, 1 reactions, 2 parameters.\n\n| reaction | rate law |\n|---|---|\n| `reaction_catalysis` | `reaction_kcat * reaction_E * reaction_S / (reaction_Km + reaction_S)` |\n\n- one enzyme turning one substrate into one product, under the quasi-steady-state assumption.\n- Read --organism 'human' as Homo sapiens.\n- 1 constant(s) resolved from the literature: reaction_Km. 1 still the motif library's placeholder (reaction_kcat): the search ran and returned nothing for them, which is different from their not having been looked for.\n\n## Invariants\n\nThese are **derived**, not asserted: they are the left null space of this model's own stoichiometry matrix, computed exactly over rationals.\n\n- `reaction_S + reaction_P` is constant\n- `reaction_E` is constant\n\n## Dimensions\n\nAll 1 rate laws balance, in dimension and in scale. Checked before compilation: a law with the wrong dimensions integrates perfectly well and is wrong by whatever factor the mistake introduced.\n\n## Where the numbers come from\n\n**1 of 2 constant(s) came from the literature**, searched for `1.1.1.27` in Homo sapiens, substrate pyruvate. Each constant is looked up under the compound it belongs to.\n\n| quantity | value | origin | source |\n|---|---|---|---|\n| `reaction_Km` | 0.03 mM | literature (Homo sapiens) | BRENDA ref 286469 |\n| `reaction_kcat` | 100.0 1/s | **placeholder** | no value in the organism requested; measurements exist in other organisms, and one is never substituted for yours (ADR 0024) -- re-run with --organism set to one of them to build the model there -- available in: Anas platyrhynchos, Champsocephalus gunnari, Cryptosporidium parvum, Deinococcus radiodurans, Enterococcus mundtii, Escherichia coli, Gallus gallus, Geobacillus stearothermophilus, Lacticaseibacillus casei, Lactobacillus helveticus, Limosilactobacillus fermentum, Oryctolagus cuniculus, Plasmodium berghei, Plasmodium falciparum, Plasmodium malariae, Plasmodium ovale, Plasmodium vivax, Rhizopus delemar, Sporolactobacillus inulinus, Thermus thermophilus (searched under the requirement that organism must be Homo sapiens, raised by your own request) |\n\nThe 1 placeholder(s) above are the motif library's illustrative values, kept because the search did not return one. The reason column says what the search actually met, which is not always \"nothing\": read it before concluding the measurement does not exist. Any conclusion resting on one of these is a statement about the library's value, not about this enzyme.\n\n### Which isozyme\n\nEC 1.1.1.27 has 5 human isozymes in the enzyme nomenclature's UniProt entries (LDH6A, LDH6B, LDHA, LDHB, LDHC) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat. Pass --isoform with the isoform's name as the papers write it (for example --isoform LDH-A) to take each constant from a row that measured it.\n\n### Where the evidence did not settle on one value\n\n- `reaction_Km`: 2 sources report 2 values (BRENDA ref 286442, 286469), spanning **0.03 to 0.398 mM** (13.3-fold). The model carries 0.03 — the resolver's pick, not a verdict; which one is right is a question about the papers.\n\nThese spreads are carried through to the model rather than averaged away. They are **not an uncertainty estimate**: the range is bounded by which rows happen to be in the database, not by any statement about the true value. A conclusion that changes across one of these ranges rests on a choice the evidence did not make for you.\n\n**Yours to set** (3): `reaction_S`, `reaction_P`, `reaction_E`. Starting amounts and any cooperativity — no paper supplies these, and they are recorded as your choices rather than as measurements.\n\n## Behaviour\n\n1 steady state(s) found from 24 starting points (14 more at negative concentrations, which the equations have and the system cannot reach):   - stable at reaction_E=0.001, reaction_P=1, reaction_S=-1.271e-16; settles over ~0.3 time units Some eigenvalues are zero, which is expected here: this network has 2 conservation law(s), and the dynamics do not move along a conserved direction at all. That is a structural zero rather than a marginal stability. These are numerical results from a root find, not derived facts. The conservation laws this model reports ARE derived; these are what a solver converged to, with the residuals shown.\n\n**These conclusions are about the model's SHAPE, not about any real system.** 1 of the 2 rate constants are the motif library's illustrative values, the search for '1.1.1.27' did not find them. Whether a real instance of this mechanism behaves this way depends on its actual constants, and this says nothing about that. What it does say is what the mechanism CAN do — which is the question a structural model is asked.\n\n## Time course\n\nIntegrated to t=1.2 in 201 points (4 x the slowest settling time (0.3), derived from the Jacobian's smallest non-zero eigenvalue). Final state: reaction_E=0.001, reaction_P=0.1163, reaction_S=0.8837. All 2 conservation law(s) survived the integration: `reaction_S + reaction_P` held to 3.33e-16; `reaction_E` held to 0.00e+00. The integrator does not know these exist, so this is an independent check that the numbers are right. 1 of these constants are the motif library's illustrative values, not measurements: reaction_kcat. The SHAPE of this curve is a property of the mechanism; its scale is a property of numbers nobody measured.\n\nEvery species stays inside what a cell can hold for the whole run (3 examined, none skipped). A capacity check, not a claim the curve is right.\n\n---\n\nBuilt by Caterva's compositional model builder. The structure was recognised deterministically from the description — no language model was involved and no API key is required. Conservation laws are exact; steady states and sweeps are numerical, and say so where they appear.\n",
+  "report_markdown": "# michaelis_menten\n\n> Michaelis Menten\n\n## Verdict\n\n```\nVERDICT: STRUCTURAL\n\nWhat this supports: Questions about the MECHANISM: can this shape oscillate, can it switch, which constants would matter if you measured them. Not questions about any particular enzyme or cell, because the constants are the library's illustrative values.\n\nQualified: EC 1.1.1.27 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\n2 concern(s), worst first:\n  - [provenance] 1 constant(s) measured and 1 still the motif library's illustrative values -- re-run with --organism set to one the provenance table lists as holding a measurement, or supply the constants yourself -- start with the top of its influence ranking\n  - [isozymes] EC 1.1.1.27 has 5 human isozymes in the enzyme nomenclature's UniProt entries (LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with one of these names (for example --isoform LDHAL6A) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nDo this next: re-run with --organism set to one the provenance table lists as holding a measurement, or supply the constants yourself -- start with the top of its influence ranking\n\nChecked: assumptions (0 violated, 1 undecided); isozymes (EC 1.1.1.27 is 5 proteins in human, none chosen); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold (14 already non-physical, not re-counted here)); provenance (1 measured, 1 unmeasured); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 1 rate law(s) balance).\n\n2 check(s) did NOT run: robustness (not run -- pass --robustness (or `robustness=`) to resample the placeholders); validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point.\n```\n\n## Structure\n\nRecognised as: **michaelis menten** (Michaelis-Menten).\n\n3 species, 1 reactions, 2 parameters.\n\n| reaction | rate law |\n|---|---|\n| `reaction_catalysis` | `reaction_kcat * reaction_E * reaction_S / (reaction_Km + reaction_S)` |\n\n- one enzyme turning one substrate into one product, under the quasi-steady-state assumption.\n- Read --organism 'human' as Homo sapiens.\n- 1 constant(s) resolved from the literature: reaction_Km. 1 still the motif library's placeholder (reaction_kcat): the search ran and returned nothing for them, which is different from their not having been looked for.\n\n## Invariants\n\nThese are **derived**, not asserted: they are the left null space of this model's own stoichiometry matrix, computed exactly over rationals.\n\n- `reaction_S + reaction_P` is constant\n- `reaction_E` is constant\n\n## Dimensions\n\nAll 1 rate laws balance, in dimension and in scale. Checked before compilation: a law with the wrong dimensions integrates perfectly well and is wrong by whatever factor the mistake introduced.\n\n## Where the numbers come from\n\n**1 of 2 constant(s) came from the literature**, searched for `1.1.1.27` in Homo sapiens, substrate pyruvate. Each constant is looked up under the compound it belongs to.\n\n| quantity | value | origin | source |\n|---|---|---|---|\n| `reaction_Km` | 0.03 mM | literature (Homo sapiens) | BRENDA ref 286469 |\n| `reaction_kcat` | 100.0 1/s | **placeholder** | no value in the organism requested; measurements exist in other organisms, and one is never substituted for yours (ADR 0024) -- re-run with --organism set to one of them to build the model there -- available in: Anas platyrhynchos, Champsocephalus gunnari, Cryptosporidium parvum, Deinococcus radiodurans, Enterococcus mundtii, Escherichia coli, Gallus gallus, Geobacillus stearothermophilus, Lacticaseibacillus casei, Lactobacillus helveticus, Limosilactobacillus fermentum, Oryctolagus cuniculus, Plasmodium berghei, Plasmodium falciparum, Plasmodium malariae, Plasmodium ovale, Plasmodium vivax, Rhizopus delemar, Sporolactobacillus inulinus, Thermus thermophilus (searched under the requirement that organism must be Homo sapiens, raised by your own request) |\n\nThe 1 placeholder(s) above are the motif library's illustrative values, kept because the search did not return one. The reason column says what the search actually met, which is not always \"nothing\": read it before concluding the measurement does not exist. Any conclusion resting on one of these is a statement about the library's value, not about this enzyme.\n\n### Which isozyme\n\nEC 1.1.1.27 has 5 human isozymes in the enzyme nomenclature's UniProt entries (LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat. Pass --isoform with one of these names (for example --isoform LDHAL6A) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused.\n\n### Where the evidence did not settle on one value\n\n- `reaction_Km`: 2 sources report 2 values (BRENDA ref 286442, 286469), spanning **0.03 to 0.398 mM** (13.3-fold). The model carries 0.03 — the resolver's pick, not a verdict; which one is right is a question about the papers.\n\nThese spreads are carried through to the model rather than averaged away. They are **not an uncertainty estimate**: the range is bounded by which rows happen to be in the database, not by any statement about the true value. A conclusion that changes across one of these ranges rests on a choice the evidence did not make for you.\n\n**Yours to set** (3): `reaction_S`, `reaction_P`, `reaction_E`. Starting amounts and any cooperativity — no paper supplies these, and they are recorded as your choices rather than as measurements.\n\n## Behaviour\n\n1 steady state(s) found from 24 starting points (14 more at negative concentrations, which the equations have and the system cannot reach):   - stable at reaction_E=0.001, reaction_P=1, reaction_S=-1.271e-16; settles over ~0.3 time units Some eigenvalues are zero, which is expected here: this network has 2 conservation law(s), and the dynamics do not move along a conserved direction at all. That is a structural zero rather than a marginal stability. These are numerical results from a root find, not derived facts. The conservation laws this model reports ARE derived; these are what a solver converged to, with the residuals shown.\n\n**These conclusions are about the model's SHAPE, not about any real system.** 1 of the 2 rate constants are the motif library's illustrative values, the search for '1.1.1.27' did not find them. Whether a real instance of this mechanism behaves this way depends on its actual constants, and this says nothing about that. What it does say is what the mechanism CAN do — which is the question a structural model is asked.\n\n## Time course\n\nIntegrated to t=1.2 in 201 points (4 x the slowest settling time (0.3), derived from the Jacobian's smallest non-zero eigenvalue). Final state: reaction_E=0.001, reaction_P=0.1163, reaction_S=0.8837. All 2 conservation law(s) survived the integration: `reaction_S + reaction_P` held to 3.33e-16; `reaction_E` held to 0.00e+00. The integrator does not know these exist, so this is an independent check that the numbers are right. 1 of these constants are the motif library's illustrative values, not measurements: reaction_kcat. The SHAPE of this curve is a property of the mechanism; its scale is a property of numbers nobody measured.\n\nEvery species stays inside what a cell can hold for the whole run (3 examined, none skipped). A capacity check, not a claim the curve is right.\n\n---\n\nBuilt by Caterva's compositional model builder. The structure was recognised deterministically from the description — no language model was involved and no API key is required. Conservation laws are exact; steady states and sweeps are numerical, and say so where they appear.\n",
   "exports": {
    "sbml": {
     "available": true,
@@ -1469,27 +1472,27 @@
   {
    "event": "status",
    "data": {
-    "run_id": "20261003-205523-compose-26dac066",
+    "run_id": "20261004-000623-compose-7031acd2",
     "seq": 1,
-    "at": "2026-10-03T20:55:23.792Z",
+    "at": "2026-10-04T00:06:23.792Z",
     "status": "queued"
    }
   },
   {
    "event": "status",
    "data": {
-    "run_id": "20261003-205523-compose-26dac066",
+    "run_id": "20261004-000623-compose-7031acd2",
     "seq": 2,
-    "at": "2026-10-03T20:55:23.797Z",
+    "at": "2026-10-04T00:06:23.794Z",
     "status": "running"
    }
   },
   {
    "event": "stage",
    "data": {
-    "run_id": "20261003-205523-compose-26dac066",
+    "run_id": "20261004-000623-compose-7031acd2",
     "seq": 3,
-    "at": "2026-10-03T20:55:23.973Z",
+    "at": "2026-10-04T00:06:23.847Z",
     "stage": "compose",
     "label": "Composing the model from its description",
     "fraction": null
@@ -1498,9 +1501,9 @@
   {
    "event": "stage",
    "data": {
-    "run_id": "20261003-205523-compose-26dac066",
+    "run_id": "20261004-000623-compose-7031acd2",
     "seq": 4,
-    "at": "2026-10-03T20:55:23.989Z",
+    "at": "2026-10-04T00:06:23.859Z",
     "stage": "search",
     "label": "Searching the literature for 1.1.1.27",
     "fraction": null
@@ -1509,9 +1512,9 @@
   {
    "event": "stage",
    "data": {
-    "run_id": "20261003-205523-compose-26dac066",
+    "run_id": "20261004-000623-compose-7031acd2",
     "seq": 5,
-    "at": "2026-10-03T20:55:24.137Z",
+    "at": "2026-10-04T00:06:23.922Z",
     "stage": "search",
     "label": "Looking up reaction_Km in BRENDA's km table for EC 1.1.1.27",
     "fraction": null
@@ -1520,9 +1523,9 @@
   {
    "event": "stage",
    "data": {
-    "run_id": "20261003-205523-compose-26dac066",
+    "run_id": "20261004-000623-compose-7031acd2",
     "seq": 6,
-    "at": "2026-10-03T20:55:24.139Z",
+    "at": "2026-10-04T00:06:23.946Z",
     "stage": "search",
     "label": "Looking up reaction_kcat in BRENDA's kcat table for EC 1.1.1.27",
     "fraction": null
@@ -1531,9 +1534,9 @@
   {
    "event": "stage",
    "data": {
-    "run_id": "20261003-205523-compose-26dac066",
+    "run_id": "20261004-000623-compose-7031acd2",
     "seq": 7,
-    "at": "2026-10-03T20:56:16.592Z",
+    "at": "2026-10-04T00:06:33.726Z",
     "stage": "dossier",
     "label": "Building the dossier: stability, time course, influence ranking, sweeps, verdict",
     "fraction": null
@@ -1542,9 +1545,9 @@
   {
    "event": "stage",
    "data": {
-    "run_id": "20261003-205523-compose-26dac066",
+    "run_id": "20261004-000623-compose-7031acd2",
     "seq": 8,
-    "at": "2026-10-03T21:00:59.651Z",
+    "at": "2026-10-04T00:06:37.607Z",
     "stage": "exports",
     "label": "Writing the SBML, Antimony, CSV and methods exports",
     "fraction": null
@@ -1553,9 +1556,9 @@
   {
    "event": "result",
    "data": {
-    "run_id": "20261003-205523-compose-26dac066",
+    "run_id": "20261004-000623-compose-7031acd2",
     "seq": 9,
-    "at": "2026-10-03T21:01:00.118Z",
+    "at": "2026-10-04T00:06:37.659Z",
     "outcome": {
      "exit_code": 0,
      "meaning": "produced",
@@ -1567,9 +1570,9 @@
   {
    "event": "status",
    "data": {
-    "run_id": "20261003-205523-compose-26dac066",
+    "run_id": "20261004-000623-compose-7031acd2",
     "seq": 10,
-    "at": "2026-10-03T21:01:00.129Z",
+    "at": "2026-10-04T00:06:37.660Z",
     "status": "done",
     "outcome": {
      "exit_code": 0,
@@ -1582,9 +1585,9 @@
   {
    "event": "end",
    "data": {
-    "run_id": "20261003-205523-compose-26dac066",
+    "run_id": "20261004-000623-compose-7031acd2",
     "seq": 11,
-    "at": "2026-10-03T21:01:00.129Z",
+    "at": "2026-10-04T00:06:37.660Z",
     "status": "done"
    }
   }

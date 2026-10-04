@@ -1,0 +1,62 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=GAPDH&organism=human"
+ },
+ "status": 200,
+ "body": {
+  "query": "GAPDH",
+  "organism": "human",
+  "organism_code": "HUMAN",
+  "organism_label": "human",
+  "release": "02-Sep-2026",
+  "outcome": "resolved",
+  "resolved_ec": "1.2.1.12",
+  "how": "listed as another name for this enzyme: 'GAPDH'; GAPDH is the human gene symbol of Glyceraldehyde-3-phosphate dehydrogenase (UniProtKB P04406), which UniProt files under this EC number",
+  "cautions": [],
+  "reason": null,
+  "recommended_ec": null,
+  "confirm_only": false,
+  "candidates_total": 1,
+  "candidates": [
+   {
+    "ec": "1.2.1.12",
+    "name": "glyceraldehyde-3-phosphate dehydrogenase (phosphorylating)",
+    "why": "listed as another name for this enzyme: 'GAPDH'; GAPDH is the human gene symbol of Glyceraldehyde-3-phosphate dehydrogenase (UniProtKB P04406), which UniProt files under this EC number",
+    "tier": 2,
+    "reaction": "D-glyceraldehyde 3-phosphate + phosphate + NAD(+) = (2R)-3-phospho-glyceroyl phosphate + NADH + H(+).",
+    "class_path": "Oxidoreductases > acting on the aldehyde or oxo group of donors > with NAD(+) or NADP(+) as acceptor",
+    "alternative_names": [
+     "GAPDH"
+    ],
+    "organism": "HUMAN",
+    "organism_proteins": [
+     {
+      "accession": "O14556",
+      "entry_name": "G3PT_HUMAN",
+      "symbol": "G3PT",
+      "gene": "GAPDHS",
+      "label": "GAPDHS"
+     },
+     {
+      "accession": "P04406",
+      "entry_name": "G3P_HUMAN",
+      "symbol": "G3P",
+      "gene": "GAPDH",
+      "label": "GAPDH"
+     }
+    ],
+    "organism_protein_count": 2,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "name",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 1.2.1.12 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   }
+  ],
+  "fallback": null
+ }
+}

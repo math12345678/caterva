@@ -4,8 +4,9 @@
  *
  * - the request carries an EC number the person chose, never typed text;
  * - the engine's isozyme notice (the verdict's "Qualified" line and the
- *   [isozymes] concern) is on the page when the engine wrote it, and gone
- *   when an isoform was given;
+ *   [isozymes] concern) is on the page when the engine wrote it, stays when
+ *   an isoform was given and a cited constant's row names no isozyme, and
+ *   says which constant;
  * - the Steady states table lists physical states only, says once how many
  *   non-physical solutions the search also found and why they are excluded,
  *   and keeps them behind a disclosure with the engine's own labels;
@@ -19,14 +20,19 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import composeHexokinase from "@/__fixtures__/api/enzymes/compose-hexokinase-human-glucose.json";
+import composeGck from "@/__fixtures__/api/enzymes/compose-hexokinase-human-glucose-gck.json";
+import composeHk2 from "@/__fixtures__/api/enzymes/compose-hexokinase-human-glucose-hk2.json";
 import composeHxk1 from "@/__fixtures__/api/enzymes/compose-hexokinase-human-glucose-hxk1.json";
+import composeTwoEnzymes from "@/__fixtures__/api/enzymes/compose-two-enzymes-competing.json";
+import composeUnused from "@/__fixtures__/api/enzymes/compose-michaelis-menten-unused-inhibitor.json";
+import constantsHexokinase from "@/__fixtures__/api/enzymes/constants-hexokinase-human-glucose.json";
 import composeLdh from "@/__fixtures__/api/enzymes/compose-ldh-human-pyruvate.json";
 import composeNames from "@/__fixtures__/api/enzymes/compose-name-several-enzymes.json";
 import constantsNames from "@/__fixtures__/api/enzymes/constants-name-several-enzymes.json";
 import capsAfterLookup from "@/__fixtures__/api/enzymes/capabilities-after-a-lookup.json";
 import capsNothingYet from "@/__fixtures__/api/enzymes/capabilities-nothing-yet.json";
 import { json, mockServer, setSessionToken } from "@/__tests__/helpers";
-import type { Capabilities, ComposeResult, NameRefusal, RunRecord } from "@/api/types";
+import type { Capabilities, ComposeResult, ConstantsResult, NameRefusal, RunRecord } from "@/api/types";
 import type { RunState } from "@/api/useRun";
 import { RunPanel } from "@/components/run/RunPanel";
 import { StatusLine } from "@/components/shell/StatusLine";
@@ -35,6 +41,7 @@ import { readNetwork } from "@/lib/network";
 import { composeRequest, EMPTY_COMPOSE } from "../Compose";
 import { constantsRequest, EMPTY_CONSTANTS } from "../Constants";
 import { ComposeResultView } from "./ComposeResult";
+import { ConstantsResultView } from "./ConstantsResult";
 
 type Captured = { run: unknown; result: unknown };
 const cap = <T,>(x: unknown) => x as T;
@@ -72,13 +79,74 @@ describe("the isozyme notice in a Compose result", () => {
     expect(within(verdict).getByText(concern.remedy)).toBeInTheDocument();
   });
 
-  it("is gone when an isoform was given", () => {
+  it("stays when an isoform was given and a cited constant's row names no isozyme, and says which constant", () => {
     const given = composeHxk1 as unknown as Captured;
     const r = cap<ComposeResult>(given.result);
-    expect(r.verdict!.concerns.some((c) => c.source === "isozymes")).toBe(false);
+    const concern = r.verdict!.concerns.find((c) => c.source === "isozymes")!;
+    expect(concern).toBeDefined();
+    expect(concern.qualifier).toMatch(/HXK1 was asked for, but the row for `reaction_kcat` does not state which isozyme/);
+    expect(concern.detail).toMatch(/--isoform HXK1 was given for EC 2\.7\.1\.1/);
     render(<ComposeResultView result={r} run={cap<RunRecord>(given.run)} />);
-    expect(screen.queryByText("Qualified")).toBeNull();
-    expect(screen.queryByText("Which isozyme")).toBeNull();
+    const verdict = screen.getByRole("region", { name: r.verdict!.verdict });
+    expect(within(verdict).getByText("Qualified")).toBeInTheDocument();
+    // The Km did come from the row that says hexokinase I; the kcat's row says nothing about which one.
+    const km = r.model.parameters.find((p) => p.id === "reaction_Km")!;
+    expect(km.provenance.chosen_because).toMatch(/the row for HXK1, as --isoform asked/);
+  });
+
+  it("names the isozyme no Km row states, visibly, instead of going quiet", () => {
+    const given = composeGck as unknown as Captured;
+    const r = cap<ComposeResult>(given.result);
+    const km = r.model.parameters.find((p) => p.id === "reaction_Km")!;
+    expect(km.provenance.scope).toContain("the row names no isoform, so whether it measured GCK, the one asked for, is unknown");
+    const concern = r.verdict!.concerns.find((c) => c.source === "isozymes")!;
+    expect(concern.qualifier).toMatch(/GCK was asked for, but the row for `reaction_Km` does not state which isozyme/);
+  });
+
+  it("takes the row that says hexokinase II for HK2, and still names the kcat whose row says nothing", () => {
+    const given = composeHk2 as unknown as Captured;
+    const r = cap<ComposeResult>(given.result);
+    const km = r.model.parameters.find((p) => p.id === "reaction_Km")!;
+    expect(km.value).toBe(0.37);
+    expect(km.provenance.citation?.reference_id).toBe("702867");
+    expect(km.provenance.commentary).toMatch(/hexokinase II/);
+    expect(r.notes.some((n) => /--isoform 'HK2' was read as HK2, human protein HXK2_HUMAN \(UniProt P52789\)/.test(n))).toBe(true);
+  });
+
+  it("does not echo an inhibitor the mechanism has no step for as searched", () => {
+    const given = composeUnused as unknown as Captured;
+    const r = cap<ComposeResult>(given.result);
+    expect(r.search.compounds).toEqual({});
+    expect(r.search.unused_compounds).toEqual({ "@inhibitor": "gossypol" });
+    render(<ComposeResultView result={r} run={cap<RunRecord>(given.run)} />);
+    const note = screen.getByTestId("unused-compounds");
+    expect(note).toHaveTextContent("Not used: inhibitor gossypol");
+    expect(note).toHaveTextContent("so no constant was looked up for it");
+    expect(screen.queryByText(/, inhibitor gossypol\./)).toBeNull();
+  });
+});
+
+describe("a constants lookup carries what the engine said", () => {
+  const fixture = constantsHexokinase as unknown as Captured;
+  const result = cap<ConstantsResult>(fixture.result);
+
+  it("shows the tie explanation, the spread and the scope concern on the chosen row", () => {
+    render(<ConstantsResultView result={result} request={{ ec: "2.7.1.1", organism: "human", substrate: "glucose" }} />);
+    const account = screen.getByTestId("engine-account");
+    const prov = result.constants[0].value!.provenance;
+    expect(account).toHaveTextContent("3 rows were equally well evidenced");
+    expect(account).toHaveTextContent("taking the lowest, which the evidence does not justify");
+    expect(prov.spread!.sentence).toBeTruthy();
+    expect(within(account).getByText(prov.spread!.sentence)).toBeInTheDocument();
+    for (const s of prov.scope!) expect(within(account).getByText(s)).toBeInTheDocument();
+  });
+
+  it("shows the isozyme notice for an EC number with several proteins in the organism", () => {
+    render(<ConstantsResultView result={result} request={{ ec: "2.7.1.1", organism: "human", substrate: "glucose" }} />);
+    const notice = screen.getByTestId("isozyme-notice");
+    expect(notice).toHaveTextContent("EC 2.7.1.1 has 5 human isozymes");
+    expect(notice).toHaveTextContent("HKDC1, HK1, HK2, HK3, GCK");
+    expect(notice.textContent).not.toMatch(/no --isoform was given/);
   });
 });
 
@@ -126,6 +194,35 @@ describe("Steady states", () => {
     const tables = within(section).getAllByRole("table");
     expect(tables).toHaveLength(2);
     expect(within(tables[1]).getAllByRole("row").slice(1)).toHaveLength(unphysical.length);
+  });
+});
+
+describe("the steady-state numbers", () => {
+  it("writes an amount that is negative only by rounding as 0, with what was reported", () => {
+    const fixture = composeHexokinase as unknown as Captured;
+    const r = cap<ComposeResult>(fixture.result);
+    const point = r.stability!.fixed_points.find((p) => p.physical && (p.state.reaction_S as number) < 0)!;
+    expect(point.state.reaction_S).toBeLessThan(0);
+    expect(Math.abs(point.state.reaction_S as number)).toBeLessThan(r.stability!.rounding_tolerance);
+    render(<ComposeResultView result={r} run={cap<RunRecord>(fixture.run)} />);
+    const zero = document.querySelector("[data-rounded-to-zero='true']") as HTMLElement;
+    expect(zero).toHaveTextContent("0");
+    expect(zero.getAttribute("title")).toMatch(/^Reported as -4\.\d+e-18: rounds to zero within the search's tolerance \(1e-6\)$/);
+    expect(screen.getByTestId("rounded-to-zero")).toHaveTextContent("rounding within the search's tolerance");
+    expect(screen.queryByText(/-4\.\d+e-18/)).toBeNull();
+  });
+
+  it("says the count of steady states on a line of equilibria is an artefact of where the starts fell, in the headline", () => {
+    const fixture = composeTwoEnzymes as unknown as Captured;
+    const r = cap<ComposeResult>(fixture.result);
+    expect(r.stability!.count_caveat).toBe(
+      "How many points land on the line is an artefact of where the starts fell, not a property of the model.",
+    );
+    render(<ComposeResultView result={r} run={cap<RunRecord>(fixture.run)} />);
+    const section = screen.getByRole("region", { name: "Steady states" });
+    const physical = r.stability!.fixed_points.filter((p) => p.physical).length;
+    expect(within(section).getByText(`${physical} found from ${r.stability!.starts_tried} starts: the count depends on where the starts fell`)).toBeInTheDocument();
+    expect(within(section).getByTestId("count-caveat")).toHaveTextContent(r.stability!.count_caveat!);
   });
 });
 
@@ -184,14 +281,19 @@ describe("the network in the status bar", () => {
     expect(screen.getByRole("button", { name: /^network not checked/ })).toBeInTheDocument();
   });
 
-  it("says reachable, from which request and when, after a lookup that worked", () => {
+  it("says which host answered, from which request and when, after a lookup that worked", () => {
     expect(used.network.source).toBe("use");
     expect(used.network.reachable).toBe(true);
+    expect(used.network.hosts["pubchem.ncbi.nlm.nih.gov"]).toBe(true);
+    expect(used.network.hosts["rest.uniprot.org"]).toBeNull();
     bar(used);
     expect(screen.queryByText("network not checked")).toBeNull();
-    const trigger = screen.getByRole("button", { name: /^network reachable/ });
-    expect(trigger).toHaveAccessibleName(/UniProt answered the last real request/);
-    expect(readNetwork(used.network).sentence).toMatch(/That was a lookup you ran, not a check of every host/);
+    const trigger = screen.getByRole("button", { name: /^some hosts reachable/ });
+    expect(trigger).toHaveAccessibleName(/PubChem answered/);
+    const sentence = readNetwork(used.network).sentence;
+    expect(sentence).toMatch(/BRENDA, UniProt, the RCSB search, the RCSB files, NCBI not checked yet/);
+    expect(sentence).toMatch(/check to test every host/);
+    expect(sentence).not.toMatch(/Every database host answered/);
   });
 
   it("offers an explicit re-check in its popover and shows the server's new answer", async () => {
@@ -206,7 +308,7 @@ describe("the network in the status bar", () => {
     expect(seen.find((r) => r.url.includes("probe=network"))!.method).toBe("GET");
   });
 
-  it("reads an unreachable host from a failed request, with the server's reason", () => {
+  it("reads an unreachable host from a failed request, with the server's reason, and does not blame the others", () => {
     const failed: Capabilities["network"] = {
       ...used.network,
       reachable: false,
@@ -215,7 +317,22 @@ describe("the network in the status bar", () => {
     };
     const reading = readNetwork(failed);
     expect(reading.state).toBe("off");
-    expect(reading.label).toBe("network unreachable");
-    expect(reading.sentence).toContain("www.brenda-enzymes.org could not be reached: name resolution failed");
+    expect(reading.label).toBe("some hosts unreachable");
+    expect(reading.sentence).toContain("PubChem answered");
+    expect(reading.sentence).toContain("BRENDA did not answer");
+    expect(reading.sentence).not.toContain("UniProt did not answer");
+  });
+
+  it("says every host answered a check only when every host did, in a check", () => {
+    const hosts = Object.fromEntries(Object.keys(used.network.hosts).map((h) => [h, true]));
+    const status = Object.fromEntries(
+      Object.keys(hosts).map((h) => [h, { reachable: true, checked_at: "2026-10-03T12:00:00.000Z", source: "probe", reason: null }]),
+    );
+    const checked: Capabilities["network"] = { ...used.network, source: "probe", hosts, host_status: status, reachable: true, reason: null };
+    expect(readNetwork(checked).sentence).toMatch(/^Every database host answered a check/);
+    expect(readNetwork(checked).label).toBe("network reachable");
+    const partly: Capabilities["network"] = { ...checked, hosts: { ...hosts, "rest.uniprot.org": null } };
+    expect(readNetwork(partly).sentence).not.toMatch(/Every database host/);
+    expect(readNetwork(partly).sentence).toMatch(/UniProt not checked yet/);
   });
 });

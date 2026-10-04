@@ -10,7 +10,7 @@
  * the exports cannot come to disagree about one.
  *
  * The network is checked only when the reader asks: the probe contacts
- * five third-party hosts (BRENDA, UniProt, the RCSB's search and files,
+ * third-party hosts (BRENDA, UniProt, the RCSB search and files, PubChem,
  * NCBI), and a page that did that on every open would be reporting the
  * reader's activity to them. Each host's answer is shown separately, so
  * "PubMed is down" is distinguishable from "you are offline".
@@ -181,7 +181,7 @@ export default function AboutScreen() {
             aside={net?.checked_at ? <span className="font-mono">checked {formatDateTime(net.checked_at)}</span> : undefined}
           >
             {probe.isPending ? (
-              <Loading label="Contacting the five database hosts" />
+              <Loading label="Contacting the database hosts" />
             ) : probe.isError ? (
               <ErrorState error={probe.error} />
             ) : net ? (

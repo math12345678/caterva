@@ -14,8 +14,9 @@
   "resolved_ec": null,
   "how": null,
   "cautions": [],
-  "reason": "'lactate dehydrogenase' names 2 enzymes",
+  "reason": "12 enzymes match 'lactate dehydrogenase'; these 2 match best",
   "recommended_ec": null,
+  "confirm_only": false,
   "candidates_total": 12,
   "candidates": [
    {
@@ -33,6 +34,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": false,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.27 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -52,6 +54,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": false,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.28 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -73,6 +76,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": false,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.5.10 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -92,6 +96,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.5.12 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -111,6 +116,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.99.6 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -130,6 +136,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.2.3 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -149,6 +156,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.2.4 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -168,6 +176,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.111 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -187,6 +196,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.436 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -206,6 +216,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.2.5 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -228,6 +239,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.110 --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -249,6 +261,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.375 --substrate <substrate>",
     "recommended": false,
     "caution": null

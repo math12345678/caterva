@@ -14,8 +14,9 @@
   "resolved_ec": null,
   "how": null,
   "cautions": [],
-  "reason": "'lactate dehydrogenase' names 2 enzymes",
+  "reason": "12 enzymes match 'lactate dehydrogenase'; these 2 match best",
   "recommended_ec": "1.1.1.27",
+  "confirm_only": false,
   "candidates_total": 12,
   "candidates": [
    {
@@ -31,27 +32,37 @@
      {
       "accession": "Q6ZMR3",
       "entry_name": "LDH6A_HUMAN",
-      "symbol": "LDH6A"
+      "symbol": "LDH6A",
+      "gene": "LDHAL6A",
+      "label": "LDHAL6A"
      },
      {
       "accession": "Q9BYZ2",
       "entry_name": "LDH6B_HUMAN",
-      "symbol": "LDH6B"
+      "symbol": "LDH6B",
+      "gene": "LDHAL6B",
+      "label": "LDHAL6B"
      },
      {
       "accession": "P00338",
       "entry_name": "LDHA_HUMAN",
-      "symbol": "LDHA"
+      "symbol": "LDHA",
+      "gene": "LDHA",
+      "label": "LDHA"
      },
      {
       "accession": "P07195",
       "entry_name": "LDHB_HUMAN",
-      "symbol": "LDHB"
+      "symbol": "LDHB",
+      "gene": "LDHB",
+      "label": "LDHB"
      },
      {
       "accession": "P07864",
       "entry_name": "LDHC_HUMAN",
-      "symbol": "LDHC"
+      "symbol": "LDHC",
+      "gene": "LDHC",
+      "label": "LDHC"
      }
     ],
     "organism_protein_count": 5,
@@ -59,6 +70,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": false,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.27 --organism human --substrate <substrate>",
     "recommended": true,
     "caution": null
@@ -78,6 +90,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": false,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.28 --organism human --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -99,6 +112,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": false,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.5.10 --organism human --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -118,6 +132,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.5.12 --organism human --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -137,6 +152,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.99.6 --organism human --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -156,6 +172,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.2.3 --organism human --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -175,6 +192,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.2.4 --organism human --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -194,6 +212,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.111 --organism human --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -213,6 +232,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.436 --organism human --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -232,6 +252,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.2.5 --organism human --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -254,6 +275,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.110 --organism human --substrate <substrate>",
     "recommended": false,
     "caution": null
@@ -275,6 +297,7 @@
     "status": "active",
     "superseded_by": [],
     "partial_match": true,
+    "matched_by": "name",
     "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.375 --organism human --substrate <substrate>",
     "recommended": false,
     "caution": null

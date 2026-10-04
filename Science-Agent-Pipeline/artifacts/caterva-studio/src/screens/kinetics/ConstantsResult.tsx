@@ -21,6 +21,8 @@ import { MarkdownReport } from "@/components/report/Report";
 import { Section } from "@/components/screen/Screen";
 import { DataTable } from "@/components/table/DataTable";
 
+import { Origin } from "./ComposeResult";
+
 const QUANTITY_LABEL: Record<string, string> = { km: "Km", kcat: "kcat", ki: "Ki" };
 
 interface Row {
@@ -86,6 +88,11 @@ function Constant({ row, request }: { row: ConstantRow; request: Record<string, 
           </span>
         </p>
       )}
+      {row.value && (row.value.provenance.chosen_because || row.value.provenance.spread || row.value.provenance.scope?.length) ? (
+        <div data-testid="engine-account">
+          <Origin v={row.value} />
+        </div>
+      ) : null}
       {rows.length ? (
         <DataTable
           caption={`Every ${label} row the resolver read`}
@@ -142,6 +149,17 @@ export function ConstantsResultView({ result, request }: { result: Result; reque
           </div>
         ) : null}
       </section>
+      {result.isozyme_notice ? (
+        <Section title={result.isozyme_notice.broad ? "Which protein" : "Which isozyme"} id="k-isozyme">
+          <p className="k-part-refusal-reason" data-testid="isozyme-notice">
+            {result.isozyme_notice.detail}.
+          </p>
+          <p className="muted">
+            A lookup cannot say which protein a row measured. To take each constant from a row that names one isozyme, use the Isoform
+            field in Compose.
+          </p>
+        </Section>
+      ) : null}
       {result.constants.map((row) => (
         <Constant key={row.name} row={row} request={request} />
       ))}

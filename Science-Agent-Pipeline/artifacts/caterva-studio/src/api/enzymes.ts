@@ -70,20 +70,24 @@ export function useEnzymeDetail(ec: string, organism: string) {
  * organism was asked (there is then nothing to say).
  */
 export function organismLine(
-  proteins: { symbol: string }[],
+  proteins: { symbol: string; label?: string }[],
   count: number,
   organismLabel: string | null,
   asked: boolean,
+  /** What the organism code covers when narrower than its name ("E. coli" is K-12), so an absence is not overstated. */
+  scope?: string | null,
 ): string | null {
   if (!asked) return null;
   if (!organismLabel) return "The finder does not know this organism, so no proteins are listed.";
   if (count > 0) {
     if (proteins.length === 0) return `${organismLabel}: ${count} UniProt ${count === 1 ? "entry" : "entries"} in the nomenclature`;
-    const shown = proteins.slice(0, 6).map((p) => p.symbol);
+    const shown = proteins.slice(0, 6).map((p) => p.label ?? p.symbol);
     const more = Math.max(count, proteins.length) - shown.length;
     return `${organismLabel}: ${shown.join(", ")}${more > 0 ? `, and ${more} more` : ""}`;
   }
-  return `no ${organismLabel} protein recorded in the nomenclature; BRENDA may still hold measurements`;
+  return scope
+    ? `no ${organismLabel} protein recorded in the nomenclature (${scope}); BRENDA may still hold measurements`
+    : `no ${organismLabel} protein recorded in the nomenclature; BRENDA may still hold measurements`;
 }
 
 /** What choosing a candidate sends: its EC, or its one successor when it was transferred; null when it cannot be chosen. */

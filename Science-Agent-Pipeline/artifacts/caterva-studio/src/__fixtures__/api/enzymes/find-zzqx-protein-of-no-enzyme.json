@@ -16,9 +16,10 @@
   "cautions": [],
   "reason": "no enzyme name in the nomenclature (ExPASy ENZYME release 02-Sep-2026) matches 'zzqx protein of no enzyme'.",
   "recommended_ec": null,
+  "confirm_only": false,
   "candidates_total": 0,
   "candidates": [],
   "fallback": null,
-  "fallback_unavailable": "the network is not known to be reachable (check it from the status bar), so UniProt was not asked"
+  "fallback_unavailable": "UniProt is not known to be reachable (its own last outcome, from a lookup or a check; check the network from the status bar), so UniProt was not asked"
  }
 }

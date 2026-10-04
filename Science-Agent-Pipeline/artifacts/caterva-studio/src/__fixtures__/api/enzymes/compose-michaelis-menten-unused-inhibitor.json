@@ -5,18 +5,21 @@
    "description": "Michaelis Menten",
    "subject": "2.7.1.1",
    "organism": "human",
-   "substrate": "glucose"
+   "substrate": "glucose",
+   "compounds": {
+    "@inhibitor": "gossypol"
+   }
   }
  },
  "run": {
   "schema": "caterva.studio.run/1",
-  "id": "20261004-000641-compose-0d686252",
+  "id": "20261004-000805-compose-dbad3714",
   "kind": "compose",
   "title": "Michaelis Menten, EC 2.7.1.1, human, glucose",
   "status": "done",
-  "created_at": "2026-10-04T00:06:41.147Z",
-  "started_at": "2026-10-04T00:06:41.161Z",
-  "finished_at": "2026-10-04T00:06:50.403Z",
+  "created_at": "2026-10-04T00:08:05.759Z",
+  "started_at": "2026-10-04T00:08:05.767Z",
+  "finished_at": "2026-10-04T00:08:18.736Z",
   "caterva_version": "0.4.0",
   "cli": [
    "caterva",
@@ -27,13 +30,18 @@
    "--organism",
    "human",
    "--substrate",
-   "glucose"
+   "glucose",
+   "--compound",
+   "@inhibitor=gossypol"
   ],
   "request": {
    "description": "Michaelis Menten",
    "subject": "2.7.1.1",
    "organism": "human",
-   "substrate": "glucose"
+   "substrate": "glucose",
+   "compounds": {
+    "@inhibitor": "gossypol"
+   }
   },
   "outcome": {
    "exit_code": 0,
@@ -46,7 +54,7 @@
    {
     "name": "report.md",
     "content_type": "text/markdown; charset=utf-8",
-    "bytes": 6893,
+    "bytes": 7239,
     "description": "the report caterva compose prints for this request"
    },
    {
@@ -243,7 +251,9 @@
    "substrate": "glucose",
    "isoform": null,
    "compounds": {},
-   "unused_compounds": {},
+   "unused_compounds": {
+    "@inhibitor": "gossypol"
+   },
    "measured": 2,
    "placeholders": 0
   },
@@ -1182,7 +1192,7 @@
    "Read --organism 'human' as Homo sapiens.",
    "2 constant(s) resolved from the literature: reaction_Km, reaction_kcat"
   ],
-  "report_markdown": "# michaelis_menten\n\n> Michaelis Menten\n\n## Verdict\n\n```\nVERDICT: GROUNDED\n\nWhat this supports: Questions about the system whose constants these are, AT the conditions those constants were measured at. Not questions about other conditions, other organisms, or other enzyme concentrations unless the report says those were checked.\n\nQualified: EC 2.7.1.1 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\n1 concern(s), worst first:\n  - [isozymes] EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nDo this next: pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nChecked: assumptions (0 violated, 1 undecided); isozymes (EC 2.7.1.1 is 5 proteins in human, none chosen); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold); provenance (all 2 constant(s) measured, with provenance); robustness (nothing to resample: every constant is measured (the spread between published values is under 'Where the evidence did not settle on one value')); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 1 rate law(s) balance).\n\n1 check(s) did NOT run: validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point.\n```\n\n## Structure\n\nRecognised as: **michaelis menten** (Michaelis-Menten).\n\n3 species, 1 reactions, 2 parameters.\n\n| reaction | rate law |\n|---|---|\n| `reaction_catalysis` | `reaction_kcat * reaction_E * reaction_S / (reaction_Km + reaction_S)` |\n\n- one enzyme turning one substrate into one product, under the quasi-steady-state assumption.\n- Read --organism 'human' as Homo sapiens.\n- 2 constant(s) resolved from the literature: reaction_Km, reaction_kcat.\n\n## Invariants\n\nThese are **derived**, not asserted: they are the left null space of this model's own stoichiometry matrix, computed exactly over rationals.\n\n- `reaction_S + reaction_P` is constant\n- `reaction_E` is constant\n\n## Dimensions\n\nAll 1 rate laws balance, in dimension and in scale. Checked before compilation: a law with the wrong dimensions integrates perfectly well and is wrong by whatever factor the mistake introduced.\n\n## Where the numbers come from\n\n**2 of 2 constant(s) came from the literature**, searched for `2.7.1.1` in Homo sapiens, substrate glucose. Each constant is looked up under the compound it belongs to.\n\n| quantity | value | origin | source |\n|---|---|---|---|\n| `reaction_Km` | 6.0 mM | literature (Homo sapiens) | BRENDA ref 641068 |\n| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |\n\n### Which isozyme\n\nEC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat. Pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused.\n\n### The conditions these were measured under\n\n- `reaction_Km` — measured at pH 7.5, 30 °C.\n- `reaction_kcat` — measured at pH 7.6, 25 °C.\n\nNo two of the 2 constants above differ by more than the thresholds this project treats as serious (1 pH unit, 10 °C), so they can be read as describing comparable experiments. That is a check on the conditions the sources STATED, not a claim that the assays were otherwise alike.\n\n### Where the evidence did not settle on one value\n\n- `reaction_Km`: 2 sources report 3 values (BRENDA ref 641068, 739603), spanning **6 to 18 mM** (3-fold). The model carries 6 — the resolver's pick, not a verdict; which one is right is a question about the papers.\n- `reaction_kcat`: 3 sources report 4 values (BRENDA ref 702282, 703624, 739603), spanning **40.1 to 101 1/s** (2.52-fold). The model carries 40.1 — the resolver's pick, not a verdict; which one is right is a question about the papers.\n\nThese spreads are carried through to the model rather than averaged away. They are **not an uncertainty estimate**: the range is bounded by which rows happen to be in the database, not by any statement about the true value. A conclusion that changes across one of these ranges rests on a choice the evidence did not make for you.\n\n**Yours to set** (3): `reaction_S`, `reaction_P`, `reaction_E`. Starting amounts and any cooperativity — no paper supplies these, and they are recorded as your choices rather than as measurements.\n\n## Behaviour\n\n1 steady state(s) found from 24 starting points:   - stable at reaction_E=0.001, reaction_P=1, reaction_S=-4.23e-18; settles over ~150 time units These are numerical results from a root find, not derived facts. The conservation laws this model reports ARE derived; these are what a solver converged to, with the residuals shown.\n\n## Time course\n\nIntegrated to t=598.5 in 201 points (4 x the slowest settling time (150), derived from the Jacobian's smallest non-zero eigenvalue). Final state: reaction_E=0.001, reaction_P=0.9784, reaction_S=0.02156. All 2 conservation law(s) survived the integration: `reaction_S + reaction_P` held to 1.33e-15; `reaction_E` held to 0.00e+00. The integrator does not know these exist, so this is an independent check that the numbers are right.\n\nEvery species stays inside what a cell can hold for the whole run (3 examined, none skipped). A capacity check, not a claim the curve is right.\n\n---\n\nBuilt by Caterva's compositional model builder. The structure was recognised deterministically from the description — no language model was involved and no API key is required. Conservation laws are exact; steady states and sweeps are numerical, and say so where they appear.\n",
+  "report_markdown": "# michaelis_menten\n\n> Michaelis Menten\n\n## Verdict\n\n```\nVERDICT: GROUNDED\n\nWhat this supports: Questions about the system whose constants these are, AT the conditions those constants were measured at. Not questions about other conditions, other organisms, or other enzyme concentrations unless the report says those were checked.\n\nQualified: EC 2.7.1.1 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\n1 concern(s), worst first:\n  - [isozymes] EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nDo this next: pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nChecked: assumptions (0 violated, 1 undecided); isozymes (EC 2.7.1.1 is 5 proteins in human, none chosen); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold); provenance (all 2 constant(s) measured, with provenance); robustness (nothing to resample: every constant is measured (the spread between published values is under 'Where the evidence did not settle on one value')); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 1 rate law(s) balance).\n\n1 check(s) did NOT run: validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point.\n```\n\n## Structure\n\nRecognised as: **michaelis menten** (Michaelis-Menten).\n\n3 species, 1 reactions, 2 parameters.\n\n| reaction | rate law |\n|---|---|\n| `reaction_catalysis` | `reaction_kcat * reaction_E * reaction_S / (reaction_Km + reaction_S)` |\n\n- one enzyme turning one substrate into one product, under the quasi-steady-state assumption.\n- Read --organism 'human' as Homo sapiens.\n- 2 constant(s) resolved from the literature: reaction_Km, reaction_kcat.\n\n## Invariants\n\nThese are **derived**, not asserted: they are the left null space of this model's own stoichiometry matrix, computed exactly over rationals.\n\n- `reaction_S + reaction_P` is constant\n- `reaction_E` is constant\n\n## Dimensions\n\nAll 1 rate laws balance, in dimension and in scale. Checked before compilation: a law with the wrong dimensions integrates perfectly well and is wrong by whatever factor the mistake introduced.\n\n## Where the numbers come from\n\n**2 of 2 constant(s) came from the literature**, searched for `2.7.1.1` in Homo sapiens, substrate glucose. Each constant is looked up under the compound it belongs to.\n\n**Not used: --inhibitor gossypol.** This mechanism (`Michaelis Menten`) has no step that compound could belong to, so no constant was looked up for it; only the constants listed below were searched. To search for an inhibitor's Ki, ask for a mechanism with an inhibition step (for example `competitive inhibition`) and name the inhibitor again.\n\n| quantity | value | origin | source |\n|---|---|---|---|\n| `reaction_Km` | 6.0 mM | literature (Homo sapiens) | BRENDA ref 641068 |\n| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |\n\n### Which isozyme\n\nEC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat. Pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused.\n\n### The conditions these were measured under\n\n- `reaction_Km` — measured at pH 7.5, 30 °C.\n- `reaction_kcat` — measured at pH 7.6, 25 °C.\n\nNo two of the 2 constants above differ by more than the thresholds this project treats as serious (1 pH unit, 10 °C), so they can be read as describing comparable experiments. That is a check on the conditions the sources STATED, not a claim that the assays were otherwise alike.\n\n### Where the evidence did not settle on one value\n\n- `reaction_Km`: 2 sources report 3 values (BRENDA ref 641068, 739603), spanning **6 to 18 mM** (3-fold). The model carries 6 — the resolver's pick, not a verdict; which one is right is a question about the papers.\n- `reaction_kcat`: 3 sources report 4 values (BRENDA ref 702282, 703624, 739603), spanning **40.1 to 101 1/s** (2.52-fold). The model carries 40.1 — the resolver's pick, not a verdict; which one is right is a question about the papers.\n\nThese spreads are carried through to the model rather than averaged away. They are **not an uncertainty estimate**: the range is bounded by which rows happen to be in the database, not by any statement about the true value. A conclusion that changes across one of these ranges rests on a choice the evidence did not make for you.\n\n**Yours to set** (3): `reaction_S`, `reaction_P`, `reaction_E`. Starting amounts and any cooperativity — no paper supplies these, and they are recorded as your choices rather than as measurements.\n\n## Behaviour\n\n1 steady state(s) found from 24 starting points:   - stable at reaction_E=0.001, reaction_P=1, reaction_S=-4.23e-18; settles over ~150 time units These are numerical results from a root find, not derived facts. The conservation laws this model reports ARE derived; these are what a solver converged to, with the residuals shown.\n\n## Time course\n\nIntegrated to t=598.5 in 201 points (4 x the slowest settling time (150), derived from the Jacobian's smallest non-zero eigenvalue). Final state: reaction_E=0.001, reaction_P=0.9784, reaction_S=0.02156. All 2 conservation law(s) survived the integration: `reaction_S + reaction_P` held to 1.33e-15; `reaction_E` held to 0.00e+00. The integrator does not know these exist, so this is an independent check that the numbers are right.\n\nEvery species stays inside what a cell can hold for the whole run (3 examined, none skipped). A capacity check, not a claim the curve is right.\n\n---\n\nBuilt by Caterva's compositional model builder. The structure was recognised deterministically from the description — no language model was involved and no API key is required. Conservation laws are exact; steady states and sweeps are numerical, and say so where they appear.\n",
   "exports": {
    "sbml": {
     "available": true,
@@ -1210,27 +1220,27 @@
   {
    "event": "status",
    "data": {
-    "run_id": "20261004-000641-compose-0d686252",
+    "run_id": "20261004-000805-compose-dbad3714",
     "seq": 1,
-    "at": "2026-10-04T00:06:41.150Z",
+    "at": "2026-10-04T00:08:05.766Z",
     "status": "queued"
    }
   },
   {
    "event": "status",
    "data": {
-    "run_id": "20261004-000641-compose-0d686252",
+    "run_id": "20261004-000805-compose-dbad3714",
     "seq": 2,
-    "at": "2026-10-04T00:06:41.163Z",
+    "at": "2026-10-04T00:08:05.767Z",
     "status": "running"
    }
   },
   {
    "event": "stage",
    "data": {
-    "run_id": "20261004-000641-compose-0d686252",
+    "run_id": "20261004-000805-compose-dbad3714",
     "seq": 3,
-    "at": "2026-10-04T00:06:41.168Z",
+    "at": "2026-10-04T00:08:05.770Z",
     "stage": "compose",
     "label": "Composing the model from its description",
     "fraction": null
@@ -1239,9 +1249,9 @@
   {
    "event": "stage",
    "data": {
-    "run_id": "20261004-000641-compose-0d686252",
+    "run_id": "20261004-000805-compose-dbad3714",
     "seq": 4,
-    "at": "2026-10-04T00:06:41.169Z",
+    "at": "2026-10-04T00:08:05.772Z",
     "stage": "search",
     "label": "Searching the literature for 2.7.1.1",
     "fraction": null
@@ -1250,9 +1260,9 @@
   {
    "event": "stage",
    "data": {
-    "run_id": "20261004-000641-compose-0d686252",
+    "run_id": "20261004-000805-compose-dbad3714",
     "seq": 5,
-    "at": "2026-10-04T00:06:41.173Z",
+    "at": "2026-10-04T00:08:05.775Z",
     "stage": "search",
     "label": "Looking up reaction_Km in BRENDA's km table for EC 2.7.1.1",
     "fraction": null
@@ -1261,9 +1271,9 @@
   {
    "event": "stage",
    "data": {
-    "run_id": "20261004-000641-compose-0d686252",
+    "run_id": "20261004-000805-compose-dbad3714",
     "seq": 6,
-    "at": "2026-10-04T00:06:41.173Z",
+    "at": "2026-10-04T00:08:05.777Z",
     "stage": "search",
     "label": "Looking up reaction_kcat in BRENDA's kcat table for EC 2.7.1.1",
     "fraction": null
@@ -1272,9 +1282,9 @@
   {
    "event": "stage",
    "data": {
-    "run_id": "20261004-000641-compose-0d686252",
+    "run_id": "20261004-000805-compose-dbad3714",
     "seq": 7,
-    "at": "2026-10-04T00:06:49.645Z",
+    "at": "2026-10-04T00:08:17.700Z",
     "stage": "dossier",
     "label": "Building the dossier: stability, time course, influence ranking, sweeps, verdict",
     "fraction": null
@@ -1283,9 +1293,9 @@
   {
    "event": "stage",
    "data": {
-    "run_id": "20261004-000641-compose-0d686252",
+    "run_id": "20261004-000805-compose-dbad3714",
     "seq": 8,
-    "at": "2026-10-04T00:06:50.378Z",
+    "at": "2026-10-04T00:08:18.703Z",
     "stage": "exports",
     "label": "Writing the SBML, Antimony, CSV and methods exports",
     "fraction": null
@@ -1294,9 +1304,9 @@
   {
    "event": "result",
    "data": {
-    "run_id": "20261004-000641-compose-0d686252",
+    "run_id": "20261004-000805-compose-dbad3714",
     "seq": 9,
-    "at": "2026-10-04T00:06:50.403Z",
+    "at": "2026-10-04T00:08:18.736Z",
     "outcome": {
      "exit_code": 0,
      "meaning": "produced",
@@ -1308,9 +1318,9 @@
   {
    "event": "status",
    "data": {
-    "run_id": "20261004-000641-compose-0d686252",
+    "run_id": "20261004-000805-compose-dbad3714",
     "seq": 10,
-    "at": "2026-10-04T00:06:50.404Z",
+    "at": "2026-10-04T00:08:18.737Z",
     "status": "done",
     "outcome": {
      "exit_code": 0,
@@ -1323,9 +1333,9 @@
   {
    "event": "end",
    "data": {
-    "run_id": "20261004-000641-compose-0d686252",
+    "run_id": "20261004-000805-compose-dbad3714",
     "seq": 11,
-    "at": "2026-10-04T00:06:50.404Z",
+    "at": "2026-10-04T00:08:18.738Z",
     "status": "done"
    }
   }

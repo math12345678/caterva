@@ -3,7 +3,7 @@
  * now. The server and its version, the literature layer, the network (what
  * a real lookup last found, or what an explicit check found; "not checked"
  * only before either has happened, and the popover checks again on request,
- * because probing contacts five third-party hosts), GROMACS, and the
+ * because probing contacts third-party hosts), GROMACS, and the
  * workspace. Each item's dot uses the same
  * vocabulary (signal: available; caution ring: off, with the reason;
  * dashed: not checked; danger: failing) and each says its reason on

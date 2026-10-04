@@ -1,0 +1,192 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=ADH&organism=human"
+ },
+ "status": 200,
+ "body": {
+  "query": "ADH",
+  "organism": "human",
+  "organism_code": "HUMAN",
+  "organism_label": "human",
+  "release": "02-Sep-2026",
+  "outcome": "ambiguous",
+  "resolved_ec": null,
+  "how": null,
+  "cautions": [],
+  "reason": "'ADH' is an abbreviation or symbol, not an enzyme name, and Caterva does not resolve one by itself; 2 enzymes go by it",
+  "recommended_ec": null,
+  "confirm_only": true,
+  "candidates_total": 5,
+  "candidates": [
+   {
+    "ec": "1.1.1.1",
+    "name": "alcohol dehydrogenase",
+    "why": "ADH is a common abbreviation for alcohol dehydrogenase (NAD(+)) and (NADP(+)); it is also used for other enzymes, so the choice is yours",
+    "tier": 2,
+    "reaction": "(1) a primary alcohol + NAD(+) = an aldehyde + NADH + H(+). (2) a secondary alcohol + NAD(+) = a ketone + NADH + H(+).",
+    "class_path": "Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor",
+    "alternative_names": [],
+    "organism": "HUMAN",
+    "organism_proteins": [
+     {
+      "accession": "P07327",
+      "entry_name": "ADH1A_HUMAN",
+      "symbol": "ADH1A",
+      "gene": "ADH1A",
+      "label": "ADH1A"
+     },
+     {
+      "accession": "P00326",
+      "entry_name": "ADH1G_HUMAN",
+      "symbol": "ADH1G",
+      "gene": "ADH1C",
+      "label": "ADH1C"
+     },
+     {
+      "accession": "P28332",
+      "entry_name": "ADH6_HUMAN",
+      "symbol": "ADH6",
+      "gene": "ADH6",
+      "label": "ADH6"
+     },
+     {
+      "accession": "P40394",
+      "entry_name": "ADH7_HUMAN",
+      "symbol": "ADH7",
+      "gene": "ADH7",
+      "label": "ADH7"
+     },
+     {
+      "accession": "P11766",
+      "entry_name": "ADHX_HUMAN",
+      "symbol": "ADHX",
+      "gene": "ADH5",
+      "label": "ADH5"
+     }
+    ],
+    "organism_protein_count": 5,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "abbreviation",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.1 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "1.1.1.2",
+    "name": "alcohol dehydrogenase (NADP(+))",
+    "why": "ADH is a common abbreviation for alcohol dehydrogenase (NAD(+)) and (NADP(+)); it is also used for other enzymes, so the choice is yours",
+    "tier": 2,
+    "reaction": "a primary alcohol + NADP(+) = an aldehyde + NADPH + H(+).",
+    "class_path": "Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor",
+    "alternative_names": [],
+    "organism": "HUMAN",
+    "organism_proteins": [
+     {
+      "accession": "P14550",
+      "entry_name": "AK1A1_HUMAN",
+      "symbol": "AK1A1",
+      "gene": "AKR1A1",
+      "label": "AKR1A1"
+     },
+     {
+      "accession": "O95154",
+      "entry_name": "ARK73_HUMAN",
+      "symbol": "ARK73",
+      "gene": "AKR7A3",
+      "label": "AKR7A3"
+     }
+    ],
+    "organism_protein_count": 2,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "abbreviation",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.2 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "1.1.1.284",
+    "name": "S-(hydroxymethyl)glutathione dehydrogenase",
+    "why": "your query is a phrase inside another name for this enzyme: 'chi-ADH'",
+    "tier": 6,
+    "reaction": "(1) S-(hydroxymethyl)glutathione + NADP(+) = S-formylglutathione + NADPH + H(+). (2) S-(hydroxymethyl)glutathione + NAD(+) = S-formylglutathione + NADH + H(+).",
+    "class_path": "Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor",
+    "alternative_names": [
+     "chi-ADH"
+    ],
+    "organism": "HUMAN",
+    "organism_proteins": [
+     {
+      "accession": "P11766",
+      "entry_name": "ADHX_HUMAN",
+      "symbol": "ADHX",
+      "gene": "ADH5",
+      "label": "ADH5"
+     }
+    ],
+    "organism_protein_count": 1,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": true,
+    "matched_by": "name",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.284 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "1.1.5.5",
+    "name": "alcohol dehydrogenase (quinone)",
+    "why": "your query is a phrase inside another name for this enzyme: 'PQQ-dependent ADH'",
+    "tier": 6,
+    "reaction": "ethanol + a ubiquinone = a ubiquinol + acetaldehyde.",
+    "class_path": "Oxidoreductases > acting on the CH-OH group of donors > with a quinone or similar compound as acceptor",
+    "alternative_names": [
+     "PQQ-dependent ADH",
+     "quinoprotein ADH",
+     "type III ADH"
+    ],
+    "organism": "HUMAN",
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": true,
+    "matched_by": "name",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.5.5 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "2.2.1.10",
+    "name": "2-amino-3,7-dideoxy-D-threo-hept-6-ulosonate synthase",
+    "why": "your query is a phrase inside another name for this enzyme: 'ADH synthase'",
+    "tier": 6,
+    "reaction": "1-deoxy-D-threo-hexo-2,5-diulose 6-phosphate + L-aspartate 4-semialdehyde = 2,3-dioxopropyl phosphate + 2-amino-2,3,7-trideoxy-D-lyxo-hept-6-ulosonate.",
+    "class_path": "Transferases > transferring aldehyde or ketonic groups > transketolases and transaldolases",
+    "alternative_names": [
+     "ADH synthase"
+    ],
+    "organism": "HUMAN",
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": true,
+    "matched_by": "name",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 2.2.1.10 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   }
+  ],
+  "fallback": null
+ }
+}

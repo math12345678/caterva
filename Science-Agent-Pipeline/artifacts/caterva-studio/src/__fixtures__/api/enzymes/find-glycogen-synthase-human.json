@@ -1,0 +1,188 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=glycogen%20synthase&organism=human"
+ },
+ "status": 200,
+ "body": {
+  "query": "glycogen synthase",
+  "organism": "human",
+  "organism_code": "HUMAN",
+  "organism_label": "human",
+  "release": "02-Sep-2026",
+  "outcome": "ambiguous",
+  "resolved_ec": null,
+  "how": null,
+  "cautions": [],
+  "reason": "'glycogen synthase' is a name of EC 2.4.1.21 (starch synthase), which lists no human protein, and also matches EC 2.4.1.11 (glycogen(starch) synthase), which lists human GYS1, GYS2, EC 2.7.11.26 ([tau protein] kinase), which lists human PRKAA1, BRSK1, BRSK2, GSK3A",
+  "recommended_ec": null,
+  "confirm_only": false,
+  "candidates_total": 4,
+  "candidates": [
+   {
+    "ec": "2.4.1.21",
+    "name": "starch synthase",
+    "why": "listed as another name for this enzyme: 'glycogen synthase'",
+    "tier": 2,
+    "reaction": "[(1->4)-alpha-D-glucosyl](n) + ADP-alpha-D-glucose = [(1->4)-alpha-D-glucosyl](n+1) + ADP + H(+).",
+    "class_path": "Transferases > glycosyltransferases > hexosyltransferases",
+    "alternative_names": [
+     "glycogen synthase"
+    ],
+    "organism": "HUMAN",
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "name",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 2.4.1.21 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "2.4.1.11",
+    "name": "glycogen(starch) synthase",
+    "why": "accepted name matches once a parenthesised alternative word in it is set aside",
+    "tier": 3,
+    "reaction": "[(1->4)-alpha-D-glucosyl](n) + UDP-alpha-D-glucose = [(1->4)-alpha-D-glucosyl](n+1) + UDP + H(+).",
+    "class_path": "Transferases > glycosyltransferases > hexosyltransferases",
+    "alternative_names": [],
+    "organism": "HUMAN",
+    "organism_proteins": [
+     {
+      "accession": "P13807",
+      "entry_name": "GYS1_HUMAN",
+      "symbol": "GYS1",
+      "gene": "GYS1",
+      "label": "GYS1"
+     },
+     {
+      "accession": "P54840",
+      "entry_name": "GYS2_HUMAN",
+      "symbol": "GYS2",
+      "gene": "GYS2",
+      "label": "GYS2"
+     }
+    ],
+    "organism_protein_count": 2,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "name",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 2.4.1.11 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "3.1.3.42",
+    "name": "[glycogen-synthase-D] phosphatase",
+    "why": "your query is a phrase inside the accepted name",
+    "tier": 5,
+    "reaction": "[glycogen-synthase D] + H2O = [glycogen-synthase I] + phosphate.",
+    "class_path": "Hydrolases > acting on ester bonds > phosphoric monoester hydrolases",
+    "alternative_names": [],
+    "organism": "HUMAN",
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": true,
+    "matched_by": "name",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 3.1.3.42 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "2.7.11.26",
+    "name": "[tau protein] kinase",
+    "why": "your query is a phrase inside another name for this enzyme: 'glycogen synthase kinase-3beta'",
+    "tier": 6,
+    "reaction": "(1) L-seryl-[tau protein] + ATP = O-phospho-L-seryl-[tau protein] + ADP + H(+). (2) L-threonyl-[tau protein] + ATP = O-phospho-L-threonyl-[tau protein] + ADP + H(+).",
+    "class_path": "Transferases > transferring phosphorus-containing groups > protein-serine/threonine kinases",
+    "alternative_names": [
+     "glycogen synthase kinase-3beta"
+    ],
+    "organism": "HUMAN",
+    "organism_proteins": [
+     {
+      "accession": "Q13131",
+      "entry_name": "AAPK1_HUMAN",
+      "symbol": "AAPK1",
+      "gene": "PRKAA1",
+      "label": "PRKAA1"
+     },
+     {
+      "accession": "Q8TDC3",
+      "entry_name": "BRSK1_HUMAN",
+      "symbol": "BRSK1",
+      "gene": "BRSK1",
+      "label": "BRSK1"
+     },
+     {
+      "accession": "Q8IWQ3",
+      "entry_name": "BRSK2_HUMAN",
+      "symbol": "BRSK2",
+      "gene": "BRSK2",
+      "label": "BRSK2"
+     },
+     {
+      "accession": "P49840",
+      "entry_name": "GSK3A_HUMAN",
+      "symbol": "GSK3A",
+      "gene": "GSK3A",
+      "label": "GSK3A"
+     },
+     {
+      "accession": "P49841",
+      "entry_name": "GSK3B_HUMAN",
+      "symbol": "GSK3B",
+      "gene": "GSK3B",
+      "label": "GSK3B"
+     },
+     {
+      "accession": "P48730",
+      "entry_name": "KC1D_HUMAN",
+      "symbol": "KC1D",
+      "gene": "CSNK1D",
+      "label": "CSNK1D"
+     },
+     {
+      "accession": "Q9P0L2",
+      "entry_name": "MARK1_HUMAN",
+      "symbol": "MARK1",
+      "gene": "MARK1",
+      "label": "MARK1"
+     },
+     {
+      "accession": "Q7KZI7",
+      "entry_name": "MARK2_HUMAN",
+      "symbol": "MARK2",
+      "gene": "MARK2",
+      "label": "MARK2"
+     },
+     {
+      "accession": "Q16816",
+      "entry_name": "PHKG1_HUMAN",
+      "symbol": "PHKG1",
+      "gene": "PHKG1",
+      "label": "PHKG1"
+     }
+    ],
+    "organism_protein_count": 9,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": true,
+    "matched_by": "name",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 2.7.11.26 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   }
+  ],
+  "fallback": null
+ }
+}

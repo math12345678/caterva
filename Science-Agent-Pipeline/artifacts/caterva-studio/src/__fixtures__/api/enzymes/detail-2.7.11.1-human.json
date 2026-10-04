@@ -1,0 +1,3755 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/2.7.11.1?organism=human"
+ },
+ "status": 200,
+ "body": {
+  "ec": "2.7.11.1",
+  "name": "non-specific serine/threonine protein kinase",
+  "name_note": null,
+  "replaced_by": [],
+  "alternative_names": [
+   "protein phosphokinase",
+   "protein serine kinase",
+   "protein-serine kinase",
+   "protein serine-threonine kinase",
+   "serine/threonine protein kinase",
+   "serine(threonine) protein kinase",
+   "serine kinase",
+   "serine protein kinase",
+   "serine-specific protein kinase",
+   "threonine-specific protein kinase"
+  ],
+  "reaction": "(1) L-seryl-[protein] + ATP = O-phospho-L-seryl-[protein] + ADP + H(+). (2) L-threonyl-[protein] + ATP = O-phospho-L-threonyl-[protein] + ADP + H(+).",
+  "class_path": "Transferases > transferring phosphorus-containing groups > protein-serine/threonine kinases",
+  "status": "active",
+  "superseded_by": [],
+  "release": "02-Sep-2026",
+  "isozymes": {
+   "organism": "HUMAN",
+   "organism_label": "human",
+   "count": 245,
+   "proteins": [
+    {
+     "accession": "Q2M2I8",
+     "entry_name": "AAK1_HUMAN",
+     "symbol": "AAK1",
+     "gene": "AAK1",
+     "label": "AAK1",
+     "names": [
+      "AAK1",
+      "KIAA1048",
+      "Adaptor-associated kinase 1",
+      "AP2-associated protein kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q13131",
+     "entry_name": "AAPK1_HUMAN",
+     "symbol": "AAPK1",
+     "gene": "PRKAA1",
+     "label": "PRKAA1",
+     "names": [
+      "PRKAA1",
+      "AAPK1",
+      "AMPK1",
+      "AMPK subunit alpha-1",
+      "ACACA kinase",
+      "HMGCR kinase"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P54646",
+     "entry_name": "AAPK2_HUMAN",
+     "symbol": "AAPK2",
+     "gene": "PRKAA2",
+     "label": "PRKAA2",
+     "names": [
+      "PRKAA2",
+      "AAPK2",
+      "AMPK",
+      "AMPK2",
+      "AMPK subunit alpha-2",
+      "ACACA kinase",
+      "HMGCR kinase"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q07912",
+     "entry_name": "ACK1_HUMAN",
+     "symbol": "ACK1",
+     "gene": "TNK2",
+     "label": "TNK2",
+     "names": [
+      "TNK2",
+      "ACK1",
+      "ACK-1",
+      "Tyrosine kinase non-receptor protein 2",
+      "Activated CDC42 kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P31749",
+     "entry_name": "AKT1_HUMAN",
+     "symbol": "AKT1",
+     "gene": "AKT1",
+     "label": "AKT1",
+     "names": [
+      "AKT1",
+      "PKB",
+      "RAC",
+      "PKB alpha",
+      "Protein kinase B",
+      "Proto-oncogene c-Akt",
+      "RAC-PK-alpha"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P31751",
+     "entry_name": "AKT2_HUMAN",
+     "symbol": "AKT2",
+     "gene": "AKT2",
+     "label": "AKT2",
+     "names": [
+      "AKT2",
+      "PKB beta",
+      "RAC-PK-beta",
+      "Protein kinase Akt-2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y243",
+     "entry_name": "AKT3_HUMAN",
+     "symbol": "AKT3",
+     "gene": "AKT3",
+     "label": "AKT3",
+     "names": [
+      "AKT3",
+      "PKBG",
+      "PKB gamma",
+      "Protein kinase Akt-3",
+      "RAC-PK-gamma",
+      "STK-2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96QP1",
+     "entry_name": "ALPK1_HUMAN",
+     "symbol": "ALPK1",
+     "gene": "ALPK1",
+     "label": "ALPK1",
+     "names": [
+      "ALPK1",
+      "KIAA1527",
+      "LAK",
+      "Chromosome 4 kinase",
+      "Alpha-protein kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q86TB3",
+     "entry_name": "ALPK2_HUMAN",
+     "symbol": "ALPK2",
+     "gene": "ALPK2",
+     "label": "ALPK2",
+     "names": [
+      "ALPK2",
+      "HAK",
+      "Alpha-protein kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96L96",
+     "entry_name": "ALPK3_HUMAN",
+     "symbol": "ALPK3",
+     "gene": "ALPK3",
+     "label": "ALPK3",
+     "names": [
+      "ALPK3",
+      "KIAA1330",
+      "MAK",
+      "Alpha-protein kinase 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8NFD2",
+     "entry_name": "ANKK1_HUMAN",
+     "symbol": "ANKK1",
+     "gene": "ANKK1",
+     "label": "ANKK1",
+     "names": [
+      "ANKK1",
+      "PKK2",
+      "SGK288",
+      "SgK288",
+      "Protein kinase PKK2",
+      "Sugen kinase 288",
+      "X-kinase"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P10398",
+     "entry_name": "ARAF_HUMAN",
+     "symbol": "ARAF",
+     "gene": "ARAF",
+     "label": "ARAF",
+     "names": [
+      "ARAF",
+      "ARAF1",
+      "PKS",
+      "PKS2",
+      "Proto-oncogene A-Raf",
+      "Proto-oncogene A-Raf-1",
+      "Proto-oncogene Pks"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q13315",
+     "entry_name": "ATM_HUMAN",
+     "symbol": "ATM",
+     "gene": "ATM",
+     "label": "ATM",
+     "names": [
+      "ATM",
+      "A-T mutated"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q13535",
+     "entry_name": "ATR_HUMAN",
+     "symbol": "ATR",
+     "gene": "ATR",
+     "label": "ATR",
+     "names": [
+      "ATR",
+      "FRP1",
+      "FRAP-related protein 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O14965",
+     "entry_name": "AURKA_HUMAN",
+     "symbol": "AURKA",
+     "gene": "AURKA",
+     "label": "AURKA",
+     "names": [
+      "AURKA",
+      "AIK",
+      "AIRK1",
+      "ARK1",
+      "AURA",
+      "AYK1",
+      "BTAK",
+      "IAK1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96GD4",
+     "entry_name": "AURKB_HUMAN",
+     "symbol": "AURKB",
+     "gene": "AURKB",
+     "label": "AURKB",
+     "names": [
+      "AURKB",
+      "AIK2",
+      "AIM1",
+      "AIRK2",
+      "ARK2",
+      "STK1",
+      "STK12",
+      "STK5"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9UQB9",
+     "entry_name": "AURKC_HUMAN",
+     "symbol": "AURKC",
+     "gene": "AURKC",
+     "label": "AURKC",
+     "names": [
+      "AURKC",
+      "AIE2",
+      "AIK3",
+      "AIRK3",
+      "ARK3",
+      "STK13",
+      "ARK-3",
+      "Aurora-related kinase 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O14874",
+     "entry_name": "BCKD_HUMAN",
+     "symbol": "BCKD",
+     "gene": "BCKDK",
+     "label": "BCKDK",
+     "names": [
+      "BCKDK",
+      "BCKD",
+      "BCKDH kinase",
+      "BCKDHKIN",
+      "BDK"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P11274",
+     "entry_name": "BCR_HUMAN",
+     "symbol": "BCR",
+     "gene": "BCR",
+     "label": "BCR",
+     "names": [
+      "BCR",
+      "BCR1",
+      "D22S11",
+      "Renal carcinoma antigen NY-REN-26"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9NSY1",
+     "entry_name": "BMP2K_HUMAN",
+     "symbol": "BMP2K",
+     "gene": "BMP2K",
+     "label": "BMP2K",
+     "names": [
+      "BMP2K",
+      "BIKE",
+      "BIKe"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P15056",
+     "entry_name": "BRAF_HUMAN",
+     "symbol": "BRAF",
+     "gene": "BRAF",
+     "label": "BRAF",
+     "names": [
+      "BRAF",
+      "BRAF1",
+      "RAFB1",
+      "Proto-oncogene B-Raf",
+      "p94"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8TDC3",
+     "entry_name": "BRSK1_HUMAN",
+     "symbol": "BRSK1",
+     "gene": "BRSK1",
+     "label": "BRSK1",
+     "names": [
+      "BRSK1",
+      "KIAA1811",
+      "SAD1",
+      "SADB",
+      "BR serine/threonine-protein kinase 1",
+      "SAD1 homolog",
+      "hSAD1",
+      "Brain-selective kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8IWQ3",
+     "entry_name": "BRSK2_HUMAN",
+     "symbol": "BRSK2",
+     "gene": "BRSK2",
+     "label": "BRSK2",
+     "names": [
+      "BRSK2",
+      "C11orf7",
+      "PEN11B",
+      "SADA",
+      "STK29",
+      "BR serine/threonine-protein kinase 2",
+      "Brain-selective kinase 2",
+      "Serine/threonine-protein kinase 29"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O60566",
+     "entry_name": "BUB1B_HUMAN",
+     "symbol": "BUB1B",
+     "gene": "BUB1B",
+     "label": "BUB1B",
+     "names": [
+      "BUB1B",
+      "BUBR1",
+      "MAD3L",
+      "SSK1",
+      "hBUBR1",
+      "Protein SSK1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O43683",
+     "entry_name": "BUB1_HUMAN",
+     "symbol": "BUB1",
+     "gene": "BUB1",
+     "label": "BUB1",
+     "names": [
+      "BUB1",
+      "BUB1L",
+      "hBUB1",
+      "BUB1A"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P33076",
+     "entry_name": "C2TA_HUMAN",
+     "symbol": "C2TA",
+     "gene": "CIITA",
+     "label": "CIITA",
+     "names": [
+      "CIITA",
+      "C2TA",
+      "MHC2TA"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O00311",
+     "entry_name": "CDC7_HUMAN",
+     "symbol": "CDC7",
+     "gene": "CDC7",
+     "label": "CDC7",
+     "names": [
+      "CDC7",
+      "CDC7L1",
+      "CDC7-related kinase",
+      "HsCdc7",
+      "huCdc7"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q00535",
+     "entry_name": "CDK5_HUMAN",
+     "symbol": "CDK5",
+     "gene": "CDK5",
+     "label": "CDK5",
+     "names": [
+      "CDK5",
+      "CDKN5",
+      "PSSALRE",
+      "Cell division protein kinase 5",
+      "Cyclin-dependent-like kinase 5",
+      "Cyclin-dependent kinase 5"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O14757",
+     "entry_name": "CHK1_HUMAN",
+     "symbol": "CHK1",
+     "gene": "CHEK1",
+     "label": "CHEK1",
+     "names": [
+      "CHEK1",
+      "CHK1",
+      "Checkpoint kinase-1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O96017",
+     "entry_name": "CHK2_HUMAN",
+     "symbol": "CHK2",
+     "gene": "CHEK2",
+     "label": "CHEK2",
+     "names": [
+      "CHEK2",
+      "CHK2",
+      "CDS1",
+      "RAD53",
+      "Hucds1",
+      "hCds1",
+      "Cds1 homolog",
+      "Checkpoint kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9UPZ9",
+     "entry_name": "CILK1_HUMAN",
+     "symbol": "CILK1",
+     "gene": "CILK1",
+     "label": "CILK1",
+     "names": [
+      "CILK1",
+      "ICK",
+      "KIAA0936",
+      "hICK",
+      "LCK2",
+      "MRK",
+      "Ciliogenesis associated kinase 1",
+      "Laryngeal cancer kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P68400",
+     "entry_name": "CSK21_HUMAN",
+     "symbol": "CSK21",
+     "gene": "CSNK2A1",
+     "label": "CSNK2A1",
+     "names": [
+      "CSNK2A1",
+      "CSK21",
+      "CK2A1",
+      "CK II alpha"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P19784",
+     "entry_name": "CSK22_HUMAN",
+     "symbol": "CSK22",
+     "gene": "CSNK2A2",
+     "label": "CSNK2A2",
+     "names": [
+      "CSNK2A2",
+      "CSK22",
+      "CK2A2",
+      "CK II alpha'"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8NEV1",
+     "entry_name": "CSK23_HUMAN",
+     "symbol": "CSK23",
+     "gene": "CSNK2A3",
+     "label": "CSNK2A3",
+     "names": [
+      "CSNK2A3",
+      "CSK23",
+      "CSNK2A1P",
+      "CK II alpha 3",
+      "Casein kinase II subunit alpha 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O14936",
+     "entry_name": "CSKP_HUMAN",
+     "symbol": "CSKP",
+     "gene": "CASK",
+     "label": "CASK",
+     "names": [
+      "CASK",
+      "CSKP",
+      "LIN2",
+      "hCASK"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O14578",
+     "entry_name": "CTRO_HUMAN",
+     "symbol": "CTRO",
+     "gene": "CIT",
+     "label": "CIT",
+     "names": [
+      "CIT",
+      "CTRO",
+      "CRIK",
+      "KIAA0949",
+      "STK21",
+      "Serine/threonine-protein kinase 21"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P53355",
+     "entry_name": "DAPK1_HUMAN",
+     "symbol": "DAPK1",
+     "gene": "DAPK1",
+     "label": "DAPK1",
+     "names": [
+      "DAPK1",
+      "DAPK",
+      "DAP kinase 1",
+      "Death-associated protein kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9UIK4",
+     "entry_name": "DAPK2_HUMAN",
+     "symbol": "DAPK2",
+     "gene": "DAPK2",
+     "label": "DAPK2",
+     "names": [
+      "DAPK2",
+      "DAP kinase 2",
+      "DRP-1",
+      "DAP-kinase-related protein 1",
+      "Death-associated protein kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O43293",
+     "entry_name": "DAPK3_HUMAN",
+     "symbol": "DAPK3",
+     "gene": "DAPK3",
+     "label": "DAPK3",
+     "names": [
+      "DAPK3",
+      "ZIPK",
+      "DAP kinase 3",
+      "Dlk",
+      "ZIP-kinase",
+      "DAP-like kinase",
+      "MYPT1 kinase",
+      "Death-associated protein kinase 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y4B6",
+     "entry_name": "DCAF1_HUMAN",
+     "symbol": "DCAF1",
+     "gene": "DCAF1",
+     "label": "DCAF1",
+     "names": [
+      "DCAF1",
+      "KIAA0800",
+      "RIP",
+      "VPRBP",
+      "VprBP",
+      "DDB1- and CUL4-associated factor 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O15075",
+     "entry_name": "DCLK1_HUMAN",
+     "symbol": "DCLK1",
+     "gene": "DCLK1",
+     "label": "DCLK1",
+     "names": [
+      "DCLK1",
+      "DCAMKL1",
+      "DCDC3A",
+      "KIAA0369",
+      "Doublecortin domain-containing protein 3A",
+      "Doublecortin-like and CAM kinase-like 1",
+      "Doublecortin-like kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8N568",
+     "entry_name": "DCLK2_HUMAN",
+     "symbol": "DCLK2",
+     "gene": "DCLK2",
+     "label": "DCLK2",
+     "names": [
+      "DCLK2",
+      "DCAMKL2",
+      "DCDC3B",
+      "DCK2",
+      "CL2",
+      "CLICK-II",
+      "CLICK2",
+      "CaMK-like CREB regulatory kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9C098",
+     "entry_name": "DCLK3_HUMAN",
+     "symbol": "DCLK3",
+     "gene": "DCLK3",
+     "label": "DCLK3",
+     "names": [
+      "DCLK3",
+      "DCAMKL3",
+      "DCDC3C",
+      "KIAA1765",
+      "Doublecortin domain-containing protein 3C",
+      "Doublecortin-like and CAM kinase-like 3",
+      "Doublecortin-like kinase 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q09013",
+     "entry_name": "DMPK_HUMAN",
+     "symbol": "DMPK",
+     "gene": "DMPK",
+     "label": "DMPK",
+     "names": [
+      "DMPK",
+      "DM1PK",
+      "MDPK",
+      "MT-PK",
+      "DMK",
+      "DM-kinase",
+      "DM1 protein kinase"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9BQI3",
+     "entry_name": "E2AK1_HUMAN",
+     "symbol": "E2AK1",
+     "gene": "EIF2AK1",
+     "label": "EIF2AK1",
+     "names": [
+      "EIF2AK1",
+      "E2AK1",
+      "HRI",
+      "KIAA1369",
+      "HCR",
+      "hHRI"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P19525",
+     "entry_name": "E2AK2_HUMAN",
+     "symbol": "E2AK2",
+     "gene": "EIF2AK2",
+     "label": "EIF2AK2",
+     "names": [
+      "EIF2AK2",
+      "E2AK2",
+      "PKR",
+      "PRKR",
+      "eIF-2A protein kinase 2",
+      "Protein kinase R",
+      "p68 kinase"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9NZJ5",
+     "entry_name": "E2AK3_HUMAN",
+     "symbol": "E2AK3",
+     "gene": "EIF2AK3",
+     "label": "EIF2AK3",
+     "names": [
+      "EIF2AK3",
+      "E2AK3",
+      "PEK",
+      "PERK",
+      "HsPEK"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9P2K8",
+     "entry_name": "E2AK4_HUMAN",
+     "symbol": "E2AK4",
+     "gene": "EIF2AK4",
+     "label": "EIF2AK4",
+     "names": [
+      "EIF2AK4",
+      "E2AK4",
+      "GCN2",
+      "KIAA1338",
+      "GCN2-like protein"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O75460",
+     "entry_name": "ERN1_HUMAN",
+     "symbol": "ERN1",
+     "gene": "ERN1",
+     "label": "ERN1",
+     "names": [
+      "ERN1",
+      "IRE1",
+      "hIRE1p",
+      "IRE1a",
+      "Endoplasmic reticulum-to-nucleus signaling 1",
+      "Inositol-requiring protein 1",
+      "Ire1-alpha"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q76MJ5",
+     "entry_name": "ERN2_HUMAN",
+     "symbol": "ERN2",
+     "gene": "ERN2",
+     "label": "ERN2",
+     "names": [
+      "ERN2",
+      "IRE2",
+      "hIRE2p",
+      "IRE1b",
+      "Endoplasmic reticulum-to-nucleus signaling 2",
+      "Inositol-requiring protein 2",
+      "Ire1-beta"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8IXL6",
+     "entry_name": "FA20C_HUMAN",
+     "symbol": "FA20C",
+     "gene": "FAM20C",
+     "label": "FAM20C",
+     "names": [
+      "FAM20C",
+      "FA20C",
+      "DMP4",
+      "DMP-4",
+      "GEF-CK",
+      "Dentin matrix protein 4",
+      "Golgi casein kinase"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q14296",
+     "entry_name": "FASTK_HUMAN",
+     "symbol": "FASTK",
+     "gene": "FASTK",
+     "label": "FASTK",
+     "names": [
+      "FASTK",
+      "FAST kinase"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y2I7",
+     "entry_name": "FYV1_HUMAN",
+     "symbol": "FYV1",
+     "gene": "PIKFYVE",
+     "label": "PIKFYVE",
+     "names": [
+      "PIKFYVE",
+      "FYV1",
+      "KIAA0981",
+      "PIP5K3",
+      "PIPkin-III",
+      "Type III PIP kinase",
+      "PIKfyve"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O14976",
+     "entry_name": "GAK_HUMAN",
+     "symbol": "GAK",
+     "gene": "GAK",
+     "label": "GAK",
+     "names": [
+      "GAK",
+      "DNAJC26",
+      "Auxilin 2",
+      "DnaJ homolog subfamily C member 26"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P49840",
+     "entry_name": "GSK3A_HUMAN",
+     "symbol": "GSK3A",
+     "gene": "GSK3A",
+     "label": "GSK3A",
+     "names": [
+      "GSK3A",
+      "GSK-3 alpha"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P49841",
+     "entry_name": "GSK3B_HUMAN",
+     "symbol": "GSK3B",
+     "gene": "GSK3B",
+     "label": "GSK3B",
+     "names": [
+      "GSK3B",
+      "GSK-3 beta"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96GX5",
+     "entry_name": "GWL_HUMAN",
+     "symbol": "GWL",
+     "gene": "MASTL",
+     "label": "MASTL",
+     "names": [
+      "MASTL",
+      "GWL",
+      "GW",
+      "THC2",
+      "hGWL",
+      "MAST-L"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8TF76",
+     "entry_name": "HASP_HUMAN",
+     "symbol": "HASP",
+     "gene": "HASPIN",
+     "label": "HASPIN",
+     "names": [
+      "HASPIN",
+      "HASP",
+      "GSG2",
+      "H-haspin"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q86Z02",
+     "entry_name": "HIPK1_HUMAN",
+     "symbol": "HIPK1",
+     "gene": "HIPK1",
+     "label": "HIPK1",
+     "names": [
+      "HIPK1",
+      "KIAA0630",
+      "MYAK",
+      "NBAK2",
+      "Nuclear body-associated kinase 2",
+      "Homeodomain-interacting protein kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9H2X6",
+     "entry_name": "HIPK2_HUMAN",
+     "symbol": "HIPK2",
+     "gene": "HIPK2",
+     "label": "HIPK2",
+     "names": [
+      "HIPK2",
+      "hHIPk2",
+      "Homeodomain-interacting protein kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9H422",
+     "entry_name": "HIPK3_HUMAN",
+     "symbol": "HIPK3",
+     "gene": "HIPK3",
+     "label": "HIPK3",
+     "names": [
+      "HIPK3",
+      "DYRK6",
+      "FIST3",
+      "PKY",
+      "ANPK",
+      "FIST",
+      "Homeodomain-interacting protein kinase 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8NE63",
+     "entry_name": "HIPK4_HUMAN",
+     "symbol": "HIPK4",
+     "gene": "HIPK4",
+     "label": "HIPK4",
+     "names": [
+      "HIPK4",
+      "Homeodomain-interacting protein kinase 4"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P57058",
+     "entry_name": "HUNK_HUMAN",
+     "symbol": "HUNK",
+     "gene": "HUNK",
+     "label": "HUNK",
+     "names": [
+      "HUNK",
+      "MAKV",
+      "B19",
+      "Serine/threonine-protein kinase MAK-V"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O14920",
+     "entry_name": "IKKB_HUMAN",
+     "symbol": "IKKB",
+     "gene": "IKBKB",
+     "label": "IKBKB",
+     "names": [
+      "IKBKB",
+      "IKKB",
+      "IKK-B",
+      "IKK-beta",
+      "IkBKB",
+      "IKK-2",
+      "IKK2",
+      "NFKBIKB"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q14164",
+     "entry_name": "IKKE_HUMAN",
+     "symbol": "IKKE",
+     "gene": "IKBKE",
+     "label": "IKBKE",
+     "names": [
+      "IKBKE",
+      "IKKE",
+      "IKKI",
+      "KIAA0151",
+      "IKK-E",
+      "IKK-epsilon",
+      "IkBKE",
+      "IKK-i"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P51617",
+     "entry_name": "IRAK1_HUMAN",
+     "symbol": "IRAK1",
+     "gene": "IRAK1",
+     "label": "IRAK1",
+     "names": [
+      "IRAK1",
+      "IRAK",
+      "IRAK-1",
+      "Interleukin-1 receptor-associated kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9NWZ3",
+     "entry_name": "IRAK4_HUMAN",
+     "symbol": "IRAK4",
+     "gene": "IRAK4",
+     "label": "IRAK4",
+     "names": [
+      "IRAK4",
+      "IRAK-4",
+      "Renal carcinoma antigen NY-REN-64",
+      "Interleukin-1 receptor-associated kinase 4"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O60229",
+     "entry_name": "KALRN_HUMAN",
+     "symbol": "KALRN",
+     "gene": "KALRN",
+     "label": "KALRN",
+     "names": [
+      "KALRN",
+      "DUET",
+      "DUO",
+      "HAPIP",
+      "TRAD",
+      "Protein Duo"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8N752",
+     "entry_name": "KC1AL_HUMAN",
+     "symbol": "KC1AL",
+     "gene": "CSNK1A1L",
+     "label": "CSNK1A1L",
+     "names": [
+      "CSNK1A1L",
+      "KC1AL",
+      "CKI-alpha-like",
+      "CK1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P48729",
+     "entry_name": "KC1A_HUMAN",
+     "symbol": "KC1A",
+     "gene": "CSNK1A1",
+     "label": "CSNK1A1",
+     "names": [
+      "CSNK1A1",
+      "KC1A",
+      "CKI-alpha",
+      "CK1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P48730",
+     "entry_name": "KC1D_HUMAN",
+     "symbol": "KC1D",
+     "gene": "CSNK1D",
+     "label": "CSNK1D",
+     "names": [
+      "CSNK1D",
+      "KC1D",
+      "HCKID",
+      "CKI-delta",
+      "CKId"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P49674",
+     "entry_name": "KC1E_HUMAN",
+     "symbol": "KC1E",
+     "gene": "CSNK1E",
+     "label": "CSNK1E",
+     "names": [
+      "CSNK1E",
+      "KC1E",
+      "CKI-epsilon",
+      "CKIe"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9HCP0",
+     "entry_name": "KC1G1_HUMAN",
+     "symbol": "KC1G1",
+     "gene": "CSNK1G1",
+     "label": "CSNK1G1",
+     "names": [
+      "CSNK1G1",
+      "KC1G1",
+      "CKI-gamma 1",
+      "Casein kinase I isoform gamma-1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P78368",
+     "entry_name": "KC1G2_HUMAN",
+     "symbol": "KC1G2",
+     "gene": "CSNK1G2",
+     "label": "CSNK1G2",
+     "names": [
+      "CSNK1G2",
+      "KC1G2",
+      "CK1G2",
+      "CKI-gamma 2",
+      "Casein kinase I isoform gamma-2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y6M4",
+     "entry_name": "KC1G3_HUMAN",
+     "symbol": "KC1G3",
+     "gene": "CSNK1G3",
+     "label": "CSNK1G3",
+     "names": [
+      "CSNK1G3",
+      "KC1G3",
+      "CKI-gamma 3",
+      "Casein kinase I isoform gamma-3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P11801",
+     "entry_name": "KPSH1_HUMAN",
+     "symbol": "KPSH1",
+     "gene": "PSKH1",
+     "label": "PSKH1",
+     "names": [
+      "PSKH1",
+      "KPSH1",
+      "PSK-H1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P14618",
+     "entry_name": "KPYM_HUMAN",
+     "symbol": "KPYM",
+     "gene": "PKM",
+     "label": "PKM",
+     "names": [
+      "PKM",
+      "KPYM",
+      "OIP3",
+      "PK2",
+      "PK3",
+      "PKM2",
+      "CTHBP",
+      "OIP-3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q15418",
+     "entry_name": "KS6A1_HUMAN",
+     "symbol": "KS6A1",
+     "gene": "RPS6KA1",
+     "label": "RPS6KA1",
+     "names": [
+      "RPS6KA1",
+      "KS6A1",
+      "MAPKAPK1A",
+      "RSK1",
+      "S6K-alpha-1",
+      "p90-RSK 1",
+      "p90RSK1",
+      "p90S6K"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q15349",
+     "entry_name": "KS6A2_HUMAN",
+     "symbol": "KS6A2",
+     "gene": "RPS6KA2",
+     "label": "RPS6KA2",
+     "names": [
+      "RPS6KA2",
+      "KS6A2",
+      "MAPKAPK1C",
+      "RSK3",
+      "S6K-alpha-2",
+      "p90-RSK 2",
+      "p90RSK2",
+      "MAPK-activated protein kinase 1c"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P51812",
+     "entry_name": "KS6A3_HUMAN",
+     "symbol": "KS6A3",
+     "gene": "RPS6KA3",
+     "label": "RPS6KA3",
+     "names": [
+      "RPS6KA3",
+      "KS6A3",
+      "ISPK1",
+      "MAPKAPK1B",
+      "RSK2",
+      "S6K-alpha-3",
+      "p90-RSK 3",
+      "p90RSK3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O75676",
+     "entry_name": "KS6A4_HUMAN",
+     "symbol": "KS6A4",
+     "gene": "RPS6KA4",
+     "label": "RPS6KA4",
+     "names": [
+      "RPS6KA4",
+      "KS6A4",
+      "MSK2",
+      "S6K-alpha-4",
+      "RSKB",
+      "90 kDa ribosomal protein S6 kinase 4",
+      "Ribosomal protein kinase B",
+      "Ribosomal protein S6 kinase alpha-4"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O75582",
+     "entry_name": "KS6A5_HUMAN",
+     "symbol": "KS6A5",
+     "gene": "RPS6KA5",
+     "label": "RPS6KA5",
+     "names": [
+      "RPS6KA5",
+      "KS6A5",
+      "MSK1",
+      "S6K-alpha-5",
+      "RSKL",
+      "90 kDa ribosomal protein S6 kinase 5",
+      "Ribosomal protein S6 kinase alpha-5"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9UK32",
+     "entry_name": "KS6A6_HUMAN",
+     "symbol": "KS6A6",
+     "gene": "RPS6KA6",
+     "label": "RPS6KA6",
+     "names": [
+      "RPS6KA6",
+      "KS6A6",
+      "RSK4",
+      "S6K-alpha-6",
+      "p90-RSK 6",
+      "p90RSK6",
+      "RSK-4",
+      "90 kDa ribosomal protein S6 kinase 6"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P23443",
+     "entry_name": "KS6B1_HUMAN",
+     "symbol": "KS6B1",
+     "gene": "RPS6KB1",
+     "label": "RPS6KB1",
+     "names": [
+      "RPS6KB1",
+      "KS6B1",
+      "STK14A",
+      "S6K-beta-1",
+      "S6K1",
+      "P70S6K1",
+      "p70-S6K 1",
+      "p70 S6 kinase alpha"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9UBS0",
+     "entry_name": "KS6B2_HUMAN",
+     "symbol": "KS6B2",
+     "gene": "RPS6KB2",
+     "label": "RPS6KB2",
+     "names": [
+      "RPS6KB2",
+      "KS6B2",
+      "STK14B",
+      "S6K-beta-2",
+      "S6K2",
+      "P70S6K2",
+      "p70-S6K 2",
+      "SRK"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96LW2",
+     "entry_name": "KS6R_HUMAN",
+     "symbol": "KS6R",
+     "gene": "RSKR",
+     "label": "RSKR",
+     "names": [
+      "RSKR",
+      "KS6R",
+      "SGK494",
+      "Sugen kinase 494"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8IVT5",
+     "entry_name": "KSR1_HUMAN",
+     "symbol": "KSR1",
+     "gene": "KSR1",
+     "label": "KSR1",
+     "names": [
+      "KSR1",
+      "KSR",
+      "Kinase suppressor of Ras 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q6VAB6",
+     "entry_name": "KSR2_HUMAN",
+     "symbol": "KSR2",
+     "gene": "KSR2",
+     "label": "KSR2",
+     "names": [
+      "KSR2",
+      "hKSR2",
+      "Kinase suppressor of Ras 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O95835",
+     "entry_name": "LATS1_HUMAN",
+     "symbol": "LATS1",
+     "gene": "LATS1",
+     "label": "LATS1",
+     "names": [
+      "LATS1",
+      "WARTS",
+      "h-warts",
+      "Large tumor suppressor homolog 1",
+      "WARTS protein kinase"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9NRM7",
+     "entry_name": "LATS2_HUMAN",
+     "symbol": "LATS2",
+     "gene": "LATS2",
+     "label": "LATS2",
+     "names": [
+      "LATS2",
+      "KPM",
+      "Large tumor suppressor homolog 2",
+      "Warts-like kinase"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P53667",
+     "entry_name": "LIMK1_HUMAN",
+     "symbol": "LIMK1",
+     "gene": "LIMK1",
+     "label": "LIMK1",
+     "names": [
+      "LIMK1",
+      "LIMK",
+      "LIMK-1",
+      "LIM domain kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P53671",
+     "entry_name": "LIMK2_HUMAN",
+     "symbol": "LIMK2",
+     "gene": "LIMK2",
+     "label": "LIMK2",
+     "names": [
+      "LIMK2",
+      "LIMK-2",
+      "LIM domain kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q6ZMQ8",
+     "entry_name": "LMTK1_HUMAN",
+     "symbol": "LMTK1",
+     "gene": "AATK",
+     "label": "AATK",
+     "names": [
+      "AATK",
+      "LMTK1",
+      "AATYK",
+      "KIAA0641",
+      "LMR1",
+      "p35BP",
+      "CDK5-binding protein",
+      "Lemur tyrosine kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8IWU2",
+     "entry_name": "LMTK2_HUMAN",
+     "symbol": "LMTK2",
+     "gene": "LMTK2",
+     "label": "LMTK2",
+     "names": [
+      "LMTK2",
+      "AATYK2",
+      "BREK",
+      "KIAA1079",
+      "KPI2",
+      "LMR2",
+      "hBREK",
+      "CPRK"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96Q04",
+     "entry_name": "LMTK3_HUMAN",
+     "symbol": "LMTK3",
+     "gene": "LMTK3",
+     "label": "LMTK3",
+     "names": [
+      "LMTK3",
+      "KIAA1883",
+      "TYKLM3",
+      "Lemur tyrosine kinase 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q38SD2",
+     "entry_name": "LRRK1_HUMAN",
+     "symbol": "LRRK1",
+     "gene": "LRRK1",
+     "label": "LRRK1",
+     "names": [
+      "LRRK1",
+      "KIAA1790"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q5S007",
+     "entry_name": "LRRK2_HUMAN",
+     "symbol": "LRRK2",
+     "gene": "LRRK2",
+     "label": "LRRK2",
+     "names": [
+      "LRRK2",
+      "PARK8",
+      "Dardarin"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q56UN5",
+     "entry_name": "M3K19_HUMAN",
+     "symbol": "M3K19",
+     "gene": "MAP3K19",
+     "label": "MAP3K19",
+     "names": [
+      "MAP3K19",
+      "M3K19",
+      "RCK",
+      "YSK4"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q92918",
+     "entry_name": "M4K1_HUMAN",
+     "symbol": "M4K1",
+     "gene": "MAP4K1",
+     "label": "MAP4K1",
+     "names": [
+      "MAP4K1",
+      "M4K1",
+      "HPK1",
+      "MEK kinase kinase 1",
+      "MEKKK 1",
+      "MAPK/ERK kinase kinase kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q12851",
+     "entry_name": "M4K2_HUMAN",
+     "symbol": "M4K2",
+     "gene": "MAP4K2",
+     "label": "MAP4K2",
+     "names": [
+      "MAP4K2",
+      "M4K2",
+      "GCK",
+      "RAB8IP",
+      "GC kinase",
+      "MEK kinase kinase 2",
+      "MEKKK 2",
+      "MAPK/ERK kinase kinase kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8IVH8",
+     "entry_name": "M4K3_HUMAN",
+     "symbol": "M4K3",
+     "gene": "MAP4K3",
+     "label": "MAP4K3",
+     "names": [
+      "MAP4K3",
+      "M4K3",
+      "RAB8IPL1",
+      "GLK",
+      "MEK kinase kinase 3",
+      "MEKKK 3",
+      "MAPK/ERK kinase kinase kinase 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O95819",
+     "entry_name": "M4K4_HUMAN",
+     "symbol": "M4K4",
+     "gene": "MAP4K4",
+     "label": "MAP4K4",
+     "names": [
+      "MAP4K4",
+      "M4K4",
+      "HGK",
+      "KIAA0687",
+      "NIK",
+      "MEK kinase kinase 4",
+      "MEKKK 4",
+      "MAPK/ERK kinase kinase kinase 4"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y4K4",
+     "entry_name": "M4K5_HUMAN",
+     "symbol": "M4K5",
+     "gene": "MAP4K5",
+     "label": "MAP4K5",
+     "names": [
+      "MAP4K5",
+      "M4K5",
+      "KHS",
+      "MEK kinase kinase 5",
+      "MEKKK 5",
+      "MAPK/ERK kinase kinase kinase 5"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P20794",
+     "entry_name": "MAK_HUMAN",
+     "symbol": "MAK",
+     "gene": "MAK",
+     "label": "MAK",
+     "names": [
+      "MAK"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P49137",
+     "entry_name": "MAPK2_HUMAN",
+     "symbol": "MAPK2",
+     "gene": "MAPKAPK2",
+     "label": "MAPKAPK2",
+     "names": [
+      "MAPKAPK2",
+      "MAPK2",
+      "MAPK-activated protein kinase 2",
+      "MAPKAP kinase 2",
+      "MAPKAP-K2",
+      "MAPKAPK-2",
+      "MK-2",
+      "MK2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q16644",
+     "entry_name": "MAPK3_HUMAN",
+     "symbol": "MAPK3",
+     "gene": "MAPKAPK3",
+     "label": "MAPKAPK3",
+     "names": [
+      "MAPKAPK3",
+      "MAPK3",
+      "MAPK-activated protein kinase 3",
+      "MAPKAP kinase 3",
+      "MAPKAP-K3",
+      "MAPKAPK-3",
+      "MK-3",
+      "3pK"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8IW41",
+     "entry_name": "MAPK5_HUMAN",
+     "symbol": "MAPK5",
+     "gene": "MAPKAPK5",
+     "label": "MAPKAPK5",
+     "names": [
+      "MAPKAPK5",
+      "MAPK5",
+      "PRAK",
+      "MAPK-activated protein kinase 5",
+      "MAPKAP kinase 5",
+      "MAPKAP-K5",
+      "MAPKAPK-5",
+      "MK-5"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9P0L2",
+     "entry_name": "MARK1_HUMAN",
+     "symbol": "MARK1",
+     "gene": "MARK1",
+     "label": "MARK1",
+     "names": [
+      "MARK1",
+      "KIAA1477",
+      "MARK",
+      "Par-1c",
+      "Par1c",
+      "MAP/microtubule affinity-regulating kinase 1",
+      "PAR1 homolog c"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q7KZI7",
+     "entry_name": "MARK2_HUMAN",
+     "symbol": "MARK2",
+     "gene": "MARK2",
+     "label": "MARK2",
+     "names": [
+      "MARK2",
+      "EMK1",
+      "EMK-1",
+      "Par-1b",
+      "Par1b",
+      "ELKL motif kinase 1",
+      "MAP/microtubule affinity-regulating kinase 2",
+      "PAR1 homolog"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P27448",
+     "entry_name": "MARK3_HUMAN",
+     "symbol": "MARK3",
+     "gene": "MARK3",
+     "label": "MARK3",
+     "names": [
+      "MARK3",
+      "CTAK1",
+      "EMK2",
+      "cTAK1",
+      "EMK-2",
+      "Par-1a",
+      "C-TAK1",
+      "Cdc25C-associated protein kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96L34",
+     "entry_name": "MARK4_HUMAN",
+     "symbol": "MARK4",
+     "gene": "MARK4",
+     "label": "MARK4",
+     "names": [
+      "MARK4",
+      "KIAA1860",
+      "MARKL1",
+      "MAP/microtubule affinity-regulating kinase 4"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y2H9",
+     "entry_name": "MAST1_HUMAN",
+     "symbol": "MAST1",
+     "gene": "MAST1",
+     "label": "MAST1",
+     "names": [
+      "MAST1",
+      "KIAA0973",
+      "SAST"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q6P0Q8",
+     "entry_name": "MAST2_HUMAN",
+     "symbol": "MAST2",
+     "gene": "MAST2",
+     "label": "MAST2",
+     "names": [
+      "MAST2",
+      "KIAA0807",
+      "MAST205"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O60307",
+     "entry_name": "MAST3_HUMAN",
+     "symbol": "MAST3",
+     "gene": "MAST3",
+     "label": "MAST3",
+     "names": [
+      "MAST3",
+      "KIAA0561"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O15021",
+     "entry_name": "MAST4_HUMAN",
+     "symbol": "MAST4",
+     "gene": "MAST4",
+     "label": "MAST4",
+     "names": [
+      "MAST4",
+      "KIAA0303"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q14680",
+     "entry_name": "MELK_HUMAN",
+     "symbol": "MELK",
+     "gene": "MELK",
+     "label": "MELK",
+     "names": [
+      "MELK",
+      "KIAA0175",
+      "hMELK",
+      "pEg3 kinase",
+      "hPK38",
+      "Protein kinase Eg3",
+      "Protein kinase PK38"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8N4C8",
+     "entry_name": "MINK1_HUMAN",
+     "symbol": "MINK1",
+     "gene": "MINK1",
+     "label": "MINK1",
+     "names": [
+      "MINK1",
+      "B55",
+      "MAP4K6",
+      "MINK",
+      "YSK2",
+      "ZC3",
+      "MEK kinase kinase 6",
+      "MEKKK 6"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9BUB5",
+     "entry_name": "MKNK1_HUMAN",
+     "symbol": "MKNK1",
+     "gene": "MKNK1",
+     "label": "MKNK1",
+     "names": [
+      "MKNK1",
+      "MNK1",
+      "MAPK signal-integrating kinase 1",
+      "Mnk1",
+      "MAP kinase signal-integrating kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9HBH9",
+     "entry_name": "MKNK2_HUMAN",
+     "symbol": "MKNK2",
+     "gene": "MKNK2",
+     "label": "MKNK2",
+     "names": [
+      "MKNK2",
+      "GPRK7",
+      "MNK2",
+      "MAPK signal-integrating kinase 2",
+      "Mnk2",
+      "MAP kinase signal-integrating kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P00540",
+     "entry_name": "MOS_HUMAN",
+     "symbol": "MOS",
+     "gene": "MOS",
+     "label": "MOS",
+     "names": [
+      "MOS",
+      "Proto-oncogene c-Mos"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q5VT25",
+     "entry_name": "MRCKA_HUMAN",
+     "symbol": "MRCKA",
+     "gene": "CDC42BPA",
+     "label": "CDC42BPA",
+     "names": [
+      "CDC42BPA",
+      "MRCKA",
+      "KIAA0451",
+      "MRCK alpha",
+      "DMPK-like alpha"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y5S2",
+     "entry_name": "MRCKB_HUMAN",
+     "symbol": "MRCKB",
+     "gene": "CDC42BPB",
+     "label": "CDC42BPB",
+     "names": [
+      "CDC42BPB",
+      "MRCKB",
+      "KIAA1124",
+      "CDC42BP-beta",
+      "MRCK beta",
+      "DMPK-like beta"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q6DT37",
+     "entry_name": "MRCKG_HUMAN",
+     "symbol": "MRCKG",
+     "gene": "CDC42BPG",
+     "label": "CDC42BPG",
+     "names": [
+      "CDC42BPG",
+      "MRCKG",
+      "DMPK2",
+      "MRCK gamma",
+      "DMPK-like gamma"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P42345",
+     "entry_name": "MTOR_HUMAN",
+     "symbol": "MTOR",
+     "gene": "MTOR",
+     "label": "MTOR",
+     "names": [
+      "MTOR",
+      "FRAP",
+      "FRAP1",
+      "FRAP2",
+      "RAFT1",
+      "RAPT1",
+      "mTOR",
+      "Rapamycin and FKBP12 target 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q86YV6",
+     "entry_name": "MYLK4_HUMAN",
+     "symbol": "MYLK4",
+     "gene": "MYLK4",
+     "label": "MYLK4",
+     "names": [
+      "MYLK4",
+      "SGK085",
+      "SgK085",
+      "Sugen kinase 85",
+      "Myosin light chain kinase family member 4"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8NEV4",
+     "entry_name": "MYO3A_HUMAN",
+     "symbol": "MYO3A",
+     "gene": "MYO3A",
+     "label": "MYO3A",
+     "names": [
+      "MYO3A"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8WXR4",
+     "entry_name": "MYO3B_HUMAN",
+     "symbol": "MYO3B",
+     "gene": "MYO3B",
+     "label": "MYO3B",
+     "names": [
+      "MYO3B"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y5B8",
+     "entry_name": "NDK7_HUMAN",
+     "symbol": "NDK7",
+     "gene": "NME7",
+     "label": "NME7",
+     "names": [
+      "NME7",
+      "NDK7",
+      "NDP kinase 7",
+      "nm23-H7",
+      "Nucleoside diphosphate kinase 7"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P15531",
+     "entry_name": "NDKA_HUMAN",
+     "symbol": "NDKA",
+     "gene": "NME1",
+     "label": "NME1",
+     "names": [
+      "NME1",
+      "NDKA",
+      "NDPKA",
+      "NM23",
+      "NDP kinase A",
+      "NDPK A",
+      "NDK1",
+      "GAAD"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q6ZWH5",
+     "entry_name": "NEK10_HUMAN",
+     "symbol": "NEK10",
+     "gene": "NEK10",
+     "label": "NEK10",
+     "names": [
+      "NEK10",
+      "NimA-related protein kinase 10",
+      "Never in mitosis A-related kinase 10"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8NG66",
+     "entry_name": "NEK11_HUMAN",
+     "symbol": "NEK11",
+     "gene": "NEK11",
+     "label": "NEK11",
+     "names": [
+      "NEK11",
+      "NimA-related protein kinase 11",
+      "Never in mitosis A-related kinase 11"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96PY6",
+     "entry_name": "NEK1_HUMAN",
+     "symbol": "NEK1",
+     "gene": "NEK1",
+     "label": "NEK1",
+     "names": [
+      "NEK1",
+      "KIAA1901",
+      "NimA-related protein kinase 1",
+      "Never in mitosis A-related kinase 1",
+      "Renal carcinoma antigen NY-REN-55"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P51955",
+     "entry_name": "NEK2_HUMAN",
+     "symbol": "NEK2",
+     "gene": "NEK2",
+     "label": "NEK2",
+     "names": [
+      "NEK2",
+      "NEK2A",
+      "NLK1",
+      "NimA-related protein kinase 2",
+      "HSPK 21",
+      "Never in mitosis A-related kinase 2",
+      "NimA-like protein kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P51956",
+     "entry_name": "NEK3_HUMAN",
+     "symbol": "NEK3",
+     "gene": "NEK3",
+     "label": "NEK3",
+     "names": [
+      "NEK3",
+      "NimA-related protein kinase 3",
+      "HSPK 36",
+      "Never in mitosis A-related kinase 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P51957",
+     "entry_name": "NEK4_HUMAN",
+     "symbol": "NEK4",
+     "gene": "NEK4",
+     "label": "NEK4",
+     "names": [
+      "NEK4",
+      "STK2",
+      "NimA-related protein kinase 4",
+      "Never in mitosis A-related kinase 4",
+      "Serine/threonine-protein kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q6P3R8",
+     "entry_name": "NEK5_HUMAN",
+     "symbol": "NEK5",
+     "gene": "NEK5",
+     "label": "NEK5",
+     "names": [
+      "NEK5",
+      "NimA-related protein kinase 5",
+      "Never in mitosis A-related kinase 5"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q86SG6",
+     "entry_name": "NEK8_HUMAN",
+     "symbol": "NEK8",
+     "gene": "NEK8",
+     "label": "NEK8",
+     "names": [
+      "NEK8",
+      "JCK",
+      "NEK12A",
+      "NimA-related protein kinase 8",
+      "Never in mitosis A-related kinase 8",
+      "Nima-related protein kinase 12a"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8IY84",
+     "entry_name": "NIM1_HUMAN",
+     "symbol": "NIM1",
+     "gene": "NIM1K",
+     "label": "NIM1K",
+     "names": [
+      "NIM1K",
+      "NIM1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q7Z2Y5",
+     "entry_name": "NRK_HUMAN",
+     "symbol": "NRK",
+     "gene": "NRK",
+     "label": "NRK",
+     "names": [
+      "NRK"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O60285",
+     "entry_name": "NUAK1_HUMAN",
+     "symbol": "NUAK1",
+     "gene": "NUAK1",
+     "label": "NUAK1",
+     "names": [
+      "NUAK1",
+      "ARK5",
+      "KIAA0537",
+      "OMPHK1",
+      "AMPK-related protein kinase 5",
+      "Omphalocele kinase 1",
+      "NUAK family SNF1-like kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9H093",
+     "entry_name": "NUAK2_HUMAN",
+     "symbol": "NUAK2",
+     "gene": "NUAK2",
+     "label": "NUAK2",
+     "names": [
+      "NUAK2",
+      "OMPHK2",
+      "SNARK",
+      "Omphalocele kinase 2",
+      "NUAK family SNF1-like kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q5VST9",
+     "entry_name": "OBSCN_HUMAN",
+     "symbol": "OBSCN",
+     "gene": "OBSCN",
+     "label": "OBSCN",
+     "names": [
+      "OBSCN",
+      "KIAA1556",
+      "KIAA1639",
+      "Obscurin-MLCK",
+      "Obscurin-RhoGEF"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O95747",
+     "entry_name": "OXSR1_HUMAN",
+     "symbol": "OXSR1",
+     "gene": "OXSR1",
+     "label": "OXSR1",
+     "names": [
+      "OXSR1",
+      "KIAA1101",
+      "OSR1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q13153",
+     "entry_name": "PAK1_HUMAN",
+     "symbol": "PAK1",
+     "gene": "PAK1",
+     "label": "PAK1",
+     "names": [
+      "PAK1",
+      "PAK-1",
+      "Alpha-PAK",
+      "p21-activated kinase 1",
+      "p65-PAK",
+      "Serine/threonine-protein kinase PAK 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q13177",
+     "entry_name": "PAK2_HUMAN",
+     "symbol": "PAK2",
+     "gene": "PAK2",
+     "label": "PAK2",
+     "names": [
+      "PAK2",
+      "PAK-2",
+      "Gamma-PAK",
+      "PAK65",
+      "S6/H4 kinase",
+      "p21-activated kinase 2",
+      "p58",
+      "Serine/threonine-protein kinase PAK 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O75914",
+     "entry_name": "PAK3_HUMAN",
+     "symbol": "PAK3",
+     "gene": "PAK3",
+     "label": "PAK3",
+     "names": [
+      "PAK3",
+      "OPHN3",
+      "PAK-3",
+      "Beta-PAK",
+      "Oligophrenin-3",
+      "p21-activated kinase 3",
+      "Serine/threonine-protein kinase PAK 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O96013",
+     "entry_name": "PAK4_HUMAN",
+     "symbol": "PAK4",
+     "gene": "PAK4",
+     "label": "PAK4",
+     "names": [
+      "PAK4",
+      "KIAA1142",
+      "PAK-4",
+      "p21-activated kinase 4",
+      "Serine/threonine-protein kinase PAK 4"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9P286",
+     "entry_name": "PAK5_HUMAN",
+     "symbol": "PAK5",
+     "gene": "PAK5",
+     "label": "PAK5",
+     "names": [
+      "PAK5",
+      "KIAA1264",
+      "PAK7",
+      "PAK-5",
+      "PAK-7",
+      "p21-activated kinase 5",
+      "p21-activated kinase 7",
+      "Serine/threonine-protein kinase PAK 5"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9NQU5",
+     "entry_name": "PAK6_HUMAN",
+     "symbol": "PAK6",
+     "gene": "PAK6",
+     "label": "PAK6",
+     "names": [
+      "PAK6",
+      "PAK5",
+      "PAK-6",
+      "PAK-5",
+      "p21-activated kinase 6",
+      "Serine/threonine-protein kinase PAK 6"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96RG2",
+     "entry_name": "PASK_HUMAN",
+     "symbol": "PASK",
+     "gene": "PASK",
+     "label": "PASK",
+     "names": [
+      "PASK",
+      "KIAA0135",
+      "PAS-kinase",
+      "PASKIN",
+      "hPASK"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8N165",
+     "entry_name": "PDK1L_HUMAN",
+     "symbol": "PDK1L",
+     "gene": "PDIK1L",
+     "label": "PDIK1L",
+     "names": [
+      "PDIK1L",
+      "PDK1L",
+      "CLIK1L"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O15530",
+     "entry_name": "PDPK1_HUMAN",
+     "symbol": "PDPK1",
+     "gene": "PDPK1",
+     "label": "PDPK1",
+     "names": [
+      "PDPK1",
+      "PDK1",
+      "hPDK1",
+      "3-phosphoinositide-dependent protein kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q6A1A2",
+     "entry_name": "PDPK2_HUMAN",
+     "symbol": "PDPK2",
+     "gene": "PDPK2P",
+     "label": "PDPK2P",
+     "names": [
+      "PDPK2P",
+      "PDPK2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P00558",
+     "entry_name": "PGK1_HUMAN",
+     "symbol": "PGK1",
+     "gene": "PGK1",
+     "label": "PGK1",
+     "names": [
+      "PGK1",
+      "PGKA",
+      "PRP 2",
+      "Primer recognition protein 2",
+      "Phosphoglycerate kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q16816",
+     "entry_name": "PHKG1_HUMAN",
+     "symbol": "PHKG1",
+     "gene": "PHKG1",
+     "label": "PHKG1",
+     "names": [
+      "PHKG1",
+      "PHKG",
+      "PHK-gamma-M",
+      "Phosphorylase kinase subunit gamma-1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q99570",
+     "entry_name": "PI3R4_HUMAN",
+     "symbol": "PI3R4",
+     "gene": "PIK3R4",
+     "label": "PIK3R4",
+     "names": [
+      "PIK3R4",
+      "PI3R4",
+      "VPS15",
+      "PI3-kinase regulatory subunit 4"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P11309",
+     "entry_name": "PIM1_HUMAN",
+     "symbol": "PIM1",
+     "gene": "PIM1",
+     "label": "PIM1",
+     "names": [
+      "PIM1",
+      "Serine/threonine-protein kinase pim-1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9P1W9",
+     "entry_name": "PIM2_HUMAN",
+     "symbol": "PIM2",
+     "gene": "PIM2",
+     "label": "PIM2",
+     "names": [
+      "PIM2",
+      "Pim-2h",
+      "Serine/threonine-protein kinase pim-2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q86V86",
+     "entry_name": "PIM3_HUMAN",
+     "symbol": "PIM3",
+     "gene": "PIM3",
+     "label": "PIM3",
+     "names": [
+      "PIM3",
+      "Serine/threonine-protein kinase pim-3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9BXM7",
+     "entry_name": "PINK1_HUMAN",
+     "symbol": "PINK1",
+     "gene": "PINK1",
+     "label": "PINK1",
+     "names": [
+      "PINK1",
+      "BRPK",
+      "PTEN-induced putative kinase protein 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P42336",
+     "entry_name": "PK3CA_HUMAN",
+     "symbol": "PK3CA",
+     "gene": "PIK3CA",
+     "label": "PIK3CA",
+     "names": [
+      "PIK3CA",
+      "PK3CA",
+      "PI3K-alpha",
+      "PI3Kalpha",
+      "p110alpha"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P42338",
+     "entry_name": "PK3CB_HUMAN",
+     "symbol": "PK3CB",
+     "gene": "PIK3CB",
+     "label": "PIK3CB",
+     "names": [
+      "PIK3CB",
+      "PK3CB",
+      "PIK3C1",
+      "PI3K-beta",
+      "PI3Kbeta",
+      "p110beta"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P48736",
+     "entry_name": "PK3CG_HUMAN",
+     "symbol": "PK3CG",
+     "gene": "PIK3CG",
+     "label": "PIK3CG",
+     "names": [
+      "PIK3CG",
+      "PK3CG",
+      "PI3K-gamma",
+      "PI3Kgamma",
+      "p110gamma",
+      "p120-PI3K"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q99640",
+     "entry_name": "PMYT1_HUMAN",
+     "symbol": "PMYT1",
+     "gene": "PKMYT1",
+     "label": "PKMYT1",
+     "names": [
+      "PKMYT1",
+      "PMYT1",
+      "MYT1",
+      "Myt1 kinase"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P78527",
+     "entry_name": "PRKDC_HUMAN",
+     "symbol": "PRKDC",
+     "gene": "PRKDC",
+     "label": "PRKDC",
+     "names": [
+      "PRKDC",
+      "HYRC",
+      "HYRC1",
+      "DNA-PKcs",
+      "S473K",
+      "DNPK1",
+      "Ser-473 kinase",
+      "p460"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P51817",
+     "entry_name": "PRKX_HUMAN",
+     "symbol": "PRKX",
+     "gene": "PRKX",
+     "label": "PRKX",
+     "names": [
+      "PRKX",
+      "PKX1",
+      "PrKX",
+      "Protein kinase X",
+      "Protein kinase PKX1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q13523",
+     "entry_name": "PRP4K_HUMAN",
+     "symbol": "PRP4K",
+     "gene": "PRP4K",
+     "label": "PRP4K",
+     "names": [
+      "PRP4K",
+      "KIAA0536",
+      "PRP4",
+      "PRP4B",
+      "PRP4H",
+      "PRPF4K",
+      "PRP4 kinase"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96S44",
+     "entry_name": "PRPK_HUMAN",
+     "symbol": "PRPK",
+     "gene": "TP53RK",
+     "label": "TP53RK",
+     "names": [
+      "TP53RK",
+      "PRPK",
+      "C20orf64",
+      "Nori-2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96QS6",
+     "entry_name": "PSKH2_HUMAN",
+     "symbol": "PSKH2",
+     "gene": "PSKH2",
+     "label": "PSKH2",
+     "names": [
+      "PSKH2",
+      "PSK-H2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P04049",
+     "entry_name": "RAF1_HUMAN",
+     "symbol": "RAF1",
+     "gene": "RAF1",
+     "label": "RAF1",
+     "names": [
+      "RAF1",
+      "RAF",
+      "cRaf",
+      "Proto-oncogene c-RAF",
+      "Raf-1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9BRS2",
+     "entry_name": "RIOK1_HUMAN",
+     "symbol": "RIOK1",
+     "gene": "RIOK1",
+     "label": "RIOK1",
+     "names": [
+      "RIOK1",
+      "RIO1",
+      "RIO kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9BVS4",
+     "entry_name": "RIOK2_HUMAN",
+     "symbol": "RIOK2",
+     "gene": "RIOK2",
+     "label": "RIOK2",
+     "names": [
+      "RIOK2",
+      "RIO2",
+      "RIO kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O14730",
+     "entry_name": "RIOK3_HUMAN",
+     "symbol": "RIOK3",
+     "gene": "RIOK3",
+     "label": "RIOK3",
+     "names": [
+      "RIOK3",
+      "SUDD",
+      "RIO kinase 3",
+      "sudD homolog"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q13546",
+     "entry_name": "RIPK1_HUMAN",
+     "symbol": "RIPK1",
+     "gene": "RIPK1",
+     "label": "RIPK1",
+     "names": [
+      "RIPK1",
+      "RIP",
+      "RIP1",
+      "RIP-1",
+      "Receptor-interacting protein 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O43353",
+     "entry_name": "RIPK2_HUMAN",
+     "symbol": "RIPK2",
+     "gene": "RIPK2",
+     "label": "RIPK2",
+     "names": [
+      "RIPK2",
+      "CARDIAK",
+      "RICK",
+      "RIP2",
+      "RIP-2",
+      "Receptor-interacting protein 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y572",
+     "entry_name": "RIPK3_HUMAN",
+     "symbol": "RIPK3",
+     "gene": "RIPK3",
+     "label": "RIPK3",
+     "names": [
+      "RIPK3",
+      "RIP3",
+      "RIP-3",
+      "RIP-like protein kinase 3",
+      "Receptor-interacting protein 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P57078",
+     "entry_name": "RIPK4_HUMAN",
+     "symbol": "RIPK4",
+     "gene": "RIPK4",
+     "label": "RIPK4",
+     "names": [
+      "RIPK4",
+      "ANKRD3",
+      "DIK",
+      "Ankyrin repeat domain-containing protein 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y6S9",
+     "entry_name": "RPKL1_HUMAN",
+     "symbol": "RPKL1",
+     "gene": "RPS6KL1",
+     "label": "RPS6KL1",
+     "names": [
+      "RPS6KL1",
+      "RPKL1",
+      "Ribosomal protein S6 kinase-like 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q52WX2",
+     "entry_name": "SBK1_HUMAN",
+     "symbol": "SBK1",
+     "gene": "SBK1",
+     "label": "SBK1",
+     "names": [
+      "SBK1",
+      "SH3 domain-binding kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P0C263",
+     "entry_name": "SBK2_HUMAN",
+     "symbol": "SBK2",
+     "gene": "SBK2",
+     "label": "SBK2",
+     "names": [
+      "SBK2",
+      "SGK069",
+      "SgK069",
+      "SH3 domain-binding kinase family member 2",
+      "Sugen kinase 69"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P0C264",
+     "entry_name": "SBK3_HUMAN",
+     "symbol": "SBK3",
+     "gene": "SBK3",
+     "label": "SBK3",
+     "names": [
+      "SBK3",
+      "SGK110",
+      "SH3 domain-binding kinase family member 3",
+      "Sugen kinase 110"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O00141",
+     "entry_name": "SGK1_HUMAN",
+     "symbol": "SGK1",
+     "gene": "SGK1",
+     "label": "SGK1",
+     "names": [
+      "SGK1",
+      "SGK",
+      "Serum/glucocorticoid-regulated kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9HBY8",
+     "entry_name": "SGK2_HUMAN",
+     "symbol": "SGK2",
+     "gene": "SGK2",
+     "label": "SGK2",
+     "names": [
+      "SGK2",
+      "Serum/glucocorticoid-regulated kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96BR1",
+     "entry_name": "SGK3_HUMAN",
+     "symbol": "SGK3",
+     "gene": "SGK3",
+     "label": "SGK3",
+     "names": [
+      "SGK3",
+      "CISK",
+      "SGKL",
+      "Serum/glucocorticoid-regulated kinase 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P57059",
+     "entry_name": "SIK1_HUMAN",
+     "symbol": "SIK1",
+     "gene": "SIK1",
+     "label": "SIK1",
+     "names": [
+      "SIK1",
+      "SIK",
+      "SNF1LK",
+      "SIK-1",
+      "Salt-inducible kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9H0K1",
+     "entry_name": "SIK2_HUMAN",
+     "symbol": "SIK2",
+     "gene": "SIK2",
+     "label": "SIK2",
+     "names": [
+      "SIK2",
+      "KIAA0781",
+      "QIK",
+      "SNF1LK2",
+      "SIK-2",
+      "Qin-induced kinase",
+      "Salt-inducible kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y2K2",
+     "entry_name": "SIK3_HUMAN",
+     "symbol": "SIK3",
+     "gene": "SIK3",
+     "label": "SIK3",
+     "names": [
+      "SIK3",
+      "KIAA0999",
+      "QSK",
+      "SIK-3",
+      "Salt-inducible kinase 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9H2G2",
+     "entry_name": "SLK_HUMAN",
+     "symbol": "SLK",
+     "gene": "SLK",
+     "label": "SLK",
+     "names": [
+      "SLK",
+      "KIAA0204",
+      "STK2",
+      "STE20-like kinase",
+      "hSLK",
+      "STE20-related kinase",
+      "CTCL tumor antigen se20-9",
+      "Serine/threonine-protein kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96Q15",
+     "entry_name": "SMG1_HUMAN",
+     "symbol": "SMG1",
+     "gene": "SMG1",
+     "label": "SMG1",
+     "names": [
+      "SMG1",
+      "ATX",
+      "KIAA0421",
+      "LIP",
+      "SMG-1",
+      "hSMG-1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9NRH2",
+     "entry_name": "SNRK_HUMAN",
+     "symbol": "SNRK",
+     "gene": "SNRK",
+     "label": "SNRK",
+     "names": [
+      "SNRK",
+      "KIAA0096",
+      "SNFRK",
+      "SNF1-related kinase"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q15772",
+     "entry_name": "SPEG_HUMAN",
+     "symbol": "SPEG",
+     "gene": "SPEG",
+     "label": "SPEG",
+     "names": [
+      "SPEG",
+      "APEG1",
+      "KIAA1297",
+      "APEG-1",
+      "Aortic preferentially expressed protein 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96SB4",
+     "entry_name": "SRPK1_HUMAN",
+     "symbol": "SRPK1",
+     "gene": "SRPK1",
+     "label": "SRPK1",
+     "names": [
+      "SRPK1",
+      "SR-protein-specific kinase 1",
+      "SFRS protein kinase 1",
+      "SRSF protein kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P78362",
+     "entry_name": "SRPK2_HUMAN",
+     "symbol": "SRPK2",
+     "gene": "SRPK2",
+     "label": "SRPK2",
+     "names": [
+      "SRPK2",
+      "SR-protein-specific kinase 2",
+      "SFRS protein kinase 2",
+      "SRSF protein kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9UPE1",
+     "entry_name": "SRPK3_HUMAN",
+     "symbol": "SRPK3",
+     "gene": "SRPK3",
+     "label": "SRPK3",
+     "names": [
+      "SRPK3",
+      "MSSK1",
+      "STK23",
+      "MSSK-1",
+      "SR-protein-specific kinase 3",
+      "Muscle-specific serine kinase 1",
+      "Serine/threonine-protein kinase 23",
+      "SRSF protein kinase 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9UEE5",
+     "entry_name": "ST17A_HUMAN",
+     "symbol": "ST17A",
+     "gene": "STK17A",
+     "label": "STK17A",
+     "names": [
+      "STK17A",
+      "ST17A",
+      "DRAK1",
+      "Serine/threonine-protein kinase 17A"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O94768",
+     "entry_name": "ST17B_HUMAN",
+     "symbol": "ST17B",
+     "gene": "STK17B",
+     "label": "STK17B",
+     "names": [
+      "STK17B",
+      "ST17B",
+      "DRAK2",
+      "Serine/threonine-protein kinase 17B"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8WU08",
+     "entry_name": "ST32A_HUMAN",
+     "symbol": "ST32A",
+     "gene": "STK32A",
+     "label": "STK32A",
+     "names": [
+      "STK32A",
+      "ST32A",
+      "YANK1",
+      "Yet another novel kinase 1",
+      "Serine/threonine-protein kinase 32A"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9NY57",
+     "entry_name": "ST32B_HUMAN",
+     "symbol": "ST32B",
+     "gene": "STK32B",
+     "label": "STK32B",
+     "names": [
+      "STK32B",
+      "ST32B",
+      "YANK2",
+      "Yet another novel kinase 2",
+      "Serine/threonine-protein kinase 32B"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q86UX6",
+     "entry_name": "ST32C_HUMAN",
+     "symbol": "ST32C",
+     "gene": "STK32C",
+     "label": "STK32C",
+     "names": [
+      "STK32C",
+      "ST32C",
+      "YANK3",
+      "PKE",
+      "Yet another novel kinase 3",
+      "Serine/threonine-protein kinase 32C"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y2H1",
+     "entry_name": "ST38L_HUMAN",
+     "symbol": "ST38L",
+     "gene": "STK38L",
+     "label": "STK38L",
+     "names": [
+      "STK38L",
+      "ST38L",
+      "KIAA0965",
+      "NDR2",
+      "NDR2 protein kinase",
+      "Nuclear Dbf2-related kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O94804",
+     "entry_name": "STK10_HUMAN",
+     "symbol": "STK10",
+     "gene": "STK10",
+     "label": "STK10",
+     "names": [
+      "STK10",
+      "LOK",
+      "Serine/threonine-protein kinase 10"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q15831",
+     "entry_name": "STK11_HUMAN",
+     "symbol": "STK11",
+     "gene": "STK11",
+     "label": "STK11",
+     "names": [
+      "STK11",
+      "LKB1",
+      "PJS",
+      "hLKB1",
+      "Liver kinase B1",
+      "Renal carcinoma antigen NY-REN-19"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O75716",
+     "entry_name": "STK16_HUMAN",
+     "symbol": "STK16",
+     "gene": "STK16",
+     "label": "STK16",
+     "names": [
+      "STK16",
+      "MPSK1",
+      "PKL12",
+      "TSF1",
+      "MPSK",
+      "TSF-1",
+      "Protein kinase PKL12",
+      "TGF-beta-stimulated factor 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y6E0",
+     "entry_name": "STK24_HUMAN",
+     "symbol": "STK24",
+     "gene": "STK24",
+     "label": "STK24",
+     "names": [
+      "STK24",
+      "MST3",
+      "STK3",
+      "MST-3",
+      "Mammalian STE20-like protein kinase 3",
+      "Serine/threonine-protein kinase 24"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O00506",
+     "entry_name": "STK25_HUMAN",
+     "symbol": "STK25",
+     "gene": "STK25",
+     "label": "STK25",
+     "names": [
+      "STK25",
+      "SOK1",
+      "YSK1",
+      "SOK-1",
+      "Ste20/oxidant stress response kinase 1",
+      "Ste20-like kinase",
+      "Sterile 20/oxidant stress-response kinase 1",
+      "Serine/threonine-protein kinase 25"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9P289",
+     "entry_name": "STK26_HUMAN",
+     "symbol": "STK26",
+     "gene": "STK26",
+     "label": "STK26",
+     "names": [
+      "STK26",
+      "MASK",
+      "MST4",
+      "MST-4",
+      "Mammalian STE20-like protein kinase 4",
+      "Serine/threonine-protein kinase 26"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9BXU1",
+     "entry_name": "STK31_HUMAN",
+     "symbol": "STK31",
+     "gene": "STK31",
+     "label": "STK31",
+     "names": [
+      "STK31",
+      "SGK396",
+      "SgK396",
+      "Sugen kinase 396",
+      "Serine/threonine-protein kinase 31"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9BYT3",
+     "entry_name": "STK33_HUMAN",
+     "symbol": "STK33",
+     "gene": "STK33",
+     "label": "STK33",
+     "names": [
+      "STK33",
+      "Serine/threonine-protein kinase 33"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8TDR2",
+     "entry_name": "STK35_HUMAN",
+     "symbol": "STK35",
+     "gene": "STK35",
+     "label": "STK35",
+     "names": [
+      "STK35",
+      "CLIK1",
+      "PDIK1",
+      "STK35L1",
+      "CLIK-1",
+      "CLP-36-interacting kinase 1",
+      "PDLIM1-interacting kinase 1",
+      "Serine/threonine-protein kinase 35"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9NRP7",
+     "entry_name": "STK36_HUMAN",
+     "symbol": "STK36",
+     "gene": "STK36",
+     "label": "STK36",
+     "names": [
+      "STK36",
+      "KIAA1278",
+      "Fused homolog",
+      "Serine/threonine-protein kinase 36"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q15208",
+     "entry_name": "STK38_HUMAN",
+     "symbol": "STK38",
+     "gene": "STK38",
+     "label": "STK38",
+     "names": [
+      "STK38",
+      "NDR1",
+      "NDR1 protein kinase",
+      "Nuclear Dbf2-related kinase 1",
+      "Serine/threonine-protein kinase 38"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9UEW8",
+     "entry_name": "STK39_HUMAN",
+     "symbol": "STK39",
+     "gene": "STK39",
+     "label": "STK39",
+     "names": [
+      "STK39",
+      "PASK",
+      "SPAK",
+      "DCHT",
+      "Serine/threonine-protein kinase 39"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q13188",
+     "entry_name": "STK3_HUMAN",
+     "symbol": "STK3",
+     "gene": "STK3",
+     "label": "STK3",
+     "names": [
+      "STK3",
+      "KRS1",
+      "MST2",
+      "MST-2",
+      "Mammalian STE20-like protein kinase 2",
+      "Serine/threonine-protein kinase Krs-1",
+      "Serine/threonine-protein kinase 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8N2I9",
+     "entry_name": "STK40_HUMAN",
+     "symbol": "STK40",
+     "gene": "STK40",
+     "label": "STK40",
+     "names": [
+      "STK40",
+      "SGK495",
+      "SHIK",
+      "SgK495",
+      "Sugen kinase 495",
+      "Serine/threonine-protein kinase 40"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q13043",
+     "entry_name": "STK4_HUMAN",
+     "symbol": "STK4",
+     "gene": "STK4",
+     "label": "STK4",
+     "names": [
+      "STK4",
+      "KRS2",
+      "MST1",
+      "MST-1",
+      "Mammalian STE20-like protein kinase 1",
+      "Serine/threonine-protein kinase Krs-2",
+      "Serine/threonine-protein kinase 4"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P21675",
+     "entry_name": "TAF1_HUMAN",
+     "symbol": "TAF1",
+     "gene": "TAF1",
+     "label": "TAF1",
+     "names": [
+      "TAF1",
+      "BA2R",
+      "CCG1",
+      "CCGS",
+      "TAF2A",
+      "p250",
+      "TAF(II)250",
+      "TAFII-250"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q7L7X3",
+     "entry_name": "TAOK1_HUMAN",
+     "symbol": "TAOK1",
+     "gene": "TAOK1",
+     "label": "TAOK1",
+     "names": [
+      "TAOK1",
+      "KIAA1361",
+      "MAP3K16",
+      "MARKK",
+      "hKFC-B",
+      "PSK-2",
+      "PSK2",
+      "Prostate-derived STE20-like kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9UL54",
+     "entry_name": "TAOK2_HUMAN",
+     "symbol": "TAOK2",
+     "gene": "TAOK2",
+     "label": "TAOK2",
+     "names": [
+      "TAOK2",
+      "KIAA0881",
+      "MAP3K17",
+      "PSK",
+      "PSK1",
+      "hKFC-C",
+      "PSK-1",
+      "Prostate-derived STE20-like kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9H2K8",
+     "entry_name": "TAOK3_HUMAN",
+     "symbol": "TAOK3",
+     "gene": "TAOK3",
+     "label": "TAOK3",
+     "names": [
+      "TAOK3",
+      "DPK",
+      "JIK",
+      "KDS",
+      "MAP3K18",
+      "CTCL-associated antigen HD-CL-09",
+      "hKFC-A",
+      "Kinase from chicken homolog A"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9UHD2",
+     "entry_name": "TBK1_HUMAN",
+     "symbol": "TBK1",
+     "gene": "TBK1",
+     "label": "TBK1",
+     "names": [
+      "TBK1",
+      "NAK",
+      "T2K",
+      "TANK-binding kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8WZ42",
+     "entry_name": "TITIN_HUMAN",
+     "symbol": "TITIN",
+     "gene": "TTN",
+     "label": "TTN",
+     "names": [
+      "TTN",
+      "TITIN",
+      "Connectin"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9UKI8",
+     "entry_name": "TLK1_HUMAN",
+     "symbol": "TLK1",
+     "gene": "TLK1",
+     "label": "TLK1",
+     "names": [
+      "TLK1",
+      "KIAA0137",
+      "PKU-beta",
+      "Tousled-like kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q86UE8",
+     "entry_name": "TLK2_HUMAN",
+     "symbol": "TLK2",
+     "gene": "TLK2",
+     "label": "TLK2",
+     "names": [
+      "TLK2",
+      "HsHPK",
+      "PKU-alpha",
+      "Tousled-like kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q59H18",
+     "entry_name": "TNI3K_HUMAN",
+     "symbol": "TNI3K",
+     "gene": "TNNI3K",
+     "label": "TNNI3K",
+     "names": [
+      "TNNI3K",
+      "TNI3K",
+      "CARK"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9UKE5",
+     "entry_name": "TNIK_HUMAN",
+     "symbol": "TNIK",
+     "gene": "TNIK",
+     "label": "TNIK",
+     "names": [
+      "TNIK",
+      "KIAA0551"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O75962",
+     "entry_name": "TRIO_HUMAN",
+     "symbol": "TRIO",
+     "gene": "TRIO",
+     "label": "TRIO",
+     "names": [
+      "TRIO"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9BX84",
+     "entry_name": "TRPM6_HUMAN",
+     "symbol": "TRPM6",
+     "gene": "TRPM6",
+     "label": "TRPM6",
+     "names": [
+      "TRPM6",
+      "CHAK2",
+      "Channel kinase 2",
+      "Melastatin-related TRP cation channel 6"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96QT4",
+     "entry_name": "TRPM7_HUMAN",
+     "symbol": "TRPM7",
+     "gene": "TRPM7",
+     "label": "TRPM7",
+     "names": [
+      "TRPM7",
+      "CHAK1",
+      "LTRPC7",
+      "LTrpC-7",
+      "LTrpC7",
+      "Channel-kinase 1",
+      "Long transient receptor potential channel 7"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9BXA7",
+     "entry_name": "TSSK1_HUMAN",
+     "symbol": "TSSK1",
+     "gene": "TSSK1B",
+     "label": "TSSK1B",
+     "names": [
+      "TSSK1B",
+      "TSSK1",
+      "SPOGA1",
+      "SPOGA4",
+      "STK22A",
+      "STK22D",
+      "TSK-1",
+      "TSK1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96PF2",
+     "entry_name": "TSSK2_HUMAN",
+     "symbol": "TSSK2",
+     "gene": "TSSK2",
+     "label": "TSSK2",
+     "names": [
+      "TSSK2",
+      "DGSG",
+      "SPOGA2",
+      "STK22B",
+      "TSK-2",
+      "TSK2",
+      "TSSK-2",
+      "Testis-specific kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96PN8",
+     "entry_name": "TSSK3_HUMAN",
+     "symbol": "TSSK3",
+     "gene": "TSSK3",
+     "label": "TSSK3",
+     "names": [
+      "TSSK3",
+      "SPOGA3",
+      "STK22C",
+      "TSK-3",
+      "TSSK-3",
+      "Testis-specific kinase 3",
+      "Serine/threonine-protein kinase 22C"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q6SA08",
+     "entry_name": "TSSK4_HUMAN",
+     "symbol": "TSSK4",
+     "gene": "TSSK4",
+     "label": "TSSK4",
+     "names": [
+      "TSSK4",
+      "C14orf20",
+      "STK22E",
+      "TSSK5",
+      "TSK-4",
+      "TSSK-4",
+      "Testis-specific kinase 4",
+      "Serine/threonine-protein kinase 22E"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9BXA6",
+     "entry_name": "TSSK6_HUMAN",
+     "symbol": "TSSK6",
+     "gene": "TSSK6",
+     "label": "TSSK6",
+     "names": [
+      "TSSK6",
+      "SSTK",
+      "TSK-6",
+      "TSSK-6",
+      "Testis-specific kinase 6",
+      "CT72",
+      "Cancer/testis antigen 72"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q5TCY1",
+     "entry_name": "TTBK1_HUMAN",
+     "symbol": "TTBK1",
+     "gene": "TTBK1",
+     "label": "TTBK1",
+     "names": [
+      "TTBK1",
+      "BDTK",
+      "KIAA1855",
+      "Tau-tubulin kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q6IQ55",
+     "entry_name": "TTBK2_HUMAN",
+     "symbol": "TTBK2",
+     "gene": "TTBK2",
+     "label": "TTBK2",
+     "names": [
+      "TTBK2",
+      "KIAA0847",
+      "Tau-tubulin kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8TAS1",
+     "entry_name": "UHMK1_HUMAN",
+     "symbol": "UHMK1",
+     "gene": "UHMK1",
+     "label": "UHMK1",
+     "names": [
+      "UHMK1",
+      "KIS",
+      "KIST",
+      "P-CIP2",
+      "PAM COOH-terminal interactor protein 2",
+      "U2AF homology motif kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "O75385",
+     "entry_name": "ULK1_HUMAN",
+     "symbol": "ULK1",
+     "gene": "ULK1",
+     "label": "ULK1",
+     "names": [
+      "ULK1",
+      "KIAA0722",
+      "ATG1",
+      "hATG1",
+      "Unc-51-like kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q8IYT8",
+     "entry_name": "ULK2_HUMAN",
+     "symbol": "ULK2",
+     "gene": "ULK2",
+     "label": "ULK2",
+     "names": [
+      "ULK2",
+      "KIAA0623",
+      "Unc-51-like kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q6PHR2",
+     "entry_name": "ULK3_HUMAN",
+     "symbol": "ULK3",
+     "gene": "ULK3",
+     "label": "ULK3",
+     "names": [
+      "ULK3",
+      "Unc-51-like kinase 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q99986",
+     "entry_name": "VRK1_HUMAN",
+     "symbol": "VRK1",
+     "gene": "VRK1",
+     "label": "VRK1",
+     "names": [
+      "VRK1",
+      "Vaccinia-related kinase 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q86Y07",
+     "entry_name": "VRK2_HUMAN",
+     "symbol": "VRK2",
+     "gene": "VRK2",
+     "label": "VRK2",
+     "names": [
+      "VRK2",
+      "Vaccinia-related kinase 2"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9H4A3",
+     "entry_name": "WNK1_HUMAN",
+     "symbol": "WNK1",
+     "gene": "WNK1",
+     "label": "WNK1",
+     "names": [
+      "WNK1",
+      "HSN2",
+      "KDP",
+      "KIAA0344",
+      "PRKWNK1",
+      "p65",
+      "hWNK1",
+      "Protein kinase lysine-deficient 1"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9Y3S1",
+     "entry_name": "WNK2_HUMAN",
+     "symbol": "WNK2",
+     "gene": "WNK2",
+     "label": "WNK2",
+     "names": [
+      "WNK2",
+      "KIAA1760",
+      "PRKWNK2",
+      "SDCCAG43",
+      "Antigen NY-CO-43",
+      "Protein kinase lysine-deficient 2",
+      "Protein kinase with no lysine 2",
+      "Serologically defined colon cancer antigen 43"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q9BYP7",
+     "entry_name": "WNK3_HUMAN",
+     "symbol": "WNK3",
+     "gene": "WNK3",
+     "label": "WNK3",
+     "names": [
+      "WNK3",
+      "KIAA1566",
+      "PRKWNK3",
+      "Protein kinase lysine-deficient 3",
+      "Protein kinase with no lysine 3"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "Q96J92",
+     "entry_name": "WNK4_HUMAN",
+     "symbol": "WNK4",
+     "gene": "WNK4",
+     "label": "WNK4",
+     "names": [
+      "WNK4",
+      "PRKWNK4",
+      "Protein kinase lysine-deficient 4",
+      "Protein kinase with no lysine 4"
+     ],
+     "engine_matches": true
+    }
+   ],
+   "organism_known": true,
+   "broad": true,
+   "note": "245 different human proteins share EC 2.7.11.1 (a broad class: the nomenclature files them under one number, and they are not isozymes of one enzyme) and no --isoform was given, so the cited constants may belong to any of them. Pass --isoform with the protein's gene symbol (for example --isoform AAK1) to take each constant from a row that names it; a constant whose rows name none is kept and flagged.",
+   "organism_scope": null,
+   "filed_elsewhere": null
+  }
+ }
+}

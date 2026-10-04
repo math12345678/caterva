@@ -192,6 +192,16 @@ export const CapabilitiesSchema = z
         checked: z.boolean(),
         reachable: z.boolean().nullable(),
         hosts: z.record(z.boolean().nullable()),
+        host_status: z
+          .record(
+            z.object({
+              reachable: z.boolean().nullable(),
+              checked_at: z.string().nullable(),
+              source: z.string().nullable(),
+              reason: z.string().nullable(),
+            }),
+          )
+          .default({}),
         checked_at: z.string().nullable(),
         reason: z.string().nullable(),
         source: z.string().nullable().default(null),

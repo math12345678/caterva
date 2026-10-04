@@ -28,18 +28,23 @@ committed recordings (`caterva/tests/studio_kinetics_offline.py`: the human
 hexokinase page under `Tests/fixtures/recorded/`, the lactate dehydrogenase page
 under `Tests/fixtures/ki_mode/`), so the numbers are BRENDA's as recorded.
 
-Two answers come from a real request to UniProt, made once, on 2026-10-03:
+Two answers come from a real request to a database, made at capture time:
 
 - `capabilities-after-a-lookup.json`: `GET /api/capabilities` after the script
-  asked UniProt's protein-name search for "hexokinase" (a real HTTPS request
-  through `Tests/enzyme_lookup.fetch_ec_numbers_by_name`). The server noted that
-  the host answered, so `network` is `{checked: true, reachable: true, source:
-  "use", hosts: {"rest.uniprot.org": true, ...}}` with the time of that answer.
+  asked PubChem's compound-name search for "gossypol" (a real HTTPS request through
+  the literature layer's `http_retry.retry_get`, captured 2026-10-03). The server
+  noted that the host answered, for that host alone, so `network` is
+  `{checked: true, reachable: true, source: "use", hosts: {"pubchem.ncbi.nlm.nih.gov":
+  true, ...: null}, host_status: ...}` with the time of that answer. It is the answer
+  the earlier capture made after a UniProt request; UniProt's backend was answering
+  503 on 2026-10-03, so a UniProt-based file could not be made again.
 - `find-pyruvate-kinase-pkm-human.json`: the finder found nothing for "pyruvate
   kinase PKM", the network was then known to be reachable, and the server asked
-  UniProt. The three EC numbers in `fallback` are UniProt's own answer,
-  including two protein kinases that merely carry the words; the page lists
-  them as UniProt's and chooses none.
+  UniProt. The three EC numbers in `fallback` are UniProt's own answer, including
+  two protein kinases that merely carry the words; the page lists them as UniProt's
+  and chooses none. THIS FILE WAS NOT CAPTURED AGAIN with the finder of 2026-10-03
+  (it is the answer of the finder before it, whose candidates lack `matched_by`);
+  `capture_studio_enzyme_fixtures.py` rewrites it whenever UniProt answers.
 
 Nothing was contacted for the other files. `capabilities-nothing-yet.json` is
 the answer before anything had happened (`checked: false`, `source: null`).
@@ -56,9 +61,15 @@ the answer before anything had happened (`checked: false`, `source: null`).
 | `find-transferred-1.1.1.109.json`, `find-deleted-1.1.1.128.json` | the first transferred number with one successor, and the first deleted one without, in EC order |
 | `find-zzqx-protein-of-no-enzyme.json`, `find-9-9-9-9.json` | nothing found, UniProt not asked because the network was not yet known; a well-formed number the nomenclature does not hold |
 | `find-pyruvate-kinase-pkm-human.json` | nothing found, UniProt asked (see above) |
+| `find-hk1-human.json`, `find-sdh-human.json`, `find-glycogen-synthase-human.json`, `find-adh-human.json`, `find-gapdh-human.json`, `find-idh1-yeast.json`, `find-ache-human.json`, `find-hiv-protease.json`, `find-cox-e-coli.json`, `find-ribonuclease-a-human.json` | what the review of 2026-10-03 found it resolving or recommending wrongly, and what the finder answers now: an abbreviation (`confirm_only`), a confirmed one (GAPDH, resolved), a symbol per organism (IDH1 in yeast) and a recommendation across the whole list |
 | `detail-2.7.1.1-human.json`, `detail-1.1.1.27-human.json`, `detail-5.3.1.1-human.json`, `detail-9.9.9.9.json` | one enzyme and its human isozymes: five, five, one (TPIS), and a 404 |
+| `detail-1.1.1.1-human.json`, `detail-1.1.1.1-e-coli.json`, `detail-2.7.11.1-human.json` | the isozymes of EC 1.1.1.1 (and the family the nomenclature files under EC 1.1.1.105), the same for E. coli K-12, and the 245-protein broad class |
+| `detail-transferred-*.json`, `detail-deleted-*.json` | a transferred number carrying its replacement's name, and a deleted one saying it keeps none |
 | `compose-ldh-human-pyruvate.json` | `caterva compose "Michaelis Menten" --subject 1.1.1.27 --organism human --substrate pyruvate`: the run the steady-state defect was seen on, 14 of its 15 solutions at negative amounts |
-| `compose-hexokinase-human-glucose.json`, `...-hxk1.json` | EC 2.7.1.1 in human with and without `--isoform HXK1`: the isozyme notice, then its absence |
+| `compose-hexokinase-human-glucose.json`, `...-hxk1.json`, `...-hk2.json`, `...-gck.json` | EC 2.7.1.1 in human with no `--isoform`, and with HXK1, HK2 and GCK: the isozyme notice, the Km taken from the row that states the isozyme, and the notice staying, naming the constant whose row says nothing |
+| `compose-michaelis-menten-unused-inhibitor.json` | `--inhibitor gossypol` on "Michaelis Menten": `search.unused_compounds`, not searched |
+| `compose-two-enzymes-competing.json` | a line of equilibria: `stability.count_caveat` |
+| `constants-hexokinase-human-glucose.json` | `cite.py` for human hexokinase's glucose Km: the tie explanation, the spread, the scope concern and the isozyme notice |
 | `compose-name-several-enzymes.json`, `constants-name-several-enzymes.json` | `--subject "lactate dehydrogenase"` and `--enzyme "lactate dehydrogenase"`: refused, the outcome's `name_refusal` naming each candidate |
 | `capabilities-nothing-yet.json`, `capabilities-after-a-lookup.json` | the network as the status bar reads it before and after a real lookup |
 
