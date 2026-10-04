@@ -22,7 +22,7 @@ classifiers = [
 ]
 dependencies = [
     "libroadrunner==2.8.0",
-    "antimony==2.14.0",
+    "antimony==3.2.0",
     "python-libsbml==5.21.1",
     "numpy==2.2.6",
     "scipy==1.15.3",
