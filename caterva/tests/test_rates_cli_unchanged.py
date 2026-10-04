@@ -30,8 +30,23 @@ _SOFTWARE = re.compile(r"Caterva \S+ \(caterva rates\), Python \S+, NumPy \S+, S
 _VERSION = re.compile(r'"caterva": "[^"]*"')
 
 
+_FLOAT = re.compile(r"(?<![\w.])-?\d+\.\d+(?:[eE][+-]?\d+)?(?![\w.])")
+
+
+def _to_ten_digits(match: "re.Match[str]") -> str:
+    return format(float(match.group(0)), ".10g")
+
+
 def mask(text: str) -> str:
-    return _VERSION.sub('"caterva": "VERSION"', _SOFTWARE.sub("Caterva VERSION (caterva rates), Python X, NumPy X, SciPy X", text))
+    """The version lines, and every decimal number to 10 significant digits.
+
+    The golden output was captured on one machine and runs on others: the
+    profile-likelihood roots agree to about 15 digits and differ in the last
+    one or two between platforms, which says nothing about whether the
+    command's output changed. Ten digits still catches any real change.
+    """
+    text = _VERSION.sub('"caterva": "VERSION"', _SOFTWARE.sub("Caterva VERSION (caterva rates), Python X, NumPy X, SciPy X", text))
+    return _FLOAT.sub(_to_ten_digits, text)
 
 
 def no_literature(**_kwargs):
