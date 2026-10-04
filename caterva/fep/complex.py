@@ -33,6 +33,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
+from caterva.tls import client_context
+
 import numpy as np
 
 from caterva.fep.setup import moleculetype_name
@@ -520,7 +522,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva complex") ->
         if local.is_file():
             pdb_text = local.read_text()
         else:
-            with urllib.request.urlopen(f"https://files.rcsb.org/download/{pdb_id}.pdb", timeout=30) as r:
+            with urllib.request.urlopen(f"https://files.rcsb.org/download/{pdb_id}.pdb", timeout=30, context=client_context()) as r:
                 pdb_text = r.read().decode()
     except Exception as e:
         print(f"{prog}: could not read PDB {a.pdb}: {e}", file=sys.stderr)

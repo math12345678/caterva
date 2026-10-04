@@ -35,7 +35,7 @@ import { json, mockServer, setSessionToken } from "@/__tests__/helpers";
 import type { Capabilities, ComposeResult, ConstantsResult, NameRefusal, RunRecord } from "@/api/types";
 import type { RunState } from "@/api/useRun";
 import { RunPanel } from "@/components/run/RunPanel";
-import { StatusLine } from "@/components/shell/StatusLine";
+import { resetLaunchCheck, StatusLine } from "@/components/shell/StatusLine";
 import { plain } from "@/lib/copy";
 import { readNetwork } from "@/lib/network";
 
@@ -274,6 +274,29 @@ describe("the network in the status bar", () => {
       </QueryClientProvider>,
     );
   }
+
+  beforeEach(() => resetLaunchCheck());
+
+  it("checks once when the page opens and nothing has used the network yet, and not again on a re-render", async () => {
+    setSessionToken("t0k");
+    const { seen } = mockServer((req) => (req.url === "/api/capabilities?probe=network" ? json(200, used) : undefined));
+    const view = bar(nothing);
+    await waitFor(() => expect(seen.filter((r) => r.url === "/api/capabilities?probe=network")).toHaveLength(1));
+    view.rerender(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <StatusLine health={undefined} healthError={null} capabilities={nothing} capabilitiesError={null} />
+      </QueryClientProvider>,
+    );
+    expect(seen.filter((r) => r.url === "/api/capabilities?probe=network")).toHaveLength(1);
+  });
+
+  it("does not check when a lookup has already told the server what the network is", async () => {
+    setSessionToken("t0k");
+    const { seen } = mockServer(() => undefined);
+    bar(used);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(seen.some((r) => r.url.includes("probe=network"))).toBe(false);
+  });
 
   it("says not checked only when nothing has happened", () => {
     expect(nothing.network.checked).toBe(false);

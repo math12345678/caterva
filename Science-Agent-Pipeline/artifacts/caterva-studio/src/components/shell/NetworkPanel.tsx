@@ -3,8 +3,9 @@
  * the status bar's popover and on the Settings screen, so the answer and
  * the way to refresh it are the same in both.
  *
- * The check contacts each database host once with a short timeout (5 s) and
- * only when this button is pressed; nothing here runs it on its own.
+ * The check contacts each database host once with a short timeout (5 s). The
+ * status bar runs it once when the page opens, so the first thing a person
+ * sees is an answer; after that it runs only when this button is pressed.
  */
 import type { NetworkCapability } from "@/api/types";
 import { hostName, readNetwork, useNetworkCheck } from "@/lib/network";

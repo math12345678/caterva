@@ -79,6 +79,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 from caterva import netuse
+from caterva.tls import client_context
 from caterva.studio.contract import RUN_KINDS, STUDIO_API_VERSION
 
 #: The services the literature layer reads (CONTRACT.md 10).
@@ -153,7 +154,7 @@ def https_head(host: str, timeout: float) -> Optional[str]:
         headers={"User-Agent": f"caterva-studio/{__version__} (reachability check)"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout):  # noqa: S310 - fixed https hosts
+        with urllib.request.urlopen(request, timeout=timeout, context=client_context()):  # noqa: S310 - fixed https hosts
             return None
     except urllib.error.HTTPError:
         return None  # an error status is still an answer from the host
@@ -167,6 +168,9 @@ def _describe_failure(reason: object, timeout: float) -> str:
     text = str(reason)
     if isinstance(reason, TimeoutError) or "timed out" in text:
         return f"no answer within {timeout:g} s"
+    if "CERTIFICATE_VERIFY_FAILED" in text:
+        return ("the host answered but its certificate could not be verified; a network proxy or a "
+                "firewall that inspects secure traffic is the usual cause")
     return text or type(reason).__name__
 
 

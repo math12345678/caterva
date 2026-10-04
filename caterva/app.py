@@ -140,6 +140,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"caterva {__version__}")
         return 0
     command, rest = args[0], args[1:]
+    from caterva.tls import trust_bundled_certificates
+
+    trust_bundled_certificates()
     if command not in COMMANDS:
         print(f"caterva: unknown command {command!r}\n", file=sys.stderr)
         print(_usage(), file=sys.stderr, end="")

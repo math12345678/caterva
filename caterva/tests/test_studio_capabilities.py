@@ -183,7 +183,7 @@ def test_each_host_is_probed_at_a_path_its_api_serves_not_at_the_root(monkeypatc
         def __exit__(self, *exc):
             return False
 
-    def fake(request, timeout):
+    def fake(request, timeout, context=None):
         seen.append((request.full_url, request.get_method(), timeout))
         return Answer()
 

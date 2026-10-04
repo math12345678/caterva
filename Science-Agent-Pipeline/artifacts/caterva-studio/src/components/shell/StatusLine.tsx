@@ -11,13 +11,13 @@
  */
 import * as Popover from "@radix-ui/react-popover";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Link } from "wouter";
 
 import type { Capabilities, Health } from "@/api/types";
 import { describeError } from "@/lib/errors";
 import { formatCount } from "@/lib/format";
-import { readNetwork } from "@/lib/network";
+import { readNetwork, useNetworkCheck } from "@/lib/network";
 
 import { NetworkPanel } from "./NetworkPanel";
 
@@ -83,6 +83,14 @@ function NetworkItem({ net }: { net: Capabilities["network"] }) {
   );
 }
 
+/** The first check of this page load has been started. */
+let checkedOnLaunch = false;
+
+/** Lets a test start a "page load" again. */
+export function resetLaunchCheck(): void {
+  checkedOnLaunch = false;
+}
+
 export function StatusLine({
   health,
   healthError,
@@ -96,6 +104,16 @@ export function StatusLine({
 }) {
   const c = capabilities;
   const capsReason = capabilitiesError ? describeError(capabilitiesError).message : "asking the server";
+  const check = useNetworkCheck();
+  const unchecked = c ? !c.network.checked : false;
+  useEffect(() => {
+    // Once per page load: a status that says "not checked" on a working network reads as a broken one.
+    // The server skips the contact itself while offline mode is on.
+    if (unchecked && !checkedOnLaunch) {
+      checkedOnLaunch = true;
+      check.mutate();
+    }
+  }, [unchecked, check]);
   return (
     <Tooltip.Provider delayDuration={250} skipDelayDuration={150}>
       <footer className="status-line" aria-label="What this installation can reach">

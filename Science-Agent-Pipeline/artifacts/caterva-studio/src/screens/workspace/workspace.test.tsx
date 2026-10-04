@@ -3,6 +3,7 @@
  * with five runs (src/__fixtures__/api/workspace, captured through the
  * dispatch layer; README there). No number here is typed by hand.
  */
+import { resetLaunchCheck } from "@/components/shell/StatusLine";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -228,14 +229,16 @@ describe("About", () => {
     expect(docs).toHaveAttribute("href", expect.stringContaining("docs/adr/0008-parameter-provenance.md"));
   });
 
-  it("checks the network only when asked", async () => {
+  it("checks the network once when the app opens, then only when asked", async () => {
     setSessionToken("t0k");
+    resetLaunchCheck();
     const { seen } = serve();
     at("/about");
     render(<App />);
     await screen.findByRole("button", { name: "Check the network" });
-    expect(seen.some((r) => r.url.includes("probe=network"))).toBe(false);
+    const probes = () => seen.filter((r) => r.url === "/api/capabilities?probe=network").length;
+    await waitFor(() => expect(probes()).toBe(1));
     await userEvent.click(screen.getByRole("button", { name: "Check the network" }));
-    await waitFor(() => expect(seen.some((r) => r.url === "/api/capabilities?probe=network")).toBe(true));
+    await waitFor(() => expect(probes()).toBe(2));
   });
 });
