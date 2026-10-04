@@ -47,8 +47,14 @@ def test_asking_for_ldh_a_returns_ldh_as_ki(asked):
     assert any(f"measuring {asked}" in line for line in r.search_log)
 
 
-def test_an_isoform_brenda_does_not_hold_is_refused_and_the_others_named():
+def test_a_name_uniprot_gives_ldh_c_finds_ldh_cs_row():
+    """LDH-X is UniProtKB's alternative name for LDHC (the testis subunit), so the request is LDH-C's row."""
     r = gossypol("LDH-X")
+    assert r.found and r.value == pytest.approx(0.0042) and r.commentary.startswith("LDH-C")
+
+
+def test_an_isoform_brenda_does_not_hold_is_refused_and_the_others_named():
+    r = gossypol("LDH-Z")
     assert not r.found and r.source == "isoform_withheld"
     assert r.isoforms_available == ["LDH-A", "LDH-B", "LDH-C"]
     assert r.value is None

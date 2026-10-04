@@ -168,7 +168,7 @@ def test_a_name_that_is_several_enzymes_is_refused_with_every_candidate_named(tm
     """The one name policy refuses, offline, and the outcome carries its named candidates."""
     got, (code, out, err), _ = _both(tmp_path, {"subject": "lactate dehydrogenase"})
     assert got.exit_code == code == 3 and out == "" and got.result is None
-    assert got.refusal == err.strip() and "names 2 enzymes" in got.refusal
+    assert got.refusal == err.strip() and "12 enzymes match 'lactate dehydrogenase'; these 2 match best" in got.refusal
     refusal = got.name_refusal
     assert refusal["kind"] == "ambiguous" and refusal["rerun_flag"] == "--subject {ec}"
     assert refusal["recommended"] is None and refusal["message"] in got.refusal

@@ -448,7 +448,7 @@ CASES = [
     ("1.1.1.27", "Homo sapiens", "gossypol", "noncompetitive", "pyruvate", "LDH-A"),
     # An isoform no row names (test_isoform_resolution's): both refuse for
     # the isoform before a mode is read.
-    ("1.1.1.27", "Homo sapiens", "gossypol", "competitive", "pyruvate", "LDH-X"),
+    ("1.1.1.27", "Homo sapiens", "gossypol", "competitive", "pyruvate", "LDH-Z"),
     *[("2.7.1.1", "Oryctolagus cuniculus", "MgADP-", m, s, None)
       for m in ("competitive", "noncompetitive", "uncompetitive")
       for s in ("glucose", "MgATP2-", None)],
@@ -683,7 +683,7 @@ class TestAnyMode:
         got = any_mode_asks(ec, inhibitor, organism, mode, substrate, isoform)
         default = asked_for(ec, inhibitor, organism, mode, substrate, isoform)
         if not got.found:
-            # Refused before the mode step (LDH-X), so the default refuses
+            # Refused before the mode step (LDH-Z), so the default refuses
             # the same way and there is nothing to compare.
             assert got.mode_default is None and default.source == got.source
             return

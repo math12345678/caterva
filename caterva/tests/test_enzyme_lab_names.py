@@ -68,6 +68,25 @@ def test_the_fixture_covers_every_name_the_reviewer_ran_in_every_organism():
     assert all(name in BY_QUERY for name in right)
 
 
+def test_every_ec_the_fixture_names_is_an_active_enzyme_of_the_nomenclature():
+    """A typo in the hand-checked table would defeat it: each number must be a real, current EC number."""
+    from caterva.enzymes import load_index
+
+    entries = load_index().entries
+    named = set()
+    for entry in NAMES:
+        named.update(entry["verified"], entry.get("include", ()), entry.get("exclude", ()))
+        for override in entry.get("by_organism", {}).values():
+            named.update(override.get("include", ()), override.get("exclude", ()), [override["ec"]] if "ec" in override else [])
+        for listed in entry.get("verified_by_organism", {}).values():
+            named.update(listed)
+        if "ec" in entry:
+            named.add(entry["ec"])
+    assert len(named) > 100
+    gone = sorted(ec for ec in named if ec not in entries or entries[ec].status != "active")
+    assert gone == []
+
+
 @pytest.mark.parametrize("query, organism", CASES)
 def test_no_name_resolves_or_is_recommended_to_an_enzyme_outside_its_verified_set(answers, query, organism):
     entry = BY_QUERY[query]
