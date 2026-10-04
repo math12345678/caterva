@@ -230,10 +230,10 @@ export const TEST_SUITES: TestSuite[] = [
         // per-shape cases for the new Rates shapes, all passing in focused
         // runs on the branch (2026-10-04):
         // 6235 as CI collects it with stdpopsim hidden.
-        // Then the md smoke run's verdict-explanation rule: 4 tests in
-        // test_md_smoke_verdicts.py, all passing in a focused run
-        // (2026-10-04): 6239.
-        passed: 6239,
+        // Then the md smoke run's verdict-explanation rule: 5 tests in
+        // test_md_smoke_verdicts.py plus one for identical areas, all passing in a
+        // focused run (2026-10-04): 6240.
+        passed: 6240,
         skipped: 1,
         failed: 0,
       },

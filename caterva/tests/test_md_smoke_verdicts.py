@@ -45,7 +45,8 @@ def test_a_threshold_inside_the_span_explains_a_difference_the_replica_rows_do_n
     assert min(rows) - routes_agree_nm2(max(rows)) <= edge  # the line is inside the span and its allowance
     smoke = _smoke()
     assert smoke.state(round(rows[0] / LARGEST, 2)) == smoke.state(round(rows[2] / LARGEST, 2))
-    assert _differ(rows, rows) == (["Asn46"], [])
+    other_route = [x + 0.004 for x in rows]  # the routes' areas agree only to a tolerance, never exactly
+    assert _differ(rows, other_route) == (["Asn46"], [])
 
 
 def test_a_difference_far_from_both_thresholds_is_still_a_failure():
@@ -53,3 +54,9 @@ def test_a_difference_far_from_both_thresholds_is_still_a_failure():
     allowance = routes_agree_nm2(middle)
     assert abs(middle - BURIED * LARGEST) > 3 * allowance and abs(middle - EXPOSED * LARGEST) > 3 * allowance
     assert _differ([middle, middle], [middle, middle]) == ([], ["Asn46"])
+
+
+def test_identical_areas_on_both_routes_never_explain_a_difference_however_close_to_a_threshold():
+    edge = BURIED * LARGEST
+    rows = [edge + 0.03, edge + 0.01, edge + 0.04]
+    assert _differ(rows, list(rows)) == ([], ["Asn46"])

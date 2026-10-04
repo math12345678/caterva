@@ -275,12 +275,12 @@ def _verdicts_differ(native: dict, gromacs: dict, rows_n: dict, rows_g: dict) ->
     it. The verdict reads the start, each replica's mean and its middle-95%
     range, and also individual frames, whose shares lie between the lowest
     and the highest of those areas. A difference is explained when some
-    pair of the routes' areas falls in different states, or when a
-    threshold lies within the routes' allowed disagreement of that span
-    (some frame can then sit either side of it on each route). A
-    difference in the verdicts for a residue whose areas are all clear of
-    both thresholds is the verdict logic disagreeing with itself, which is
-    a failure."""
+    pair of the routes' areas falls in different states, or when the
+    routes' areas differ and a threshold lies within their allowed
+    disagreement of the span (some frame can then sit either side of it on
+    each route). Identical areas on both routes cannot explain a different
+    verdict, and neither can areas clear of both thresholds: that is the
+    verdict logic disagreeing with itself, which is a failure."""
     explained, unexplained = [], []
     for label in native:
         if native[label][1] == gromacs.get(label, (None, None))[1]:
@@ -289,7 +289,7 @@ def _verdicts_differ(native: dict, gromacs: dict, rows_n: dict, rows_g: dict) ->
         pairs = list(zip(rows_n.get(label, ()), rows_g.get(label, ())))
         near = largest is not None and any(state(round(a / largest, 2)) != state(round(b / largest, 2))
                                            for a, b in pairs)
-        if not near and largest and pairs:
+        if not near and largest and any(a != b for a, b in pairs):
             areas = [x for pair in pairs for x in pair]
             allowance = routes_agree_nm2(max(areas))
             near = any(min(areas) - allowance <= share * largest <= max(areas) + allowance
