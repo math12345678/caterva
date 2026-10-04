@@ -17,17 +17,30 @@ HOW EACH IS DECIDED, AND WHAT IS NEVER DONE UNASKED
   (`caterva.checkout.literature_module`), once per process, on first ask.
 - network: never probed while the `offline` setting is on, and NOT probed
   until something asks (`?probe=network`), because
-  probing contacts five third-party hosts and a user who has not asked
-  should not have their address sent to them. Then one HTTPS HEAD per host
-  with a 5 s timeout, all at once, so the answer takes at most about 5 s;
-  any HTTP answer, even an error status, means the host is reachable. The
-  last probe is kept and shown until the next one.
+  probing contacts third-party hosts and a user who has not asked should
+  not have their address sent to them. Then one HTTPS HEAD per host, to a
+  path that host's own API serves for the literature layer (`PROBE_PATHS`:
+  a BRENDA enzyme page, a UniProt search, an RCSB header, an NCBI einfo, a
+  PubChem compound), with a 5 s timeout, all at once, so the answer takes at
+  most about 5 s; any HTTP answer, even an error status, means the host is
+  reachable. The hosts are the ones the literature layer reads: BRENDA,
+  UniProt, the RCSB search and files, NCBI, PubChem, and KEGG only while
+  its opt-in (`CATERVA_ENABLE_KEGG`) is set.
+  REACHABILITY IS KEPT PER HOST: each host has its own last outcome, with
+  the time, where it came from and why it failed (`host_status`). A BRENDA
+  failure after a UniProt success does not overwrite UniProt's answer, and
+  anything that must know whether UniProt can be asked (the enzyme finder's
+  fallback) reads UniProt's own entry, not an aggregate. `reachable` is the
+  aggregate and says only what was checked: True when every host that has
+  an outcome answered, False when any of them did not, None when none has
+  one; `reason` names the hosts that did not answer and, separately, those
+  never checked.
   The studio also notes the outcome of REAL network use (`caterva.netuse`:
-  a BRENDA, UniProt, NCBI or RCSB request that was answered marks the
-  network reachable, one that could not be made marks it unreachable, each
-  with the time), so the status bar does not say "not checked" after a
-  lookup has just worked. `source` says which of the two the answer is
-  from ("use" or "probe"); it is None, and `checked` False, only while
+  a BRENDA, UniProt, NCBI, PubChem or RCSB request that was answered marks
+  that host reachable, one that could not be made marks it unreachable,
+  each with the time), so the status bar does not say "not checked" after a
+  lookup has just worked. `source` says which of the two the newest outcome
+  is from ("use" or "probe"); it is None, and `checked` False, only while
   nothing has happened yet. Noting use contacts nothing.
 - gromacs: the settings' `gromacs_path`, else `$GMX`, else `gmx` on PATH,
   else the two places Homebrew puts it (a GUI app's PATH does not include
@@ -66,8 +79,33 @@ NETWORK_HOSTS: Tuple[str, ...] = (
     "search.rcsb.org",
     "files.rcsb.org",
     "eutils.ncbi.nlm.nih.gov",
+    "pubchem.ncbi.nlm.nih.gov",
 )
+#: KEGG is read only when the person opted in (Tests/enzyme_lookup.py, KEGG_OPT_IN_ENV).
+KEGG_HOST = "rest.kegg.jp"
+KEGG_OPT_IN_ENV = "CATERVA_ENABLE_KEGG"
 PROBE_TIMEOUT_S = 5.0
+
+#: The path each host's API is asked at, for a check: one the literature layer reads,
+#: with a fixed identifier that names a common enzyme, compound or structure. The
+#: root of a host can answer while its API is down.
+PROBE_PATHS: Mapping[str, str] = {
+    "www.brenda-enzymes.org": "/enzyme.php?ecno=1.1.1.1",
+    "rest.uniprot.org": "/uniprotkb/search?query=accession:P00338&fields=accession&size=1",
+    "search.rcsb.org": "/rcsbsearch/v2/query",
+    "files.rcsb.org": "/header/1LYZ.pdb",
+    "eutils.ncbi.nlm.nih.gov": "/entrez/eutils/einfo.fcgi?retmode=json",
+    "pubchem.ncbi.nlm.nih.gov": "/rest/pug/compound/cid/2244/cids/JSON",
+    KEGG_HOST: "/get/ec:1.1.1.1",
+}
+
+
+def network_hosts(environ: Mapping[str, str] = os.environ) -> Tuple[str, ...]:
+    """The hosts to check: the literature layer's, and KEGG only while its opt-in is set."""
+    hosts = NETWORK_HOSTS
+    if environ.get(KEGG_OPT_IN_ENV, "").strip().lower() in {"1", "true", "yes"}:
+        hosts = hosts + (KEGG_HOST,)
+    return hosts
 
 #: Where Homebrew installs gmx on Apple silicon and on Intel Macs.
 GMX_FALLBACKS: Tuple[str, ...] = ("/opt/homebrew/bin/gmx", "/usr/local/bin/gmx")
@@ -98,11 +136,11 @@ OFFLINE_REASON = ("offline mode is on (Settings): the studio contacts no network
 
 
 def https_head(host: str, timeout: float) -> Optional[str]:
-    """None when `host` answered an HTTPS HEAD, else why it did not."""
+    """None when `host` answered an HTTPS HEAD at its API path (`PROBE_PATHS`), else why it did not."""
     from caterva import __version__
 
     request = urllib.request.Request(
-        f"https://{host}/", method="HEAD",
+        f"https://{host}{PROBE_PATHS.get(host, '/')}", method="HEAD",
         headers={"User-Agent": f"caterva-studio/{__version__} (reachability check)"},
     )
     try:
@@ -146,7 +184,7 @@ class CapabilityProbe:
         literature_import: Optional[Callable[[], Any]] = None,
         find_spec: Callable[[str], Any] = importlib.util.find_spec,
         clock: Optional[Callable[[], str]] = None,
-        hosts: Sequence[str] = NETWORK_HOSTS,
+        hosts: Optional[Sequence[str]] = None,
         is_executable: Callable[[str], bool] = lambda p: os.path.isfile(p) and os.access(p, os.X_OK),
     ) -> None:
         from caterva.studio.workspace import iso, utc_now
@@ -163,17 +201,15 @@ class CapabilityProbe:
         self._literature_import = literature_import or _import_literature
         self._find_spec = find_spec
         self._clock = clock or (lambda: iso(utc_now()))
-        self._hosts = tuple(hosts)
+        self._hosts = tuple(hosts) if hosts is not None else network_hosts(environ)
         self._is_executable = is_executable
         self._lock = threading.Lock()
         self._probe_lock = threading.Lock()
         self._literature: Optional[Dict[str, Any]] = None
         self._gromacs: Optional[Dict[str, Any]] = None
-        self._network: Dict[str, Any] = {
-            "checked": False, "reachable": None, "hosts": {h: None for h in self._hosts},
-            "checked_at": None, "source": None,
-            "reason": "not checked: probing contacts third-party hosts, so it is done only when asked",
-        }
+        #: host -> {reachable, checked_at, source, reason}: each host's own latest outcome.
+        self._host_status: Dict[str, Dict[str, Any]] = {}
+        self._network_reason: Optional[str] = None
         self._unsubscribe = netuse.subscribe(self.observe_network_use)
         #: $GMX as the server found it, before a setting or a Homebrew
         #: location was put there (apply_gromacs_to_environment).
@@ -226,36 +262,64 @@ class CapabilityProbe:
         """A real request was answered (`reached`) or could not be made.
 
         Called from whichever thread made the request (`caterva.netuse`).
-        The newest event decides `reachable`; `hosts` keeps each host's
-        latest outcome, so one that failed beside one that answered is
-        visible. Nothing is contacted."""
+        It updates THAT host's entry only: a BRENDA failure after a UniProt
+        success leaves UniProt reachable. Nothing is contacted."""
         if self._settings().get("offline"):
             return
         stamp = self._clock()
         with self._lock:
-            hosts = dict(self._network["hosts"])
-            hosts[host] = reached
-            self._network = {
-                "checked": True,
-                "reachable": reached,
-                "hosts": hosts,
-                "checked_at": stamp,
-                "source": "use",
-                "reason": None if reached else f"{host} could not be reached: {reason or 'no reason given'}",
+            self._network_reason = None
+            self._host_status[host] = {
+                "reachable": reached, "checked_at": stamp, "source": "use",
+                "reason": None if reached else (reason or "no reason given"),
             }
 
     def network(self) -> Dict[str, Any]:
         """The network capability as last learned, without probing."""
         with self._lock:
-            return dict(self._network, hosts=dict(self._network["hosts"]))
+            return self._network_view()
+
+    def _network_view(self) -> Dict[str, Any]:
+        """The per-host outcomes and what they add up to. Caller holds the lock."""
+        hosts_known = [h for h in self._hosts] + [h for h in self._host_status if h not in self._hosts]
+        status = {
+            h: dict(self._host_status.get(h) or {"reachable": None, "checked_at": None, "source": None,
+                                                 "reason": None})
+            for h in hosts_known
+        }
+        known = {h: s for h, s in status.items() if s["reachable"] is not None}
+        if not known:
+            return {
+                "checked": False, "reachable": None, "hosts": {h: None for h in status},
+                "host_status": status, "checked_at": None, "source": None,
+                "reason": self._network_reason
+                or "not checked: probing contacts third-party hosts, so it is done only when asked",
+            }
+        failed = [h for h, s in known.items() if s["reachable"] is False]
+        newest = max(known.items(), key=lambda item: item[1]["checked_at"] or "")
+        # Each failure in the words of where it was learned: a check says "not reachable from this
+        # computer", a real request says which host "could not be reached".
+        checked = [f"{h}: {known[h]['reason'] or 'no reason given'}" for h in failed if known[h]["source"] == "probe"]
+        used = [f"{h} could not be reached: {known[h]['reason'] or 'no reason given'}"
+                for h in failed if known[h]["source"] != "probe"]
+        parts = ([("not reachable from this computer: " + "; ".join(checked))] if checked else []) + used
+        return {
+            "checked": True,
+            "reachable": not failed,
+            "hosts": {h: s["reachable"] for h, s in status.items()},
+            "host_status": status,
+            "checked_at": newest[1]["checked_at"],
+            "source": newest[1]["source"],
+            "reason": "; ".join(parts) if parts else None,
+        }
 
     def probe_network(self) -> Dict[str, Any]:
         if self._settings().get("offline"):
             # Nothing is contacted; the last real probe, if any, is not shown
             # as current either.
             with self._lock:
-                self._network = {"checked": False, "reachable": None, "hosts": {h: None for h in self._hosts},
-                                 "checked_at": None, "source": None, "reason": OFFLINE_REASON}
+                self._host_status = {}
+                self._network_reason = OFFLINE_REASON
             return self.network()
         with self._probe_lock:
             results: Dict[str, Optional[str]] = {}
@@ -271,27 +335,17 @@ class CapabilityProbe:
                 threads.append(thread)
             for thread in threads:
                 thread.join(PROBE_TIMEOUT_S + 2.0)
-            hosts: Dict[str, Optional[bool]] = {}
-            failures = []
-            for host in self._hosts:
-                if host not in results:
-                    hosts[host] = False
-                    failures.append(f"{host}: no answer within {PROBE_TIMEOUT_S:g} s")
-                elif results[host] is None:
-                    hosts[host] = True
-                else:
-                    hosts[host] = False
-                    failures.append(f"{host}: {results[host]}")
-            reachable = not failures
+            stamp = self._clock()
             with self._lock:
-                self._network = {
-                    "checked": True,
-                    "reachable": reachable,
-                    "hosts": hosts,
-                    "checked_at": self._clock(),
-                    "source": "probe",
-                    "reason": None if reachable else "not reachable from this computer: " + "; ".join(failures),
-                }
+                self._network_reason = None
+                for host in self._hosts:
+                    if host not in results:
+                        outcome: Optional[str] = f"no answer within {PROBE_TIMEOUT_S:g} s"
+                    else:
+                        outcome = results[host]
+                    self._host_status[host] = {
+                        "reachable": outcome is None, "checked_at": stamp, "source": "probe", "reason": outcome,
+                    }
             return self.network()
 
     def gromacs_candidate(self) -> Tuple[Optional[str], str]:
@@ -410,5 +464,6 @@ def _import_literature() -> Any:
     return literature_module("fallback_logic")
 
 
-__all__ = ["CapabilityProbe", "GMX_FALLBACKS", "NETWORK_HOSTS", "NOT_BUILT_YET", "OFFLINE_REASON", "PROBE_TIMEOUT_S",
-           "UNBUILT_COMMANDS", "https_head", "parse_gmx_version"]
+__all__ = ["CapabilityProbe", "GMX_FALLBACKS", "KEGG_HOST", "KEGG_OPT_IN_ENV", "NETWORK_HOSTS", "NOT_BUILT_YET",
+           "OFFLINE_REASON", "PROBE_PATHS", "PROBE_TIMEOUT_S", "UNBUILT_COMMANDS", "https_head", "network_hosts",
+           "parse_gmx_version"]

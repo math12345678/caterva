@@ -179,6 +179,31 @@ class ModelDossier:
         )
         return lines
 
+    def _used_compounds(self) -> dict:
+        used = getattr(self.model, "used_compounds", None)
+        return dict(used()) if callable(used) else dict(getattr(self.model, "compounds", None) or {})
+
+    def _unused_compound_lines(self) -> List[str]:
+        """A compound the caller named that this mechanism has no constant for.
+
+        `--inhibitor gossypol` with "Michaelis Menten" looked up a Km and a
+        kcat only. Saying it had searched for gossypol was false."""
+        unused = getattr(self.model, "unused_compounds", None)
+        named = dict(unused()) if callable(unused) else {}
+        if not named:
+            return []
+        parts = ", ".join(
+            f"{('--' + k.lstrip('@')) if k.startswith('@') else ('--compound ' + k + '=')} {v}".replace("= ", "=")
+            for k, v in sorted(named.items()))
+        return [
+            "",
+            f"**Not used: {parts}.** This mechanism (`{self.model.query}`) has no step that "
+            f"{'compound' if len(named) == 1 else 'compounds'} could belong to, so no constant was looked up for "
+            f"{'it' if len(named) == 1 else 'them'}; only the constants listed below were searched. To search for an "
+            "inhibitor's Ki, ask for a mechanism with an inhibition step (for example `competitive inhibition`) and "
+            "name the inhibitor again.",
+        ]
+
     def _measured_table(self) -> List[str]:
         """What the literature returned, and what it did not.
 
@@ -196,8 +221,9 @@ class ModelDossier:
             + (f" in {self.model.organism}" if self.model.organism else "")
             + (f", substrate {self.model.substrate}" if self.model.substrate else "")
             + "".join(f", {k.lstrip('@') if k.startswith('@') else 'port ' + k} {v}"
-                      for k, v in sorted((getattr(self.model, "compounds", None) or {}).items()))
+                      for k, v in sorted(self._used_compounds().items()))
             + ". Each constant is looked up under the compound it belongs to.",
+            *self._unused_compound_lines(),
             "",
             "| quantity | value | origin | source |",
             "|---|---|---|---|",

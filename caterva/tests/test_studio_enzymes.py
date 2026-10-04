@@ -218,7 +218,46 @@ def test_the_detail_lists_the_organisms_isozymes_by_entry_name(app):
 def test_the_detail_without_an_organism_has_no_isozymes_and_does_not_pretend(app):
     _, body = get(app, "/api/enzymes/2.7.1.1")
     assert body["isozymes"] == {"organism": None, "organism_label": None, "count": 0, "proteins": [],
-                                "organism_known": False}
+                                "organism_known": False, "broad": False, "note": None, "organism_scope": None,
+                                "filed_elsewhere": None}
+
+
+def test_a_broad_class_is_not_called_isozymes_and_a_chooser_is_not_built_for_it(app):
+    """EC 2.7.11.1 is 245 different human kinases, not isozymes of one enzyme."""
+    _, body = get(app, "/api/enzymes/2.7.11.1?organism=human")
+    iso = body["isozymes"]
+    assert iso["count"] == 245 and iso["broad"] is True
+    assert "245 different human proteins share EC 2.7.11.1 (a broad class" in iso["note"]
+    assert "isozymes" not in iso["note"].split("(a broad class")[0]
+
+
+def test_the_family_the_nomenclature_files_elsewhere_is_named_for_alcohol_dehydrogenase(app):
+    """ADH1B and ADH4 are filed under EC 1.1.1.105 only, so EC 1.1.1.1's list leaves them out."""
+    _, body = get(app, "/api/enzymes/1.1.1.1?organism=human")
+    iso = body["isozymes"]
+    assert [p["label"] for p in iso["proteins"]] == ["ADH1A", "ADH1C", "ADH6", "ADH7", "ADH5"]
+    assert "ADH1B" in iso["filed_elsewhere"] and "ADH4" in iso["filed_elsewhere"] and "EC 1.1.1.105" in iso["filed_elsewhere"]
+
+
+def test_e_coli_means_the_k_12_strain_and_the_detail_says_so(app):
+    _, body = get(app, "/api/enzymes/1.1.1.1?organism=" + quote("E. coli"))
+    scope = body["isozymes"]["organism_scope"]
+    assert scope.startswith("E. coli K-12") and "other E. coli strains" in scope
+    assert "E. coli K-12 isozymes" in body["isozymes"]["note"]
+
+
+def test_a_transferred_ec_carries_its_replacements_name_and_a_deleted_one_says_it_has_none(app):
+    from caterva.enzymes import load_index
+
+    entries = load_index().entries
+    moved = next(e for e in sorted(entries) if entries[e].status == "transferred" and len(entries[e].superseded_by) == 1)
+    _, body = get(app, f"/api/enzymes/{moved}")
+    successor = entries[body["replaced_by"][0]["ec"]]
+    assert body["name"] == successor.name != "" and body["replaced_by"] == [{"ec": successor.ec, "name": successor.name}]
+    assert "transferred" in body["name_note"]
+    gone = next(e for e in sorted(entries) if entries[e].status == "deleted" and not entries[e].superseded_by)
+    _, body = get(app, f"/api/enzymes/{gone}")
+    assert body["name"] == "Deleted entry" and body["replaced_by"] == [] and "deleted" in body["name_note"]
 
 
 def test_an_organism_the_finder_does_not_know_is_not_zero_proteins(app):
@@ -231,7 +270,11 @@ def test_the_detail_isozymes_are_the_notice_the_report_prints(app):
 
     _, body = get(app, "/api/enzymes/2.7.1.1?organism=human")
     notice = isozyme_notice("2.7.1.1", "human", None)
-    assert tuple(p["symbol"] for p in body["isozymes"]["proteins"]) == notice.symbols
+    assert tuple(p["label"] for p in body["isozymes"]["proteins"]) == notice.symbols == ("HKDC1", "HK1", "HK2", "HK3", "GCK")
+    assert body["isozymes"]["note"] == notice.text and body["isozymes"]["broad"] is False
+    first = body["isozymes"]["proteins"][1]
+    assert (first["symbol"], first["gene"], first["accession"]) == ("HXK1", "HK1", "P19367")
+    assert first["names"][0] == "HK1" and "HK I" in first["names"] and first["engine_matches"] is True
 
 
 def test_an_ec_the_nomenclature_does_not_list_is_404_in_the_finders_words(app):
@@ -288,6 +331,27 @@ def test_nothing_found_and_the_network_reachable_asks_uniprot_through_the_policy
     assert fallback["kind"] == "uniprot" and "fallback_unavailable" not in body
     assert fallback["suggestions"] == [{"ec": "2.7.1.40", "name": "pyruvate kinase"}]
     assert "exactly one EC number" in fallback["note"]
+
+
+def test_the_fallback_is_gated_on_uniprots_own_status_not_on_an_aggregate(app, monkeypatch):
+    """A BRENDA failure after a UniProt success used to overwrite one flag and block the fallback;
+    a BRENDA success with nothing known about UniProt must not open it."""
+    _lookup(monkeypatch, ["2.7.1.40"])
+    netuse.answered("https://rest.uniprot.org/uniprotkb/search")
+    netuse.failed("https://www.brenda-enzymes.org/enzyme.php", "connection reset")
+    _, body = find(app, NOTHING)
+    assert body["fallback"] is not None and "fallback_unavailable" not in body, "UniProt answered; BRENDA failing is not UniProt failing"
+    netuse.failed("https://rest.uniprot.org/uniprotkb/search", "name resolution failed")
+    _, body = find(app, NOTHING)
+    assert body["fallback"] is None and "UniProt is not known to be reachable" in body["fallback_unavailable"]
+
+
+def test_a_reachable_brenda_alone_does_not_open_the_uniprot_fallback(app, monkeypatch):
+    _lookup(monkeypatch, ["2.7.1.40"])
+    app.capabilities._host_status.clear()
+    netuse.answered("https://www.brenda-enzymes.org/enzyme.php")
+    _, body = find(app, NOTHING)
+    assert body["fallback"] is None and "UniProt is not known to be reachable" in body["fallback_unavailable"]
 
 
 def test_uniprot_naming_several_enzymes_lists_each_and_picks_none(app, monkeypatch):

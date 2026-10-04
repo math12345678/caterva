@@ -143,6 +143,10 @@ def main() -> None:
             ("lactate dehydrogenase", None), ("lactate dehydrogenase", "human"), ("pyruvate kinase", None),
             ("hexokinase", "human"), ("glucokinase", None), ("LDHA", "human"), ("hexokinse", "human"),
             ("1.1.1.27", "human"), ("1.1.1", None), ("zzqx protein of no enzyme", None), ("9.9.9.9", None),
+            # What the review of 2026-10-03 found it resolving wrongly, and what it answers now.
+            ("HK1", "human"), ("SDH", "human"), ("glycogen synthase", "human"), ("ADH", "human"),
+            ("GAPDH", "human"), ("IDH1", "yeast"), ("ACHE", "human"), ("HIV protease", None),
+            ("COX", "E. coli"), ("ribonuclease A", "human"),
         ]:
             target = f"/api/enzymes/find?q={quote(query)}" + (f"&organism={quote(organism)}" if organism else "")
             slug = "-".join(filter(None, [query.replace(" ", "-").replace(".", "-").lower(), organism]))
@@ -159,9 +163,24 @@ def main() -> None:
         write(ENZYMES / "detail-1.1.1.27-human.json", get_json(app, "/api/enzymes/1.1.1.27?organism=human"))
         write(ENZYMES / "detail-5.3.1.1-human.json", get_json(app, "/api/enzymes/5.3.1.1?organism=human"))
         write(ENZYMES / "detail-9.9.9.9.json", get_json(app, "/api/enzymes/9.9.9.9"))
+        # An EC number that is several proteins, a broad class, an E. coli (K-12) count, and the two retired kinds.
+        write(ENZYMES / "detail-1.1.1.1-human.json", get_json(app, "/api/enzymes/1.1.1.1?organism=human"))
+        write(ENZYMES / "detail-2.7.11.1-human.json", get_json(app, "/api/enzymes/2.7.11.1?organism=human"))
+        write(ENZYMES / "detail-1.1.1.1-e-coli.json", get_json(app, "/api/enzymes/1.1.1.1?organism=" + quote("E. coli")))
+        for status, need_one in (("transferred", True), ("deleted", False)):
+            ec = next(e for e in sorted(entries) if entries[e].status == status
+                      and (len(entries[e].superseded_by) == 1 if need_one else not entries[e].superseded_by))
+            write(ENZYMES / f"detail-{status}-{ec}.json", get_json(app, f"/api/enzymes/{ec}"))
 
         # The network, as the status bar sees it before anything happened, and after a BRENDA lookup worked.
-        write(ENZYMES / "capabilities-nothing-yet.json", get_json(app, "/api/capabilities"))
+        nothing_yet = get_json(app, "/api/capabilities")
+        write(ENZYMES / "capabilities-nothing-yet.json", nothing_yet)
+        # The workspace fixture of the same answer keeps the rest of what it captured and takes the
+        # server's current `network`, which is the one thing this change altered in that answer.
+        workspace = OUT / "workspace" / "capabilities.json"
+        kept = json.loads(workspace.read_text(encoding="utf-8"))
+        kept["network"] = nothing_yet["body"]["network"]
+        write(workspace, kept)
 
         # Compose: the live run the steady-state defect was seen on, and the isozyme notice.
         with ldh_offline():
@@ -174,21 +193,36 @@ def main() -> None:
                                  "substrate": "glucose"}, "compose-hexokinase-human-glucose")
             run(app, "compose", {"description": "Michaelis Menten", "subject": "2.7.1.1", "organism": "human",
                                  "substrate": "glucose", "isoform": "HXK1"}, "compose-hexokinase-human-glucose-hxk1")
+            run(app, "compose", {"description": "Michaelis Menten", "subject": "2.7.1.1", "organism": "human",
+                                 "substrate": "glucose", "isoform": "HK2"}, "compose-hexokinase-human-glucose-hk2")
+            run(app, "compose", {"description": "Michaelis Menten", "subject": "2.7.1.1", "organism": "human",
+                                 "substrate": "glucose", "isoform": "GCK"}, "compose-hexokinase-human-glucose-gck")
+            run(app, "compose", {"description": "Michaelis Menten", "subject": "2.7.1.1", "organism": "human",
+                                 "substrate": "glucose", "compounds": {"@inhibitor": "gossypol"}},
+                "compose-michaelis-menten-unused-inhibitor")
             run(app, "constants", {"enzyme": "lactate dehydrogenase", "organism": "human", "substrate": "pyruvate"},
                 "constants-name-several-enzymes")
+            run(app, "constants", {"ec": "2.7.1.1", "organism": "human", "substrate": "glucose"},
+                "constants-hexokinase-human-glucose")
 
         # A REAL lookup, outside the recordings: UniProt's protein-name search for hexokinase. The server notes
         # that it was answered, and says so in /api/capabilities. Nothing is written if it could not be made.
         from caterva.checkout import literature_module
 
-        answered = literature_module("enzyme_lookup").fetch_ec_numbers_by_name("hexokinase", None, timeout=20)
-        assert answered, "UniProt answered with no EC number for hexokinase"
-        capabilities = get_json(app, "/api/capabilities")
-        assert capabilities["body"]["network"]["source"] == "use" and capabilities["body"]["network"]["reachable"] is True
-        write(ENZYMES / "capabilities-after-a-lookup.json", capabilities)
-        # With the network known to be reachable, a name the nomenclature does not hold is asked of UniProt.
-        write(ENZYMES / "find-pyruvate-kinase-pkm-human.json",
-              get_json(app, f"/api/enzymes/find?q={quote('pyruvate kinase PKM')}&organism=human"))
+        try:
+            answered = literature_module("enzyme_lookup").fetch_ec_numbers_by_name("hexokinase", None, timeout=20)
+        except Exception as exc:  # noqa: BLE001 - reported; the two files that need UniProt are then kept as they are
+            answered = None
+            print(f"UniProt did not answer ({type(exc).__name__}: {exc}); capabilities-after-a-lookup.json and "
+                  "find-pyruvate-kinase-pkm-human.json were NOT rewritten")
+        if answered:
+            capabilities = get_json(app, "/api/capabilities")
+            network = capabilities["body"]["network"]
+            assert network["source"] == "use" and network["hosts"]["rest.uniprot.org"] is True
+            write(ENZYMES / "capabilities-after-a-lookup.json", capabilities)
+            # With UniProt known to be reachable, a name the nomenclature does not hold is asked of UniProt.
+            write(ENZYMES / "find-pyruvate-kinase-pkm-human.json",
+                  get_json(app, f"/api/enzymes/find?q={quote('pyruvate kinase PKM')}&organism=human"))
 
         # Structures: the name policy changed what these two answer, so they are written again.
         with structure_recordings():

@@ -49,6 +49,8 @@ from caterva.studio.adapters import EndpointRequest
 MAX_QUERY_CHARS = 200
 MAX_ORGANISM_CHARS = 100
 MAX_LIMIT = 50
+#: The host the fallback asks, whose own status gates it (not an aggregate of every host).
+UNIPROT_HOST = "rest.uniprot.org"
 #: How long the UniProt fallback may take before it is reported as failed.
 FALLBACK_TIMEOUT_S = 6.0
 #: Answers kept: a query, an organism and a limit give one answer for the life of the process.
@@ -112,7 +114,7 @@ def find_base(query: str, organism: Optional[str], limit: int) -> Dict[str, Any]
 
     Kept for the life of the process: the index is immutable."""
     from caterva.enzymes.__main__ import find_payload
-    from caterva.enzymes.index import organism_label
+    from caterva.enzymes.index import ORGANISM_SCOPE, organism_label
 
     key = (query.casefold(), (organism or "").casefold(), limit)
     with _cache_lock:
@@ -137,10 +139,13 @@ def find_base(query: str, organism: Optional[str], limit: int) -> Dict[str, Any]
         "cautions": cautions,
         "reason": payload.get("reason"),
         "recommended_ec": recommended_ec,
+        "confirm_only": bool(payload.get("confirm_only")),
         "candidates_total": payload["candidates_total"],
         "candidates": [_candidate(c, recommended_ec, resolved_ec, cautions) for c in payload["candidates"]],
         "fallback": None,
     }
+    if code in ORGANISM_SCOPE:
+        answer["organism_scope"] = ORGANISM_SCOPE[code]
     with _cache_lock:
         _cache[key] = answer
         while len(_cache) > CACHE_SIZE:
@@ -181,9 +186,9 @@ def _fallback(request: EndpointRequest, answer: Dict[str, Any], query: str,
     literature = known.get("literature") or {}
     if known.get("offline"):
         why = "offline mode is on (Settings), so UniProt was not asked"
-    elif network.get("reachable") is not True:
-        why = ("the network is not known to be reachable (check it from the status bar), so UniProt was "
-               "not asked")
+    elif (network.get("hosts") or {}).get(UNIPROT_HOST) is not True:
+        why = ("UniProt is not known to be reachable (its own last outcome, from a lookup or a check; check "
+               "the network from the status bar), so UniProt was not asked")
     elif not literature.get("available"):
         why = "the literature layer, which asks UniProt, is not in this installation"
     else:
@@ -204,10 +209,47 @@ def find_enzymes(request: EndpointRequest) -> Dict[str, Any]:
     return answer
 
 
+def _protein_view(protein: Any) -> Dict[str, Any]:
+    """One listed protein with the gene symbol and names UniProt gives it, and whether the
+    engine that reads papers' isoform names can match it."""
+    from caterva.enzymes.isoforms import can_match, names_for
+
+    label = protein.label
+    return {
+        "accession": protein.accession, "entry_name": protein.entry_name, "symbol": protein.symbol,
+        "gene": protein.gene, "label": label,
+        "names": list(names_for(protein.accession, protein.symbol))[:8],
+        "engine_matches": can_match(label),
+    }
+
+
+def _replacements(index: Any, entry: Any) -> List[Dict[str, str]]:
+    """The active enzymes a transferred number is now filed under, named, following chains."""
+    found: List[Dict[str, str]] = []
+    seen = {entry.ec}
+    frontier = list(entry.superseded_by)
+    for _ in range(5):
+        following: List[str] = []
+        for ec in frontier:
+            if ec in seen:
+                continue
+            seen.add(ec)
+            target = index.get(ec)
+            if target is None:
+                continue
+            if target.status == "active":
+                found.append({"ec": ec, "name": target.name})
+            else:
+                following.extend(target.superseded_by)
+        frontier = following
+    return found
+
+
 def enzyme_detail(request: EndpointRequest) -> Dict[str, Any]:
     """GET /api/enzymes/{ec}."""
     from caterva.enzymes.finder import isozymes
-    from caterva.enzymes.index import load_index, organism_code, organism_label
+    from caterva.enzymes.index import ORGANISM_SCOPE, load_index, organism_code, organism_label
+    from caterva.enzymes.isozyme import BROAD_CLASS, isozyme_notice
 
     _only(request.query, _DETAIL_KEYS)
     organism = _text(request.query, "organism", MAX_ORGANISM_CHARS)
@@ -219,9 +261,25 @@ def enzyme_detail(request: EndpointRequest) -> Dict[str, Any]:
                                 f"{index.release}). Check the number.")
     found = isozymes(ec, organism)
     code = organism_code(organism)
+    notice = isozyme_notice(ec, organism, None)
+    name = entry.name
+    name_note: Optional[str] = None
+    replaced_by: List[Dict[str, str]] = []
+    if entry.status == "transferred":
+        replaced_by = _replacements(index, entry)
+        name = "; ".join(r["name"] for r in replaced_by)
+        name_note = (f"EC {ec} was transferred in the enzyme nomenclature and keeps no name of its own here; "
+                     "the name shown is that of the enzyme" + ("s" if len(replaced_by) != 1 else "")
+                     + " it is now filed under")
+    elif entry.status == "deleted":
+        name = "Deleted entry"
+        name_note = (f"EC {ec} was deleted from the enzyme nomenclature and has no replacement; the nomenclature "
+                     "keeps no name for a deleted number")
     return {
         "ec": ec,
-        "name": entry.name,
+        "name": name,
+        "name_note": name_note,
+        "replaced_by": replaced_by,
         "alternative_names": list(entry.alternative_names),
         "reaction": entry.reaction,
         "class_path": index.class_path(ec),
@@ -232,9 +290,12 @@ def enzyme_detail(request: EndpointRequest) -> Dict[str, Any]:
             "organism": found.organism,
             "organism_label": organism_label(code) if code else None,
             "count": found.count,
-            "proteins": [{"accession": p.accession, "entry_name": p.entry_name, "symbol": p.symbol}
-                         for p in found.proteins],
+            "proteins": [_protein_view(p) for p in found.proteins],
             "organism_known": code is not None,
+            "broad": found.count > BROAD_CLASS,
+            "note": notice.text if notice is not None else None,
+            "organism_scope": ORGANISM_SCOPE.get(code) if code else None,
+            "filed_elsewhere": (notice.elsewhere_text or None) if notice is not None else None,
         },
     }
 

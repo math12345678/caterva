@@ -1,7 +1,7 @@
 """What the installation can do, decided by looking: each part of /api/capabilities.
 
 Every outside effect (importing the literature layer, finding and running
-`gmx`, contacting the five hosts) is handed to CapabilityProbe as a
+`gmx`, contacting the database hosts) is handed to CapabilityProbe as a
 function, so each answer and each failure can be produced here on purpose
 and its wording checked: the page shows these reasons as they are
 (docs/studio/CONTRACT.md section 10). One test runs the real probe against
@@ -128,6 +128,72 @@ def test_a_request_that_could_not_be_made_marks_the_network_unreachable_with_why
         p.close()
 
 
+def test_reachability_is_kept_per_host_so_one_failure_does_not_block_another(tmp_path):
+    """A BRENDA failure after a UniProt success overwrote the one flag, and the enzyme
+    finder's UniProt fallback, which read that flag, was refused."""
+    from caterva import netuse
+
+    p = probe(tmp_path)
+    try:
+        netuse.answered("https://rest.uniprot.org/uniprotkb/search")
+        netuse.failed("https://www.brenda-enzymes.org/enzyme.php", "connection reset")
+        network = p.snapshot()["network"]
+        assert network["hosts"]["rest.uniprot.org"] is True, "UniProt's own last outcome stands"
+        assert network["hosts"]["www.brenda-enzymes.org"] is False
+        status = network["host_status"]
+        assert status["rest.uniprot.org"] == {"reachable": True, "checked_at": "2026-09-30T12:00:00.000Z",
+                                              "source": "use", "reason": None}
+        assert status["www.brenda-enzymes.org"]["reason"] == "connection reset"
+        assert status["pubchem.ncbi.nlm.nih.gov"] == {"reachable": None, "checked_at": None, "source": None,
+                                                      "reason": None}
+        assert network["reachable"] is False, "the aggregate says only what was checked: one host did not answer"
+        # And the next answer from the failed host does not erase the other's outcome.
+        netuse.answered("https://www.brenda-enzymes.org/enzyme.php")
+        again = p.snapshot()["network"]
+        assert again["hosts"]["www.brenda-enzymes.org"] is True and again["hosts"]["rest.uniprot.org"] is True
+    finally:
+        p.close()
+
+
+def test_the_hosts_include_pubchem_and_kegg_only_while_its_opt_in_is_set(tmp_path):
+    from caterva.studio.capabilities import KEGG_HOST, KEGG_OPT_IN_ENV, network_hosts
+
+    assert "pubchem.ncbi.nlm.nih.gov" in NETWORK_HOSTS
+    assert KEGG_HOST not in network_hosts({})
+    assert KEGG_HOST not in network_hosts({KEGG_OPT_IN_ENV: "0"})
+    assert KEGG_HOST in network_hosts({KEGG_OPT_IN_ENV: "1"})
+    default = probe(tmp_path, environ={}).network()
+    assert KEGG_HOST not in default["hosts"] and "pubchem.ncbi.nlm.nih.gov" in default["hosts"]
+    opted = probe(tmp_path, environ={KEGG_OPT_IN_ENV: "yes"}).network()
+    assert KEGG_HOST in opted["hosts"]
+
+
+def test_each_host_is_probed_at_a_path_its_api_serves_not_at_the_root(monkeypatch):
+    from caterva.studio import capabilities
+    from caterva.studio.capabilities import PROBE_PATHS, https_head
+
+    assert all(host in PROBE_PATHS for host in NETWORK_HOSTS)
+    assert all(path.startswith("/") and path != "/" for path in PROBE_PATHS.values())
+    seen = []
+
+    class Answer:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def fake(request, timeout):
+        seen.append((request.full_url, request.get_method(), timeout))
+        return Answer()
+
+    monkeypatch.setattr(capabilities.urllib.request, "urlopen", fake)
+    for host in NETWORK_HOSTS:
+        assert https_head(host, 5.0) is None
+    assert {url for url, _, _ in seen} == {f"https://{h}{PROBE_PATHS[h]}" for h in NETWORK_HOSTS}
+    assert {m for _, m, _ in seen} == {"HEAD"} and {t for _, _, t in seen} == {5.0}
+
+
 def test_the_explicit_recheck_replaces_what_use_noted(tmp_path):
     from caterva import netuse
 
@@ -203,7 +269,7 @@ def test_a_replayed_answer_touches_no_network_and_notes_nothing(tmp_path, monkey
     try:
         monkeypatch.setattr(httpx, "get", lambda url, **kw: httpx.Response(200, request=httpx.Request("GET", url)))
         http_retry.retry_get("https://rest.uniprot.org/uniprotkb/search", params={"q": "memo"})
-        p._network = dict(p._network, checked=False, reachable=None, source=None)
+        p._host_status = {}
         http_retry.retry_get("https://rest.uniprot.org/uniprotkb/search", params={"q": "memo"})  # the memo answers
         assert p.network()["checked"] is False
     finally:

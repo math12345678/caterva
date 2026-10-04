@@ -113,6 +113,29 @@ class ComposedModel:
             return self.compounds["@product"]
         return self.substrate if quantity.primary else None
 
+    def used_compounds(self) -> Dict[str, str]:
+        """The compounds named that some constant of this mechanism belongs to."""
+        unused = self.unused_compounds()
+        return {k: v for k, v in (self.compounds or {}).items() if k not in unused}
+
+    def unused_compounds(self) -> Dict[str, str]:
+        """The compounds named that NO constant of this mechanism belongs to.
+
+        `--inhibitor gossypol` on "Michaelis Menten" names a compound the
+        mechanism has no place for: it has no inhibition step, so no inhibition
+        constant is looked up and gossypol is not searched for at all. The
+        report used to say it had searched for it."""
+        used = set()
+        for q in self.resolvable:
+            if q.ligand_port is None:
+                continue
+            used.add(q.ligand_port)
+            if q.ligand_role == "regulator":
+                used.add("@inhibitor")
+            if q.ligand_role == "product":
+                used.add("@product")
+        return {k: v for k, v in (self.compounds or {}).items() if k not in used}
+
     def unsearched(self) -> Dict[str, str]:
         """Constants that were deliberately not looked up, and why: their
         compound was not named, or no single database value can fill them.

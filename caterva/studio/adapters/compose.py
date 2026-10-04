@@ -442,7 +442,8 @@ def search_summary(composed: Any, subject: Optional[str]) -> contract.SearchSumm
         "organism": model.organism,
         "substrate": model.substrate,
         "isoform": model.isoform,
-        "compounds": {str(k): str(v) for k, v in (model.compounds or {}).items()},
+        "compounds": {str(k): str(v) for k, v in model.used_compounds().items()},
+        "unused_compounds": {str(k): str(v) for k, v in model.unused_compounds().items()},
         "measured": len(model.measured),
         "placeholders": len(model.unmeasured),
     }
@@ -476,7 +477,12 @@ def _complex(value: complex) -> contract.ComplexNumber:
 def stability_view(stability: Any) -> Optional[contract.StabilityView]:
     if stability is None:
         return None
+    from caterva.compose.analysis import CONTINUUM_COUNT_CAVEAT, STATE_DISTINCT_TOLERANCE
+
+    on_a_line = bool(getattr(stability, "on_a_continuum", False))
     return {
+        "rounding_tolerance": float(STATE_DISTINCT_TOLERANCE),
+        "count_caveat": CONTINUUM_COUNT_CAVEAT if on_a_line else None,
         "starts_tried": int(stability.starts_tried),
         "species": list(stability.species),
         "notes": [str(n) for n in stability.notes],

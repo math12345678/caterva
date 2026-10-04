@@ -58,6 +58,13 @@ RESIDUAL_TOLERANCE = 1e-9
 #: would turn one stable state into a dozen.
 STATE_DISTINCT_TOLERANCE = 1e-6
 
+#: The engine's own words about the count of points on a line of equilibria. A
+#: page that prints "N found from M starts" for such a model must print this
+#: beside it: the count is where the starts fell, not a fact about the model.
+CONTINUUM_COUNT_CAVEAT = (
+    "How many points land on the line is an artefact of where the starts fell, not a property of the model."
+)
+
 #: An eigenvalue whose real part is within this of zero is not called stable
 #: OR unstable. At a bifurcation the linearisation decides nothing, and
 #: rounding a marginal eigenvalue to one side is how a model gets reported
@@ -284,9 +291,8 @@ class StabilityReport:
                 f"This is NOT a switch. A switch has discrete states with "
                 f"repellors between them; here every point on the line is "
                 f"an equilibrium and 'which state' has no answer -- a time "
-                f"course from your actual starting amounts does. How many "
-                f"points land on the line is an artefact of where the "
-                f"starts fell, not a property of the model."
+                f"course from your actual starting amounts does. "
+                + CONTINUUM_COUNT_CAVEAT
             )
         elif self.at_least_bistable:
             lines.append(
@@ -934,6 +940,6 @@ __all__ = [
     "analyse", "classify", "jacobian", "derivative_function",
     "STABLE", "UNSTABLE", "SADDLE", "MARGINAL", "CONTINUUM",
     "OSCILLATORY_STABLE", "OSCILLATORY_UNSTABLE",
-    "RESIDUAL_TOLERANCE", "STATE_DISTINCT_TOLERANCE", "MARGINAL_EIGENVALUE",
+    "RESIDUAL_TOLERANCE", "STATE_DISTINCT_TOLERANCE", "CONTINUUM_COUNT_CAVEAT", "MARGINAL_EIGENVALUE",
     "JACOBIAN_STEP", "DEFAULT_STARTS_PER_SPECIES",
 ]

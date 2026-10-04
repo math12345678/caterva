@@ -66,6 +66,51 @@ def test_the_km_is_the_resolvers_with_its_citation(hexokinase):
     assert progress.stages() == ["resolve", "document"]
 
 
+def test_the_engines_tie_explanation_reaches_the_row_and_the_ui_can_show_it(hexokinase):
+    """Human hexokinase's glucose Km is 3 equally evidenced rows, 6 to 18 mM. The engine says so ("taking the lowest,
+    which the evidence does not justify"); the adapter used to drop it (`scope: []`, `chosen_because: None`)."""
+    _, _, _, outcome, _ = hexokinase
+    (row,) = outcome.result["constants"]
+    prov = row["value"]["provenance"]
+    tie = row["raw"]["selection_tie"]
+    assert prov["chosen_because"] == tie["reason"]
+    assert "3 rows were equally well evidenced" in prov["chosen_because"]
+    assert "taking the lowest, which the evidence does not justify" in prov["chosen_because"]
+    spread = prov["spread"]
+    assert (spread["low"], spread["high"], spread["carried"], spread["n_values"], spread["unit"]) == (6.0, 18.0, 6.0, 3, "mM")
+    assert spread["references"] == ["641068", "739603"] and "spanning 6 to 18 mM (3-fold)" in spread["sentence"]
+    # The rows it ranked equal are the alternatives, each as measured.
+    assert sorted(a["value"] for a in row["alternatives"]) == [6.3, 18.0]
+
+
+def test_the_engines_scope_concerns_reach_the_row(hexokinase):
+    """The candidate rows name 6 different forms of hexokinase; the engine says returning the lowest would pick a
+    form rather than answer the question. That is a scope concern of the value, and it was `[]`."""
+    _, _, _, outcome, _ = hexokinase
+    prov = outcome.result["constants"][0]["value"]["provenance"]
+    assert any("name 6 different forms of hexokinase" in c and "would pick a form rather than answer" in c
+               for c in prov["scope"])
+
+
+def test_the_isozyme_notice_is_shown_for_an_ec_with_several_proteins_in_the_organism(hexokinase):
+    _, _, _, outcome, _ = hexokinase
+    notice = outcome.result["isozyme_notice"]
+    assert (notice["ec"], notice["count"], notice["broad"]) == ("2.7.1.1", 5, False)
+    assert notice["symbols"] == ["HKDC1", "HK1", "HK2", "HK3", "GCK"]
+    assert notice["detail"].startswith("EC 2.7.1.1 has 5 human isozymes") and "this lookup returns may belong to any of them" in notice["detail"]
+    assert "--isoform" not in notice["detail"], "a lookup has no isoform field to have left empty"
+    assert "Isoform field of Compose" in notice["remedy"]
+
+
+def test_a_one_protein_ec_or_an_unresolved_name_carries_no_isozyme_notice():
+    from types import SimpleNamespace
+
+    assert adapter.isozyme_view({"ec": "5.3.1.1", "organism": "human"}, SimpleNamespace(organism="human")) is None
+    assert adapter.isozyme_view({"enzyme": "lactate dehydrogenase", "organism": "human"}, SimpleNamespace()) is None
+    named = adapter.isozyme_view({"enzyme": "hexokinase", "organism": "human"}, SimpleNamespace())
+    assert named["ec"] == "2.7.1.1"
+
+
 def test_the_supplied_values_are_chosen_by_cites_defaults(hexokinase):
     _, _, _, outcome, _ = hexokinase
     supplied = {v["id"]: v for v in outcome.result["supplied"]}

@@ -336,12 +336,28 @@ class LiteratureCapability(TypedDict):
     reason: Optional[str]
 
 
+class HostStatus(TypedDict):
+    #: True when the host's latest outcome was an answer, False when it was not, None never checked.
+    reachable: Optional[bool]
+    checked_at: Optional[str]
+    #: "use" (a real request) or "probe" (the explicit check) for this host's own latest outcome.
+    source: Optional[str]
+    #: Why the host did not answer, or None.
+    reason: Optional[str]
+
+
 class NetworkCapability(TypedDict):
     #: False until something asked (GET /api/capabilities?probe=network):
     #: probing contacts third parties, so it is never done unasked.
     checked: bool
+    #: What was CHECKED adds up to: True when every host with an outcome answered, False when any
+    #: did not, None when none has an outcome. Read a host's own entry in `hosts` to know whether
+    #: that host can be asked: one failure does not make another host unreachable.
     reachable: Optional[bool]
     hosts: Dict[str, Optional[bool]]
+    #: Each host's own latest outcome, with the time and where it came from.
+    host_status: Dict[str, HostStatus]
+    #: The time of the newest outcome of any host.
     checked_at: Optional[str]
     reason: Optional[str]
     #: Where the answer came from: "use" (a real BRENDA, UniProt, NCBI or
@@ -445,14 +461,29 @@ class DevSession(TypedDict):
 # ---------------------------------------------------------------------------
 
 
-class EnzymeProteinView(TypedDict):
+class _EnzymeProteinRequired(TypedDict):
     """One UniProt entry the enzyme nomenclature lists under an EC number."""
 
     accession: str
     #: HXK1_HUMAN
     entry_name: str
-    #: The entry name without its organism suffix: HXK1.
+    #: The entry name without its organism suffix: HXK1. A UniProt MNEMONIC,
+    #: which is not the gene symbol.
     symbol: str
+
+
+class EnzymeProteinView(_EnzymeProteinRequired, total=False):
+    """A protein, with the names UniProtKB gives it where the names file holds it."""
+
+    #: The gene symbol (HK1 for HXK1_HUMAN), or None when UniProt gives none.
+    gene: Optional[str]
+    #: What to show and to put in the --isoform field: the gene symbol, else the mnemonic.
+    label: str
+    #: The names a paper's isoform text is matched against, gene symbol first.
+    names: List[str]
+    #: True when the isoform engine knows this label (rows that name the isozyme in
+    #: other words match it); False when it is compared by spelling alone.
+    engine_matches: bool
 
 
 class _EnzymeCandidateRequired(TypedDict):
@@ -478,6 +509,9 @@ class _EnzymeCandidateRequired(TypedDict):
     superseded_by: List[str]
     #: True when the query matched only a fragment of a longer name.
     partial_match: bool
+    #: How it matched: name, abbreviation (the gene-symbol and abbreviation
+    #: table), mnemonic, typo, ec or class.
+    matched_by: str
 
 
 class EnzymeCandidate(_EnzymeCandidateRequired, total=False):
@@ -538,6 +572,9 @@ class _EnzymeFindResponseRequired(TypedDict):
     #: Why it did not resolve, in words.
     reason: Optional[str]
     recommended_ec: Optional[str]
+    #: True when the query is an abbreviation or symbol: the candidates are
+    #: what it can mean, for the person to confirm even when there is one.
+    confirm_only: bool
     candidates_total: int
     candidates: List[EnzymeCandidate]
     #: "uniprot" suggestions when the finder found nothing and the network is
@@ -546,6 +583,9 @@ class _EnzymeFindResponseRequired(TypedDict):
 
 
 class EnzymeFindResponse(_EnzymeFindResponseRequired, total=False):
+    #: What the organism code covers when that is narrower than the name
+    #: ("E. coli" is K-12), or absent.
+    organism_scope: str
     #: Why no fallback was offered when it could have been (offline mode, the
     #: network not known to be reachable, no literature layer).
     fallback_unavailable: str
@@ -561,11 +601,35 @@ class IsozymeList(TypedDict):
     #: False for an organism the finder does not know: zero proteins then
     #: means "not known", not "none".
     organism_known: bool
+    #: True above 12 proteins: a broad class of different proteins, which the
+    #: nomenclature does not call isozymes and no chooser is offered for.
+    broad: bool
+    #: The notice for this EC number and organism, in words (the same text the
+    #: compose verdict carries), or None when it is one protein or none.
+    note: Optional[str]
+    #: What the organism code covers when narrower than the name, or None.
+    organism_scope: Optional[str]
+    #: Proteins of this family the nomenclature files under other EC numbers, so that this
+    #: list may leave out one papers measured under this EC number; None when there are none.
+    filed_elsewhere: Optional[str]
+
+
+class EnzymeReplacement(TypedDict):
+    ec: str
+    name: str
 
 
 class EnzymeDetail(TypedDict):
     ec: str
+    #: The nomenclature's name for the EC number. For a transferred number
+    #: it holds no name of its own, so this is the replacement's name (the
+    #: only one, or "A; B" for several); for a deleted one, "Deleted entry"
+    #: "Deleted entry" (the nomenclature's own words) and `name_note` says there is no name to give.
     name: str
+    #: Why `name` is what it is when the entry is transferred or deleted, else None.
+    name_note: Optional[str]
+    #: The active enzymes a transferred number is now filed under, named.
+    replaced_by: List[EnzymeReplacement]
     alternative_names: List[str]
     reaction: str
     class_path: str
@@ -583,6 +647,8 @@ class NameRefusal(TypedDict):
 
     #: ambiguous, suggestions, none, lookup_failed or unknown_ec.
     kind: str
+    #: True when the name is an abbreviation or symbol: the candidates are what it can mean.
+    confirm_only: bool
     #: The policy's own sentence, as the CLI prints it.
     message: str
     named_candidates: List[EnzymeCandidate]
@@ -865,7 +931,12 @@ class SearchSummary(TypedDict):
     organism: Optional[str]
     substrate: Optional[str]
     isoform: Optional[str]
+    #: Compounds a constant of this mechanism was looked up under.
     compounds: Dict[str, str]
+    #: Compounds the request named that this mechanism has no constant for
+    #: (an inhibitor given to a mechanism with no inhibition step). They were
+    #: NOT searched for, and `compounds` does not echo them.
+    unused_compounds: Dict[str, str]
     measured: int
     placeholders: int
 
@@ -921,6 +992,12 @@ class FixedPointView(_FixedPointRequired, total=False):
 
 
 class StabilityView(TypedDict):
+    #: A steady-state amount below zero by less than this is rounding, not a negative amount: the
+    #: search calls a point physical when every amount is above minus this.
+    rounding_tolerance: float
+    #: The engine's sentence that the number of points found is an artefact of where the starts
+    #: fell, present when the search found a line of equilibria and no isolated attractor; else None.
+    count_caveat: Optional[str]
     starts_tried: int
     species: List[str]
     notes: List[str]
@@ -1045,6 +1122,26 @@ class ConstantsResult(_ConstantsResultRequired, total=False):
     #: How cite.py read the organism typed ("Read --organism 'human' as
     #: Homo sapiens."), which it prints to stderr; None when used as typed.
     organism_note: Optional[str]
+    #: The isozyme notice compose carries (`enzymes.isozyme`), when the EC number is
+    #: several proteins in the organism asked about: the constants may belong to any of
+    #: them. None for one protein or none.
+    isozyme_notice: Optional["IsozymeNoticeView"]
+
+
+class IsozymeNoticeView(TypedDict):
+    ec: str
+    organism: str
+    organism_label: str
+    count: int
+    #: Gene symbols (or entry-name stems where UniProt gives no gene symbol); every
+    #: one for a small set, all of them for a broad class.
+    symbols: List[str]
+    #: True above 12 proteins: a broad class, not isozymes of one enzyme.
+    broad: bool
+    headline: str
+    detail: str
+    remedy: str
+    text: str
 
 
 class _SimRequestRequired(TypedDict):

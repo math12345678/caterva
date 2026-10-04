@@ -324,6 +324,30 @@ def test_human_hexokinase_carries_brenda_ref_641068(tmp_path):
     assert "Looking up reaction_Km in BRENDA's km table for EC 2.7.1.1" in looked_up
 
 
+def test_a_compound_the_mechanism_has_no_step_for_is_not_echoed_as_searched(tmp_path):
+    request = {"description": "Michaelis Menten", "subject": "2.7.1.1", "organism": "human", "substrate": "glucose",
+               "compounds": {"@inhibitor": "gossypol"}}
+    with hexokinase_offline():
+        code, out, err, outcome = both(request, tmp_path)
+    assert_parity(code, out, err, outcome)
+    search = outcome.result["search"]
+    assert search["compounds"] == {} and search["unused_compounds"] == {"@inhibitor": "gossypol"}
+    assert "**Not used: --inhibitor gossypol.**" in out and "inhibitor gossypol" not in out.split("searched for")[1].split("\n")[0]
+
+
+def test_a_line_of_equilibria_carries_the_engines_sentence_that_the_count_is_an_artefact():
+    from caterva.compose.analysis import CONTINUUM_COUNT_CAVEAT, STATE_DISTINCT_TOLERANCE, analyse
+    from caterva.compose.pipeline import compose
+    from caterva.studio.adapters.compose import stability_view
+
+    line = stability_view(analyse(compose("two enzymes competing for the same substrate").network))
+    assert line["count_caveat"] == CONTINUUM_COUNT_CAVEAT
+    assert line["count_caveat"] in line["text"], "the sentence is the engine's, not the adapter's"
+    assert line["rounding_tolerance"] == STATE_DISTINCT_TOLERANCE == 1e-6
+    isolated = stability_view(analyse(compose("Michaelis Menten").network))
+    assert isolated["count_caveat"] is None
+
+
 @pytest.fixture(scope="module")
 def ldh(tmp_path_factory):
     """The four LDH runs, each by the command and by the adapter."""

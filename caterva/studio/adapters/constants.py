@@ -51,7 +51,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from typing import Any, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 from caterva.studio import contract
 from caterva.studio.adapters import AdapterOutcome, AdapterSpec, RunContext, cli_parser
@@ -201,7 +201,8 @@ def constants_result(request: Mapping[str, Any], args: Any, payload: Mapping[str
                      result: Mapping[str, Any], organism_note: Optional[str]) -> contract.ConstantsResult:
     cite = cite_module()
     resolved: Mapping[str, Any] = result.get("resolved") or {}
-    rows = [constant_row(entry["name"], entry.get("quantity", "km"), resolved.get(entry["name"]))
+    substrate = payload.get("parameters", [{}])[0].get("substrate") if payload.get("parameters") else None
+    rows = [constant_row(entry["name"], entry.get("quantity", "km"), resolved.get(entry["name"]), substrate=substrate)
             for entry in payload.get("parameters") or []]
     supplied = []
     for entry in payload.get("supplied") or []:
@@ -222,6 +223,7 @@ def constants_result(request: Mapping[str, Any], args: Any, payload: Mapping[str
         "disagreements": list(result.get("disagreements") or []),
         "defensible": bool(result.get("defensible")),
         "organism_note": organism_note,
+        "isozyme_notice": isozyme_view(payload, args),
     }
 
 
@@ -235,22 +237,84 @@ def _citation_text(citation: Optional[Mapping[str, Any]]) -> str:
     return lab._citation_of(holder)
 
 
-def constant_row(name: str, quantity: str, raw: Optional[Mapping[str, Any]]) -> contract.ConstantRow:
+def isozyme_view(payload: Mapping[str, Any], args: Any) -> Optional[Dict[str, Any]]:
+    """The isozyme notice compose carries, for the EC number this lookup is about.
+
+    The same function the compose verdict reads (`enzymes.isozyme`): shown when the EC number
+    is several proteins in the organism asked about, because the constants of a lookup may
+    belong to any of them (a lookup has no --isoform). None for one protein, none, or an
+    organism the index does not know."""
+    from caterva.enzymes.isozyme import isozyme_notice
+    from caterva.enzymes.policy import NameNotResolved, resolve_enzyme_name
+
+    ec = payload.get("ec")
+    organism = payload.get("organism") or getattr(args, "organism", None)
+    if not ec and payload.get("enzyme"):
+        try:
+            ec = resolve_enzyme_name(str(payload["enzyme"]), organism).ec
+        except NameNotResolved:
+            return None
+    notice = isozyme_notice(ec, organism, None)
+    if notice is None:
+        return None
+    return {
+        "ec": notice.ec, "organism": notice.organism, "organism_label": notice.label, "count": notice.count,
+        "symbols": list(notice.symbols), "broad": notice.broad, "headline": notice.headline,
+        "detail": notice.lookup_detail,
+        "remedy": "use the Isoform field of Compose to take each constant from a row that names one isozyme",
+        "text": notice.lookup_detail + ".",
+    }
+
+
+def scope_concerns(commentary: Optional[str], quantity: Optional[str], substrate: Optional[str]) -> List[str]:
+    """What the row's own commentary says that could make it the wrong number: another isoform
+    named, an inhibition mode, none stated. `caterva compose` prints the same sentences under
+    "What each value's own row says it measured", read by the same function."""
+    from caterva.compose.row_scope import read_scope
+
+    scope = read_scope(commentary, table=quantity, substrate=substrate)
+    return [getattr(c, "plain", str(c)) for c in (scope.concerns if scope is not None else ())]
+
+
+def tie_provenance(raw: Mapping[str, Any]) -> Dict[str, Any]:
+    """The engine's own account of a tie, as the provenance fields that carry it.
+
+    When the evidence ranked several rows equal, the resolver says so in `selection_tie.reason`
+    ("3 rows were equally well evidenced ... taking the lowest, which the evidence does not
+    justify"), with the rows. That sentence is `chosen_because`, and the span is the `spread`."""
+    tie = raw.get("selection_tie") or {}
+    rows = tie.get("candidates") or []
+    if len(rows) < 2 or not tie.get("reason"):
+        return {"chosen_because": None, "spread": None}
+    from caterva.compose.export import Spread
+
+    references = tuple(sorted({str(r["reference_id"]) for r in rows if r.get("reference_id")}))
+    spread = Spread(low=float(tie["low"]), high=float(tie["high"]), unit=str(raw.get("unit") or ""),
+                    carried=float(raw["value"]), n_values=len(rows), references=references)
+    return {"chosen_because": str(tie["reason"]), "spread": {
+        "low": float(spread.low), "high": float(spread.high), "unit": str(spread.unit),
+        "carried": float(spread.carried), "n_values": int(spread.n_values),
+        "references": [str(r) for r in spread.references], "sentence": spread.sentence()}}
+
+
+def constant_row(name: str, quantity: str, raw: Optional[Mapping[str, Any]],
+                 substrate: Optional[str] = None) -> contract.ConstantRow:
     """One resolved quantity, read from the resolver's KineticResult."""
     if raw is None:
         raise ValueError(f"report_lab returned no KineticResult for {name!r}")
     value = None
     if raw.get("found") and raw.get("value") is not None:
-        value = measured(raw, ident=name, label=name)
+        value = measured(raw, ident=name, label=name, quantity=quantity, substrate=substrate)
     alternatives: List[contract.SourcedValue] = []
     tie = raw.get("selection_tie") or {}
     for i, candidate in enumerate(tie.get("candidates") or []):
         if not candidate.get("selected"):
             alternatives.append(candidate_value(candidate, f"{name}:tied:{i}", "selection_tie",
-                                                cross_species=False))
+                                                cross_species=False, quantity=quantity, substrate=substrate))
     for i, candidate in enumerate(raw.get("cross_species_candidates") or []):
         alternatives.append(candidate_value(candidate, f"{name}:other_organism:{i}",
-                                            "cross_species_candidates", cross_species=True))
+                                            "cross_species_candidates", cross_species=True,
+                                            quantity=quantity, substrate=substrate))
     return {
         "name": name,
         "quantity": quantity,
@@ -266,7 +330,8 @@ def constant_row(name: str, quantity: str, raw: Optional[Mapping[str, Any]]) -> 
     }
 
 
-def measured(raw: Mapping[str, Any], *, ident: str, label: str) -> contract.SourcedValue:
+def measured(raw: Mapping[str, Any], *, ident: str, label: str, quantity: Optional[str] = None,
+             substrate: Optional[str] = None) -> contract.SourcedValue:
     citation = raw.get("citation") or None
     cite_obj: contract.Citation = {"text": _citation_text(citation), "via": str(raw.get("source"))}
     if citation:
@@ -278,13 +343,17 @@ def measured(raw: Mapping[str, Any], *, ident: str, label: str) -> contract.Sour
         "conditions": {"ph": raw.get("assay_ph"), "temperature_c": raw.get("assay_temperature_c"),
                        "buffer": raw.get("assay_buffer"),
                        "unreported": [str(x) for x in raw.get("assay_unreported") or []]},
-        "commentary": raw.get("commentary"), "scope": [], "chosen_because": None, "spread": None,
+        "commentary": raw.get("commentary"),
+        "scope": scope_concerns(raw.get("commentary"), quantity, substrate)
+        + [str(m["reason"]) for m in raw.get("form_mixtures") or [] if m.get("reason")],
+        **tie_provenance(raw),  # type: ignore[typeddict-item]
     }
     return contract.sourced(raw["value"], str(raw.get("unit") or ""), provenance, ident=ident, label=label)
 
 
 def candidate_value(candidate: Mapping[str, Any], ident: str, via: str, *,
-                    cross_species: bool) -> contract.SourcedValue:
+                    cross_species: bool, quantity: Optional[str] = None,
+                    substrate: Optional[str] = None) -> contract.SourcedValue:
     """A row the resolver ranked and did not carry (a TiedCandidate)."""
     reference = candidate.get("reference_id")
     citation: contract.Citation = {"text": f"BRENDA ref {reference}" if reference else "BRENDA",
@@ -293,7 +362,9 @@ def candidate_value(candidate: Mapping[str, Any], ident: str, via: str, *,
         "kind": "measured", "citation": citation, "organism": candidate.get("organism"),
         "cross_species": cross_species,
         "conditions": {"ph": None, "temperature_c": None, "buffer": None, "unreported": []},
-        "commentary": candidate.get("conditions"), "scope": [], "chosen_because": None, "spread": None,
+        "commentary": candidate.get("conditions"),
+        "scope": scope_concerns(candidate.get("conditions"), quantity, substrate),
+        "chosen_because": None, "spread": None,
     }
     return contract.sourced(candidate["value"], str(candidate.get("unit") or ""), provenance, ident=ident)
 
