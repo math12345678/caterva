@@ -138,7 +138,7 @@ jobs:
           python -m pip install --upgrade pip "$SETUPTOOLS_PIN"
           python scripts/build_release.py --out dist
           cat dist/SHA256SUMS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: python-artifacts
           path: |
@@ -283,7 +283,7 @@ jobs:
           set -euo pipefail
           python "$GITHUB_WORKSPACE/scripts/build_app.py" --out "$GITHUB_WORKSPACE/dist/app"
           ls -la "$GITHUB_WORKSPACE/dist/app"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: app-${{ matrix.label }}
           path: |
@@ -361,7 +361,7 @@ jobs:
             --tag "$RELEASE_TAG" --notes "docs/releases/$base.md" --out appcast.xml
           python scripts/make_appcast.py --check appcast.xml
           cat appcast.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: update-feed
           path: appcast.xml
