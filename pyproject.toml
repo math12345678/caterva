@@ -173,12 +173,12 @@ exclude = ["caterva.tests", "caterva.tests.*"]
 # Caterva Studio's built page (caterva/studio/static/, written by the Vite
 # build in Science-Agent-Pipeline/artifacts/caterva-studio and not
 # committed). Absent from a wheel built without it; `caterva studio` then
-# serves a page saying how to build it. The enzyme finder's packaged index
-# (caterva/enzymes/data) is read at query time. The literature layer's modules
+# serves a page saying how to build it. The enzyme finder's packaged index, protein names and gene-symbol table
+# (caterva/enzymes/data) are read at query time. The literature layer's modules
 # (caterva/_literature/, copied from Tests/ by scripts/vendor_literature.py,
 # git-ignored) are flat modules imported by caterva.checkout, so they ship as
 # data beside the package rather than as a subpackage.
-caterva = ["core/data/*.json", "core/data/README.md", "enzymes/data/enzyme_index.json.gz", "enzymes/data/NOTICE.txt", "studio/static/*", "studio/static/**/*", "_literature/*.py", "_literature/README.txt"]
+caterva = ["core/data/*.json", "core/data/README.md", "enzymes/data/enzyme_index.json.gz", "enzymes/data/protein_names.json.gz", "enzymes/data/symbols.json", "enzymes/data/NOTICE.txt", "studio/static/*", "studio/static/**/*", "_literature/*.py", "_literature/README.txt"]
 
 [tool.setuptools.exclude-package-data]
 caterva = ["conftest.py", "pytest.ini", ".coverage"]

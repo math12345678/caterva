@@ -259,6 +259,14 @@ def test_the_index_ships_in_the_wheel_and_the_source_distribution():
     assert "caterva/enzymes/data/enzyme_index.json.gz" in manifest
 
 
+def test_every_data_file_the_finder_reads_ships_in_the_wheel_and_the_source_distribution():
+    pyproject = (REPO / "pyproject.toml").read_text(encoding="utf-8")
+    manifest = (REPO / "MANIFEST.in").read_text(encoding="utf-8")
+    for path in sorted((REPO / "caterva" / "enzymes" / "data").iterdir()):
+        assert f"enzymes/data/{path.name}" in pyproject, f"{path.name} is not package data"
+        assert f"caterva/enzymes/data/{path.name}" in manifest, f"{path.name} is not in MANIFEST.in"
+
+
 def test_the_data_notice_names_the_release_the_licence_and_the_modifications():
     text = (REPO / "caterva" / "enzymes" / "data" / "NOTICE.txt").read_text(encoding="utf-8")
     index = load_index()
