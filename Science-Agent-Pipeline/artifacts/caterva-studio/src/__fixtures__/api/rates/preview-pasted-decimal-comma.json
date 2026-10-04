@@ -3,7 +3,7 @@
   "method": "POST",
   "path": "/api/rates/preview",
   "body": {
-   "text": "﻿[S] (ppm)\tv0 (counts/min/min)\r\n0,02\t76\r\n0,02\t47\r\n0,06\t97\r\n0,06\t107\r\n0,11\t123\r\n0,11\t139\r\n0,22\t159\r\n0,22\t152\r\n0,56\t191\r\n0,56\t201\r\n1,10\t207\r\n1,10\t200\r\n\r\n"
+   "text": "\ufeff[S] (ppm)\tv0 (counts/min/min)\r\n0,02\t76\r\n0,02\t47\r\n0,06\t97\r\n0,06\t107\r\n0,11\t123\r\n0,11\t139\r\n0,22\t159\r\n0,22\t152\r\n0,56\t191\r\n0,56\t201\r\n1,10\t207\r\n1,10\t200\r\n\r\n"
   }
  },
  "status": 200,

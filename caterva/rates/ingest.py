@@ -203,7 +203,7 @@ def neutralise_cell(cell: Any) -> Any:
 
 def _lines(text: str, decisions: List[str], fmt: Dict[str, Any]) -> List[Tuple[int, str]]:
     """(line number, line) for every non-blank, non-comment line."""
-    bom = text.startswith("﻿")
+    bom = text.startswith("\ufeff")
     if bom:
         text = text[1:]
         decisions.append("A byte-order mark at the start of the file was ignored.")

@@ -70,7 +70,7 @@ def tables() -> Dict[str, str]:
     messy.insert(3, "")
     return {
         "puromycin": TEXT,
-        "pasted-decimal-comma": "﻿[S] (ppm)\tv0 (counts/min/min)\r\n"
+        "pasted-decimal-comma": "\ufeff[S] (ppm)\tv0 (counts/min/min)\r\n"
         + "\r\n".join(f"{comma(s)}\t{comma(v)}" for s, v in TREATED) + "\r\n\r\n",
         "wide": "[S] (ppm)\trep1 (counts/min/min)\trep2 (counts/min/min)\n"
         + "\n".join(f"{s}\t{vs[0]}\t{vs[1]}" for s, vs in by_s.items()) + "\n",
@@ -83,7 +83,7 @@ def tables() -> Dict[str, str]:
 
 def write(path: Path, body: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(base.neutral(json.dumps(body, indent=1, ensure_ascii=False, allow_nan=False)) + "\n", encoding="utf-8")
+    path.write_text(base.neutral(json.dumps(body, indent=1, ensure_ascii=False, allow_nan=False)).replace("\ufeff", "\\ufeff") + "\n", encoding="utf-8")
     print("wrote", path.relative_to(REPO))
 
 
@@ -125,7 +125,7 @@ def run(app: Any, name: str, request: Dict[str, Any]) -> None:
     }, indent=1, ensure_ascii=False, allow_nan=False).replace(data_dir, "<data dir>")
     path = OUT / f"run-{name}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(base.neutral(text) + "\n", encoding="utf-8")
+    path.write_text(base.neutral(text).replace("\ufeff", "\\ufeff") + "\n", encoding="utf-8")
     print("wrote", path.relative_to(REPO), record["status"], record["outcome"]["meaning"] if record.get("outcome") else "")
 
 

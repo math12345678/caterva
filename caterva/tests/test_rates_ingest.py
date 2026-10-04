@@ -38,7 +38,7 @@ def comma(x: str) -> str:
 
 def pasted(rows=TREATED, header="[S] (ppm)\tv0 (counts/min/min)", decimal=True, eol="\r\n", bom=True) -> str:
     body = eol.join(f"{comma(s) if decimal else s}\t{comma(v) if decimal else v}" for s, v in rows)
-    return ("﻿" if bom else "") + header + eol + body + eol + eol
+    return ("\ufeff" if bom else "") + header + eol + body + eol + eol
 
 
 def engine_view(read):
