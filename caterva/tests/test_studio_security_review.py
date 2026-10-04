@@ -1319,14 +1319,12 @@ def test_s11_the_smoke_checks_the_token_arrangement_over_a_real_socket():
 
 
 def test_s11_swift_typechecks_with_the_build_flags(tmp_path):
-    """Opt in with CATERVA_TEST_SWIFT=1 (it takes a couple of minutes); the DMG workflow compiles the
-    same sources with the same flags on every release."""
+    """Runs wherever a Swift toolchain exists (a Mac with the Command Line Tools); the Linux CI jobs have
+    none and the DMG workflow compiles the same sources with the same flags on macOS."""
     import platform
     import shutil
     import subprocess
 
-    if os.environ.get("CATERVA_TEST_SWIFT") != "1":
-        pytest.skip("set CATERVA_TEST_SWIFT=1 to typecheck the Swift sources")
     if platform.system() != "Darwin" or shutil.which("xcrun") is None:
         pytest.skip("swiftc is only on macOS")
     sources = sorted(str(p) for p in SWIFT_DIR.glob("*.swift"))

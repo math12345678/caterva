@@ -77,6 +77,13 @@ EXPECTED_MAX_SKIPS = 0
 #: A baseline that can be added to but never emptied records a problem
 #: instead of fixing it.
 ALLOWED_SKIPS: dict[str, str] = {
+    "test_s11_swift_typechecks_with_the_build_flags": (
+        "Type-checks the macOS shell's Swift sources, which needs a Swift "
+        "toolchain: the Linux CI jobs have none, so it skips there. It is "
+        "not untested: the studio-dmg workflow compiles the same sources with "
+        "the same flags on a macOS runner, and the test runs for real on any "
+        "Mac. Added 2026-10-04."
+    ),
     "test_popgen_resolver": (
         "Needs `stdpopsim`, which lives in the optional "
         "requirements-popgen.txt. `make setup` installs requirements-dev.txt "
