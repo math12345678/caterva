@@ -1,0 +1,13 @@
+{
+ "request": {
+  "feature": "ask",
+  "question": "What is the Km of hexokinase?"
+ },
+ "status": 409,
+ "body": {
+  "error": {
+   "code": "conflict",
+   "message": "I can only answer about this run, and I don't give values from memory. For a value with its source, use Constants: it looks the value up and cites it."
+  }
+ }
+}

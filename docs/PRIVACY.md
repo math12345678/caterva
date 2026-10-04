@@ -207,7 +207,52 @@ provider's data-processing terms, because this project has no control over
 what they retain or train on.
 
 `scripts/check_llm_disclosure.py` fails the build if the code can call an
-external provider while this section is missing.
+external provider (this resolver, or the Studio assistant below) while the section that covers it is missing.
+
+## Caterva Studio's assistant can send a run's results to an LLM provider, if someone turns it on
+
+Caterva Studio (the desktop app, `caterva studio`) has an optional assistant that can explain a result, draft
+methods text, answer a question about one run, narrate the engine's ranked next measurements and interpret a
+description of a mechanism. It is described in [`docs/studio/ASSISTANT.md`](studio/ASSISTANT.md); the code is
+`caterva/assistant/`.
+
+**It is off by default**, and it is off until a person switches on three things: the assistant (Settings, Assistant),
+each feature they want, and, the first time they use each feature, their agreement to what that feature sends. With
+it off, no request is made and no assistant code builds a payload; a test holds the code to that.
+
+**What is sent**, per call: a fixed system prompt, and the data the feature needs, as one JSON document. For an
+explanation, a methods draft, a question or a next-measurement account, that is a bounded digest of the run's result
+(its figures, units, verdict, concerns, and where each figure came from), plus the question for a question. For
+"describe it" it is the sentence the person typed, the list of mechanism shapes, and enzyme names the finder matched.
+What the person typed or chose to start a run (its title, compound names) is left out unless they tick "include my
+data" for that call. File paths, the home folder, the user name, e-mail addresses and anything shaped like an API key
+are removed before anything is sent. Before the first send of each feature, and whenever asked ("Show exactly what
+will be sent"), the page shows the real request, byte for byte, and the server sends exactly that. A status-line
+indicator reads "Assistant active: sends to <provider>" whenever data can leave.
+
+**Where it goes:** to the provider the person chooses (Anthropic, OpenAI, Groq, OpenRouter or Mistral), under **their
+terms** and retention policy, not Caterva's. Or to a model on the same computer (an OpenAI-compatible server at a
+loopback address, such as Ollama), in which case nothing leaves the machine and the page says so. Offline mode blocks
+every provider except a local one.
+
+**The key:** never in the repository, a `.env` file, the data folder, a run record, a bundle, a log, the page, a
+command line or an error message. On macOS the app keeps it in the login Keychain and gives it to the server over a
+private pipe; the server holds it in memory only. In a browser or development run it comes from the
+`CATERVA_ASSISTANT_KEY` environment variable.
+
+**What is recorded:** every call (provider, model, the exact payload sent, the reply, the result of the check on it,
+accepted or rejected, the time, and the person's confirmation) in that run's record and in `assistant/calls.jsonl` in
+the data folder, and in the run's bundle when it is exported. Nothing is sent anywhere else, and Caterva keeps no
+chat history beyond the run.
+
+| | |
+|---|---|
+| default install | nothing leaves the machine |
+| assistant on, a provider chosen, a feature agreed to | that feature's payload goes to the provider, under **their** terms, as shown in the preview |
+| assistant on with a model on this computer | nothing leaves the machine |
+
+Everything the assistant writes is checked against the run's own result before it is shown (`caterva/assistant/
+grounding.py`); that check protects the correctness of what is shown, not the privacy of what was sent.
 
 ## What is deliberately not claimed here
 

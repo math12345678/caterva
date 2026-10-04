@@ -14,13 +14,15 @@
  * fields and waits for the button.
  */
 import { useQuery } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { attachAssistantCalls } from "@/api/assistant";
 import { apiJson, apiPost } from "@/api/client";
 import { isCompleteEc, subjectFields } from "@/api/enzymes";
 import { plain } from "@/lib/copy";
 import type { ComposeAnalyses, ComposeRequest, NormaliseOrganismResponse, ShapesResponse } from "@/api/types";
 import { useRun } from "@/api/useRun";
+import { DescribeAssist, type DescribeUse } from "@/components/assistant/DescribeAssist";
 import { Disclosure } from "@/components/forms/Disclosure";
 import { Checkbox, Field, fieldError, NumberInput, parseNumber, TextInput } from "@/components/forms/Field";
 import { EnzymeFinder } from "@/components/enzyme/EnzymeFinder";
@@ -205,6 +207,24 @@ export default function ComposeScreen() {
   );
   useRunAddress("/compose", run.run, reopened);
 
+  // A proposal the person confirmed (the assistant's, checked by the engine) becomes an ordinary request; once the
+  // run exists the calls that led to it are attached to its record.
+  const proposalCalls = useRef<string[]>([]);
+  const applyProposal = (use: DescribeUse) => {
+    const next = composeForm(use.request);
+    setForm(next);
+    proposalCalls.current.push(use.callId);
+    void run.submit(composeRequest(next));
+  };
+  const runId = run.run?.id;
+  useEffect(() => {
+    if (runId && proposalCalls.current.length) {
+      const calls = proposalCalls.current;
+      proposalCalls.current = [];
+      void attachAssistantCalls(runId, calls).catch(() => undefined);
+    }
+  }, [runId]);
+
   const readOrganism = () => {
     const name = form.organism.trim();
     if (!name) return setOrganismNote(null);
@@ -369,6 +389,7 @@ export default function ComposeScreen() {
             exports={composeExports}
             onRetry={() => void run.submit(composeRequest(form))}
             onChooseEnzyme={chooseEnzyme}
+            refusalExtra={<DescribeAssist description={form.description} onUse={applyProposal} />}
             idle={
               <EmptyState title="Describe a mechanism, not a pathway">
                 <p>

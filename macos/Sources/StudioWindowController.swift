@@ -23,6 +23,10 @@ final class StudioWindowController: NSWindowController, NSWindowDelegate, WKNavi
     private static let zoomSteps: [CGFloat] = [0.75, 0.85, 1.0, 1.1, 1.25, 1.5, 1.75]
 
     var onRestart: (() -> Void)?
+    var assistantKeys: AssistantKeyBridge? {
+        get { bridge.assistantKeys }
+        set { bridge.assistantKeys = newValue }
+    }
 
     private let isDevelopment: Bool
     private let container = NSView()

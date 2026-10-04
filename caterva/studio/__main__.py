@@ -284,8 +284,13 @@ def stdin_is_pipe(fd: int = 0) -> bool:
 
 
 def watch_parent(stop: threading.Event, *, stdin_fd: Optional[int] = 0,
-                 getppid: Callable[[], int] = os.getppid, poll_s: float = PARENT_POLL_S) -> List[threading.Thread]:
-    """Set `stop` when the launching process goes (module docstring, "How it stops")."""
+                 getppid: Callable[[], int] = os.getppid, poll_s: float = PARENT_POLL_S,
+                 on_control: Optional[Callable[[dict], Any]] = None) -> List[threading.Thread]:
+    """Set `stop` when the launching process goes (module docstring, "How it stops").
+
+    When stdin is the shell's pipe it also carries CONTROL LINES: one JSON object per line with a
+    `caterva_control` member (docs/studio/CONTRACT.md 22, "The assistant key"). A line is handed to
+    `on_control` and never logged; any other bytes are discarded as before."""
     threads: List[threading.Thread] = []
     first = getppid()
 
@@ -299,9 +304,24 @@ def watch_parent(stop: threading.Event, *, stdin_fd: Optional[int] = 0,
 
     if stdin_fd is not None and stdin_is_pipe(stdin_fd):
         def pipe() -> None:
+            buffered = b""
             try:
-                while os.read(stdin_fd, 4096):
-                    pass
+                while True:
+                    chunk = os.read(stdin_fd, 65536)
+                    if not chunk:
+                        break
+                    if on_control is None:
+                        continue
+                    buffered = (buffered + chunk)[-(1 << 20):]
+                    while b"\n" in buffered:
+                        line, buffered = buffered.split(b"\n", 1)
+                        if b"caterva_control" in line:
+                            try:
+                                message = json.loads(line.decode("utf-8"))
+                            except ValueError:
+                                continue
+                            if isinstance(message, dict):
+                                on_control(message)
             except OSError:
                 pass
             if not stop.is_set():
@@ -360,7 +380,7 @@ def serve(args: argparse.Namespace, prog: str, out: TextIO, err: TextIO, *,
                 threading.Thread(target=_open_browser, args=(app, workspace.root), name="caterva-studio-browser",
                                  daemon=True).start()
             if watch:
-                watch_parent(stop)
+                watch_parent(stop, on_control=app.assistant.on_control)
             if on_serving is not None:
                 on_serving(app)
             code = 0

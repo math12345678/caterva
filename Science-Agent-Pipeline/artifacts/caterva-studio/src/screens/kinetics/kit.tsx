@@ -23,6 +23,7 @@ import { downloadFrom } from "@/api/client";
 import { downloadArtifact, downloadBundle } from "@/api/runs";
 import type { RunKind, RunRecord, RunResults } from "@/api/types";
 import type { RunState } from "@/api/useRun";
+import { RunAssistant } from "@/components/assistant/RunAssistant";
 import { Disclosure } from "@/components/forms/Disclosure";
 import { FormActions, useRequiredCheck } from "@/components/forms/Field";
 import { Split } from "@/components/layout/Split";
@@ -350,6 +351,7 @@ export function KineticsRun<K extends RunKind>({
   retryVerb,
   onChooseEnzyme,
   onChooseCompound,
+  refusalExtra,
   children,
 }: {
   state: RunState<K> & { cancel: () => Promise<void> };
@@ -364,6 +366,8 @@ export function KineticsRun<K extends RunKind>({
   onChooseEnzyme?: (ec: string) => void;
   /** Fills the form's Inhibitor field with a compound a refusal says has a measurement. */
   onChooseCompound?: (name: string) => void;
+  /** Shown inside a refusal (Compose: the assistant's help reading a description). */
+  refusalExtra?: ReactNode;
   children: (result: RunResults[K], run: RunRecord) => ReactNode;
 }) {
   const top = useRef<HTMLDivElement>(null);
@@ -395,6 +399,7 @@ export function KineticsRun<K extends RunKind>({
         <div className="k-result">
           <RunToolbar path={path} run={run} exports={exports ? exports(result, run) : []} />
           {children(result, run)}
+          <RunAssistant run={run} result={result} />
           <div className="k-result-foot">
             <RunFiles run={run} />
             <Disclosure title="The same run in a terminal">
@@ -410,6 +415,7 @@ export function KineticsRun<K extends RunKind>({
           retryVerb={retryVerb}
           onChooseEnzyme={onChooseEnzyme}
           onChooseCompound={onChooseCompound}
+          refusalExtra={refusalExtra}
           idle={idle}
         >
           {() => null}

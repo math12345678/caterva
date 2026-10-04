@@ -107,6 +107,7 @@
   --prov-computed: var(--muted);
   --prov-placeholder: var(--caution);
   --prov-chosen: var(--fg);
+  --prov-ai: var(--muted);
 
   /* Chart series (charts/theme.tsx). Odd series are dark and even ones mid,
      so neighbours differ by 3:1 or more in luminance as well as in hue, and

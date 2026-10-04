@@ -22,6 +22,8 @@ import { EmptyState, ErrorState, OutcomeNotice, RunFailedState } from "@/compone
 import { humaniseStage, plain } from "@/lib/copy";
 import { elapsed } from "@/lib/format";
 
+import { RunAssistant } from "@/components/assistant/RunAssistant";
+
 function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -150,6 +152,7 @@ export function RunPanel<K extends RunKind>({
   retryVerb,
   onChooseEnzyme,
   onChooseCompound,
+  refusalExtra,
   idle,
   children,
 }: {
@@ -162,6 +165,8 @@ export function RunPanel<K extends RunKind>({
   onChooseEnzyme?: (ec: string) => void;
   /** Fills the form's Inhibitor field with a compound a refusal says has a measurement. */
   onChooseCompound?: (name: string) => void;
+  /** Shown inside a refusal (Compose offers the assistant's help to read a description the grammar refused). */
+  refusalExtra?: ReactNode;
   /** Shown before anything was submitted. */
   idle?: ReactNode;
   /** The screen's drawing of a finished result. */
@@ -230,8 +235,10 @@ export function RunPanel<K extends RunKind>({
         <div className="run-finished">
           <OutcomeNotice outcome={state.outcome} onRetry={onRetry} again={retryVerb} onChooseCompound={onChooseCompound}>
             {state.outcome?.name_refusal ? <NameRefusalChoices refusal={state.outcome.name_refusal} onChoose={onChooseEnzyme} /> : null}
+            {state.outcome?.meaning === "refused" ? refusalExtra : null}
           </OutcomeNotice>
           {state.result !== null ? children(state.result) : null}
+          {state.result !== null && state.run ? <RunAssistant run={state.run} result={state.result} /> : null}
           {command}
         </div>
       );

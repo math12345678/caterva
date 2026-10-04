@@ -1,0 +1,37 @@
+{
+ "request": {
+  "call_id": "5f0978bd7644bfa8",
+  "payload_sha256": "5c787768f5501b359fee4427f9b5e8e4979cec721e21b4877dac2eb87c4755ac",
+  "consent": true
+ },
+ "status": 200,
+ "body": {
+  "call_id": "5f0978bd7644bfa8",
+  "feature": "methods",
+  "outcome": "accepted",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "local": false,
+  "latency_ms": 0,
+  "content": {
+   "reply": {
+    "text": "The Km was 0.03 mM (BRENDA ref 286469) and the Ki was 0.0014 mM (BRENDA ref 711801), both measured; kcat was a placeholder of 100 1/s."
+   },
+   "kind": "ai"
+  },
+  "rejection": null,
+  "error": null,
+  "fallback": {
+   "text": "## Methods\n\nThe model `michaelis_menten_with_a_competitive_inhibitor` was assembled with Caterva's compositional model builder from 1 motif instance(s) -- competitive_inhibition -- giving 4 species, 1 reaction(s) and 3 parameter(s). The structure was composed from the description \"Michaelis-Menten with a competitive inhibitor\". Constants were sought for 1.1.1.27.\n\n- inhibitor competing for the active site: apparent Km rises by (1 + I/Ki), kcat is untouched.\n- Read --organism 'human' as Homo sapiens.\n- 2 constant(s) resolved from the literature: reaction_Ki, reaction_Km. 1 still the motif library's placeholder (reaction_kcat): the search ran and returned nothing for them, which is different from their not having been looked for.\n\nThe following are conserved and were derived from the model's own stoichiometry rather than asserted: `reaction_S + reaction_P`, `reaction_E`, `reaction_I`.\n\n### Assumptions each motif carries\n\n- **competitive_inhibition** -- The inhibitor binds free enzyme only, so it raises the apparent Km by (1 + [I]/Ki) and leaves kcat untouched. That signature -- Vmax unchanged, Km inflated -- is what distinguishes competitive from uncompetitive inhibition on a Lineweaver-Burk plot.\n\n### Where every constant came from\n\n**LITERATURE-DERIVED (2 of 3).** Each of the following was taken from the cited source; Caterva recorded the citation and did not verify that the source reports the value:\n\n- `reaction_Km` = 0.03 mM (BRENDA ref 286469, measured in Homo sapiens)\n  - The values disagree: 2 sources report 2 values (BRENDA ref 286442, 286469), spanning 0.03 to 0.398 mM (13.3-fold); this model carries 0.03, the resolver's pick, not a verdict; which one is right is a question about the papers. The range is not an uncertainty estimate: it is bounded by which rows are in the database.\n- `reaction_Ki` = 0.0014 mM (BRENDA ref 711801, measured in Homo sapiens)\n  - The row measured isoform LDH-B; if the enzyme you mean is another isoform, this is a different protein's constant.\n  - The row states no inhibition mode, so whether it is the competitive constant this model uses is unknown.\n  - The values disagree: one source (BRENDA ref 711801) reports 3 values, spanning 0.0014 to 0.0042 mM (3-fold); this model carries 0.0014, the resolver's pick, not a verdict; two rows from one publication usually differ in the conditions or the exact substrate, so read that paper before choosing. The range is not an uncertainty estimate: it is bounded by which rows are in the database.\n\n**ILLUSTRATIVE PLACEHOLDERS (1 of 3). These are not measurements. No publication supplies them and nobody measured them; they are Caterva's motif library values, present so that the structure could be checked, dimensioned and simulated:**\n\n- `reaction_kcat` = 100 1/s -- competitive_inhibition.kcat; the kcat table would supply it\n\nAny result that depends on these values is a statement about the shape of the mechanism rather than about a particular real system, and should be read as on"
+  },
+  "grounding": {
+   "ok": true,
+   "failures": [],
+   "checked": {
+    "citation": 2,
+    "number": 3
+   }
+  },
+  "run_id": "20261004-222110-compose-6bf8a05d"
+ }
+}

@@ -1,10 +1,10 @@
 /**
- * The key to the five marks, in the same order everywhere. A screen shows
+ * The key to the six marks (the engine's five and the assistant's), in the same order everywhere. A screen shows
  * it once, near the first table of numbers; with `counts` it also says how
  * many of each kind the screen holds, so "three placeholders" is visible
  * before anyone opens a number.
  */
-import type { ProvenanceKind, SourcedValue } from "@/api/types";
+import type { MarkKind, ProvenanceKind, SourcedValue } from "@/api/types";
 
 import { PROVENANCE_MEANING, PROVENANCE_ORDER, ProvenanceMark, provenanceLabel } from "./ProvenanceMark";
 
@@ -20,10 +20,10 @@ export function ProvenanceLegend({
   layout = "row",
   only,
 }: {
-  counts?: Partial<Record<ProvenanceKind, number>>;
+  counts?: Partial<Record<MarkKind, number>>;
   layout?: "row" | "stack";
   /** Show only these kinds (those that occur on the screen). */
-  only?: readonly ProvenanceKind[];
+  only?: readonly MarkKind[];
 }) {
   const kinds = PROVENANCE_ORDER.filter((k) => (only ? only.includes(k) : true));
   return (

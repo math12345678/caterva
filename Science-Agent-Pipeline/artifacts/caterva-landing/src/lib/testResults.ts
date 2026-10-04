@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "155 test files -- kinetics & Michaelis-Menten correctness, " +
+          "163 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -223,8 +223,15 @@ export const TEST_SUITES: TestSuite[] = [
         // test_enzyme_source.py, both passing): 6074. Then the certificate
         // fix for the packaged app: 12 tests in test_tls.py, all passing in
         // a focused run on the branch (2026-10-04), which also ran the 743
-        // other studio, app and complex tests it could affect: 6086.
-        passed: 6086,
+        // other studio, app and complex tests it could affect: 6086. Then
+        // Studio's assistant: 388 new tests in 8 files (grounding, intents,
+        // injection, redaction, providers, service, policy, the disclosure
+        // guard), all passing in a focused run on the branch (2026-10-04),
+        // which also ran the 493 studio and certificate tests it could
+        // affect (881 passed in all). The rest of the suite was NOT re-run
+        // here: a full run of caterva/ stalled at 32% in this sandbox. So the
+        // figure is the earlier 6086 plus the 388 measured: 6474.
+        passed: 6474,
         skipped: 1,
         failed: 0,
       },

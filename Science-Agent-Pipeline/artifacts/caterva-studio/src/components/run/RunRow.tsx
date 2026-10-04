@@ -4,6 +4,8 @@
  */
 import { Link } from "wouter";
 
+import { ProvenanceMark } from "@/components/provenance/ProvenanceMark";
+
 import type { RunSummary } from "@/api/types";
 import { RunStatusMark, runStatusLabel } from "@/components/shell/RunStatusMark";
 
@@ -40,11 +42,14 @@ export function RunRow({
   href,
   selected = false,
   onSelect,
+  assisted = false,
 }: {
   run: RunSummary;
   href?: string;
   selected?: boolean;
   onSelect?: () => void;
+  /** The run used the assistant (History marks it with the `ai` mark). */
+  assisted?: boolean;
 }) {
   const body = (
     <>
@@ -57,6 +62,13 @@ export function RunRow({
       <span className="run-row-time">{formatWhen(run.created_at)}</span>
       <span className="run-row-sub">
         <span className="font-mono">{run.kind}</span> · {outcomeLine(run)}
+        {assisted ? (
+          <span className="run-row-ai" title="This run used an assistant">
+            {" "}
+            <ProvenanceMark provenance={{ kind: "ai" }} />
+            <span className="sr-only"> used an assistant</span>
+          </span>
+        ) : null}
       </span>
     </>
   );

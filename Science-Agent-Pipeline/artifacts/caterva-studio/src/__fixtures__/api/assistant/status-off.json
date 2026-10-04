@@ -1,0 +1,99 @@
+{
+ "request": null,
+ "status": 200,
+ "body": {
+  "state": "off",
+  "indicator": "Assistant off",
+  "leaves_machine": false,
+  "destination": {
+   "host": "api.anthropic.com",
+   "local": false,
+   "label": "Anthropic"
+  },
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "providers": [
+   {
+    "name": "anthropic",
+    "label": "Anthropic",
+    "local": false,
+    "needs_key": true
+   },
+   {
+    "name": "openai",
+    "label": "OpenAI",
+    "local": false,
+    "needs_key": true
+   },
+   {
+    "name": "groq",
+    "label": "Groq",
+    "local": false,
+    "needs_key": true
+   },
+   {
+    "name": "openrouter",
+    "label": "OpenRouter",
+    "local": false,
+    "needs_key": true
+   },
+   {
+    "name": "mistral",
+    "label": "Mistral",
+    "local": false,
+    "needs_key": true
+   },
+   {
+    "name": "local",
+    "label": "A model on this computer",
+    "local": true,
+    "needs_key": false
+   }
+  ],
+  "key": {
+   "present": false,
+   "needed": true,
+   "source": null,
+   "provider": "anthropic",
+   "note": null
+  },
+  "features": {
+   "describe": {
+    "label": "Describe it (Compose)",
+    "on": false,
+    "sends": "The sentence you typed, the list of mechanism shapes Caterva can build, and enzyme names the finder matched.",
+    "consented_at": null
+   },
+   "explain": {
+    "label": "Explain this result",
+    "on": false,
+    "sends": "The run's result (its figures, units, verdict, concerns, and where each figure came from).",
+    "consented_at": null
+   },
+   "methods": {
+    "label": "Draft my methods",
+    "on": false,
+    "sends": "The run's result and Caterva's own methods text for it.",
+    "consented_at": null
+   },
+   "ask": {
+    "label": "Ask this run",
+    "on": false,
+    "sends": "Your question and the run's result.",
+    "consented_at": null
+   },
+   "next": {
+    "label": "What should I measure next",
+    "on": false,
+    "sends": "The run's ranked next measurements, with their figures.",
+    "consented_at": null
+   }
+  },
+  "spend": {
+   "remaining": 20,
+   "max_calls_per_hour": 20,
+   "max_tokens": 1024
+  },
+  "note": null
+ }
+}

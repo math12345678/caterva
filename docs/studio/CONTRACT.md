@@ -431,6 +431,38 @@ present), `events.jsonl`, `artifacts/<name>` for each artifact,
 run in a terminal, and `README.txt` saying what each file is (amended by
 core).
 
+### Assistant
+
+The assistant (docs/studio/ASSISTANT.md) is off until a person switches it on. These routes are core-owned
+(`caterva/assistant/service.py`) and none of them takes or returns a key.
+
+`GET /api/assistant/status` -> `AssistantStatus` `{state, indicator, leaves_machine, destination, provider, model,
+providers, key: {present, needed, source, note}, features, spend, note}`. `state` is one of `off`, `blocked`
+(offline mode), `needs_key`, `needs_model`, `idle`, `ready`. `indicator` is the sentence the status bar shows
+("Assistant active: sends to api.anthropic.com", "Assistant off"). `key.source` is `keychain`, `environment` or
+null; the value of a key is never an answer.
+
+`GET /api/assistant/settings` -> `AssistantSettings`; `PUT /api/assistant/settings` takes a partial object
+(`enabled`, `provider`, `models`, `model_lists`, `local_url`, `local_only`, `features`, `max_calls_per_hour`,
+`max_tokens`); an unknown key (a key field included) is 400. `local_url` must be a loopback address.
+
+`POST /api/assistant/prepare` with `{feature, run_id?, text?, question?, include_data?}` -> `AssistantPreview`:
+the exact payload a send would transmit, after redaction (`payload`, its `payload_sha256`, the `destination`).
+Nothing is sent. 409 when the assistant, the feature, a key or a model is not ready, or a question is one it
+refuses (clinical, a value from memory, an action).
+
+`POST /api/assistant/send` with `{call_id, payload_sha256, consent?}` -> `AssistantAnswer`. Sends exactly the
+prepared bytes. 409 `consent` until the person has agreed to what the feature sends (first use), 409 when the
+hash is not the one prepared. The answer's `outcome` is `accepted`, `rejected` (schema, intent, grounding or an
+unranked choice; `rejection` says which tokens failed), `declined`, `cancelled` or `error` (provider failure,
+in `error`); `fallback` is the engine's own text for the same question.
+
+`POST /api/assistant/cancel` with `{call_id}`; `POST /api/assistant/confirm` with `{call_id, event, choices?}`
+(a proposal is confirmed, optionally with the person's edits, and the answer is the compose request to submit,
+with a `chosen` provenance naming the assistant as the source of the suggestion); `GET /api/assistant/log`
+(`?run_id=`) the audit records and methods sentences; `GET /api/assistant/runs` the run ids that used the
+assistant; `POST /api/assistant/attach` with `{run_id, call_ids}`; `POST /api/assistant/forget-consent` with `{}`.
+
 ### Development
 
 `GET /api/dev/session` -> `DevSession` `{token, api_version}`. Exists only
@@ -570,6 +602,13 @@ from a name.
 | `placeholder` | stands in for a measurement nobody has made here | `reason`: the library's own sentence (`ParameterOrigin.sentence()`, the resolver's not-found text); `contract.placeholder` refuses an empty one | `table` (the database table that would supply it) |
 | `chosen` | somebody chose it | `by`: `user` (in this request) or `default` (a stated default of the command: an argparse default, a motif's starting amount) | `reason` |
 
+**The sixth mark, `ai`, is not an engine kind.** No adapter emits it and `PROVENANCE_KINDS` is the five above.
+It marks text a language model wrote or a value it suggested: "suggested by an assistant, not a measurement"
+(`ASSISTANT_PROVENANCE_KIND` in contract.py; the page's `ProvenanceKind` union adds it). Text with this mark is
+shown only after the grounding check passed (ASSISTANT.md 3), always beside the engine's own text, never styled
+as a verdict. Once a person confirms a suggestion, the resulting engine value is `chosen` with `by: user`, a
+`reason` naming the assistant and a `suggested_by` object `{assistant, provider, call_id}`.
+
 Helpers in contract.py, used by every adapter: `sourced`, `computed`,
 `chosen`, `placeholder`, `fitted`, `measured_from_measurement`,
 `from_parameter_origin` (compose: transcribes `export.provenance_of`, the
@@ -615,6 +654,8 @@ Default data dir: macOS `~/Library/Application Support/Caterva`; Linux
 ```
 <data dir>/
   settings.json                  Settings
+  assistant.json                 the assistant's settings and per-feature consent (0600); never a key
+  assistant/calls.jsonl          the per-call log of every assistant call
   studio.log                     server log; rotated at 5 MB, one old copy kept
   instances/<id>.lock            held by each running server (amended by core: a run is
                                  marked interrupted only when its owner's lock is free)
@@ -625,6 +666,8 @@ Default data dir: macOS `~/Library/Application Support/Caterva`; Linux
     result.json                  the kind's Result, when one was produced
     events.jsonl                 {"event": name, "data": {...}} per line, in seq order
     owner                        the instance id of the server running it (amended by core)
+    assistant.jsonl              every assistant call for this run: provider, model, the exact payload sent
+                                 (redacted), response, grounding result, outcome, confirmation; never a key
     artifacts/<name>             every file listed in run.artifacts
     md-setup/                    md.setup's default output directory
 ```
@@ -820,7 +863,12 @@ Command Line Tools (no Xcode project).
   purpose, extensions}` with an absolute path or null (NSOpenPanel), and
   `{action: "reveal", path}` (NSWorkspace). The page's side is
   `src/lib/desktop.ts`; in a plain browser the page falls back to a text
-  field for the path.
+  field for the path. Three more messages carry the assistant's key (section
+  22.9): `{action: "setAssistantKey", provider, key}` stores it in the login
+  Keychain and sends it to the server's stdin, `{action:
+  "clearAssistantKey", provider}` removes it, and `{action:
+  "assistantKeyStatus", provider}` answers `"present"` or `"absent"`, never
+  the value (`macos/Sources/AssistantKeychain.swift`).
 - If the server process exits, a native error view replaces the web view
   with the exit status, the last stderr lines and a Restart button.
 - Quit: close stdin, SIGTERM, wait 5 s, SIGKILL.
@@ -905,6 +953,7 @@ colour second so it survives greyscale:
 | computed | small square; hover/focus shows method and inputs |
 | placeholder | lighter ring in four coarse dashes, in the caution colour; hover/focus shows the reason |
 | chosen | filled diamond (ink) when the user chose it; outlined diamond with a tick, in the caution colour, when a stated default did |
+| ai | open hexagon with a small centre dot, drawn in the muted ink: "suggested by an assistant, not a measurement". Used only on assistant text and unconfirmed suggestions; a number never wears it, because an assistant never authors one |
 
 Marks are drawn at 12 px at the least (`MARK_SIZE`), the smallest size at
 which a dashed ring and a solid ring, and a filled and an outlined diamond,
@@ -1235,3 +1284,25 @@ port 0 and port 99999 are exit 2).
 pipe, the page's memory and the workspace itself; the token does not claim to stop
 it. Nothing in the studio verifies that a `gmx` is GROMACS beyond its name, owner,
 permissions and the `GROMACS version:` line it prints.
+
+**22.9 The assistant key.** A provider key is never in the repository, a `.env`, the data folder, a run record, a
+bundle, a log, the page, an argument vector or an error message. On macOS the shell keeps it in the login Keychain
+(service `org.caterva.assistant`, one item per provider) and hands it to the server over the private channel it
+already holds open: one JSON line on the server's stdin, `{"caterva_control": "assistant_key", "provider": "...",
+"key": "..."}` at launch (after the URL line is read) and whenever the key changes, and `{"caterva_control":
+"assistant_key_clear", "provider": "..."}` to remove it (`__main__.watch_parent`). A line without `caterva_control`
+is discarded as before; a control line is never logged. The server keeps the key in memory only
+(`caterva/assistant/config.KeyStore`); `GET /api/assistant/status` says present or absent and where it came from.
+There is no HTTP route that accepts a key. In a browser or development run the key may come from the environment
+variable `CATERVA_ASSISTANT_KEY` only, and Settings says so. Every error and log line is scrubbed of key shapes
+(`sk-`, `sk-ant-`, `gsk_`, `AIza`, long hexadecimal runs, bearer tokens) and of the exact key held
+(`redact.scrub`). The shell's bridge messages are `setAssistantKey`, `clearAssistantKey` and `assistantKeyStatus`
+(section 16): the first takes a key from the Settings field once and the page clears the field; the last answers
+`present` or `absent` and nothing else.
+
+**22.10 What the assistant sends.** Nothing, unless the assistant is on, the feature is on and the person has agreed
+to that feature's payload; then exactly the bytes shown in the preview (`payload_sha256`), after redaction of file
+paths, the home folder, the user name, e-mail addresses and key shapes, and without the person's own input to the
+run unless they ticked "include my data" for that call. The provider's own terms govern what it does with it
+(docs/PRIVACY.md). A model on this computer (loopback only) sends nothing off the machine. The model has no tools:
+the server performs every action, after a click.

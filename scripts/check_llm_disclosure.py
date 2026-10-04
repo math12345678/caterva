@@ -72,10 +72,12 @@ RESOLVER = (
     / "src" / "lib" / "llmResolver.ts"
 )
 PRIVACY = REPO / "docs" / "PRIVACY.md"
+#: Caterva Studio's assistant (docs/studio/ASSISTANT.md): its provider layer is where user text can leave.
+STUDIO_PROVIDERS = REPO / "caterva" / "assistant" / "providers.py"
 
 #: Evidence the module can reach an external provider.
 CALLS_OUT = [
-    re.compile(r"https://api\.(openai|groq|mistral)\.", re.I),
+    re.compile(r"https://api\.(openai|groq|mistral|anthropic)\.", re.I),
     re.compile(r"https://openrouter\.ai/", re.I),
     re.compile(r"\bchat/completions\b"),
 ]
@@ -91,6 +93,29 @@ REQUIRED = [
     (re.compile(r"their terms|provider'?s?\s+(data|terms)|retention", re.I),
      "that the provider's terms govern it, not Caterva's"),
 ]
+
+
+#: What PRIVACY.md must say about Studio's assistant once its provider layer can reach a provider: that it is
+#: named, that it is off by default, what is sent and that it can be previewed, that the key is not stored in
+#: the repository or data folder, and that a local model keeps data on the machine.
+STUDIO_REQUIRED = [
+    (re.compile(r"Caterva Studio'?s assistant", re.I), "that Studio's assistant is named as a way text can leave"),
+    (re.compile(r"off by default", re.I), "that the assistant is OFF by default"),
+    (re.compile(r"What is sent", re.I), "what is sent, per call"),
+    (re.compile(r"exactly that|byte for byte", re.I), "that the preview is what is sent"),
+    (re.compile(r"their\s+terms", re.I), "that the provider's terms govern it"),
+    (re.compile(r"key.{0,200}(never|not).{0,200}(repository|\.env)", re.I | re.S),
+     "that the key is not in the repository or a .env"),
+    (re.compile(r"(model on the same computer|local model).{0,300}nothing leaves", re.I | re.S),
+     "that a local model keeps data on the machine"),
+]
+
+
+def studio_can_call_out() -> bool:
+    if not STUDIO_PROVIDERS.exists():
+        return False
+    code = _strip_comments(STUDIO_PROVIDERS.read_text(encoding="utf-8"))
+    return any(pattern.search(code) for pattern in CALLS_OUT) or "chat/completions" in code
 
 
 def _strip_comments(text: str) -> str:
@@ -131,6 +156,20 @@ def selftest() -> int:
         if any(p.search(_strip_comments(sample)) for p in CALLS_OUT):
             failures.append(f"outbound call wrongly detected: {sample!r}")
 
+    studio_complete = (
+        "Caterva Studio's assistant is off by default. What is sent is shown byte for byte, exactly that. "
+        "It goes to a provider under their terms. The key is never in the repository or a .env file. "
+        "With a model on the same computer nothing leaves the machine."
+    )
+    for pattern, what in STUDIO_REQUIRED:
+        if not pattern.search(studio_complete):
+            failures.append(f"a complete Studio disclosure read as missing {what}")
+    studio_silent = "The assistant is mentioned somewhere."
+    if all(pattern.search(studio_silent) for pattern, _ in STUDIO_REQUIRED):
+        failures.append("an empty Studio disclosure read as complete")
+    if not any(p.search('const url = "https://api.anthropic.com/v1/messages";') for p in CALLS_OUT):
+        failures.append("an Anthropic outbound call was not detected")
+
     complete = (
         "An LLM provider can be called. It is off by default. The query text "
         "is sent. The provider's terms and retention govern it."
@@ -148,7 +187,7 @@ def selftest() -> int:
     print(
         f"SELFTEST OK: {len(calling)} outbound form(s) detected, "
         f"{len(not_calling)} comment(s) about outbound calls ignored, and "
-        f"{len(REQUIRED)} disclosure clause(s) detectable."
+        f"{len(REQUIRED)} resolver + {len(STUDIO_REQUIRED)} Studio disclosure clause(s) detectable."
     )
     return 0
 
@@ -156,6 +195,23 @@ def selftest() -> int:
 def main() -> int:
     if "--selftest" in sys.argv:
         return selftest()
+
+    studio = studio_can_call_out()
+    if studio:
+        if not PRIVACY.exists():
+            print("FAIL: Studio's assistant can send text to a provider and docs/PRIVACY.md does not exist.")
+            return 1
+        doc_text = PRIVACY.read_text(encoding="utf-8")
+        studio_missing = [w for p, w in STUDIO_REQUIRED if not p.search(doc_text)]
+        if studio_missing:
+            print(f"Caterva Studio's assistant (caterva/assistant/providers.py) can send text to an external provider, "
+                  f"and docs/PRIVACY.md is missing {len(studio_missing)} part(s):\n")
+            for what in studio_missing:
+                print(f"  - {what}")
+            return 1
+        print("OK: Studio's assistant can reach an external provider, and docs/PRIVACY.md says it is off by default, "
+              "what is sent, that\n    the provider's terms govern it, that the key is not stored, and that a local "
+              "model keeps data on the machine.")
 
     if not can_call_out():
         print(
