@@ -225,7 +225,7 @@ def test_no_command_keeps_a_private_copy_of_the_decision():
     for root in ("caterva", "scripts", "Science-Agent-Pipeline/artifacts/api-server/src/lib", "Tests"):
         for path in (REPO / root).rglob("*.py"):
             rel = path.relative_to(REPO).as_posix()
-            if rel in allowed or "/tests/" in rel or path.name.startswith("test_"):
+            if rel in allowed or "/tests/" in rel or "/_literature/" in rel or path.name.startswith("test_"):
                 continue
             if "fetch_ec_numbers_by_name(" in path.read_text(encoding="utf-8", errors="replace"):
                 offenders.append(rel)

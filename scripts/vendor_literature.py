@@ -40,6 +40,7 @@ Usage:
     python3 scripts/vendor_literature.py            # write caterva/_literature/
     python3 scripts/vendor_literature.py --check    # exit 1 if it is missing or stale
     python3 scripts/vendor_literature.py --list     # print the closure
+    python3 scripts/vendor_literature.py --remove   # delete caterva/_literature/
 """
 from __future__ import annotations
 
@@ -213,13 +214,33 @@ def vendor() -> list[str]:
     return sorted(n[:-3] for n in want if n.endswith(".py"))
 
 
+def remove() -> bool:
+    """Delete caterva/_literature/, which only a build needs. True if it was there.
+
+    The copies duplicate Tests/ modules, so anything that scans caterva/ for
+    sources (a guard, a test that greps for a function name) would see every
+    literature module twice. build_release.py removes them as soon as the
+    sdist, which carries them into the wheel, has been built.
+    """
+    import shutil
+
+    if not TARGET.is_dir():
+        return False
+    shutil.rmtree(TARGET)
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--check", action="store_true", help="exit 1 if caterva/_literature/ is missing or stale")
     parser.add_argument("--list", action="store_true", help="print the closure and exit")
+    parser.add_argument("--remove", action="store_true", help="delete caterva/_literature/ and exit")
     args = parser.parse_args(argv)
     if args.list:
         print("\n".join(closure()))
+        return 0
+    if args.remove:
+        print(f"removed {_shown(TARGET)}/" if remove() else f"{_shown(TARGET)}/ was not there")
         return 0
     if args.check:
         found = problems()

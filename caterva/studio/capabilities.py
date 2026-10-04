@@ -3,9 +3,11 @@
 WHY THE PAGE ASKS FIRST
 -----------------------
 The same studio runs from a source checkout (the literature layer in
-`Tests/` is there, `gmx` is on PATH), from the downloadable app (no
-literature layer, a GUI app's short PATH), and on a laptop in a lecture
-hall with no network. A page that offered a BRENDA search it could not run
+`Tests/` is there, `gmx` is on PATH), from the downloadable app (the
+literature layer is copied into `caterva/_literature/` by the release build,
+a GUI app's PATH is short), from a wheel built without that step (no literature
+layer), and on a laptop in a lecture hall with no network. A page that
+offered a BRENDA search it could not run
 would fail late, after the user had filled in a form, with an error that
 reads like a defect. So the page reads `GET /api/capabilities` first and
 draws every unavailable kind with its reason ("the literature layer is not

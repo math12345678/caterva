@@ -248,6 +248,8 @@ def test_the_built_wheel_carries_exactly_the_closure_and_builds_the_same_twice(t
         assert result.returncode == 0, result.stdout[-1500:] + result.stderr[-1500:]
         sums.append((out / "SHA256SUMS").read_text(encoding="utf-8"))
     assert sums[0] == sums[1], "the wheel and sdist must be byte-identical for one SOURCE_DATE_EPOCH"
+    assert not (REPO / "caterva" / "_literature").exists(), (
+        "build_release.py must remove the build-time copies once the sdist is built, or every scan of caterva/ sees each module twice")
     (wheel,) = (tmp_path / "one").glob("caterva-*.whl")
     with zipfile.ZipFile(wheel) as zf:
         shipped = {n.split("/", 2)[2] for n in zf.namelist() if n.startswith("caterva/_literature/")}

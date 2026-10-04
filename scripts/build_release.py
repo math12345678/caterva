@@ -246,7 +246,13 @@ def main(argv: list[str] | None = None) -> int:
         work = Path(tmp)
         # Build the sdist into a scratch directory first so a failed wheel
         # build does not leave a lone sdist in dist/ looking like a release.
-        sdist = _build_sdist(work / "sdist")
+        try:
+            sdist = _build_sdist(work / "sdist")
+        finally:
+            # The sdist carries the copies into the wheel; leaving them in the
+            # checkout would make every scan of caterva/ see each literature
+            # module twice.
+            vendor_literature.remove()
         wheel = _build_wheel_from_sdist(sdist, work / "wheel", work / "src")
 
         problems = _check_wheel(wheel)
