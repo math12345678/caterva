@@ -28,7 +28,7 @@ from caterva import __version__
 from caterva.studio import __main__ as studio_main
 from caterva.studio.adapters import Registry, load_registry
 from caterva.studio.contract import (
-    SESSION_HEADER, STUDIO_API_VERSION, TOKEN_PLACEHOLDER, Health, Malformed, NotFound, Settings, Unavailable,
+    SESSION_HEADER, STUDIO_API_VERSION, Health, Malformed, NotFound, Settings, Unavailable,
 )
 from caterva.studio.dispatch import App, Request
 from caterva.studio.routes import ROUTES
@@ -39,7 +39,7 @@ from caterva.studio.workspace import Workspace
 PORT = 18768
 TOKEN = "s" * 43
 HEADERS = [("Host", f"127.0.0.1:{PORT}"), (SESSION_HEADER, TOKEN)]
-INDEX = (f'<!doctype html><html><head><meta name="caterva-session" content="{TOKEN_PLACEHOLDER}" />'
+INDEX = ('<!doctype html><html><head><meta name="caterva-studio-page" content="token-in-url-fragment" />'
          '<link rel="stylesheet" href="/assets/index-0a1b2c.css"></head><body><div id="root"></div></body></html>')
 
 
@@ -110,7 +110,7 @@ def test_settings_read_replace_and_refuse(app, tmp_path):
     new = {"theme": "dark", "max_parallel_runs": 4, "confirm_delete": False}
     stored = call(app, "PUT", "/api/settings", new)
     assert stored.status == 200
-    assert stored.json() == {**new, "gromacs_path": None, "offline": False}
+    assert stored.json() == {**new, "gromacs_path": None, "offline": False, "keep_runs": 200}
     assert json.loads((tmp_path / "data" / "settings.json").read_text()) == stored.json()
     refused = call(app, "PUT", "/api/settings", {**new, "max_parallel_runs": 0})
     assert refused.status == 400 and refused.json()["error"]["field"] == "max_parallel_runs"
@@ -188,12 +188,13 @@ def test_a_run_id_that_does_not_exist_is_404_on_every_run_route(app):
 # -- the page ---------------------------------------------------------------------------
 
 
-def test_the_page_gets_the_token_and_its_client_routes_get_the_page(app):
+def test_the_page_holds_no_token_and_its_client_routes_get_the_page(app):
     for target in ("/", "/compose", "/history/20260930-141502-compose-3f9a0c1d", "/index.html"):
         response = call(app, "GET", target)
         assert response.status == 200, target
         assert response.header("Content-Type") == "text/html; charset=utf-8"
-        assert f'content="{TOKEN}"' in response.body.decode()
+        assert TOKEN not in response.body.decode()
+        assert 'name="caterva-studio-page"' in response.body.decode()
         assert response.header("Cache-Control") == "no-store"
 
 
@@ -211,7 +212,7 @@ def test_assets_are_served_with_their_types_and_cached_forever(app):
     assert call(app, "HEAD", "/").status == 200
 
 
-def test_a_page_not_built_from_this_package_is_a_500_not_a_page_without_a_token(tmp_path):
+def test_a_page_not_built_from_this_package_is_a_500_not_a_page_that_cannot_reach_the_server(tmp_path):
     root = tmp_path / "foreign"
     root.mkdir()
     (root / "index.html").write_text("<!doctype html><html><head></head><body>someone else's</body></html>")
@@ -220,7 +221,7 @@ def test_a_page_not_built_from_this_package_is_a_500_not_a_page_without_a_token(
         response = call(app, "GET", "/")
         assert response.status == 500
         assert "not built from this package" in response.json()["error"]["message"]
-        assert "no session placeholder" in call(app, "GET", "/api/capabilities").json()["ui"]["reason"]
+        assert "no page marker" in call(app, "GET", "/api/capabilities").json()["ui"]["reason"]
     finally:
         app.close()
 
@@ -487,11 +488,11 @@ def test_serving_prints_exactly_the_url_line_logs_to_the_data_folder_and_stops_c
     code = studio_main.main(["--port", "0", "--no-browser", "--print-url", "--data-dir", str(tmp_path / "data")],
                             stop=stop, on_serving=serving)
     assert code == 0
-    assert out.getvalue() == "CATERVA_STUDIO_URL=http://127.0.0.1:18790/\n"
+    assert out.getvalue() == f"CATERVA_STUDIO_URL=http://127.0.0.1:18790/#token={seen[0].token}\n"
     assert "a stray print while serving" in err.getvalue()
     log = (tmp_path / "data" / "studio.log").read_text()
     assert "serving http://127.0.0.1:18790/" in log and "stopped" in log
-    assert seen[0].token not in log and seen[0].token not in err.getvalue()
+    assert seen[0].token not in log and seen[0].token not in err.getvalue()  # only the URL line holds it
     assert sys.stdout is out and sys.stderr is err
 
 

@@ -22,7 +22,7 @@ the session token. 5 Development: the dev origin and the Vite proxy.
 Capabilities. 11 The workspace on disk. 12 Adapters. 13 Kinds, one by one.
 14 Gaps. 15 User paths. 16 The desktop shell. 17 The page: screens, themes,
 provenance as the visual system. 18 Ownership map. 19 How to install in a
-new worktree. 20 Verification and guards. 21 Amending this contract.
+new worktree. 20 Verification and guards. 21 Amending this contract. 22 SECURITY: the token bootstrap, validation, limits.
 
 ---
 
@@ -74,8 +74,8 @@ caterva studio [--host 127.0.0.1] [--port N] [--no-browser] [--dev-origin URL]
 | `--no-browser` | do not open the default browser (the macOS shell and CI pass it). |
 | `--dev-origin URL` | also accept requests whose `Origin` is exactly `URL` and serve `GET /api/dev/session`. Development only. `URL` must be `http://127.0.0.1:<port>` or `http://localhost:<port>`; anything else is exit 2. |
 | `--data-dir PATH` | where runs and settings live; default in section 11. Created (mode 0700) if absent; not writable is exit 3 with the reason. |
-| `--print-url` | once the socket is listening, print exactly one line `CATERVA_STUDIO_URL=<url>` to stdout and flush. `<url>` is `http://127.0.0.1:<port>/` (or `http://[::1]:<port>/`, `http://localhost:<port>/`). Nothing else is ever printed to stdout; logs go to stderr and `<data dir>/studio.log`. |
-| `--self-test` | start on a free port, request `/api/health` (with the token) and `/` over a real socket, check the health body and that `/` is either the built page with the token injected or the "not built" page, print one line per check to stdout, stop, exit 0 or 1. Used by the frozen-app checks and CI. |
+| `--print-url` | once the socket is listening, print exactly one line `CATERVA_STUDIO_URL=<url>#token=<token>` to stdout and flush. `<url>` is `http://127.0.0.1:<port>/` (or `http://[::1]:<port>/`, `http://localhost:<port>/`); the session token is in the URL fragment (section 4), which no server ever receives. Nothing else is ever printed to stdout; logs go to stderr and `<data dir>/studio.log`, and neither holds the token. |
+| `--self-test` | start on a free port, request `/api/health` (with the token, and without it: 401) and `/` over a real socket, check the health body and that `/` is either the built page (holding no token) or the "not built" page, check that the address printed for the app carries the token in its fragment, print one line per check to stdout, stop, exit 0 or 1. Used by the frozen-app checks and CI. |
 
 Exit codes follow the rest of Caterva: 0 served and stopped cleanly (Ctrl-C,
 SIGTERM, or the shell quitting) or a self-test passed; 1 a crash or a failed
@@ -84,7 +84,8 @@ writable, port in use). The parser is already in `caterva/studio/__main__.py`;
 core replaces `main`, not the flags.
 
 The macOS shell launches `caterva studio --port 0 --no-browser --print-url`,
-reads stdout until the `CATERVA_STUDIO_URL=` line, and loads that URL. The
+reads stdout until the `CATERVA_STUDIO_URL=` line, and loads that URL as it is
+(fragment included). It never logs the part after `#`. The
 server stops when its stdin closes (the shell's pipe) as well as on SIGTERM,
 so a crashed shell never leaves an orphan server behind.
 
@@ -101,7 +102,7 @@ handler runs, in this order:
    `localhost:P`; for `::1`, `[::1]:P` or `localhost:P`; for `localhost`,
    `localhost:P` or `127.0.0.1:P`. Anything else (a rebinding attacker's
    `evil.example:P`, a missing Host) is 403 `forbidden`. This applies to
-   static files too, because index.html carries the token.
+   static files too.
 3. **Origin.** A request carrying `Origin` must have exactly the server's own
    origin (`http://` + an allowed Host) or the `--dev-origin` value; else 403.
    A request with `Sec-Fetch-Site: cross-site` is 403 whatever its Origin.
@@ -112,7 +113,8 @@ handler runs, in this order:
    per-launch token, compared with `hmac.compare_digest`. Missing or wrong is
    401 `unauthorized`. The token is `secrets.token_urlsafe(32)`, minted at
    start, held in memory only, never written to disk, never logged, never
-   accepted from a query string or cookie. Static files need no token.
+   accepted from a query string or cookie, and it is in NO document the server
+   serves (section 4). Static files need no token and contain none.
 5. **Bodies.** `POST` and `PUT` must send `Content-Type: application/json`
    (a form cannot, so a cross-site form post is refused even before the
    token check matters): else 415 `unsupported_media_type`. Bodies over
@@ -152,11 +154,18 @@ loopback; the studio binds no fixed port.
 ## 4. Static serving and the session token
 
 - `GET /` and every non-`/api/` path that is not a file under `static/`
-  answer with `static/index.html`, after replacing the one occurrence of
-  contract.TOKEN_PLACEHOLDER (`__CATERVA_SESSION_TOKEN__`) inside
-  `<meta name="caterva-session" content="...">` with the token. If the
-  placeholder is absent the page was not built from this package: 500
-  `crash` with that sentence, not a page without a token.
+  answer with `static/index.html`, byte for byte, the same to every caller.
+  **The token is never in a document the server serves.** It reaches the page
+  in the URL fragment of the address the launcher opens:
+  `http://127.0.0.1:<port>/#token=<token>` (`security.bootstrap_url`). A browser
+  never sends a fragment to a server, so it is in no request, log or response.
+  Anyone who can only make requests (another user's process, a sandboxed app
+  scanning loopback ports) cannot learn it from the server.
+- `index.html` carries `<meta name="caterva-studio-page" content="token-in-url-fragment">`
+  (contract.PAGE_MARKER_NAME and PAGE_MARKER_CONTENT). If it is missing the
+  directory holds a page not built from this package (one that expects a token
+  written into it): 500 `crash` with that sentence, not a page that cannot talk to
+  the server. Capabilities reports `ui.built: false` for it.
 - Files under `static/assets/` are served with their `mimetypes` type
   (`.js` as `text/javascript`, `.woff2` as `font/woff2`, `.svg` as
   `image/svg+xml`) and `Cache-Control: public, max-age=31536000, immutable`
@@ -167,10 +176,23 @@ loopback; the studio binds no fixed port.
   (`pnpm --filter @workspace/caterva-studio run build` from
   `Science-Agent-Pipeline/`); and that the API is running. Capabilities
   reports `ui.built: false` with the same reason.
-- The page reads the token from the meta tag (`src/api/client.ts`,
-  `sessionToken()`), sends it as a header on every `/api/` request, and never
-  puts it in a URL. A page whose tag still holds the placeholder says it was
-  not served by `caterva studio`.
+- **The page** (`src/api/client.ts`, `sessionToken()`) reads `location.hash` once,
+  before anything renders; keeps the token in memory and in the tab's
+  `sessionStorage` (so a reload of the same tab works); at once rewrites the
+  address with `history.replaceState` so the fragment is not in the address bar,
+  history or a copied link; and sends the token in the `X-Caterva-Session` header
+  on every `/api/` request, never in a path or query string. A `401` makes it
+  forget the token. A page opened with no fragment and nothing remembered says it
+  was opened without a session token and asks for the address `caterva studio`
+  printed.
+- **Launching a browser.** A process's arguments are readable by every user, so
+  `caterva studio` does not pass the token-bearing address to the browser as an
+  argument: it writes a one-use page (`<data dir>/.open-studio-<random>.html`, mode
+  0600, created exclusively, deleted after 30 s) that forwards to the address, and
+  opens that file's `file:` URL. When no browser can be opened it logs the address
+  without the token and says to use `--print-url`.
+- **The macOS shell** loads the printed URL with its fragment and keeps and logs
+  only the address without it; its web view uses a non-persistent data store.
 
 ## 5. Development: the dev origin and the Vite proxy
 
@@ -192,9 +214,13 @@ STUDIO_API=http://127.0.0.1:18740 PORT=18741 node node_modules/vite/bin/vite.js 
   server's own Node `fetch` sends neither, and a web page cannot avoid
   sending them. It answers `DevSession` `{token, api_version}`.
 - The Vite plugin `caterva-studio-dev-session` fetches it when index.html is
-  served and writes the token into the same meta tag, so the page reads it
-  the same way in both modes. If the backend is not up yet, the placeholder
-  stays and the page says so; reload once the backend is running.
+  served and writes the token into a development-only meta tag
+  (`caterva-dev-session`), which `client.ts` reads only in a development build
+  (`import.meta.env.DEV`); the production page and a build never contain it. This
+  endpoint hands the token to any local process that asks and exists only with
+  `--dev-origin`: it is for development and is never enabled by the app. If the
+  backend is not up yet, the page says it has no token; reload once the backend is
+  running.
 - `studio-packaged` serves the built page from `caterva/studio/static` with
   no dev origin: that is the configuration that proves the release shape.
 
@@ -213,7 +239,7 @@ Every error response has body `ErrorBody` `{"error": {"code", "message",
 | 409 | `conflict` | result of a run not finished; cancelling a finished run; deleting a running run | none |
 | 413 | `too_large` | body over 1 MiB | none |
 | 415 | `unsupported_media_type` | POST/PUT without `application/json` | none |
-| 503 | `unavailable` | the kind or adapter endpoint cannot run in this installation (`contract.Unavailable`: literature layer absent, module not built, `rates` not integrated), with the reason in `message` | the CLI's refusal to start ("needs the source checkout") |
+| 503 | `unavailable` | the kind or adapter endpoint cannot run in this installation (`contract.Unavailable`: literature layer absent, module not built, `rates` not integrated), with the reason in `message`; also a limit of section 22 (too many connections, event streams or queued runs, or a finder search over its time budget), which carries a `Retry-After` header | the CLI's refusal to start ("needs the source checkout") |
 | 500 | `crash` | a handler raised something undeclared; the message names the exception type; the traceback goes to stderr and `studio.log`, not to the page | exit 1 |
 
 Three outcomes of a science question are kept apart all the way to the
@@ -228,6 +254,19 @@ page, because the CLI keeps them apart in its exit code:
   measured conditions were asked for and not found), or none (compose's
   UnrecognisedShape): then `GET /api/runs/{id}/result` is 404 and the page
   shows the reason.
+- **an upstream outage** (`outcome.meaning = "network"`): a run whose
+  refusal text is a database not answering (a timeout, a connection that
+  was never made, an HTTP error status from UniProt, the RCSB, BRENDA or
+  NCBI). It exits 3 like a refusal, but an outage is not Caterva declining
+  the question, so `contract.outcome_for` classifies it from the exception
+  signature in the text (`contract.network_failure`) and carries the host
+  and status in `outcome.network` (`NetworkFailure` `{host, status,
+  timed_out}`). `outcome.reason` stays the raw text; the page shows a
+  plain sentence ("UniProt did not answer") with a retry and keeps the raw
+  text in a disclosure. A refusal that only mentions the network (offline
+  mode) stays `refused`. `outcome.has_result` is `false` when the run
+  finished without a result, so the page never requests a `/result` that
+  would be 404.
 - **a crash** (exit 1): status `failed`, `RunRecord.error` `{type, message,
   traceback}`. The traceback is kept for the report-a-bug path; the page
   shows type and message.
@@ -255,13 +294,21 @@ number. Must answer in milliseconds: imports nothing of the engine.
 10.2 and fills `network`; without `probe` it never does. Other query keys:
 400.
 
+`POST /api/capabilities/refresh` with `{}` -> `Capabilities`, after running the
+chosen `gmx` (`--version`, argument list, 5 s) and storing what it answered. It
+is the only request that runs the program the `gromacs_path` setting names; a
+`GET /api/capabilities` never does (section 10).
+
 `GET /api/settings` -> `Settings`. `PUT /api/settings` with a full
 `Settings` -> the stored `Settings`. Keys: `theme` (`system` | `light` |
 `dark`, default `system`), `max_parallel_runs` (1..8, default 2),
 `confirm_delete` (default true). Two optional keys (amended by core): a
 PUT without one keeps its stored value; GET always returns both.
 `gromacs_path` (absolute path of an executable `gmx`, or null to look for
-it as section 10 says; it also sets `$GMX` for the runs) and `offline`
+it as section 10 says; it also sets `$GMX` for the runs; validated as the
+SECURITY section says: named `gmx`, `gmx_mpi`, `gmx_d` or `gmx_<suffix>`, a regular
+executable owned by you or root, not world-writable, no `..`, and not a link to a
+program of another name) and `offline`
 (default false; when true the network probe contacts nothing and a run
 whose request needs `network` is 503 with that reason: the adapter's
 `needs_for(request)` when it has one, else every `needs` of its kind, so a
@@ -405,8 +452,10 @@ command line in this version (the Md screen says so and shows the command).
 ```
 queued -> running -> done        (outcome: produced | refused | negative)
                   -> failed      (error: a crash)
-                  -> cancelled
-queued|running -> interrupted    (found at startup: the server stopped mid-run)
+                  -> cancelling -> cancelled    (a cancel was asked for; the thread stopped)
+                                -> abandoned    (it did not stop within the grace period)
+queued -> cancelled              (cancelled before it started)
+queued|running|cancelling -> interrupted   (found at startup: the server stopped mid-run)
 ```
 
 - A run id is `yyyymmdd-hhmmss-<kind with . as ->-<8 hex>` in UTC
@@ -416,12 +465,21 @@ queued|running -> interrupted    (found at startup: the server stopped mid-run)
   (compose, sim: they drive roadrunner, antimony and libsbml, none of which
   documents concurrent calls from two threads as supported) also take one process-wide engine lock, so two of them
   never run at once, while network-bound kinds run beside them.
-- **Cancel** is cooperative: `POST .../cancel` sets a flag;
-  `Progress.check_cancelled()` raises `adapters.Cancelled` at the adapter's
-  next check (every stage boundary, and inside loops the adapter drives,
-  such as per analysis section). A library call already running finishes
-  first; the page says "cancelling" until the `cancelled` status arrives. A
-  cancelled run keeps no result.
+- **Cancel** is cooperative: `POST .../cancel` sets a flag and the run's status
+  becomes `cancelling` (not terminal). `Progress.check_cancelled()` raises
+  `adapters.Cancelled` at the adapter's next check (every stage boundary, and
+  inside loops the adapter drives, such as per analysis section), and a library
+  loop that polls `Progress.is_cancelled()` (the SSA's `should_stop`) stops inside
+  the call. Only when the thread has really stopped is the status `cancelled`. A
+  library call that never checks finishes first. If the run has not stopped within
+  20 s the status is `abandoned`, never `cancelled`: its `error` is `{type:
+  "Abandoned", message}` saying the call may still be running in the background,
+  and its result is discarded if it ever returns. A cancelled or abandoned run keeps
+  no result.
+- **Timeouts** are per kind (`jobs.KIND_TIMEOUTS_S`): constants, sim, bind,
+  structure and md.setup 10 minutes; prepare 15; compose, md.summarise, fep.status,
+  complex.check and rates 30; analyze 2 hours. A run past its bound is asked to stop
+  and then abandoned, and ends `failed` with error type `TimedOut`.
 - **Interrupted**: at startup every run whose `run.json` says `queued` or
   `running` is marked `interrupted` with `finished_at` = now and error
   `{type: "Interrupted", message: "the studio stopped while this run was in
@@ -474,9 +532,10 @@ data: <one line of JSON>
   a request header (rule 3.4): `src/api/runs.ts`, `followRun`.
 - A comment line `: keep-alive` is sent every 15 s while a run is live.
 - The server closes the stream after sending `end`.
-- Order: `status{queued}`, `status{running}`, then any `stage`/`log`, then
-  exactly one of: `result{outcome}` + `status{done, outcome}`;
-  `error{error}` + `status{failed}`; `status{cancelled}`;
+- Order: `status{queued}`, `status{running}`, then any `stage`/`log` (and
+  `status{cancelling}` once a cancel was asked for), then exactly one of:
+  `result{outcome}` + `status{done, outcome}`; `error{error}` +
+  `status{failed}`; `status{cancelled}`; `error{error}` + `status{abandoned}`;
   `status{interrupted}`; and finally `end{status}`.
 - Shapes: `StatusEvent`, `StageEvent` `{stage, label, fraction}`,
   `LogEvent` `{line}`, `ResultEvent` `{outcome}`, `ErrorEvent` `{error}`,
@@ -540,9 +599,9 @@ its mark. Section 17.3.
 | `version`, `api_version`, `python`, `platform`, `frozen` | `caterva.__version__`, contract.STUDIO_API_VERSION, `platform.python_version()`, `sys.platform`, `getattr(sys, "frozen", False)` |
 | `literature` `{available, reason}` | `caterva.checkout.literature_module("fallback_logic")` imports; else `available: false` and `LiteratureLayerUnavailable`'s message. Cached for the process. |
 | `network` `{checked, reachable, hosts, host_status, checked_at, reason, source}` | `checked: false`, `source: null` and nulls until something happens. Two things make it happen. The explicit re-check, `?probe=network` (the status bar's popover and Settings call it): one HTTPS HEAD (5 s timeout, `urllib.request`) to each of `www.brenda-enzymes.org`, `rest.uniprot.org`, `search.rcsb.org`, `files.rcsb.org`, `eutils.ncbi.nlm.nih.gov`, `pubchem.ncbi.nlm.nih.gov` (and `rest.kegg.jp` only while `CATERVA_ENABLE_KEGG` is set), each at a path its own API serves (`capabilities.PROBE_PATHS`), not the host root; `source: "probe"`. And real network use, noted through `caterva.netuse` with nothing extra contacted: a request to one of those hosts that was answered (any HTTP status) marks THAT host reachable, one that could not be made (refused, no DNS, timed out) marks it unreachable with `reason`; `source: "use"`. Reachability is per host: `host_status` maps each host to `{reachable, checked_at, source, reason}` (its own latest outcome; `reachable: null` is never checked) and `hosts` to true/false/null; a BRENDA failure does not overwrite UniProt's answer, and a caller asks whether a host can be used by reading that host's entry, never the aggregate. `reachable` is the aggregate and says only what was checked: true when every host with an outcome answered, false when any did not, null when none has one; `reason` names the hosts that did not answer; `checked_at` and `source` are the newest host outcome's. Never contacts a host unasked; offline mode notes nothing. |
-| `gromacs` `{found, path, version, reason}` | `$GMX` if set, else `gmx`, through `shutil.which` (and `/opt/homebrew/bin/gmx`, `/usr/local/bin/gmx` if not on PATH: a GUI app's PATH is short); version from the first line of `gmx --version` matching `GROMACS version:`, 5 s timeout. Run once per process and on each capabilities request after a failure. |
+| `gromacs` `{found, path, version, reason}` | the `gromacs_path` setting, else `$GMX` if set, else `gmx`, through `shutil.which` (and `/opt/homebrew/bin/gmx`, `/usr/local/bin/gmx` if not on PATH: a GUI app's PATH is short); version from the first line of `gmx --version` matching `GROMACS version:`, 5 s timeout, argument list. A gmx from the environment is run on a capabilities request until it is found. The program the SETTING names is never run by a GET: it is run when the setting is saved, at start-up when one is saved, and by `POST /api/capabilities/refresh`; until then `found` is false and `reason` says it has not been checked. |
 | `rates` `{available, reason}` | `importlib.util.find_spec("caterva.rates")` is not None AND an adapter registered kind `rates`; else false with which of the two is missing. |
-| `ui` `{built, static_dir, reason}` | `static/index.html` exists and holds the placeholder. |
+| `ui` `{built, static_dir, reason}` | `static/index.html` exists and carries the page marker (section 4). |
 | `data_dir` `{path, writable, runs, reason}` | the resolved data dir, a write probe, the number of run directories. |
 | `kinds` | kind -> `KindCapability` `{available, title, command, needs, reason}` for every RunKind: not registered -> "not built yet"; registered -> the adapter's `unavailable()`. |
 | `dev_origin` | the `--dev-origin` value or null. |
@@ -606,7 +665,8 @@ An adapter module:
    parser path first.
 3. `run(request, ctx)` imports the engine lazily (so `/api/health` stays
    fast), calls the same library functions the CLI calls in the same order,
-   reports `ctx.progress.stage(...)`, checks `ctx.progress.check_cancelled()`,
+   reports `ctx.progress.stage(...)`, checks `ctx.progress.check_cancelled()`
+   (and hands `ctx.progress.is_cancelled` to a library loop that polls a flag),
    and returns `AdapterOutcome(exit_code, result, summary, refusal,
    artifacts)`. Anything it raises other than Malformed or Cancelled is a
    crash (status `failed`).
@@ -840,10 +900,14 @@ colour second so it survives greyscale:
 | kind | mark |
 |---|---|
 | measured | solid signal dot (the mark's own signal dot); the number is a button: one click opens the citation (text, registry, reference, commentary, conditions, scope, spread, link) |
-| fitted | ring |
+| fitted | heavy solid ring |
 | computed | small square; hover/focus shows method and inputs |
-| placeholder | hollow dashed dot in the caution colour; hover/focus shows the reason |
-| chosen | short bar; caution when a default chose it, ink when the user did |
+| placeholder | lighter ring in four coarse dashes, in the caution colour; hover/focus shows the reason |
+| chosen | filled diamond (ink) when the user chose it; outlined diamond with a tick, in the caution colour, when a stated default did |
+
+Marks are drawn at 12 px at the least (`MARK_SIZE`), the smallest size at
+which a dashed ring and a solid ring, and a filled and an outlined diamond,
+still differ.
 
 A number is formatted for display only by `src/lib/format.ts`, from the
 value the API sent; the full-precision value is one hover away and is what
@@ -877,6 +941,39 @@ tailwindcss + @tailwindcss/vite, typescript, vitest, jsdom,
 A builder who truly needs another package says so in their report, with
 the reason; nobody but the integrator edits `package.json` dependencies or
 `pnpm-lock.yaml`.
+
+### 17.6 Copy, problems and forms
+
+The engine writes for a terminal; the page does not repeat it. `src/lib/copy.ts`
+is the one place its phrasings are rewritten for the window: a flag is named
+by the field that sets it ("Set Inhibitor"), a script name or a command in
+parentheses is dropped, `--` and the long dash are not punctuation here,
+`row(s)` is `rows`, a request URL is its host's name ("UniProt"), and a
+Python exception that is a database not answering is the sentence "UniProt
+did not answer. Check the network, then try again." with the raw text in a
+disclosure. A rewrite only rephrases; each is tested with the engine's own
+string as input (`src/__tests__/copy.test.ts`). Code, file names and the
+terminal command stay as written.
+
+A refusal, a failure, a negative finding and an outage are one component
+(`States.tsx`): kicker, heading, reason, what to change, the engine's text in
+a disclosure, actions. Exception text is never an accessible name or a toast.
+
+A form frame (`RunForm`, the structure `RunScreen`) pins its action bar to
+the bottom of the pane, names an empty required field inline before any
+request (`aria-required`, `aria-invalid`), and points a disabled primary
+button at the sentence that says why. The only live region while a run works
+is its one-line stage sentence; the counter beside it is not announced. When
+a run finishes, one status sentence is announced and focus moves to the
+result's heading. A run whose `outcome.has_result` is false is not asked for
+its result. Health and the live-run list are polled only while the tab is
+visible, a quarter as often when idle, and less after failures
+(`src/lib/polling.ts`).
+
+Chart series are told apart by luminance (each 3:1 against the surface,
+neighbours 3:1 against each other, asserted over `index.css` in
+`seriesContrast.test.ts`), a dash pattern, a marker where a series has few
+points, and a direct label at the end of its line.
 
 ## 18. Ownership map
 
@@ -1052,3 +1149,90 @@ touches. The integrator applies amendments to `contract.py`, `types.ts`,
 `routes.py` and this document in one commit, and bumps
 contract.STUDIO_API_VERSION when a page built against the old shapes would
 misread the new ones.
+
+---
+
+## 22. SECURITY: the token bootstrap, validation and limits
+
+The rules of section 3 keep web pages out. These keep out the rest of what can
+reach a loopback port (another user's process, a sandboxed app scanning ports) and
+bound what a request, a folder name or a file can make the server do. Every item
+has a regression test in `caterva/tests/test_studio_security_review.py`.
+
+**22.1 The token is in no served document.** Section 4: it travels in the URL
+fragment (`#token=...`) of the address `--print-url` prints and the launcher opens.
+`GET /` gives every caller the same bytes. A browser started by `caterva studio` is
+given a one-use `file:` page (mode 0600, deleted after 30 s) that forwards to that
+address, so the token is never an argument of any process. The development endpoint
+`GET /api/dev/session` (only with `--dev-origin`) is the one place a local process
+can still ask for it; the app never enables it.
+
+**22.2 `gromacs_path`** is the absolute path of a program the server will run, so it
+is checked as one: no `..`; named `gmx`, `gmx_mpi`, `gmx_d` or `gmx_<suffix>`, both as
+given and after links are resolved (a link named `gmx` to another program is
+refused); a regular file the current user can execute, owned by that user or root;
+neither the file nor, unless sticky, its folder writable by everyone. It is run
+(`gmx --version`, argument list, 5 s, no shell) only when the setting is saved, at
+start-up when one is saved, and by `POST /api/capabilities/refresh`; it is validated
+again immediately before each run. `GET /api/capabilities` never runs it.
+
+**22.3 Nothing from a request reaches a shell as code.**
+- `md.setup`: `pdb` must be `^[0-9][A-Za-z0-9]{3}$` and `chain` `^[A-Za-z0-9]{1,4}$`,
+  ASCII only, no surrounding space or newline, in the `caterva md` library, so the
+  command line and the studio agree; `ns`, `ionic_strength_m`, `temperature_k` and
+  `ph` must be finite and bounded, `seed` 0 to 2^31-1, `replicas` 1 to 50. Every
+  value written into `run.sh` and the complex `build.sh` is quoted with
+  `shlex.quote` (awk receives names as `-v` variables), and comments are flattened to
+  one line.
+- `analyze`: a replica folder is `rep<number>` (`^rep[0-9]+$`); any other folder
+  matching `rep*` is refused with a plain message. Every selection is
+  `shlex.quote`d in `analyze.sh`, and GROMACS steps run as argument lists with no
+  shell (`analyze.command_argv`).
+- `md.setup` writes into a new staging folder beside the target and moves the files
+  into place; a symbolic link anywhere inside an existing setup folder is refused
+  (`UnsafeOutput`, exit 3, `Malformed` on field `out` in the studio) and nothing is
+  written through it.
+- A ChimeraX script (`caterva/structure/chimerax.py`) has control characters and line
+  or paragraph separators removed from every free-text field, and only ASCII letters
+  and digits in an id that stands in a command.
+
+**22.4 Limits** (all refuse with `503 unavailable` and `Retry-After` unless noted):
+
+| what | limit |
+|---|---|
+| connections served at once | 64 (`limits.MAX_CONNECTIONS`), refused on the socket before a thread is spent |
+| event streams at once | 16 (`limits.MAX_STREAMS`) |
+| runs waiting in the queue | 32 (`jobs.MAX_PENDING`), `Retry-After: 30` |
+| finished runs kept | `settings.keep_runs`, 10 to 5000, default 200; older ones move to `trash/` when a run is accepted; Settings says so |
+| a request line and headers | 10 s from the first byte (`limits.HEADER_DEADLINE_S`) |
+| a request body | 30 s from the start of the body (`limits.BODY_DEADLINE_S`) |
+| an idle kept-alive connection | 60 s |
+| `sim` | at most `contract.MAX_SSA_EVENTS` (200,000) expected reaction events, else 400 on `a0` with the number in the message; the loop also stops at 1.25 times that |
+| enzyme finder | 2 searches at once, answers kept by normalised query (NFKC, case-folded, spacing collapsed), 4 s per request, then `Retry-After: 2` while the search finishes and is kept |
+
+**22.5 Bundles.** `GET /api/runs/{id}/bundle` takes `redact_paths` (default `true`)
+and `diagnostics` (default `false`), each `true` or `false`, else 400. By default the
+home folder is written `~` and a data folder outside it `<data dir>` in every text
+file of the zip, and an error's `traceback` is `null` (its type and message stay).
+`diagnostics=true` keeps the traceback, with paths still redacted when `redact_paths`
+is on. `README.txt` states which was done.
+
+**22.6 The macOS shell.** `CATERVA_STUDIO_COMMAND`, `_CWD`, `_DATA_DIR` and
+`PYTHONPATH` are ignored in a release build. They count only in a build made with
+`-D CATERVA_DEVELOPMENT` (`scripts/build_studio_app.py --dev`) AND with
+`CATERVA_STUDIO_DEV=1` set or `~/Library/Application Support/Caterva/development-marker`
+present; a release build also drops every `PYTHON*`, `DYLD_*` and
+`CATERVA_STUDIO_*` variable from the server's environment. The `reveal` message shows
+only paths inside the data folder or ones the person chose in a panel this launch.
+Links open in the default browser only when they are `https` or `mailto`. The web
+view's data store is non-persistent, so a reused random port cannot inherit another
+launch's storage, and the printed address is logged and kept without its fragment.
+
+**22.7 `--dev-origin`** must be the whole of `http://127.0.0.1:<port>` or
+`http://localhost:<port>` with a port from 1 to 65535 (`fullmatch`: a trailing newline,
+port 0 and port 99999 are exit 2).
+
+**22.8 Not covered.** A process running as the same user can read the launcher's
+pipe, the page's memory and the workspace itself; the token does not claim to stop
+it. Nothing in the studio verifies that a `gmx` is GROMACS beyond its name, owner,
+permissions and the `GROMACS version:` line it prints.

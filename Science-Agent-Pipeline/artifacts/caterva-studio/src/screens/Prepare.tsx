@@ -71,6 +71,7 @@ export default function PrepareScreen() {
         formLabel="Audit an entry"
         action="Audit"
         canSubmit={Boolean(entry.trim())}
+        blockedReason="Enter a PDB id or choose a file first."
         onSubmit={() => void run.submit(request())}
         run={run}
         firstSize={26}

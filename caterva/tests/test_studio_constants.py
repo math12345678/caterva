@@ -140,7 +140,11 @@ def test_a_question_report_lab_refuses_is_refused_in_cites_words(tmp_path):
     assert code == outcome.exit_code == 3 and out == ""
     assert outcome.result is None
     assert outcome.refusal == err.rstrip("\n")
-    assert outcome.refusal.startswith("Not produced.\n\nA report needs an enzyme and an organism.")
+    # Only the organism is missing, so only the organism is named, and no
+    # em dash or flag reaches the person.
+    assert outcome.refusal.startswith("Not produced.\n\nA report needs an organism.")
+    assert "enzyme" not in outcome.refusal.split("A report needs")[1]
+    assert "\u2014" not in outcome.refusal
 
 
 def test_report_labs_json_now_carries_the_resolved_results(hexokinase):

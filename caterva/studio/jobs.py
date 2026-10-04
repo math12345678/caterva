@@ -30,21 +30,32 @@ rather than waiting too.
 
 WHAT CANCELLING DOES, AND WHAT IT CANNOT
 ----------------------------------------
-Python cannot stop a thread. Cancelling sets a flag; the adapter's next
+Python cannot stop a thread. Cancelling sets a flag and the run's status
+becomes `cancelling`, which is not an end: the adapter's next
 `check_cancelled()` (and every `stage()`, which is a stage boundary) raises
-`Cancelled`, and the run ends `cancelled`, keeping no result. A library
-call already running finishes first. If the run has not stopped within
-CANCEL_GRACE_S, it is abandoned: marked cancelled at once with a log line
-saying it was abandoned rather than stopped, its slot given to the next
-run, and whatever the call returns later discarded. A serial run keeps the
-engine lock until its call really returns, because the engine is still
-busy; the log line says so.
+`Cancelled`, a library loop that polls the flag (the SSA's `should_stop`)
+stops inside the call, and only when the thread really has stopped is the
+run `cancelled`, keeping no result. A library call that does not poll
+finishes first. If the run has not stopped within CANCEL_GRACE_S, the
+server gives up waiting: the run ends `abandoned` (never `cancelled`),
+its error says the call may still be running in the background, its slot
+goes to the next run, and whatever the call returns later is discarded. A
+serial run keeps the engine lock until its call really returns, because the
+engine is still busy; the message says so.
 
-The same machinery bounds a stuck run: a run still going after
-RUN_TIMEOUT_S (hours, far beyond any kind's measured duration, so it
-catches a network call that never returns rather than a slow computation)
-is asked to stop and then abandoned, and ends `failed` with the error type
-`TimedOut`, saying which of the two happened.
+The same machinery bounds a stuck run: a run still going after its kind's
+timeout (KIND_TIMEOUTS_S: each kind's own bound, far beyond its measured
+duration, so it catches a network call that never returns rather than a
+slow computation) is asked to stop and then abandoned, and ends `failed`
+with the error type `TimedOut`, saying which of the two happened.
+
+HOW MANY MAY WAIT, AND HOW MANY ARE KEPT
+----------------------------------------
+At most MAX_PENDING runs may be queued; one more is refused at submission
+(503, Retry-After) rather than accepted into a queue that grows without end.
+When a run is accepted, finished runs beyond `settings.keep_runs` (oldest
+first, never one still going) are moved to <data dir>/trash/, the same
+reversible move deleting a run makes.
 
 WHAT A RUN PRINTS
 -----------------
@@ -100,8 +111,30 @@ KEEP_LOG_LINES = 2000
 #: How long a cancelled run may take to reach its next check before it is
 #: abandoned.
 CANCEL_GRACE_S = 20.0
-#: How long a run may take before it is stopped as stuck (module docstring).
-RUN_TIMEOUT_S = 4 * 60 * 60.0
+#: How long a run of a kind may take before it is stopped as stuck (module
+#: docstring), in seconds. Each is a long multiple of the kind's measured
+#: duration: the bound is for a call that never returns. `analyze` reads
+#: whole trajectories and runs GROMACS steps, so it gets the longest.
+KIND_TIMEOUTS_S: Mapping[str, float] = {
+    "compose": 30 * 60.0,
+    "constants": 10 * 60.0,
+    "sim": 10 * 60.0,
+    "bind": 10 * 60.0,
+    "structure": 10 * 60.0,
+    "prepare": 15 * 60.0,
+    "md.setup": 10 * 60.0,
+    "md.summarise": 30 * 60.0,
+    "analyze": 2 * 60 * 60.0,
+    "fep.status": 30 * 60.0,
+    "complex.check": 30 * 60.0,
+    "rates": 30 * 60.0,
+}
+#: For a kind not in the table above.
+RUN_TIMEOUT_S = 60 * 60.0
+#: Runs that may wait in the queue (module docstring).
+MAX_PENDING = 32
+#: What a refused submission tells the page to wait, in seconds.
+QUEUE_RETRY_AFTER_S = 30
 #: Seconds between keep-alive comments on an idle event stream.
 KEEPALIVE_S = 15.0
 #: How often a stream re-reads the file of a run another server owns.
@@ -110,6 +143,15 @@ POLL_S = 0.5
 
 class Conflict(Exception):
     """The request is right but the run's state forbids it: HTTP 409."""
+
+
+class QueueFull(Unavailable):
+    """Too many runs are waiting: HTTP 503 with Retry-After."""
+
+    retry_after_s = QUEUE_RETRY_AFTER_S
+
+
+_UNSET: Any = object()
 
 
 def make_run_id(kind: str, moment: Optional[Any] = None) -> str:
@@ -298,6 +340,9 @@ class _Progress:
         if self._job.cancel.is_set():
             raise Cancelled(self._job.run_id)
 
+    def is_cancelled(self) -> bool:
+        return self._job.cancel.is_set()
+
 
 # ---------------------------------------------------------------------------
 # The manager
@@ -316,7 +361,9 @@ class JobManager:
         parallel: Callable[[], int] = lambda: 2,
         offline: Callable[[], bool] = lambda: False,
         cancel_grace_s: float = CANCEL_GRACE_S,
-        timeout_s: Optional[float] = RUN_TIMEOUT_S,
+        timeout_s: Optional[float] = _UNSET,
+        max_pending: int = MAX_PENDING,
+        keep_runs: Callable[[], int] = lambda: 200,
         keepalive_s: float = KEEPALIVE_S,
         poll_s: float = POLL_S,
         tick_s: float = 0.25,
@@ -331,7 +378,11 @@ class JobManager:
         self._parallel = parallel
         self._offline = offline
         self.cancel_grace_s = cancel_grace_s
+        #: One bound for every kind when given (tests, a caller that wants one);
+        #: by default each kind has its own (KIND_TIMEOUTS_S).
         self.timeout_s = timeout_s
+        self.max_pending = max_pending
+        self._keep_runs = keep_runs
         self.keepalive_s = keepalive_s
         self.poll_s = poll_s
         self.tick_s = tick_s
@@ -354,6 +405,11 @@ class JobManager:
 
         if self._stopping:
             raise Unavailable("the studio is stopping; the run was not started")
+        with self._lock:
+            waiting = len(self._pending)
+        if waiting >= self.max_pending:
+            raise QueueFull(f"{waiting} runs are already waiting to start (at most {self.max_pending} may); "
+                            "wait for some to finish, or cancel some, and try again")
         spec = self.registry.get(kind)
         if spec is None:
             raise Unavailable(f"{kind}: {NOT_BUILT_YET}")
@@ -395,6 +451,7 @@ class JobManager:
             "artifacts": [],
             "progress": None,
         }
+        self._prune()
         self.ws.create_run(record, record["request"], owner=self.instance_id)
         job = _Job(self, spec, record["request"], run_dir, record)
         with self._lock:
@@ -406,6 +463,41 @@ class JobManager:
             self._pump()
         log.info("run %s accepted (%s)", run_id, kind)
         return accepted
+
+    def _prune(self) -> None:
+        """Move finished runs beyond `keep_runs` (oldest first) to the trash."""
+        try:
+            keep = max(1, int(self._keep_runs()))
+        except Exception:  # noqa: BLE001 - a settings read that failed must not stop a run being accepted
+            return
+        try:
+            ids = self.ws.run_ids()
+        except OSError:
+            return
+        if len(ids) <= keep:
+            return
+        finished = []
+        for run_id in sorted(ids, reverse=True):  # ids sort by time, newest first
+            with self._lock:
+                if run_id in self._jobs:
+                    continue  # still queued or running, or not yet cleaned up
+            try:
+                status = self.ws.summary(run_id)["status"]
+            except Exception:  # noqa: BLE001 - an unreadable run is left where it is
+                continue
+            if status in TERMINAL_STATUSES:
+                finished.append(run_id)
+        for run_id in finished[keep:]:
+            try:
+                self.ws.trash(run_id)
+                log.info("run %s moved to the trash: History keeps %d finished runs", run_id, keep)
+            except (RunNotFound, OSError) as exc:
+                log.warning("run %s could not be moved to the trash: %s", run_id, exc)
+
+    def _timeout_for(self, job: "_Job") -> Optional[float]:
+        if self.timeout_s is not _UNSET:
+            return self.timeout_s
+        return KIND_TIMEOUTS_S.get(job.kind, RUN_TIMEOUT_S)
 
     def _new_run_id(self, kind: str) -> str:
         while True:
@@ -600,6 +692,24 @@ class JobManager:
             self._end(job)
         log.info("run %s cancelled", job.run_id)
 
+    def _finish_abandoned(self, job: _Job, detail: str) -> None:
+        """A cancel the thread did not obey in time: not `cancelled`, because
+        the thread is still running, and the record says so."""
+        with self._lock:
+            if job.finished:
+                return
+            warning = f"Abandoned, not stopped: {detail}"
+            self._emit_log(job, warning)
+            self._flush_omitted(job)
+            job.record["error"] = {"type": "Abandoned", "message": warning, "traceback": None}
+            job.record["status"] = "abandoned"
+            job.record["finished_at"] = iso(utc_now())
+            self._emit(job, "error", {"error": job.record["error"]})
+            self._save(job)
+            self._emit(job, "status", {"status": "abandoned"})
+            self._end(job)
+        log.warning("run %s abandoned: its thread is still running", job.run_id)
+
     def _finish_interrupted(self, job: _Job) -> None:
         with self._lock:
             if job.finished:
@@ -624,7 +734,7 @@ class JobManager:
 
     def _stopped_by_request(self, job: _Job) -> None:
         if job.timed_out:
-            self._finish_failed(job, "TimedOut", f"the run took longer than {_duration(self.timeout_s)} "
+            self._finish_failed(job, "TimedOut", f"the run took longer than {_duration(self._timeout_for(job))} "
                                                   "and was stopped at its next check", None)
         else:
             self._finish_cancelled(job, "Cancelled: the run stopped at its next check and keeps no result.")
@@ -638,9 +748,9 @@ class JobManager:
                   f"and whatever it returns is discarded.{engine}")
         if job.timed_out:
             self._finish_failed(job, "TimedOut",
-                                f"the run took longer than {_duration(self.timeout_s)}, and {detail}", None)
+                                f"the run took longer than {_duration(self._timeout_for(job))}, and {detail}", None)
         else:
-            self._finish_cancelled(job, f"Cancelled: {detail}")
+            self._finish_abandoned(job, detail)
 
     # -- cancelling ----------------------------------------------------------
 
@@ -660,6 +770,10 @@ class JobManager:
             elif not job.cancel.is_set():
                 job.cancel.set()
                 job.cancel_deadline = self._clock() + self.cancel_grace_s
+                if job.record["status"] == "running":
+                    job.record["status"] = "cancelling"
+                    self._save(job)
+                    self._emit(job, "status", {"status": "cancelling"})
                 self._emit_log(job, "Cancel requested: the run stops at its next check.")
                 self._cond.notify_all()
             return copy.deepcopy(job.record)
@@ -678,13 +792,13 @@ class JobManager:
                 for job in list(self._jobs.values()):
                     if job.finished or job.started is None:
                         continue
-                    if (self.timeout_s is not None and not job.timed_out
-                            and now - job.started > self.timeout_s):
+                    timeout = self._timeout_for(job)
+                    if timeout is not None and not job.timed_out and now - job.started > timeout:
                         job.timed_out = True
                         if not job.cancel.is_set():
                             job.cancel.set()
                             job.cancel_deadline = now + self.cancel_grace_s
-                        self._emit_log(job, f"The run has taken longer than {_duration(self.timeout_s)}; "
+                        self._emit_log(job, f"The run has taken longer than {_duration(timeout)}; "
                                             "asking it to stop.")
                     if job.cancel.is_set() and job.cancel_deadline is not None and now >= job.cancel_deadline:
                         self._abandon(job)
@@ -712,7 +826,7 @@ class JobManager:
                 record = self.ws.read_record(run_id)
             except (RunNotFound, UnreadableRun):
                 continue
-            if record["status"] not in ("queued", "running"):
+            if record["status"] not in ("queued", "running", "cancelling"):
                 continue
             if self.ws.owner_alive(self.ws.owner_of(run_id)):
                 continue
@@ -731,7 +845,7 @@ class JobManager:
                 record = self.ws.read_record(run_id)
             except (RunNotFound, UnreadableRun):
                 return False
-            if record["status"] not in ("queued", "running"):
+            if record["status"] not in ("queued", "running", "cancelling"):
                 return False
             if self.ws.owner_alive(self.ws.owner_of(run_id)):
                 return False
@@ -880,7 +994,8 @@ def _prepare(kind: str, outcome: Any) -> Tuple[Optional[bytes], Tuple[Artifact, 
         raise TypeError(f"run() returned {type(outcome).__name__}, not an AdapterOutcome")
     if not isinstance(outcome.summary, str):
         raise TypeError("the summary is not text")
-    verdict = outcome_for(kind, outcome.exit_code, outcome.summary, outcome.refusal, outcome.name_refusal)
+    verdict = outcome_for(kind, outcome.exit_code, outcome.summary, outcome.refusal, outcome.name_refusal,
+                          has_result=outcome.result is not None)
     result_bytes: Optional[bytes] = None
     if outcome.result is not None:
         if not isinstance(outcome.result, Mapping):
@@ -934,6 +1049,7 @@ class _run_dir_lock:
 
 __all__ = [
     "CANCEL_GRACE_S", "Conflict", "JobManager", "KEEPALIVE_FRAME", "KEEPALIVE_S", "KEEP_LOG_LINES",
-    "OutputRouter", "POLL_S", "RUN_DIR_PLACEHOLDER", "RUN_TIMEOUT_S", "RunLogHandler", "SINKS", "cli_prefix",
+    "KIND_TIMEOUTS_S", "MAX_PENDING", "OutputRouter", "POLL_S", "QueueFull", "RUN_DIR_PLACEHOLDER", "RUN_TIMEOUT_S",
+    "RunLogHandler", "SINKS", "cli_prefix",
     "make_run_id", "sse_frame",
 ]

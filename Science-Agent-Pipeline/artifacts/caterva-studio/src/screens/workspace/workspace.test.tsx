@@ -16,9 +16,10 @@ import runs from "@/__fixtures__/api/workspace/runs.json";
 import settings from "@/__fixtures__/api/workspace/settings.json";
 import shapes from "@/__fixtures__/api/workspace/shapes.json";
 import App from "@/App";
-import { type Handler, json, mockServer, setSessionToken } from "@/__tests__/helpers";
+import { type Handler, json, mockServer, runTitle, setSessionToken } from "@/__tests__/helpers";
 import { resetRunStreamsForTests } from "@/api/runs";
 import type { Capabilities, RunRecord, RunSummary } from "@/api/types";
+import { plain } from "@/lib/copy";
 import { resetToastsForTests } from "@/lib/toast";
 
 import { citeCaterva } from "../About";
@@ -79,7 +80,7 @@ describe("Home", () => {
     const first = shapes.shapes[0].split(": ")[1];
     await userEvent.click(within(suggestions).getByRole("button", { name: first }));
     expect(ask).toHaveValue(first);
-    for (const r of RUNS) expect(screen.getAllByText(r.title).length).toBeGreaterThan(0);
+    for (const r of RUNS) expect(screen.getAllByText(runTitle(r.title)).length).toBeGreaterThan(0);
     for (const s of machineSentences(capabilities as Capabilities, settings.offline)) {
       expect(screen.getByText(s.text)).toBeInTheDocument();
     }
@@ -146,7 +147,7 @@ describe("History", () => {
     const negativeRun = RUNS.find((r) => r.outcome?.meaning === "negative")!;
     await userEvent.type(search, "disagrees");
     expect(within(list).getAllByRole("listitem")).toHaveLength(RUNS.filter((r) => matchesSearch(r, "disagrees")).length);
-    expect(within(list).getByText(negativeRun.title)).toBeInTheDocument();
+    expect(within(list).getByText(runTitle(negativeRun.title))).toBeInTheDocument();
   });
 
   it("deletes with an undo: nothing is sent while Undo is offered, and Undo sends nothing at all", async () => {
@@ -160,10 +161,10 @@ describe("History", () => {
     await userEvent.click(within(detail).getByRole("button", { name: "Delete" }));
     await userEvent.click(within(screen.getByRole("group", { name: "Confirm deleting this run" })).getByRole("button", { name: "Delete" }));
     const list = screen.getByRole("list", { name: "Runs, newest first" });
-    expect(within(list).queryByText(target.title)).toBeNull();
+    expect(within(list).queryByText(runTitle(target.title))).toBeNull();
     expect(seen.some((r) => r.method === "DELETE")).toBe(false);
     await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
-    expect(await within(list).findByText(target.title)).toBeInTheDocument();
+    expect(await within(list).findByText(runTitle(target.title))).toBeInTheDocument();
     expect(seen.some((r) => r.method === "DELETE")).toBe(false);
   });
 
@@ -220,8 +221,8 @@ describe("About", () => {
     render(<App />);
     expect(await screen.findByText(citeCaterva(health.version))).toBeInTheDocument();
     for (const s of dataSources.sources) {
-      expect(screen.getByText(s.creator)).toBeInTheDocument();
-      if (s.citation_request) expect(screen.getByText(`How to cite it: ${s.citation_request}`)).toBeInTheDocument();
+      expect(screen.getByText(plain(s.creator))).toBeInTheDocument();
+      if (s.citation_request) expect(screen.getByText(`How to cite it: ${plain(s.citation_request)}`)).toBeInTheDocument();
     }
     const docs = screen.getByRole("link", { name: /How every parameter gets its origin/ });
     expect(docs).toHaveAttribute("href", expect.stringContaining("docs/adr/0008-parameter-provenance.md"));

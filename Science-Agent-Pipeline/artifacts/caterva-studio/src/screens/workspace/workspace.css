@@ -248,6 +248,12 @@
     transition: none;
   }
 }
+.about-net-aside {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.875rem;
+}
 .about-source a {
   display: inline-flex;
   align-items: center;

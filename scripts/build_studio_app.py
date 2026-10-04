@@ -85,9 +85,10 @@ STUDIO_PACKAGE = ROOT / "Science-Agent-Pipeline" / "artifacts" / "caterva-studio
 #: oldest release Apple still shipped security updates for when this was set.
 MIN_MACOS = "12.0"
 
-#: What the page carries until the server writes the session token in
-#: (caterva.studio.contract.TOKEN_PLACEHOLDER), read as text.
-TOKEN_PLACEHOLDER = "__CATERVA_SESSION_TOKEN__"
+#: What a page built from this package carries
+#: (caterva.studio.contract.PAGE_MARKER_*), read as text. The page holds no
+#: session token: it arrives in the URL fragment the server prints.
+PAGE_MARKER = '<meta name="caterva-studio-page" content="token-in-url-fragment"'
 
 #: The resources the shell reads at run time, from macos/Resources/.
 RESOURCES = ("first-run.txt",)
@@ -168,8 +169,8 @@ def frozen_problems(folder: Path, require_page: bool = True) -> list[str]:
         page = folder / "_internal" / "caterva" / "studio" / "static" / "index.html"
         if not page.is_file():
             problems.append(f"{page} is missing: the wheel was built before the page")
-        elif TOKEN_PLACEHOLDER not in page.read_text(encoding="utf-8", errors="replace"):
-            problems.append(f"{page} has no {TOKEN_PLACEHOLDER}: not the studio's built page")
+        elif PAGE_MARKER not in page.read_text(encoding="utf-8", errors="replace"):
+            problems.append(f"{page} has no {PAGE_MARKER}: not the studio's built page")
     return problems
 
 
@@ -180,12 +181,17 @@ def smoke_passed(stdout: str) -> bool:
 
 
 def swiftc_command(sources: Sequence[Path], output: Path, arch: str, module_cache: Path,
-                   parse_as_library: bool = False) -> list[str]:
+                   parse_as_library: bool = False, development: bool = False) -> list[str]:
     command = ["xcrun", "swiftc", "-swift-version", "5", "-O",
                "-target", f"{arch}-apple-macos{MIN_MACOS}",
                "-module-cache-path", str(module_cache)]
     if parse_as_library:
         command.append("-parse-as-library")
+    if development:
+        # Only a --dev app honours CATERVA_STUDIO_COMMAND and its siblings
+        # (macos/Sources/StudioServer.swift); a release build is compiled
+        # without this flag and ignores them.
+        command += ["-D", "CATERVA_DEVELOPMENT"]
     return command + [str(s) for s in sources] + ["-o", str(output)]
 
 
@@ -209,18 +215,18 @@ def build_page(root: Path = ROOT) -> None:
         _fail("pnpm is not on PATH (corepack enable, then rerun)")
     _run([pnpm, "--filter", "@workspace/caterva-studio", "run", "build"], cwd=root / "Science-Agent-Pipeline")
     page = root / "caterva" / "studio" / "static" / "index.html"
-    if not page.is_file() or TOKEN_PLACEHOLDER not in page.read_text(encoding="utf-8"):
-        _fail(f"the page build did not write {page} with the token placeholder")
+    if not page.is_file() or PAGE_MARKER not in page.read_text(encoding="utf-8"):
+        _fail(f"the page build did not write {page} with its page marker")
 
 
-def compile_shell(work: Path, arch: str, cache: Path) -> Path:
+def compile_shell(work: Path, arch: str, cache: Path, development: bool = False) -> Path:
     cache.mkdir(parents=True, exist_ok=True)
     binary = work / "Caterva"
     sources = sorted(SOURCES.glob("*.swift"))
     if not sources:
         _fail(f"no Swift sources under {SOURCES}")
     env = {**os.environ, "CLANG_MODULE_CACHE_PATH": str(cache)}
-    _run(swiftc_command(sources, binary, arch, cache), env=env)
+    _run(swiftc_command(sources, binary, arch, cache, development=development), env=env)
     return binary
 
 
@@ -317,6 +323,7 @@ def dev_environment(python: Path, checkout: Path, data_dir: Optional[Path]) -> d
     if not (checkout / "caterva" / "app.py").is_file():
         _fail(f"--checkout {checkout} is not a Caterva checkout (no caterva/app.py)")
     environment = {
+        "CATERVA_STUDIO_DEV": "1",
         "CATERVA_STUDIO_COMMAND": json.dumps([str(python), "-m", "caterva.app", "studio"]),
         "CATERVA_STUDIO_CWD": str(checkout),
     }
@@ -392,7 +399,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         # Not resolved: swiftc records the spelling, and /tmp and /private/tmp
         # naming one cache make it load each module twice and crash.
         cache = Path(os.path.abspath(args.module_cache)) if args.module_cache else work / "module-cache"
-        binary = compile_shell(work, args.arch, cache)
+        binary = compile_shell(work, args.arch, cache, development=args.dev)
         icns = draw_icon(work, args.arch, cache, own_icns=args.own_icns)
         app = out / "Caterva.app"
         assemble(app, binary, icns, plist, frozen)

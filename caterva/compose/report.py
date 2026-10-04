@@ -777,11 +777,18 @@ class ModelDossier:
         else:
             total = len(getattr(self.model, "resolvable", ()) or ()) or count
         subject = getattr(self.model, "subject", None)
+        try:
+            from .verdict import _database_could_supply
+        except ImportError:  # pragma: no cover - flat import
+            from verdict import _database_could_supply  # type: ignore[no-redef]
         # The caveat used to vanish the moment a subject was NAMED, with no
         # search run -- so a query mentioning an enzyme lost the one line
         # telling the reader its constants were still placeholders.
         why = (
-            "because no enzyme was named" if not subject
+            "because this mechanism has no enzyme step, so its constants are "
+            "not kept in an enzyme database"
+            if not subject and not _database_could_supply(self.model)
+            else "because no enzyme was named" if not subject
             else f"because no search has been run for {subject!r}"
             if count == total and not getattr(self.model, "searched", False)
             else f"because the search for {subject!r} did not find them"

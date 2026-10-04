@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from caterva.studio.adapters import Registry
-from caterva.studio.contract import MAX_BODY_BYTES, SESSION_HEADER, TOKEN_PLACEHOLDER
+from caterva.studio.contract import MAX_BODY_BYTES, SESSION_HEADER
 from caterva.studio.dispatch import App, Request
 from caterva.studio.security import CSP, Guard, authorities, mint_token, url_for
 from caterva.studio.static_files import StaticSite
@@ -27,7 +27,7 @@ PORT = 18765
 TOKEN = mint_token()
 HOST = ("Host", f"127.0.0.1:{PORT}")
 AUTH = (SESSION_HEADER, TOKEN)
-INDEX = (f'<!doctype html><html><head><meta name="caterva-session" content="{TOKEN_PLACEHOLDER}">'
+INDEX = (f'<!doctype html><html><head><meta name="caterva-studio-page" content="token-in-url-fragment">'
          '<script type="module" src="/assets/index-abc123.js"></script></head><body></body></html>')
 
 
@@ -112,7 +112,7 @@ def test_a_rebinding_page_is_refused_by_its_host_header(app, host):
     assert host not in response.body.decode() or host == ""
 
 
-def test_the_page_itself_is_refused_to_a_forged_host_because_it_carries_the_token(app):
+def test_the_page_itself_is_refused_to_a_forged_host(app):
     response = get(app, "/", ("Host", f"evil.example:{PORT}"))
     assert response.status == 403
     assert TOKEN.encode() not in response.body
@@ -194,11 +194,11 @@ def test_the_token_is_never_read_from_the_url_or_a_cookie(app):
     assert get(app, "/api/health", HOST, ("Cookie", f"{SESSION_HEADER}={TOKEN}")).status == 401
 
 
-def test_static_files_need_no_token_and_the_page_carries_it(app):
+def test_static_files_need_no_token_and_the_page_carries_none(app):
     response = get(app, "/", HOST)
     assert response.status == 200
     body = response.body.decode()
-    assert f'content="{TOKEN}"' in body and TOKEN_PLACEHOLDER not in body
+    assert TOKEN not in body and "caterva-session" not in body
 
 
 def test_the_dev_session_exists_only_with_a_dev_origin(app, dev_app):

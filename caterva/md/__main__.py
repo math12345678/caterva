@@ -11,6 +11,10 @@ MEASURED at, cited. Without them, 25 C is used and labelled a choice.
 from __future__ import annotations
 
 import argparse
+import math
+import os
+import secrets
+import shutil
 import stat
 import sys
 from dataclasses import dataclass
@@ -18,7 +22,7 @@ from pathlib import Path
 from typing import Any, List, Optional, Sequence, TextIO, Tuple
 
 from caterva.compose.organisms import normalise_organism
-from caterva.md.setup import Conditions, MdSetup
+from caterva.md.setup import CHAIN_ID, PDB_ID, Conditions, MdSetup
 
 
 def build_parser(prog: str = "caterva md") -> argparse.ArgumentParser:
@@ -98,6 +102,12 @@ def _from_kinetics(ec: str, organism: Optional[str], substrate: str) -> Tuple[Co
     return c, "no cited constant states its assay temperature; 25 C used, labelled a choice"
 
 
+#: Limits a request is held to (a script and mdp files are written from them).
+MAX_REPLICAS = 50
+MAX_NS = 10_000.0
+MAX_SEED = 2**31 - 1
+
+
 def check(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     """The refusals argparse cannot express on its own, through `parser.error`
     (exit 2), so that anything driving this parser (the studio refuses a
@@ -108,9 +118,24 @@ def check(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
         parser.error("a setup needs --pdb and --out (or use --summarise DIR on a finished run)")
     if args.replicas < 1:
         parser.error("--replicas must be at least 1")
-    pdb = args.pdb.strip().upper()
-    if len(pdb) != 4 or not pdb[0].isdigit() or not pdb.isalnum():
-        parser.error(f"{args.pdb!r} is not a PDB id (four characters, starting with a digit, like 1I10)")
+    if args.replicas > MAX_REPLICAS:
+        parser.error(f"--replicas must be at most {MAX_REPLICAS}")
+    if PDB_ID.fullmatch(args.pdb) is None:
+        parser.error(f"{args.pdb!r} is not a PDB id (four ASCII characters, a digit then letters or digits, "
+                     "like 1I10)")
+    if args.chain is not None and CHAIN_ID.fullmatch(args.chain) is None:
+        parser.error(f"{args.chain!r} is not a chain id (one to four ASCII letters or digits, like A)")
+    for flag, value, low, high, nonzero in (("--ns", args.ns, 0.0, MAX_NS, True),
+                                            ("--ionic-strength", args.ionic_strength, 0.0, 5.0, False),
+                                            ("--temperature", args.temperature, 0.0, 1000.0, True),
+                                            ("--ph", args.ph, 0.0, 14.0, False)):
+        if value is None:
+            continue
+        if not math.isfinite(value) or not low <= value <= high or (nonzero and value == low):
+            parser.error(f"{flag} must be a finite number up to {high:g}" + (" and above zero" if nonzero else
+                                                                             f", from {low:g}"))
+    if not 0 <= args.seed <= MAX_SEED:
+        parser.error(f"--seed must be a whole number from 0 to {MAX_SEED}")
     if (args.subject or args.substrate) and not (args.subject and args.substrate):
         parser.error("taking conditions from the kinetics needs both --subject and --substrate")
 
@@ -148,23 +173,71 @@ def plan(args: argparse.Namespace, out: Optional[TextIO] = None) -> Planned:
         conditions.ph = args.ph
         conditions.ph_source = "chosen: set with --ph"
         conditions.ph_measurement = None
-    setup = MdSetup(pdb_id=args.pdb.strip().upper(), chain=args.chain, conditions=conditions, ns=args.ns,
+    setup = MdSetup(pdb_id=args.pdb.upper(), chain=args.chain, conditions=conditions, ns=args.ns,
                     ionic_strength_m=args.ionic_strength, seed=args.seed, replicas=args.replicas)
     return Planned(setup, note, exit_code)
 
 
+class UnsafeOutput(ValueError):
+    """The output folder holds a link, so writing there could change a file
+    elsewhere; nothing was written."""
+
+
+def _links_inside(root: Path) -> List[Path]:
+    """Every symbolic link anywhere under `root` (not followed)."""
+    found: List[Path] = []
+    for folder, names, files in os.walk(root, followlinks=False):
+        for name in [*names, *files]:
+            path = Path(folder) / name
+            if path.is_symlink():
+                found.append(path)
+    return found
+
+
 def write(setup: MdSetup, out: Path) -> List[str]:
-    """Write the setup's files under `out`; their names, in the order written."""
-    out.mkdir(parents=True, exist_ok=True)
-    names = []
-    for name, text in setup.files().items():
-        path = out / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
-        if name.endswith(".sh"):
-            path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-        names.append(name)
-    return names
+    """Write the setup's files under `out`; their names, in the order written.
+
+    A link inside an existing `out` (a run.sh that points at another file,
+    say) would be written THROUGH, changing a file the setup has nothing to
+    do with. So `out` is refused (UnsafeOutput, nothing written) when it holds
+    a link anywhere; the files are first written into a new folder beside it
+    (exclusive create, links not followed), and only then moved into place
+    with a rename, which replaces a link rather than following it."""
+    files = setup.files()
+    if out.exists() and out.is_dir():
+        links = _links_inside(out)
+        if links:
+            raise UnsafeOutput(f"{out} holds a symbolic link ({links[0].relative_to(out)}); remove it or choose "
+                               "another folder: the setup does not write through links")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    staging = out.parent / f".caterva-md-{secrets.token_hex(6)}"
+    os.mkdir(staging)
+    try:
+        names = []
+        for name, text in files.items():
+            path = staging / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            mode = 0o755 if name.endswith(".sh") else 0o644
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), mode)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(text)
+            if name.endswith(".sh"):
+                path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            names.append(name)
+        if not out.exists():
+            os.rename(staging, out)
+            staging = None  # type: ignore[assignment]
+        else:
+            for name in names:
+                target = out / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.is_symlink():
+                    raise UnsafeOutput(f"{target} became a link while the setup was written; nothing more was written")
+                os.replace(staging / name, target)
+        return names
+    finally:
+        if staging is not None:
+            shutil.rmtree(staging, ignore_errors=True)
 
 
 def written_lines(planned: Planned, out: Path, prog: str = "caterva md") -> List[str]:
@@ -196,7 +269,11 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva md") -> int:
         return summarise_run(Path(args.summarise)).code
     planned = plan(args)
     out = Path(args.out)
-    write(planned.setup, out)
+    try:
+        write(planned.setup, out)
+    except UnsafeOutput as refused:
+        print(f"Refused: {refused}", file=sys.stderr)
+        return 3
     for line in written_lines(planned, out, prog):
         print(line)
     return planned.exit_code

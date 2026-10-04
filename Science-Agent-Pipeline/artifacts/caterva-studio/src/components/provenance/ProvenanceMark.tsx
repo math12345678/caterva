@@ -2,14 +2,17 @@
  * The mark every number wears, saying what kind of number it is.
  *
  *   measured     solid signal dot (the mark's own signal dot)
- *   fitted       ring
+ *   fitted       heavy solid ring
  *   computed     small square
- *   placeholder  hollow dashed dot, in the caution colour
- *   chosen       short bar; caution when a default chose it, ink when you did
+ *   placeholder  lighter ring in four coarse dashes, in the caution colour
+ *   chosen       filled diamond when you chose it; an outlined diamond with
+ *                a tick, in the caution colour, when a stated default did
  *
  * Shape carries the meaning and colour only reinforces it, so the marks
  * stay distinguishable in greyscale and to a reader who does not see the
- * colours (docs/studio/CONTRACT.md 17.3). Each has an accessible name.
+ * colours (docs/studio/CONTRACT.md 17.3). They are drawn at 12 px at the
+ * least, the size at which a dashed ring and a solid ring, and a filled and
+ * an outlined diamond, can still be told apart. Each has an accessible name.
  */
 import type { Provenance, ProvenanceKind } from "@/api/types";
 
@@ -37,9 +40,12 @@ export function provenanceLabel(p: Pick<Provenance, "kind" | "by">): string {
   return PROVENANCE_LABEL[p.kind];
 }
 
+/** The smallest a mark is drawn, in px. */
+export const MARK_SIZE = 12;
+
 export function ProvenanceMark({
   provenance,
-  size = 10,
+  size = MARK_SIZE,
   decorative = false,
 }: {
   provenance: Pick<Provenance, "kind" | "by">;
@@ -49,8 +55,8 @@ export function ProvenanceMark({
 }) {
   const label = provenanceLabel(provenance);
   const common = {
-    width: size,
-    height: size,
+    width: Math.max(size, MARK_SIZE),
+    height: Math.max(size, MARK_SIZE),
     viewBox: "0 0 10 10",
     focusable: "false" as const,
     ...(decorative ? { "aria-hidden": true as const } : { role: "img", "aria-label": label }),
@@ -65,7 +71,7 @@ export function ProvenanceMark({
     case "fitted":
       return (
         <svg {...common} className="prov-mark" data-kind="fitted">
-          <circle cx="5" cy="5" r="3.35" fill="none" stroke="var(--prov-fitted)" strokeWidth="1.5" />
+          <circle cx="5" cy="5" r="3.1" fill="none" stroke="var(--prov-fitted)" strokeWidth="2" />
         </svg>
       );
     case "computed":
@@ -80,25 +86,23 @@ export function ProvenanceMark({
           <circle
             cx="5"
             cy="5"
-            r="3.4"
+            r="3.6"
             fill="none"
             stroke="var(--prov-placeholder)"
-            strokeWidth="1.35"
-            strokeDasharray="1.7 1.35"
+            strokeWidth="1.3"
+            strokeDasharray="3.1 2.15"
           />
         </svg>
       );
     case "chosen":
-      return (
-        <svg {...common} className="prov-mark" data-kind="chosen" data-by={provenance.by ?? "default"}>
-          <rect
-            x="1.25"
-            y="4.1"
-            width="7.5"
-            height="1.8"
-            rx="0.4"
-            fill={provenance.by === "user" ? "var(--prov-chosen)" : "var(--prov-placeholder)"}
-          />
+      return provenance.by === "user" ? (
+        <svg {...common} className="prov-mark" data-kind="chosen" data-by="user">
+          <polygon points="5,0.6 9.4,5 5,9.4 0.6,5" fill="var(--prov-chosen)" />
+        </svg>
+      ) : (
+        <svg {...common} className="prov-mark" data-kind="chosen" data-by="default">
+          <polygon points="5,0.9 9.1,5 5,9.1 0.9,5" fill="none" stroke="var(--prov-placeholder)" strokeWidth="1.2" />
+          <path d="M3.3 5.1 4.6 6.4 6.8 3.7" fill="none" stroke="var(--prov-placeholder)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
   }

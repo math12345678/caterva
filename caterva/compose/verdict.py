@@ -621,6 +621,15 @@ def _provenance_concerns(
             f"the search for {subject!r} found nothing it could use"
         )
         note = f"{unmeasured} constant(s) unmeasured after searching"
+    elif not _database_could_supply(model):
+        # No enzyme step: say once why an enzyme does not apply, so the
+        # remedy below can be the one thing left to do.
+        detail = (
+            f"all {unmeasured} rate constant(s) are the motif library's "
+            f"illustrative values: this mechanism has no enzyme step, and "
+            f"its constants are not kept in an enzyme database"
+        )
+        note = f"{unmeasured} constant(s) unmeasured"
     else:
         detail = (
             f"all {unmeasured} rate constant(s) are the motif library's "
@@ -639,10 +648,10 @@ def _provenance_concerns(
         if _database_could_supply(model) else
         # A gene circuit's synthesis rates and repression thresholds are in
         # no enzyme database, and "name the enzyme" sent the reader to look
-        # for one in a model that has none (found 2026-09-25).
+        # for one in a model that has none (found 2026-09-25). The reason is
+        # stated once, in the concern's detail.
         "supply the constants the provenance table lists, from your own "
-        "measurements or a paper: this mechanism's constants are not kept "
-        "in an enzyme database, so naming an enzyme would not find them"
+        "measurements or a paper"
     )
     informative = _influence_is_informative(influence)
     if informative is True:

@@ -3,7 +3,7 @@
   "body": {
     "error": {
       "code": "unauthorized",
-      "message": "this request needs the session token of the page `caterva studio` served, in the X-Caterva-Session header"
+      "message": "this request needs the session token from the address `caterva studio` printed, in the X-Caterva-Session header"
     }
   }
 }

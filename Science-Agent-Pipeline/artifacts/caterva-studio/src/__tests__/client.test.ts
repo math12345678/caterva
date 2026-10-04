@@ -8,7 +8,15 @@ import runMissing from "./fixtures/api/run_missing.json";
 import settings from "./fixtures/api/settings.json";
 import settingsBad from "./fixtures/api/settings_bad.json";
 import wrongHost from "./fixtures/api/wrong_host.json";
-import { ApiRequestError, apiJson, apiPost, apiPut, sessionToken } from "@/api/client";
+import {
+  ApiRequestError,
+  apiJson,
+  apiPost,
+  apiPut,
+  discardSessionToken,
+  resetSessionTokenForTests,
+  sessionToken,
+} from "@/api/client";
 import { createRun, getRun } from "@/api/runs";
 import type { Capabilities, Health, Settings } from "@/api/types";
 import { describeError } from "@/lib/errors";
@@ -22,12 +30,45 @@ beforeEach(() => setSessionToken(TOKEN));
 afterEach(() => vi.unstubAllGlobals());
 
 describe("the session token", () => {
-  it("is read from the meta tag the server wrote", () => {
+  it("is the one the test gave the page", () => {
     expect(sessionToken()).toBe(TOKEN);
   });
 
-  it("is absent when the tag still holds the placeholder, and no request is made", async () => {
-    setSessionToken("__CATERVA_SESSION_TOKEN__");
+  it("is read from the URL fragment, which is removed from the address at once", () => {
+    const real = "A".repeat(43);
+    window.history.replaceState(null, "", `/runs#token=${real}`);
+    resetSessionTokenForTests();
+    expect(sessionToken()).toBe(real);
+    expect(window.location.hash).toBe("");
+    expect(window.location.pathname).toBe("/runs");
+    // A reload of the same tab has no fragment and still has the token.
+    resetSessionTokenForTests();
+    expect(sessionToken()).toBe(real);
+    discardSessionToken();
+    resetSessionTokenForTests();
+    expect(sessionToken()).toBeNull();
+  });
+
+  it("keeps other fragment parameters and drops an unusable token", () => {
+    window.history.replaceState(null, "", "/#token=short&section=about");
+    resetSessionTokenForTests();
+    expect(sessionToken()).toBeNull();
+    expect(window.location.hash).toBe("#section=about");
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("is never read from a meta tag in a build, nor written in by the server", () => {
+    const meta = document.createElement("meta");
+    meta.name = "caterva-session";
+    meta.content = "B".repeat(43);
+    document.head.appendChild(meta);
+    resetSessionTokenForTests();
+    expect(sessionToken()).toBeNull();
+    meta.remove();
+  });
+
+  it("is absent when the page was opened without one, and no request is made", async () => {
+    setSessionToken(null);
     expect(sessionToken()).toBeNull();
     const { fetchMock } = mockServer(() => health);
     const e = await apiJson("/api/health").catch((x: unknown) => x);

@@ -8,29 +8,49 @@
 // page) fails the build instead of the first person who opens it.
 //
 // What it reports about the page, and never the session token itself:
-//   the built page     index.html with the placeholder replaced by a token
+//   the built page     index.html built from this package, holding no token
 //   the not-built page the server's own page saying how to build the UI
 // `--require-page` fails the second; a development build may pass it.
+//
+// It also checks the token arrangement (docs/studio/CONTRACT.md, section 4):
+// the address the server printed carries the token in its URL fragment, no
+// page the server answers holds it, /api/health without it is refused, and
+// /api/health with it answers.
 
 import Foundation
 
 enum Smoke {
-    static let placeholder = "__CATERVA_SESSION_TOKEN__"
+    static let marker = "name=\"caterva-studio-page\""
+    static let fragmentKey = "token"
 
     enum Page {
         case built
         case notBuilt
-        case placeholderLeft
+        case carriesToken
         case unexpected(String)
 
         var line: String {
             switch self {
-            case .built: return "the built page, with a session token in place of the placeholder"
+            case .built: return "the built page, holding no session token"
             case .notBuilt: return "the server's not-built page (the API runs; the UI was not built into this copy)"
-            case .placeholderLeft: return "a page that still carries the token placeholder: it was not served by caterva studio"
+            case .carriesToken: return "a page that holds the session token: it must arrive in the URL fragment only"
             case .unexpected(let what): return "not a studio page: \(what)"
             }
         }
+    }
+
+    /// The token in an address's fragment, and the address without the fragment.
+    static func split(_ url: URL) -> (base: URL, token: String?) {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return (url, nil) }
+        var token: String?
+        if let fragment = components.fragment {
+            for pair in fragment.split(separator: "&") {
+                let parts = pair.split(separator: "=", maxSplits: 1).map(String.init)
+                if parts.count == 2, parts[0] == fragmentKey, !parts[1].isEmpty { token = parts[1] }
+            }
+        }
+        components.fragment = nil
+        return (components.url ?? url, token)
     }
 
     static func run(requirePage: Bool) -> Int32 {
@@ -78,22 +98,49 @@ enum Smoke {
             server.stop()
             return 1
         }
-        say(String(format: "url %@ after %.1f s", url.absoluteString, Date().timeIntervalSince(started)))
-
-        let (status, body, failure) = fetch(url)
+        let (base, token) = split(url)
+        say(String(format: "url %@ after %.1f s", base.absoluteString, Date().timeIntervalSince(started)))
         var ok = true
+        if token == nil {
+            say("FAIL the address the server printed has no #\(fragmentKey)= fragment")
+            ok = false
+        } else {
+            say("the address carries a session token in its URL fragment")
+        }
+
+        let (status, body, failure) = fetch(base)
         if let failure {
             say("FAIL GET / did not answer: \(failure)")
             ok = false
         } else {
-            let page = classify(body)
+            let page = classify(body, token: token)
             say("GET / -> \(status), \(page.line)")
             switch page {
             case .built: break
             case .notBuilt: if requirePage { say("FAIL --require-page: this copy has no built page"); ok = false }
-            case .placeholderLeft, .unexpected: ok = false
+            case .carriesToken, .unexpected: ok = false
             }
             if status != 200 { ok = false }
+        }
+
+        let health = base.appendingPathComponent("api/health")
+        let (refusedStatus, _, refusedFailure) = fetch(health)
+        if let refusedFailure {
+            say("FAIL GET /api/health without the token did not answer: \(refusedFailure)")
+            ok = false
+        } else {
+            say("GET /api/health without the token -> \(refusedStatus)")
+            if refusedStatus != 401 { say("FAIL it must be refused with 401"); ok = false }
+        }
+        if let token {
+            let (answered, _, answerFailure) = fetch(health, headers: ["X-Caterva-Session": token])
+            if let answerFailure {
+                say("FAIL GET /api/health with the token did not answer: \(answerFailure)")
+                ok = false
+            } else {
+                say("GET /api/health with the token -> \(answered)")
+                if answered != 200 { say("FAIL it must answer 200"); ok = false }
+            }
         }
 
         server.stop()
@@ -114,9 +161,10 @@ enum Smoke {
         return ok ? 0 : 1
     }
 
-    static func fetch(_ url: URL) -> (Int, String, String?) {
+    static func fetch(_ url: URL, headers: [String: String] = [:]) -> (Int, String, String?) {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
         request.setValue("text/html", forHTTPHeaderField: "Accept")
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         let session = URLSession(configuration: .ephemeral)
         let done = DispatchSemaphore(value: 0)
         var status = 0
@@ -136,22 +184,15 @@ enum Smoke {
         return (status, body, failure)
     }
 
-    /// Which page `/` answered with, read from the `caterva-session` meta tag.
-    static func classify(_ html: String) -> Page {
-        guard let tag = html.range(of: "name=\"caterva-session\"") else {
+    /// Which page `/` answered with, read from the page marker.
+    static func classify(_ html: String, token: String?) -> Page {
+        if let token, html.contains(token) { return .carriesToken }
+        guard html.range(of: marker) != nil else {
             if html.range(of: "<html", options: .caseInsensitive) != nil {
                 return .notBuilt
             }
             return .unexpected("no HTML in the answer")
         }
-        let after = html[tag.upperBound...]
-        guard let open = after.range(of: "content=\""),
-              let close = after[open.upperBound...].firstIndex(of: "\"") else {
-            return .unexpected("a caterva-session tag without content")
-        }
-        let value = after[open.upperBound..<close]
-        if value == placeholder { return .placeholderLeft }
-        if value.isEmpty { return .unexpected("an empty session token") }
         return .built
     }
 }

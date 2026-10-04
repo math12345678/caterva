@@ -42,7 +42,7 @@ caterva studio [--host 127.0.0.1] [--port N] [--no-browser] [--dev-origin URL]
 | `--no-browser` | Do not open the browser. |
 | `--dev-origin URL` | For working on the page: also accept requests from the Vite development server at `URL` (`http://127.0.0.1:<port>` or `http://localhost:<port>`). Development only. |
 | `--data-dir PATH` | Where runs, settings and the log are kept. Default: `~/Library/Application Support/Caterva` on macOS, `$XDG_DATA_HOME/caterva` or `~/.local/share/caterva` on Linux, `%APPDATA%\Caterva` on Windows. A folder that cannot be written is refused (exit 3). |
-| `--print-url` | Once listening, print one line `CATERVA_STUDIO_URL=<url>` to stdout. Nothing else is ever printed to stdout. The macOS app reads this line. |
+| `--print-url` | Once listening, print one line `CATERVA_STUDIO_URL=<url>#token=<token>` to stdout. Open the whole address, including the part after the `#`. Nothing else is ever printed to stdout. The macOS app reads this line. |
 | `--self-test` | Start on a free port in a temporary data folder (or `--data-dir`), request `/api/health` and `/` over a real socket, print one line per check, stop. Exit 0 when every check passed, 1 otherwise. |
 
 Exit codes: 0 stopped cleanly (or the self-test passed), 1 a crash or a
@@ -88,8 +88,9 @@ Set on the page (Settings) or with `PUT /api/settings`:
 The server listens on loopback only, refuses requests whose `Host` header
 does not name it (a defence against DNS rebinding), refuses requests from
 other web origins, and requires a per-launch session token on every API
-request. The token is written into the page the server serves and is never
-put in a URL or on disk. Section 3 of [CONTRACT.md](CONTRACT.md) has the
+request. The token is in no page the server serves: it reaches the page in the
+fragment of the address the app or `--print-url` gives (`#token=...`), which a
+browser never sends to a server, and it is never put on disk. Section 3 of [CONTRACT.md](CONTRACT.md) has the
 full list.
 
 ## Working on the page

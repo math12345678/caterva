@@ -7,7 +7,7 @@
  * read an SVG polyline) and also the honest one: the chart rounds by
  * drawing, the table shows each value as format.ts writes it. The plot
  * itself carries role="img" and an accessible name built from the title
- * and the caption.
+ * and a one-line summary of what it holds (its caption describes it).
  */
 import { type ReactNode, useId } from "react";
 
@@ -28,8 +28,11 @@ export function ChartFrame({
   table,
   children,
   height = 280,
+  summary,
 }: {
   title: string;
+  /** One line on what the plot holds ("3 series: S, P, E; 120 time points"), part of the plot's accessible name. */
+  summary?: string;
   /** What is plotted, in which units, and where it came from. */
   caption?: ReactNode;
   legend?: readonly LegendEntry[];
@@ -60,7 +63,7 @@ export function ChartFrame({
       <div
         className="chart-body"
         role="img"
-        aria-labelledby={`${id}-title`}
+        aria-label={summary ? `${title}. ${summary}` : title}
         aria-describedby={caption ? `${id}-caption` : undefined}
         style={{ height }}
       >

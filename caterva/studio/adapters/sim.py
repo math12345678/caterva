@@ -31,16 +31,27 @@ WHAT IS REFUSED
     --out (the table is the result and an artefact). Parameters the engine
     refuses (a negative k, a zero population) are refused at submission with
     the engine's own message, through the same validation the engine runs.
+    A request expected to make more than contract.MAX_SSA_EVENTS reaction
+    events is refused too, with that number in the message: the table holds
+    a row per event in memory, and a library call cannot be killed.
+
+HOW A CANCEL REACHES THE LOOP
+    The SSA loop polls `should_stop` every few hundred events; the adapter
+    passes `ctx.progress.is_cancelled`, so a cancelled run stops inside the
+    simulation within milliseconds, not at the end of it. The loop is also
+    given a hard event bound (a little above the limit) so a trajectory that
+    runs away from its expectation stops by itself.
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import io
+import math
 from typing import Any, Dict, List, Mapping
 
 from caterva.studio import contract
-from caterva.studio.adapters import AdapterOutcome, AdapterSpec, Artifact, RunContext, cli_parser
+from caterva.studio.adapters import AdapterOutcome, AdapterSpec, Artifact, Cancelled, RunContext, cli_parser
 from caterva.studio.adapters.compose import every_for, thinned_indices
 
 KIND = "sim"
@@ -111,7 +122,39 @@ def argv(request: Mapping[str, Any]) -> List[str]:
         validation.raise_if_invalid()
     except ModelBuildError as exc:
         raise contract.Malformed(f"error: {exc}") from exc
+    refuse_if_too_long(args)
     return out
+
+
+def expected_events(a0: float, b0: float, k: float, end: float, bimolecular: bool) -> float:
+    """How many reaction events the run is expected to make: the molecules the
+    deterministic solution consumes by `end` (never more than the molecules
+    there are to react). The loop's work, and the table's rows, scale with it."""
+    if not bimolecular:
+        return a0 * (1.0 - math.exp(-k * end))
+    limit = float(min(a0, b0))
+    try:
+        if a0 == b0:
+            left = a0 / (1.0 + k * a0 * end)
+        else:
+            left = (a0 - b0) / (1.0 - (b0 / a0) * math.exp(-k * (a0 - b0) * end))
+        consumed = a0 - left
+    except (OverflowError, ZeroDivisionError):
+        return limit
+    if math.isnan(consumed):
+        return limit
+    return max(0.0, min(consumed, limit))
+
+
+def refuse_if_too_long(args: argparse.Namespace) -> None:
+    """Malformed, naming the limit, when the run would make too many events."""
+    events = expected_events(args.a0, args.b0 if args.bimolecular else 0, args.k, args.end,
+                             bool(args.bimolecular))
+    if events > contract.MAX_SSA_EVENTS:
+        raise contract.Malformed(
+            f"this run is expected to make about {events:,.0f} reaction events (a0 {args.a0:,}, k {args.k:g}, "
+            f"end {args.end:g}); a run is limited to {contract.MAX_SSA_EVENTS:,}. Lower a0, k or end.",
+            field="a0")
 
 
 def describe(request: Mapping[str, Any]) -> str:
@@ -122,14 +165,22 @@ def describe(request: Mapping[str, Any]) -> str:
 def run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
     from caterva.caterva_engine import ModelBuildError
     from caterva.cli import expectation, report, simulate
+    from caterva.discrete.gillespie_ssa import SimulationCancelled, SimulationTooLong
 
     args = _parsed(argv_of(request))
+    refuse_if_too_long(args)
     ctx.progress.check_cancelled()
     ctx.progress.stage("simulate", "Running the exact stochastic simulation", None)
     try:
-        result = simulate(args)
+        result = simulate(args, should_stop=getattr(ctx.progress, "is_cancelled", None),
+                          max_events=int(contract.MAX_SSA_EVENTS * 1.25))
     except ModelBuildError as exc:
         raise contract.Malformed(f"error: {exc}") from exc
+    except SimulationCancelled:
+        raise Cancelled(ctx.run_id) from None
+    except SimulationTooLong as exc:
+        raise contract.Malformed(f"{exc}; a run is limited to {contract.MAX_SSA_EVENTS:,} expected events",
+                                 field="a0") from None
     summary = expectation(args, result)
     text = report(args, result)
     out = sim_result(request, args, result, summary, text)

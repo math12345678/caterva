@@ -5,7 +5,7 @@
  */
 import { vi } from "vitest";
 
-import { resetSessionTokenForTests } from "@/api/client";
+import { adoptSessionTokenForTests } from "@/api/client";
 
 export interface Recorded {
   status: number;
@@ -29,16 +29,9 @@ export function fromRecorded(r: Recorded): Response {
   return json(r.status, r.body);
 }
 
-/** Put a session token in the page, as the server does when it serves index.html. */
+/** Give the page a session token, as the address the launcher opens does (or none). */
 export function setSessionToken(token: string | null): void {
-  document.head.querySelectorAll('meta[name="caterva-session"]').forEach((m) => m.remove());
-  if (token !== null) {
-    const meta = document.createElement("meta");
-    meta.name = "caterva-session";
-    meta.content = token;
-    document.head.appendChild(meta);
-  }
-  resetSessionTokenForTests();
+  adoptSessionTokenForTests(token);
 }
 
 export function mockServer(handler: Handler) {
@@ -94,3 +87,11 @@ export function parseCsv(text: string): { columns: string[]; series: Record<stri
   }
   return { columns, series };
 }
+
+/**
+ * A text matcher for a run's title in a list. The title is drawn with its
+ * identifiers ("EC 1.1.1.27") in their own spans, so the text is split across
+ * elements; this matches the title element by its whole text.
+ */
+export const runTitle = (text: string) => (_content: string, element: Element | null): boolean =>
+  Boolean(element && element.matches(".run-row-title") && element.textContent === text);

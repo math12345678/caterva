@@ -25,7 +25,33 @@ struct StudioCommand {
     /// as a JSON array of strings or as words separated by spaces, the first
     /// an absolute path to an executable. The studio flags are appended.
     ///   CATERVA_STUDIO_COMMAND='/path/to/.venv/bin/python -m caterva.app studio'
+    ///
+    /// Honoured only by a build made with `-D CATERVA_DEVELOPMENT` (the
+    /// `--dev` build of scripts/build_studio_app.py) AND when
+    /// `CATERVA_STUDIO_DEV=1` is set or the marker file exists. A release
+    /// build ignores these variables whatever the environment holds: an
+    /// environment variable is something any process that starts the app can
+    /// set, and it would otherwise choose the program the app runs.
     static let commandKey = "CATERVA_STUDIO_COMMAND"
+    static let developmentKey = "CATERVA_STUDIO_DEV"
+    /// An empty file whose presence, in a development build, switches the
+    /// development variables on without setting an environment variable.
+    static var developmentMarker: URL {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
+        return support.appendingPathComponent("Caterva/development-marker")
+    }
+
+    /// Whether the development variables count: a development build, and an
+    /// explicit switch. Always false in a release build.
+    static func developmentEnabled(environment: [String: String],
+                                   markerExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }) -> Bool {
+        #if CATERVA_DEVELOPMENT
+        return environment[developmentKey] == "1" || markerExists(developmentMarker)
+        #else
+        return false
+        #endif
+    }
     /// Working directory for the development command (a checkout, so that
     /// `python -m caterva.app` imports that checkout's package).
     static let directoryKey = "CATERVA_STUDIO_CWD"
@@ -59,8 +85,10 @@ struct StudioCommand {
 
     static func resolve(bundle: Bundle = .main,
                         environment: [String: String] = ProcessInfo.processInfo.environment) throws -> StudioCommand {
-        let dataDirectory = try absoluteDirectory(environment[dataDirectoryKey], key: dataDirectoryKey, mustExist: false)
-        if let raw = environment[commandKey]?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty {
+        let development = developmentEnabled(environment: environment)
+        let dataDirectory = development
+            ? try absoluteDirectory(environment[dataDirectoryKey], key: dataDirectoryKey, mustExist: false) : nil
+        if development, let raw = environment[commandKey]?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty {
             let words = try split(raw)
             guard let first = words.first, first.hasPrefix("/") else {
                 throw Failure.malformed("\(commandKey) must start with an absolute path to an executable; it starts with \(words.first ?? "nothing").")
@@ -121,16 +149,21 @@ struct StudioCommand {
     }
 
     /// The server inherits the shell's environment, less what would make the
-    /// frozen interpreter load somebody else's Python.
+    /// frozen interpreter load somebody else's Python or library: in a
+    /// release build every PYTHON*, DYLD_* and CATERVA_STUDIO_* variable is
+    /// dropped (the two the server needs are set after), in a development
+    /// run only PYTHONHOME is.
     func environment(_ base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
         var environment = base
-        environment["PYTHONUNBUFFERED"] = "1"
-        environment["PYTHONUTF8"] = "1"
         environment.removeValue(forKey: "PYTHONHOME")
         if !isDevelopment {
-            environment.removeValue(forKey: "PYTHONPATH")
-            environment.removeValue(forKey: "PYTHONSTARTUP")
+            for key in Array(environment.keys)
+            where key.hasPrefix("PYTHON") || key.hasPrefix("DYLD_") || key.hasPrefix("CATERVA_STUDIO_") {
+                environment.removeValue(forKey: key)
+            }
         }
+        environment["PYTHONUNBUFFERED"] = "1"
+        environment["PYTHONUTF8"] = "1"
         return environment
     }
 }
@@ -312,12 +345,13 @@ final class StudioServer {
             let value = String(line.dropFirst(StudioServer.urlPrefix.count)).trimmingCharacters(in: .whitespaces)
             if let url = StudioServer.loopbackURL(value) {
                 urlSeen = true
-                writeLog("listening at \(url.absoluteString)\n")
+                writeLog("listening at \(StudioServer.withoutFragment(url).absoluteString)\n")
                 let callback = onURL
                 callbackQueue.async { callback?(url) }
             } else {
-                writeLog("ignored an address that is not a loopback http URL: \(value)\n")
-                remember("(the server printed an address that is not on this machine: \(value))")
+                let shown = StudioServer.withoutFragment(URL(string: value)) ?? "(unreadable)"
+                writeLog("ignored an address that is not a loopback http URL: \(shown)\n")
+                remember("(the server printed an address that is not on this machine: \(shown))")
             }
             return
         }
@@ -330,6 +364,18 @@ final class StudioServer {
     private func remember(_ line: String) {
         tail.append(line)
         if tail.count > StudioServer.tailLength { tail.removeFirst(tail.count - StudioServer.tailLength) }
+    }
+
+    /// The address without its fragment, which holds the session token: what
+    /// may be written to a log or shown in a window.
+    static func withoutFragment(_ url: URL) -> URL {
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.fragment = nil
+        return components?.url ?? url
+    }
+
+    static func withoutFragment(_ url: URL?) -> String? {
+        url.map { withoutFragment($0).absoluteString }
     }
 
     /// `http://<loopback>:<port>/...` and nothing else.

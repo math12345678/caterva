@@ -50,7 +50,13 @@ export type RunEvent =
 const EVENT_NAMES: readonly EventName[] = ["status", "stage", "log", "result", "error", "end"];
 
 /** A run that will not change again. */
-export const TERMINAL: ReadonlySet<RunStatus> = new Set(["done", "failed", "cancelled", "interrupted"]);
+export const TERMINAL: ReadonlySet<RunStatus> = new Set(["done", "failed", "cancelled", "abandoned", "interrupted"]);
+
+/** What a screen treats a run's status as: "cancelling" is a run still working, so it stays "running"
+ * (the screens' own `cancelling` flag says a stop was asked for). */
+export function liveStatus(status: RunStatus): RunStatus {
+  return status === "cancelling" ? "running" : status;
+}
 
 export function isTerminal(status: RunStatus | "idle"): boolean {
   return status !== "idle" && TERMINAL.has(status);
@@ -102,9 +108,17 @@ export function downloadArtifact(id: string, name: string): Promise<string> {
   return downloadFrom(`${runPath(id)}/artifacts/${encodeURIComponent(name)}`, name);
 }
 
-/** Save a run as caterva-<id>.zip: the record, request, result, events, artifacts and the command. */
-export function downloadBundle(id: string): Promise<string> {
-  return downloadFrom(`${runPath(id)}/bundle`, `caterva-${id}.zip`);
+/**
+ * Save a run as caterva-<id>.zip: the record, request, result, events, artifacts and the command.
+ * By default the home folder is written as ~ and a crash's traceback is left out; `diagnostics`
+ * keeps the traceback, `redactPaths: false` keeps every path as it was.
+ */
+export function downloadBundle(id: string, options: { diagnostics?: boolean; redactPaths?: boolean } = {}): Promise<string> {
+  const query = new URLSearchParams();
+  if (options.diagnostics) query.set("diagnostics", "true");
+  if (options.redactPaths === false) query.set("redact_paths", "false");
+  const suffix = query.size ? `?${query.toString()}` : "";
+  return downloadFrom(`${runPath(id)}/bundle${suffix}`, `caterva-${id}.zip`);
 }
 
 /** Parse one SSE block ("event: x\nid: n\ndata: {...}") into a checked RunEvent. */

@@ -547,10 +547,10 @@ def _smoke(bundle: Path, version: str, require_studio_page: bool = False) -> Non
 #: Where the studio's built page lands inside a onedir folder: PyInstaller's
 #: `--collect-all caterva` copies the installed package's data files there.
 STUDIO_PAGE = Path("_internal") / "caterva" / "studio" / "static" / "index.html"
-#: What the built page carries until the server writes the session token in
-#: (caterva.studio.contract.TOKEN_PLACEHOLDER; read as text, not imported,
-#: so this script needs nothing but the standard library).
-TOKEN_PLACEHOLDER = "__CATERVA_SESSION_TOKEN__"
+#: What a page built from this package carries
+#: (caterva.studio.contract.PAGE_MARKER_*; read as text, not imported, so this
+#: script needs nothing but the standard library). It holds no session token.
+PAGE_MARKER = '<meta name="caterva-studio-page" content="token-in-url-fragment"'
 
 
 def studio_page_problem(bundle: Path) -> str | None:
@@ -559,8 +559,8 @@ def studio_page_problem(bundle: Path) -> str | None:
     if not page.is_file():
         return (f"{STUDIO_PAGE.as_posix()} is missing: the installed wheel was built without the page "
                 "(build it first: pnpm --filter @workspace/caterva-studio run build, from Science-Agent-Pipeline/)")
-    if TOKEN_PLACEHOLDER not in page.read_text(encoding="utf-8", errors="replace"):
-        return f"{STUDIO_PAGE.as_posix()} has no {TOKEN_PLACEHOLDER} to replace: it is not the studio's built page"
+    if PAGE_MARKER not in page.read_text(encoding="utf-8", errors="replace"):
+        return f"{STUDIO_PAGE.as_posix()} has no page marker: it is not the studio's built page"
     if not any((page.parent / "assets").glob("*.js")):
         return f"{STUDIO_PAGE.as_posix()} is there but static/assets/ holds no script"
     return None

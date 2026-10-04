@@ -64,6 +64,8 @@ ROUTES: Tuple[Route, ...] = (
           summary="liveness, version and api_version"),
     Route("GET", "/api/capabilities", "capabilities", "Capabilities",
           summary="what this installation can do; ?probe=network checks the hosts"),
+    Route("POST", "/api/capabilities/refresh", "refresh_capabilities", "Capabilities",
+          summary="run the chosen gmx now and answer capabilities; the only request that runs it (body {})"),
     Route("GET", "/api/settings", "get_settings", "Settings"),
     Route("PUT", "/api/settings", "put_settings", "Settings",
           summary="replace the settings; unknown keys are malformed"),
@@ -94,7 +96,8 @@ ROUTES: Tuple[Route, ...] = (
     Route("GET", "/api/runs/{id}/artifacts/{name}", "get_artifact", "<artifact media type>",
           summary="a file the run produced, by its recorded name"),
     Route("GET", "/api/runs/{id}/bundle", "get_bundle", "application/zip",
-          summary="run.json, request.json, result.json, events.jsonl and artifacts"),
+          summary="run.json, request.json, result.json, events.jsonl and artifacts; ?redact_paths=true (default) "
+                  "writes the home folder as ~, ?diagnostics=false (default) leaves out tracebacks"),
     Route("GET", "/api/dev/session", "dev_session", "DevSession",
           token=False, dev_only=True,
           summary="the session token for the Vite dev server's index.html (--dev-origin only)"),

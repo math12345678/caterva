@@ -3,7 +3,7 @@
     caterva studio                       serve on 127.0.0.1, a free port, open the browser
     caterva studio --port 0 --no-browser --print-url
                                          what the macOS app runs; prints one line
-                                         CATERVA_STUDIO_URL=<url> once serving
+                                         CATERVA_STUDIO_URL=<url>#token=<token> once serving
     caterva studio --self-test           start, request /api/health and / over a real
                                          socket, print the result, exit 0 or 1
 
@@ -13,7 +13,8 @@ shell, the preview launch configurations and CI all pass them.
 WHAT GOES TO STDOUT, AND WHY NOTHING ELSE DOES
 ----------------------------------------------
 The macOS shell reads this process's stdout until it sees the
-`CATERVA_STUDIO_URL=` line, and a stray line before it (a library's notice,
+`CATERVA_STUDIO_URL=` line (the address with the session token in its URL
+fragment: the token is in no document the server serves), and a stray line before it (a library's notice,
 a warning) would be read as the answer or block the pipe. So once the
 server is up, `sys.stdout` and `sys.stderr` are routed (jobs.OutputRouter):
 what a run prints becomes that run's log events, and everything else goes
@@ -41,12 +42,14 @@ from __future__ import annotations
 
 import argparse
 import errno
+import html
 import http.client
 import json
 import logging
 import logging.handlers
 import os
 import re
+import secrets
 import signal
 import stat
 import sys
@@ -63,7 +66,16 @@ LOOPBACK_HOSTS = ("127.0.0.1", "::1", "localhost")
 
 #: A development origin is another loopback server (Vite), named exactly as
 #: the browser will send it in `Origin`: scheme, loopback host, port, no path.
-DEV_ORIGIN = re.compile(r"^http://(?:127\.0\.0\.1|localhost):[0-9]{1,5}$")
+DEV_ORIGIN = re.compile(r"http://(?:127\.0\.0\.1|localhost):([0-9]{1,5})", re.ASCII)
+
+
+def valid_dev_origin(text: str) -> bool:
+    """Whether `text` is exactly a loopback origin with a port from 1 to 65535.
+
+    `fullmatch`, because `$` also matches before a trailing newline, and a
+    range check, because the pattern alone accepts port 0 and 99999."""
+    match = DEV_ORIGIN.fullmatch(text)
+    return match is not None and 1 <= int(match.group(1)) <= 65535
 
 #: studio.log is rotated at this size, keeping one old copy (CONTRACT.md 11).
 LOG_MAX_BYTES = 5 * 1024 * 1024
@@ -102,7 +114,7 @@ def build_parser(prog: str = "caterva studio") -> argparse.ArgumentParser:
     p.add_argument("--data-dir", metavar="PATH",
                    help="where runs and settings are kept (default: the platform's application data folder)")
     p.add_argument("--print-url", action="store_true",
-                   help="print CATERVA_STUDIO_URL=<url> on one line once serving")
+                   help="print CATERVA_STUDIO_URL=<url>#token=<token> on one line once serving")
     p.add_argument("--self-test", action="store_true",
                    help="start, request /api/health and / over a real socket, report, exit 0 or 1")
     return p
@@ -121,9 +133,9 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva studio", *,
                      f"{', '.join(LOOPBACK_HOSTS)}")
     if not 0 <= args.port <= 65535:
         parser.error(f"--port {args.port} is not a port number (0 picks a free one)")
-    if args.dev_origin is not None and not DEV_ORIGIN.match(args.dev_origin):
+    if args.dev_origin is not None and not valid_dev_origin(args.dev_origin):
         parser.error(f"--dev-origin {args.dev_origin!r} is not a loopback origin such as "
-                     "http://127.0.0.1:18741 (scheme, host and port, nothing else)")
+                     "http://127.0.0.1:18741 (scheme, host and a port from 1 to 65535, nothing else)")
     if args.data_dir is not None and not args.data_dir.strip():
         parser.error("--data-dir needs a path")
 
@@ -342,10 +354,10 @@ def serve(args: argparse.Namespace, prog: str, out: TextIO, err: TextIO, *,
             if args.dev_origin:
                 log.info("accepting requests from the development origin %s", args.dev_origin)
             if args.print_url:
-                out.write(f"{URL_LINE_PREFIX}{app.url}\n")
+                out.write(f"{URL_LINE_PREFIX}{app.bootstrap_url}\n")
                 out.flush()
             if not args.no_browser:
-                threading.Thread(target=_open_browser, args=(app.url,), name="caterva-studio-browser",
+                threading.Thread(target=_open_browser, args=(app, workspace.root), name="caterva-studio-browser",
                                  daemon=True).start()
             if watch:
                 watch_parent(stop)
@@ -366,12 +378,59 @@ def serve(args: argparse.Namespace, prog: str, out: TextIO, err: TextIO, *,
     return code
 
 
-def _open_browser(url: str) -> None:
+#: How long the one-use launch page stays on disk, in seconds.
+LAUNCH_PAGE_TTL_S = 30.0
+
+
+def launch_page_html(url: str) -> str:
+    """A page that sends the browser on to `url`, which carries the token."""
+    escaped = html.escape(url, quote=True)
+    return ('<!doctype html><meta charset="utf-8"><title>Caterva Studio</title>'
+            f'<meta http-equiv="refresh" content="0;url={escaped}">'
+            f'<p><a href="{escaped}">Open Caterva Studio</a></p>\n')
+
+
+def write_launch_page(directory: Path, url: str) -> Path:
+    """The launch page, in a file only this user can read, created exclusively
+    (never through a link another process planted)."""
+    path = directory / f".open-studio-{secrets.token_hex(8)}.html"
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(launch_page_html(url))
+    return path
+
+
+def _open_browser(app: Any, directory: Path, *, opener: Callable[[str], bool] = webbrowser.open,
+                  ttl_s: float = LAUNCH_PAGE_TTL_S) -> None:
+    """Open the default browser on the address with the token in its fragment.
+
+    A process's arguments are readable by every user on the machine, and the
+    browser is started with the address as an argument. So the browser is
+    given a file: URL to a page, readable only by this user and deleted
+    after `ttl_s`, that forwards to the address; the token is never an
+    argument of any process. If no browser can be opened the address is not
+    logged: the user starts again with --print-url."""
+    page: Optional[Path] = None
     try:
-        if not webbrowser.open(url):
-            log.warning("no browser could be opened; open %s yourself", url)
+        page = write_launch_page(directory, app.bootstrap_url)
+        if not opener(page.as_uri()):
+            log.warning("no browser could be opened; run `caterva studio --no-browser --print-url` "
+                        "and open the address it prints (%s plus the token)", app.url)
     except Exception as exc:  # noqa: BLE001 - a missing browser is reported, not fatal
-        log.warning("no browser could be opened (%s); open %s yourself", exc, url)
+        log.warning("no browser could be opened (%s); run `caterva studio --no-browser --print-url` "
+                    "and open the address it prints (%s plus the token)", type(exc).__name__, app.url)
+    finally:
+        if page is not None:
+            timer = threading.Timer(ttl_s, _remove_quietly, args=(page,))
+            timer.daemon = True
+            timer.start()
+
+
+def _remove_quietly(path: Path) -> None:
+    try:
+        path.unlink()
+    except OSError:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -451,7 +510,7 @@ class _Collect:
 
 
 def _checks(app: Any) -> Iterator[Tuple[bool, str]]:
-    from caterva.studio.contract import SESSION_HEADER, STUDIO_API_VERSION, TOKEN_PLACEHOLDER
+    from caterva.studio.contract import SESSION_HEADER, STUDIO_API_VERSION, TOKEN_FRAGMENT_KEY
 
     host, port = app.guard.host, app.guard.port
     connect_host = "::1" if host == "::1" else "127.0.0.1"
@@ -485,20 +544,27 @@ def _checks(app: Any) -> Iterator[Tuple[bool, str]]:
         text = body.decode("utf-8", errors="replace")
         built, reason = app.static.built()
         csp = "content-security-policy" in headers
+        leaked = app.token in text
         if built:
-            good = status == 200 and csp and f'content="{app.token}"' in text and TOKEN_PLACEHOLDER not in text
-            yield good, f"/: HTTP {status}, the built page with the session token written in" if good else \
-                f"/: HTTP {status}, the built page without the session token written in"
+            good = status == 200 and csp and not leaked
+            yield good, (f"/: HTTP {status}, the built page, with no session token in it" if good
+                         else f"/: HTTP {status}, the built page carries the session token" if leaked
+                         else f"/: HTTP {status}, not the built page")
         else:
-            good = status == 200 and csp and "the page is not built" in text
-            yield good, f"/: HTTP {status}, the page is not built here, so the server's own page explaining " \
-                        "how to build it" if good else f"/: HTTP {status}, not the expected not-built page"
+            good = status == 200 and csp and "the page is not built" in text and not leaked
+            yield good, (f"/: HTTP {status}, the page is not built here, so the server's own page explaining "
+                         "how to build it" if good else f"/: HTTP {status}, not the expected not-built page")
     except (OSError, http.client.HTTPException) as exc:
         yield False, f"/: {type(exc).__name__}: {exc}"
 
+    url = app.bootstrap_url
+    expected = f"{app.url}#{TOKEN_FRAGMENT_KEY}={app.token}"
+    yield url == expected, "the address printed for the app carries the session token in its URL fragment" \
+        if url == expected else "the address printed for the app does not carry the token in its fragment"
 
-__all__ = ["DEV_ORIGIN", "LOOPBACK_HOSTS", "build_parser", "main", "self_test", "serve", "stdin_is_pipe",
-           "watch_parent"]
+
+__all__ = ["DEV_ORIGIN", "LAUNCH_PAGE_TTL_S", "LOOPBACK_HOSTS", "build_parser", "launch_page_html", "main",
+           "self_test", "serve", "stdin_is_pipe", "valid_dev_origin", "watch_parent", "write_launch_page"]
 
 
 if __name__ == "__main__":

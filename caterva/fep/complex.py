@@ -26,6 +26,7 @@ Exit codes: 0 written (or: the ligand kept its pose), 4 it left its pose,
 from __future__ import annotations
 
 import argparse
+import shlex
 import sys
 import urllib.request
 from dataclasses import dataclass
@@ -205,9 +206,20 @@ def ligand_gro(atoms: Sequence[LigandAtom], resname: str) -> str:
 
 
 def build_script(pdb_id: str, moltype: str, itp_name: str, setup: MdSetup, resname: str = "") -> str:
-    ff, water, seed = setup.force_field, setup.water, setup.seed
+    """build.sh. Every name that came from a file or the command line (the
+    PDB id, the ligand's moleculetype and file name, its residue name) is
+    quoted for the shell, and the awk program receives them as variables, so
+    none of them can end a quote and start a command."""
+    ff, water, seed = shlex.quote(setup.force_field), shlex.quote(setup.water), int(setup.seed)
+    title = shlex.quote(f"{pdb_id.upper()} with {moltype}")
+    include = shlex.quote(f'#include "{itp_name}"')
+    itp = shlex.quote(itp_name)
+    column = shlex.quote(f"{moltype:<20}1")
+    ligand = shlex.quote(resname or moltype)
+    comment_pdb = "".join(c if c.isalnum() else "_" for c in pdb_id.upper())
+    comment_mol = "".join(c if c.isalnum() or c in "_-+." else "_" for c in moltype)
     return f"""#!/usr/bin/env bash
-# Caterva complex: PDB {pdb_id.upper()} with {moltype} in its crystal pose. Read BUILD.md.
+# Caterva complex: PDB {comment_pdb} with {comment_mol} in its crystal pose. Read BUILD.md.
 # Needs GROMACS (gmx). Stops at the first error. Output: npt.gro + topol.top.
 set -euo pipefail
 GMX="${{GMX:-gmx}}"
@@ -218,30 +230,31 @@ cd "$(dirname "$0")"
 
 # Protein + ligand in one coordinate file: the protein's atoms, then the
 # ligand's, under the protein's box line.
-awk 'FNR==NR {{ p[FNR]=$0; np=FNR; next }} {{ l[FNR]=$0; nl=FNR }}
-     END {{ print "{pdb_id.upper()} with {moltype}"; print p[2]+l[2];
-           for (i=3;i<np;i++) print p[i]; for (i=3;i<nl;i++) print l[i]; print p[np] }}' \\
+awk -v title={title} 'FNR==NR {{ p[FNR]=$0; np=FNR; next }} {{ l[FNR]=$0; nl=FNR }}
+     END {{ print title; print p[2]+l[2];
+           for (i=3;i<np;i++) print p[i]; for (i=3;i<nl;i++) print l[i]; print p[np] }}' \
     protein.gro ligand.gro > complex_vacuum.gro
 
 # The ligand's topology goes straight after the force field, where its own
 # [ atomtypes ] (if it has them) must be; its molecule after the protein's.
-if ! grep -q '#include "{itp_name}"' topol.top; then
-  awk '{{ print }} /#include ".*forcefield.itp"/ && !done {{ print "#include \\"{itp_name}\\""; done=1 }}' topol.top > topol.tmp
+if ! grep -qF {include} topol.top; then
+  awk -v itp={itp} '{{ print }} /#include ".*forcefield.itp"/ && !done {{ print "#include \"" itp "\""; done=1 }}' topol.top > topol.tmp
   mv topol.tmp topol.top
-  printf '{moltype:<20}1\\n' >> topol.top
+  printf '%s\\n' {column} >> topol.top
 fi
 
 "$GMX" editconf -f complex_vacuum.gro -o boxed.gro -c -d 1.0 -bt dodecahedron
 "$GMX" solvate -cp boxed.gro -cs spc216.gro -o solvated.gro -p topol.top
 "$GMX" grompp -f ions.mdp -c solvated.gro -p topol.top -o ions.tpr -maxwarn 1
-echo SOL | "$GMX" genion -s ions.tpr -o ionized.gro -p topol.top -pname NA -nname CL -neutral -conc {setup.ionic_strength_m:g} -seed {seed}
+echo SOL | "$GMX" genion -s ions.tpr -o ionized.gro -p topol.top -pname NA -nname CL -neutral -conc {shlex.quote(format(setup.ionic_strength_m, "g"))} -seed {seed}
 "$GMX" grompp -f em.mdp -c ionized.gro -p topol.top -o em.tpr
 "$GMX" mdrun -deffnm em $MDRUN_FLAGS
 "$GMX" grompp -f nvt.mdp -c em.gro -r em.gro -p topol.top -o nvt.tpr
 "$GMX" mdrun -deffnm nvt $MDRUN_FLAGS
 "$GMX" grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -o npt.tpr
 "$GMX" mdrun -deffnm npt $MDRUN_FLAGS
-echo "done: equilibrated complex in $(pwd)/npt.gro, topology $(pwd)/topol.top"\necho "check the pose held: caterva complex --check $(pwd) --ligand {resname or moltype}"
+echo "done: equilibrated complex in $(pwd)/npt.gro, topology $(pwd)/topol.top"
+echo "check the pose held: caterva complex --check $(pwd) --ligand "{ligand}
 """
 
 

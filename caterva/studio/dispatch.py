@@ -16,7 +16,7 @@ thing over a real port where one can be bound.
 THE ORDER THE RULES RUN IN (docs/studio/CONTRACT.md section 3)
 --------------------------------------------------------------
 Host (403), then Origin and Sec-Fetch-Site (403), for every path, static
-files included, because index.html carries the token. Then, for /api/:
+files included (the page itself holds no token: static_files.py). Then, for /api/:
 the session token (401), the body rules (415, 413, 400), and only then the
 route (404, 405), so a request without the token learns nothing about
 which paths exist. A handler runs last, and anything it raises that is not
@@ -38,14 +38,14 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
 from urllib.parse import parse_qsl, unquote, urlsplit
 
-from caterva.studio import routes
+from caterva.studio import limits, routes
 from caterva.studio.adapters import EndpointRequest, load_registry
 from caterva.studio.capabilities import NOT_BUILT_YET, CapabilityProbe
 from caterva.studio.contract import (
     MAX_BODY_BYTES, RUN_KINDS, RUN_STATUSES, SESSION_HEADER, STUDIO_API_VERSION, Malformed, NotFound, Unavailable,
 )
-from caterva.studio.jobs import Conflict, JobManager
-from caterva.studio.security import ARTIFACT_CSP, BASE_HEADERS, CSP, Guard, mint_token, url_for
+from caterva.studio.jobs import Conflict, JobManager, QueueFull
+from caterva.studio.security import ARTIFACT_CSP, BASE_HEADERS, CSP, Guard, bootstrap_url, mint_token, url_for
 from caterva.studio.static_files import NotFromThisPackage, StaticSite
 from caterva.studio.workspace import (
     DEFAULT_LIMIT, MAX_LIMIT, TERMINAL_STATUSES, RunNotFound, Workspace, iso, summary_of, utc_now, validate_settings,
@@ -199,7 +199,12 @@ class App:
         self._settings, self.settings_note = workspace.load_settings()
         self.manager = JobManager(workspace, self.registry, instance_id=self.instance_id,
                                   parallel=lambda: self.settings()["max_parallel_runs"],
-                                  offline=lambda: bool(self.settings().get("offline")), **dict(job_options or {}))
+                                  offline=lambda: bool(self.settings().get("offline")),
+                                  keep_runs=lambda: int(self.settings().get("keep_runs") or 200),
+                                  **dict(job_options or {}))
+        #: The bounds on work a request can start (limits.py), one set per server.
+        self.finder = limits.SearchGuard()
+        self.streams = limits.Gate(limits.MAX_STREAMS)
         self.capabilities = CapabilityProbe(registry=self.registry, workspace=workspace, static_site=self.static,
                                             dev_origin=dev_origin, settings=self.settings,
                                             **dict(capability_options or {}))
@@ -210,7 +215,14 @@ class App:
 
     @property
     def url(self) -> str:
+        """The server's address, without the token: safe to log."""
         return url_for(self.guard.host, self.guard.port)
+
+    @property
+    def bootstrap_url(self) -> str:
+        """The address a launcher opens: `url` and the token in the URL
+        fragment. Never logged."""
+        return bootstrap_url(self.guard.host, self.guard.port, self.token)
 
     def settings(self) -> Dict[str, Any]:
         with self._settings_lock:
@@ -225,6 +237,9 @@ class App:
         swept = self.manager.sweep_interrupted()
         if apply_environment:
             self.capabilities.apply_gromacs_to_environment()
+            if self.settings().get("gromacs_path"):
+                threading.Thread(target=self.capabilities.refresh_gromacs, name="caterva-gmx-check",
+                                 daemon=True).start()
         return swept
 
     def close(self) -> None:
@@ -274,7 +289,7 @@ class App:
             return error_response(405, "method_not_allowed", f"{method} is not served for the page",
                                   headers=[("Allow", "GET, HEAD")])
         try:
-            answer = self.static.serve(path, self.token)
+            answer = self.static.serve(path)
         except NotFromThisPackage as exc:
             log.error("%s", exc)
             return error_response(500, "crash", str(exc))
@@ -296,7 +311,7 @@ class App:
             if not self.guard.token_matches(request.header_all(SESSION_HEADER)):
                 return error_response(
                     401, "unauthorized",
-                    f"this request needs the session token of the page `caterva studio` served, in the "
+                    f"this request needs the session token from the address `caterva studio` printed, in the "
                     f"{SESSION_HEADER} header",
                 )
         if route is not None and route.handler == "dev_session":
@@ -362,15 +377,24 @@ class App:
         if fn is None:
             return error_response(503, "unavailable",
                                   f"{call.route.method} {call.route.path}: {NOT_BUILT_YET}")
+        endpoint_request = EndpointRequest(params=call.params, query=call.query, body=call.body,
+                                           data_dir=self.ws.root, capabilities=self._what_is_known)
         try:
-            answer = fn(EndpointRequest(params=call.params, query=call.query, body=call.body,
-                                        data_dir=self.ws.root, capabilities=self._what_is_known))
+            if call.route.handler == "find_enzymes":
+                # The finder spends CPU on every string it has not seen: at most a few at once, answers
+                # kept by normalised query, and a time budget per request (limits.py).
+                key = (limits.normalise_text(call.query.get("q")), limits.normalise_text(call.query.get("organism")),
+                       call.query.get("limit"))
+                answer = self.finder.run(key, lambda: fn(endpoint_request))
+            else:
+                answer = fn(endpoint_request)
         except Malformed as exc:
             return error_response(400, "malformed", str(exc), field=exc.field)
         except NotFound as exc:
             return error_response(404, "not_found", str(exc))
         except Unavailable as exc:
-            return error_response(503, "unavailable", str(exc))
+            ask = limits.retry_after(exc)
+            return error_response(503, "unavailable", str(exc), headers=[ask] if ask else ())
         return json_response(answer)
 
     def _what_is_known(self) -> Dict[str, Any]:
@@ -395,6 +419,12 @@ class App:
             raise ApiFailure(400, "malformed", "probe takes one value: network", field="probe")
         return json_response(self.capabilities.snapshot(probe_network=probe == "network"))
 
+    def _h_refresh_capabilities(self, call: _Call) -> Response:
+        _only(call.query, ())
+        if call.body != {}:
+            raise ApiFailure(400, "malformed", "refreshing takes an empty object: {}")
+        return json_response(self.capabilities.snapshot(refresh_gromacs=True))
+
     def _h_get_settings(self, call: _Call) -> Response:
         _only(call.query, ())
         return json_response(self.settings())
@@ -409,6 +439,8 @@ class App:
             self.ws.save_settings(settings)
             self._settings = settings
         self.capabilities.apply_gromacs_to_environment()
+        if settings.get("gromacs_path"):
+            self.capabilities.refresh_gromacs()
         self.manager.pump()
         return json_response(settings)
 
@@ -439,6 +471,9 @@ class App:
             record = self.manager.submit(kind, request, title.strip() if title else None)
         except Malformed as exc:
             raise ApiFailure(400, "malformed", str(exc), field=exc.field) from None
+        except QueueFull as exc:
+            raise ApiFailure(503, "unavailable", str(exc),
+                             headers=[("Retry-After", str(exc.retry_after_s))]) from None
         except Unavailable as exc:
             raise ApiFailure(503, "unavailable", str(exc)) from None
         return json_response({"run": record}, status=202)
@@ -515,7 +550,17 @@ class App:
             after = int(text)
         headers = _with_security([("Content-Type", "text/event-stream; charset=utf-8"),
                                   ("Cache-Control", "no-store"), ("X-Accel-Buffering", "no")])
-        return Response(200, headers, stream=self.manager.events(run_id, after))
+        if not self.streams.enter():
+            raise ApiFailure(503, "unavailable",
+                             f"{self.streams.ceiling} event streams are already open (the most the studio serves "
+                             "at once); close a tab or wait a moment",
+                             headers=[("Retry-After", str(limits.RETRY_AFTER_S))])
+        try:
+            frames = self.manager.events(run_id, after)
+        except BaseException:
+            self.streams.leave()
+            raise
+        return Response(200, headers, stream=limits.GuardedStream(frames, self.streams))
 
     def _h_cancel_run(self, call: _Call) -> Response:
         _only(call.query, ())
@@ -552,11 +597,20 @@ class App:
         ]), data)
 
     def _h_get_bundle(self, call: _Call) -> Response:
-        _only(call.query, ())
+        _only(call.query, ("redact_paths", "diagnostics"))
         run_id = call.params["id"]
         self._record(run_id)
+        flags = {}
+        for key, default in (("redact_paths", True), ("diagnostics", False)):
+            value = call.query.get(key)
+            if value is None:
+                flags[key] = default
+            elif value in ("true", "false"):
+                flags[key] = value == "true"
+            else:
+                raise ApiFailure(400, "malformed", f"{key} takes true or false", field=key)
         try:
-            data = self.ws.bundle(run_id)
+            data = self.ws.bundle(run_id, **flags)
         except RunNotFound:
             raise ApiFailure(404, "not_found", "there is no run with that id") from None
         return Response(200, _with_security([

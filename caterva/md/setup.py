@@ -27,12 +27,36 @@ silently assumed to be 7.
 """
 from __future__ import annotations
 
+import re
+import shlex
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from caterva.methods import METHODS
 
 ORIGINS = ("measured", "chosen", "method")
+
+#: A PDB entry id: a digit and three ASCII letters or digits. ASCII only: a
+#: Unicode digit or letter is not an id, and would go into a script.
+PDB_ID = re.compile(r"[0-9][A-Za-z0-9]{3}", re.ASCII)
+#: A chain id: one to four ASCII letters or digits (mmCIF allows more than one).
+CHAIN_ID = re.compile(r"[A-Za-z0-9]{1,4}", re.ASCII)
+
+
+def check_pdb_id(value: str) -> str:
+    """`value` when it is a PDB id exactly (no spaces, no newline), else ValueError."""
+    if not isinstance(value, str) or PDB_ID.fullmatch(value) is None:
+        raise ValueError("a PDB id is four characters, a digit then three letters or digits, like 1I10")
+    return value
+
+
+def check_chain_id(value: Optional[str]) -> Optional[str]:
+    """`value` when it is None or a chain id exactly, else ValueError."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or CHAIN_ID.fullmatch(value) is None:
+        raise ValueError("a chain id is one to four letters or digits, like A")
+    return value
 
 
 @dataclass(frozen=True)
@@ -86,6 +110,8 @@ class MdSetup:
         return [self.seed + r for r in range(self.replicas)]
 
     def __post_init__(self) -> None:
+        check_pdb_id(self.pdb_id)
+        check_chain_id(self.chain)
         if self.replicas < 1:
             raise ValueError("replicas must be at least 1")
         c = self.conditions
@@ -228,6 +254,15 @@ class MdSetup:
     def _script(self) -> str:
         pdb = self.pdb_id.upper()
         chain = self.chain or ""
+        # Every value that came from a request is quoted for the shell, even
+        # those already checked: a script is read by bash, and what reaches it
+        # is never trusted to be harmless text.
+        q_pdb = shlex.quote(pdb)
+        q_chain = shlex.quote(chain)
+        q_ff = shlex.quote(self.force_field)
+        q_water = shlex.quote(self.water)
+        q_url = shlex.quote(f"https://files.rcsb.org/download/{pdb}.pdb")
+        q_file = shlex.quote(f"{pdb}.pdb")
         return f"""#!/usr/bin/env bash
 # Caterva MD setup: PDB {pdb}{', chain ' + chain if chain else ''}. Read PROVENANCE.md first.
 # Needs GROMACS (gmx) on PATH, and curl. Stops at the first error.
@@ -240,23 +275,23 @@ MDRUN_FLAGS="${{MDRUN_FLAGS:--ntmpi 1}}"
 cd "$(dirname "$0")"
 
 # The PDB wwPDB copy of the entry.
-[ -f {pdb}.pdb ] || curl -fsSL -o {pdb}.pdb https://files.rcsb.org/download/{pdb}.pdb
+[ -f {q_file} ] || curl -fsSL -o {q_file} {q_url}
 
 # Protein only{', chain ' + chain if chain else ''}. pdb2gmx has no topology for small molecules, so
 # they are removed here and listed, not guessed.
-awk -v chain="{chain}" '
+awk -v chain={q_chain} '
   /^(ATOM|TER)/ && (chain == "" || substr($0,22,1) == chain) {{ print; next }}
   /^HETATM/ && (chain == "" || substr($0,22,1) == chain) {{ het[substr($0,18,3)]++ }}
   END {{
     for (h in het) if (h != "HOH") printf "stripped: %s (%d atoms)\\n", h, het[h] > "/dev/stderr"
     print "END"
-  }}' {pdb}.pdb > protein.pdb
+  }}' {q_file} > protein.pdb
 
-"$GMX" pdb2gmx -f protein.pdb -o processed.gro -p topol.top -ff {self.force_field} -water {self.water} -ignh
+"$GMX" pdb2gmx -f protein.pdb -o processed.gro -p topol.top -ff {q_ff} -water {q_water} -ignh
 "$GMX" editconf -f processed.gro -o boxed.gro -c -d 1.0 -bt dodecahedron
 "$GMX" solvate -cp boxed.gro -cs spc216.gro -o solvated.gro -p topol.top
 "$GMX" grompp -f ions.mdp -c solvated.gro -p topol.top -o ions.tpr -maxwarn 0
-echo SOL | "$GMX" genion -s ions.tpr -o ionized.gro -p topol.top -pname NA -nname CL -neutral -conc {self.ionic_strength_m:g} -seed {self.seed}
+echo SOL | "$GMX" genion -s ions.tpr -o ionized.gro -p topol.top -pname NA -nname CL -neutral -conc {shlex.quote(format(self.ionic_strength_m, "g"))} -seed {int(self.seed)}
 
 "$GMX" grompp -f em.mdp -c ionized.gro -p topol.top -o em.tpr
 "$GMX" mdrun -deffnm em $MDRUN_FLAGS

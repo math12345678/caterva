@@ -60,6 +60,7 @@ import datetime as _dt
 import enum
 import math
 import pathlib
+import re
 from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple, TypedDict
 
 # ---------------------------------------------------------------------------
@@ -74,12 +75,16 @@ STUDIO_API_VERSION = 1
 #: The request header that carries the per-launch session token.
 SESSION_HEADER = "X-Caterva-Session"
 
-#: The <meta name="..."> the server writes the token into, in index.html.
-SESSION_META_NAME = "caterva-session"
+#: The key of the URL fragment that carries the session token to the page:
+#: `http://127.0.0.1:<port>/#token=<token>`. A fragment is never sent to a
+#: server, so no document or log the server produces holds the token.
+TOKEN_FRAGMENT_KEY = "token"
 
-#: What index.html carries in that meta tag until the server replaces it.
-#: A page that still shows this string was not served by the studio server.
-TOKEN_PLACEHOLDER = "__CATERVA_SESSION_TOKEN__"
+#: The <meta name="..."> index.html carries so the server can tell the page
+#: it serves was built from this package, and its required content. The
+#: page holds no token (docs/studio/CONTRACT.md, section 4).
+PAGE_MARKER_NAME = "caterva-studio-page"
+PAGE_MARKER_CONTENT = "token-in-url-fragment"
 
 #: The one line `caterva studio --print-url` writes to stdout once serving.
 URL_LINE_PREFIX = "CATERVA_STUDIO_URL="
@@ -112,8 +117,14 @@ RUN_KINDS: Tuple[str, ...] = (
 #: A run's place in its life. `interrupted` is a run the server was stopped
 #: during; it is never resumed, because a half-finished search resumed
 #: later would mix two days' database answers in one result.
-RunStatus = Literal["queued", "running", "done", "failed", "cancelled", "interrupted"]
-RUN_STATUSES: Tuple[str, ...] = ("queued", "running", "done", "failed", "cancelled", "interrupted")
+#: `cancelling` is a run that was asked to stop and whose thread has not
+#: stopped yet; it is never terminal. `cancelled` means the thread really
+#: stopped. `abandoned` is a run asked to stop that did not stop within the
+#: grace period: the server gave up waiting, and its library call may still
+#: be running in the background (its error says so).
+RunStatus = Literal["queued", "running", "cancelling", "done", "failed", "cancelled", "abandoned", "interrupted"]
+RUN_STATUSES: Tuple[str, ...] = ("queued", "running", "cancelling", "done", "failed", "cancelled", "abandoned",
+                                 "interrupted")
 
 #: What a finished run's CLI exit code means. 2 (malformed) never becomes a
 #: run: it is a 400 at submission. 1 (a crash) is status `failed`.
@@ -127,8 +138,14 @@ RUN_STATUSES: Tuple[str, ...] = ("queued", "running", "done", "failed", "cancell
 #: which is neither a success nor a refusal. So the meaning is `negative`
 #: and NEGATIVE_MEANING carries each command's own words for it; the
 #: page shows those words, never a generic "failed".
-OutcomeMeaning = Literal["produced", "refused", "negative"]
-OUTCOME_MEANINGS: Tuple[str, ...] = ("produced", "refused", "negative")
+#:
+#: `network` is a fourth meaning that has no exit code of its own: the
+#: command exited 3 because a database it reads (UniProt, the RCSB, BRENDA,
+#: NCBI) did not answer, and an upstream outage is not Caterva declining the
+#: question. `outcome_for` assigns it from the refusal's text; `Outcome.network`
+#: carries the host and the HTTP status when the text names them.
+OutcomeMeaning = Literal["produced", "refused", "negative", "network"]
+OUTCOME_MEANINGS: Tuple[str, ...] = ("produced", "refused", "negative", "network")
 EXIT_MEANING: Mapping[int, str] = {0: "produced", 3: "refused", 4: "negative"}
 
 #: Kind -> what exit 4 means for the command it mirrors, in that command's
@@ -433,6 +450,10 @@ class Settings(_SettingsRequired, total=False):
     #: probe answers without probing) and refuses to start a run of any kind
     #: whose `needs` include "network", with that reason (503). Default False.
     offline: bool
+    #: How many finished runs the studio keeps in History; older ones are
+    #: moved to <data dir>/trash/ when a new run is accepted (10 to 5000,
+    #: default 200). Never a run that is still going.
+    keep_runs: int
 
 
 class NormaliseOrganismRequest(TypedDict):
@@ -687,11 +708,30 @@ class _OutcomeRequired(TypedDict):
     reason: Optional[str]
 
 
+class NetworkFailure(TypedDict):
+    """An upstream database that did not answer, read from a refusal's text."""
+
+    #: The host the request went to ("rest.uniprot.org"), or None when the
+    #: text does not name one.
+    host: Optional[str]
+    #: The HTTP status of an error answer (503), or None for a timeout or a
+    #: connection that was never made.
+    status: Optional[int]
+    #: True when the request timed out rather than being refused.
+    timed_out: bool
+
+
 class Outcome(_OutcomeRequired, total=False):
     #: Present when a refusal was a name that is not exactly one enzyme
     #: (compose, constants, structure): the named candidates, the kind, the
     #: recommended EC number and the flag that re-runs with one.
     name_refusal: NameRefusal
+    #: Present when `meaning` is `network`: which host, and what it answered.
+    network: NetworkFailure
+    #: False when the run finished without a result (GET /result is 404), so
+    #: the page does not ask for one. Absent in records written before this
+    #: key existed: the page then asks, and treats a 404 as "no result".
+    has_result: bool
 
 
 class _RunErrorRequired(TypedDict):
@@ -826,6 +866,12 @@ class StructuredSection(TypedDict):
 #: (`rows`, `every`): each row sent is one the run held, never an
 #: interpolation, and the full table is the CLI's (or the CSV artefact).
 SERIES_ROW_LIMIT = 20_000
+
+#: The most reaction events a `sim` run may be expected to make. The table
+#: holds one row per event, in memory, and the run cannot be stopped inside
+#: a single library call, so a request whose expected event count passes
+#: this is refused at submission with this number in the message.
+MAX_SSA_EVENTS = 200_000
 
 
 class _SweepRequestRequired(TypedDict):
@@ -2069,8 +2115,38 @@ def _maybe_float(value: Any) -> Optional[float]:
     return finite(value)[0]
 
 
+_NETWORK_SIGNATURES = re.compile(
+    r"ReadTimeout|ConnectTimeout|ConnectionError|ConnectionPool|Max retries exceeded|Read timed out"
+    r"|Connect timed out|Temporary failure in name resolution|Name or service not known|nodename nor servname"
+    r"|RemoteDisconnected|ConnectionResetError|URLError|HTTPError: \d{3}|\d{3} (?:Server|Client) Error"
+)
+_HOST_IN_TEXT = re.compile(r"host='([^']+)'|https?://([A-Za-z0-9.-]+)")
+_STATUS_IN_TEXT = re.compile(r"HTTPError: (\d{3})|(\d{3}) (?:Server|Client) Error")
+
+
+def network_failure(text: Optional[str]) -> Optional[NetworkFailure]:
+    """Read a refusal's text for an upstream network failure, or None.
+
+    The runners report a failed request as the exception's own text
+    ("ReadTimeout: HTTPSConnectionPool(host='rest.uniprot.org', ...",
+    "HTTPError: 503 Server Error: ... for url: https://..."). That is a
+    database not answering, not Caterva declining a question, so it is
+    classified apart from a refusal. Only these exception signatures count:
+    a refusal that merely mentions the network (offline mode) does not.
+    """
+    if not text or not _NETWORK_SIGNATURES.search(text):
+        return None
+    host_match = _HOST_IN_TEXT.search(text)
+    host = (host_match.group(1) or host_match.group(2)) if host_match else None
+    status_match = _STATUS_IN_TEXT.search(text)
+    status = int(status_match.group(1) or status_match.group(2)) if status_match else None
+    timed_out = bool(re.search(r"ReadTimeout|ConnectTimeout|Read timed out|Connect timed out", text))
+    return {"host": host, "status": status, "timed_out": timed_out}
+
+
 def outcome_for(kind: str, exit_code: int, summary: str, refusal: Optional[str] = None,
-                name_refusal: Optional[Mapping[str, Any]] = None) -> Outcome:
+                name_refusal: Optional[Mapping[str, Any]] = None,
+                has_result: Optional[bool] = None) -> Outcome:
     """The Outcome for a finished run's CLI-equivalent exit code.
 
     `refusal` is the CLI's own refusal text and is required for exit 3: a
@@ -2094,6 +2170,13 @@ def outcome_for(kind: str, exit_code: int, summary: str, refusal: Optional[str] 
                         "summary": summary, "reason": reason}
     if name_refusal is not None and exit_code == 3:
         outcome["name_refusal"] = dict(name_refusal)  # type: ignore[typeddict-item]
+    if exit_code == 3 and name_refusal is None:
+        failure = network_failure(reason)
+        if failure is not None:
+            outcome["meaning"] = "network"
+            outcome["network"] = failure
+    if has_result is not None:
+        outcome["has_result"] = has_result
     return outcome
 
 
@@ -2123,9 +2206,11 @@ MIRRORED_UNIONS: Mapping[str, Tuple[str, ...]] = {
 MIRRORED_CONSTANTS: Mapping[str, Any] = {
     "STUDIO_API_VERSION": STUDIO_API_VERSION,
     "SESSION_HEADER": SESSION_HEADER,
-    "SESSION_META_NAME": SESSION_META_NAME,
-    "TOKEN_PLACEHOLDER": TOKEN_PLACEHOLDER,
+    "TOKEN_FRAGMENT_KEY": TOKEN_FRAGMENT_KEY,
+    "PAGE_MARKER_NAME": PAGE_MARKER_NAME,
+    "PAGE_MARKER_CONTENT": PAGE_MARKER_CONTENT,
     "MAX_BODY_BYTES": MAX_BODY_BYTES,
     "MAX_VIEWER_ATOMS": MAX_VIEWER_ATOMS,
     "SERIES_ROW_LIMIT": SERIES_ROW_LIMIT,
+    "MAX_SSA_EVENTS": MAX_SSA_EVENTS,
 }

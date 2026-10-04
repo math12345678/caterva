@@ -82,7 +82,7 @@ function Shell() {
           error={{
             code: "unauthorized",
             message:
-              "It carries no session token, so the server would refuse every request. Start it with `caterva studio` (or open Caterva.app) and use the address it prints.",
+              "It carries no session token, so the server would refuse every request. Start it with `caterva studio` (or open Caterva.app) and open the whole address it prints, including the part after the #.",
           }}
         />
       </ShellMessage>
@@ -126,7 +126,16 @@ function Shell() {
   const routes = visibleRoutes(capabilities.data);
   return (
     <div className="app">
-      <a className="skip-link" href="#main">
+      <a
+        className="skip-link"
+        href="#main"
+        onClick={(e) => {
+          // Following the anchor would rewrite the address to "#main" and
+          // leave the router on a hash; move focus instead.
+          e.preventDefault();
+          document.getElementById("main")?.focus();
+        }}
+      >
         Skip to the screen
       </a>
       <Rail routes={routes} version={health.data.version} />

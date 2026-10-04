@@ -2,11 +2,16 @@
  * The one way the page talks to `caterva studio`.
  *
  * Every /api/ request carries the per-launch session token in a header,
- * never in a URL, where it would land in logs and history. The token is
- * read once from the <meta> tag the server wrote into index.html; a page
- * whose tag still holds the placeholder was not served by the studio, and
- * `sessionToken()` returns null so the shell can say so rather than make
- * requests that will all be refused.
+ * never in a path or query string. The server puts the token in no document
+ * it serves: it arrives in the URL FRAGMENT of the address the launcher
+ * opens (`http://127.0.0.1:<port>/#token=<token>`), which a browser never
+ * sends to a server. `sessionToken()` reads it from `location.hash` the
+ * first time it is asked (at import, before anything renders), keeps it in
+ * memory and in this tab's sessionStorage so a reload keeps working, and
+ * removes the fragment from the address bar at once. A page opened without
+ * one (and with none remembered) has no token: `sessionToken()` returns
+ * null so the shell can say so rather than make requests that will all be
+ * refused.
  *
  * A response the page depends on is checked against its schema
  * (src/lib/schemas.ts) before anyone reads it. Four ways a request can go
@@ -19,22 +24,90 @@ import type { ZodType, ZodTypeDef } from "zod";
 
 import { ErrorBodySchema } from "@/lib/schemas";
 
-import { type ApiError, SESSION_HEADER, SESSION_META_NAME, TOKEN_PLACEHOLDER } from "./types";
+import { type ApiError, SESSION_HEADER, TOKEN_FRAGMENT_KEY } from "./types";
 
 let cachedToken: string | null | undefined;
 
+const STORAGE_KEY = "caterva.studio.session";
+const TOKEN_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
+/** The development server writes the backend's token in this tag; a build never has it. */
+const DEV_META = "caterva-dev-session";
+
+function fromFragment(): string | null {
+  const hash = window.location.hash;
+  if (hash.length < 2) return null;
+  const params = new URLSearchParams(hash.slice(1));
+  const value = params.get(TOKEN_FRAGMENT_KEY);
+  if (value === null) return null;
+  params.delete(TOKEN_FRAGMENT_KEY);
+  const rest = params.toString();
+  // The fragment is removed whether or not the token in it is usable, so it
+  // never sits in the address bar, history or a copied link.
+  try {
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ""}`,
+    );
+  } catch {
+    // An address that cannot be rewritten leaves the fragment; the token still works.
+  }
+  return TOKEN_SHAPE.test(value) ? value : null;
+}
+
+function remembered(): string | null {
+  try {
+    const value = window.sessionStorage.getItem(STORAGE_KEY);
+    return value && TOKEN_SHAPE.test(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function remember(value: string | null): void {
+  try {
+    if (value === null) window.sessionStorage.removeItem(STORAGE_KEY);
+    else window.sessionStorage.setItem(STORAGE_KEY, value);
+  } catch {
+    // Storage can be unavailable; the token then lives in memory for this load only.
+  }
+}
+
 export function sessionToken(): string | null {
   if (cachedToken !== undefined) return cachedToken;
-  const meta = document.querySelector<HTMLMetaElement>(`meta[name="${SESSION_META_NAME}"]`);
-  const value = meta?.content ?? "";
-  cachedToken = value && value !== TOKEN_PLACEHOLDER ? value : null;
+  let value = fromFragment();
+  if (value !== null) remember(value);
+  else value = remembered();
+  if (value === null && import.meta.env.DEV) {
+    const meta = document.querySelector<HTMLMetaElement>(`meta[name="${DEV_META}"]`);
+    const content = meta?.content ?? "";
+    value = TOKEN_SHAPE.test(content) ? content : null;
+  }
+  cachedToken = value;
   return cachedToken;
+}
+
+/** The server refused the token (a page left open across a restart, or a
+ * stale one remembered by this tab): forget it, so the shell says to reopen
+ * the address the studio printed rather than retrying with it. */
+export function discardSessionToken(): void {
+  remember(null);
+  cachedToken = null;
+}
+
+/** Hand the page a token directly, or none. For tests. */
+export function adoptSessionTokenForTests(token: string | null): void {
+  remember(null);
+  cachedToken = token;
 }
 
 /** Forget the token read from the page, so the next request reads it again. For tests. */
 export function resetSessionTokenForTests(): void {
   cachedToken = undefined;
 }
+
+// Read the fragment before anything renders or any router can see it.
+if (typeof window !== "undefined") sessionToken();
 
 export type FailureKind = "server" | "network" | "contract" | "session";
 
@@ -54,7 +127,7 @@ export class ApiRequestError extends Error {
 }
 
 export const NO_SESSION_MESSAGE =
-  "This page was not served by `caterva studio`, so it has no session token. Open the address `caterva studio` prints.";
+  "This page was opened without a session token. Open the address `caterva studio` prints, including the part after the #, or use the app.";
 
 async function errorFrom(response: Response): Promise<ApiRequestError> {
   let body: unknown = null;
@@ -96,6 +169,7 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
       "network",
     );
   }
+  if (response.status === 401) discardSessionToken();
   if (!response.ok) throw await errorFrom(response);
   return response;
 }

@@ -11,8 +11,8 @@ decide what a person downloads and reads:
 - a frozen folder without its licences or without the built page is
   refused, and `caterva studio --self-test` output is read line by line,
   not by exit status alone;
-- the shell speaks the contract's protocol: the URL line, the token
-  placeholder, the session meta tag and the bridge's name are the values
+- the shell speaks the contract's protocol: the URL line, the page marker,
+  the token's fragment key and the bridge's name are the values
   caterva/studio/contract.py fixes, so the two sides cannot drift apart.
 """
 from __future__ import annotations
@@ -140,7 +140,7 @@ def _frozen(tmp_path: Path, page: str | None) -> Path:
 
 
 def test_a_frozen_folder_with_its_page_and_licences_is_accepted(tmp_path):
-    page = f'<meta name="{contract.SESSION_META_NAME}" content="{contract.TOKEN_PLACEHOLDER}">'
+    page = f'<meta name="{contract.PAGE_MARKER_NAME}" content="{contract.PAGE_MARKER_CONTENT}">'
     folder = _frozen(tmp_path, page)
     assert studio_app.frozen_problems(folder) == []
     assert build_app.studio_page_problem(folder) is None
@@ -153,10 +153,10 @@ def test_a_frozen_folder_without_the_page_is_refused(tmp_path):
     assert studio_app.frozen_problems(folder, require_page=False) == []
 
 
-def test_a_page_without_the_token_placeholder_is_refused(tmp_path):
+def test_a_page_without_the_page_marker_is_refused(tmp_path):
     folder = _frozen(tmp_path, "<html>someone else's page</html>")
-    assert any(contract.TOKEN_PLACEHOLDER in p for p in studio_app.frozen_problems(folder))
-    assert contract.TOKEN_PLACEHOLDER in build_app.studio_page_problem(folder)
+    assert any("caterva-studio-page" in p for p in studio_app.frozen_problems(folder))
+    assert "page marker" in build_app.studio_page_problem(folder)
 
 
 def test_a_frozen_folder_without_its_licences_is_refused(tmp_path):
@@ -220,11 +220,12 @@ def test_the_shell_reads_the_url_line_the_server_prints():
     assert '"--port", String(port), "--no-browser", "--print-url"' in SWIFT["StudioServer.swift"]
 
 
-def test_the_shell_smoke_knows_the_token_placeholder_and_meta_tag():
-    assert f'static let placeholder = "{contract.TOKEN_PLACEHOLDER}"' in SWIFT["Smoke.swift"]
-    assert f'name=\\"{contract.SESSION_META_NAME}\\"' in SWIFT["Smoke.swift"]
-    assert build_app.TOKEN_PLACEHOLDER == contract.TOKEN_PLACEHOLDER
-    assert studio_app.TOKEN_PLACEHOLDER == contract.TOKEN_PLACEHOLDER
+def test_the_shell_smoke_knows_the_page_marker_and_the_token_fragment():
+    marker = f'<meta name="{contract.PAGE_MARKER_NAME}" content="{contract.PAGE_MARKER_CONTENT}"'
+    assert f'static let marker = "name=\\"{contract.PAGE_MARKER_NAME}\\""' in SWIFT["Smoke.swift"]
+    assert f'static let fragmentKey = "{contract.TOKEN_FRAGMENT_KEY}"' in SWIFT["Smoke.swift"]
+    assert build_app.PAGE_MARKER == marker
+    assert studio_app.PAGE_MARKER == marker
 
 
 def test_the_bridge_answers_the_page_by_the_name_and_actions_the_page_uses():

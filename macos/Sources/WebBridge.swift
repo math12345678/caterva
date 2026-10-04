@@ -59,7 +59,22 @@ final class WebBridge: NSObject, WKScriptMessageHandlerWithReply {
 
     weak var window: NSWindow?
     var origin: ServerOrigin?
+    /// Folders `reveal` may show: the server's data folder, which holds every
+    /// run folder, plus each file or folder the person chose in a panel
+    /// during this launch. Nothing else.
+    var revealRoots: [URL] = []
     private var panelOpen = false
+
+    /// Whether `path` is one of the roots or inside one, after links are
+    /// resolved (a link inside a root cannot lead out of it).
+    static func isRevealable(_ path: String, roots: [URL]) -> Bool {
+        let target = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
+        for root in roots {
+            let base = root.resolvingSymlinksInPath().standardizedFileURL.path
+            if target == base || target.hasPrefix(base.hasSuffix("/") ? base : base + "/") { return true }
+        }
+        return false
+    }
 
     func userContentController(_ controller: WKUserContentController,
                                didReceive message: WKScriptMessage,
@@ -81,6 +96,10 @@ final class WebBridge: NSObject, WKScriptMessageHandlerWithReply {
         case "reveal":
             guard let path = body["path"] as? String, path.hasPrefix("/"), !path.contains("\0") else {
                 replyHandler(nil, "reveal needs an absolute path")
+                return
+            }
+            guard WebBridge.isRevealable(path, roots: revealRoots) else {
+                replyHandler(nil, "reveal only shows files in the studio's data folder or ones you chose")
                 return
             }
             let url = URL(fileURLWithPath: path)
@@ -122,6 +141,7 @@ final class WebBridge: NSObject, WKScriptMessageHandlerWithReply {
         panel.beginSheetModal(for: window) { [weak self] response in
             self?.panelOpen = false
             if response == .OK, let url = panel.url {
+                self?.revealRoots.append(url)
                 reply(url.path, nil)
             } else {
                 reply(nil, nil)

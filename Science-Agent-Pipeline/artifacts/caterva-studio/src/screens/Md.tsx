@@ -233,6 +233,7 @@ function SetupPanel({ runId, onSummarise, active }: { runId: string | null; onSu
       formLabel="Write a GROMACS setup"
       action="Write setup"
       canSubmit={Boolean(f.pdb.trim())}
+      blockedReason="Enter a PDB entry first."
       onSubmit={() => void run.submit(setupRequest(f))}
       onChooseEnzyme={(ec) => setF((s) => ({ ...s, subject: ec, subjectSeed: "" }))}
       run={run}
@@ -540,6 +541,7 @@ function ConvergencePanel({
       formLabel="Summarise replicas"
       action="Summarise"
       canSubmit={Boolean(directory.trim())}
+      blockedReason="Choose the setup folder first."
       onSubmit={() => void run.submit({ directory: directory.trim() })}
       run={run}
       form={
@@ -660,6 +662,7 @@ function FepPanel({ runId, active }: { runId: string | null; active: boolean }) 
       formLabel="Read a free-energy run"
       action="Read status"
       canSubmit={Boolean(dir.trim())}
+      blockedReason="Choose the free-energy folder first."
       onSubmit={() => void run.submit({ directory: dir.trim() })}
       run={run}
       form={
@@ -837,6 +840,7 @@ function ComplexPanel({ runId, active }: { runId: string | null; active: boolean
       formLabel="Check a ligand's pose"
       action="Check the pose"
       canSubmit={Boolean(dir.trim() && ligand.trim())}
+      blockedReason="Choose the complex folder and name the ligand first."
       onSubmit={() => void run.submit({ directory: dir.trim(), ligand: ligand.trim() })}
       run={run}
       form={

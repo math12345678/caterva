@@ -26,7 +26,9 @@ import { PROVENANCE_MEANING, PROVENANCE_ORDER, ProvenanceMark, provenanceLabel }
 import { Screen, Section } from "@/components/screen/Screen";
 import { Loading } from "@/components/states/Loading";
 import { ErrorState } from "@/components/states/States";
+import { plain } from "@/lib/copy";
 import { formatDateTime } from "@/lib/format";
+import { describeReason } from "@/lib/network";
 import { CAPABILITIES_KEY, probeNetwork, useCapabilities, useHealth } from "@/lib/queries";
 
 import "./workspace/workspace.css";
@@ -114,11 +116,6 @@ export default function AboutScreen() {
     <Screen
       title="About"
       purpose="Version, how a number is decided, where measurements come from and how to cite them, licences, and what this installation can reach."
-      actions={
-        <button type="button" className="btn btn-primary" onClick={() => probe.mutate()} disabled={probe.isPending}>
-          {probe.isPending ? "Checking" : "Check the network"}
-        </button>
-      }
     >
       <div className="about-lockup">
         <Lockup size={34} />
@@ -131,7 +128,15 @@ export default function AboutScreen() {
                 <li key={kind}>
                   <ProvenanceMark provenance={{ kind, by: kind === "chosen" ? "user" : undefined }} decorative />
                   <span>
-                    <strong>{kind === "chosen" ? "chosen" : provenanceLabel({ kind })}</strong>: {PROVENANCE_MEANING[kind]}.
+                    {kind === "chosen" ? (
+                      <>
+                        <strong>chosen by you</strong> or{" "}
+                        <ProvenanceMark provenance={{ kind, by: "default" }} decorative /> <strong>a stated default</strong>
+                      </>
+                    ) : (
+                      <strong>{provenanceLabel({ kind })}</strong>
+                    )}
+                    : {PROVENANCE_MEANING[kind]}.
                   </span>
                 </li>
               ))}
@@ -178,7 +183,14 @@ export default function AboutScreen() {
 
           <Section
             title="Network"
-            aside={net?.checked_at ? <span className="font-mono">checked {formatDateTime(net.checked_at)}</span> : undefined}
+            aside={
+              <span className="about-net-aside">
+                {net?.checked_at ? <span className="font-mono">checked {formatDateTime(net.checked_at)}</span> : null}
+                <button type="button" className="btn btn-sm" onClick={() => probe.mutate()} disabled={probe.isPending}>
+                  {probe.isPending ? "Checking" : "Check the network"}
+                </button>
+              </span>
+            }
           >
             {probe.isPending ? (
               <Loading label="Contacting the database hosts" />
@@ -186,7 +198,7 @@ export default function AboutScreen() {
               <ErrorState error={probe.error} />
             ) : net ? (
               <>
-                {!net.checked ? <p className="soft">{net.reason ?? "Not checked."}</p> : null}
+                {!net.checked ? <p className="soft">{plain(net.reason ?? "Not checked.")}</p> : null}
                 <ul className="host-list">
                   {Object.entries(net.hosts).map(([host, ok]) => (
                     <li key={host}>
@@ -196,7 +208,15 @@ export default function AboutScreen() {
                     </li>
                   ))}
                 </ul>
-                {net.checked && !net.reachable && net.reason ? <p className="soft">{net.reason}</p> : null}
+                {net.checked && !net.reachable && net.reason ? (
+                  <>
+                    <p className="soft">{describeReason(net.reason, "A host did not answer")}.</p>
+                    <details className="state-raw">
+                      <summary>What the check reported</summary>
+                      <pre>{net.reason}</pre>
+                    </details>
+                  </>
+                ) : null}
               </>
             ) : null}
           </Section>
@@ -207,7 +227,7 @@ export default function AboutScreen() {
             <ul className="about-sources">
               {SOURCES.map((s) => (
                 <li key={s.tokens.join("-")} className="about-source">
-                  <span className="about-source-name">{s.creator}</span>
+                  <span className="about-source-name">{plain(s.creator)}</span>
                   <p>
                     {s.licence_uri ? <External href={s.licence_uri}>{s.licence}</External> : s.licence}
                     {s.source_uri ? (
@@ -217,8 +237,8 @@ export default function AboutScreen() {
                       </>
                     ) : null}
                   </p>
-                  <p>What Caterva does to the rows: {s.modifications}</p>
-                  {s.citation_request ? <p>How to cite it: {s.citation_request}</p> : null}
+                  <p>What Caterva does to the rows: {plain(s.modifications)}</p>
+                  {s.citation_request ? <p>How to cite it: {plain(s.citation_request)}</p> : null}
                 </li>
               ))}
             </ul>

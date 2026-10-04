@@ -366,3 +366,52 @@ def test_studio_is_a_command_and_refuses_a_non_loopback_host():
     assert exc.value.code == 0
     for flag in ("--host", "--port", "--no-browser", "--dev-origin", "--data-dir", "--print-url", "--self-test"):
         assert flag in out.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# An upstream outage is not a refusal
+# ---------------------------------------------------------------------------
+
+UNIPROT_TIMEOUT = (
+    "ReadTimeout: HTTPSConnectionPool(host='rest.uniprot.org', port=443): "
+    "Read timed out. (read timeout=30)"
+)
+UNIPROT_503 = (
+    "HTTPError: 503 Server Error: Service Unavailable for url: "
+    "https://rest.uniprot.org/uniprotkb/search?query=ec%3A1.1.1.27&format=json"
+)
+
+
+def test_a_timeout_is_classified_as_the_network_with_its_host() -> None:
+    failure = contract.network_failure(UNIPROT_TIMEOUT)
+    assert failure == {"host": "rest.uniprot.org", "status": None, "timed_out": True}
+
+
+def test_an_http_error_status_is_classified_with_its_status() -> None:
+    failure = contract.network_failure(UNIPROT_503)
+    assert failure == {"host": "rest.uniprot.org", "status": 503, "timed_out": False}
+
+
+def test_a_refusal_that_only_mentions_the_network_stays_a_refusal() -> None:
+    offline = "Refused: offline mode is on, and this request needs the network."
+    assert contract.network_failure(offline) is None
+    assert contract.outcome_for("structure", 3, "Refused", offline)["meaning"] == "refused"
+
+
+def test_outcome_for_marks_an_outage_apart_from_a_refusal_and_keeps_the_raw_text() -> None:
+    for text in (UNIPROT_TIMEOUT, UNIPROT_503):
+        outcome = contract.outcome_for("structure", 3, text.split(":")[0], text, has_result=False)
+        assert outcome["meaning"] == "network"
+        assert outcome["exit_code"] == 3
+        assert outcome["reason"] == text
+        assert outcome["network"]["host"] == "rest.uniprot.org"
+        assert outcome["has_result"] is False
+
+
+def test_a_name_refusal_is_never_an_outage() -> None:
+    outcome = contract.outcome_for(
+        "compose", 3, "x", "ReadTimeout: HTTPSConnectionPool(host='rest.uniprot.org')",
+        name_refusal={"kind": "lookup_failed"},
+    )
+    assert outcome["meaning"] == "refused"
+    assert "network" not in outcome

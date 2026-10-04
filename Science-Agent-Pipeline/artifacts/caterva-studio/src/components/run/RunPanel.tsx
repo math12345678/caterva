@@ -9,7 +9,7 @@
  * The screen passes only how to draw its result; the states are shared.
  */
 import { Square } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
 import { isTerminal } from "@/api/runs";
 import type { RunKind, RunResults } from "@/api/types";
@@ -19,6 +19,7 @@ import { NameRefusalChoices } from "@/components/enzyme/NameRefusal";
 import { CommandSlab } from "@/components/report/Report";
 import { Loading } from "@/components/states/Loading";
 import { EmptyState, ErrorState, OutcomeNotice, RunFailedState } from "@/components/states/States";
+import { humaniseStage, plain } from "@/lib/copy";
 import { elapsed } from "@/lib/format";
 
 function useNow(active: boolean): number {
@@ -45,11 +46,13 @@ export function RunProgress<K extends RunKind>({
 }) {
   const live = !isTerminal(state.status) && state.status !== "idle";
   const now = useNow(live);
-  const label = state.submitting
-    ? "Sending the request"
-    : state.cancelling
-      ? "Cancelling: the current step finishes first"
-      : (state.stage?.label ?? STATUS_LABEL[state.status] ?? "Working");
+  const label = humaniseStage(
+    state.submitting
+      ? "Sending the request"
+      : state.cancelling
+        ? "Cancelling: the current step finishes first"
+        : (state.stage?.label ?? STATUS_LABEL[state.status] ?? "Working"),
+  );
   const since = state.run?.started_at ?? state.run?.created_at ?? null;
   const time = since ? elapsed(since, null, now) : "";
   return (
@@ -64,7 +67,7 @@ export function RunProgress<K extends RunKind>({
           <ol className="run-stages" aria-label="Stages so far">
             {state.stages.map((s, i) => (
               <li key={`${s.stage}-${i}`} data-current={i === state.stages.length - 1 ? "true" : undefined}>
-                {s.label}
+                {humaniseStage(s.label)}
               </li>
             ))}
           </ol>
@@ -78,10 +81,65 @@ export function RunProgress<K extends RunKind>({
       </div>
       {state.log.length ? (
         <Disclosure title="What the command wrote" aside={<span className="font-mono">{state.log.length}</span>}>
-          <pre className="report-text run-log">{state.log.join("\n")}</pre>
+          <pre className="report-text run-log">{plain(state.log.join("\n"))}</pre>
         </Disclosure>
       ) : null}
     </div>
+  );
+}
+
+/** The one sentence a finished run announces, or null while it works. */
+export function finishSentence<K extends RunKind>(state: RunState<K>): string | null {
+  if (state.requestError || state.submitting || !isTerminal(state.status) || !state.settled) return null;
+  switch (state.status) {
+    case "failed":
+      return "The run stopped with an error. The details are below.";
+    case "cancelled":
+      return "Cancelled.";
+    case "interrupted":
+      return "Interrupted: the studio stopped while this run was in progress.";
+    default: {
+      const meaning = state.outcome?.meaning ?? "produced";
+      if (meaning === "refused") return "Refused. The reason is below.";
+      if (meaning === "network") return "Did not finish: a database did not answer. The details are below.";
+      if (meaning === "negative") return "Finished with a negative finding. The result is below.";
+      return "Finished. The result is below.";
+    }
+  }
+}
+
+/**
+ * Says a run finished, once, in a one-line status, and moves focus to the
+ * result's heading, so a keyboard or screen-reader user lands on the answer
+ * rather than on a button that is now somewhere above it. Nothing is
+ * announced while the run works (the loading state announces its own stage
+ * changes) and nothing moves for a run that was only reopened.
+ */
+export function RunAnnouncer<K extends RunKind>({ state, root }: { state: RunState<K>; root: RefObject<HTMLElement | null> }) {
+  const wasLive = useRef(false);
+  const [message, setMessage] = useState("");
+  const live = state.submitting || state.status === "queued" || state.status === "running";
+  const sentence = finishSentence(state);
+  useEffect(() => {
+    if (live) {
+      wasLive.current = true;
+      setMessage("");
+    }
+  }, [live]);
+  useEffect(() => {
+    if (!sentence || !wasLive.current) return;
+    wasLive.current = false;
+    setMessage(sentence);
+    const heading = root.current?.querySelector<HTMLElement>("h2, h3");
+    if (heading) {
+      heading.setAttribute("tabindex", "-1");
+      heading.focus();
+    }
+  }, [sentence, root]);
+  return (
+    <p className="sr-only" role="status">
+      {message}
+    </p>
   );
 }
 
@@ -89,22 +147,28 @@ export function RunPanel<K extends RunKind>({
   state,
   onCancel,
   onRetry,
+  retryVerb,
   onChooseEnzyme,
+  onChooseCompound,
   idle,
   children,
 }: {
   state: RunState<K>;
   onCancel?: () => void;
   onRetry?: () => void;
+  /** Finishes "Check the network, then ...": "search again". */
+  retryVerb?: string;
   /** Sets the form's enzyme when the person picks one of the candidates a refused name was given. */
   onChooseEnzyme?: (ec: string) => void;
+  /** Fills the form's Inhibitor field with a compound a refusal says has a measurement. */
+  onChooseCompound?: (name: string) => void;
   /** Shown before anything was submitted. */
   idle?: ReactNode;
   /** The screen's drawing of a finished result. */
   children: (result: RunResults[K]) => ReactNode;
 }) {
   if (state.requestError) {
-    return <ErrorState error={state.requestError} inset />;
+    return <ErrorState error={state.requestError} inset onRetry={onRetry} again={retryVerb} />;
   }
   if (state.status === "idle" && !state.submitting) return <>{idle ?? null}</>;
   if (state.submitting || !isTerminal(state.status) || (state.status === "done" && !state.settled)) {
@@ -124,7 +188,11 @@ export function RunPanel<K extends RunKind>({
     case "failed":
       return (
         <div className="run-finished">
-          <RunFailedState error={state.runError ?? { type: "Error", message: "the run failed without a message" }} action={retry} />
+          <RunFailedState
+            error={state.runError ?? { type: "Error", message: "the run failed without a message" }}
+            action={retry}
+            onRetry={onRetry}
+          />
           {command}
         </div>
       );
@@ -133,6 +201,20 @@ export function RunPanel<K extends RunKind>({
         <EmptyState title="Cancelled" inset actions={retry}>
           <p>The run was stopped before it finished, so it kept no result.</p>
         </EmptyState>
+      );
+    case "abandoned":
+      return (
+        <ErrorState
+          inset
+          title="Abandoned, not stopped"
+          error={{
+            code: "unavailable",
+            message:
+              state.runError?.message ??
+              "The run was asked to stop and did not. It may still be running in the background; its result was discarded.",
+          }}
+          action={retry}
+        />
       );
     case "interrupted":
       return (
@@ -146,7 +228,7 @@ export function RunPanel<K extends RunKind>({
     default:
       return (
         <div className="run-finished">
-          <OutcomeNotice outcome={state.outcome}>
+          <OutcomeNotice outcome={state.outcome} onRetry={onRetry} again={retryVerb} onChooseCompound={onChooseCompound}>
             {state.outcome?.name_refusal ? <NameRefusalChoices refusal={state.outcome.name_refusal} onChoose={onChooseEnzyme} /> : null}
           </OutcomeNotice>
           {state.result !== null ? children(state.result) : null}

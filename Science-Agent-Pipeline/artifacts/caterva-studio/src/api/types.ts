@@ -16,10 +16,12 @@
 
 export const STUDIO_API_VERSION = 1;
 export const SESSION_HEADER = "X-Caterva-Session";
-export const SESSION_META_NAME = "caterva-session";
-export const TOKEN_PLACEHOLDER = "__CATERVA_SESSION_TOKEN__";
+export const TOKEN_FRAGMENT_KEY = "token";
+export const PAGE_MARKER_NAME = "caterva-studio-page";
+export const PAGE_MARKER_CONTENT = "token-in-url-fragment";
 export const MAX_BODY_BYTES = 1048576;
 export const MAX_VIEWER_ATOMS = 60000;
+export const MAX_SSA_EVENTS = 200000;
 
 // ---------------------------------------------------------------------------
 // String unions
@@ -38,8 +40,16 @@ export type RunKind =
   | "fep.status"
   | "complex.check"
   | "rates";
-export type RunStatus = "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted";
-export type OutcomeMeaning = "produced" | "refused" | "negative";
+export type RunStatus =
+  | "queued"
+  | "running"
+  | "cancelling"
+  | "done"
+  | "failed"
+  | "cancelled"
+  | "abandoned"
+  | "interrupted";
+export type OutcomeMeaning = "produced" | "refused" | "negative" | "network";
 export type ProvenanceKind = "measured" | "fitted" | "computed" | "placeholder" | "chosen";
 export type ChosenBy = "user" | "default";
 export type Nonfinite = "nan" | "inf" | "-inf";
@@ -251,6 +261,8 @@ export interface Settings {
   gromacs_path?: string | null;
   /** True: no network probe, and runs of kinds that need the network are refused (503). */
   offline?: boolean;
+  /** How many finished runs History keeps (10 to 5000, default 200); older ones go to the trash folder. */
+  keep_runs?: number;
 }
 
 export interface NormaliseOrganismRequest {
@@ -431,6 +443,20 @@ export interface Outcome {
   reason: string | null;
   /** Present on a refusal that was a name that is not exactly one enzyme. */
   name_refusal?: NameRefusal;
+  /** Present when `meaning` is "network": which host, and what it answered. */
+  network?: NetworkFailure;
+  /** False when the run finished without a result (its /result is 404), so the page does not ask. */
+  has_result?: boolean;
+}
+
+/** An upstream database that did not answer, read from a refusal's text. */
+export interface NetworkFailure {
+  /** "rest.uniprot.org", or null when the text names none. */
+  host: string | null;
+  /** The HTTP status of an error answer, or null for a timeout or a connection never made. */
+  status: number | null;
+  /** True when the request timed out rather than being refused. */
+  timed_out: boolean;
 }
 
 export interface RunError {

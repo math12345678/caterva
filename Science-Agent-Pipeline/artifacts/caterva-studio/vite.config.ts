@@ -4,15 +4,16 @@
  * Two modes, one page:
  *
  * - `vite build` writes the page into caterva/studio/static at the
- *   repository root, where `caterva studio` serves it and replaces the
- *   session-token placeholder in index.html (docs/studio/CONTRACT.md,
- *   "Static serving"). That directory is built at release time and is not
- *   committed.
+ *   repository root, where `caterva studio` serves it. index.html holds no
+ *   session token: it arrives in the URL fragment of the address the server
+ *   prints (docs/studio/CONTRACT.md, "Static serving"). That directory is
+ *   built at release time and is not committed.
  * - `vite` (development) serves the page itself and proxies /api to the
  *   backend named by STUDIO_API, which must have been started with
  *   `--dev-origin <this server's origin>`. The token the backend minted is
- *   fetched from its /api/dev/session when index.html is served, and written
- *   into the same meta tag, so the page reads it the same way in both modes.
+ *   fetched from its /api/dev/session when index.html is served and written
+ *   into a development-only meta tag, which the page reads only in
+ *   development builds.
  *
  * Development only, and only while the backend at STUDIO_API does not
  * answer (a worktree whose `caterva studio` is still the contract's
@@ -28,7 +29,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, type Plugin, searchForWorkspaceRoot } from "vite";
 
-const TOKEN_PLACEHOLDER = "__CATERVA_SESSION_TOKEN__";
+const DEV_TOKEN_META = "caterva-dev-session";
 const studioApi = process.env.STUDIO_API;
 const rawPort = process.env.PORT;
 const port = rawPort ? Number(rawPort) : undefined;
@@ -37,7 +38,12 @@ if (rawPort && (Number.isNaN(port) || (port ?? 0) <= 0)) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-/** Writes the backend's session token into index.html while developing. */
+/** While developing only: puts the backend's session token in a meta tag of
+ * the page the Vite server serves. A build never has it (apply: "serve"). */
+function devMeta(token: string): string {
+  return `<meta name="${DEV_TOKEN_META}" content="${token}" />`;
+}
+
 function studioDevSession(stub: DevStub): Plugin {
   return {
     name: "caterva-studio-dev-session",
@@ -50,12 +56,12 @@ function studioDevSession(stub: DevStub): Plugin {
         const body = (await response.json()) as { token?: unknown };
         if (typeof body.token !== "string" || !/^[A-Za-z0-9_-]+$/.test(body.token)) return html;
         stub.active = false;
-        return html.replace(TOKEN_PLACEHOLDER, body.token);
+        return html.replace("</head>", `${devMeta(body.token)}</head>`);
       } catch {
         // The backend is not running. The health-only stub below answers
         // instead, under a token minted for this development server.
         stub.active = true;
-        return html.replace(TOKEN_PLACEHOLDER, stub.token);
+        return html.replace("</head>", `${devMeta(stub.token)}</head>`);
       }
     },
   };

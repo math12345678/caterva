@@ -42,6 +42,7 @@ import math
 import os
 import re
 import shutil
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -99,10 +100,35 @@ def setup_info(directory: Path) -> Tuple[str, Optional[str]]:
     raise AnalyzeError(f"{directory} is not a `caterva md` setup (no caterva-setup.json or run.sh)")
 
 
+#: What a replica folder is called: `caterva md` writes rep1, rep2, ... and
+#: nothing else is a replica. Its name goes into analyze.sh and into the
+#: commands run for it, so a folder called `rep1;touch PWNED;#` is refused.
+REPLICA_NAME = re.compile(r"rep[0-9]+", re.ASCII)
+
+
 def replicas(directory: Path) -> List[Path]:
-    reps = sorted((p for p in directory.glob("rep*") if p.is_dir()),
-                  key=lambda p: int(re.sub(r"\D", "", p.name) or 0))
+    folders = [p for p in directory.glob("rep*") if p.is_dir()]
+    for folder in folders:
+        if REPLICA_NAME.fullmatch(folder.name) is None:
+            raise AnalyzeError(
+                f"{directory} holds a folder named {_shown(folder.name)}, which is not a replica: replica "
+                "folders are called rep1, rep2, and so on. Rename or remove it, then run this again")
+    reps = sorted(folders, key=lambda p: int(p.name[3:]))
     return [r for r in reps if (r / "md.xtc").exists() and (r / "md.tpr").exists()]
+
+
+def _shown(name: str) -> str:
+    """A folder name for a message: printable characters only, shortened."""
+    text = "".join(c if c.isprintable() else "?" for c in name)
+    return repr(text[:40] + ("..." if len(text) > 40 else ""))
+
+
+def _check_replica_names(reps: Sequence[str]) -> List[str]:
+    """`reps` as quoted words for a script, after refusing a name that is not rep<number>."""
+    for name in reps:
+        if REPLICA_NAME.fullmatch(name) is None:
+            raise AnalyzeError(f"{_shown(name)} is not a replica folder name (rep1, rep2, ...)")
+    return [shlex.quote(name) for name in reps]
 
 
 def catalytic_residues(pdb: str, chain: Optional[str]) -> Tuple[List[Tuple[int, str]], str]:
@@ -149,13 +175,13 @@ def write_chi1_index(directory: Path, groups) -> None:
 def water_selections(p: Plan) -> str:
     """One `gmx select` selection per catalytic residue, quoted for the shell."""
     from caterva.analyze.water import selection
-    return " ".join(f"'{selection(s.resnr, s.atoms)}'" for s in p.sites)
+    return " ".join(shlex.quote(selection(s.resnr, s.atoms)) for s in p.sites)
 
 
 def sasa_selections(p: Plan) -> str:
     """One `gmx sasa -output` selection per catalytic residue, quoted for the shell."""
     from caterva.analyze.sasa import output_selection
-    return " ".join(f"'{output_selection(s.resnr)}'" for s in p.sites)
+    return " ".join(shlex.quote(output_selection(s.resnr)) for s in p.sites)
 
 
 # -- principal motions of the active site (caterva/analyze/pca.py) ---------------------
@@ -209,6 +235,7 @@ def pca_commands(reps: Sequence[str], gmx: str = "$GMX") -> List[str]:
     frame count covar logged."""
     from caterva.analyze.pca import COSINE_MODES, RMSIP_MODES
     k = RMSIP_MODES
+    reps = _check_replica_names(reps)
 
     def covar(ref: str, traj: str, out: str) -> str:
         return (f"printf '0\\n0\\n' | {gmx} covar -s {ref} -f {traj} -n pca.ndx -last {k} "
@@ -305,10 +332,11 @@ def gromacs_pca(directory: Path, p: Plan, reps: Sequence[Path], idx: Sequence[in
 def commands(p: Plan, reps: Sequence[str], gmx: str = "$GMX", chi1: Sequence = (),
              pca: Sequence[int] = ()) -> List[str]:
     from caterva.analyze.sasa import gmx_options
-    sel = " ".join(f"'{q.selection()}'" for q in p.pairs)
-    angle_sel = " ".join(f"'{t.selection()}'" for t in p.angles)
-    plane_sel = " ".join(f"'{t.selection()}'" for t in p.faces)
-    arm_sel = " ".join(f"'{t.arm_selection()}'" for t in p.faces)
+    reps = _check_replica_names(reps)
+    sel = " ".join(shlex.quote(q.selection()) for q in p.pairs)
+    angle_sel = " ".join(shlex.quote(t.selection()) for t in p.angles)
+    plane_sel = " ".join(shlex.quote(t.selection()) for t in p.faces)
+    arm_sel = " ".join(shlex.quote(t.arm_selection()) for t in p.faces)
     water_sel = water_selections(p)
     sasa_sel = sasa_selections(p)
     lines = []
@@ -381,7 +409,7 @@ def commands(p: Plan, reps: Sequence[str], gmx: str = "$GMX", chi1: Sequence = (
     # trajectories the RMSF lines above made.
     from caterva.analyze.pca import too_few_atoms
     if pca and too_few_atoms(len(pca)) is None:
-        lines += pca_commands(reps, gmx)
+        lines += pca_commands([shlex.split(r)[0] for r in reps], gmx)
     return lines
 
 
@@ -926,16 +954,38 @@ def hbond_verdict(o) -> str:
     return "partial"
 
 
+def command_argv(line: str, gmx: str) -> Tuple[List[str], Optional[str]]:
+    """One line of analyze.sh as (argv, text for standard input).
+
+    The lines are `GMX args`, or `printf 'answers\\n' | GMX args` for a
+    command that asks which group to use. They are run without a shell: the
+    line is split into words the way a shell would split it, `$GMX` is
+    replaced by the program itself, and the printf is done here. A line of
+    any other shape is a defect in this module and is refused."""
+    words = shlex.split(line)
+    stdin: Optional[str] = None
+    if "|" in words:
+        cut = words.index("|")
+        left, words = words[:cut], words[cut + 1:]
+        if len(left) != 2 or left[0] != "printf" or "|" in words:
+            raise AnalyzeError(f"an analysis command has a shape this program does not run: {line!r}")
+        stdin = left[1].replace("\\n", "\n")
+    if not words or words[0] != "$GMX" or any(w == "$GMX" for w in words[1:]):
+        raise AnalyzeError(f"an analysis command does not start with $GMX: {line!r}")
+    return [gmx, *words[1:]], stdin
+
+
 def run_gromacs(directory: Path, p: Plan, reps: Sequence[Path], gmx: str, chi1: Sequence = (),
                 pca: Sequence[int] = ()) -> None:
-    for line in commands(p, [r.name for r in reps], gmx=shlex_quote(gmx), chi1=chi1, pca=pca):
-        proc = subprocess.run(["bash", "-c", line], cwd=directory, capture_output=True, text=True)
+    """Run each GROMACS step as an argument list, with no shell, in `directory`."""
+    for line in commands(p, [r.name for r in reps], chi1=chi1, pca=pca):
+        argv, stdin = command_argv(line, gmx)
+        proc = subprocess.run(argv, cwd=directory, capture_output=True, text=True, input=stdin or "")
         if proc.returncode != 0:
             raise AnalyzeError(f"GROMACS failed:\n  {line}\n{proc.stderr.strip()[-800:]}")
 
 
 def shlex_quote(s: str) -> str:
-    import shlex
     return shlex.quote(s)
 
 

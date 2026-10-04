@@ -36,6 +36,7 @@ import type { Capabilities, ComposeResult, ConstantsResult, NameRefusal, RunReco
 import type { RunState } from "@/api/useRun";
 import { RunPanel } from "@/components/run/RunPanel";
 import { StatusLine } from "@/components/shell/StatusLine";
+import { plain } from "@/lib/copy";
 import { readNetwork } from "@/lib/network";
 
 import { composeRequest, EMPTY_COMPOSE } from "../Compose";
@@ -72,11 +73,11 @@ describe("the isozyme notice in a Compose result", () => {
     render(<ComposeResultView result={result} run={run} />);
     const verdict = screen.getByRole("region", { name: result.verdict!.verdict });
     expect(within(verdict).getByText("Qualified")).toBeInTheDocument();
-    expect(within(verdict).getByText(`${concern.qualifier}.`, { exact: false })).toBeInTheDocument();
+    expect(within(verdict).getByText(`${plain(concern.qualifier ?? "")}.`, { exact: false })).toBeInTheDocument();
     // The verdict word is still the engine's: the notice qualifies it, it does not change it.
     expect(result.verdict!.text).toContain(`Qualified: ${concern.qualifier}.`);
-    expect(within(verdict).getByText(concern.detail)).toBeInTheDocument();
-    expect(within(verdict).getByText(concern.remedy)).toBeInTheDocument();
+    expect(within(verdict).getByText(plain(concern.detail))).toBeInTheDocument();
+    expect(within(verdict).getByText(plain(concern.remedy ?? ""))).toBeInTheDocument();
   });
 
   it("stays when an isoform was given and a cited constant's row names no isozyme, and says which constant", () => {
@@ -321,6 +322,9 @@ describe("the network in the status bar", () => {
     expect(reading.sentence).toContain("PubChem answered");
     expect(reading.sentence).toContain("BRENDA did not answer");
     expect(reading.sentence).not.toContain("UniProt did not answer");
+    // A host that did not answer is said by its name; the server's own reason is kept for a disclosure.
+    expect(reading.sentence).not.toContain("www.brenda-enzymes.org");
+    expect(reading.detail).toBe("www.brenda-enzymes.org could not be reached: name resolution failed");
   });
 
   it("says every host answered a check only when every host did, in a check", () => {

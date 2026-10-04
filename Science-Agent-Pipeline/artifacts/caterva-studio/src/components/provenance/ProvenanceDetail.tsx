@@ -15,6 +15,8 @@ import { useState } from "react";
 import type { SourcedValue } from "@/api/types";
 import { formatNumber, fullValue } from "@/lib/format";
 
+import { type PlaceholderReading, placeholderRowReason, plain, readPlaceholder } from "@/lib/copy";
+
 import { Citation } from "./Citation";
 import { PROVENANCE_MEANING, ProvenanceMark, provenanceLabel } from "./ProvenanceMark";
 
@@ -118,7 +120,7 @@ export function ProvenanceDetail({ v, showValue = true }: { v: SourcedValue; sho
         {p.method ? (
           <>
             <dt>Method</dt>
-            <dd>{p.method}</dd>
+            <dd>{plain(p.method)}</dd>
           </>
         ) : null}
         {p.inputs?.length ? (
@@ -160,25 +162,25 @@ export function ProvenanceDetail({ v, showValue = true }: { v: SourcedValue; sho
           <blockquote className="prov-quote">{p.commentary}</blockquote>
         </div>
       ) : null}
-      {p.reason ? <p className="m-0">{p.reason}</p> : null}
+      {p.reason ? <p className="m-0">{plain(readPlaceholder(p.reason) ? placeholderRowReason(readPlaceholder(p.reason) as PlaceholderReading) : p.reason)}</p> : null}
       {p.chosen_because ? (
         <p className="m-0">
           <span className="muted">Chosen because </span>
-          {p.chosen_because}
+          {plain(p.chosen_because)}
         </p>
       ) : null}
-      {p.spread ? <p className="m-0 prov-note">{p.spread.sentence}</p> : null}
+      {p.spread ? <p className="m-0 prov-note">{plain(p.spread.sentence)}</p> : null}
       {p.scope?.length ? (
         <div className="grid gap-1">
           <span className="text-xs muted">Where this could be the wrong number for this model</span>
           <ul className="prov-scope">
             {p.scope.map((line) => (
-              <li key={line}>{line}</li>
+              <li key={line}>{plain(line)}</li>
             ))}
           </ul>
         </div>
       ) : null}
-      {p.note ? <p className="m-0 prov-note">{p.note}</p> : null}
+      {p.note && p.note !== p.reason ? <p className="m-0 prov-note">{plain(readPlaceholder(p.note) ? placeholderRowReason(readPlaceholder(p.note) as PlaceholderReading) : p.note)}</p> : null}
       {!p.citation && !p.reason && !p.method && !p.fit && p.kind !== "chosen" ? (
         <p className="m-0 muted">{PROVENANCE_MEANING[p.kind]}.</p>
       ) : null}

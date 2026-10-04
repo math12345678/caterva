@@ -45,8 +45,15 @@ HOW EACH IS DECIDED, AND WHAT IS NEVER DONE UNASKED
 - gromacs: the settings' `gromacs_path`, else `$GMX`, else `gmx` on PATH,
   else the two places Homebrew puts it (a GUI app's PATH does not include
   them). The version is the `GROMACS version:` line of `gmx --version`
-  (5 s timeout). Kept once found; looked for again on every request while
-  it is not, so installing GROMACS does not need a restart.
+  (5 s timeout, an argument list, no shell). Kept once found; for a gmx
+  found in the environment it is looked for again on every request while it
+  is not, so installing GROMACS does not need a restart. The program the
+  `gromacs_path` SETTING names is different: a request to read
+  capabilities never runs it. It is run when the setting is saved, at
+  start-up when one was saved, and on the explicit `refresh_gromacs`
+  (POST /api/capabilities/refresh); until then the answer says it has not
+  been checked. The path is validated again (workspace.validate_gromacs_path)
+  immediately before it is run.
 - rates, ui, data_dir, kinds: read fresh on every request; each is a file
   test or a dictionary lookup.
 
@@ -217,11 +224,13 @@ class CapabilityProbe:
 
     # -- the whole answer ----------------------------------------------------
 
-    def snapshot(self, *, probe_network: bool = False) -> Dict[str, Any]:
+    def snapshot(self, *, probe_network: bool = False, refresh_gromacs: bool = False) -> Dict[str, Any]:
         from caterva import __version__
 
         if probe_network:
             self.probe_network()
+        if refresh_gromacs:
+            self.refresh_gromacs()
         built, ui_reason = self.static_site.built()
         return {
             "version": __version__,
@@ -366,17 +375,45 @@ class CapabilityProbe:
         return None, "gmx on PATH, $GMX, " + " and ".join(GMX_FALLBACKS)
 
     def gromacs(self) -> Dict[str, Any]:
+        """GROMACS as last learned. Never runs the program the `gromacs_path`
+        setting names (module docstring); a gmx from the environment is
+        run until it has been found."""
         candidate, where = self.gromacs_candidate()
+        from_setting = bool(self._settings().get("gromacs_path"))
         with self._lock:
             cached = self._gromacs
             if cached and cached["found"] and cached["path"] == candidate:
                 return dict(cached)
-        result = self._probe_gromacs(candidate, where)
+            if from_setting and cached is not None and cached["path"] == candidate:
+                return dict(cached)
+        if from_setting:
+            return {"found": False, "path": candidate, "version": None,
+                    "reason": f"{candidate} (from {where}) has not been checked: it is run only when you save "
+                              "the setting or ask for a check"}
+        return self._store_gromacs(self._probe_gromacs(candidate, where))
+
+    def refresh_gromacs(self) -> Dict[str, Any]:
+        """Run the chosen gmx now, on the user's request: the one place the
+        `gromacs_path` setting's program is executed for a probe."""
+        candidate, where = self.gromacs_candidate()
+        return self._store_gromacs(self._probe_gromacs(candidate, where, validate=bool(
+            self._settings().get("gromacs_path"))))
+
+    def _store_gromacs(self, result: Dict[str, Any]) -> Dict[str, Any]:
         with self._lock:
             self._gromacs = result
         return dict(result)
 
-    def _probe_gromacs(self, candidate: Optional[str], where: str) -> Dict[str, Any]:
+    def _probe_gromacs(self, candidate: Optional[str], where: str, *, validate: bool = False) -> Dict[str, Any]:
+        if candidate is not None and validate:
+            from caterva.studio.contract import Malformed
+            from caterva.studio.workspace import validate_gromacs_path
+
+            try:
+                validate_gromacs_path(candidate)
+            except Malformed as exc:
+                return {"found": False, "path": candidate, "version": None,
+                        "reason": f"{candidate} (from {where}) is not run: {exc}"}
         if candidate is None:
             return {"found": False, "path": None, "version": None,
                     "reason": f"GROMACS was not found (looked for {where}); setting up a simulation still "

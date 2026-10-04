@@ -283,21 +283,24 @@
   color: var(--fg);
 }
 .k-worst[data-source="isozymes"] {
-  border-color: color-mix(in oklch, var(--signal) 55%, var(--rule));
+  border-left-color: var(--signal);
 }
 .k-worst[data-source="isozymes"] .k-eyebrow {
   color: var(--signal-deep);
 }
+/* A rule, not a box: the verdict is the one bordered region, and what is
+   worst about it sits inside it as a ruled passage, never a nested card. */
 .k-worst {
   display: grid;
   gap: 0.25rem;
-  padding: 0.75rem 0.875rem;
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  border: 1px solid color-mix(in oklch, var(--caution) 45%, var(--rule));
+  padding: 0.125rem 0 0.125rem 0.875rem;
+  border: 0;
+  border-left: 3px solid var(--caution);
+  border-radius: 0;
+  background: none;
 }
 .k-worst[data-severity="broken"] {
-  border-color: color-mix(in oklch, var(--danger) 55%, var(--rule));
+  border-left-color: var(--danger);
 }
 .k-worst .k-eyebrow {
   color: var(--caution);
@@ -619,27 +622,37 @@
 
 /* ------------------------------------------------------------ sim */
 
+/* The end-of-run counts as a compact key/value list, each value with its
+   provenance mark: a reading of the run, not a headline number. */
 .k-finals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 2.25rem;
+  display: grid;
+  grid-template-columns: max-content max-content;
+  justify-content: start;
+  gap: 0;
   margin: 0.25rem 0 0;
+  font-size: var(--text-base);
 }
 .k-finals > div {
-  display: grid;
-  gap: 0.125rem;
+  display: contents;
 }
-.k-finals dt {
-  font-size: var(--text-xs);
-  color: var(--muted);
-}
+.k-finals dt,
 .k-finals dd {
   margin: 0;
-  font-size: var(--text-lg);
+  padding: 0.3125rem 0;
+  border-bottom: 1px solid var(--rule);
 }
-.k-finals > div[data-kind="expected"] {
-  padding-left: 2.25rem;
-  border-left: 1px solid var(--rule-strong);
+.k-finals dt {
+  padding-right: 2rem;
+  font-size: var(--text-sm);
+  color: var(--fg-soft);
+}
+.k-finals dd {
+  font-size: var(--text-base);
+}
+.k-finals > div[data-kind="expected"] dt,
+.k-finals > div[data-kind="expected"] dd {
+  border-bottom: 0;
+  border-top: 1px solid var(--rule-strong);
 }
 .k-inputs {
   width: auto;

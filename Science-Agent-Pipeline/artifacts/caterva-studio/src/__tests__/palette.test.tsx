@@ -14,6 +14,8 @@ import { CommandPalette, orderSections, paletteFilter } from "@/components/palet
 import { CommandProvider, useCommand } from "@/components/palette/commands";
 import { JobsProvider } from "@/lib/jobs";
 
+import { css } from "./stylesheet";
+
 import { json, mockServer, setSessionToken } from "./helpers";
 
 const caps = capabilities.body as unknown as Capabilities;
@@ -117,5 +119,40 @@ describe("the command palette", () => {
     expect(orderSections(sections, "History").map((s) => s.key)).toEqual(["workspace", "go"]);
     expect(orderSections(sections, "").map((s) => s.key)).toEqual(["go", "workspace"]);
     expect(paletteFilter("palette:compose-from-text", "History")).toBeLessThan(paletteFilter("History /history", "History"));
+  });
+});
+
+describe("the palette as a modal dialog", () => {
+  it("is a named modal dialog, with the rest of the page inert while it is open", async () => {
+    mockServer((req) => (req.url.startsWith("/api/runs") ? runsEmpty : undefined));
+    const memory = memoryLocation({ path: "/", record: true });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <Router hook={memory.hook}>
+          <CommandProvider>
+            <JobsProvider>
+              <div id="app">
+                <main id="page-behind">the page</main>
+                <CommandPalette capabilities={caps} />
+              </div>
+            </JobsProvider>
+          </CommandProvider>
+        </Router>
+      </QueryClientProvider>,
+    );
+    const page = document.getElementById("page-behind")!;
+    expect(page).not.toHaveAttribute("inert");
+    act(() => openWithKeys());
+    const dialog = await screen.findByRole("dialog", { name: "Command palette" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(page).toHaveAttribute("inert");
+    expect(dialog).not.toHaveAttribute("inert");
+    act(() => openWithKeys());
+    await waitFor(() => expect(page).not.toHaveAttribute("inert"));
+  });
+
+  it("draws a scrim behind it", () => {
+    expect(css).toMatch(/\.palette::backdrop\s*\{[^}]*background:\s*oklch\([^)]*\/\s*0\.\d+\)/);
   });
 });

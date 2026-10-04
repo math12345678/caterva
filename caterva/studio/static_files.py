@@ -1,21 +1,28 @@
-"""The built page: serving it from caterva/studio/static, with the session token written in.
+"""The built page: serving it from caterva/studio/static, with no token in it.
 
-WHY THE TOKEN GOES INTO THE HTML
---------------------------------
-Every /api/ request must carry the per-launch token (security.py). The
-page has to learn it somehow, and every other channel is worse: a query
-string lands in history and logs, a cookie is attached by the browser to a
-foreign page's requests too, and a separate endpoint would itself need
-protecting. index.html is fetched by the page's own tab and cannot be read
-by a foreign one (no CORS, CORP same-origin), so the server replaces the
-one placeholder in `<meta name="caterva-session" content="...">` as it
-serves the file, per request, from memory. The token is never written to
-disk.
+WHY THE TOKEN IS NOT IN ANY DOCUMENT
+------------------------------------
+Every /api/ request must carry the per-launch token (security.py). A page
+that carried the token would hand it to any process that can ask for `/`:
+the Host check keeps out web pages, and does nothing about another user's
+process or a sandboxed app scanning loopback ports. So no document the
+server serves holds the token, and `GET /` answers the same bytes to
+everyone.
 
-If the placeholder is not there, the directory holds a page that was not
-built from this package, and serving it would hand the user a page that
-cannot talk to the server while looking as if it could. That is a 500 with
-that sentence, not a page without a token.
+The token reaches the page out of band, in the URL FRAGMENT of the address
+the launcher opens: `http://127.0.0.1:<port>/#token=<token>`. A browser
+never sends a fragment to a server, so it appears in no request, no log
+and no response; the page reads `location.hash`, keeps the token in memory
+(and in sessionStorage so a reload of the same tab keeps working), and
+removes the fragment from the address bar at once. The server prints that
+address on its `CATERVA_STUDIO_URL=` line (`security.bootstrap_url`), which
+is the only place it exists outside the server's memory and the page.
+
+What the server still checks is that the directory holds a page built from
+this package: index.html must carry `<meta name="caterva-studio-page"
+content="token-in-url-fragment">`. A page without it (an older build that
+expects the token to be written in) would load and be unable to talk to the
+server while looking as if it could. That is a 500 with that sentence.
 
 WHAT IS REFUSED
 ---------------
@@ -47,7 +54,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from caterva.studio.contract import SESSION_META_NAME, TOKEN_PLACEHOLDER
+from caterva.studio.contract import PAGE_MARKER_CONTENT, PAGE_MARKER_NAME
 from caterva.studio.security import CSP
 
 #: Where Vite writes the page (vite.config.ts `build.outDir`).
@@ -85,9 +92,9 @@ _TYPES = {
 #: may keep it for a year; a new build has new names.
 IMMUTABLE = "public, max-age=31536000, immutable"
 
-_META = re.compile(
-    r"<meta\s+name=\"" + re.escape(SESSION_META_NAME) + r"\"\s+content=\""
-    + re.escape(TOKEN_PLACEHOLDER) + r"\"\s*/?>"
+_MARKER = re.compile(
+    r"<meta\s+name=\"" + re.escape(PAGE_MARKER_NAME) + r"\"\s+content=\""
+    + re.escape(PAGE_MARKER_CONTENT) + r"\"\s*/?>"
 )
 
 _NOT_BUILT_STYLE = (
@@ -105,7 +112,7 @@ NOT_BUILT_CSP = CSP.replace("style-src 'self'", f"style-src 'sha256-{_NOT_BUILT_
 
 
 class NotFromThisPackage(RuntimeError):
-    """index.html exists but has no token placeholder in its session meta tag."""
+    """index.html exists but lacks the marker of a page built from this package."""
 
 
 @dataclass(frozen=True)
@@ -156,7 +163,7 @@ class StaticSite:
 
     def built(self) -> Tuple[bool, Optional[str]]:
         """(built, why not). Built means index.html exists and carries the
-        token placeholder in its session meta tag (Capabilities.ui)."""
+        page marker (Capabilities.ui)."""
         if not self.index.is_file():
             return False, (
                 f"the page has not been built: {self.index} does not exist. Build it with "
@@ -166,24 +173,22 @@ class StaticSite:
             text = self.index.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError) as exc:
             return False, f"{self.index} cannot be read: {exc}"
-        if not _META.search(text):
-            return False, f"{self.index} was not built from this package: it has no session placeholder"
+        if not _MARKER.search(text):
+            return False, f"{self.index} was not built from this package: it has no page marker"
         return True, None
 
-    def index_with_token(self, token: str) -> bytes:
-        """index.html with the placeholder replaced by `token`.
+    def index_page(self) -> bytes:
+        """index.html as built: the same bytes for every request.
 
         Raises FileNotFoundError when there is no build and
-        NotFromThisPackage when the placeholder is missing."""
+        NotFromThisPackage when the page marker is missing."""
         text = self.index.read_text(encoding="utf-8")
-        match = _META.search(text)
-        if match is None:
+        if _MARKER.search(text) is None:
             raise NotFromThisPackage(
                 "the page in the static directory was not built from this package: its "
-                f"<meta name=\"{SESSION_META_NAME}\"> tag has no session placeholder"
+                f"<meta name=\"{PAGE_MARKER_NAME}\"> tag is missing"
             )
-        tag = match.group(0).replace(TOKEN_PLACEHOLDER, token)
-        return (text[: match.start()] + tag + text[match.end():]).encode("utf-8")
+        return text.encode("utf-8")
 
     def not_built_page(self) -> StaticFile:
         """The server's own page for a checkout whose page is not built."""
@@ -239,7 +244,7 @@ it is made at release time, and the downloadable app carries it.</p>
             return "missing", None
         return "index", None
 
-    def serve(self, decoded_path: str, token: str) -> StaticFile:
+    def serve(self, decoded_path: str) -> StaticFile:
         """The answer to GET `decoded_path` (not under /api/)."""
         what, path = self.lookup(decoded_path)
         if what in ("refused", "missing"):
@@ -247,7 +252,7 @@ it is made at release time, and the downloadable app carries it.</p>
         if what == "index":
             if not self.index.is_file():
                 return self.not_built_page()
-            body = self.index_with_token(token)
+            body = self.index_page()
             return StaticFile(200, body, "text/html; charset=utf-8", "no-store", csp=CSP)
         assert path is not None
         body = path.read_bytes()

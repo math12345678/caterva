@@ -1,9 +1,9 @@
 /**
- * A `scripts/cite.py` result: for each constant asked for, the row the
+ * A lab-report result: for each constant asked for, the row the
  * resolver chose and every other row it read, each with the paper that
  * measured it; the values the person supplied (marked as theirs or as the
- * script's defaults); what was declined and why; and the document cite.py
- * prints.
+ * command's defaults); what was declined and why; and the document the
+ * command prints.
  *
  * "Use in Compose" fills Compose's form with the same enzyme, organism and
  * substrate. Compose then looks the constants up itself, through the same
@@ -20,6 +20,7 @@ import { Value } from "@/components/provenance/Value";
 import { MarkdownReport } from "@/components/report/Report";
 import { Section } from "@/components/screen/Screen";
 import { DataTable } from "@/components/table/DataTable";
+import { describeSource, plain, plural } from "@/lib/copy";
 
 import { Origin } from "./ComposeResult";
 
@@ -77,14 +78,14 @@ function Constant({ row, request }: { row: ConstantRow; request: Record<string, 
             <Value v={row.value} />
           </span>
           <span className="muted">
-            the resolver&apos;s pick ({row.source}); {rows.length} row(s) read in all
+            the resolver&apos;s pick ({describeSource(row.source)}); {plural(rows.length, "row")} read in all
           </span>
         </p>
       ) : (
         <p className="k-constant-headline">
           <span className="text-caution">Not found</span>{" "}
           <span className="muted">
-            ({row.source}){row.organisms_available.length ? `. Measured in: ${row.organisms_available.join(", ")}` : ""}
+            ({describeSource(row.source)}){row.organisms_available.length ? `. Measured in: ${row.organisms_available.join(", ")}` : ""}
           </span>
         </p>
       )}
@@ -107,8 +108,12 @@ function Constant({ row, request }: { row: ConstantRow; request: Record<string, 
               sortValue: (r) => r.v.provenance.citation?.text ?? null,
             },
             { key: "org", header: "Organism", cell: (r) => <em>{r.v.provenance.organism ?? ""}</em>, sortValue: (r) => r.v.provenance.organism ?? null },
-            { key: "cond", header: "Conditions", cell: (r) => <span className="font-mono">{conditionsText(r.v)}</span> },
-            { key: "says", header: "The row says", cell: (r) => <span className="k-cell-prose">{r.v.provenance.commentary ?? ""}</span> },
+            ...(rows.some((r) => conditionsText(r.v) !== "")
+              ? [{ key: "cond", header: "Conditions", cell: (r: Row) => <span className="font-mono">{conditionsText(r.v)}</span> }]
+              : []),
+            ...(rows.some((r) => r.v.provenance.commentary)
+              ? [{ key: "says", header: "The row says", cell: (r: Row) => <span className="k-cell-prose">{r.v.provenance.commentary ?? ""}</span> }]
+              : []),
             { key: "role", header: "", cell: (r) => (r.role === "chosen" ? <span className="chip" data-tone="signal">chosen</span> : null) },
           ]}
         />
@@ -134,16 +139,16 @@ export function ConstantsResultView({ result, request }: { result: Result; reque
         </h2>
         <p className="k-verdict-licence">
           {result.defensible
-            ? "Every number in the lab report is either cited or declared as yours (cite.py's own check)."
-            : "Not every number in the lab report is cited or declared as yours (cite.py's own check); the document says which."}
+            ? "Every number in the lab report is either cited or declared as yours (the command's own check)."
+            : "Not every number in the lab report is cited or declared as yours (the command's own check); the document says which."}
         </p>
-        {result.organism_note ? <p className="k-verdict-behaviour muted">{result.organism_note}</p> : null}
+        {result.organism_note ? <p className="k-verdict-behaviour muted">{plain(result.organism_note)}</p> : null}
         {result.refusals.length ? (
           <div className="k-part-refusal" role="note">
             <span className="state-kicker">Declined</span>
             {result.refusals.map((r) => (
               <p key={r} className="k-part-refusal-reason">
-                {r}
+                {plain(r)}
               </p>
             ))}
           </div>
@@ -176,7 +181,7 @@ export function ConstantsResultView({ result, request }: { result: Result; reque
                     <td data-align="end">
                       <Value v={v} />
                     </td>
-                    <td className="muted">{v.provenance.reason}</td>
+                    <td className="muted">{plain(v.provenance.reason ?? "")}</td>
                   </tr>
                 ))}
               </tbody>
@@ -184,7 +189,7 @@ export function ConstantsResultView({ result, request }: { result: Result; reque
           </div>
         </Section>
       ) : null}
-      <Disclosure title="The document cite.py prints">
+      <Disclosure title="The document as the command prints it">
         <MarkdownReport source={result.document_markdown} />
       </Disclosure>
     </>

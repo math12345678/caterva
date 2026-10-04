@@ -13,7 +13,7 @@
  * a SourcedValue drawn by Value.
  */
 import { FolderOpen } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useSearch } from "wouter";
 
 import { ApiRequestError, apiFetch } from "@/api/client";
@@ -22,7 +22,7 @@ import type { RunState } from "@/api/useRun";
 import { Field, FormActions, TextInput } from "@/components/forms/Field";
 import { Split } from "@/components/layout/Split";
 import { useCommand } from "@/components/palette/commands";
-import { RunPanel } from "@/components/run/RunPanel";
+import { RunAnnouncer, RunPanel } from "@/components/run/RunPanel";
 import { chooseDirectory, chooseFile, isDesktop, reveal } from "@/lib/desktop";
 import { modKey, useHotkey } from "@/lib/keyboard";
 
@@ -73,6 +73,8 @@ export function RunScreen<K extends RunKind>({
   form,
   action,
   canSubmit,
+  blockedReason,
+  retryVerb,
   onSubmit,
   run,
   idle,
@@ -89,6 +91,10 @@ export function RunScreen<K extends RunKind>({
   /** The primary action's name: "Search", "Audit", "Write setup", "Analyze". */
   action: string;
   canSubmit: boolean;
+  /** Why the button is not available while `canSubmit` is false ("Choose an enzyme first"), shown under it. */
+  blockedReason?: string;
+  /** Finishes "Check the network, then ...", for an outage's message. */
+  retryVerb?: string;
   onSubmit: () => void;
   run: RunState<NoInfer<K>> & { cancel: () => Promise<void> };
   idle: ReactNode;
@@ -101,6 +107,9 @@ export function RunScreen<K extends RunKind>({
   onChooseEnzyme?: (ec: string) => void;
 }) {
   const working = busy(run);
+  const whyId = useId();
+  const resultRoot = useRef<HTMLDivElement>(null);
+  const why = working ? "A run is in progress." : !canSubmit ? blockedReason : undefined;
   const submit = () => {
     if (canSubmit && !working) onSubmit();
   };
@@ -133,18 +142,36 @@ export function RunScreen<K extends RunKind>({
         >
           {form}
           <FormActions>
-            <button type="submit" className="btn btn-primary" aria-disabled={!canSubmit || working}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              aria-disabled={!canSubmit || working}
+              aria-describedby={why ? whyId : undefined}
+            >
               {action}
             </button>
             <span className="field-hint">
               <kbd className="kbd">{modKey()}</kbd> <kbd className="kbd">Enter</kbd>
             </span>
           </FormActions>
+          {why ? (
+            <p className="form-why" id={whyId}>
+              {why}
+            </p>
+          ) : null}
         </form>
       }
       second={
-        <div className="st-result" aria-live="polite">
-          <RunPanel state={run} onCancel={() => void run.cancel()} onRetry={submit} onChooseEnzyme={onChooseEnzyme} idle={idle}>
+        <div className="st-result" ref={resultRoot}>
+          <RunAnnouncer state={run} root={resultRoot} />
+          <RunPanel
+            state={run}
+            onCancel={() => void run.cancel()}
+            onRetry={submit}
+            retryVerb={retryVerb}
+            onChooseEnzyme={onChooseEnzyme}
+            idle={idle}
+          >
             {(result) => children(result)}
           </RunPanel>
         </div>

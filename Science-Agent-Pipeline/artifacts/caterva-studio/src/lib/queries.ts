@@ -10,6 +10,7 @@ import { ApiRequestError, apiJson } from "@/api/client";
 import { type ListRunsQuery, listRuns } from "@/api/runs";
 import type { Capabilities, Health } from "@/api/types";
 
+import { pollInterval } from "./polling";
 import { CapabilitiesSchema, HealthSchema } from "./schemas";
 
 export function makeQueryClient(): QueryClient {
@@ -31,8 +32,10 @@ export function useHealth() {
   return useQuery({
     queryKey: HEALTH_KEY,
     queryFn: () => apiJson<Health>("/api/health", {}, HealthSchema),
-    // A server that stops is noticed within half a minute, and the shell says so.
-    refetchInterval: 30_000,
+    // A server that stops is noticed within half a minute while someone is
+    // looking, and the shell says so. A hidden tab asks nothing, an idle
+    // window a quarter as often, a failing server less and less often.
+    refetchInterval: pollInterval(30_000),
     refetchIntervalInBackground: false,
   });
 }
@@ -49,6 +52,11 @@ export function useCapabilities(enabled = true) {
 /** Contacts the database hosts of CONTRACT.md 10.2; only when the reader asks. */
 export function probeNetwork(): Promise<Capabilities> {
   return apiJson<Capabilities>("/api/capabilities?probe=network", {}, CapabilitiesSchema);
+}
+
+/** Runs the chosen gmx now (CONTRACT.md 7): the only request that does. Answers the capabilities. */
+export function refreshGromacs(): Promise<Capabilities> {
+  return apiJson<Capabilities>("/api/capabilities/refresh", { method: "POST", body: "{}" }, CapabilitiesSchema);
 }
 
 export function useRunList(query: ListRunsQuery = {}, enabled = true) {

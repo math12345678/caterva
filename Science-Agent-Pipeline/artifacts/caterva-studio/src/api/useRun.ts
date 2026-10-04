@@ -24,7 +24,7 @@ import { describeError } from "@/lib/errors";
 import { useJobActionsOptional } from "@/lib/jobs";
 
 import { ApiRequestError } from "./client";
-import { cancelRun, createRun, getResult, getRun, isTerminal, type RunEvent, subscribeToRun } from "./runs";
+import { cancelRun, createRun, getResult, getRun, isTerminal, liveStatus, type RunEvent, subscribeToRun } from "./runs";
 import type {
   ApiError,
   Outcome,
@@ -52,7 +52,7 @@ export interface RunState<K extends RunKind> {
   runError: RunError | null;
   /** Submitting: the POST has not answered yet. */
   submitting: boolean;
-  /** Cancel was asked for and the `cancelled` status has not arrived yet. */
+  /** Cancel was asked for and the run has not stopped yet (`cancelled` or `abandoned` has not arrived). */
   cancelling: boolean;
   /** The run finished and its result (if it has one) has been read. */
   settled: boolean;
@@ -83,9 +83,9 @@ function apply<K extends RunKind>(s: RunState<K>, e: RunEvent): RunState<K> {
     case "status":
       return {
         ...s,
-        status: e.data.status,
+        status: liveStatus(e.data.status),
         outcome: e.data.outcome ?? s.outcome,
-        cancelling: e.data.status === "cancelled" ? false : s.cancelling,
+        cancelling: e.data.status === "cancelling" ? true : isTerminal(e.data.status) ? false : s.cancelling,
       };
     case "stage":
       return {
@@ -124,7 +124,11 @@ export function useRun<K extends RunKind>(kind: K, existingRunId?: string | null
     try {
       const finished = await getRun(id);
       let result: RunResults[K] | null = null;
-      if (finished.status === "done") {
+      // A run whose outcome says it has no result is not asked for one: the
+      // request would be a 404, drawn as an error in the console. Records
+      // written before the server said so are still asked, and a 404 there
+      // is "no result".
+      if (finished.status === "done" && finished.outcome?.has_result !== false) {
         try {
           result = await getResult<K>(id);
         } catch (e) {
@@ -153,7 +157,15 @@ export function useRun<K extends RunKind>(kind: K, existingRunId?: string | null
     (run: RunRecord) => {
       stop();
       current.current = run.id;
-      setState((s) => ({ ...s, run, status: run.status, outcome: run.outcome, runError: run.error, submitting: false }));
+      setState((s) => ({
+        ...s,
+        run,
+        status: liveStatus(run.status),
+        cancelling: run.status === "cancelling" ? true : s.cancelling,
+        outcome: run.outcome,
+        runError: run.error,
+        submitting: false,
+      }));
       // A finished run's result is read at once; its events are still
       // replayed, for the stages and the log, but nothing waits on them.
       const finishedAlready = isTerminal(run.status);
