@@ -17,3 +17,7 @@ exclude caterva/conftest.py caterva/pytest.ini caterva/.coverage
 global-exclude __pycache__ *.py[cod] .DS_Store
 include caterva/core/data/*.json caterva/core/data/README.md
 include caterva/enzymes/data/enzyme_index.json.gz caterva/enzymes/data/NOTICE.txt
+# The literature layer's import closure, copied out of Tests/ by
+# scripts/vendor_literature.py (which build_release.py runs first). Code only:
+# no fixture and no recorded answer goes with it.
+include caterva/_literature/*.py caterva/_literature/README.txt

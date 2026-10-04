@@ -376,7 +376,7 @@ Analysis (2):      /api/compare/jobs, /api/analyze/sweep/:id
 
 ### Start the System
 ```bash
-cd /Users/smyan/Desktop/Coding/Caterva
+cd path/to/caterva
 npm run web:start
 # Open http://localhost:3000
 ```

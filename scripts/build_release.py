@@ -40,6 +40,14 @@ rewritten archive is then re-opened and its member list and contents
 compared with the original's before it is kept, so a rewrite that lost or
 changed a byte cannot be shipped.
 
+THE LITERATURE LAYER
+--------------------
+Before the sdist is built, scripts/vendor_literature.py copies the modules of
+`Tests/` that `caterva.checkout.literature_module` can load, and the modules
+those import, into `caterva/_literature/` (git-ignored, deterministic bytes).
+`MANIFEST.in` and package-data carry them into the sdist and the wheel, and the
+wheel is refused if the core of the layer is not in it.
+
 WHAT IT CHECKS BEFORE IT WRITES SHA256SUMS
 ------------------------------------------
 The wheel is opened and its file list is held to what the release notes
@@ -87,6 +95,12 @@ FORBIDDEN_IN_WHEEL = (
 #: Files the release notes say are inside the wheel.
 REQUIRED_IN_WHEEL = ("LICENSE", "NOTICE")
 
+#: Literature modules the wheel must carry (caterva/_literature/, vendored from
+#: Tests/ by scripts/vendor_literature.py). A wheel without them cannot run a
+#: literature search, the headline feature, and reports that it cannot.
+REQUIRED_LITERATURE = ("fallback_logic", "brenda_client", "http_retry", "enzyme_lookup", "citation",
+                       "parameterize", "model_compatibility", "assay_conditions", "evidence_rank")
+
 
 def _build_sdist(out_dir: Path) -> Path:
     from setuptools import build_meta  # PEP 517 backend, imported lazily
@@ -130,6 +144,9 @@ def _check_wheel(wheel: Path) -> list[str]:
     for required in REQUIRED_IN_WHEEL:
         if not any(m.endswith("/" + required) or m == required for m in names):
             problems.append(f"missing {required}")
+    for module in REQUIRED_LITERATURE:
+        if f"caterva/_literature/{module}.py" not in names:
+            problems.append(f"missing caterva/_literature/{module}.py (the literature layer was not vendored)")
     modules = [m for m in names if m.endswith(".py")]
     # Every member is Caterva's package or its own metadata; nothing else.
     outside = [m for m in names if not (m.startswith("caterva/") or ".dist-info/" in m)]
@@ -215,6 +232,13 @@ def main(argv: list[str] | None = None) -> int:
     import os
 
     os.chdir(ROOT)
+    # The literature layer is part of the package at release time: copy it in
+    # before the sdist is built, exactly as the Studio page is built first.
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import vendor_literature
+
+    vendored = vendor_literature.vendor()
+    print(f"vendor: {len(vendored)} literature modules copied into caterva/_literature/")
     epoch = os.environ.get("SOURCE_DATE_EPOCH") or _head_commit_epoch()
     if epoch:
         os.environ["SOURCE_DATE_EPOCH"] = epoch
@@ -222,7 +246,13 @@ def main(argv: list[str] | None = None) -> int:
         work = Path(tmp)
         # Build the sdist into a scratch directory first so a failed wheel
         # build does not leave a lone sdist in dist/ looking like a release.
-        sdist = _build_sdist(work / "sdist")
+        try:
+            sdist = _build_sdist(work / "sdist")
+        finally:
+            # The sdist carries the copies into the wheel; leaving them in the
+            # checkout would make every scan of caterva/ see each literature
+            # module twice.
+            vendor_literature.remove()
         wheel = _build_wheel_from_sdist(sdist, work / "wheel", work / "src")
 
         problems = _check_wheel(wheel)

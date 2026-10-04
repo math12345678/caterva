@@ -5,9 +5,13 @@ WHY THIS EXISTS
 The resolvers that read BRENDA, rank rows by how well evidenced they are
 and carry the disagreement between papers -- `fallback_logic`,
 `parameterize`, `model_compatibility`, `assay_conditions` -- live in
-`Tests/` at the repository root. They are not part of the wheel
-(`MANIFEST.in` prunes them, and ADR 0177 records why the released artifacts
-carry Caterva's code only).
+`Tests/` at the repository root, as flat modules. `MANIFEST.in` prunes
+`Tests/` from the wheel (its fixtures are BRENDA data under their own
+licence, ADR 0177), so the release build copies exactly the modules the
+resolvers import, and none of the fixtures, into `caterva/_literature/`
+(`scripts/vendor_literature.py`, run by `scripts/build_release.py`). That
+directory is generated, git-ignored, and present in the wheel and the app
+folder.
 
 Seven places in `caterva/` reach for them, each with the same two-line
 idiom:
@@ -34,13 +38,18 @@ nothing user-facing called it.
 So the path is arranged in one place, by a function that says plainly when
 it cannot.
 
+WHERE IT LOOKS, IN ORDER
+------------------------
+1. `Tests/` beside the package's parent: the repository layout, so a
+   developer's checkout behaves exactly as before.
+2. `caterva/_literature/` inside the installed package: the wheel and the
+   frozen app.
+
 WHAT IT REFUSES TO DO
 ---------------------
-Guess. It looks for `Tests/` beside the package's own parent, which is the
-repository layout and nothing else. From an installed wheel or the app
-folder there is no such directory, and `LiteratureLayerUnavailable` names
-that rather than letting an `ImportError` surface three frames away as
-though the code were broken.
+Guess. When neither directory exists (a wheel built without the vendoring
+step), `LiteratureLayerUnavailable` names that rather than letting an
+`ImportError` surface three frames away as though the code were broken.
 """
 from __future__ import annotations
 
@@ -54,6 +63,9 @@ _PACKAGE_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _PACKAGE_DIR.parent
 _TESTS_DIR = _REPO_ROOT / "Tests"
 
+#: The literature modules as the release build vendors them into the package.
+_VENDORED_DIR = _PACKAGE_DIR / "_literature"
+
 
 class LiteratureLayerUnavailable(ImportError):
     """The literature resolvers are not reachable from this installation."""
@@ -62,6 +74,16 @@ class LiteratureLayerUnavailable(ImportError):
 def tests_directory() -> Path | None:
     """The checkout's `Tests/`, or None when running from an installed copy."""
     return _TESTS_DIR if _TESTS_DIR.is_dir() else None
+
+
+def vendored_directory() -> Path | None:
+    """The package's own copy of the literature modules, or None when absent."""
+    return _VENDORED_DIR if _VENDORED_DIR.is_dir() else None
+
+
+def literature_directory() -> Path | None:
+    """Where the literature modules are: the checkout's `Tests/`, else the package's copy."""
+    return tests_directory() or vendored_directory()
 
 
 def literature_module(name: str) -> Any:
@@ -79,28 +101,35 @@ def literature_module(name: str) -> Any:
         except ImportError:
             continue
 
-    tests = tests_directory()
-    if tests is None:
+    found = literature_directory()
+    if found is None:
         raise LiteratureLayerUnavailable(
-            f"{name!r} is part of Caterva's literature layer, which lives in "
-            f"the repository's Tests/ directory and is not shipped in the "
-            f"wheel or the app folder (ADR 0177). No literature search is "
-            f"possible from this installation; clone the repository to run "
-            f"one. Looked for {_TESTS_DIR}."
+            f"{name!r} is part of Caterva's literature layer, which is in "
+            f"neither the repository's Tests/ directory ({_TESTS_DIR}) nor "
+            f"the package's caterva/_literature/ ({_VENDORED_DIR}). A release "
+            f"build puts it in the second (scripts/vendor_literature.py); "
+            f"this installation was built without it, so no literature "
+            f"search is possible from here."
         )
 
-    if str(tests) not in sys.path:
+    if str(found) not in sys.path:
         # Appended, not inserted: a flat directory of modules with names as
         # general as `parameterize` must never shadow a real package.
-        sys.path.append(str(tests))
+        sys.path.append(str(found))
     try:
         return importlib.import_module(name)
     except ImportError as exc:
         raise LiteratureLayerUnavailable(
-            f"{name!r} was not importable even with {tests} on sys.path: "
+            f"{name!r} was not importable even with {found} on sys.path: "
             f"{exc}. The literature layer is present but broken, which is a "
             f"different fact from its being absent."
         ) from exc
 
 
-__all__ = ["LiteratureLayerUnavailable", "literature_module", "tests_directory"]
+__all__ = [
+    "LiteratureLayerUnavailable",
+    "literature_directory",
+    "literature_module",
+    "tests_directory",
+    "vendored_directory",
+]

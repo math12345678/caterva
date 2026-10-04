@@ -36,6 +36,9 @@ Every tracked file that names one of the three variables must be one of:
     that;
   * the recorder, scripts/record_http_fixtures.py, which sets them for the
     runner processes it spawns and for nothing else;
+  * scripts/build_app.py, whose smoke check of the frozen folder sets the
+    replay variables for one child process, to run the literature search
+    offline;
   * a test (test_*.py, *.test.ts, caterva/tests/), or documentation (*.md).
 
 Naming is checked rather than setting, deliberately: "sets" has a dozen
@@ -61,9 +64,14 @@ READERS = {
 
 VITEST_CONFIG = "Science-Agent-Pipeline/artifacts/api-server/vitest.config.ts"
 RECORDER = "scripts/record_http_fixtures.py"
+#: The release build's frozen-folder check: it runs ONE `caterva compose
+#: --subject` child process offline against the repository's recordings, to
+#: prove the literature layer is inside the folder. The variables are set in
+#: that child's environment only; they are never written into the folder.
+FREEZE_SMOKE = "scripts/build_app.py"
 
 #: Test configuration and tooling allowed to set them.
-SETTERS = {VITEST_CONFIG, RECORDER}
+SETTERS = {VITEST_CONFIG, RECORDER, FREEZE_SMOKE}
 
 _NAME_PATTERN = re.compile(r"CATERVA_(?:BRENDA_RECORDED|HTTP_RECORDED|HTTP_RECORD)\b")
 

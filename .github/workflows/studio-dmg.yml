@@ -12,17 +12,32 @@
 #   page     pnpm install --frozen-lockfile, tsc, vitest and the Vite build
 #            into caterva/studio/static/
 #   wheel    scripts/build_release.py after the page build, so the wheel
-#            carries the page (pyproject package-data); checked to contain it
+#            carries the page (pyproject package-data) and, copied in by
+#            scripts/vendor_literature.py, the literature layer
+#            (caterva/_literature/); checked to contain both, and the page's
+#            licences/THIRD-PARTY-NOTICES.txt
 #   folder   scripts/build_app.py --require-studio-page: the frozen folder's
-#            CLI smoke (a time course, an SBML export) and
+#            CLI smoke (a time course, an SBML export, an enzyme lookup, and
+#            a literature search run offline from recorded BRENDA answers) and
 #            `caterva studio --self-test` with the built page served
 #   app      scripts/build_studio_app.py: swiftc, the icon, Info.plist with
 #            the package's version, an ad-hoc signature over the bundle,
 #            and `Caterva --smoke --require-page` (the shell starts the
 #            bundled server, reads its URL, fetches the page, stops it)
-#   image    hdiutil create + verify; then the DMG is mounted read-only and
+#   image    hdiutil create (up to three attempts) + verify; then the DMG is mounted read-only and
 #            the copy INSIDE it is smoke-tested again, because that copy is
 #            what a person drags to Applications
+#
+# WHEN IT FAILS
+# Every step has an id, and the last step (it runs only on failure) prints
+# which one failed: `the DMG job failed at the step: <name>`. A failure here
+# stops release.yml's `publish` job, because the DMG is a required artifact
+# of a release, so the wheel and the folders are withheld with it. The first
+# attempt at any new version therefore uses an `-rc` tag (v0.5.0-rc.1): the
+# whole pipeline runs and, if it passes, publishes a PRE-release, and a
+# macOS-only failure costs a candidate tag and not the version's own tag.
+# docs/releases/v0.5.0.md says the same. A re-run of a failed job needs no new
+# tag: Actions > Re-run failed jobs.
 #
 # WHAT IT DOES NOT DO
 # Sign with a Developer ID or notarise: the repository holds no Apple
@@ -67,6 +82,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Node
+        id: node
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -81,10 +97,12 @@ jobs:
         run: corepack enable
 
       - name: Install the studio package
+        id: install_page
         working-directory: Science-Agent-Pipeline
         run: pnpm install --frozen-lockfile --filter @workspace/caterva-studio...
 
       - name: Page type-checks, passes its tests, and builds
+        id: page
         working-directory: Science-Agent-Pipeline/artifacts/caterva-studio
         run: |
           set -euo pipefail
@@ -93,7 +111,8 @@ jobs:
           pnpm run build
           test -f "$GITHUB_WORKSPACE/caterva/studio/static/index.html"
 
-      - name: Build the wheel, with the page inside
+      - name: Build the wheel, with the page and the literature layer inside
+        id: wheel
         shell: bash
         run: |
           set -euo pipefail
@@ -105,18 +124,24 @@ jobs:
           names = zipfile.ZipFile(wheel).namelist()
           page = "caterva/studio/static/index.html"
           assets = [n for n in names if n.startswith("caterva/studio/static/assets/")]
+          notices = "caterva/studio/static/licenses/THIRD-PARTY-NOTICES.txt"
+          literature = [n for n in names if n.startswith("caterva/_literature/") and n.endswith(".py")]
           assert page in names, f"{wheel} does not carry {page}"
           assert assets, f"{wheel} carries no caterva/studio/static/assets/"
-          print(f"{wheel}: {page} and {len(assets)} asset files")
+          assert notices in names, f"{wheel} does not carry {notices}"
+          assert "caterva/_literature/fallback_logic.py" in literature, f"{wheel} carries no literature layer"
+          print(f"{wheel}: {page}, {len(assets)} asset files, the page's licences, {len(literature)} literature modules")
           PY
 
       - name: Install that wheel and the freezer
+        id: install_wheel
         shell: bash
         run: |
           set -euo pipefail
           python -m pip install dist/python/caterva-*.whl -r requirements-release.txt
 
       - name: Freeze, check, run the studio self-test
+        id: freeze
         shell: bash
         # Outside the checkout, so the analysis cannot pick the source tree
         # over the installed wheel; build_app.py refuses if it did.
@@ -127,6 +152,7 @@ jobs:
             --require-studio-page --keep-folder "$GITHUB_WORKSPACE/dist/frozen"
 
       - name: Build Caterva.app and the DMG
+        id: app
         shell: bash
         run: |
           set -euo pipefail
@@ -134,6 +160,7 @@ jobs:
             --build-number "$(git rev-list --count HEAD)" --dmg
 
       - name: The frozen server inside the app passes its self-test
+        id: app_self_test
         shell: bash
         working-directory: ${{ runner.temp }}
         run: |
@@ -142,6 +169,7 @@ jobs:
           if grep -q 'not built' self-test.txt; then echo "::error::the app's server served its not-built page"; exit 1; fi
 
       - name: The copy inside the DMG starts, serves the page and stops
+        id: dmg_copy
         shell: bash
         run: |
           set -euo pipefail
@@ -163,3 +191,25 @@ jobs:
             dist/studio/Caterva-*-macos-arm64.dmg
             dist/studio/Caterva-*-macos-arm64.dmg.sha256
           if-no-files-found: error
+
+      - name: Say which step failed
+        if: failure()
+        shell: bash
+        run: |
+          set -u
+          failed=""
+          for pair in \
+            "set up Node=${{ steps.node.outcome }}" \
+            "install the studio package (pnpm)=${{ steps.install_page.outcome }}" \
+            "page type-check, tests and build=${{ steps.page.outcome }}" \
+            "build the wheel with the page and the literature layer=${{ steps.wheel.outcome }}" \
+            "install the wheel and the freezer=${{ steps.install_wheel.outcome }}" \
+            "freeze the folder, check it, run the studio self-test=${{ steps.freeze.outcome }}" \
+            "build Caterva.app and the DMG (swiftc, codesign, smoke, hdiutil)=${{ steps.app.outcome }}" \
+            "the frozen server inside the app passes its self-test=${{ steps.app_self_test.outcome }}" \
+            "the copy inside the DMG starts, serves the page and stops=${{ steps.dmg_copy.outcome }}"; do
+            if [ "${pair##*=}" = "failure" ]; then failed="${pair%=*}"; break; fi
+          done
+          echo "::error::the DMG job failed at the step: ${failed:-an earlier step (checkout or Python setup)}"
+          echo "The step's own log names the build script's sub-step (compile, seal, smoke, hdiutil) it stopped in."
+          echo "A failed DMG job withholds the whole release; a new version's first tag should be an -rc tag."

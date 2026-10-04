@@ -122,7 +122,7 @@ def build_parser(prog: str = "caterva rates") -> argparse.ArgumentParser:
                          help="also print the Lineweaver-Burk, Eadie-Hofstee and Hanes-Woolf "
                               "points and the Km and Vmax their straight lines give, beside the "
                               "nonlinear fit, for teaching; they are never the reported estimate")
-    lit = p.add_argument_group("literature (needs the source checkout's literature layer)")
+    lit = p.add_argument_group("literature (reads BRENDA live: needs a network connection)")
     lit.add_argument("--ec", metavar="EC",
                      help="the enzyme's EC number, e.g. 1.1.1.27, to compare the fitted Km and Ki "
                           "with the values BRENDA cites")

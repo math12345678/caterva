@@ -10,7 +10,7 @@
 
 ### Local Development
 ```bash
-cd /Users/smyan/Desktop/Coding/Caterva
+cd path/to/caterva
 npm run web:start
 # http://localhost:3000
 ```
@@ -577,4 +577,4 @@ docker run -p 3000:3000 caterva:latest
 
 ---
 
-**Questions?** See the full documentation in `/Users/smyan/Desktop/Coding/Caterva/`
+**Questions?** See the full documentation in the repository root

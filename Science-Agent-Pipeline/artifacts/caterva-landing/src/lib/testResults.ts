@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "124 test files -- kinetics & Michaelis-Menten correctness, " +
+          "148 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -199,9 +199,19 @@ export const TEST_SUITES: TestSuite[] = [
         // the merged tree (2026-09-30) gave 3355 passed, 1 skipped: 3355.
         // Plus round five: caterva rates (110), solvent exposure, principal
         // motions and the gap fixes: a full run on the merged tree
-        // (2026-10-01) gave 3592 passed, 1 skipped: 3592.
-        passed: 3592,
-        skipped: 0,
+        // (2026-10-01) gave 3592 passed, 1 skipped: 3592. Then Caterva
+        // Studio (the server, its adapters and the packaging tests), the
+        // enzyme finder and the literature layer's packaging: a full run of
+        // caterva/ on the branch (2026-10-03, .venv, run the way CI runs it:
+        // stdpopsim hidden, no JavaScript packages installed) collected
+        // 4329 tests and gave 4320 passed, 1 skipped (the codegen selftest,
+        // which needs npx and a pnpm install and runs in the api-server CI
+        // job), 0 failed, and 8 errors at setup. The 8 are
+        // tests/test_studio_socket.py, which binds a loopback port; the
+        // sandbox this run was made in refuses to bind one, they run in CI,
+        // and they are NOT counted as passed here: 4320.
+        passed: 4320,
+        skipped: 1,
         failed: 0,
       },
     ],
@@ -212,7 +222,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "88 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "90 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -244,8 +254,17 @@ export const TEST_SUITES: TestSuite[] = [
         // merged tree (2026-10-01) gave 1570 passed, 1 skipped. 21 of those
         // are test_popgen_resolver.py, which skips without stdpopsim; CI does
         // not install it, so the figure CI collects and runs is 1549 passed
-        // of 1550: 1549.
-        passed: 1549,
+        // of 1550: 1549. Then Caterva Studio's isozyme and name-policy tests:
+        // a full run of Tests/ on the branch (2026-10-03, .venv, run the way
+        // CI runs it: stdpopsim hidden, which gives 1574 collected where the
+        // venv alone collects 1595, the same 21 test_popgen_resolver.py tests;
+        // no JavaScript packages installed) gave 1572 passed, 1 skipped (the
+        // dependency-licence test, which reads installed JavaScript packages
+        // and passes with them) and 1 failed, a scan of caterva/ that saw the
+        // literature layer's build-time copies; the scan now skips them and
+        // its file passes (16 passed with test_recorded_env_is_test_only.py):
+        // 1573.
+        passed: 1573,
         skipped: 1,
         failed: 0,
       },

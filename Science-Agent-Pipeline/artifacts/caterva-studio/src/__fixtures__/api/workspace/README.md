@@ -26,3 +26,10 @@ through `caterva/tests/studio_kinetics_offline.py` (`ldh_offline`,
 The only edit after capture: the scratch data directory's path was replaced
 by `<data dir>`. `capabilities.json` keeps the paths of the checkout it ran
 in (`ui.static_dir`), as the server reported them.
+
+## Paths
+
+A response that names a directory on the machine it was captured on carried a
+throwaway scratch or worktree path. After capture, only that prefix was
+rewritten, to `/tmp/caterva-checkout`, so that no file in the repository names a person's
+home or scratch folder; every other byte is what the server answered.

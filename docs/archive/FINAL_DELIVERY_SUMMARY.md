@@ -469,7 +469,7 @@ tests pass; branch coverage 65.26% vs the repo's own 80% threshold
 **Delivery Date:** 2026-08-09  
 **Owner:** Backend & Architecture Team  
 
-**All 15 documents ready in:** `/Users/smyan/Desktop/Coding/Caterva/`
+**All 15 documents ready in:** the repository root
 
 ---
 

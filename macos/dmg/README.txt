@@ -6,18 +6,26 @@ INSTALL
 OPENING IT THE FIRST TIME
     This app is not signed with an Apple Developer ID and has not been
     notarised by Apple: the project does not hold a Developer ID. macOS
-    therefore refuses the first open with a message that it "cannot verify"
+    therefore refuses the first open with a message that it cannot verify
     the app. To open it anyway, once per downloaded version:
 
-    1. In Applications, Control-click (or right-click) Caterva and choose
-       Open, then Open in the dialog.
-    or
-    2. Open it once, dismiss the message, then go to System Settings,
-       Privacy & Security, scroll to the message about Caterva and choose
-       Open Anyway.
+    1. Try to open Caterva from Applications and dismiss the message. Then
+       open System Settings, Privacy & Security, scroll down to the message
+       about Caterva, click Open Anyway and enter your login password.
+       (Apple's page "Open a Mac app from an unknown developer" gives this
+       route; the button stays available for about an hour after the
+       attempt. Control-click, Open is no longer offered for an app like
+       this one on recent macOS, so it is not listed here.)
 
-    If the window then says the studio server could not start and mentions
-    the quarantine mark, it shows the one Terminal command that clears it.
+    2. If the window then says the studio server could not start, or macOS
+       keeps refusing, remove the download mark yourself: open Terminal and
+       run
+
+           xattr -dr com.apple.quarantine /Applications/Caterva.app
+
+       then open Caterva again. (Open Anyway approves the app's main file
+       but not the libraries inside it; this command clears them all.) The
+       window shows the same command when it detects the mark.
 
     Check what you downloaded before you do either: the release page lists
     a SHA-256 for this disk image (shasum -a 256 Caterva-@VERSION@-macos-arm64.dmg).
@@ -31,19 +39,26 @@ WHAT IT IS
     Runs and settings: ~/Library/Application Support/Caterva
     Server log:        ~/Library/Logs/Caterva/studio-server.log
 
-    Literature lookups use the network when you ask for them; the rest
-    works offline. GROMACS (for molecular dynamics setup) is not included;
+    Literature lookups (BRENDA, UniProt, RCSB, NCBI, PubChem) use the
+    network when you ask for them; the rest works offline. GROMACS (for molecular dynamics setup) is not included;
     install it separately and Caterva finds it.
 
 REQUIREMENTS
-    macOS 12 or later on Apple silicon (arm64).
+    macOS 14 (Sonoma) or later on Apple silicon (arm64). The scientific
+    libraries inside the app (NumPy, SciPy, libRoadRunner) are built for
+    macOS 14; on an older macOS the app says so and quits.
 
 LICENCES
     Caterva is under the Apache License 2.0. The app carries the Python
     runtime and the libraries Caterva uses, each under its own licence
     (libSBML under the GNU LGPL 2.1); their texts are inside the app, in
     Caterva.app/Contents/Resources/caterva/licenses/, and Help, Licences in
-    the app shows them. Unaffiliated with Tellurium.
+    the app shows them. The page's own JavaScript packages and its three
+    typefaces (SIL Open Font License 1.1) are listed, with their licence
+    texts, in THIRD-PARTY-NOTICES.txt beside them. Enzyme names come from the
+    ExPASy ENZYME database (SIB Swiss Institute of Bioinformatics, CC BY 4.0)
+    and constants from BRENDA (CC BY 4.0); NOTICE has the attributions.
+    Unaffiliated with Tellurium.
 
 SOURCE AND DOCUMENTATION
     https://github.com/math12345678/caterva

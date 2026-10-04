@@ -40,9 +40,22 @@ PORT = 18770
 TOKEN = "f" * 43
 
 
+#: The scratch folder of this run, as the server spells it (and as the operating
+#: system resolves it): replaced in everything written, so that no fixture
+#: names a throwaway folder on the machine that captured it.
+SCRATCH: List[str] = []
+NEUTRAL_SCRATCH = "/tmp/caterva-enzyme-fixtures"
+
+
+def neutral(text: str) -> str:
+    for spelling in sorted(SCRATCH, key=len, reverse=True):
+        text = text.replace(spelling, NEUTRAL_SCRATCH)
+    return text
+
+
 def write(path: Path, body: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(body, indent=1, ensure_ascii=False, allow_nan=False) + "\n", encoding="utf-8")
+    path.write_text(neutral(json.dumps(body, indent=1, ensure_ascii=False, allow_nan=False)) + "\n", encoding="utf-8")
     print("wrote", path.relative_to(REPO))
 
 
@@ -104,7 +117,7 @@ def run(app: Any, kind: str, request: Dict[str, Any], name: str) -> None:
     }, indent=1, ensure_ascii=False, allow_nan=False).replace(data_dir, "<data dir>")
     path = ENZYMES / f"{name}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text + "\n", encoding="utf-8")
+    path.write_text(neutral(text) + "\n", encoding="utf-8")
     print("wrote", path.relative_to(REPO), record["status"], record["outcome"]["meaning"] if record.get("outcome") else "")
 
 
@@ -135,6 +148,7 @@ def main() -> None:
     from studio_kinetics_offline import hexokinase_offline, ldh_offline
 
     work = Path(tempfile.mkdtemp(prefix="caterva-enzyme-fixtures-"))
+    SCRATCH[:] = [str(work), str(work.resolve())]
     os.environ["XDG_CACHE_HOME"] = str(work / "cache")
     app = make_app(work)
     try:

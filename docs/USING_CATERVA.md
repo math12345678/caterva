@@ -87,6 +87,16 @@ caterva studio --no-browser --port 8765 --data-dir ~/caterva-runs
 caterva studio --self-test          # starts, checks itself over a socket, exits 0 or 1
 ```
 
+**Where the page comes from.** The page is built from the repository's
+`Science-Agent-Pipeline/artifacts/caterva-studio` and is not in the wheel or
+in the plain app folder from the Releases page: there `caterva studio`
+starts, answers its API, and serves a short "the page is not built" page
+saying how to build it. You get the page in one of two ways: the macOS app
+from the DMG (Apple silicon, macOS 14 or later) carries it, and in a
+checkout `make studio-page` builds it (Node 22 and pnpm needed) and `make
+studio` builds it and opens it. There is no Rates screen yet; `caterva rates`
+works in the terminal, below.
+
 What you will see:
 
 - **Every number wears a mark.** A solid dot is a cited measurement; click
@@ -108,8 +118,10 @@ What you will see:
 Runs and settings are kept in `~/Library/Application Support/Caterva` on
 macOS (`~/.local/share/caterva` on Linux, `%APPDATA%\Caterva` on Windows)
 unless you pass `--data-dir`. The macOS app is not signed with an Apple
-Developer ID and is not notarised; the first time, Control-click Caterva in
-Applications and choose Open. [docs/studio/README.md](studio/README.md)
+Developer ID and is not notarised; the first time, try to open it, then use
+System Settings, Privacy & Security, Open Anyway, and if macOS keeps
+refusing run `xattr -dr com.apple.quarantine /Applications/Caterva.app`.
+[docs/studio/README.md](studio/README.md)
 says what each screen runs and how the app is built, and
 [docs/studio/USING_STUDIO.md](studio/USING_STUDIO.md) lists every flag.
 
@@ -1309,8 +1321,14 @@ carry were archived on 2026-09-27; v0.4.0 still runs them (see
 
 ## Real constants, with real citations
 
-**This is what Caterva is for.** It needs the source checkout, not the app
-folder: the resolvers that read BRENDA are not shipped in the download.
+**This is what Caterva is for.** It reads BRENDA, NCBI Taxonomy, UniProt and
+PubChem live, so it needs a network connection. The resolvers that do it ship
+in the wheel, the app folder and the macOS app (the release build copies them
+into `caterva/_literature/`); a source checkout is only needed to change them.
+
+`caterva compose ... --subject` and `caterva bind` work from any install.
+The `make cite` and `scripts/cite.py` commands below are in the repository, so
+they need a checkout.
 
 **Getting the checkout, once** (about five minutes, most of it downloading
 dependencies). Put it somewhere iCloud does not sync — *not* under
@@ -1651,9 +1669,9 @@ library, and the report says so.
 - A search with no `--substrate` when the model needs a Km or Ki. Those
   BRENDA tables are per-substrate, and a motif knows it needs a Km but not
   what the Km is *for*.
-- Running at all from the app folder rather than the checkout: the
-  resolvers live in `Tests/`, which the wheel does not ship. It says so
-  rather than failing obscurely.
+- Having no network connection, or a database that is down: BRENDA, NCBI
+  Taxonomy, UniProt and PubChem are read live. The report names which one
+  could not be reached rather than failing obscurely.
 
 None of those costs you the report. The structure, the invariants, the
 dimensions and the behaviour are true regardless, and the refusal arrives
@@ -1685,7 +1703,7 @@ other door: you measured initial rates yourself, at several substrate
 concentrations and perhaps several inhibitor concentrations, and want the
 constants, how well your data determine them, which mechanisms they rule
 out, and how they compare with the values BRENDA cites. It runs from the app
-folder; only the literature comparison needs the source checkout.
+folder; the literature comparison also needs a network connection.
 
 **The file** is a CSV whose header names each column and its unit:
 
@@ -1830,7 +1848,7 @@ lowest concentration is a third of Km).
 
 ### Against the literature
 
-From the source checkout, name the enzyme, the organism and the compounds:
+Name the enzyme, the organism and the compounds (this reads BRENDA live, so it needs a network connection):
 
 ```
 caterva rates my_rates.csv --sigma-from replicates --ec 1.1.1.27 --organism human --substrate pyruvate --inhibitor oxamate
@@ -1848,7 +1866,7 @@ fitted value or ratio is printed: only the one-sided bound is held against
 the cited value.
 A mixed fit's two constants are not compared, because a database row does
 not say which of the two it measured. From the app folder the fit is
-reported and the comparison is refused, with exit code 3.
+reported; if BRENDA cannot be reached the comparison is refused, with exit code 3.
 
 ### For teaching, and for papers
 

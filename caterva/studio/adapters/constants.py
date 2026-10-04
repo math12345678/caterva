@@ -18,10 +18,13 @@ WHY IN-PROCESS
     calls the same function the subprocess would have run.
 
 WHERE IT RUNS
-    scripts/ and the literature layer (Tests/) are in the repository, not
-    in the wheel or the app folder (ADR 0177). This kind is therefore
-    available from a source checkout only, and `unavailable()` says which
-    of the two is missing, in the words cite.py and caterva.checkout use.
+    In a source checkout, scripts/cite.py and the literature layer
+    (Tests/) are read where they are. In the wheel and the app folder the
+    release build has copied cite.py, report_lab.py and the modules they
+    import into caterva/_literature/ (scripts/vendor_literature.py), and
+    this kind reads them from there. `unavailable()` says which part is
+    missing when a build lacks them, in the words cite.py and
+    caterva.checkout use.
 
 WHAT EACH NUMBER IS
     A resolved constant is `measured`: report_lab's citation text (the
@@ -65,7 +68,10 @@ _KEYS = frozenset(_STRINGS + _NUMBERS + ("quantities", "seed"))
 
 #: The repository root, where scripts/cite.py lives in a source checkout.
 REPO_ROOT = Path(__file__).resolve().parents[3]
+#: Where cite.py is: the checkout's scripts/, else the installed package's copy.
 CITE = REPO_ROOT / "scripts" / "cite.py"
+if not CITE.is_file():
+    CITE = Path(__file__).resolve().parents[2] / "_literature" / "cite.py"
 
 
 @functools.lru_cache(maxsize=1)
@@ -76,7 +82,7 @@ def cite_module() -> ModuleType:
         return module
     spec = importlib.util.spec_from_file_location("caterva_cite", CITE)
     if spec is None or spec.loader is None:
-        raise FileNotFoundError(f"{CITE} is missing; this needs the source checkout, not the app folder.")
+        raise FileNotFoundError(f"{CITE} is missing; this build carries no literature layer.")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     sys.modules["caterva_cite"] = module
@@ -86,7 +92,7 @@ def cite_module() -> ModuleType:
 @functools.lru_cache(maxsize=1)
 def _missing() -> Optional[str]:
     if not CITE.is_file():
-        return f"{CITE} is missing; this needs the source checkout, not the app folder."
+        return f"{CITE} is missing; this build carries no literature layer."
     cite = cite_module()
     if not cite.REPORT_LAB.is_file():
         return cite.MISSING

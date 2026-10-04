@@ -10,7 +10,7 @@
 
 ### Easiest Way (5 seconds)
 ```bash
-cd /Users/smyan/Desktop/Coding/Caterva
+cd path/to/caterva
 npm run web:start
 ```
 

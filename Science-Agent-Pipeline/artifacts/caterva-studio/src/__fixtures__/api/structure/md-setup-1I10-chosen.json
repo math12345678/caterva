@@ -24,16 +24,16 @@
   "--replicas",
   "4",
   "--out",
-  "/tmp/claude-501/caterva-fixtures-fi2et7n_/runs/20260930-120000-md-setup-0badc0de/md-setup"
+  "/tmp/caterva-fixtures/runs/20260930-120000-md-setup-0badc0de/md-setup"
  ],
  "outcome": {
   "exit_code": 0,
   "meaning": "produced",
-  "summary": "PDB 1I10, chain A: 11 files written to /tmp/claude-501/caterva-fixtures-fi2et7n_/runs/20260930-120000-md-setup-0badc0de/md-setup, 310.00 K, 4 replicas",
+  "summary": "PDB 1I10, chain A: 11 files written to /tmp/caterva-fixtures/runs/20260930-120000-md-setup-0badc0de/md-setup, 310.00 K, 4 replicas",
   "reason": null
  },
  "result": {
-  "out_dir": "/tmp/claude-501/caterva-fixtures-fi2et7n_/runs/20260930-120000-md-setup-0badc0de/md-setup",
+  "out_dir": "/tmp/caterva-fixtures/runs/20260930-120000-md-setup-0badc0de/md-setup",
   "pdb": "1I10",
   "chain": "A",
   "temperature": {
@@ -286,7 +286,7 @@
    "PROVENANCE.md"
   ],
   "note": null,
-  "report_text": "Wrote /tmp/claude-501/caterva-fixtures-fi2et7n_/runs/20260930-120000-md-setup-0badc0de/md-setup/: run.sh, em/npt/md.mdp, rep1..rep4/nvt.mdp, PROVENANCE.md (310.00 K, 20 ns, 4 replicas).\n  temperature          310.00 K                               chosen\n  pH (protonation)     7.4                                    measured\n  ionic strength       0.15 M NaCl, net charge neutralised    chosen\n  pressure             1.0 bar                                chosen\n  production length    20 ns                                  chosen\n  replicas             4                                      chosen\n  velocity seed        rep1: 20260927, rep2: 20260928, rep3: 20260929, rep4: 20260930 chosen\n  PME grid             0.16 nm spacing, 4th-order interpolation chosen\n  van der Waals        1.0 nm cut-off, dispersion correction to energy and pressure chosen\n  neighbour list       Verlet buffer, updated every 10 steps  chosen\n  compressibility      4.5e-5 1/bar                           chosen\n  minimisation         steepest descent to max force < 1000 kJ/mol/nm, at most 50000 steps chosen\n  equilibration        NVT 100 ps then NPT 100 ps, protein heavy atoms restrained chosen\n  output               coordinates every 10 ps; energies and log every 2 ps chosen\n  structure            PDB 1I10, chain A                      measured\nRun it: bash /tmp/claude-501/caterva-fixtures-fi2et7n_/runs/20260930-120000-md-setup-0badc0de/md-setup/run.sh   (GROMACS needed; GMX=/path/to/gmx to choose one)\nThen:   caterva md --summarise /tmp/claude-501/caterva-fixtures-fi2et7n_/runs/20260930-120000-md-setup-0badc0de/md-setup\n",
+  "report_text": "Wrote /tmp/caterva-fixtures/runs/20260930-120000-md-setup-0badc0de/md-setup/: run.sh, em/npt/md.mdp, rep1..rep4/nvt.mdp, PROVENANCE.md (310.00 K, 20 ns, 4 replicas).\n  temperature          310.00 K                               chosen\n  pH (protonation)     7.4                                    measured\n  ionic strength       0.15 M NaCl, net charge neutralised    chosen\n  pressure             1.0 bar                                chosen\n  production length    20 ns                                  chosen\n  replicas             4                                      chosen\n  velocity seed        rep1: 20260927, rep2: 20260928, rep3: 20260929, rep4: 20260930 chosen\n  PME grid             0.16 nm spacing, 4th-order interpolation chosen\n  van der Waals        1.0 nm cut-off, dispersion correction to energy and pressure chosen\n  neighbour list       Verlet buffer, updated every 10 steps  chosen\n  compressibility      4.5e-5 1/bar                           chosen\n  minimisation         steepest descent to max force < 1000 kJ/mol/nm, at most 50000 steps chosen\n  equilibration        NVT 100 ps then NPT 100 ps, protein heavy atoms restrained chosen\n  output               coordinates every 10 ps; energies and log every 2 ps chosen\n  structure            PDB 1I10, chain A                      measured\nRun it: bash /tmp/caterva-fixtures/runs/20260930-120000-md-setup-0badc0de/md-setup/run.sh   (GROMACS needed; GMX=/path/to/gmx to choose one)\nThen:   caterva md --summarise /tmp/caterva-fixtures/runs/20260930-120000-md-setup-0badc0de/md-setup\n",
   "ns": {
    "value": 20.0,
    "unit": "ns",

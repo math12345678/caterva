@@ -42,9 +42,10 @@ The repository holds no Apple Developer ID, so nothing here is signed with
 one or notarised. The bundle gets an AD-HOC signature (`codesign --sign -`):
 Apple silicon will not run an unsigned arm64 binary at all, and a bundle
 whose resources are not sealed is reported by Gatekeeper as "damaged" rather
-than as "from an unidentified developer", which a person can open
-(Control-click, Open). The DMG's README and the app's first-run sheet say
-how; neither claims notarisation, and `check_unsigned_wording` refuses a
+than as "from an unidentified developer", which a person can approve in
+System Settings (Apple's current instructions list only that route).
+The DMG's README and the app's first-run sheet say how (Privacy & Security,
+Open Anyway; then the xattr command); neither claims notarisation, and `check_unsigned_wording` refuses a
 README or first-run text that does.
 
 A DEVELOPMENT APP
@@ -73,6 +74,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import NoReturn, Optional, Sequence
 
@@ -81,9 +84,19 @@ MACOS = ROOT / "macos"
 SOURCES = MACOS / "Sources"
 STUDIO_PACKAGE = ROOT / "Science-Agent-Pipeline" / "artifacts" / "caterva-studio"
 
-#: The oldest macOS the shell runs on. WKDownload needs 11.3; 12 is the
-#: oldest release Apple still shipped security updates for when this was set.
-MIN_MACOS = "12.0"
+#: The oldest macOS Caterva.app runs on, written into Info.plist
+#: (LSMinimumSystemVersion), the DMG README and the docs. 14.0, because the
+#: pinned wheels inside the app are built for it: NumPy 2.2.6 and SciPy 1.15.3
+#: are macosx_14_0_arm64 and libRoadRunner 2.8.0 macosx_14_0_universal2
+#: (`vtool -show-build` on their extension modules reports minos 14.0).
+MIN_MACOS = "14.0"
+
+#: The deployment target the Swift shell itself is compiled for. Lower than
+#: MIN_MACOS on purpose: a shell that could not start on macOS 12 or 13 could
+#: not tell the person why, and macos/Sources/Requirement.swift (which checks
+#: ProcessInfo against MIN_MACOS) is how it does. WKDownload needs 11.3, so
+#: 12.0 is enough for everything else the shell uses.
+SHELL_TARGET_MACOS = "12.0"
 
 #: What a page built from this package carries
 #: (caterva.studio.contract.PAGE_MARKER_*), read as text. The page holds no
@@ -103,6 +116,27 @@ _DENIAL = re.compile(r"\b(not|never|no|isn't|hasn't|has not|is not|without|canno
 def _fail(msg: str) -> NoReturn:
     print(f"NOT A RELEASE APP: {msg}", file=sys.stderr)
     sys.exit(1)
+
+
+@contextmanager
+def step(name: str):
+    """Say exactly which step failed, in the words of the step.
+
+    A failing command raises CalledProcessError and `_fail` raises SystemExit;
+    either way the job's log ends with one line naming the step (a GitHub
+    annotation when CI reads it), instead of a traceback from somewhere in it.
+    """
+    print(f"== {name}", flush=True)
+    try:
+        yield
+    except subprocess.CalledProcessError as exc:
+        print(f"::error::Caterva.app build failed at the step: {name} (`{exc.cmd[0] if exc.cmd else '?'}` exited {exc.returncode})",
+              flush=True)
+        sys.exit(1)
+    except SystemExit as exc:
+        if exc.code not in (0, None):
+            print(f"::error::Caterva.app build failed at the step: {name}", flush=True)
+        raise
 
 
 def package_version(root: Path = ROOT) -> str:
@@ -165,7 +199,14 @@ def frozen_problems(folder: Path, require_page: bool = True) -> list[str]:
     for name in ("LICENSE", "NOTICE", "licenses/README.txt"):
         if not (folder / name).is_file():
             problems.append(f"{folder / name} is missing: the app would convey the folder without its terms")
+    literature = folder / "_internal" / "caterva" / "_literature"
+    for name in ("fallback_logic.py", "brenda_client.py", "http_retry.py", "enzyme_lookup.py", "cite.py", "report_lab.py"):
+        if not (literature / name).is_file():
+            problems.append(f"{literature / name} is missing: the app would have no literature search")
     if require_page:
+        notices = folder / "_internal" / "caterva" / "studio" / "static" / "licenses" / "THIRD-PARTY-NOTICES.txt"
+        if not notices.is_file():
+            problems.append(f"{notices} is missing: the page's packages would be conveyed without their licences")
         page = folder / "_internal" / "caterva" / "studio" / "static" / "index.html"
         if not page.is_file():
             problems.append(f"{page} is missing: the wheel was built before the page")
@@ -183,7 +224,7 @@ def smoke_passed(stdout: str) -> bool:
 def swiftc_command(sources: Sequence[Path], output: Path, arch: str, module_cache: Path,
                    parse_as_library: bool = False, development: bool = False) -> list[str]:
     command = ["xcrun", "swiftc", "-swift-version", "5", "-O",
-               "-target", f"{arch}-apple-macos{MIN_MACOS}",
+               "-target", f"{arch}-apple-macos{SHELL_TARGET_MACOS}",
                "-module-cache-path", str(module_cache)]
     if parse_as_library:
         command.append("-parse-as-library")
@@ -198,6 +239,25 @@ def swiftc_command(sources: Sequence[Path], output: Path, arch: str, module_cach
 def _run(command: Sequence[str], **kwargs) -> subprocess.CompletedProcess:
     print("$ " + " ".join(str(c) for c in command), flush=True)
     return subprocess.run([str(c) for c in command], check=True, **kwargs)
+
+
+#: hdiutil create fails now and then on a busy runner ("Resource busy"), with
+#: nothing wrong in what it was asked to pack. Three tries, a pause between.
+DMG_ATTEMPTS = 3
+DMG_PAUSE_SECONDS = 20
+
+
+def _retry(command: Sequence[str], attempts: int, pause: float) -> subprocess.CompletedProcess:
+    """`_run`, repeated up to `attempts` times with `pause` seconds between."""
+    for attempt in range(1, attempts + 1):
+        try:
+            return _run(command)
+        except subprocess.CalledProcessError as exc:
+            print(f"attempt {attempt} of {attempts}: {command[0]} exited {exc.returncode}", flush=True)
+            if attempt == attempts:
+                raise
+            time.sleep(pause)
+    raise AssertionError("unreachable")
 
 
 def _need_macos() -> None:
@@ -307,9 +367,12 @@ def make_dmg(app: Path, out: Path, version: str, arch: str) -> Path:
         (stage / "README.txt").write_text(readme, encoding="utf-8")
         if dmg.exists():
             dmg.unlink()
-        _run(["hdiutil", "create", "-volname", f"Caterva {version}", "-srcfolder", stage,
-              "-fs", "HFS+", "-format", "UDZO", "-imagekey", "zlib-level=9", "-ov", dmg])
-    _run(["hdiutil", "verify", dmg])
+        with step("make the disk image (hdiutil create)"):
+            _retry(["hdiutil", "create", "-volname", f"Caterva {version}", "-srcfolder", stage,
+                    "-fs", "HFS+", "-format", "UDZO", "-imagekey", "zlib-level=9", "-ov", dmg],
+                   attempts=DMG_ATTEMPTS, pause=DMG_PAUSE_SECONDS)
+    with step("verify the disk image (hdiutil verify)"):
+        _run(["hdiutil", "verify", dmg])
     digest = hashlib.sha256(dmg.read_bytes()).hexdigest()
     (out / (dmg.name + ".sha256")).write_text(f"{digest}  {dmg.name}\n", encoding="utf-8")
     print(f"dmg    : {dmg} ({dmg.stat().st_size / 1e6:.1f} MB)\nsha256 : {digest}")
@@ -360,25 +423,28 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
 
-    for name, path in (("README", MACOS / "dmg" / "README.txt"), ("first-run text", MACOS / "Resources" / "first-run.txt")):
-        problems = unsigned_wording_problems(path.read_text(encoding="utf-8"), name)
-        if problems:
-            _fail("; ".join(problems))
+    with step("check the README and first-run text claim no signature"):
+        for name, path in (("README", MACOS / "dmg" / "README.txt"), ("first-run text", MACOS / "Resources" / "first-run.txt")):
+            problems = unsigned_wording_problems(path.read_text(encoding="utf-8"), name)
+            if problems:
+                _fail("; ".join(problems))
 
     if args.build_page:
-        build_page()
+        with step("build the page (pnpm)"):
+            build_page()
 
     frozen: Optional[Path] = None
     environment: Optional[dict] = None
     require_page = True
     if args.frozen:
         frozen = Path(args.frozen).resolve()
-        problems = frozen_problems(frozen)
-        if problems:
-            _fail("; ".join(problems))
-        r = subprocess.run([str(frozen / "caterva"), "--version"], capture_output=True, text=True, timeout=300)
-        if r.stdout.strip() != f"caterva {version}":
-            _fail(f"the frozen folder says {r.stdout.strip()!r}; this checkout is caterva {version}")
+        with step("check the frozen folder"):
+            problems = frozen_problems(frozen)
+            if problems:
+                _fail("; ".join(problems))
+            r = subprocess.run([str(frozen / "caterva"), "--version"], capture_output=True, text=True, timeout=300)
+            if r.stdout.strip() != f"caterva {version}":
+                _fail(f"the frozen folder says {r.stdout.strip()!r}; this checkout is caterva {version}")
     else:
         checkout = Path(args.checkout).resolve()
         environment = dev_environment(Path(args.python), checkout,
@@ -399,15 +465,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         # Not resolved: swiftc records the spelling, and /tmp and /private/tmp
         # naming one cache make it load each module twice and crash.
         cache = Path(os.path.abspath(args.module_cache)) if args.module_cache else work / "module-cache"
-        binary = compile_shell(work, args.arch, cache, development=args.dev)
-        icns = draw_icon(work, args.arch, cache, own_icns=args.own_icns)
+        with step("compile the Swift shell (swiftc)"):
+            binary = compile_shell(work, args.arch, cache, development=args.dev)
+        with step("draw the icon"):
+            icns = draw_icon(work, args.arch, cache, own_icns=args.own_icns)
         app = out / "Caterva.app"
-        assemble(app, binary, icns, plist, frozen)
-    seal(app)
+        with step("assemble Caterva.app"):
+            assemble(app, binary, icns, plist, frozen)
+    with step("seal the bundle with an ad-hoc signature (codesign)"):
+        seal(app)
     print(f"app    : {app}")
 
     if not args.no_smoke:
-        smoke(app, environment, require_page)
+        with step("run Caterva --smoke on the assembled bundle"):
+            smoke(app, environment, require_page)
     if args.dmg:
         make_dmg(app, out, version, args.arch)
     return 0

@@ -84,6 +84,11 @@ What it does today, across five simulation domains and two structure tools:
 - **Molecular dynamics setup**: `caterva md` writes a GROMACS system where
   every setting is measured, chosen or cited, run at the assay conditions
   of a cited constant.
+- **Which enzyme does this name mean**: `caterva enzyme "pyruvate kinase"`
+  lists every enzyme a name could be, with the EC number, why it matched and
+  the exact `--subject` line to use. It works offline.
+- **A window onto all of it**: Caterva Studio (`caterva studio`, or the Mac
+  app), described below.
 
 Where the dynamics side is going is in
 [docs/design/MD_ROADMAP.md](docs/design/MD_ROADMAP.md). Epidemiology, PCR,
@@ -113,27 +118,27 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 5,143 tests (3,593 engine + 1,550 literature)
+make test      # runs all 5,903 tests (4,329 engine + 1,574 literature)
 ```
 
 ### Or download the release
 
-Since v0.3.0 (2026-09-21) every tagged version is published on the
-repository's Releases page by CI, after it has rebuilt, reinstalled and
-run what it attaches. Each release carries one folder per platform that
-runs without Python, and a wheel. The literature search stays in the
-checkout; the release notes say what else does not ship
-([`docs/releases/v0.3.4.md`](docs/releases/v0.3.4.md)). The same access
-caveat applies: the repository, and so its Releases page, is private.
+The repository and its [Releases page](https://github.com/math12345678/caterva/releases)
+are public. Every tagged version is published there by CI, after it has
+rebuilt, reinstalled and run what it attaches: a one-folder app per platform
+that runs without Python, a Python wheel, the source, and, from v0.5.0, a
+disk image for Macs (below). Every file is listed with its SHA-256 in
+`SHA256SUMS` on the release page. The release notes for each version are in
+[`docs/releases/`](docs/releases/).
 
 ```bash
-tar xzf caterva-0.3.4-macos-arm64.tar.gz      # or linux-x86_64.tar.gz, windows-x86_64.zip
+tar xzf caterva-<version>-macos-arm64.tar.gz   # or linux-x86_64.tar.gz, windows-x86_64.zip
 cd caterva && xattr -dr com.apple.quarantine .   # macOS only, once (unsigned folder)
 ./caterva compose "a toggle switch between two repressors"
 ```
 
 ```bash
-pip install caterva-0.3.4-py3-none-any.whl     # the wheel, from the same page
+pip install caterva-<version>-py3-none-any.whl   # the wheel, from the same page
 caterva-compose "a toggle switch between two repressors"
 ```
 
@@ -142,13 +147,41 @@ SmartScreen asks once, and `README.txt` inside each folder gives the exact
 step for its platform (on Windows, run `.\caterva.exe` from a terminal in
 the folder).
 
-**Real constants with real citations** need the checkout, not the folder.
-`make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM="Homo sapiens"` returns
-`km = 0.03 mM` from `BRENDA ref 286469`, with the papers that disagree and
-the conditions it was measured under; and `compose --subject 1.1.1.27
---organism "Homo sapiens" --substrate pyruvate` builds the mechanism with
-those constants already in it, each row naming its reference and any
-constant the search could not find still marked a placeholder (ADR 0178).
+**Real constants with real citations** work from the wheel, the folder and
+the Mac app as well as from a checkout (from v0.5.0 the literature search
+ships in every artifact; it reads BRENDA, NCBI, UniProt and PubChem live and
+needs a network connection).
+`compose --subject 1.1.1.27 --organism "Homo sapiens" --substrate pyruvate`
+builds the mechanism with those constants already in it, each row naming its
+reference and any constant the search could not find still marked a
+placeholder (ADR 0178). `make cite EC=1.1.1.27 SUBSTRATE=pyruvate
+ORGANISM="Homo sapiens"`, in a checkout, prints the constant alone, with the
+papers that disagree and the conditions it was measured under.
+
+### Caterva Studio, and the Mac app
+
+Caterva Studio is a window onto the commands above: a server on your own
+computer (127.0.0.1 only) calls the same library functions and serves a page
+in which every number says whether it is a cited measurement, a fit, a
+computation, a value you chose, or a placeholder and why. It keeps every run
+so you can reopen or export it. There is no Rates screen yet (`caterva
+rates` works in the terminal).
+
+- **On a Mac with Apple silicon and macOS 14 or later**, download
+  `Caterva-<version>-macos-arm64.dmg` from the Releases page, drag Caterva
+  to Applications and open it. **The app is not signed with an Apple
+  Developer ID and is not notarised**, so macOS refuses the first open: try
+  to open it, then System Settings, Privacy & Security, Open Anyway; if macOS
+  keeps refusing, run `xattr -dr com.apple.quarantine
+  /Applications/Caterva.app` in Terminal. The disk image's README says the
+  same. There is no Intel build.
+- **From a checkout, on any platform:** `make studio` builds the page (needs
+  Node 22 and pnpm) and opens it in your browser. The wheel and the plain app
+  folder carry no built page: `caterva studio` there starts, and serves a
+  page saying the page is not built and how to build it.
+
+[`docs/studio/README.md`](docs/studio/README.md) says what each screen runs
+and how the app is built.
 
 **New to it? [`docs/USING_CATERVA.md`](docs/USING_CATERVA.md)** is the guide:
 what to type first, how to read a report, and a recipe for each question a
@@ -547,18 +580,18 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Caterva/
 ├── caterva/                  simulation engine (ODE + discrete/stochastic)
 │   ├── caterva_engine.py     public entry point (88 names)
-│   └── tests/                3,593 tests
+│   └── tests/                4,329 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1550 tests
+│   └── ...                   1574 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
 │   └── adr/                    176 decision records (and counting)
-├── scripts/                    76 guard scripts + build verification
+├── scripts/                    77 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
 │   └── ...                     see scripts/README.md for the full list
@@ -638,10 +671,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 5,143 tests
+make test        # run all 5,903 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (3,593 tests)
-make test-lit    # literature layer only (1550 tests)
-python3 scripts/verify_build.py --quick  # all 76 guard scripts, incl. TypeScript compile
+make test-sim    # simulation engine only (4,329 tests)
+make test-lit    # literature layer only (1574 tests)
+python3 scripts/verify_build.py --quick  # all 77 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

@@ -16,6 +16,10 @@
 // the address the server printed carries the token in its URL fragment, no
 // page the server answers holds it, /api/health without it is refused, and
 // /api/health with it answers.
+//
+// The server is started with `--data-dir` pointing at a temporary folder (the
+// environment's CATERVA_STUDIO_DATA_DIR wins when set), so running the smoke
+// check never touches ~/Library/Application Support/Caterva.
 
 import Foundation
 
@@ -59,13 +63,24 @@ enum Smoke {
             fflush(stdout)
         }
 
-        let command: StudioCommand
+        let resolved: StudioCommand
         do {
-            command = try StudioCommand.resolve()
+            resolved = try StudioCommand.resolve()
         } catch {
             say("FAIL \(error)")
             return 1
         }
+        // The smoke run must not read or write the person's real runs and
+        // settings: it gets a data folder of its own, removed afterwards,
+        // unless the environment already names one (a development build).
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("caterva-smoke-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let command = StudioCommand(executable: resolved.executable,
+                                    baseArguments: resolved.baseArguments,
+                                    workingDirectory: resolved.workingDirectory,
+                                    dataDirectory: resolved.dataDirectory ?? scratch.path,
+                                    isDevelopment: resolved.isDevelopment)
         say("command \(command.display(port: 0))")
         let events = DispatchQueue(label: "caterva.smoke")
         let server = StudioServer(callbackQueue: events)

@@ -37,11 +37,13 @@ import re
 import sys
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "Tests"))
+if (REPO_ROOT / "Tests").is_dir():
+    sys.path.insert(0, str(REPO_ROOT / "Tests"))
 # The repository root too — `lab_report` reaches modules that import
 # `caterva.*`. `export_citations.py` shipped in HEAD with only the first of
 # these lines and died on its import line (ADR 0107).
-sys.path.insert(0, str(REPO_ROOT))
+if (REPO_ROOT / "caterva").is_dir():
+    sys.path.insert(0, str(REPO_ROOT))
 
 from brenda_client import fetch_brenda_html  # noqa: E402
 from enzyme_lookup import EnzymeNameNotResolved, ec_number_for_name  # noqa: E402

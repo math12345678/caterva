@@ -149,3 +149,8 @@ Science-Agent-Pipeline/artifacts/api-server/front-door-coverage.txt
 /Business/
 *pitch_deck*
 md-smoke
+
+# The literature layer as the release build copies it into the package
+# (scripts/vendor_literature.py, run by scripts/build_release.py): a build
+# product, regenerated from Tests/ every time, never committed.
+caterva/_literature/

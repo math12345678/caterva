@@ -305,7 +305,7 @@ curl http://localhost:3000/api/analyze/sweep/sweep_123
 
 ### Start the System
 ```bash
-cd /Users/smyan/Desktop/Coding/Caterva
+cd path/to/caterva
 npm run web:start
 # Open http://localhost:3000
 ```

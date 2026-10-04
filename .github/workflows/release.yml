@@ -35,6 +35,17 @@
 #               notes from docs/releases/<tag>.md, every artifact, and one
 #               SHA256SUMS covering all of them
 #
+# THE FIRST ATTEMPT AT A VERSION IS A RELEASE CANDIDATE
+# `studio-dmg` is a prerequisite of `publish`: the DMG is a required artifact,
+# and it is built on a macOS runner this repository cannot reproduce locally
+# (swiftc, codesign, hdiutil). A failure only there would withhold the wheel
+# and the folders with it. So a new version is first tagged `-rc.1`
+# (v0.5.0-rc.1): the whole pipeline runs and, if it passes, publishes a
+# PRE-release; a failure costs the candidate tag and its page, and the plain
+# `v0.5.0` tag is cut only after a candidate has shipped every artifact.
+# docs/releases/v0.5.0.md records this for 0.5.0. The notes and the version
+# check below use the plain tag, so `-rc.1` needs no notes of its own.
+#
 # WHAT IT DOES NOT DO
 # It does not upload to PyPI (a separate, unmade decision: NOTICE, the
 # release notes). It does not sign or notarise the macOS folder: that needs
@@ -188,6 +199,18 @@ jobs:
           PY
           caterva --help > /dev/null
           caterva-compose --help > /dev/null
+          # The literature layer rides in the wheel (caterva/_literature/,
+          # copied from Tests/ by scripts/vendor_literature.py), so a
+          # literature search is possible from an install with no checkout.
+          python - <<'PY'
+          import pathlib
+          from caterva.checkout import literature_module
+          module = literature_module("fallback_logic")
+          path = pathlib.Path(module.__file__).resolve()
+          assert "site-packages" in path.parts and path.parent.name == "_literature", path
+          literature_module("brenda_client"); literature_module("http_retry")
+          print("literature layer ->", path)
+          PY
           # A VERDICT alone is not proof: a failed simulation becomes the note
           # "no time course" and still exits 0. Require the integration line,
           # a real SBML export (libsbml + the packaged data files), and a

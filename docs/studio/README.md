@@ -26,7 +26,7 @@ CLI's for real inputs.
 |---|---|---|
 | Home | `caterva compose "<line>"` | One written line starts a model; recent runs; what this machine can reach |
 | Compose | `caterva compose` | The verdict and the worst thing wrong with the model first, then where every constant came from, the time course, influence, steady states, sweeps and each requested analysis |
-| Constants | `scripts/cite.py` | Every BRENDA row the resolver read for a constant, with its reference, organism, conditions and the row's own words |
+| Constants | `scripts/cite.py` (a copy of it rides in the wheel and the app, in `caterva/_literature/`) | Every BRENDA row the resolver read for a constant, with its reference, organism, conditions and the row's own words |
 | Stochastic | `caterva sim ssa` | One exact trajectory beside the ODE expectation, with its seed |
 | Binding | `caterva bind` | Each cited Ki turned into a ΔG°bind band, with the method and each row's temperature |
 | Structures | `caterva structure` | PDB entries for an EC number or enzyme name, grouped by protein, and the chosen entry in 3D |
@@ -37,9 +37,13 @@ CLI's for real inputs.
 | Settings | | Theme, runs at once, offline mode, the GROMACS program, the workspace folder |
 | About | | How a number's kind is decided, the data sources and their licences, how to cite them |
 
-`/rates` is reserved for `caterva rates`. It appears only when
-`/api/capabilities` reports the rates kind as available; until then the
-address says the screen is not in this installation, and why.
+**There is no Rates screen yet.** `caterva rates` exists and works from the
+command line (`caterva rates --help`, and the section "Fitting your own rates"
+in [USING_CATERVA.md](../USING_CATERVA.md)), but Studio has not been given a
+screen for it. `/rates` is reserved: the page shows it only when
+`/api/capabilities` reports a `rates` kind as available, and the server's
+`rates` adapter does not exist, so today the address says the screen is not
+in this installation, and why.
 
 ## Run it from a checkout
 
@@ -113,9 +117,44 @@ A development app is never put in a DMG.
 
 The app is not signed with an Apple Developer ID and is not notarised: the
 project holds no Developer ID. The DMG's README and the app's first-run text
-say how to open it (Control-click, Open; or System Settings, Privacy &
-Security, Open Anyway), and the build script refuses either text if a
-sentence in it claims a signature or notarisation.
+say how to open it (System Settings, Privacy & Security, Open Anyway; then
+`xattr -dr com.apple.quarantine /Applications/Caterva.app` if macOS keeps
+refusing), and the build script refuses either text if a sentence in it
+claims a signature or notarisation. Control-click, Open is not offered: the
+route is not in Apple's current instructions for opening an app from an
+unknown developer (support.apple.com, "Open a Mac app from an unknown
+developer", read 2026-10-03, lists only Open Anyway), and on recent macOS
+releases it does not work for this kind of app. What was verified is that
+page's text; what was not is the behaviour on each macOS release, which
+needs a Mac of each kind.
+
+The app needs **macOS 14 or later** on Apple silicon: the wheels the app
+carries (NumPy 2.2.6, SciPy 1.15.3, libRoadRunner 2.8.0) are built for macOS
+14. `LSMinimumSystemVersion` says 14.0, and the shell itself checks
+`ProcessInfo` and shows a plain alert on an older macOS instead of starting a
+server that cannot import them.
+
+## Things to know when running more than one server
+
+- **Settings are last-writer-wins.** Each server reads `settings.json` from
+  the data folder when it starts and writes the whole file, atomically, each
+  time a setting changes. Two servers on one data folder (two `caterva
+  studio` commands, or the app beside a terminal) each hold their own copy:
+  the one that saved last decides what the next server reads, and a change
+  made in one is not seen by the other until it restarts. Give a second
+  server its own `--data-dir` to keep them apart. Runs do not have this
+  problem: each run is its own folder, claimed by the server that started it.
+- **A server started in the background stops with its parent.** The server
+  watches the process that launched it and, about one second after that
+  process has gone (`PARENT_POLL_S`), shuts itself down. So
+  `caterva studio --no-browser &` in a shell that then exits (a script, an
+  `ssh` command, a CI step) stops about a second later. Keep the launching
+  shell open, or run it in a terminal multiplexer (`tmux`, `screen`),
+  whose shell stays alive. `nohup` and `setsid` do not help: the check is
+  whether the parent process id changed, and it changes to 1 when the
+  parent dies however the server was detached; there is no flag to turn the
+  check off. When stdin is a pipe (as it is when Caterva.app starts the
+  server) closing that pipe stops the server too.
 
 ## What is not done yet
 
@@ -124,7 +163,8 @@ sentence in it claims a signature or notarisation.
 - The DMG is built for Apple silicon (arm64) only. The page and the server
   run on Linux and Windows through `caterva studio` in a browser; there is
   no native window there.
-- `caterva rates` is not in this branch; its screen is reserved and hidden.
+- Studio has no Rates screen: `caterva rates` is in the command line, and
+  its Studio screen is reserved and hidden until an adapter for it exists.
 - The 3D viewer draws a C-alpha trace with highlighted side chains on a 2D
   canvas. It does not draw cartoons or surfaces, and it does not label
   residues on the canvas itself (the list and the side panel name them).
