@@ -23,6 +23,7 @@ import type { Outcome, RunError, RunKind, RunRecord, RunStatus, RunSummary } fro
 import { routeForKind } from "@/routes";
 
 import { networkFailureOf, networkSentence, plain } from "./copy";
+import { reportActiveRuns } from "./desktop";
 import { pollInterval } from "./polling";
 import { describeError } from "./errors";
 import { notify } from "./toast";
@@ -315,6 +316,12 @@ export function JobsProvider({ children }: { children: ReactNode }) {
       .slice(0, KEEP_FINISHED);
     return { jobs: [...active, ...done], active };
   }, [version]);
+
+  // The macOS shell asks before an update stops runs; it learns the count here.
+  const activeCount = list.active.length;
+  useEffect(() => {
+    reportActiveRuns(activeCount);
+  }, [activeCount]);
 
   return (
     <ActionsContext.Provider value={actions}>

@@ -1,7 +1,7 @@
 /**
  * /settings: the theme, how many runs work at once, whether deleting a run
  * asks first, offline mode, which GROMACS to use, and where the workspace
- * is.
+ * is. The Updates section belongs to the macOS app (see UpdatesSection).
  *
  * The theme applies the moment it is chosen (and is stored at once); the
  * others are saved together with the Save button, and a value the
@@ -16,6 +16,7 @@ import type { Settings } from "@/api/types";
 import { Field, fieldError, FormActions, Select, Switch, TextInput } from "@/components/forms/Field";
 import { useCommand } from "@/components/palette/commands";
 import { Screen, Section } from "@/components/screen/Screen";
+import { UpdatesSection } from "@/components/settings/UpdatesSection";
 import { NetworkPanel } from "@/components/shell/NetworkPanel";
 import { ThemeSwitch } from "@/components/shell/ThemeSwitch";
 import { Loading } from "@/components/states/Loading";
@@ -80,7 +81,7 @@ export default function SettingsScreen() {
   useCommand(dirty ? { id: "settings.save", title: "Save settings", run: submit } : null);
 
   return (
-    <Screen title="Settings" purpose="Theme, how many runs at once, offline mode, GROMACS, and where the workspace lives.">
+    <Screen title="Settings" purpose="Theme, how many runs at once, offline mode, GROMACS, where the workspace lives, and updates.">
       <Section title="Appearance">
         <div className="field">
           <span className="field-label" id="theme-label">
@@ -270,6 +271,8 @@ export default function SettingsScreen() {
           </dl>
         )}
       </Section>
+
+      <UpdatesSection />
     </Screen>
   );
 }

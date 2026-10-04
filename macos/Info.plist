@@ -6,6 +6,20 @@
   build number it is given (the commit count in CI), and refuses a result
   that still holds an @...@ placeholder.
 
+  Sparkle (in-app updates, macos/Sources/Updater.swift):
+    SUFeedURL                   the stable feed: GitHub serves the newest
+                                release that is not a prerelease
+    SUPublicEDKey               the public half of the EdDSA key that signs
+                                each update archive in the release workflow;
+                                the private half is the repository secret
+                                SPARKLE_ED_PRIVATE_KEY. Not an Apple signature.
+    SUEnableAutomaticChecks     check once a day without a first-run question;
+                                Settings, Updates turns it off
+    SUAllowsAutomaticUpdates    false: an update is always offered, never
+                                installed behind the person's back
+    SUVerifyUpdateBeforeExtraction  check the archive's signature before it is
+                                unpacked
+
   NSAllowsLocalNetworking: the window loads the studio server over plain
   http on a loopback address. It allows exactly that; every other load is
   refused by StudioWindowController and opened in the default browser.
@@ -36,6 +50,18 @@
 	<string>public.app-category.education</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
+	<key>SUAllowsAutomaticUpdates</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/math12345678/caterva/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>PKIjU44x9hJWWjzfxITm6z4SQj2uNanoI6T55aVjOTc=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

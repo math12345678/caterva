@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "155 test files -- kinetics & Michaelis-Menten correctness, " +
+          "156 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -223,8 +223,11 @@ export const TEST_SUITES: TestSuite[] = [
         // test_enzyme_source.py, both passing): 6074. Then the certificate
         // fix for the packaged app: 12 tests in test_tls.py, all passing in
         // a focused run on the branch (2026-10-04), which also ran the 743
-        // other studio, app and complex tests it could affect: 6086.
-        passed: 6086,
+        // other studio, app and complex tests it could affect: 6086. Then the
+        // in-app updater: test_app_updates.py, 49 tests, all passing in a
+        // focused run on the branch (2026-10-04) together with the 42 of
+        // test_build_studio_app.py: 6135.
+        passed: 6135,
         skipped: 1,
         failed: 0,
       },

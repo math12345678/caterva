@@ -119,6 +119,16 @@ xattr -dr com.apple.quarantine .
 
 ---
 
+## Before the first release with updates (v0.5.1)
+
+The release workflow signs the Mac app's update file with a key kept as a
+repository secret, and stops without publishing if the secret is missing. The
+commands to set it up once, and what to do if the key is lost, are under "The
+update key" in [docs/studio/README.md](studio/README.md). Do that before
+tagging `v0.5.1-rc.1`.
+
+---
+
 ## Later, when you're ready
 
 ### Your business files

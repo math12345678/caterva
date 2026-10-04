@@ -6,6 +6,7 @@
 //                                  report; no window (scripts/build_studio_app.py
 //                                  and CI run this)
 //   Caterva --version              the version this bundle carries
+//   Caterva --updater-selftest     check the update feed rules (no network, no window)
 //
 // On a macOS older than the one the bundled Python libraries were built for
 // (14.0: NumPy 2.2 and SciPy 1.15 are macosx_14_0 wheels, libRoadRunner 2.8
@@ -24,6 +25,10 @@ if arguments.contains("--version") {
     let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
     print("Caterva \(version)")
     exit(0)
+}
+
+if arguments.contains("--updater-selftest") {
+    exit(UpdaterSelfTest.run())
 }
 
 if let problem = MacOSRequirement.problem() {

@@ -118,7 +118,7 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 7,687 tests (6,098 engine + 1,589 literature)
+make test      # runs all 7,736 tests (6,147 engine + 1,589 literature)
 ```
 
 ### Or download the release
@@ -174,7 +174,12 @@ rates` works in the terminal).
   to open it, then System Settings, Privacy & Security, Open Anyway; if macOS
   keeps refusing, run `xattr -dr com.apple.quarantine
   /Applications/Caterva.app` in Terminal. The disk image's README says the
-  same. There is no Intel build.
+  same. There is no Intel build. **From 0.5.1 the app updates itself**
+  (Caterva menu, Check for Updates; Settings, Updates): the first copy that
+  has the updater must be installed by hand from the disk image, and after
+  that new versions arrive inside the app, checked against a key built into
+  it. That is not an Apple signature; the app is still unsigned, and the Open
+  Anyway step is for the first install only.
 - **From a checkout, on any platform:** `make studio` builds the page (needs
   Node 22 and pnpm) and opens it in your browser. The wheel and the plain app
   folder carry no built page: `caterva studio` there starts, and serves a
@@ -580,7 +585,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Caterva/
 ├── caterva/                  simulation engine (ODE + discrete/stochastic)
 │   ├── caterva_engine.py     public entry point (88 names)
-│   └── tests/                6,098 tests
+│   └── tests/                6,147 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
@@ -671,9 +676,9 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 7,687 tests
+make test        # run all 7,736 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (6,098 tests)
+make test-sim    # simulation engine only (6,147 tests)
 make test-lit    # literature layer only (1589 tests)
 python3 scripts/verify_build.py --quick  # all 77 guard scripts, incl. TypeScript compile
 make clean       # remove caches

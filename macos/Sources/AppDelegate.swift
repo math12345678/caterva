@@ -27,6 +27,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var command: StudioCommand?
     private var quitting = false
     private var restarting = false
+    private let updates = UpdateController(isDevelopment: AppDelegate.isDevelopmentBuild)
+
+    #if CATERVA_DEVELOPMENT
+    private static let isDevelopmentBuild = true
+    #else
+    private static let isDevelopmentBuild = false
+    #endif
 
     // MARK: - Lifecycle
 
@@ -35,12 +42,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         command = resolved
         let window = StudioWindowController(isDevelopment: resolved?.isDevelopment ?? false)
         window.onRestart = { [weak self] in self?.restartServer() }
+        window.updates = updates
+        updates.window = window.window
         controller = window
         NSApp.mainMenu = MainMenu.build(target: self)
         window.showWindow(nil)
         window.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         startServer(route: UserDefaults.standard.string(forKey: AppDelegate.routeKey))
+        updates.start()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -153,6 +163,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             + "Atkinson Hyperlegible Next and DM Mono (SIL Open Font License 1.1). Enzyme names come from the "
             + "ExPASy ENZYME database (SIB Swiss Institute of Bioinformatics, CC BY 4.0); constants come from BRENDA "
             + "(CC BY 4.0) when you search the literature.\n\n"
+            + "Updates are checked and installed by Sparkle (MIT licence, with the notices of the components it "
+            + "carries; they are in Help, Licences).\n\n"
             + "Not signed with an Apple Developer ID and not notarised.\n\n"
             + "Unaffiliated with Tellurium.", attributes: body))
         NSApp.orderFrontStandardAboutPanel(options: [
@@ -164,6 +176,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    @objc func checkForUpdates(_ sender: Any?) { updates.checkForUpdates() }
     @objc func showSettings(_ sender: Any?) { controller?.go(to: "/settings") }
     @objc func goHome(_ sender: Any?) { controller?.go(to: "/") }
     @objc func goHistory(_ sender: Any?) { controller?.go(to: "/history") }
@@ -204,7 +217,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let folder = resources.appendingPathComponent("caterva/licenses", isDirectory: true)
         let pageFolder = resources.appendingPathComponent("caterva/_internal/caterva/studio/static/licenses", isDirectory: true)
         let notice = resources.appendingPathComponent("caterva/NOTICE")
-        let present = [folder, pageFolder, notice].filter { FileManager.default.fileExists(atPath: $0.path) }
+        let sparkle = resources.appendingPathComponent("licenses/Sparkle-LICENSE.txt")
+        let present = [folder, pageFolder, notice, sparkle].filter { FileManager.default.fileExists(atPath: $0.path) }
         if present.isEmpty {
             explain("The licence files are not in this copy",
                     "A development build runs the server from a checkout; the licences are in the repository "
@@ -235,6 +249,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         case #selector(reloadPage(_:)), #selector(showSettings(_:)), #selector(goHome(_:)), #selector(goHistory(_:)),
              #selector(zoomIn(_:)), #selector(zoomOut(_:)), #selector(actualSize(_:)):
             return controller?.canNavigate ?? false
+        case #selector(checkForUpdates(_:)):
+            return updates.unavailableReason != nil || updates.canCheck
         case #selector(goBack(_:)):
             return controller?.canGoBack ?? false
         case #selector(goForward(_:)):
@@ -273,6 +289,7 @@ enum MainMenu {
         NSApp.servicesMenu = services
         _ = submenu("Caterva", [
             item("About Caterva", #selector(AppDelegate.showAbout(_:)), to: target),
+            item("Check for Updates…", #selector(AppDelegate.checkForUpdates(_:)), to: target),
             .separator(),
             item("Settings…", #selector(AppDelegate.showSettings(_:)), ",", to: target),
             .separator(),

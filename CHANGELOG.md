@@ -12,6 +12,20 @@ onward and [Keep a Changelog](https://keepachangelog.com/) in shape.
 Entries before 0.1.0 are grouped by date, because that is how the work was
 done: there was no release to version.
 
+## [0.5.1] - 2026-10-04
+
+Caterva.app updates itself. A release candidate, `v0.5.1-rc.1`, comes first,
+as for 0.5.0.
+
+### Added
+- **In-app updates for Caterva.app**, with Sparkle 2.10.0. Caterva menu, Check for Updates; Settings, Updates (installed version, last check, Check now, Check automatically, Include prereleases). The app checks about once a day unless turned off and always asks before installing; installing closes the app, stopping the server first, and asks if runs are in progress. Runs and settings are in `~/Library/Application Support/Caterva` and are not touched. **The first copy with the updater (this version) must be installed by hand from the DMG**; after that, versions arrive in the app. The app is still not signed with an Apple Developer ID and not notarised: each update archive is checked against an Ed25519 key built into the app, which is not an Apple signature. Whether an update opens with no macOS prompt has not been observed on a Mac (docs/studio/README.md, "What was and was not verified").
+- **The feed is the release itself.** Each GitHub Release carries `appcast.xml` (written by `scripts/make_appcast.py`) and `Caterva-<version>-macos-arm64.zip`, the update archive (a `ditto` zip of Caterva.app), both in `SHA256SUMS`. The app's stable feed is `releases/latest/download/appcast.xml`; "Include prereleases" reads the newest release's appcast from the GitHub Releases API. No server, no GitHub Pages.
+- `release.yml` has an `update-feed` job that signs the archive with the repository secret `SPARKLE_ED_PRIVATE_KEY` (on tag builds only, key on standard input), checks the signature against the public key inside the app, and fails the release if the secret is missing or does not match. `scripts/check_release_artifacts.py` holds those rules and checks NOTICE names Sparkle and the licences it carries.
+- `scripts/fetch_sparkle.py` downloads Sparkle against a pinned SHA-256; `Caterva --updater-selftest` checks the feed rules in the built app. NOTICE (item 2a) and `docs/PRIVACY.md` record Sparkle's licences and the update check.
+
+### Changed
+- Version 0.5.1. The Studio's desktop bridge has four new messages (`updateStatus`, `checkForUpdates`, `setUpdateOptions`, `reportActiveRuns`; `docs/studio/CONTRACT.md`, section 16).
+
 ## [0.5.0] - 2026-10-03
 
 Caterva Studio, the enzyme finder, and a Mac app, on top of the tools listed

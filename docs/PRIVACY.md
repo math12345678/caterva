@@ -164,6 +164,20 @@ class, read that first.
 
 No cookies, no `localStorage`, no analytics, no telemetry.
 
+## Caterva.app asks GitHub whether a newer version exists
+
+From 0.5.1 the Mac app checks for updates (about once a day, and when you
+choose Check for Updates). A check is an HTTPS request to `github.com` for
+`appcast.xml` (and to GitHub's download host if you accept an update). If
+"Include prereleases" is on, the app also asks `api.github.com` for the list
+of releases. Those hosts therefore see your IP address, the app's name and
+version (in the User-Agent) and the time. The app sends no system profile,
+nothing from your runs, and sets no identifier of its own. GitHub's own
+privacy statement governs what GitHub keeps. Turn the daily check off in
+Settings, Updates; it is separate from Offline mode, which concerns the
+literature services. A copy built from a checkout (`caterva studio`, or a
+development app) never checks.
+
 ## Query text can be sent to an LLM provider, if someone turns it on
 
 > **Correction (2026-08-15).** This document previously said "no third-party

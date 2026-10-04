@@ -821,6 +821,17 @@ Command Line Tools (no Xcode project).
   `{action: "reveal", path}` (NSWorkspace). The page's side is
   `src/lib/desktop.ts`; in a plain browser the page falls back to a text
   field for the path.
+- Updates (Sparkle 2; docs/studio/README.md, "Updates inside Caterva.app"):
+  the same handler also answers `{action: "updateStatus"}` with `{enabled,
+  reason, version, build, lastCheck, automatic, prereleases, checking, note}`,
+  `{action: "checkForUpdates"}` (Sparkle's own window follows),
+  `{action: "setUpdateOptions", automatic?, prereleases?}` (booleans) and
+  `{action: "reportActiveRuns", count}` (how many runs the page sees going,
+  so an update asks before it stops them). All four are answered only for the
+  server's own page in the main frame, like the first three. In a plain
+  browser there is no handler: `desktop.ts` returns null and Settings says the
+  app owns updates. Quitting for an update takes the Quit path above, so the
+  server is stopped before the app is replaced.
 - If the server process exits, a native error view replaces the web view
   with the exit status, the last stderr lines and a Restart button.
 - Quit: close stdin, SIGTERM, wait 5 s, SIGKILL.

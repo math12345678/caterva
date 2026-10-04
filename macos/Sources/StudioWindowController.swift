@@ -23,6 +23,11 @@ final class StudioWindowController: NSWindowController, NSWindowDelegate, WKNavi
     private static let zoomSteps: [CGFloat] = [0.75, 0.85, 1.0, 1.1, 1.25, 1.5, 1.75]
 
     var onRestart: (() -> Void)?
+    /// What the page's Updates section talks to (WebBridge).
+    var updates: UpdateBridging? {
+        get { bridge.updates }
+        set { bridge.updates = newValue }
+    }
 
     private let isDevelopment: Bool
     private let container = NSView()

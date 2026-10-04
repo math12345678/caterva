@@ -24,6 +24,13 @@
 #            the package's version, an ad-hoc signature over the bundle,
 #            and `Caterva --smoke --require-page` (the shell starts the
 #            bundled server, reads its URL, fetches the page, stops it)
+#   updater  Sparkle 2.10.0 downloaded and checked against its pinned SHA-256
+#            (scripts/fetch_sparkle.py), embedded as Contents/Frameworks and
+#            sealed with the bundle; `Caterva --updater-selftest` runs on it
+#   archive  the same Caterva.app as Caterva-<version>-macos-arm64.zip
+#            (`ditto -c -k --keepParent`), unpacked again and checked with
+#            `codesign --verify --deep --strict`. This is the file the app's
+#            updater downloads; release.yml's update-feed job signs it
 #   image    hdiutil create (up to three attempts) + verify; then the DMG is mounted read-only and
 #            the copy INSIDE it is smoke-tested again, because that copy is
 #            what a person drags to Applications
@@ -40,6 +47,8 @@
 # tag: Actions > Re-run failed jobs.
 #
 # WHAT IT DOES NOT DO
+# Sign the update archive: that needs the update key, which only release.yml's
+# update-feed job reads (this workflow has no secrets and also runs by hand).
 # Sign with a Developer ID or notarise: the repository holds no Apple
 # Developer ID. The DMG's README (macos/dmg/README.txt) and the app's
 # first-run sheet say how to open an unsigned app and claim nothing more.
@@ -157,7 +166,7 @@ jobs:
         run: |
           set -euo pipefail
           python scripts/build_studio_app.py --frozen dist/frozen/caterva --out dist/studio \
-            --build-number "$(git rev-list --count HEAD)" --dmg
+            --build-number "$(git rev-list --count HEAD)" --dmg --zip
 
       - name: The frozen server inside the app passes its self-test
         id: app_self_test
@@ -182,6 +191,7 @@ jobs:
           test -f "$mnt/README.txt"
           codesign --verify --deep --strict "$mnt/Caterva.app"
           "$mnt/Caterva.app/Contents/MacOS/Caterva" --version
+          "$mnt/Caterva.app/Contents/MacOS/Caterva" --updater-selftest
           "$mnt/Caterva.app/Contents/MacOS/Caterva" --smoke --require-page
 
       - uses: actions/upload-artifact@v4
@@ -190,6 +200,8 @@ jobs:
           path: |
             dist/studio/Caterva-*-macos-arm64.dmg
             dist/studio/Caterva-*-macos-arm64.dmg.sha256
+            dist/studio/Caterva-*-macos-arm64.zip
+            dist/studio/Caterva-*-macos-arm64.zip.sha256
           if-no-files-found: error
 
       - name: Say which step failed
@@ -205,7 +217,7 @@ jobs:
             "build the wheel with the page and the literature layer=${{ steps.wheel.outcome }}" \
             "install the wheel and the freezer=${{ steps.install_wheel.outcome }}" \
             "freeze the folder, check it, run the studio self-test=${{ steps.freeze.outcome }}" \
-            "build Caterva.app and the DMG (swiftc, codesign, smoke, hdiutil)=${{ steps.app.outcome }}" \
+            "build Caterva.app, the update archive and the DMG (Sparkle, swiftc, codesign, smoke, ditto, hdiutil)=${{ steps.app.outcome }}" \
             "the frozen server inside the app passes its self-test=${{ steps.app_self_test.outcome }}" \
             "the copy inside the DMG starts, serves the page and stops=${{ steps.dmg_copy.outcome }}"; do
             if [ "${pair##*=}" = "failure" ]; then failed="${pair%=*}"; break; fi

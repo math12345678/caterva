@@ -12,7 +12,11 @@
 type BridgeMessage =
   | { action: "chooseDirectory"; purpose: string }
   | { action: "chooseFile"; purpose: string; extensions: string[] }
-  | { action: "reveal"; path: string };
+  | { action: "reveal"; path: string }
+  | { action: "updateStatus" }
+  | { action: "checkForUpdates" }
+  | { action: "setUpdateOptions"; automatic?: boolean; prereleases?: boolean }
+  | { action: "reportActiveRuns"; count: number };
 
 interface Bridge {
   postMessage(message: BridgeMessage): Promise<unknown>;
@@ -49,4 +53,62 @@ export async function chooseFile(purpose: string, extensions: string[]): Promise
 export async function reveal(path: string): Promise<void> {
   const b = bridge();
   if (b) await b.postMessage({ action: "reveal", path });
+}
+
+/**
+ * What the shell reports about in-app updates (macos/Sources/Updater.swift).
+ * `enabled` is false in a development build, with the reason; `lastCheck` is
+ * an ISO 8601 time or null; `note` says when a feed could not be read.
+ */
+export interface UpdateStatus {
+  enabled: boolean;
+  reason: string | null;
+  version: string;
+  build: string;
+  lastCheck: string | null;
+  automatic: boolean;
+  prereleases: boolean;
+  checking: boolean;
+  note: string | null;
+}
+
+function isUpdateStatus(value: unknown): value is UpdateStatus {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.enabled === "boolean" &&
+    typeof v.version === "string" &&
+    typeof v.automatic === "boolean" &&
+    typeof v.prereleases === "boolean" &&
+    typeof v.checking === "boolean"
+  );
+}
+
+/** The shell's update state, or null in a plain browser (or a shell without updates). */
+export async function updateStatus(): Promise<UpdateStatus | null> {
+  const b = bridge();
+  if (!b) return null;
+  const answer = await b.postMessage({ action: "updateStatus" });
+  return isUpdateStatus(answer) ? answer : null;
+}
+
+/** Ask the shell to check now; Sparkle's own window shows the result. */
+export async function checkForUpdates(): Promise<void> {
+  const b = bridge();
+  if (b) await b.postMessage({ action: "checkForUpdates" });
+}
+
+/** Turn automatic checks, or the prerelease feed, on or off. */
+export async function setUpdateOptions(options: { automatic?: boolean; prereleases?: boolean }): Promise<void> {
+  const b = bridge();
+  if (b) await b.postMessage({ action: "setUpdateOptions", ...options });
+}
+
+/**
+ * Tell the shell how many runs are going, so an update asks before it stops
+ * them. Never throws: a shell that cannot take it just does not ask.
+ */
+export function reportActiveRuns(count: number): void {
+  const b = bridge();
+  if (b) void b.postMessage({ action: "reportActiveRuns", count }).catch(() => undefined);
 }

@@ -30,6 +30,21 @@ OPENING IT THE FIRST TIME
     Check what you downloaded before you do either: the release page lists
     a SHA-256 for this disk image (shasum -a 256 Caterva-@VERSION@-macos-arm64.dmg).
 
+UPDATES
+    This is the first kind of Caterva that updates itself, so install this
+    copy by hand, as above. After that, new versions arrive inside the app:
+    Caterva menu, Check for Updates, or Settings, Updates (which also has the
+    switches for checking automatically, about once a day, and for including
+    prereleases). The app asks before it installs, closes itself, and opens
+    the new version; your runs and settings are in the folder named below,
+    not in the app, so an update leaves them alone. Each update is checked
+    against a key built into the app before it installs. That is not an Apple
+    approval: the app still has no Developer ID, and the steps above are for
+    the first install of a copy you downloaded yourself. If macOS ever does
+    refuse an updated copy, use the same steps. Install Caterva in
+    Applications first: an update cannot replace an app that is still running
+    from this disk image.
+
 WHAT IT IS
     A window onto the Caterva engine, which runs as a local server on this
     Mac only (127.0.0.1, a fresh key every launch) and stops when you quit.
@@ -40,7 +55,8 @@ WHAT IT IS
     Server log:        ~/Library/Logs/Caterva/studio-server.log
 
     Literature lookups (BRENDA, UniProt, RCSB, NCBI, PubChem) use the
-    network when you ask for them; the rest works offline. GROMACS (for molecular dynamics setup) is not included;
+    network when you ask for them, and the update check asks GitHub about
+    once a day unless you turn it off in Settings; the rest works offline. GROMACS (for molecular dynamics setup) is not included;
     install it separately and Caterva finds it.
 
 REQUIREMENTS

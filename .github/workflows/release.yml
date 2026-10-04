@@ -28,11 +28,19 @@
 #               frozen and self-tested, wrapped in Caterva.app and a DMG, and
 #               the copy inside the DMG smoke-tested; the DMG and its
 #               .sha256 are attached beside the folders
+#   update-feed the update archive Caterva-<version>-macos-arm64.zip (made in
+#               studio-dmg) signed with the EdDSA key in the repository
+#               secret SPARKLE_ED_PRIVATE_KEY (Sparkle's sign_update, key on
+#               stdin), the signature checked against the public key in the
+#               app's own Info.plist, and appcast.xml written by
+#               scripts/make_appcast.py. A missing secret FAILS the release:
+#               an update that is not signed is never published
 #   sources     the corresponding source of every libSBML version the
 #               folders carry, and of the two libraries that embed it, is
 #               fetched from upstream and attached beside the folders
 #   publish     only after all of the above: `gh release create` with the
-#               notes from docs/releases/<tag>.md, every artifact, and one
+#               notes from docs/releases/<tag>.md, every artifact (the DMG,
+#               the update archive and appcast.xml among them), and one
 #               SHA256SUMS covering all of them
 #
 # THE FIRST ATTEMPT AT A VERSION IS A RELEASE CANDIDATE
@@ -45,6 +53,14 @@
 # `v0.5.0` tag is cut only after a candidate has shipped every artifact.
 # docs/releases/v0.5.0.md records this for 0.5.0. The notes and the version
 # check below use the plain tag, so `-rc.1` needs no notes of its own.
+#
+# IN-APP UPDATES
+# Caterva.app asks the newest non-prerelease Release for its appcast.xml
+# (releases/latest/download/appcast.xml); a person who turns on "Include
+# prereleases" gets the newest Release of any kind. Both read the appcast.xml
+# attached to a Release, so there is no server and no GitHub Pages. The
+# update key is used by the update-feed job alone: this workflow runs on tags
+# and by hand, never on pull requests, and no other workflow names the secret.
 #
 # WHAT IT DOES NOT DO
 # It does not upload to PyPI (a separate, unmade decision: NOTICE, the
@@ -286,9 +302,74 @@ jobs:
     with:
       ref: ${{ github.event.inputs.tag || github.ref_name }}
 
+  # Signs the update archive and writes appcast.xml. On a macOS runner because
+  # Sparkle's sign_update is a macOS tool. The key is read from the secret by
+  # the one step that signs, written to that process's stdin and nowhere else.
+  update-feed:
+    name: signed update archive + appcast.xml
+    needs: [studio-dmg]
+    if: ${{ github.event_name == 'push' || github.event.inputs.publish == 'true' }}
+    runs-on: macos-14
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: studio-dmg
+          path: studio
+      - name: Sparkle's tools, checked against the pinned SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/fetch_sparkle.py --out dist/sparkle
+          ls dist/sparkle/Sparkle-*/bin/sign_update
+      - name: The signature checker
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/tools
+          xcrun swiftc -O macos/Updater/VerifyUpdateSignature.swift -o dist/tools/verify-update-signature
+      - name: Sign the update archive and write appcast.xml
+        shell: bash
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SPARKLE_ED_PRIVATE_KEY:-}" ]; then
+            echo "::error::the repository secret SPARKLE_ED_PRIVATE_KEY is not set, so the update archive cannot be signed. An update that is not signed is never published, so this release stops here. Create the key and the secret as docs/studio/README.md (Updates, The update key) describes, then re-run this job."
+            exit 1
+          fi
+          base="${RELEASE_TAG%%-*}"
+          archive="$(ls studio/Caterva-*-macos-arm64.zip)"
+          # printf is a shell builtin: the key is not in any command line.
+          signed="$(printf '%s' "$SPARKLE_ED_PRIVATE_KEY" | dist/sparkle/Sparkle-*/bin/sign_update --ed-key-file - "$archive")"
+          signature="$(printf '%s' "$signed" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')"
+          length="$(printf '%s' "$signed" | sed -n 's/.*length="\([0-9]*\)".*/\1/p')"
+          [ -n "$signature" ] && [ -n "$length" ] || { echo "::error::sign_update printed no signature or length"; exit 1; }
+          unzip -p "$archive" Caterva.app/Contents/Info.plist > "$RUNNER_TEMP/Info.plist"
+          public="$(plutil -extract SUPublicEDKey raw -o - "$RUNNER_TEMP/Info.plist")"
+          dist/tools/verify-update-signature "$public" "$signature" "$archive" \
+            || { echo "::error::the signature does not verify against the public key inside the app: SPARKLE_ED_PRIVATE_KEY is not the key whose public half is in macos/Info.plist. Installed apps would reject this update, so nothing is published."; exit 1; }
+          python scripts/make_appcast.py --zip "$archive" --signature "$signature" --length "$length" \
+            --tag "$RELEASE_TAG" --notes "docs/releases/$base.md" --out appcast.xml
+          python scripts/make_appcast.py --check appcast.xml
+          cat appcast.xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: update-feed
+          path: appcast.xml
+          if-no-files-found: error
+
   publish:
     name: GitHub Release
-    needs: [artifacts, reproduce, verify, app, studio-dmg]
+    needs: [artifacts, reproduce, verify, app, studio-dmg, update-feed]
     if: ${{ github.event_name == 'push' || github.event.inputs.publish == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -338,11 +419,14 @@ jobs:
           set -euo pipefail
           find staged -type f \( -name '*.whl' -o -name '*.tar.gz' -o -name '*.zip' -o -name '*.dmg' \) -exec cp {} release/ \;
           ls release/Caterva-*-macos-arm64.dmg > /dev/null || { echo "::error::the studio-dmg job's DMG is not among the staged artifacts"; exit 1; }
+          ls release/Caterva-*-macos-arm64.zip > /dev/null || { echo "::error::the studio-dmg job's update archive is not among the staged artifacts"; exit 1; }
+          find staged -type f -name appcast.xml -exec cp {} release/ \;
+          [ -f release/appcast.xml ] || { echo "::error::the update-feed job's appcast.xml is not among the staged artifacts"; exit 1; }
           cd release
           # Named inputs, not `*`: the redirect can create SHA256SUMS before
           # the glob expands, and the file then lists itself with the digest
           # of an empty file.
-          sha256sum -- *.whl *.tar.gz *.zip *.dmg *.tsv | sort -k2 > SHA256SUMS
+          sha256sum -- *.whl *.tar.gz *.zip *.dmg *.tsv appcast.xml | sort -k2 > SHA256SUMS
           # The wheel/sdist lines must equal the tested build's own sums.
           grep -E '  caterva-[0-9][0-9.]*(-py3-none-any\.whl|\.tar\.gz)$' SHA256SUMS | diff - <(sort -k2 ../staged/python-artifacts/SHA256SUMS)
           cat SHA256SUMS

@@ -8,6 +8,14 @@
 //   {action: "chooseDirectory", purpose}               -> "/abs/path" | null
 //   {action: "chooseFile", purpose, extensions: [..]}  -> "/abs/path" | null
 //   {action: "reveal", path}                           -> null
+//   {action: "updateStatus"}                           -> {enabled, reason, version, build,
+//                                                          lastCheck, automatic, prereleases,
+//                                                          checking, note}
+//   {action: "checkForUpdates"}                        -> null   (Sparkle's own window follows)
+//   {action: "setUpdateOptions", automatic?, prereleases?} -> null
+//   {action: "reportActiveRuns", count}                -> null   (how many runs the page sees
+//                                                                 running, so an update asks
+//                                                                 before it stops them)
 //
 // Only the studio server's own page, in the main frame, is answered. The
 // panel is the person's choice, so a path comes back only when they chose
@@ -55,9 +63,11 @@ struct ServerOrigin: Equatable {
 
 final class WebBridge: NSObject, WKScriptMessageHandlerWithReply {
     static let name = "caterva"
-    static let actions = ["chooseDirectory", "chooseFile", "reveal"]
+    static let actions = ["chooseDirectory", "chooseFile", "reveal", "updateStatus", "checkForUpdates",
+                          "setUpdateOptions", "reportActiveRuns"]
 
     weak var window: NSWindow?
+    weak var updates: UpdateBridging?
     var origin: ServerOrigin?
     /// Folders `reveal` may show: the server's data folder, which holds every
     /// run folder, plus each file or folder the person chose in a panel
@@ -108,6 +118,28 @@ final class WebBridge: NSObject, WKScriptMessageHandlerWithReply {
                 return
             }
             NSWorkspace.shared.activateFileViewerSelecting([url])
+            replyHandler(nil, nil)
+        case "updateStatus":
+            guard let updates else { return replyHandler(nil, "updates are not available") }
+            replyHandler(updates.updateStatus(), nil)
+        case "checkForUpdates":
+            guard let updates else { return replyHandler(nil, "updates are not available") }
+            updates.checkForUpdates()
+            replyHandler(nil, nil)
+        case "setUpdateOptions":
+            guard let updates else { return replyHandler(nil, "updates are not available") }
+            let automatic = body["automatic"] as? Bool
+            let prereleases = body["prereleases"] as? Bool
+            guard automatic != nil || prereleases != nil else {
+                return replyHandler(nil, "setUpdateOptions needs automatic or prereleases as true or false")
+            }
+            updates.setUpdateOptions(automatic: automatic, prereleases: prereleases)
+            replyHandler(nil, nil)
+        case "reportActiveRuns":
+            guard let count = body["count"] as? Int, count >= 0, count < 10_000 else {
+                return replyHandler(nil, "reportActiveRuns needs a count")
+            }
+            updates?.setActiveRuns(count)
             replyHandler(nil, nil)
         default:
             replyHandler(nil, "unknown action \(action)")

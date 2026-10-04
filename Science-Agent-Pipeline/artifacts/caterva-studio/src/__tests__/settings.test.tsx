@@ -78,3 +78,69 @@ describe("Settings", () => {
   });
 });
 
+
+describe("Settings, Updates", () => {
+  const status = {
+    enabled: true,
+    reason: null,
+    version: "0.5.1",
+    build: "412",
+    lastCheck: "2026-10-04T12:00:00Z",
+    automatic: true,
+    prereleases: false,
+    checking: false,
+    note: null,
+  };
+
+  function openSettings() {
+    setSessionToken("token");
+    window.history.replaceState(null, "", "/settings");
+    mockServer((req) => {
+      if (req.url === "/api/health") return health;
+      if (req.url.startsWith("/api/capabilities")) return capabilities;
+      if (req.url === "/api/settings") return settings;
+      if (req.url.startsWith("/api/runs")) return runsEmpty;
+      return undefined;
+    });
+    render(<App />);
+  }
+
+  function stubShell(answer: unknown) {
+    const postMessage = vi.fn(async (message: { action: string }) => (message.action === "updateStatus" ? answer : null));
+    vi.stubGlobal("webkit", { messageHandlers: { caterva: { postMessage } } });
+    return postMessage;
+  }
+
+  it("says updates are the app's business when the page runs in a browser", async () => {
+    openSettings();
+    expect(await screen.findByRole("heading", { name: "Updates" })).toBeTruthy();
+    expect(screen.getByText(/open in a browser, not in the app/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Check now" })).toBeNull();
+    expect(screen.queryByRole("switch", { name: /Include prereleases/ })).toBeNull();
+  });
+
+  it("shows the installed version and asks the shell to check, in the app", async () => {
+    const post = stubShell(status);
+    openSettings();
+    expect(await screen.findByText(/0\.5\.1 \(build 412\)/)).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Check now" }));
+    await vi.waitFor(() => expect(post).toHaveBeenCalledWith({ action: "checkForUpdates" }));
+  });
+
+  it("sends each switch to the shell on its own and never claims an Apple signature", async () => {
+    const post = stubShell(status);
+    openSettings();
+    await userEvent.click(await screen.findByRole("switch", { name: /Include prereleases/ }));
+    await vi.waitFor(() => expect(post).toHaveBeenCalledWith({ action: "setUpdateOptions", prereleases: true }));
+    await userEvent.click(screen.getByRole("switch", { name: /Check automatically/ }));
+    await vi.waitFor(() => expect(post).toHaveBeenCalledWith({ action: "setUpdateOptions", automatic: false }));
+    expect(screen.getByText(/not signed with an Apple Developer ID and not notarised/)).toBeTruthy();
+  });
+
+  it("gives the reason when this build does not update itself", async () => {
+    stubShell({ ...status, enabled: false, reason: "A development build runs from a checkout and does not update itself." });
+    openSettings();
+    expect(await screen.findByText(/development build runs from a checkout/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Check now" })).toBeNull();
+  });
+});

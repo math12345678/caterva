@@ -121,6 +121,10 @@ unless you pass `--data-dir`. The macOS app is not signed with an Apple
 Developer ID and is not notarised; the first time, try to open it, then use
 System Settings, Privacy & Security, Open Anyway, and if macOS keeps
 refusing run `xattr -dr com.apple.quarantine /Applications/Caterva.app`.
+From 0.5.1 the app also offers new versions itself (Caterva menu, Check for
+Updates; Settings, Updates has the switches): the first copy with the updater
+is installed by hand, and later versions arrive in the app. Updates replace
+only the app; the runs and settings above stay.
 [docs/studio/README.md](studio/README.md)
 says what each screen runs and how the app is built, and
 [docs/studio/USING_STUDIO.md](studio/USING_STUDIO.md) lists every flag.

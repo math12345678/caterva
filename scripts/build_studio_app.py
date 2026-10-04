@@ -9,11 +9,18 @@ WHAT IT BUILDS
         Contents/Info.plist             macos/Info.plist, version from caterva/__init__.py
         Contents/Resources/Caterva.icns drawn by macos/Icon/MakeIcon.swift, packed by iconutil
         Contents/Resources/first-run.txt
+        Contents/Resources/licenses/Sparkle-LICENSE.txt
+        Contents/Frameworks/Sparkle.framework   the updater (scripts/fetch_sparkle.py pins it)
         Contents/Resources/caterva/     the PyInstaller folder scripts/build_app.py checked,
                                         copied whole (its LICENSE, NOTICE and licenses/ with it)
       Caterva-<version>-macos-arm64.dmg (with --dmg) Caterva.app, an Applications link,
                                         README.txt on opening an unsigned app
       Caterva-<version>-macos-arm64.dmg.sha256
+      Caterva-<version>-macos-arm64.zip (with --zip) the same Caterva.app, made by
+                                        `ditto -c -k --keepParent`: the archive
+                                        Sparkle downloads. The release workflow signs
+                                        it with the update key and lists it in appcast.xml
+      Caterva-<version>-macos-arm64.zip.sha256
 
 The shell launches `Contents/Resources/caterva/caterva studio --port 0
 --no-browser --print-url` and shows the URL it prints
@@ -35,6 +42,16 @@ THE ORDER, AND WHO DOES EACH STEP
 Steps 2 and 3 install packages and run PyInstaller; this script does not do
 them for you, because both decide what a person downloads and each already
 refuses what it should refuse.
+
+SPARKLE
+-------
+Updates come from Sparkle 2, embedded as Contents/Frameworks/Sparkle.framework.
+scripts/fetch_sparkle.py downloads the pinned release and checks its SHA-256;
+this script compiles the shell against it (-F and -framework), sets the
+runtime search path to @executable_path/../Frameworks, copies the framework in
+(without its XPC services, which only a sandboxed app uses), copies its LICENSE
+into the app, and seals every piece with the same ad-hoc signature, inside out:
+Autoupdate, Updater.app, the framework, then the app.
 
 UNSIGNED, AND SAID SO
 ---------------------
@@ -58,12 +75,13 @@ Contents/MacOS/Caterva directly needs the variables in the environment,
 and `--smoke` here passes them. A development app is never put in a DMG.
 
 Usage:
-    python3 scripts/build_studio_app.py --frozen dist/frozen/caterva --dmg
+    python3 scripts/build_studio_app.py --frozen dist/frozen/caterva --dmg --zip
     python3 scripts/build_studio_app.py --dev --python .venv/bin/python --checkout . --out /tmp/studio-dev
 """
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -75,11 +93,16 @@ import subprocess
 import sys
 import tempfile
 import time
+import zipfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import NoReturn, Optional, Sequence
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import fetch_sparkle  # noqa: E402  (the pin for the updater framework)
+
 MACOS = ROOT / "macos"
 SOURCES = MACOS / "Sources"
 STUDIO_PACKAGE = ROOT / "Science-Agent-Pipeline" / "artifacts" / "caterva-studio"
@@ -105,6 +128,15 @@ PAGE_MARKER = '<meta name="caterva-studio-page" content="token-in-url-fragment"'
 
 #: The resources the shell reads at run time, from macos/Resources/.
 RESOURCES = ("first-run.txt",)
+
+#: Where the embedded framework goes, relative to Contents/, and the version
+#: folder inside it that holds the code to seal.
+SPARKLE_FRAMEWORK = Path("Frameworks") / "Sparkle.framework"
+#: The runtime search path the shell is linked with: Contents/Frameworks.
+FRAMEWORK_RPATH = "@executable_path/../Frameworks"
+#: Info.plist keys without which the shell cannot update, checked on the plist
+#: that is about to be written (test_app_updates.py reads the same list).
+UPDATE_PLIST_KEYS = ("SUFeedURL", "SUPublicEDKey", "SUEnableAutomaticChecks", "SUScheduledCheckInterval")
 
 #: Words that would claim a signature or a review the app does not have,
 #: matched case-insensitively in text a person reads before opening it.
@@ -152,11 +184,19 @@ def dmg_name(version: str, arch: str = "arm64") -> str:
     return f"Caterva-{version}-macos-{arch}.dmg"
 
 
+def zip_name(version: str, arch: str = "arm64") -> str:
+    """The archive Sparkle downloads; scripts/make_appcast.py and release.yml look for this name."""
+    return f"Caterva-{version}-macos-{arch}.zip"
+
+
 def render_info_plist(template: str, version: str, build: str,
-                      environment: Optional[dict] = None) -> bytes:
+                      environment: Optional[dict] = None, updater: Optional[dict] = None) -> bytes:
     """macos/Info.plist with the version and build filled in, as plist bytes.
 
-    `environment` becomes LSEnvironment (a development app only). Refuses a
+    `environment` becomes LSEnvironment (a development app only). `updater`
+    replaces SUFeedURL and/or SUPublicEDKey, for a local update test only
+    (docs/studio/README.md, "Testing an update by hand"); scripts/make_appcast.py
+    refuses to describe an app whose feed is not the stable one. Refuses a
     template that still holds a placeholder afterwards, or a version that is
     not dotted numbers (CFBundleShortVersionString's rule).
     """
@@ -169,6 +209,12 @@ def render_info_plist(template: str, version: str, build: str,
     if left:
         raise ValueError(f"Info.plist still holds {', '.join(left)}")
     data = plistlib.loads(text.encode("utf-8"))
+    data.update(updater or {})
+    missing = [key for key in UPDATE_PLIST_KEYS if key not in data]
+    if missing:
+        raise ValueError(f"Info.plist lacks the updater's keys: {', '.join(missing)}")
+    if len(base64.b64decode(str(data["SUPublicEDKey"]), validate=True)) != 32:
+        raise ValueError("SUPublicEDKey is not a base64 Ed25519 public key (32 bytes)")
     if environment:
         data["LSEnvironment"] = dict(environment)
     return plistlib.dumps(data, fmt=plistlib.FMT_XML, sort_keys=True)
@@ -222,12 +268,17 @@ def smoke_passed(stdout: str) -> bool:
 
 
 def swiftc_command(sources: Sequence[Path], output: Path, arch: str, module_cache: Path,
-                   parse_as_library: bool = False, development: bool = False) -> list[str]:
+                   parse_as_library: bool = False, development: bool = False,
+                   sparkle: Optional[Path] = None) -> list[str]:
+    """`sparkle` is the folder holding Sparkle.framework: the shell is compiled
+    against it and linked with a run-time search path to Contents/Frameworks."""
     command = ["xcrun", "swiftc", "-swift-version", "5", "-O",
                "-target", f"{arch}-apple-macos{SHELL_TARGET_MACOS}",
                "-module-cache-path", str(module_cache)]
     if parse_as_library:
         command.append("-parse-as-library")
+    if sparkle is not None:
+        command += ["-F", str(sparkle), "-framework", "Sparkle", "-Xlinker", "-rpath", "-Xlinker", FRAMEWORK_RPATH]
     if development:
         # Only a --dev app honours CATERVA_STUDIO_COMMAND and its siblings
         # (macos/Sources/StudioServer.swift); a release build is compiled
@@ -279,14 +330,14 @@ def build_page(root: Path = ROOT) -> None:
         _fail(f"the page build did not write {page} with its page marker")
 
 
-def compile_shell(work: Path, arch: str, cache: Path, development: bool = False) -> Path:
+def compile_shell(work: Path, arch: str, cache: Path, sparkle: Path, development: bool = False) -> Path:
     cache.mkdir(parents=True, exist_ok=True)
     binary = work / "Caterva"
     sources = sorted(SOURCES.glob("*.swift"))
     if not sources:
         _fail(f"no Swift sources under {SOURCES}")
     env = {**os.environ, "CLANG_MODULE_CACHE_PATH": str(cache)}
-    _run(swiftc_command(sources, binary, arch, cache, development=development), env=env)
+    _run(swiftc_command(sources, binary, arch, cache, development=development, sparkle=sparkle), env=env)
     return binary
 
 
@@ -314,7 +365,29 @@ def draw_icon(work: Path, arch: str, cache: Path, own_icns: bool = False) -> Pat
     return icns
 
 
-def assemble(app: Path, binary: Path, icns: Path, plist: bytes, frozen: Optional[Path]) -> None:
+def embed_sparkle(app: Path, sparkle: Path) -> None:
+    """Contents/Frameworks/Sparkle.framework, and Sparkle's LICENSE beside the other licences.
+
+    The XPC services are left out: they exist for a sandboxed app, which
+    Caterva is not (Sparkle's documentation says an app that is not sandboxed
+    can remove them), and each would be one more thing to seal.
+    """
+    contents = app / "Contents"
+    target = contents / SPARKLE_FRAMEWORK
+    target.parent.mkdir(exist_ok=True)
+    shutil.copytree(sparkle / "Sparkle.framework", target, symlinks=True)
+    for path in (target / "XPCServices", target / "Versions" / "B" / "XPCServices"):
+        if path.is_symlink():
+            path.unlink()
+        elif path.exists():
+            shutil.rmtree(path)
+    licenses = contents / "Resources" / "licenses"
+    licenses.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(sparkle / "LICENSE", licenses / "Sparkle-LICENSE.txt")
+
+
+def assemble(app: Path, binary: Path, icns: Path, plist: bytes, frozen: Optional[Path],
+             sparkle: Optional[Path] = None) -> None:
     if app.exists():
         shutil.rmtree(app)
     contents = app / "Contents"
@@ -326,13 +399,30 @@ def assemble(app: Path, binary: Path, icns: Path, plist: bytes, frozen: Optional
     shutil.copy2(icns, contents / "Resources" / "Caterva.icns")
     for name in RESOURCES:
         shutil.copy2(MACOS / "Resources" / name, contents / "Resources" / name)
+    if sparkle is not None:
+        embed_sparkle(app, sparkle)
     if frozen is not None:
         shutil.copytree(frozen, contents / "Resources" / "caterva", symlinks=True)
     _run(["plutil", "-lint", contents / "Info.plist"])
 
 
+def sparkle_code(app: Path) -> list[Path]:
+    """Sparkle's own code that exists in `app`, innermost first (a seal covers what is inside it)."""
+    version = app / "Contents" / SPARKLE_FRAMEWORK / "Versions" / "B"
+    found = [version / "Autoupdate", version / "Updater.app", app / "Contents" / SPARKLE_FRAMEWORK]
+    return [path for path in found if path.exists()]
+
+
 def seal(app: Path) -> None:
-    """An ad-hoc signature over the whole bundle; not a Developer ID."""
+    """An ad-hoc signature over the whole bundle; not a Developer ID.
+
+    Sparkle's helper tools and framework are sealed first, one by one, then
+    the app with --deep (which also seals the frozen folder's libraries, as
+    before). Every piece gets the same kind of signature, so the bundle
+    verifies as one.
+    """
+    for code in sparkle_code(app):
+        _run(["codesign", "--force", "--sign", "-", "--timestamp=none", code])
     _run(["codesign", "--force", "--deep", "--sign", "-", "--timestamp=none", app])
     _run(["codesign", "--verify", "--deep", "--strict", "--verbose=2", app])
 
@@ -350,6 +440,71 @@ def smoke(app: Path, environment: Optional[dict], require_page: bool) -> str:
     if result.returncode != 0 or not smoke_passed(result.stdout):
         _fail(f"Caterva --smoke failed (exit {result.returncode}); the app would open onto an error view")
     return result.stdout
+
+
+def updater_selftest(app: Path) -> None:
+    """`Caterva --updater-selftest`: the feed rules, and the plist keys the updater reads."""
+    command = [str(app / "Contents" / "MacOS" / "Caterva"), "--updater-selftest"]
+    print("$ " + " ".join(command), flush=True)
+    result = subprocess.run(command, capture_output=True, text=True, timeout=120)
+    sys.stdout.write(result.stdout)
+    sys.stderr.write(result.stderr)
+    if result.returncode != 0 or "caterva updater self-test: OK" not in result.stdout:
+        _fail(f"Caterva --updater-selftest failed (exit {result.returncode})")
+
+
+def make_zip(app: Path, out: Path, version: str, arch: str) -> Path:
+    """The update archive: `ditto -c -k --keepParent`, as Sparkle's documentation advises for an app.
+
+    ditto keeps the symbolic links inside Sparkle.framework and the frozen
+    folder, which a plain `zip` would flatten or break.
+    """
+    archive = out / zip_name(version, arch)
+    if archive.exists():
+        archive.unlink()
+    with step("make the update archive (ditto)"):
+        _run(["ditto", "-c", "-k", "--keepParent", app, archive])
+    with step("verify the update archive (unpack it and check the seal)"):
+        verify_zip(archive, version)
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    (out / (archive.name + ".sha256")).write_text(f"{digest}  {archive.name}\n", encoding="utf-8")
+    print(f"zip    : {archive} ({archive.stat().st_size / 1e6:.1f} MB)\nsha256 : {digest}")
+    return archive
+
+
+def zip_problems(archive: Path, version: str) -> list[str]:
+    """What is wrong with an update archive, read from its listing (no unpacking)."""
+    problems = []
+    with zipfile.ZipFile(archive) as bundle:
+        names = bundle.namelist()
+        if not names or any(not name.startswith("Caterva.app/") for name in names):
+            problems.append(f"{archive.name} must hold Caterva.app and nothing beside it")
+        try:
+            plist = plistlib.loads(bundle.read("Caterva.app/Contents/Info.plist"))
+        except KeyError:
+            problems.append(f"{archive.name} has no Caterva.app/Contents/Info.plist")
+        else:
+            if plist.get("CFBundleShortVersionString") != version:
+                problems.append(f"{archive.name} carries version {plist.get('CFBundleShortVersionString')!r}, not {version!r}")
+            for key in UPDATE_PLIST_KEYS:
+                if key not in plist:
+                    problems.append(f"{archive.name}'s Info.plist lacks {key}")
+        if "Caterva.app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle" not in names:
+            problems.append(f"{archive.name} does not carry Sparkle.framework")
+    return problems
+
+
+def verify_zip(archive: Path, version: str) -> None:
+    problems = zip_problems(archive, version)
+    if problems:
+        _fail("; ".join(problems))
+    with tempfile.TemporaryDirectory(prefix="caterva-zip-") as tmp:
+        _run(["ditto", "-x", "-k", archive, tmp])
+        app = Path(tmp) / "Caterva.app"
+        _run(["codesign", "--verify", "--deep", "--strict", "--verbose=2", app])
+        marked = subprocess.run(["xattr", "-lr", str(app)], capture_output=True, text=True).stdout
+        if "com.apple.quarantine" in marked:
+            _fail("the unpacked archive carries a quarantine mark; it should not have been made with one")
 
 
 def make_dmg(app: Path, out: Path, version: str, arch: str) -> Path:
@@ -410,6 +565,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--no-smoke", action="store_true", help="skip Caterva --smoke (a sandbox that cannot bind ports)")
     parser.add_argument("--allow-no-page", action="store_true", help="--dev: accept a checkout whose page is not built")
     parser.add_argument("--dmg", action="store_true", help="also make the DMG (not with --dev)")
+    parser.add_argument("--zip", action="store_true", help="also make the update archive Sparkle downloads (not with --dev)")
+    parser.add_argument("--update-feed", metavar="URL", help="TEST ONLY: replace SUFeedURL (an update test against a local feed); "
+                        "a release is never built with it")
+    parser.add_argument("--update-public-key", metavar="BASE64", help="TEST ONLY: replace SUPublicEDKey with a test key's public half")
+    parser.add_argument("--sparkle", metavar="DIR", help="the unpacked Sparkle distribution (default: fetch the pinned "
+                        "release into dist/sparkle with scripts/fetch_sparkle.py)")
     parser.add_argument("--own-icns", action="store_true",
                         help="use the icon tool's own .icns, not iconutil's (where iconutil cannot run)")
     parser.add_argument("--module-cache", help="keep swiftc's module cache here between builds "
@@ -417,8 +578,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     _need_macos()
-    if args.dev and args.dmg:
-        _fail("a development app is never put in a DMG")
+    if args.dev and (args.dmg or args.zip):
+        _fail("a development app is never put in a DMG or an update archive")
     version = package_version()
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -454,9 +615,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if require_page and not page.is_file():
             _fail(f"{page} is missing; build the page or pass --allow-no-page")
 
+    with step("get the pinned Sparkle (SHA-256 checked)"):
+        if args.sparkle:
+            sparkle = Path(args.sparkle).resolve()
+            lacking = fetch_sparkle.missing_files(sparkle)
+            if lacking:
+                _fail(f"--sparkle {sparkle} lacks {', '.join(lacking)}")
+        else:
+            sparkle = fetch_sparkle.fetch(ROOT / "dist" / "sparkle")
+
     template = (MACOS / "Info.plist").read_text(encoding="utf-8")
     try:
-        plist = render_info_plist(template, version, args.build_number, environment)
+        overrides = {}
+        if args.update_feed:
+            overrides["SUFeedURL"] = args.update_feed
+        if args.update_public_key:
+            overrides["SUPublicEDKey"] = args.update_public_key
+        plist = render_info_plist(template, version, args.build_number, environment, overrides)
     except ValueError as exc:
         _fail(str(exc))
 
@@ -466,19 +641,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         # naming one cache make it load each module twice and crash.
         cache = Path(os.path.abspath(args.module_cache)) if args.module_cache else work / "module-cache"
         with step("compile the Swift shell (swiftc)"):
-            binary = compile_shell(work, args.arch, cache, development=args.dev)
+            binary = compile_shell(work, args.arch, cache, sparkle, development=args.dev)
         with step("draw the icon"):
             icns = draw_icon(work, args.arch, cache, own_icns=args.own_icns)
         app = out / "Caterva.app"
         with step("assemble Caterva.app"):
-            assemble(app, binary, icns, plist, frozen)
+            assemble(app, binary, icns, plist, frozen, sparkle)
     with step("seal the bundle with an ad-hoc signature (codesign)"):
         seal(app)
     print(f"app    : {app}")
 
+    with step("run Caterva --updater-selftest on the assembled bundle"):
+        updater_selftest(app)
     if not args.no_smoke:
         with step("run Caterva --smoke on the assembled bundle"):
             smoke(app, environment, require_page)
+    if args.zip:
+        make_zip(app, out, version, args.arch)
     if args.dmg:
         make_dmg(app, out, version, args.arch)
     return 0

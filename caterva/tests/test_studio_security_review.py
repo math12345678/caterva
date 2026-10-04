@@ -1327,9 +1327,21 @@ def test_s11_swift_typechecks_with_the_build_flags(tmp_path):
 
     if platform.system() != "Darwin" or shutil.which("xcrun") is None:
         pytest.skip("swiftc is only on macOS")
+    # The shell imports Sparkle, so the type-check needs the pinned distribution
+    # (python3 scripts/fetch_sparkle.py --out dist/sparkle) or CATERVA_SPARKLE_DIR.
+    import sys
+
+    repo = SWIFT_DIR.parents[1]
+    sys.path.insert(0, str(repo / "scripts"))
+    import fetch_sparkle
+
+    sparkle_dir = Path(os.environ.get("CATERVA_SPARKLE_DIR") or repo / "dist" / "sparkle" / f"Sparkle-{fetch_sparkle.SPARKLE_VERSION}")
+    if fetch_sparkle.missing_files(sparkle_dir):
+        pytest.skip(f"Sparkle is not unpacked at {sparkle_dir}; run python3 scripts/fetch_sparkle.py --out dist/sparkle")
     sources = sorted(str(p) for p in SWIFT_DIR.glob("*.swift"))
     for flags in ([], ["-D", "CATERVA_DEVELOPMENT"]):
         done = subprocess.run(["xcrun", "swiftc", "-typecheck", "-swift-version", "5", "-target",
-                               "arm64-apple-macos12.0", "-module-cache-path", str(tmp_path / "modules"), *flags,
+                               "arm64-apple-macos12.0", "-module-cache-path", str(tmp_path / "modules"),
+                               "-F", str(sparkle_dir), *flags,
                                *sources], capture_output=True, text=True, timeout=900)
         assert done.returncode == 0, done.stderr[-2000:]

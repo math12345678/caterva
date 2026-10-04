@@ -251,6 +251,33 @@ WHAT IS ACTUALLY DISTRIBUTED, AS OF v0.3.0 (2026-09-21)
   "Open Anyway" approves one file and not the libraries). Signing needs a
   certificate the repository does not hold and is the owner's to obtain.
 
+  2a. CATERVA.APP (since v0.5.0) is a further artifact, not covered by the
+  numbered list above because it is built by `.github/workflows/studio-dmg.yml`
+  and attached as a DMG and, from v0.5.1, as an update archive (a zip of the
+  same Caterva.app). It conveys the frozen folder of item 2 whole, with its
+  licences, and one more library, Sparkle, below. The licence texts are
+  inside the app (Help, Licences).
+
+  Sparkle 2.10.0 (macOS app updater), since v0.5.1. MIT. Copyright (c)
+  2006-2013 Andy Matuschak; (c) 2009-2013 Elgato Systems GmbH; (c) 2011-2014
+  Kornel Lesinski; (c) 2015-2017 Mayur Pawashe; (c) 2014 C.W. Betts; (c) 2014
+  Petroules Corporation; (c) 2014 Big Nerd Ranch. MIT grants use, copy,
+  modification, distribution and sale on condition that the notice is kept
+  in all copies. Sparkle's LICENSE file also carries the notices of the
+  components compiled into it, which are conveyed with it:
+    bsdiff and bspatch   BSD-2-Clause, Copyright 2003-2005 Colin Percival
+    sais-lite            MIT, Copyright (c) 2008-2010 Yuta Mori
+    Ed25519 (orlp)       zlib licence, Copyright (c) 2015 Orson Peters
+    SUSignatureVerifier  BSD-2-Clause, Copyright (c) 2011 Mark Hamlin
+  Nothing of Sparkle is vendored into this repository. `scripts/fetch_sparkle.py`
+  downloads the project's release archive (Sparkle-2.10.0.tar.xz) and refuses
+  it unless its SHA-256 is c2bf58aa8387266ac179357b1415d6f2635f044da8be41042af32425dae6da0c;
+  `scripts/build_studio_app.py` embeds the framework unmodified (without its
+  XPC services, which only a sandboxed app uses) and copies its LICENSE to
+  Caterva.app/Contents/Resources/licenses/Sparkle-LICENSE.txt.
+  `scripts/check_release_artifacts.py` fails if the workflows embed Sparkle
+  and this paragraph does not name it.
+
   3. THE SOURCE ARCHIVES GitHub attaches to every release are copies of the
   tagged tree: Caterva's own files only, no dependency.
 
@@ -310,7 +337,10 @@ sections is authoritative has been given less than one section would.)
 Caterva does not vendor, copy or modify any of the software below. It
 imports each as a separately-installed package through its public API. No
 file in this repository carries a third-party copyright header, and there
-is no vendor/ or third_party/ tree.
+is no vendor/ or third_party/ tree. (Sparkle, which Caterva.app embeds as its
+updater, is the one library that is not imported through a package manager:
+it is downloaded at build time against a pinned SHA-256 and conveyed in the
+app unmodified; see item 2a above.)
 
 libRoadRunner  --  Apache License 2.0
 -------------------------------------

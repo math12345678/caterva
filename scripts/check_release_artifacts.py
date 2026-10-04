@@ -46,6 +46,21 @@ It does NOT try to decide whether the obligations are met. That needs a
 lawyer and a look at the actual artifact. It fails the build with a pointer
 to what must be done, which is the honest limit of what a regex can offer.
 
+IN-APP UPDATES (Sparkle)
+------------------------
+Caterva.app updates itself. Three things about that are worth a guard:
+
+  * Sparkle is conveyed inside the app, so NOTICE must name it, its pinned
+    version and the licences it carries (`sparkle_notice_problems`).
+  * The update archive is signed with an EdDSA key held as the repository
+    secret SPARKLE_ED_PRIVATE_KEY. Only release.yml may name it, never in a
+    workflow that runs for pull requests, never at workflow or job level
+    (only the one step that signs), never on a command line or echoed, and
+    the signing step must FAIL when it is empty: an unsigned update is never
+    published (`secret_use_problems`).
+  * release.yml must publish the archive and appcast.xml, or the app has
+    nothing to update from (`update_publication_problems`).
+
 WHAT IT DOES NOT CHECK
 ----------------------
 Publishing done outside CI -- someone running `docker push` from a laptop --
@@ -63,7 +78,7 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 REPO = Path(__file__).resolve().parent.parent
 WORKFLOWS = REPO / ".github" / "workflows"
@@ -87,6 +102,13 @@ REQUIRED_IN_NOTICE = [
     "LGPL-2.1",
     "conveyance",
 ]
+
+SECRET_NAME = "SPARKLE_ED_PRIVATE_KEY"
+SIGNING_WORKFLOW = "release.yml"
+#: What NOTICE must say about Sparkle: the library and the components whose
+#: notices its LICENSE carries.
+SPARKLE_NOTICE_TERMS = ["Sparkle", "bsdiff", "sais-lite", "Ed25519", "SUSignatureVerifier", "MIT"]
+FETCH_SPARKLE = REPO / "scripts" / "fetch_sparkle.py"
 
 
 def publishing_steps() -> List[str]:
@@ -114,6 +136,87 @@ def notice_has_conveyance_section() -> bool:
         return False
     text = NOTICE.read_text(encoding="utf-8")
     return all(token.lower() in text.lower() for token in REQUIRED_IN_NOTICE)
+
+
+def pinned_sparkle_version(text: str) -> str:
+    match = re.search(r'^SPARKLE_VERSION = "([^"]+)"$', text, re.M)
+    return match.group(1) if match else ""
+
+
+def sparkle_notice_problems(notice: str, fetch_text: str, embeds_sparkle: bool) -> List[str]:
+    """NOTICE must name Sparkle, its pinned version and its components, once the app embeds it."""
+    if not embeds_sparkle:
+        return []
+    problems = []
+    version = pinned_sparkle_version(fetch_text)
+    if not version:
+        problems.append("scripts/fetch_sparkle.py has no SPARKLE_VERSION line")
+    elif f"Sparkle {version}" not in notice:
+        problems.append(f"NOTICE does not name the pinned Sparkle {version}")
+    for term in SPARKLE_NOTICE_TERMS:
+        if term not in notice:
+            problems.append(f"NOTICE does not mention {term}, which Sparkle's LICENSE covers")
+    return problems
+
+
+def secret_use_problems(workflows: Dict[str, str]) -> List[str]:
+    """How the update-signing secret is used across workflow files (name -> text)."""
+    import yaml  # CI installs it for check_ci_toolchain.py
+
+    problems: List[str] = []
+    for name, text in sorted(workflows.items()):
+        code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+        if re.search(r"^\s*pull_request_target\s*:|\[[^\]]*pull_request_target", code, re.M):
+            problems.append(f"{name}: uses pull_request_target")
+        if SECRET_NAME not in code:
+            continue
+        if name != SIGNING_WORKFLOW:
+            problems.append(f"{name}: names {SECRET_NAME}; only {SIGNING_WORKFLOW} may")
+            continue
+        if re.search(r"^\s*pull_request\s*:|\[[^\]]*pull_request\b", code, re.M):
+            problems.append(f"{name}: runs for pull requests and names {SECRET_NAME}")
+        document = yaml.safe_load(text) or {}
+        if SECRET_NAME in str(document.get("env", {})):
+            problems.append(f"{name}: {SECRET_NAME} is set at workflow level; only the signing step may set it")
+        for job_id, job in (document.get("jobs") or {}).items():
+            if SECRET_NAME in str(job.get("env", {})):
+                problems.append(f"{name}: job {job_id} sets {SECRET_NAME} for every step; only the signing step may")
+            if job.get("permissions", {}) not in ({"contents": "read"}, {}) and SECRET_NAME in str(job):
+                problems.append(f"{name}: job {job_id} holds the secret with permissions {job.get('permissions')}")
+        if not re.search(r'-z "\$\{%s:-\}"' % SECRET_NAME, code):
+            problems.append(f"{name}: no check that {SECRET_NAME} is set before signing")
+        if not re.search(r"sign_update[^\n]*--ed-key-file -(\s|$)", code):
+            problems.append(f"{name}: sign_update is not given the key on stdin (--ed-key-file -)")
+        if re.search(r"sign_update[^\n]*\s(-s|--private-key)\s", code):
+            problems.append(f"{name}: sign_update is given a key on its command line")
+        if re.search(r"echo[^\n]*\$\{?%s" % SECRET_NAME, code) or re.search(r"set -[a-z]*x|xtrace", code):
+            problems.append(f"{name}: the secret could be echoed (echo or set -x)")
+    return problems
+
+
+def update_publication_problems(release: str) -> List[str]:
+    """release.yml must publish the update archive and its appcast, and say so in SHA256SUMS."""
+    problems = []
+    for needle, why in (
+        ("Caterva-*-macos-arm64.zip", "the update archive is not required among the staged artifacts"),
+        ("appcast.xml", "appcast.xml is not published"),
+        ("update-feed", "there is no update-feed job"),
+        ("*.zip *.dmg *.tsv appcast.xml", "SHA256SUMS does not cover the zip and appcast.xml"),
+    ):
+        if needle not in release:
+            problems.append(f"release.yml: {why}")
+    return problems
+
+
+def update_problems() -> List[str]:
+    workflows = {w.name: w.read_text(encoding="utf-8") for w in sorted(WORKFLOWS.glob("*.y*ml"))} if WORKFLOWS.is_dir() else {}
+    embeds = any("fetch_sparkle" in text for text in workflows.values())
+    notice = NOTICE.read_text(encoding="utf-8") if NOTICE.exists() else ""
+    fetch_text = FETCH_SPARKLE.read_text(encoding="utf-8") if FETCH_SPARKLE.exists() else ""
+    problems = sparkle_notice_problems(notice, fetch_text, embeds) + secret_use_problems(workflows)
+    if embeds and SIGNING_WORKFLOW in workflows:
+        problems += update_publication_problems(workflows[SIGNING_WORKFLOW])
+    return problems
 
 
 def selftest() -> int:
@@ -159,6 +262,35 @@ def selftest() -> int:
             "build the moment publishing were added. Add it to NOTICE."
         )
 
+    # The update guards must be capable of saying no.
+    good = (
+        "on:\n  push:\n    tags: ['v*']\njobs:\n  feed:\n    runs-on: macos-14\n    permissions:\n      contents: read\n"
+        "    steps:\n      - shell: bash\n        env:\n          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}\n"
+        "        run: |\n          if [ -z \"${SPARKLE_ED_PRIVATE_KEY:-}\" ]; then exit 1; fi\n"
+        "          printf '%s' \"$K\" | tools/sign_update --ed-key-file - a.zip\n"
+    )
+    if secret_use_problems({"release.yml": good}):
+        failures.append(f"a correct signing workflow was refused: {secret_use_problems({'release.yml': good})}")
+    for label, bad in (
+        ("a pull_request trigger", good.replace("push:\n    tags: ['v*']", "pull_request:\n    branches: [main]")),
+        ("a job-level secret", good.replace("    runs-on: macos-14\n", "    runs-on: macos-14\n    env:\n      SPARKLE_ED_PRIVATE_KEY: x\n")),
+        ("a key on the command line", good.replace("--ed-key-file -", "-s \"$K\"")),
+        ("no missing-secret check", good.replace("-z", "-n")),
+        ("an echoed secret", good.replace("printf", "echo $SPARKLE_ED_PRIVATE_KEY; printf")),
+    ):
+        if not secret_use_problems({"release.yml": bad}):
+            failures.append(f"should have refused ({label}), did not")
+    if not secret_use_problems({"tests.yml": good}):
+        failures.append("should have refused the secret in a workflow other than release.yml")
+    if not secret_use_problems({"x.yml": "on:\n  pull_request_target:\n"}):
+        failures.append("should have refused pull_request_target")
+    if not sparkle_notice_problems("nothing here", 'SPARKLE_VERSION = "9.9.9"\n', True):
+        failures.append("NOTICE without Sparkle should have been refused")
+    if sparkle_notice_problems("nothing here", "", False):
+        failures.append("a tree that does not embed Sparkle needs no Sparkle notice")
+    if not update_publication_problems("name: Release\n"):
+        failures.append("a release.yml that publishes no update archive should have been refused")
+
     if failures:
         print("SELFTEST FAILED:")
         for failure in failures:
@@ -178,6 +310,13 @@ def main() -> int:
         return selftest()
 
     steps = publishing_steps()
+
+    update = update_problems()
+    if update:
+        print("FAIL: the in-app update arrangement is not consistent:")
+        for problem in update:
+            print(f"  - {problem}")
+        return 1
 
     if not steps:
         print(
