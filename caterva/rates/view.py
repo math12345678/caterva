@@ -321,8 +321,7 @@ def cautions(analysis: Analysis) -> Dict[str, Any]:
             for finding in (det.findings if det else []):
                 add(group, law.law.name, "undetermined", finding,
                     move or "Measure over a wider range of substrate concentrations, at the end the sentence names.")
-            if move:
-                better.append(move)
+
             lof = law.lack_of_fit
             if lof is not None and lof.p is not None and lof.p < sig:
                 add(group, law.law.name, "lack-of-fit", lof.sentence(sig),
@@ -358,9 +357,11 @@ def cautions(analysis: Analysis) -> Dict[str, Any]:
         if verdict is not None:
             for sentence in verdict.advice:
                 better.append(sentence)
+    # What to change is said once: a line already given under a caution is not repeated below the list.
+    changes = {c["change"] for c in found if c["change"]}
     seen_better: List[str] = []
     for line in better:
-        if line not in seen_better:
+        if line not in seen_better and line not in changes:
             seen_better.append(line)
     return {"cautions": found, "better": seen_better[:4]}
 

@@ -94,8 +94,9 @@ starts, answers its API, and serves a short "the page is not built" page
 saying how to build it. You get the page in one of two ways: the macOS app
 from the DMG (Apple silicon, macOS 14 or later) carries it, and in a
 checkout `make studio-page` builds it (Node 22 and pnpm needed) and `make
-studio` builds it and opens it. There is no Rates screen yet; `caterva rates`
-works in the terminal, below.
+studio` builds it and opens it. The Rates screen takes a table of your own initial rates
+to a figure and a methods paragraph; `caterva rates` is the same fit in the
+terminal, below.
 
 What you will see:
 
@@ -1888,6 +1889,13 @@ rates, one row per point and units in the headers; `--export methods` a
 methods paragraph naming the law, the weighting, the interval method, the
 references and the software versions. Exit codes are compose's: `0` done,
 `2` malformed question, `3` refused and said why, `1` a crash.
+
+The same fit is a screen in Caterva Studio (Rates): drop a CSV or paste cells
+from a spreadsheet, check how the table was read, and the run is this command
+on the table the screen writes into the run's bundle as `dataset.csv`, so
+`caterva rates dataset.csv ...` in that folder gives the screen's numbers to
+the last digit. The screen adds a figure, tables and a methods paragraph; the
+guide is `docs/studio/USING_STUDIO.md`, "Fitting your own rates".
 
 ---
 

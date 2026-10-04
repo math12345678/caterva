@@ -369,15 +369,17 @@ def _detect_roles(headers: List[Tuple[str, Optional[str]]], numeric: List[bool],
 # ---------------------------------------------------------------------------
 
 
-def _unit_info(role: str, column: str, given: Optional[str]) -> Dict[str, Any]:
+def _unit_info(role: str, column: str, given: Optional[str], headerless: bool = False) -> Dict[str, Any]:
     """The engine's reading of a unit: kind and convertibility, or the
     refusal in the engine's own words."""
     from caterva.rates.table import UnitRefused, read_unit
 
     if not given:
         return {"given": None, "text": None, "kind": None, "convertible": False,
-                "problem": f"the {role} column {column!r} has no unit: name it below, or write it "
-                           f"in the header as '{column} (mM)'"}
+                "problem": (f"the {role} column ({column}) has no unit: name it in the unit box below"
+                            if headerless else
+                            f"the {role} column {column!r} has no unit: name it in the unit box below, or "
+                            f"write it in the header as '{column} (mM)'")}
     text, changed = normalise_unit(given)
     try:
         cu = read_unit(column, text, role)
@@ -933,7 +935,7 @@ def _resolve_units(unit_text: Dict[str, Optional[str]], roles: Mapping[str, Any]
             decisions.append(f"The sigma column {name!r} has no unit; the standard deviation of a rate is in "
                              f"the rate's unit, {unit_text['rate']}, and was read as that.")
             text_ = unit_text["sigma"] = unit_text["rate"]
-        info = _unit_info(role, name, text_)
+        info = _unit_info(role, name, text_, headerless=header_line is None)
         unit_info[role] = info
         if info.get("note"):
             decisions.append(info["note"][0].upper() + info["note"][1:] + ".")

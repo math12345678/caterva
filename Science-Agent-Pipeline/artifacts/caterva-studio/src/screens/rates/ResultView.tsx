@@ -42,6 +42,7 @@ import { TextReport } from "@/components/report/Report";
 import { Section } from "@/components/screen/Screen";
 import { DataTable } from "@/components/table/DataTable";
 import { describeError } from "@/lib/errors";
+import { plain } from "@/lib/copy";
 import { formatNumber } from "@/lib/format";
 import { notify } from "@/lib/toast";
 
@@ -77,10 +78,10 @@ export function ReadFirst({ cautions, better }: { cautions: RatesCaution[]; bett
                 {KIND_LABEL[c.kind] ?? c.kind}
                 {where(c.group, c.law) ? <span className="font-mono muted"> {where(c.group, c.law)}</span> : null}
               </p>
-              <p>{c.text}</p>
+              <p>{plain(c.text)}</p>
               {c.change ? (
                 <p className="r-change">
-                  <strong>What to change:</strong> {c.change}
+                  <strong>What to change:</strong> {plain(c.change)}
                 </p>
               ) : null}
             </li>
@@ -92,7 +93,7 @@ export function ReadFirst({ cautions, better }: { cautions: RatesCaution[]; bett
           {cautions.length ? <h4 className="r-minor">What would make this better</h4> : null}
           <ul>
             {better.map((b, i) => (
-              <li key={i}>{b}</li>
+              <li key={i}>{plain(b)}</li>
             ))}
           </ul>
         </div>
@@ -110,20 +111,20 @@ export function Support({ result }: { result: RatesResult }) {
           {c.group ? <h4 className="r-minor">{c.group}</h4> : null}
           <ul>
             {c.verdict.length ? (
-              c.verdict.map((s, i) => <li key={i}>{s}</li>)
+              c.verdict.map((s, i) => <li key={i}>{plain(s)}</li>)
             ) : (
               <li>
                 {c.laws.find((l) => l.status === "reported")?.title ?? "One law"} was the law asked for; no other law was fitted or tested.
               </li>
             )}
             {c.to_decide.map((s, i) => (
-              <li key={`d${i}`}>To decide: {s}</li>
+              <li key={`d${i}`}>To decide: {plain(s)}</li>
             ))}
           </ul>
         </div>
       ))}
       <p className="r-sigma">
-        <strong>Uncertainty of each rate:</strong> {result.sigma.description}. {result.sigma.why}
+        <strong>Uncertainty of each rate:</strong> {plain(result.sigma.description)}. {result.sigma.why}
       </p>
     </div>
   );
@@ -207,7 +208,7 @@ export function ParameterTable({ rows, turnover, basis, refused }: { rows: Rates
           <p className="r-basis">kcat is the fitted Vmax divided by the enzyme concentration you gave, taken as exact: its interval is Vmax&apos;s and carries no uncertainty in that concentration.</p>
         </>
       ) : null}
-      {refused ? <p className="r-refusal-inline">kcat was not computed: {refused}</p> : null}
+      {refused ? <p className="r-refusal-inline">kcat was not computed: {plain(refused)}</p> : null}
     </div>
   );
 }
@@ -219,9 +220,9 @@ export function LackOfFit({ rows }: { rows: RatesResult["lack_of_fit"] }) {
         <li key={i} data-failed={r.failed ? "true" : undefined}>
           <p>
             {r.group ? <strong>{r.group}, </strong> : null}
-            <strong>{r.title}.</strong> {r.sentence}
+            <strong>{r.title}.</strong> {plain(r.sentence)}
           </p>
-          <p className="r-trust">{r.trust}</p>
+          <p className="r-trust">{plain(r.trust)}</p>
         </li>
       ))}
     </ul>
@@ -267,7 +268,7 @@ export function ModelComparison({ comparison }: { comparison: RatesComparison[] 
           ) : null}
           {c.described.map((d, i) => (
             <p key={i} className="r-basis">
-              {d}
+              {plain(d)}
             </p>
           ))}
           <p className="r-basis">{c.note} Ruled out means p below {c.significance}, a convention; every p is shown so another can be applied.</p>
@@ -294,7 +295,7 @@ export function GroupsBlock({ groups }: { groups: NonNullable<RatesResult["group
       />
       <ul>
         {groups.sentences.map((s, i) => (
-          <li key={i}>{s}</li>
+          <li key={i}>{plain(s)}</li>
         ))}
       </ul>
     </div>
@@ -304,7 +305,7 @@ export function GroupsBlock({ groups }: { groups: NonNullable<RatesResult["group
 export function LiteratureBlock({ rows, refused }: { rows: RatesLiterature[]; refused: string | null }) {
   return (
     <div className="r-literature">
-      {refused ? <p className="r-refusal-inline">Not compared: {refused}</p> : null}
+      {refused ? <p className="r-refusal-inline">Not compared: {plain(refused)}</p> : null}
       {rows.map((r, i) => (
         <article key={i} className="r-lit-row">
           <p className="r-lit-head">
@@ -314,7 +315,7 @@ export function LiteratureBlock({ rows, refused }: { rows: RatesLiterature[]; re
             </span>{" "}
             <span className="muted">{r.law}</span>
           </p>
-          <p>{r.sentence}</p>
+          <p>{plain(r.sentence)}</p>
           {r.found && r.cited ? (
             <p className="r-lit-cited">
               Cited: <Value v={r.cited} /> {r.organism ? <span className="muted">in {r.organism}</span> : null}
@@ -331,12 +332,12 @@ export function LiteratureBlock({ rows, refused }: { rows: RatesLiterature[]; re
               <span className="font-mono">{r.cited_unit}</span>, fitted from your data
             </p>
           ) : null}
-          {r.conditional ? <p className="r-note">{r.conditional}.</p> : null}
-          {r.spread_text ? <p className="r-note">{r.spread_text}</p> : null}
-          {r.evidence_against ? <p className="r-note">{r.evidence_against}.</p> : null}
+          {r.conditional ? <p className="r-note">{plain(r.conditional)}.</p> : null}
+          {r.spread_text ? <p className="r-note">{plain(r.spread_text)}</p> : null}
+          {r.evidence_against ? <p className="r-note">{plain(r.evidence_against)}.</p> : null}
           {r.concerns.map((c, k) => (
             <p key={k} className="r-note">
-              {c}
+              {plain(c)}
             </p>
           ))}
           {r.commentary ? <p className="r-note">Row commentary: {r.commentary}</p> : null}

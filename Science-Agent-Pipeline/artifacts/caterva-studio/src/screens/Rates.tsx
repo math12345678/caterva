@@ -88,7 +88,9 @@ function RatesWorkbench() {
   const run = useRun("rates", reopened);
   const query = useTablePreview(source?.text ?? null, source?.filename ?? null, overrides);
   const preview = source ? query.data : undefined;
-  const mapping = preview?.mapping ?? overrides;
+  // Once the person has changed anything, what they asked for is the mapping, so a second quick change builds
+  // on the first instead of on the server's older answer; until then it is the server's own reading.
+  const mapping = Object.keys(overrides).length ? overrides : (preview?.mapping ?? {});
   const running = run.submitting || run.status === "queued" || run.status === "running";
   const set = <K extends keyof FitForm>(key: K, value: FitForm[K]) => setForm((f) => ({ ...f, [key]: value }));
   const err = (field: string) => fieldError(run.requestError, field);

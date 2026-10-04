@@ -1,0 +1,50 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "/api/rates/preview",
+  "body": {
+   "text": "PK\u0003\u0004\u0014\u0000\u0000\u0000\b\u0000 a spreadsheet saved as a workbook\u0000\u0000",
+   "filename": "workbook.xlsx"
+  }
+ },
+ "status": 200,
+ "body": {
+  "ok": false,
+  "ready": false,
+  "refusal": "the text contains a NUL byte, so it is not a text table (a spreadsheet saved as .xlsx, or another binary file). Save it as CSV or TSV (UTF-8) and drop that.",
+  "bytes": 46,
+  "lines": 0,
+  "filename": "workbook.xlsx",
+  "shape": null,
+  "format": null,
+  "columns": [],
+  "mapping": {},
+  "units": {},
+  "decisions": [],
+  "problems": [
+   {
+    "line": null,
+    "column": null,
+    "severity": "blocking",
+    "message": "the text contains a NUL byte, so it is not a text table (a spreadsheet saved as .xlsx, or another binary file). Save it as CSV or TSV (UTF-8) and drop that."
+   }
+  ],
+  "problems_total": 1,
+  "preview": {
+   "headers": [],
+   "rows": [],
+   "shown": 0,
+   "total": 0
+  },
+  "summary": null,
+  "canonical": null,
+  "sigma_options": null,
+  "group_column": null,
+  "column_names": {},
+  "units_needed": false,
+  "limits": {
+   "bytes": 524288,
+   "rows": 2000
+  }
+ }
+}

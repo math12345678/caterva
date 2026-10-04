@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "155 test files -- kinetics & Michaelis-Menten correctness, " +
+          "158 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -223,8 +223,14 @@ export const TEST_SUITES: TestSuite[] = [
         // test_enzyme_source.py, both passing): 6074. Then the certificate
         // fix for the packaged app: 12 tests in test_tls.py, all passing in
         // a focused run on the branch (2026-10-04), which also ran the 743
-        // other studio, app and complex tests it could affect: 6086.
-        passed: 6086,
+        // other studio, app and complex tests it could affect: 6086. Then the
+        // Rates screen's Python side: 149 tests: 103 in three new files
+        // (test_rates_cli_unchanged.py 17, test_rates_ingest.py 41,
+        // test_studio_rates.py 45) and the rest the contract mirror's
+        // per-shape cases for the new Rates shapes, all passing in focused
+        // runs on the branch (2026-10-04):
+        // 6235 as CI collects it with stdpopsim hidden.
+        passed: 6235,
         skipped: 1,
         failed: 0,
       },

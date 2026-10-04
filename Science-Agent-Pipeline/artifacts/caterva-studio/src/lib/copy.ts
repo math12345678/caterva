@@ -112,6 +112,15 @@ const FLAG_FIELD: Record<string, string> = {
   replicas: "Replicas",
   out: "the output folder",
   end: "the end time",
+  model: "the rate law",
+  "sigma-from": "the source of uncertainty",
+  "error-model": "the error model",
+  level: "the confidence level",
+  significance: "the significance level",
+  group: "the group column",
+  "show-linearizations": "the straight-line plots",
+  "substrate-column": "the substrate column",
+  "rate-column": "the rate column",
 };
 
 type Rewrite = string | ((match: string, ...groups: string[]) => string);

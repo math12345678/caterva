@@ -28,6 +28,7 @@ CLI's for real inputs.
 | Compose | `caterva compose` | The verdict and the worst thing wrong with the model first, then where every constant came from, the time course, influence, steady states, sweeps and each requested analysis |
 | Constants | `scripts/cite.py` (a copy of it rides in the wheel and the app, in `caterva/_literature/`) | Every BRENDA row the resolver read for a constant, with its reference, organism, conditions and the row's own words |
 | Stochastic | `caterva sim ssa` | One exact trajectory beside the ODE expectation, with its seed |
+| Rates | `caterva rates` | Your own initial rates fitted: the figure, the constants with profile intervals, which rate law the data support, and a methods paragraph |
 | Binding | `caterva bind` | Each cited Ki turned into a ΔG°bind band, with the method and each row's temperature |
 | Structures | `caterva structure` | PDB entries for an EC number or enzyme name, grouped by protein, and the chosen entry in 3D |
 | Prepare | `caterva prepare` | What is wrong with an entry before it is simulated, ranked by distance to the active site |
@@ -37,13 +38,12 @@ CLI's for real inputs.
 | Settings | | Theme, runs at once, offline mode, the GROMACS program, the workspace folder |
 | About | | How a number's kind is decided, the data sources and their licences, how to cite them |
 
-**There is no Rates screen yet.** `caterva rates` exists and works from the
-command line (`caterva rates --help`, and the section "Fitting your own rates"
-in [USING_CATERVA.md](../USING_CATERVA.md)), but Studio has not been given a
-screen for it. `/rates` is reserved: the page shows it only when
-`/api/capabilities` reports a `rates` kind as available, and the server's
-`rates` adapter does not exist, so today the address says the screen is not
-in this installation, and why.
+**Rates starts from your own measurements.** Drop a CSV, TSV or text file on
+the Rates screen (or choose one, or paste the cells from a spreadsheet), check
+how it was read, choose what to fit, and get a figure, a table of constants
+with profile intervals, the lack-of-fit test, the rate laws compared and a
+methods paragraph, as files you can put in a lab report. The guide is
+[USING_STUDIO.md](USING_STUDIO.md), "Fitting your own rates".
 
 ## Run it from a checkout
 
@@ -186,8 +186,9 @@ says so. Two routes work:
 - The DMG is built for Apple silicon (arm64) only. The page and the server
   run on Linux and Windows through `caterva studio` in a browser; there is
   no native window there.
-- Studio has no Rates screen: `caterva rates` is in the command line, and
-  its Studio screen is reserved and hidden until an adapter for it exists.
+- The Rates screen has not been tried on a real laboratory's tables beyond
+  R's Puromycin data and formats of its values: see "What is weak" in
+  USING_STUDIO.md.
 - The 3D viewer draws a C-alpha trace with highlighted side chains on a 2D
   canvas. It does not draw cartoons or surfaces, and it does not label
   residues on the canvas itself (the list and the side panel name them).

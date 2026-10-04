@@ -134,14 +134,15 @@ def test_the_studio_and_the_command_give_the_same_numbers_for_every_constant(pur
     outcome, work, _r, argv = puromycin
     code, out, _ = cli_in(work, argv, "--json")
     engine = json.loads(out)
+    theirs = {}
     for group in engine["results"]:
-        reported = {l["law"]: l for l in group["laws"]}
-        for row in outcome.result["parameters"]:
-            if row["group"] == group["group"] and not row["product"]:
-                law = reported[row["law"]]
-                mine = next(c for c in law["constants"] if c["constant"] == row["constant"])
-                assert (row["estimate"], row["low"], row["high"], row["standard_error"]) == (
-                    mine["estimate"], mine["low"], mine["high"], mine["standard_error"])
+        for law in group["laws"]:
+            for c in law["constants"]:
+                theirs[(group["group"], law["law"], c["constant"])] = (c["estimate"], c["low"], c["high"], c["standard_error"])
+    mine = {(p["group"], p["law"], p["constant"]): (p["estimate"], p["low"], p["high"], p["standard_error"])
+            for p in outcome.result["parameters"] if not p["product"]}
+    assert len(mine) == 5 and set(mine) <= set(theirs)
+    assert all(mine[k] == theirs[k] for k in mine)
 
 
 def test_dataset_csv_is_the_table_the_engine_read_and_keeps_the_files_own_comments(puromycin):
@@ -289,8 +290,9 @@ def test_a_table_that_cannot_bound_km_is_said_so_and_shows_no_confident_number(t
     assert "undetermined" in kinds
     caution = next(c for c in outcome.result["cautions"] if c["kind"] == "undetermined")
     assert "Every substrate concentration is well below Km" in caution["text"]
-    assert "measure at higher concentrations" in caution["change"]
-    assert outcome.result["better"] and "the highest is 0.06 ppm" in outcome.result["better"][0]
+    assert "measure at higher concentrations" in caution["change"] and "the highest is 0.06 ppm" in caution["change"]
+    # What to change is said once: under the caution, not again in the list below it.
+    assert caution["change"] not in outcome.result["better"]
     # Cautions are shown once each.
     texts = [c["text"] for c in outcome.result["cautions"]]
     assert len(texts) == len(set(texts))

@@ -1,0 +1,209 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "/api/rates/preview",
+  "body": {
+   "text": "substrate (ppm),rate (counts/min/min),state\n0.02,76,treated\n0.02,47,treated\n0.06,97,treated\n0.06,107,treated\n",
+   "filename": "treated-low.csv"
+  }
+ },
+ "status": 200,
+ "body": {
+  "ok": true,
+  "ready": true,
+  "refusal": null,
+  "bytes": 109,
+  "lines": 5,
+  "filename": "treated-low.csv",
+  "shape": "long",
+  "format": {
+   "bom": false,
+   "line_ending": "LF",
+   "comment_text": [],
+   "blank_lines": 0,
+   "comment_lines": 0,
+   "delimiter": "comma",
+   "decimal": ".",
+   "header": true
+  },
+  "columns": [
+   {
+    "index": 0,
+    "header": "substrate (ppm)",
+    "name": "substrate",
+    "unit": "ppm",
+    "role": "substrate",
+    "role_reason": "its name, 'substrate', reads as the substrate",
+    "numeric": 4,
+    "non_numeric": 0,
+    "blank": 0
+   },
+   {
+    "index": 1,
+    "header": "rate (counts/min/min)",
+    "name": "rate",
+    "unit": "counts/min/min",
+    "role": "rate",
+    "role_reason": "its name, 'rate', reads as the rate",
+    "numeric": 4,
+    "non_numeric": 0,
+    "blank": 0
+   },
+   {
+    "index": 2,
+    "header": "state",
+    "name": "state",
+    "unit": null,
+    "role": "group",
+    "role_reason": "its name, 'state', reads as the group",
+    "numeric": 0,
+    "non_numeric": 4,
+    "blank": 0
+   }
+  ],
+  "mapping": {
+   "delimiter": "comma",
+   "decimal": ".",
+   "header": true,
+   "roles": {
+    "substrate": 0,
+    "rate": 1,
+    "sigma": null,
+    "inhibitor": null,
+    "group": 2,
+    "replicate": null,
+    "rates": []
+   },
+   "units": {
+    "substrate": "ppm",
+    "rate": "counts/min/min"
+   },
+   "target": {
+    "substrate": "ppm",
+    "rate": "counts/min/min"
+   }
+  },
+  "units": {
+   "substrate": {
+    "given": "ppm",
+    "read_as": "ppm",
+    "kind": "arbitrary",
+    "convertible": false,
+    "problem": null,
+    "target": "ppm",
+    "factor": 1.0
+   },
+   "rate": {
+    "given": "counts/min/min",
+    "read_as": "counts/min/min",
+    "kind": "arbitrary",
+    "convertible": false,
+    "problem": null,
+    "target": "counts/min/min",
+    "factor": 1.0
+   }
+  },
+  "decisions": [
+   "Fields are split at commas: every line has 3 fields when split at commas.",
+   "Commas separate the fields, so decimals are read with a point.",
+   "The first row is a header: it has text where numbers would be.",
+   "One row per measurement (long layout).",
+   "Column 1 ('substrate') is the substrate: its name, 'substrate', reads as the substrate.",
+   "Column 2 ('rate') is the rate: its name, 'rate', reads as the rate.",
+   "Column 3 ('state') is the group: its name, 'state', reads as the group."
+  ],
+  "problems": [],
+  "problems_total": 0,
+  "preview": {
+   "headers": [
+    "substrate (ppm)",
+    "rate (counts/min/min)",
+    "state"
+   ],
+   "rows": [
+    {
+     "line": 2,
+     "cells": [
+      "0.02",
+      "76",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 3,
+     "cells": [
+      "0.02",
+      "47",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 4,
+     "cells": [
+      "0.06",
+      "97",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 5,
+     "cells": [
+      "0.06",
+      "107",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    }
+   ],
+   "shown": 4,
+   "total": 4
+  },
+  "summary": {
+   "rows_used": 4,
+   "conditions": 2,
+   "replicate_rows": 2,
+   "inhibitor": false,
+   "groups": [
+    {
+     "label": "treated",
+     "rows": 4
+    }
+   ],
+   "substrate_unit": "ppm",
+   "rate_unit": "counts/min/min",
+   "substrate_convertible": false,
+   "rate_convertible": false,
+   "rate_kind": "arbitrary",
+   "highest_substrate": 0.06,
+   "lowest_substrate": 0.02,
+   "rows_read": 4,
+   "rows_skipped": 0,
+   "wide_measurements_skipped": 0
+  },
+  "canonical": "# Read by Caterva Studio from treated-low.csv; the table below is what was fitted.\n# Fields are split at commas: every line has 3 fields when split at commas.\n# Commas separate the fields, so decimals are read with a point.\n# The first row is a header: it has text where numbers would be.\n# One row per measurement (long layout).\n# Column 1 ('substrate') is the substrate: its name, 'substrate', reads as the substrate.\n# Column 2 ('rate') is the rate: its name, 'rate', reads as the rate.\n# Column 3 ('state') is the group: its name, 'state', reads as the group.\nsubstrate (ppm),rate (counts/min/min),state\n0.02,76,treated\n0.02,47,treated\n0.06,97,treated\n0.06,107,treated\n",
+  "sigma_options": {
+   "column": false,
+   "replicate_sets": 2,
+   "replicate_dof": 2,
+   "replicates": true,
+   "residuals": true
+  },
+  "group_column": "state",
+  "column_names": {
+   "substrate": "substrate",
+   "rate": "rate"
+  },
+  "units_needed": false,
+  "limits": {
+   "bytes": 524288,
+   "rows": 2000
+  }
+ }
+}

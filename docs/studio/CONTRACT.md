@@ -239,7 +239,7 @@ Every error response has body `ErrorBody` `{"error": {"code", "message",
 | 409 | `conflict` | result of a run not finished; cancelling a finished run; deleting a running run | none |
 | 413 | `too_large` | body over 1 MiB | none |
 | 415 | `unsupported_media_type` | POST/PUT without `application/json` | none |
-| 503 | `unavailable` | the kind or adapter endpoint cannot run in this installation (`contract.Unavailable`: literature layer absent, module not built, `rates` not integrated), with the reason in `message`; also a limit of section 22 (too many connections, event streams or queued runs, or a finder search over its time budget), which carries a `Retry-After` header | the CLI's refusal to start ("needs the source checkout") |
+| 503 | `unavailable` | the kind or adapter endpoint cannot run in this installation (`contract.Unavailable`: literature layer absent, module not built, the adapter's module missing), with the reason in `message`; also a limit of section 22 (too many connections, event streams or queued runs, or a finder search over its time budget), which carries a `Retry-After` header | the CLI's refusal to start ("needs the source checkout") |
 | 500 | `crash` | a handler raised something undeclared; the message names the exception type; the traceback goes to stderr and `studio.log`, not to the page | exit 1 |
 
 Three outcomes of a science question are kept apart all the way to the
@@ -325,6 +325,24 @@ Stored in `<data dir>/settings.json`.
 `{organism, note}`, exactly `compose.organisms.normalise_organism(name)`
 (owner: compose). For form hints only; a run normalises through its CLI path
 as the CLI does.
+
+`POST /api/rates/preview` with `{text, filename?, mapping?}` ->
+`RatesPreview` (owner: rates): how a pasted or dropped table is read, by
+`caterva.rates.ingest.inspect`, unchanged. `text` is the table as the browser
+read it (never a path); `mapping` overrides what was detected (delimiter,
+decimal mark, header row, each column's role, the units as the data has them,
+the units to convert to) and anything it leaves out is detected and
+answered back in `mapping`, so the page sends the answer back with its edit.
+The answer states every decision (`decisions`), locates every problem by line
+and column with a severity (`skipped`: the row is left out and the answer
+says why; `blocking`: nothing can run; `note`), previews the table, and
+carries `canonical`, the table exactly as the run will read it. A table that
+cannot be used is a 200 with `ok: false` and `refusal` (a NUL byte or other
+control characters, over `RATES_MAX_BYTES` or `RATES_MAX_ROWS`, no table,
+no column that can be a substrate or a rate); only a body that is not a
+question (`text` not a string, an unknown key, a mapping of the wrong shape)
+is a 400. Limits: 524,288 bytes and 2,000 data rows, half the request body
+because JSON escaping grows a table.
 
 `GET /api/structure/{pdb_id}/coordinates` -> `CoordinatesResponse` (owner:
 structure): the first model's atoms of the entry's mmCIF, fetched and cached
@@ -707,7 +725,7 @@ expectations; they are not promises.
 | `analyze` | `caterva analyze DIR [--gromacs\|--no-run\|--script-only]` | `setup_info`, `catalytic_residues` (M-CSA via prepare: network), `plan`, `measure_native` or `run_gromacs` + `measure`, `Analysis`, `report` | network; gromacs for `gromacs` mode | seconds to minutes (reads every .xtc) | 0, 3, 4 (not a result) |
 | `fep.status` | `caterva fep --summarise DIR` | `summarise` (reads caterva-fep.json and BAR output; `bind.core.judge`) | none | seconds | 0, 3, 4 |
 | `complex.check` | `caterva complex --check DIR --ligand RES` | `complex.check`, `pose_over_trajectory`, `centroid_shift` | none | seconds | 0, 3, 4 (left its pose) |
-| `rates` | reserved for `caterva rates` | arrives from another branch | declared then | | |
+| `rates` | `caterva rates dataset.csv ...` | `rates.ingest.inspect` (the table the page sends as text, into the canonical CSV the command reads), `table.read_table`, `run.execute` (the one function `main` also calls: the fit, the tests, the verdict, the literature comparison), `report.render`/`to_json`/`parameters_csv`/`curves_csv`/`methods`, `view.figure`/`parameter_rows`/`comparison`/`lack_of_fit`/`cautions`/`groups`, `turnover.turnover` | network + literature only with `ec` | seconds to a minute; a cancel stops between laws | 0, 3 (no uncertainty chosen, two sources of it, a group of one rate, a law the table does not fit, or a literature comparison the command declines: the report is kept) |
 
 Request to argv mapping, stated where it is not one flag per key:
 
@@ -734,6 +752,23 @@ Request to argv mapping, stated where it is not one flag per key:
   `--temperature`; `ionic_strength_m` -> `--ionic-strength`.
 - analyze: `mode` -> nothing (`native`) | `--gromacs` | `--no-run` |
   `--script-only`.
+- rates: `dataset.csv` positional, the canonical table the run writes as an
+  artifact (the page sends text, never a path: `dataset.text` is the table,
+  `dataset.mapping` what the person confirmed, `dataset.filename` its name for
+  the report); `sigma_from` is required and is `column` (no flag: the
+  table's own sigma column is used), `replicates` or `residuals`
+  (`--sigma-from`), because the fit never invents an uncertainty;
+  `error_model`, `model`, `level`, `significance`, `ec`, `organism`,
+  `substrate`, `inhibitor`, `isoform` -> the flag of the same name; the
+  columns' names in the canonical table (the person's own word where it is
+  safe in a header) -> `--substrate-column` and its siblings, and the group
+  column -> `--group`; never `--json`, `--export` or `--show-linearizations`
+  (the result and the artifacts are those). `enzyme_concentration` and
+  `enzyme_unit` have no flag: they make kcat = Vmax / [E] from the fitted
+  Vmax, in the result only. The result's `analysis` is `--json` unchanged,
+  `report_text` the command's stdout, and `parameters.csv` and `curves.csv`
+  its `--export csv` and `curves` with a leading apostrophe on any text cell a
+  spreadsheet would run as a formula.
 
 Stage keys (the owner may add, never rename once shipped): compose
 `compose`, `search`, `precompute`, `dossier`, `section:<flag>`, `exports`;
@@ -741,7 +776,8 @@ constants `resolve`, `document`; sim `simulate`; bind `fetch`, `rows`,
 `target`, `judge`; structure `search`, `rank`; prepare `fetch`, `audit`;
 md.setup `conditions`, `write`; md.summarise `read`, `summarise`; analyze
 `plan`, `measure`, `report`; fep.status `read`, `judge`; complex.check
-`check`, `trajectory`.
+`check`, `trajectory`; rates `read`, `fit-<law>` (one per law and group,
+its fraction the share of fits begun), `report`.
 
 Result shapes are the TypedDicts in contract.py's "Kinetics kinds" and
 "Structure kinds" sections. Every Result that has a CLI report carries it
@@ -851,7 +887,7 @@ red error.
 | `/` Home | what this installation can do and the runs opened last | open a recent run, or start one from a kind | health, capabilities, runs (limit 8) | no runs yet: the three first questions to ask, as real commands the forms prefill | mark + "Connecting to the studio server" | server not reachable: how to start it | capabilities that are off, each with its reason (no literature layer, no gmx) |
 | `/compose` | build a model from the shape of a mechanism; see where every number came from | Compose | compose/shapes, organisms/normalise, enzymes/find, enzymes/{ec}, runs (kind compose), result, artifacts | description field with the shapes list one keystroke away | stage labels (search, dossier, each section) | request 400 under the field it names; crash with type and message | UnrecognisedShape's text; refused sections under their own headings |
 | `/constants` | an enzyme's measured constants, each with the paper | Look up | runs (constants), enzyme finder | the form; which fields are required | resolve, document | 503 when not a source checkout, with the reason | ambiguous enzyme name with every candidate named (`name_refusal`) |
-| `/rates` | reserved for `caterva rates` | declared when integrated | capabilities | shown only when `rates.available` | | | |
+| `/rates` | take your own measured initial rates to a figure, constants with intervals, and a methods paragraph | Fit my data | capabilities, rates/preview, runs (kind rates), result, artifacts, bundle, enzymes/find | a drop zone (a real button and file input), Ctrl or Cmd V anywhere, and an example (R's Puromycin) | the preview while a table is read; `fit-<law>` stages | the 400 under the field it names; a table that cannot be read says why, by line and column | a refusal in the command's words with no result; a literature comparison the command declines keeps the report; a constant the data do not bound is shown without a value and with what to change |
 | `/sim` | exact stochastic kinetics, seeded | Simulate | runs (sim) | the form, seed prefilled and editable | simulate | 400 | none |
 | `/bind` | the measured binding free energy a simulation is held to | Build the target / Judge | runs (bind), enzymes/find | EC and organism; list compounds | fetch, rows, target | 503 without the literature layer | no Ki rows; none fits the state (with the other state suggested); negative: "disagrees" drawn as a verdict |
 | `/structure` | an enzyme's PDB entries, cited, with a 3D view | Search | runs (structure), enzymes/find, structure coordinates, artifacts (.cxc) | EC, organism, gene | search, rank; viewer loading its atoms | no network | a name that is several enzymes: each candidate named (`name_refusal`); several proteins for one EC: choose gene or UniProt |
@@ -1053,7 +1089,7 @@ to edit them; changing one is a contract amendment (section 21).
 `docs/studio/CONTRACT.md`; `caterva/studio/__init__.py`;
 `caterva/studio/contract.py` (outside the two science sections);
 `caterva/studio/routes.py`; `caterva/studio/adapters/__init__.py`
-(`ADAPTER_MODULES`, the registry); `caterva/studio/adapters/rates.py`;
+(`ADAPTER_MODULES`, the registry); `caterva/studio/adapters/rates.py` (now the rates owner's);
 `src/api/types.ts` (outside the two science sections); `src/routes.tsx`
 paths; `caterva/app.py` (`studio` is registered); `pyproject.toml`
 (package-data); `.gitignore`; `Science-Agent-Pipeline/pnpm-lock.yaml`,
