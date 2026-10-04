@@ -38,7 +38,7 @@ FIXTURE = STUDIO_UI / "src" / "__fixtures__" / "api" / "contract" / "michaelis-m
 #: Interfaces the page declares for its own convenience, with no Python twin.
 TS_ONLY = {"RunRequests", "RunResults"}
 #: Python aliases (not TypedDicts) the page declares as `type X = ...`.
-PY_ALIASES = {"RatesRequest", "RatesResult"}
+PY_ALIASES: set = set()
 
 
 # ---------------------------------------------------------------------------

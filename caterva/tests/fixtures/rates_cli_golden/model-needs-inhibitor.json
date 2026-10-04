@@ -1,0 +1,14 @@
+{
+ "argv": [
+  "examples/rates/puromycin.csv",
+  "--sigma-from",
+  "residuals",
+  "--model",
+  "competitive",
+  "--group",
+  "state"
+ ],
+ "exit": 3,
+ "stdout": "",
+ "stderr": "caterva rates: --model competitive needs rates measured with an inhibitor, and the file has no inhibitor concentration above zero\n"
+}

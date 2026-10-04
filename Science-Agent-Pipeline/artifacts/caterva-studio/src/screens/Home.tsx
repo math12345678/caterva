@@ -66,11 +66,11 @@ export const FIRST_QUESTIONS: { title: string; why: string; argv: string[]; href
 ];
 
 const KIND_ORDER: RunKind[] = [
-  "compose",
+  "rates",
   "constants",
+  "compose",
   "sim",
   "bind",
-  "rates",
   "structure",
   "prepare",
   "md.setup",
@@ -192,6 +192,36 @@ function Ask({ caps }: { caps: Capabilities | undefined }) {
               </li>
             ) : null}
           </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** The second way in, as prominent as the first: start from what you measured. */
+function FitStart({ caps }: { caps: Capabilities | undefined }) {
+  const rates = caps?.rates;
+  const unavailable = rates && !rates.available ? (rates.reason ?? "this installation cannot fit rates") : null;
+  return (
+    <section className="home-fit" aria-labelledby="home-fit-label">
+      <h2 id="home-fit-label" className="home-ask-label">
+        Start from your own measurements.
+      </h2>
+      <p className="home-ask-hint">
+        Drop a CSV, or paste the cells from your spreadsheet. It fits the rate laws, says which your data support, gives every constant an interval,
+        and hands you a figure, a table and a methods paragraph. It runs as <span className="font-mono">caterva rates</span>.
+      </p>
+      {unavailable ? (
+        <p className="field-hint">Fitting rates is not available here: {unavailable}</p>
+      ) : (
+        <div className="home-fit-actions">
+          <Link href="/rates" className="btn btn-primary home-ask-go">
+            <ArrowRight size={14} aria-hidden="true" />
+            Fit my data
+          </Link>
+          <Link href="/rates?example=puromycin" className="btn home-ask-go">
+            Open an example
+          </Link>
         </div>
       )}
     </section>
@@ -341,7 +371,10 @@ export default function HomeScreen() {
     >
       <div className="home-grid">
         <div className="home-main">
-          <Ask caps={caps.data} />
+          <div className="home-starts">
+            <Ask caps={caps.data} />
+            <FitStart caps={caps.data} />
+          </div>
           {empty ? (
             <FirstRun />
           ) : (

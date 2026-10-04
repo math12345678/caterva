@@ -225,14 +225,19 @@ export function CommandPalette({ capabilities }: { capabilities: Capabilities | 
     if (!rs.length) continue;
     sections.push({
       key: `routes-${group}`,
-      items: rs.map((r) => [`${r.title} ${r.path}`, [r.purpose]]),
+      items: rs.map((r) => [`${r.palette?.title ?? r.title} ${r.path}`, [r.purpose, ...(r.palette?.keywords ?? [])]]),
       node: (
         <Command.Group heading={GROUP_TITLE[group]} value={`routes-${group}`}>
           {rs.map((r) => (
-            <Command.Item key={r.path} value={`${r.title} ${r.path}`} keywords={[r.purpose]} onSelect={() => go(r.path)}>
+            <Command.Item
+              key={r.path}
+              value={`${r.palette?.title ?? r.title} ${r.path}`}
+              keywords={[r.purpose, ...(r.palette?.keywords ?? [])]}
+              onSelect={() => go(r.path)}
+            >
               <ArrowRight size={14} aria-hidden="true" />
               <span className="palette-item-main">
-                <span className="palette-item-title">{r.title}</span>
+                <span className="palette-item-title">{r.palette?.title ?? r.title}</span>
                 <span className="palette-item-sub">{r.purpose}</span>
               </span>
             </Command.Item>

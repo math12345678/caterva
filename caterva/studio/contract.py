@@ -63,6 +63,8 @@ import pathlib
 import re
 from typing import Any, Dict, List, Literal, Mapping, Optional, Sequence, Tuple, TypedDict
 
+from caterva.rates import ingest as _rates_ingest
+
 # ---------------------------------------------------------------------------
 # Constants both sides of the boundary read
 # ---------------------------------------------------------------------------
@@ -1782,11 +1784,433 @@ class ComplexCheckResult(_ComplexCheckResultRequired, total=False):
     frames: Optional[int]
 
 
-#: The `rates` kind arrives from another branch; its shapes are declared
-#: when it is integrated. Until then a request is an untyped object and the
-#: kind reports itself unavailable.
-RatesRequest = Dict[str, Any]
-RatesResult = Dict[str, Any]
+# ---------------------------------------------------------------------------
+# rates: initial rates a laboratory measured, fitted (caterva rates)
+# ---------------------------------------------------------------------------
+
+#: The most a dataset may hold: bytes of UTF-8 and data rows. Half the request
+#: body, because JSON escaping grows a table (docs/studio/CONTRACT.md 13.rates).
+RATES_MAX_BYTES = _rates_ingest.MAX_BYTES
+RATES_MAX_ROWS = _rates_ingest.MAX_ROWS
+
+
+class RatesMapping(TypedDict, total=False):
+    """How a table is read: anything absent is detected and answered back."""
+
+    #: auto, tab, comma, semicolon, pipe or space.
+    delimiter: str
+    #: auto, "." or ",".
+    decimal: str
+    header: bool
+    #: role -> column number (from 0) or null; "rates" is a list of columns
+    #: (the replicate columns of a wide table).
+    roles: Dict[str, Any]
+    #: role -> the unit as the data has it (substrate, rate, sigma, inhibitor).
+    units: Dict[str, Optional[str]]
+    #: role -> the unit to convert to (substrate, rate).
+    target: Dict[str, Optional[str]]
+
+
+class _RatesDatasetRequired(TypedDict):
+    #: The table as text, read by the browser: never a path.
+    text: str
+
+
+class RatesDataset(_RatesDatasetRequired, total=False):
+    filename: Optional[str]
+    mapping: RatesMapping
+
+
+class _RatesRequestRequired(TypedDict):
+    dataset: RatesDataset
+    #: column (the table's own sigma column), replicates or residuals.
+    sigma_from: str
+
+
+class RatesRequest(_RatesRequestRequired, total=False):
+    error_model: str
+    model: str
+    level: float
+    significance: float
+    ec: str
+    organism: str
+    substrate: str
+    inhibitor: str
+    isoform: str
+    #: With enzyme_unit: turns the fitted Vmax into kcat.
+    enzyme_concentration: float
+    enzyme_unit: str
+
+
+class _RatesPreviewRequestRequired(TypedDict):
+    text: str
+
+
+class RatesPreviewRequest(_RatesPreviewRequestRequired, total=False):
+    filename: Optional[str]
+    mapping: RatesMapping
+
+
+class RatesColumn(TypedDict):
+    index: int
+    header: str
+    name: str
+    unit: Optional[str]
+    role: Optional[str]
+    role_reason: Optional[str]
+    numeric: int
+    non_numeric: int
+    blank: int
+
+
+class RatesProblem(TypedDict):
+    line: Optional[int]
+    column: Optional[str]
+    #: skipped (the row was left out), blocking (nothing can run) or note.
+    severity: str
+    message: str
+
+
+class RatesPreviewRow(TypedDict):
+    line: int
+    cells: List[str]
+    used: bool
+    #: column number (as text) -> why that cell is a problem.
+    flags: Dict[str, str]
+
+
+class RatesPreviewTable(TypedDict):
+    headers: List[str]
+    rows: List[RatesPreviewRow]
+    shown: int
+    total: int
+
+
+class RatesUnitReading(TypedDict):
+    given: Optional[str]
+    read_as: Optional[str]
+    kind: Optional[str]
+    convertible: bool
+    problem: Optional[str]
+    target: Optional[str]
+    factor: float
+
+
+class RatesGroupCount(TypedDict):
+    label: str
+    rows: int
+
+
+class RatesDataSummary(TypedDict):
+    rows_read: int
+    rows_used: int
+    rows_skipped: int
+    wide_measurements_skipped: int
+    conditions: int
+    replicate_rows: int
+    inhibitor: bool
+    groups: List[RatesGroupCount]
+    substrate_unit: str
+    rate_unit: str
+    substrate_convertible: bool
+    rate_convertible: bool
+    rate_kind: str
+    lowest_substrate: float
+    highest_substrate: float
+
+
+class RatesSigmaOptions(TypedDict):
+    column: bool
+    replicate_sets: int
+    replicate_dof: int
+    replicates: bool
+    residuals: bool
+
+
+class RatesPreview(TypedDict):
+    ok: bool
+    ready: bool
+    refusal: Optional[str]
+    bytes: int
+    lines: int
+    filename: Optional[str]
+    shape: Optional[str]
+    format: Optional[Dict[str, Any]]
+    columns: List[RatesColumn]
+    mapping: RatesMapping
+    units: Dict[str, RatesUnitReading]
+    decisions: List[str]
+    problems: List[RatesProblem]
+    problems_total: int
+    preview: RatesPreviewTable
+    summary: Optional[RatesDataSummary]
+    #: The table the engine reads, exactly as the run will read it.
+    canonical: Optional[str]
+    sigma_options: Optional[RatesSigmaOptions]
+    group_column: Optional[str]
+    #: role -> the column's name in the canonical table (the person's own word where safe).
+    column_names: Dict[str, str]
+    units_needed: bool
+    limits: Dict[str, int]
+
+
+class RatesAxis(TypedDict):
+    name: str
+    unit: str
+    column: str
+
+
+class RatesPoints(TypedDict):
+    s: List[Optional[float]]
+    v: List[Optional[float]]
+    #: The standard deviation the fit used for each rate (RatesBars says which).
+    sigma: List[Optional[float]]
+    fitted: List[Optional[float]]
+    residual: List[Optional[float]]
+    #: The table's line number of each point.
+    line: List[int]
+
+
+class RatesCurve(TypedDict):
+    s: List[Optional[float]]
+    v: List[Optional[float]]
+    low: List[Optional[float]]
+    high: List[Optional[float]]
+
+
+class RatesSeries(TypedDict):
+    key: str
+    label: str
+    group: Optional[str]
+    inhibitor: Optional[float]
+    law: str
+    law_title: str
+    equation: str
+    points: RatesPoints
+    curve: RatesCurve
+    #: What the band is, in the engine's words (fit.band_note).
+    band: str
+    level: float
+
+
+class RatesBars(TypedDict):
+    source: str
+    text: str
+
+
+class RatesFigure(TypedDict):
+    x: RatesAxis
+    y: RatesAxis
+    inhibitor: Optional[RatesAxis]
+    series: List[RatesSeries]
+    bars: Optional[RatesBars]
+    notes: List[str]
+    residual_note: str
+
+
+class RatesParameter(TypedDict):
+    group: Optional[str]
+    law: str
+    law_title: str
+    constant: str
+    unit: str
+    estimate: Optional[float]
+    standard_error: Optional[float]
+    low: Optional[float]
+    high: Optional[float]
+    level: float
+    determined: bool
+    #: The interval as the engine writes it, one-sided when the data bound one side.
+    interval: str
+    interval_method: str
+    #: A combination the data determine when its factors are not (Vmax/Km).
+    product: bool
+    n: int
+    #: When not determined: the engine's sentence on what is bounded.
+    statement: Optional[str]
+    #: The estimate, marked as fitted; None when the data do not determine it.
+    value: Optional[SourcedValue]
+
+
+class RatesIntervalBasis(TypedDict):
+    method: str
+    bounded_by: str
+
+
+class RatesLawRow(TypedDict, total=False):
+    law: str
+    title: str
+    fitted: bool
+    refused: Optional[str]
+    equation: str
+    parameters: int
+    n: int
+    objective: Optional[float]
+    objective_is: str
+    aicc: Optional[float]
+    delta_aicc: Optional[float]
+    lack_of_fit_p: Optional[float]
+    status: str
+
+
+class RatesTestRow(TypedDict):
+    restricted: str
+    general: str
+    restriction: str
+    boundary: bool
+    statistic: str
+    p: Optional[float]
+    p_text: str
+    ruled_out: bool
+    sentence: str
+
+
+class RatesComparison(TypedDict):
+    group: Optional[str]
+    laws: List[RatesLawRow]
+    tests: List[RatesTestRow]
+    decided: bool
+    reported: List[str]
+    ruled_out: List[str]
+    standing: List[str]
+    verdict: List[str]
+    described: List[str]
+    to_decide: List[str]
+    significance: float
+    note: str
+
+
+class _RatesLackOfFitRequired(TypedDict):
+    group: Optional[str]
+    law: str
+    title: str
+    tested: bool
+    p: Optional[float]
+    failed: bool
+    sentence: str
+    trust: str
+
+
+class RatesLackOfFit(_RatesLackOfFitRequired, total=False):
+    f: Optional[float]
+    df_lack_of_fit: int
+    df_pure_error: int
+
+
+class RatesCaution(TypedDict):
+    group: Optional[str]
+    law: Optional[str]
+    kind: str
+    text: str
+    change: Optional[str]
+
+
+class RatesGroupTest(TypedDict):
+    constant: str
+    statistic: str
+    p: Optional[float]
+    p_text: str
+    differs: bool
+    verdict: str
+
+
+class RatesGroups(TypedDict):
+    law: str
+    law_title: str
+    groups: List[str]
+    tests: List[RatesGroupTest]
+    sentences: List[str]
+    significance: float
+
+
+class RatesEnzyme(TypedDict):
+    concentration: float
+    unit: str
+
+
+class RatesTurnover(TypedDict):
+    group: Optional[str]
+    law: str
+    law_title: str
+    constant: str
+    unit: str
+    estimate: Optional[float]
+    low: Optional[float]
+    high: Optional[float]
+    standard_error: Optional[float]
+    determined: bool
+    level: float
+    enzyme: RatesEnzyme
+    #: kcat, marked as computed from the fitted Vmax and the concentration given.
+    value: Optional[SourcedValue]
+
+
+class RatesLiterature(TypedDict):
+    constant: str
+    law: str
+    group: Optional[str]
+    asked_under: str
+    mode: Optional[str]
+    found: bool
+    #: The cited value, marked as measured with BRENDA's reference.
+    cited: Optional[SourcedValue]
+    cited_unit: Optional[str]
+    organism: Optional[str]
+    sentence: str
+    refused: Optional[str]
+    determined: bool
+    fitted_estimate: Optional[float]
+    fitted_low: Optional[float]
+    fitted_high: Optional[float]
+    contains_cited: Optional[bool]
+    ratio: Optional[float]
+    concerns: List[str]
+    evidence_against: Optional[str]
+    conditional: Optional[str]
+    commentary: Optional[str]
+    tie: Optional[str]
+    spread_text: Optional[str]
+
+
+class RatesSigma(TypedDict):
+    source: str
+    description: str
+    #: Why it matters, in one sentence.
+    why: str
+
+
+class RatesDatasetUsed(TypedDict):
+    filename: Optional[str]
+    shape: Optional[str]
+    summary: RatesDataSummary
+    decisions: List[str]
+    problems: List[RatesProblem]
+    mapping: RatesMapping
+    group_column: Optional[str]
+
+
+class RatesResult(TypedDict):
+    #: The engine's own `--json`, unchanged.
+    analysis: Dict[str, Any]
+    #: The engine's own report, `caterva rates` stdout.
+    report_text: str
+    methods: str
+    cite: str
+    sigma: RatesSigma
+    dataset: RatesDatasetUsed
+    figure: RatesFigure
+    parameters: List[RatesParameter]
+    interval_basis: RatesIntervalBasis
+    comparison: List[RatesComparison]
+    lack_of_fit: List[RatesLackOfFit]
+    cautions: List[RatesCaution]
+    better: List[str]
+    groups: Optional[RatesGroups]
+    turnover: List[RatesTurnover]
+    turnover_refused: Optional[str]
+    literature: List[RatesLiterature]
+    literature_refused: Optional[str]
+
 
 #: Kind -> (request type name, result type name). The server validates
 #: nothing by these names; they exist so the page and the tests agree which
@@ -2213,4 +2637,6 @@ MIRRORED_CONSTANTS: Mapping[str, Any] = {
     "MAX_VIEWER_ATOMS": MAX_VIEWER_ATOMS,
     "SERIES_ROW_LIMIT": SERIES_ROW_LIMIT,
     "MAX_SSA_EVENTS": MAX_SSA_EVENTS,
+    "RATES_MAX_BYTES": RATES_MAX_BYTES,
+    "RATES_MAX_ROWS": RATES_MAX_ROWS,
 }

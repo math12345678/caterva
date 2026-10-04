@@ -18,7 +18,7 @@ groups, which constants differ; then the literature.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence
 
 import numpy as np
 
@@ -181,7 +181,8 @@ def _fit_law(law: RateLaw, data: Dataset, uncertainty: Uncertainty, rows: Sequen
 
 
 def _analyse_rows(data: Dataset, uncertainty: Uncertainty, options: Options, rows: List[int],
-                  group: Optional[str], names: List[str], analysis: Analysis) -> GroupResult:
+                  group: Optional[str], names: List[str], analysis: Analysis,
+                  step: Optional[Callable[[str, Optional[str]], None]] = None) -> GroupResult:
     result = GroupResult(group, rows)
     order = [n for n in names if n not in ("mixed", "substrate-inhibition", "hill")] + [
         n for n in names if n in ("mixed", "substrate-inhibition", "hill")]
@@ -190,6 +191,8 @@ def _analyse_rows(data: Dataset, uncertainty: Uncertainty, options: Options, row
         units = analysis.units_for(law)
         restricted = {n: result.laws[n] for n in result.laws
                       if any(x.general == name and x.special == n for x in NESTINGS)}
+        if step is not None:
+            step(name, group)
         result.laws[name] = _fit_law(law, data, uncertainty, rows, options, restricted, units)
     fits = {n: r.fit for n, r in result.laws.items() if r.fit is not None}
     if not fits:
@@ -222,10 +225,23 @@ def _analyse_rows(data: Dataset, uncertainty: Uncertainty, options: Options, row
     return result
 
 
-def analyse(data: Dataset, uncertainty: Uncertainty, options: Options) -> Analysis:
+def analyse(data: Dataset, uncertainty: Uncertainty, options: Options,
+            on_step: Optional[Callable[[str, str, int, int], None]] = None) -> Analysis:
+    """Every fit, test and verdict for `data`. `on_step(key, label, done, total)`
+    is called before each law is fitted (run.py says what it is for); it
+    may raise to stop the run. None, as the command passes, changes nothing."""
     names = laws_for(data, options.model)
     analysis = Analysis(data, uncertainty, options, notes=list(data.notes))
     labels = data.groups()
+    total = max(1, len(labels)) * len(names)
+    done = [0]
+
+    def step(name: str, group: Optional[str]) -> None:
+        if on_step is not None:
+            where = f" for {group}" if group else ""
+            on_step(f"fit-{name}", f"Fitting the {law_for(name).title} law{where}", done[0], total)
+        done[0] += 1
+
     if labels:
         for label in labels:
             rows = data.rows_of(label)
@@ -235,11 +251,14 @@ def analyse(data: Dataset, uncertainty: Uncertainty, options: Options) -> Analys
                     f"and a group comparison needs each group fitted on its own")
         for label in labels:
             analysis.results.append(_analyse_rows(data, uncertainty, options, data.rows_of(label),
-                                                  label, names, analysis))
-        analysis.comparison = _compare_groups(analysis, names)
+                                                  label, names, analysis, step))
+        if len(labels) >= 2:
+            # One label is a group of one: it is fitted and named, and there is
+            # nothing to compare it with.
+            analysis.comparison = _compare_groups(analysis, names)
     else:
         analysis.results.append(_analyse_rows(data, uncertainty, options, list(range(len(data))),
-                                              None, names, analysis))
+                                              None, names, analysis, step))
     return analysis
 
 

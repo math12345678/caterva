@@ -198,7 +198,7 @@ def determine(fitted: Fit, intervals: Sequence[Interval], units: Dict[str, str],
         role = law.constant(name).role
         unit = units.get(label, "")
         sentence = iv.describe(unit) + "."
-        if role == ROLE_INHIBITOR and iv.high is None:
+        if role == ROLE_INHIBITOR and iv.high is None and iv.low is not None:
             if name == "Ki_prime":
                 sentence += (" The inhibitor's binding to the enzyme-substrate complex is too weak "
                              "to see at these concentrations; it shows at [S] well above Km with "
@@ -208,8 +208,10 @@ def determine(fitted: Fit, intervals: Sequence[Interval], units: Dict[str, str],
                              "concentrations; it shows at [S] well below Km with [I] above about "
                              f"{iv.low:.3g} {unit}.")
         elif name == "Ksi" and iv.high is None:
-            sentence += (" No substrate inhibition is detectable in this range; it would show at "
-                         f"[S] approaching {iv.low:.3g} {unit} or above.")
+            # With no lower bound either, the data say nothing of where it would show.
+            sentence += (" No substrate inhibition is detectable in this range"
+                         + (f"; it would show at [S] approaching {iv.low:.3g} {unit} or above."
+                            if iv.low is not None else "."))
         out.findings.append(sentence)
     return out
 

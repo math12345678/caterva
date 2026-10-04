@@ -49,3 +49,16 @@ export function contrastRatio(a: Oklch, b: Oklch): number {
   const [hi, lo] = la >= lb ? [la, lb] : [lb, la];
   return (hi + 0.05) / (lo + 0.05);
 }
+
+/** The colour as a #rrggbb string, channels clipped to the sRGB gamut (for a file that cannot use var()). */
+export function oklchToHex(color: Oklch): string {
+  const encode = (v: number) => {
+    const c = Math.min(1, Math.max(0, v));
+    const e = c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
+    return Math.round(Math.min(1, Math.max(0, e)) * 255)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  const [r, g, b] = oklchToLinearSrgb(color);
+  return `#${encode(r)}${encode(g)}${encode(b)}`;
+}

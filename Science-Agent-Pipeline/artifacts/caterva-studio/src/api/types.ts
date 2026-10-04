@@ -22,6 +22,8 @@ export const PAGE_MARKER_CONTENT = "token-in-url-fragment";
 export const MAX_BODY_BYTES = 1048576;
 export const MAX_VIEWER_ATOMS = 60000;
 export const MAX_SSA_EVENTS = 200000;
+export const RATES_MAX_BYTES = 524288;
+export const RATES_MAX_ROWS = 2000;
 
 // ---------------------------------------------------------------------------
 // String unions
@@ -1292,9 +1294,412 @@ export interface ComplexCheckResult {
   frames?: number | null;
 }
 
-/** Reserved until `caterva rates` is integrated (contract.py RatesRequest). */
-export type RatesRequest = Record<string, unknown>;
-export type RatesResult = Record<string, unknown>;
+// ---------------------------------------------------------------------------
+// rates: initial rates a laboratory measured, fitted (caterva rates)
+// ---------------------------------------------------------------------------
+
+/** How a table is read; anything absent is detected and answered back. */
+export interface RatesMapping {
+  /** auto, tab, comma, semicolon, pipe or space. */
+  delimiter?: string;
+  /** auto, "." or ",". */
+  decimal?: string;
+  header?: boolean;
+  /** role -> column number (from 0) or null; "rates" lists the replicate columns of a wide table. */
+  roles?: Record<string, unknown>;
+  /** role -> the unit as the data has it. */
+  units?: Record<string, string | null>;
+  /** role -> the unit to convert to (substrate, rate). */
+  target?: Record<string, string | null>;
+}
+
+export interface RatesDataset {
+  /** The table as text, read by the browser: never a path. */
+  text: string;
+  filename?: string | null;
+  mapping?: RatesMapping;
+}
+
+export interface RatesRequest {
+  dataset: RatesDataset;
+  /** column (the table's own sigma column), replicates or residuals. */
+  sigma_from: string;
+  error_model?: string;
+  model?: string;
+  level?: number;
+  significance?: number;
+  ec?: string;
+  organism?: string;
+  substrate?: string;
+  inhibitor?: string;
+  isoform?: string;
+  enzyme_concentration?: number;
+  enzyme_unit?: string;
+}
+
+export interface RatesPreviewRequest {
+  text: string;
+  filename?: string | null;
+  mapping?: RatesMapping;
+}
+
+export interface RatesColumn {
+  index: number;
+  header: string;
+  name: string;
+  unit: string | null;
+  role: string | null;
+  role_reason: string | null;
+  numeric: number;
+  non_numeric: number;
+  blank: number;
+}
+
+export interface RatesProblem {
+  line: number | null;
+  column: string | null;
+  /** skipped (the row was left out), blocking (nothing can run) or note. */
+  severity: string;
+  message: string;
+}
+
+export interface RatesPreviewRow {
+  line: number;
+  cells: string[];
+  used: boolean;
+  /** column number (as text) -> why that cell is a problem. */
+  flags: Record<string, string>;
+}
+
+export interface RatesPreviewTable {
+  headers: string[];
+  rows: RatesPreviewRow[];
+  shown: number;
+  total: number;
+}
+
+export interface RatesUnitReading {
+  given: string | null;
+  read_as: string | null;
+  kind: string | null;
+  convertible: boolean;
+  problem: string | null;
+  target: string | null;
+  factor: number;
+}
+
+export interface RatesGroupCount {
+  label: string;
+  rows: number;
+}
+
+export interface RatesDataSummary {
+  rows_read: number;
+  rows_used: number;
+  rows_skipped: number;
+  wide_measurements_skipped: number;
+  conditions: number;
+  replicate_rows: number;
+  inhibitor: boolean;
+  groups: RatesGroupCount[];
+  substrate_unit: string;
+  rate_unit: string;
+  substrate_convertible: boolean;
+  rate_convertible: boolean;
+  rate_kind: string;
+  lowest_substrate: number;
+  highest_substrate: number;
+}
+
+export interface RatesSigmaOptions {
+  column: boolean;
+  replicate_sets: number;
+  replicate_dof: number;
+  replicates: boolean;
+  residuals: boolean;
+}
+
+export interface RatesPreview {
+  ok: boolean;
+  ready: boolean;
+  refusal: string | null;
+  bytes: number;
+  lines: number;
+  filename: string | null;
+  shape: string | null;
+  format: Record<string, unknown> | null;
+  columns: RatesColumn[];
+  mapping: RatesMapping;
+  units: Record<string, RatesUnitReading>;
+  decisions: string[];
+  problems: RatesProblem[];
+  problems_total: number;
+  preview: RatesPreviewTable;
+  summary: RatesDataSummary | null;
+  /** The table the engine reads, exactly as the run will read it. */
+  canonical: string | null;
+  sigma_options: RatesSigmaOptions | null;
+  group_column: string | null;
+  /** role -> the column's name in the canonical table (the person's own word where safe). */
+  column_names: Record<string, string>;
+  units_needed: boolean;
+  limits: Record<string, number>;
+}
+
+export interface RatesAxis {
+  name: string;
+  unit: string;
+  column: string;
+}
+
+export interface RatesPoints {
+  s: (number | null)[];
+  v: (number | null)[];
+  /** The standard deviation the fit used for each rate (RatesBars says which). */
+  sigma: (number | null)[];
+  fitted: (number | null)[];
+  residual: (number | null)[];
+  /** The table's line number of each point. */
+  line: number[];
+}
+
+export interface RatesCurve {
+  s: (number | null)[];
+  v: (number | null)[];
+  low: (number | null)[];
+  high: (number | null)[];
+}
+
+export interface RatesSeries {
+  key: string;
+  label: string;
+  group: string | null;
+  inhibitor: number | null;
+  law: string;
+  law_title: string;
+  equation: string;
+  points: RatesPoints;
+  curve: RatesCurve;
+  /** What the band is, in the engine's words. */
+  band: string;
+  level: number;
+}
+
+export interface RatesBars {
+  source: string;
+  text: string;
+}
+
+export interface RatesFigure {
+  x: RatesAxis;
+  y: RatesAxis;
+  inhibitor: RatesAxis | null;
+  series: RatesSeries[];
+  bars: RatesBars | null;
+  notes: string[];
+  residual_note: string;
+}
+
+export interface RatesParameter {
+  group: string | null;
+  law: string;
+  law_title: string;
+  constant: string;
+  unit: string;
+  estimate: number | null;
+  standard_error: number | null;
+  low: number | null;
+  high: number | null;
+  level: number;
+  determined: boolean;
+  /** The interval as the engine writes it, one-sided when the data bound one side. */
+  interval: string;
+  interval_method: string;
+  /** A combination the data determine when its factors are not (Vmax/Km). */
+  product: boolean;
+  n: number;
+  /** When not determined: the engine's sentence on what is bounded. */
+  statement: string | null;
+  /** The estimate, marked as fitted; null when the data do not determine it. */
+  value: SourcedValue | null;
+}
+
+export interface RatesIntervalBasis {
+  method: string;
+  bounded_by: string;
+}
+
+export interface RatesLawRow {
+  law?: string;
+  title?: string;
+  fitted?: boolean;
+  refused?: string | null;
+  equation?: string;
+  parameters?: number;
+  n?: number;
+  objective?: number | null;
+  objective_is?: string;
+  aicc?: number | null;
+  delta_aicc?: number | null;
+  lack_of_fit_p?: number | null;
+  status?: string;
+}
+
+export interface RatesTestRow {
+  restricted: string;
+  general: string;
+  restriction: string;
+  boundary: boolean;
+  statistic: string;
+  p: number | null;
+  p_text: string;
+  ruled_out: boolean;
+  sentence: string;
+}
+
+export interface RatesComparison {
+  group: string | null;
+  laws: RatesLawRow[];
+  tests: RatesTestRow[];
+  decided: boolean;
+  reported: string[];
+  ruled_out: string[];
+  standing: string[];
+  verdict: string[];
+  described: string[];
+  to_decide: string[];
+  significance: number;
+  note: string;
+}
+
+export interface RatesLackOfFit {
+  group: string | null;
+  law: string;
+  title: string;
+  tested: boolean;
+  p: number | null;
+  failed: boolean;
+  sentence: string;
+  trust: string;
+  f?: number | null;
+  df_lack_of_fit?: number;
+  df_pure_error?: number;
+}
+
+export interface RatesCaution {
+  group: string | null;
+  law: string | null;
+  kind: string;
+  text: string;
+  change: string | null;
+}
+
+export interface RatesGroupTest {
+  constant: string;
+  statistic: string;
+  p: number | null;
+  p_text: string;
+  differs: boolean;
+  verdict: string;
+}
+
+export interface RatesGroups {
+  law: string;
+  law_title: string;
+  groups: string[];
+  tests: RatesGroupTest[];
+  sentences: string[];
+  significance: number;
+}
+
+export interface RatesEnzyme {
+  concentration: number;
+  unit: string;
+}
+
+export interface RatesTurnover {
+  group: string | null;
+  law: string;
+  law_title: string;
+  constant: string;
+  unit: string;
+  estimate: number | null;
+  low: number | null;
+  high: number | null;
+  standard_error: number | null;
+  determined: boolean;
+  level: number;
+  enzyme: RatesEnzyme;
+  /** kcat, marked as computed from the fitted Vmax and the concentration given. */
+  value: SourcedValue | null;
+}
+
+export interface RatesLiterature {
+  constant: string;
+  law: string;
+  group: string | null;
+  asked_under: string;
+  mode: string | null;
+  found: boolean;
+  /** The cited value, marked as measured with BRENDA's reference. */
+  cited: SourcedValue | null;
+  cited_unit: string | null;
+  organism: string | null;
+  sentence: string;
+  refused: string | null;
+  determined: boolean;
+  fitted_estimate: number | null;
+  fitted_low: number | null;
+  fitted_high: number | null;
+  contains_cited: boolean | null;
+  ratio: number | null;
+  concerns: string[];
+  evidence_against: string | null;
+  conditional: string | null;
+  commentary: string | null;
+  tie: string | null;
+  spread_text: string | null;
+}
+
+export interface RatesSigma {
+  source: string;
+  description: string;
+  /** Why it matters, in one sentence. */
+  why: string;
+}
+
+export interface RatesDatasetUsed {
+  filename: string | null;
+  shape: string | null;
+  summary: RatesDataSummary;
+  decisions: string[];
+  problems: RatesProblem[];
+  mapping: RatesMapping;
+  group_column: string | null;
+}
+
+export interface RatesResult {
+  /** The engine's own `--json`, unchanged. */
+  analysis: Record<string, unknown>;
+  /** The engine's own report, `caterva rates` stdout. */
+  report_text: string;
+  methods: string;
+  cite: string;
+  sigma: RatesSigma;
+  dataset: RatesDatasetUsed;
+  figure: RatesFigure;
+  parameters: RatesParameter[];
+  interval_basis: RatesIntervalBasis;
+  comparison: RatesComparison[];
+  lack_of_fit: RatesLackOfFit[];
+  cautions: RatesCaution[];
+  better: string[];
+  groups: RatesGroups | null;
+  turnover: RatesTurnover[];
+  turnover_refused: string | null;
+  literature: RatesLiterature[];
+  literature_refused: string | null;
+}
 
 /** Kind -> what exit 4 means for its command, as contract.NEGATIVE_MEANING. */
 export const NEGATIVE_MEANING: Partial<Record<RunKind, string>> = {
