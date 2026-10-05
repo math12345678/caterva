@@ -159,31 +159,20 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva rates",
     """`resolver` replaces the literature layer's resolve_kinetic_value, so the
     tests can read committed BRENDA pages instead of the network."""
     from caterva.rates import report
-    from caterva.rates.analysis import Options, Refused, analyse, compare_literature
+    from caterva.rates.analysis import Refused
     from caterva.rates.fit import FitRefused
-    from caterva.rates.literature import LiteratureUnavailable
+    from caterva.rates.run import LiteratureQuery, QuestionError, check_inhibitor_asked, execute, validate_question
     from caterva.rates.table import TableError, UnitRefused, read_table
-    from caterva.rates.uncertainty import NoUncertainty, resolve
+    from caterva.rates.uncertainty import NoUncertainty
 
     parser = build_parser(prog)
     args = parser.parse_args(argv)
-    if not 0.0 < args.level < 1.0:
-        return _usage_error(parser, f"--level is a probability between 0 and 1 (0.95, not 95); "
-                                    f"got {args.level:g}")
-    if not 0.0 < args.significance < 1.0:
-        return _usage_error(parser, f"--significance is a probability between 0 and 1; got "
-                                    f"{args.significance:g}")
-    wants_literature = bool(args.substrate or args.inhibitor or args.isoform)
-    if wants_literature and not args.ec:
-        return _usage_error(parser, "--substrate, --inhibitor and --isoform name what to look up in "
-                                    "the literature, and need --ec to say which enzyme")
-    if args.ec and not (args.substrate or args.inhibitor):
-        return _usage_error(parser, "--ec compares the fitted constants with cited ones, and needs "
-                                    "--substrate (for Km) or --inhibitor (for Ki) to say which")
-    if args.ec and not args.organism:
-        return _usage_error(parser, "--ec needs --organism: a Km or a Ki is a property of one "
-                                    "organism's enzyme, and borrowing another's would compare "
-                                    "different proteins")
+    try:
+        validate_question(level=args.level, significance=args.significance, ec=args.ec,
+                          organism=args.organism, substrate=args.substrate,
+                          inhibitor=args.inhibitor, isoform=args.isoform)
+    except QuestionError as exc:
+        return _usage_error(parser, str(exc))
     if args.json and args.export:
         return _usage_error(parser, "--json and --export each replace the report; give one")
 
@@ -197,40 +186,23 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva rates",
     except UnitRefused as exc:
         print(f"{prog}: {exc}", file=sys.stderr)
         return EXIT_REFUSED
-    if args.inhibitor and not data.has_inhibitor:
-        return _usage_error(parser, "--inhibitor names the inhibitor whose Ki to look up, and the "
-                                    "file has no rate measured with an inhibitor")
+    try:
+        check_inhibitor_asked(data, args.inhibitor)
+    except QuestionError as exc:
+        return _usage_error(parser, str(exc))
 
     try:
-        uncertainty = resolve(data, args.sigma_from, args.error_model)
-        options = Options(model=args.model, level=args.level, significance=args.significance,
-                          linearizations=args.show_linearizations)
-        analysis = analyse(data, uncertainty, options)
+        execution = execute(
+            data, sigma_from=args.sigma_from, error_model=args.error_model, model=args.model,
+            level=args.level, significance=args.significance,
+            linearizations=args.show_linearizations,
+            literature=LiteratureQuery(args.ec, args.organism, args.substrate, args.inhibitor,
+                                       args.isoform) if args.ec else None,
+            resolver=resolver)
     except (NoUncertainty, Refused, FitRefused) as exc:
         print(f"{prog}: {exc}", file=sys.stderr)
         return EXIT_REFUSED
-
-    refused = False
-    if args.ec:
-        from caterva.compose.organisms import normalise_organism
-
-        organism, read_as = normalise_organism(args.organism)
-        if read_as:
-            analysis.notes.append(read_as)
-        try:
-            compare_literature(analysis, ec=args.ec.strip(), organism=organism,
-                               substrate=args.substrate, inhibitor=args.inhibitor,
-                               isoform=args.isoform, resolver=resolver)
-        except LiteratureUnavailable as exc:
-            analysis.literature = []
-            analysis.literature_refused = str(exc)
-        except Exception as exc:  # noqa: BLE001 - a failed search is a refusal with a reason, as in compose
-            analysis.literature = []
-            analysis.literature_refused = f"the literature search failed: {type(exc).__name__}: {exc}"
-        # A comparison this command declined is a refusal (exit 3); a
-        # resolver that ran and found no row has answered, as in compose.
-        refused = analysis.literature_refused is not None or any(
-            c.declined for c in analysis.literature)
+    analysis, refused = execution.analysis, execution.refused
 
     if args.json:
         sys.stdout.write(report.to_json(analysis))
@@ -243,10 +215,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva rates",
     else:
         sys.stdout.write(report.render(analysis))
     if refused:
-        reasons = ([analysis.literature_refused] if analysis.literature_refused else
-                   [f"{c.constant}" + (f" [{c.group}]" if c.group else "") + f": {c.refused}"
-                    for c in analysis.literature if c.declined])
-        print(f"{prog}: a literature comparison was not made: " + "; ".join(reasons),
+        print(f"{prog}: a literature comparison was not made: " + "; ".join(execution.refusal_reasons),
               file=sys.stderr)
         return EXIT_REFUSED
     return EXIT_OK

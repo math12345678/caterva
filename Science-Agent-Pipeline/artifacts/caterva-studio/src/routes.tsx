@@ -5,7 +5,9 @@
  *
  * Each path has its own screen file under src/screens/, owned as
  * docs/studio/CONTRACT.md's "Ownership map" says. `/rates` is gated: it is
- * listed only when /api/capabilities reports `rates.available`.
+ * listed only when /api/capabilities reports `rates.available`. The kinetics
+ * group is ordered by what a laboratory does first: fit what it measured
+ * (Rates), look up what others measured (Constants), then model.
  */
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 
@@ -21,6 +23,8 @@ export interface StudioRoute {
   group: RouteGroup;
   /** The run kinds this screen submits. */
   kinds: RunKind[];
+  /** What the command palette calls this screen, when it is a thing a person does ("Fit my data") more than a place. */
+  palette?: { title: string; keywords: string[] };
   /** Shown only when this capability is available. */
   gate?: "rates";
   screen: LazyExoticComponent<ComponentType>;
@@ -34,6 +38,16 @@ export const ROUTES: StudioRoute[] = [
     group: "start",
     kinds: [],
     screen: lazy(() => import("@/screens/Home")),
+  },
+  {
+    path: "/rates",
+    title: "Rates",
+    purpose: "Fit the initial rates you measured: paste or drop your table, get a figure, constants with intervals, and a methods paragraph.",
+    palette: { title: "Fit my data", keywords: ["rates", "measurements", "csv", "paste", "spreadsheet", "km", "vmax", "kinetics"] },
+    group: "kinetics",
+    kinds: ["rates"],
+    gate: "rates",
+    screen: lazy(() => import("@/screens/Rates")),
   },
   {
     path: "/compose",
@@ -50,15 +64,6 @@ export const ROUTES: StudioRoute[] = [
     group: "kinetics",
     kinds: ["constants"],
     screen: lazy(() => import("@/screens/Constants")),
-  },
-  {
-    path: "/rates",
-    title: "Rates",
-    purpose: "Reserved for `caterva rates`.",
-    group: "kinetics",
-    kinds: ["rates"],
-    gate: "rates",
-    screen: lazy(() => import("@/screens/Rates")),
   },
   {
     path: "/sim",

@@ -115,6 +115,13 @@ def _replicate_sets(data: Dataset) -> Dict[Tuple[object, ...], List[int]]:
     return sets
 
 
+def replicate_summary(data: Dataset) -> Tuple[int, int]:
+    """(replicate sets, degrees of freedom they give): what `--sigma-from
+    replicates` would pool, without pooling it."""
+    sets = [rows for rows in _replicate_sets(data).values() if len(rows) >= 2]
+    return len(sets), sum(len(rows) - 1 for rows in sets)
+
+
 def condition_means(data: Dataset) -> np.ndarray:
     """Each row's condition mean, the scale a proportional error uses."""
     rate = np.asarray(data.rate, dtype=float)
@@ -229,5 +236,5 @@ def pure_error(rate: Sequence[float], sigma: Sequence[float],
 
 __all__ = [
     "KNOWN", "POOLED", "RESIDUAL", "SOURCES", "ERROR_MODELS", "NoUncertainty", "Uncertainty",
-    "resolve", "pure_error", "condition_means",
+    "resolve", "pure_error", "condition_means", "replicate_summary",
 ]

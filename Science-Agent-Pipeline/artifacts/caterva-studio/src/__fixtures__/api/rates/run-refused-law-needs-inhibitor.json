@@ -1,0 +1,179 @@
+{
+ "captured": {
+  "kind": "rates",
+  "request": {
+   "dataset": {
+    "text": "# Initial rates of galactosyltransferase in Golgi membranes, from cells\n# treated with puromycin and from untreated cells.\n# Treloar MA (1974) Effects of Puromycin on Galactosyltransferase in Golgi\n# Membranes. M.Sc. thesis, University of Toronto. Published in Bates DM &\n# Watts DG (1988) Nonlinear Regression Analysis and Its Applications, Wiley,\n# Appendix A1.3, and distributed as R's datasets::Puromycin, where the\n# substrate column is called conc and the grouping column state.\n# Substrate concentration in parts per million; rate in counts/min/min.\nsubstrate (ppm),rate (counts/min/min),state\n0.02,76,treated\n0.02,47,treated\n0.06,97,treated\n0.06,107,treated\n0.11,123,treated\n0.11,139,treated\n0.22,159,treated\n0.22,152,treated\n0.56,191,treated\n0.56,201,treated\n1.10,207,treated\n1.10,200,treated\n0.02,67,untreated\n0.02,51,untreated\n0.06,84,untreated\n0.06,86,untreated\n0.11,98,untreated\n0.11,115,untreated\n0.22,131,untreated\n0.22,124,untreated\n0.56,144,untreated\n0.56,158,untreated\n1.10,160,untreated\n",
+    "filename": "puromycin.csv",
+    "mapping": {
+     "delimiter": "comma",
+     "decimal": ".",
+     "header": true,
+     "roles": {
+      "substrate": 0,
+      "rate": 1,
+      "sigma": null,
+      "inhibitor": null,
+      "group": 2,
+      "replicate": null,
+      "rates": []
+     },
+     "units": {
+      "substrate": "ppm",
+      "rate": "counts/min/min"
+     },
+     "target": {
+      "substrate": "ppm",
+      "rate": "counts/min/min"
+     }
+    }
+   },
+   "sigma_from": "residuals",
+   "model": "competitive"
+  }
+ },
+ "run": {
+  "schema": "caterva.studio.run/1",
+  "id": "20261004-215206-rates-b0426b5b",
+  "kind": "rates",
+  "title": "Initial rates, puromycin.csv, competitive laws, uncertainty from residuals",
+  "status": "done",
+  "created_at": "2026-10-04T21:52:06.106Z",
+  "started_at": "2026-10-04T21:52:06.108Z",
+  "finished_at": "2026-10-04T21:52:06.114Z",
+  "caterva_version": "0.5.0",
+  "cli": [
+   "caterva",
+   "rates",
+   "dataset.csv",
+   "--sigma-from",
+   "residuals",
+   "--group",
+   "state",
+   "--model",
+   "competitive"
+  ],
+  "request": {
+   "dataset": {
+    "text": "# Initial rates of galactosyltransferase in Golgi membranes, from cells\n# treated with puromycin and from untreated cells.\n# Treloar MA (1974) Effects of Puromycin on Galactosyltransferase in Golgi\n# Membranes. M.Sc. thesis, University of Toronto. Published in Bates DM &\n# Watts DG (1988) Nonlinear Regression Analysis and Its Applications, Wiley,\n# Appendix A1.3, and distributed as R's datasets::Puromycin, where the\n# substrate column is called conc and the grouping column state.\n# Substrate concentration in parts per million; rate in counts/min/min.\nsubstrate (ppm),rate (counts/min/min),state\n0.02,76,treated\n0.02,47,treated\n0.06,97,treated\n0.06,107,treated\n0.11,123,treated\n0.11,139,treated\n0.22,159,treated\n0.22,152,treated\n0.56,191,treated\n0.56,201,treated\n1.10,207,treated\n1.10,200,treated\n0.02,67,untreated\n0.02,51,untreated\n0.06,84,untreated\n0.06,86,untreated\n0.11,98,untreated\n0.11,115,untreated\n0.22,131,untreated\n0.22,124,untreated\n0.56,144,untreated\n0.56,158,untreated\n1.10,160,untreated\n",
+    "filename": "puromycin.csv",
+    "mapping": {
+     "delimiter": "comma",
+     "decimal": ".",
+     "header": true,
+     "roles": {
+      "substrate": 0,
+      "rate": 1,
+      "sigma": null,
+      "inhibitor": null,
+      "group": 2,
+      "replicate": null,
+      "rates": []
+     },
+     "units": {
+      "substrate": "ppm",
+      "rate": "counts/min/min"
+     },
+     "target": {
+      "substrate": "ppm",
+      "rate": "counts/min/min"
+     }
+    }
+   },
+   "sigma_from": "residuals",
+   "model": "competitive"
+  },
+  "outcome": {
+   "exit_code": 3,
+   "meaning": "refused",
+   "summary": "--model competitive needs rates measured with an inhibitor, and the file has no inhibitor concentration above zero",
+   "reason": "caterva rates: --model competitive needs rates measured with an inhibitor, and the file has no inhibitor concentration above zero",
+   "has_result": false
+  },
+  "error": null,
+  "artifacts": [],
+  "progress": {
+   "stage": "read",
+   "label": "Reading your table",
+   "fraction": 0.0
+  }
+ },
+ "result_status": 404,
+ "error": {
+  "error": {
+   "code": "not_found",
+   "message": "the run finished without a result: caterva rates: --model competitive needs rates measured with an inhibitor, and the file has no inhibitor concentration above zero"
+  }
+ },
+ "events": [
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261004-215206-rates-b0426b5b",
+    "seq": 1,
+    "at": "2026-10-04T21:52:06.107Z",
+    "status": "queued"
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261004-215206-rates-b0426b5b",
+    "seq": 2,
+    "at": "2026-10-04T21:52:06.109Z",
+    "status": "running"
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261004-215206-rates-b0426b5b",
+    "seq": 3,
+    "at": "2026-10-04T21:52:06.112Z",
+    "stage": "read",
+    "label": "Reading your table",
+    "fraction": 0.0
+   }
+  },
+  {
+   "event": "result",
+   "data": {
+    "run_id": "20261004-215206-rates-b0426b5b",
+    "seq": 4,
+    "at": "2026-10-04T21:52:06.114Z",
+    "outcome": {
+     "exit_code": 3,
+     "meaning": "refused",
+     "summary": "--model competitive needs rates measured with an inhibitor, and the file has no inhibitor concentration above zero",
+     "reason": "caterva rates: --model competitive needs rates measured with an inhibitor, and the file has no inhibitor concentration above zero",
+     "has_result": false
+    }
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261004-215206-rates-b0426b5b",
+    "seq": 5,
+    "at": "2026-10-04T21:52:06.115Z",
+    "status": "done",
+    "outcome": {
+     "exit_code": 3,
+     "meaning": "refused",
+     "summary": "--model competitive needs rates measured with an inhibitor, and the file has no inhibitor concentration above zero",
+     "reason": "caterva rates: --model competitive needs rates measured with an inhibitor, and the file has no inhibitor concentration above zero",
+     "has_result": false
+    }
+   }
+  },
+  {
+   "event": "end",
+   "data": {
+    "run_id": "20261004-215206-rates-b0426b5b",
+    "seq": 6,
+    "at": "2026-10-04T21:52:06.115Z",
+    "status": "done"
+   }
+  }
+ ]
+}

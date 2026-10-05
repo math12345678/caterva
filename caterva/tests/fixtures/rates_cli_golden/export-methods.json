@@ -1,0 +1,14 @@
+{
+ "argv": [
+  "examples/rates/puromycin.csv",
+  "--sigma-from",
+  "residuals",
+  "--group",
+  "state",
+  "--export",
+  "methods"
+ ],
+ "exit": 0,
+ "stdout": "Initial rates (23 measurements at 12 distinct conditions, in 2 groups; substrate in ppm, rate in counts/min/min) were fitted to the Michaelis-Menten, substrate inhibition (Haldane), Hill rate laws (Cornish-Bowden 2012; Segel 1975) by nonlinear least squares (scipy.optimize.least_squares, trust-region reflective, on the logarithms of the constants, which keeps them positive; derivatives by the complex step; multiple starting points spread across the range of the data). Rates were weighted equally (ordinary least squares) and the standard deviation was estimated from the residuals, which assumes the rate law is correct. 95% confidence intervals are profile-likelihood intervals (Bates & Watts 1988), bounded by the profile-t statistic against Student's t on the residual degrees of freedom; asymptotic standard errors are also reported. Nested rate laws were compared by likelihood-ratio tests (chi-square with the error known, extra-sum-of-squares F with it estimated); restrictions that put a constant at infinity were referred to the 50:50 mixture of chi-square(0) and chi-square(1) (Self & Liang 1987), and non-nested laws were described by AICc (Hurvich & Tsai 1989) without a test. Lack of fit was tested against pure error from replicates (Draper & Smith). Differences between groups were tested by fitting each constant shared across groups and comparing with separate fits. Software: Caterva 0.5.0 (caterva rates), Python 3.12.13, NumPy 2.2.6, SciPy 1.15.3.\n",
+ "stderr": ""
+}

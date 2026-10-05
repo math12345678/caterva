@@ -12,6 +12,16 @@ onward and [Keep a Changelog](https://keepachangelog.com/) in shape.
 Entries before 0.1.0 are grouped by date, because that is how the work was
 done: there was no release to version.
 
+## Unreleased
+
+### Added
+- **Rates in Caterva Studio**: start from your own measurements. Drop a CSV, TSV or text file (or choose one, or paste the cells from a spreadsheet) on the Rates screen and the page, with the server's help, says how the table was read (delimiter, header, decimal comma, a byte-order mark, Windows line endings, units in headers such as `[S] (mM)`, long, wide and two-column layouts), states every decision, locates every problem by line and column and skips a bad row only in the open. Then it fits it as `caterva rates` does and shows a figure (rates with error bars, the fitted curve with its band, the residuals beneath), the constants each marked as fitted from your data with a profile-likelihood interval, the lack-of-fit test, the rate laws compared with AICc, the comparison between groups and with BRENDA, and what to change when the data cannot bound a constant. It takes away the figure as SVG and as a 300 dpi PNG for a single or double column, the tables as CSV (a text cell a spreadsheet would run as a formula is made inert), a methods paragraph generated from the run, a citation line and the run's bundle. Home and the command palette offer "Fit my data" beside the written line, and the Kinetics group now leads with Rates. R's `datasets::Puromycin` opens as an example.
+- `caterva/rates/run.py`, the sequence `caterva rates` ran inside `main` as a library call that the command and Studio both use (the command's output is unchanged: sixteen golden outputs on the real Puromycin table are byte for byte the same before and after), `caterva/rates/ingest.py` (reading a pasted or dropped table into the canonical CSV), `view.py` (what a screen draws from one analysis) and `turnover.py` (kcat from a fitted Vmax and an enzyme concentration you give).
+
+### Fixed
+- `caterva rates` crashed on a table with a single group of rows (`--group` naming a column with one label); it now fits and names the group and compares nothing.
+- `caterva rates` crashed describing a substrate-inhibition constant the data bound on neither side (rates at only the lowest concentrations); it now says no substrate inhibition is detectable.
+
 ## [0.5.1] - 2026-10-04
 
 Caterva.app updates itself. A release candidate, `v0.5.1-rc.1`, comes first,

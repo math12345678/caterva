@@ -71,6 +71,10 @@ ROUTES: Tuple[Route, ...] = (
           summary="replace the settings; unknown keys are malformed"),
     Route("GET", "/api/compose/shapes", "compose_shapes", "ShapesResponse",
           summary="grammar.shapes(), the mechanisms compose can build", owner="compose"),
+    Route("POST", "/api/rates/preview", "rates_preview", "RatesPreview",
+          summary="body {text, filename?, mapping?}: how a pasted or dropped table is read (delimiter, header, "
+                  "decimal mark, units, columns), every decision and every problem by line and column; "
+                  "never a 400 for a bad table, only for a body that is not a question", owner="rates"),
     Route("POST", "/api/organisms/normalise", "normalise_organism", "NormaliseOrganismResponse",
           summary="compose.organisms.normalise_organism, for form hints", owner="compose"),
     Route("GET", "/api/enzymes/find", "find_enzymes", "EnzymeFindResponse",
