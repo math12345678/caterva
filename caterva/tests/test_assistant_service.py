@@ -228,7 +228,6 @@ def test_the_payload_is_redacted_and_the_persons_input_is_withheld_unless_ticked
     assert "your_input" in ticked["payload"] and "patient_smith" not in ticked["payload"]
     assert home not in ticked["payload"] and TEST_KEY not in ticked["payload"]
     assert "[path]" in ticked["payload"] and "[key]" in ticked["payload"]
-    assert "ada" != getattr(os, "getlogin", lambda: "x")()  # (the login name, if long enough, is redacted below)
     assert str(app.ws.root) not in ticked["payload"]
 
 
