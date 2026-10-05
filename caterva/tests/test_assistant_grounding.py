@@ -361,7 +361,7 @@ def test_significance_needs_a_test_in_the_result_and_significant_figures_is_not_
 
 
 def test_the_check_never_raises_on_odd_input():
-    for text in ["", " ", "\x00", "9" * 400, "e" * 5000, "1e999999", "1." * 300, "‮", "((((", "1/0"]:
+    for text in ["", " ", "\x00", "9" * 400, "e" * 5000, "1e999999", "1." * 300, "\u202e", "((((", "1/0"]:
         check(text, SOURCES["compose"])
     assert not check(None, {}).ok  # type: ignore[arg-type]
 

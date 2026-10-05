@@ -113,6 +113,20 @@
       "rule": "concealment/hidden-markup",
       "reviewed": "2026-09-28",
       "reason": "`aria-hidden=\"true\"` on an EMPTY span (line 549) used as a CSS-drawn rule in the manifest section. There is no text in it at all. Same markup as the reviewed mule/index.html entry."
+    },
+    {
+      "fingerprint": "b86e1bd12e507b82",
+      "file": "caterva/assistant/providers.py",
+      "rule": "injection/exfiltration",
+      "reviewed": "2026-10-05",
+      "reason": "A module docstring (line 10) in the section that says what the provider layer does NOT do. Read in full: it states that the request builder holds no secret, that the secret is attached only at the moment of sending, and that the consent preview shows the exact bytes sent. It is a description of the design for a human maintainer, in the passive voice of documentation, and it addresses nobody. The scanner matched the words for a secret and for sending within one sentence; the sentence says where the secret is NOT kept. The code beside it is the check: tests in test_assistant_providers.py and test_assistant_service.py assert the secret is absent from the preview and from every record written."
+    },
+    {
+      "fingerprint": "d73ebb01bd8e5081",
+      "file": "caterva/assistant/redact.py",
+      "rule": "injection/exfiltration",
+      "reviewed": "2026-10-05",
+      "reason": "A module docstring (line 8) listing what the redaction step REMOVES from text before it leaves the machine: home folder, paths, user name, e-mail addresses and anything shaped like a service key, each replaced by a placeholder. The scanner matched the words for a key and for leaving the machine. The text is the opposite of a collection instruction: it describes deleting such strings. The behaviour is pinned by test_assistant_redact.py, which feeds key-shaped strings (split into fragments in the source) and asserts none survives."
     }
   ]
 }

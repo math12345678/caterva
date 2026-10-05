@@ -41,6 +41,27 @@ matching English phrases in legitimate documentation:
                                API guide with a "System:" line in an example
                                transcript.
 
+On 2026-10-05, integrating the assistant (caterva/assistant/), the scan reported six findings. Each was
+read at its site:
+
+  * providers.py:10, redact.py:8  module docstrings describing that the
+                               request builder holds no secret and that the
+                               redaction step removes secret-shaped text. Both
+                               are descriptions of safeguards, recorded in
+                               trojan-baseline.json with their reasons.
+  * injection_corpus.json      three fragments of the assistant's hostile
+                               test inputs (the fixture exists to hold text
+                               an attacker might plant). The fixture's own
+                               rule is that no scanner phrase may sit on one
+                               line, so the three lines were split further;
+                               the joined strings the tests use are unchanged
+                               (checked by comparing them before and after).
+                               Not baselined: the file stays scannable.
+  * test_assistant_grounding   a literal right-to-left override character
+                               in a list of odd inputs. Replaced by its
+                               escape in the source: same test, no hidden
+                               character in the file.
+
 The findings then disappeared on their own: concurrent agents reworded
 several of those files for unrelated reasons between the scan and this
 guard being written. That is worth knowing, because it means a clean scan
