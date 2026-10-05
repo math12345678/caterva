@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "159 test files -- kinetics & Michaelis-Menten correctness, " +
+          "163 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -227,16 +227,10 @@ export const TEST_SUITES: TestSuite[] = [
         // Rates screen's Python side: 149 tests: 103 in three new files
         // (test_rates_cli_unchanged.py 17, test_rates_ingest.py 41,
         // test_studio_rates.py 45) and the rest the contract mirror's
-        // per-shape cases for the new Rates shapes, all passing in focused
-        // runs on the branch (2026-10-04):
-        // 6235 as CI collects it with stdpopsim hidden.
-        // Then the md smoke run's verdict-explanation rule: 5 tests in
-        // test_md_smoke_verdicts.py plus one for identical areas, all passing in a
-        // focused run (2026-10-04): 6240.
-        // in-app updater: test_app_updates.py, 49 tests, all passing in a
-        // focused run on the branch (2026-10-04) together with the 42 of
-        // test_build_studio_app.py: 6135.
-        passed: 6240, // PLACEHOLDER: recounted after the second merge
+        // per-shape cases for the new Rates shapes; then the md smoke
+        // verdict rule (test_md_smoke_verdicts.py); then Studio's assistant
+        // (388 tests in 8 files). PLACEHOLDER: recounted on the merged tree.
+        passed: 6474,
         skipped: 1,
         failed: 0,
       },

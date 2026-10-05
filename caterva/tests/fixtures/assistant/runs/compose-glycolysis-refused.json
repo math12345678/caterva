@@ -1,0 +1,44 @@
+{
+ "captured": {
+  "kind": "compose",
+  "request": {
+   "description": "glycolysis"
+  }
+ },
+ "run": {
+  "schema": "caterva.studio.run/1",
+  "id": "20261004-222126-compose-7e0e4725",
+  "kind": "compose",
+  "title": "glycolysis",
+  "status": "done",
+  "created_at": "2026-10-04T22:21:26.602Z",
+  "started_at": "2026-10-04T22:21:26.605Z",
+  "finished_at": "2026-10-04T22:21:26.608Z",
+  "caterva_version": "0.5.0",
+  "cli": [
+   "caterva",
+   "compose",
+   "glycolysis"
+  ],
+  "request": {
+   "description": "glycolysis"
+  },
+  "outcome": {
+   "exit_code": 3,
+   "meaning": "refused",
+   "summary": "'glycolysis' is a named pathway, not a shape. Building it means its actual enzymes and stoichiometry, which needs a pathway database (KEGG or Reactome) that Caterva does not yet read. Guessing a plausible pathway would be worse than saying so. You can describe the steps you want, or supply SBML.",
+   "reason": "Not built.\n\n'glycolysis' is a named pathway, not a shape. Building it means its actual enzymes and stoichiometry, which needs a pathway database (KEGG or Reactome) that Caterva does not yet read. Guessing a plausible pathway would be worse than saying so. You can describe the steps you want, or supply SBML.",
+   "has_result": false
+  },
+  "error": null,
+  "artifacts": [],
+  "progress": {
+   "stage": "compose",
+   "label": "Composing the model from its description",
+   "fraction": null
+  }
+ },
+ "result_status": 404,
+ "result": null,
+ "artifact_files": {}
+}

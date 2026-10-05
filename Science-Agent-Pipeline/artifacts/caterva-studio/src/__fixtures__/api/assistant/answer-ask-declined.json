@@ -1,0 +1,28 @@
+{
+ "request": {
+  "call_id": "855f13a4b6fab907",
+  "payload_sha256": "766458c1ec19beb19b5ef20b58cdf5e325a5216b74f1ddf1c3f17bef3938c3aa",
+  "consent": true
+ },
+ "status": 200,
+ "body": {
+  "call_id": "855f13a4b6fab907",
+  "feature": "ask",
+  "outcome": "declined",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "local": false,
+  "latency_ms": 0,
+  "content": {
+   "declined": true,
+   "text": "I can only answer about this run, and this run's result does not contain that."
+  },
+  "rejection": null,
+  "error": null,
+  "fallback": {
+   "text": "The assistant is not answering this one. The closest facts in this run's own record:\n- result.model.motifs[0].basis: The inhibitor binds free enzyme only, so it raises the apparent Km by (1 + [I]/Ki) and leaves kcat untouched. That signature -- Vmax unchanged, Km inflated -- is what distinguishes competitive from uncompetitive inhibition on a Lineweaver-Burk plot.\n- result.model.species[0].initial.provenance.reason: CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model.\n- result.model.species[1].initial.provenance.reason: CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model.\n- result.model.species[2].initial.provenance.reason: CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model.\n- result.model.species[3].initial.provenance.reason: CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model.\n- result.model.parameters[0].provenance.reason: no value in the organism requested; measurements exist in other organisms, and one is never substituted for yours (ADR 0024) -- re-run with --organism set to one of them to build the model there -- available in: Anas platyrhynchos, Champsocephalus gunnari, Cryptosporidium parvum, Deinococcus radiodu"
+  },
+  "grounding": null,
+  "run_id": "20261004-222110-compose-6bf8a05d"
+ }
+}

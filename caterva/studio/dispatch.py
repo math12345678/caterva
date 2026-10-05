@@ -188,6 +188,7 @@ class App:
         instance_id: Optional[str] = None,
         job_options: Optional[Mapping[str, Any]] = None,
         capability_options: Optional[Mapping[str, Any]] = None,
+        assistant_options: Optional[Mapping[str, Any]] = None,
     ) -> None:
         self.ws = workspace
         self.guard = Guard(host, port, token or mint_token(), dev_origin)
@@ -204,6 +205,11 @@ class App:
                                   **dict(job_options or {}))
         #: The bounds on work a request can start (limits.py), one set per server.
         self.finder = limits.SearchGuard()
+        #: The Studio's assistant (docs/studio/ASSISTANT.md): off unless a person switches it on.
+        from caterva.assistant.service import AssistantService
+
+        self.assistant = AssistantService(workspace=workspace, offline=lambda: bool(self.settings().get("offline")),
+                                          **dict(assistant_options or {}))
         self.streams = limits.Gate(limits.MAX_STREAMS)
         self.capabilities = CapabilityProbe(registry=self.registry, workspace=workspace, static_site=self.static,
                                             dev_origin=dev_origin, settings=self.settings,
@@ -453,6 +459,21 @@ class App:
         _only(call.query, ())
         return json_response({"token": self.token, "api_version": STUDIO_API_VERSION})
 
+    def _assistant_route(self, call: _Call) -> Response:
+        """Every /api/assistant/ route (registered as `_h_assistant_*` below): the service answers, and a
+        refusal becomes the contract's error body."""
+        from caterva.assistant.providers import AssistantError
+
+        _only(call.query, ("run_id",) if call.route.handler == "assistant_log" else ())
+        try:
+            status, payload = self.assistant.handle(call.route.handler, call.query, call.body)
+        except AssistantError as exc:
+            code = {400: "malformed", 404: "not_found", 409: "conflict"}.get(exc.status, "unavailable")
+            headers = [("Retry-After", str(exc.retry_after_s))] if exc.retry_after_s else ()
+            raise ApiFailure(exc.status if exc.status in (400, 404, 409) else 503, code, exc.message,
+                             headers=headers) from None
+        return json_response(payload, status=status)
+
     # -- run handlers --------------------------------------------------------
 
     def _h_create_run(self, call: _Call) -> Response:
@@ -623,6 +644,11 @@ class App:
             ("Content-Disposition", f'attachment; filename="caterva-{run_id}.zip"'),
             ("Cache-Control", "no-store"),
         ]), data)
+
+
+for _route in routes.ROUTES:
+    if _route.handler.startswith("assistant_"):
+        setattr(App, f"_h_{_route.handler}", App._assistant_route)
 
 
 def _query(query_string: str) -> Dict[str, str]:

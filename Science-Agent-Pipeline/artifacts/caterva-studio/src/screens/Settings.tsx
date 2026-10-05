@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import type { Settings } from "@/api/types";
 import { Field, fieldError, FormActions, Select, Switch, TextInput } from "@/components/forms/Field";
 import { useCommand } from "@/components/palette/commands";
+import { AssistantSection } from "@/components/assistant/AssistantSection";
 import { Screen, Section } from "@/components/screen/Screen";
 import { UpdatesSection } from "@/components/settings/UpdatesSection";
 import { NetworkPanel } from "@/components/shell/NetworkPanel";
@@ -227,6 +228,8 @@ export default function SettingsScreen() {
           <NetworkPanel net={caps.data.network} />
         )}
       </Section>
+
+      <AssistantSection />
 
       <Section title="Workspace">
         {caps.isPending ? (

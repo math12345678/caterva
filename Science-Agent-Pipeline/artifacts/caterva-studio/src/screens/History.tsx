@@ -23,6 +23,7 @@ import { Link, useLocation } from "wouter";
 
 import { createRun, downloadArtifact, downloadBundle, getRun, isTerminal, listRuns } from "@/api/runs";
 import type { RunKind, RunRecord, RunSummary } from "@/api/types";
+import { useAssistantRuns } from "@/components/assistant/useAssistant";
 import { Disclosure } from "@/components/forms/Disclosure";
 import { Select } from "@/components/forms/Field";
 import { Segmented } from "@/components/forms/Segmented";
@@ -324,6 +325,8 @@ export default function HistoryScreen() {
   const held = useHeldDeletes();
   const [, navigate] = useLocation();
   const all = useAllRuns(kind);
+  const assistedRuns = useAssistantRuns();
+  const assisted = useMemo(() => new Set(assistedRuns.data?.run_ids ?? []), [assistedRuns.data]);
   const runs = useMemo(
     () => (all.data?.runs ?? []).filter((r) => !held.has(r.id) && matchesFilter(r, filter) && matchesSearch(r, query)),
     [all.data, filter, query, held],
@@ -388,7 +391,7 @@ export default function HistoryScreen() {
           <div className="run-list" role="list" aria-label="Runs, newest first" onKeyDown={walk}>
             {runs.map((r) => (
               <div role="listitem" key={r.id}>
-                <RunRow run={r} selected={r.id === shown} onSelect={() => select(r.id)} />
+                <RunRow run={r} selected={r.id === shown} onSelect={() => select(r.id)} assisted={assisted.has(r.id)} />
               </div>
             ))}
             {all.data?.more ? (

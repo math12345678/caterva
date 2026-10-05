@@ -52,7 +52,13 @@ export type RunStatus =
   | "abandoned"
   | "interrupted";
 export type OutcomeMeaning = "produced" | "refused" | "negative" | "network";
+/** The five kinds the engine emits (CONTRACT.md 9); mirrored by contract.PROVENANCE_KINDS. */
 export type ProvenanceKind = "measured" | "fitted" | "computed" | "placeholder" | "chosen";
+/**
+ * The marks the page draws: the engine's five and `ai`, "suggested by an assistant, not a measurement"
+ * (CONTRACT.md 9 and 17.3). No server answer carries `ai`: it marks assistant text and unconfirmed suggestions.
+ */
+export type MarkKind = ProvenanceKind | "ai";
 export type ChosenBy = "user" | "default";
 export type Nonfinite = "nan" | "inf" | "-inf";
 export type ErrorCode =

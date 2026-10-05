@@ -96,6 +96,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             self?.showFirstRunIfNeeded()
         }
         server.onExit = { [weak self] exit in self?.serverEnded(exit) }
+        let relay = AssistantKeyRelay { [weak server] data in server?.writeToServer(data) }
+        server.assistantRelay = relay
+        controller.assistantKeys = AssistantKeyBridge(store: relay.store, relay: relay)
         self.server = server
         do {
             try server.start(command, port: 0)

@@ -1,0 +1,37 @@
+{
+ "request": {
+  "call_id": "450badc0de4c9ce0",
+  "payload_sha256": "68691e7697159dd58ab99aaffa0d1bd80d62bddaa4337b7b074a9a8ca04b5b7b",
+  "consent": true
+ },
+ "status": 200,
+ "body": {
+  "call_id": "450badc0de4c9ce0",
+  "feature": "next",
+  "outcome": "accepted",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "local": false,
+  "latency_ms": 0,
+  "content": {
+   "reply": {
+    "narration": "The engine ranks settling_time first: it adds a new direction.",
+    "order": [
+     "settling_time"
+    ]
+   },
+   "kind": "ai"
+  },
+  "rejection": null,
+  "error": null,
+  "fallback": {
+   "text": "The engine's own ranking, best first:\n1. settling_time: the time the system takes to settle (novelty 1.41, adds a new direction)\n2. steady_state:reaction_S: the steady-state concentration of reaction_S (novelty 0, adds nothing the measurements already taken do not show)\n3. steady_state:reaction_P: the steady-state concentration of reaction_P (novelty 0, adds nothing the measurements already taken do not show)\n4. steady_state:reaction_E: the steady-state concentration of reaction_E (novelty 0, adds nothing the measurements already taken do not show)\n5. steady_state:reaction_I: the steady-state concentration of reaction_I (novelty 0, adds nothing the measurements already taken do not show)"
+  },
+  "grounding": {
+   "ok": true,
+   "failures": [],
+   "checked": {}
+  },
+  "run_id": "20261004-222110-compose-6bf8a05d"
+ }
+}

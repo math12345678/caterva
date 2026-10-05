@@ -164,6 +164,10 @@ NEGATIVE_MEANING: Mapping[str, str] = {
 
 ProvenanceKind = Literal["measured", "fitted", "computed", "placeholder", "chosen"]
 PROVENANCE_KINDS: Tuple[str, ...] = ("measured", "fitted", "computed", "placeholder", "chosen")
+#: The sixth mark the page draws, for text a language model wrote or a value it suggested
+#: ("suggested by an assistant, not a measurement"). It is NOT an engine kind: no adapter emits it and
+#: `sourced` refuses it. docs/studio/CONTRACT.md section 9; docs/studio/ASSISTANT.md.
+ASSISTANT_PROVENANCE_KIND = "ai"
 
 #: Who chose a chosen number: the person, in the request, or a stated
 #: default of the command (the CLI's argparse default, a motif's starting

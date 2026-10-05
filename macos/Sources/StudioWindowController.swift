@@ -28,6 +28,10 @@ final class StudioWindowController: NSWindowController, NSWindowDelegate, WKNavi
         get { bridge.updates }
         set { bridge.updates = newValue }
     }
+    var assistantKeys: AssistantKeyBridge? {
+        get { bridge.assistantKeys }
+        set { bridge.assistantKeys = newValue }
+    }
 
     private let isDevelopment: Bool
     private let container = NSView()

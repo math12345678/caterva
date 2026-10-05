@@ -200,6 +200,8 @@ final class StudioServer {
     let logURL: URL
     var onURL: ((URL) -> Void)?
     var onExit: ((Exit) -> Void)?
+    /// Sent the stored assistant keys once the server has printed its address.
+    var assistantRelay: AssistantKeyRelay?
     /// The last run's end, whether or not it was asked for.
     private(set) var lastExit: Exit?
 
@@ -293,6 +295,14 @@ final class StudioServer {
         done.signal()   // leave it signalled for any later waiter
     }
 
+    /// Write to the child's stdin; a closed pipe is ignored.
+    func writeToServer(_ data: Data) {
+        queue.async { [weak self] in
+            signal(SIGPIPE, SIG_IGN)
+            AssistantKeyRelay.write(data, to: self?.stdinPipe?.fileHandleForWriting)
+        }
+    }
+
     // MARK: - Reading
 
     /// A blocking read loop per stream, on its own thread. `read(2)` rather
@@ -348,6 +358,7 @@ final class StudioServer {
                 writeLog("listening at \(StudioServer.withoutFragment(url).absoluteString)\n")
                 let callback = onURL
                 callbackQueue.async { callback?(url) }
+                assistantRelay?.sendAll()
             } else {
                 let shown = StudioServer.withoutFragment(URL(string: value)) ?? "(unreadable)"
                 writeLog("ignored an address that is not a loopback http URL: \(shown)\n")

@@ -1,0 +1,45 @@
+{
+ "request": {
+  "call_id": "485e04231795a876",
+  "payload_sha256": "fb669c4c85d432159c0382b61b2c3b789b18036d14e286fde3d42a020ac13f8f",
+  "consent": true
+ },
+ "status": 200,
+ "body": {
+  "call_id": "485e04231795a876",
+  "feature": "explain",
+  "outcome": "accepted",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "local": false,
+  "latency_ms": 0,
+  "content": {
+   "reply": {
+    "summary": "The verdict is structural, so this run supports questions about the mechanism only.",
+    "worst_thing": "Only 2 constants are measured and 1 is still a placeholder.",
+    "next_step": "Re-run with an organism that holds a measurement.",
+    "terms": [
+     {
+      "term": "placeholder",
+      "meaning": "a stand-in value nobody has measured here"
+     }
+    ]
+   },
+   "kind": "ai"
+  },
+  "rejection": null,
+  "error": null,
+  "fallback": {
+   "text": "VERDICT: STRUCTURAL\n\nWhat this supports: Questions about the MECHANISM: can this shape oscillate, can it switch, which constants would matter if you measured them. Not questions about any particular enzyme or cell, because the constants are the library's illustrative values.\n\nQualified: EC 1.1.1.27 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\nThe conclusion tested: exactly one stable state\n\n2 concern(s), worst first:\n  - [provenance] 2 constant(s) measured and 1 still the motif library's illustrative values -- re-run with --organism set to one the provenance table lists as holding a measurement, or supply the constants yourself -- start with the top of its influence ranking\n  - [isozymes] EC 1.1.1.27 has 5 human isozymes in the enzyme nomenclature's UniProt entries (LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with one of these names (for example --isoform LDHAL6A) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nDo this next: re-run with --organism set to one the provenance table lists as holding a measurement, or supply the constants yourself -- start with the top of its influence ranking\n\nChecked: assumptions (none checkable); isozymes (EC 1.1.1.27 is 5 proteins in human, none chosen); predictions (all 4 predicted amounts are possible; 1 sit below one molecule per cell, where the deterministic model stops applying); provenance (2 measured, 1 unmeasured); robustness (5/5 samples); scale (all 7 numbers examined are possible); stability (1 stable state(s) from 32 starting points); units (all 1 rate law(s) balance); validate (cross-checks agree).\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point."
+  },
+  "grounding": {
+   "ok": true,
+   "failures": [],
+   "checked": {
+    "number": 2,
+    "name": 1
+   }
+  },
+  "run_id": "20261004-222110-compose-6bf8a05d"
+ }
+}

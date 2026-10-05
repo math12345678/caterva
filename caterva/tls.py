@@ -67,3 +67,18 @@ def client_context() -> ssl.SSLContext:
 
 __all__ = ["USER_CERTIFICATE_SETTINGS", "bundled_ca_file", "client_context", "default_certificates_exist",
            "trust_bundled_certificates"]
+
+
+def client_context() -> ssl.SSLContext:
+    """A verifying TLS context for an HTTPS client: the user's certificate settings if any, else the bundle.
+
+    `httpx` takes it as `verify=`. Used by the studio's assistant, which is the only code in the
+    studio that sends text to a server the person did not start themselves."""
+    for name in USER_CERTIFICATE_SETTINGS:
+        value = os.environ.get(name)
+        if value and os.path.exists(value):
+            return ssl.create_default_context(cafile=value) if os.path.isfile(value) \
+                else ssl.create_default_context(capath=value)
+    bundle = bundled_ca_file()
+    return ssl.create_default_context(cafile=bundle) if bundle else ssl.create_default_context()
+

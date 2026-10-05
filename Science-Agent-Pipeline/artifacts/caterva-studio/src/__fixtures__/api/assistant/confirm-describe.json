@@ -1,0 +1,27 @@
+{
+ "request": {
+  "call_id": "78f4e4910a56d530",
+  "event": "confirm"
+ },
+ "status": 200,
+ "body": {
+  "call_id": "78f4e4910a56d530",
+  "request": {
+   "description": "Michaelis-Menten with a competitive inhibitor",
+   "substrate": "pyruvate",
+   "inhibitor": "gossypol",
+   "organism": "human"
+  },
+  "reading": "competitive inhibition",
+  "provenance": {
+   "kind": "chosen",
+   "by": "user",
+   "reason": "suggested by an assistant (claude-sonnet-5-5, anthropic) and confirmed by you",
+   "suggested_by": {
+    "assistant": "claude-sonnet-5-5",
+    "provider": "anthropic",
+    "call_id": "78f4e4910a56d530"
+   }
+  }
+ }
+}

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import fixture from "@/__fixtures__/api/contract/michaelis-menten-parameters.json";
-import type { ProvenanceKind, SourcedValue } from "@/api/types";
+import type { MarkKind, ProvenanceKind, SourcedValue } from "@/api/types";
 import { Citation, doiUrl, pubmedUrl } from "@/components/provenance/Citation";
 import { ProvenanceDetail } from "@/components/provenance/ProvenanceDetail";
 import { countKinds, ProvenanceLegend } from "@/components/provenance/ProvenanceLegend";
@@ -17,8 +17,8 @@ const km = searched.find((v) => v.id === "reaction_Km")!;
 const kcat = searched.find((v) => v.id === "reaction_kcat")!;
 
 describe("ProvenanceMark", () => {
-  it("gives each of the five kinds its own shape and accessible name", () => {
-    const kinds: ProvenanceKind[] = ["measured", "fitted", "computed", "placeholder", "chosen"];
+  it("gives each of the six marks its own shape and accessible name", () => {
+    const kinds: MarkKind[] = ["measured", "fitted", "computed", "placeholder", "chosen", "ai"];
     const shapes = new Set<string>();
     for (const kind of kinds) {
       const { container, unmount } = render(<ProvenanceMark provenance={{ kind, by: "user" }} />);
@@ -27,7 +27,7 @@ describe("ProvenanceMark", () => {
       shapes.add(container.querySelector("svg")!.innerHTML);
       unmount();
     }
-    expect(shapes.size).toBe(5);
+    expect(shapes.size).toBe(6);
   });
 
   it("tells a default apart from a choice the reader made", () => {
@@ -127,7 +127,7 @@ describe("ProvenanceLegend", () => {
 });
 
 describe("ProvenanceMark shapes, at the size they are read", () => {
-  const draw = (provenance: { kind: ProvenanceKind; by?: "user" | "default" }) => {
+  const draw = (provenance: { kind: MarkKind; by?: "user" | "default" }) => {
     const { container, unmount } = render(<ProvenanceMark provenance={provenance} />);
     const svg = container.querySelector("svg")!;
     const out = { html: svg.innerHTML, width: Number(svg.getAttribute("width")), svg };
@@ -167,6 +167,25 @@ describe("ProvenanceMark shapes, at the size they are read", () => {
   it("keeps the legend naming every mark", () => {
     render(<ProvenanceLegend layout="stack" />);
     const legend = screen.getByRole("list", { name: "What the marks mean" });
-    expect(within(legend).getAllByRole("listitem")).toHaveLength(5);
+    expect(within(legend).getAllByRole("listitem")).toHaveLength(6);
+    expect(within(legend).getByText(/suggested by an assistant, not a measurement/)).toBeInTheDocument();
+  });
+
+  it("gives the assistant's mark its own shape, an open hexagon with a centre dot, and no engine kind wears it", () => {
+    const ai = draw({ kind: "ai" });
+    expect(ai.width).toBeGreaterThanOrEqual(12);
+    const hexagon = ai.svg.querySelector("polygon")!;
+    expect(hexagon.getAttribute("fill")).toBe("none");
+    expect(hexagon.getAttribute("points")!.trim().split(/\s+/)).toHaveLength(6);
+    expect(ai.svg.querySelector("circle")).not.toBeNull();
+    for (const kind of ["measured", "fitted", "computed", "placeholder", "chosen"] as ProvenanceKind[]) {
+      expect(draw({ kind, by: "user" }).html).not.toBe(ai.html);
+    }
+    expect(screen.queryAllByRole("img")).toHaveLength(0);
+  });
+
+  it("names the ai mark for assistive technology as what it is", () => {
+    render(<ProvenanceMark provenance={{ kind: "ai" }} />);
+    expect(screen.getByRole("img", { name: "suggested by an assistant, not a measurement" })).toBeInTheDocument();
   });
 });

@@ -1,0 +1,394 @@
+{
+ "captured": {
+  "kind": "constants",
+  "request": {
+   "ec": "2.7.1.1",
+   "organism": "human",
+   "substrate": "glucose"
+  }
+ },
+ "run": {
+  "schema": "caterva.studio.run/1",
+  "id": "20261004-222126-constants-ab4e544f",
+  "kind": "constants",
+  "title": "km of EC 2.7.1.1, glucose, human",
+  "status": "done",
+  "created_at": "2026-10-04T22:21:26.918Z",
+  "started_at": "2026-10-04T22:21:26.921Z",
+  "finished_at": "2026-10-04T22:21:30.443Z",
+  "caterva_version": "0.5.0",
+  "cli": [
+   "python3",
+   "scripts/cite.py",
+   "--ec=2.7.1.1",
+   "--organism=human",
+   "--substrate=glucose"
+  ],
+  "request": {
+   "ec": "2.7.1.1",
+   "organism": "human",
+   "substrate": "glucose"
+  },
+  "outcome": {
+   "exit_code": 0,
+   "meaning": "produced",
+   "summary": "1 constant(s) from the literature: km",
+   "reason": null,
+   "has_result": true
+  },
+  "error": null,
+  "artifacts": [],
+  "progress": {
+   "stage": "document",
+   "label": "Writing the document with a citation beside each number",
+   "fraction": null
+  }
+ },
+ "result_status": 200,
+ "result": {
+  "document_markdown": "# EC 2.7.1.1 in Homo sapiens\n\nWhat are the measured constants, and where did each come from?\n\n## Parameters\n\n| parameter | value | origin | source |\n|---|---|---|---|\n| km | 6 mM | literature | BRENDA ref 641068 |\n| s0 | 10 mM | **yours** | chosen for this run |\n| vmax | 0.25 mM/s | **yours** | chosen for this run |\n\nA value marked **yours** describes the experiment, not the enzyme. No database reports it, and Caterva has not checked it.\n\n## Conditions the values were measured under\n\nKinetic values move with pH, temperature and buffer. Two values measured under different conditions describe experiments nobody ran together.\n\n- **km** — measured at pH 7.5, 30 °C\n\n## The literature disagrees about km\n\nThe evidence ranked 3 values of km equal: 6 to 18. Running the model at each -- and at no other value, since no other value was measured -- the substrate remaining at t=10 ranges from 8.485 to 9.133. A factor of 1.08. This is the disagreement among the sources carried through the model. It is NOT an uncertainty estimate: the spread is bounded by which papers happen to be in BRENDA, not by any statement about the true value.\n\n| value | result |\n|---|---|\n| 18 | 9.13281 |\n| 6 (returned) | 8.48542 |\n| 6.3 | 8.51371 |\n\n## What Caterva would not do\n\nThese are not omissions. Each one is a decision, with the reason and what would change it.\n\n- no band was produced across the 3 values the literature reports for km: no seed was supplied, and an ensemble nobody can reproduce is not evidence. Re-run with --seed N.\n\n## Result\n\n| time | [S] | [P] |\n|---|---|---|\n| 0 | 10 | 0 |\n| 10 | 8.48542 | 1.51458 |\n\n51 time points; first and last shown. The full trajectory is in the CSV export.\n\n\n---\n\n## How this document was produced\n\n| | |\n|---|---|\n| Caterva commit | `9ddb66f plus 16 uncommitted change(s)` |\n| Generated | 2026-10-04 22:21 UTC |\n\n**This document is not reproducible as it stands:** the working tree was modified, so checking out 9ddb66f will NOT reproduce this exactly. Commit first if this document is going anywhere.\n\n<!-- 1 constant(s) from the literature: km; 2 supplied by you: s0, vmax -->\n",
+  "constants": [
+   {
+    "name": "km",
+    "quantity": "km",
+    "found": true,
+    "source": "brenda_exact",
+    "value": {
+     "value": 6.0,
+     "unit": "mM",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "BRENDA ref 641068",
+       "via": "brenda_exact",
+       "registry": "BRENDA",
+       "reference_id": "641068",
+       "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+       "title": null
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": 7.5,
+       "temperature_c": 30.0,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "30°C, pH 7.5, wild-type",
+      "scope": [
+       "The candidate rows name 6 different forms of hexokinase: hexokinaseI = 0.032–0.5, hexokinaseII = 0.37, hexokinaseIII = 0.034–0.038, hexokinaseIa = 0.77, hexokinaseIb = 0.56, hexokinaseIc = 1.16. The values span a factor of 36. These are distinct gene products with their own kinetics, and a request for the enzyme did not ask for one of them. Returning the lowest would pick a form rather than answer the question."
+      ],
+      "chosen_because": "3 rows were equally well evidenced -- no row beats another on assay completeness, what it states about the protein, and organism match -- and their values span 6 to 18, a 3-fold range. The value returned was chosen by taking the lowest, which the evidence does not justify. That spread is disagreement in the literature, not a measurement uncertainty, and the alternatives are listed so it can be read as such.",
+      "spread": {
+       "low": 6.0,
+       "high": 18.0,
+       "unit": "mM",
+       "carried": 6.0,
+       "n_values": 3,
+       "references": [
+        "641068",
+        "739603"
+       ],
+       "sentence": "2 sources report 3 values (BRENDA ref 641068, 739603), spanning 6 to 18 mM (3-fold); this model carries 6, the resolver's pick, not a verdict; which one is right is a question about the papers. The range is not an uncertainty estimate: it is bounded by which rows are in the database"
+      }
+     },
+     "id": "km",
+     "label": "km"
+    },
+    "alternatives": [
+     {
+      "value": 18.0,
+      "unit": "mM",
+      "provenance": {
+       "kind": "measured",
+       "citation": {
+        "text": "BRENDA ref 641068",
+        "registry": "BRENDA",
+        "reference_id": "641068",
+        "via": "selection_tie"
+       },
+       "organism": "Homo sapiens",
+       "cross_species": false,
+       "conditions": {
+        "ph": null,
+        "temperature_c": null,
+        "buffer": null,
+        "unreported": []
+       },
+       "commentary": "30°C, pH 7.5, wild-type",
+       "scope": [],
+       "chosen_because": null,
+       "spread": null
+      },
+      "id": "km:tied:0"
+     },
+     {
+      "value": 6.3,
+      "unit": "mM",
+      "provenance": {
+       "kind": "measured",
+       "citation": {
+        "text": "BRENDA ref 739603",
+        "registry": "BRENDA",
+        "reference_id": "739603",
+        "via": "selection_tie"
+       },
+       "organism": "Homo sapiens",
+       "cross_species": false,
+       "conditions": {
+        "ph": null,
+        "temperature_c": null,
+        "buffer": null,
+        "unreported": []
+       },
+       "commentary": "wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C",
+       "scope": [],
+       "chosen_because": null,
+       "spread": null
+      },
+      "id": "km:tied:2"
+     }
+    ],
+    "organisms_available": [],
+    "isoforms_available": [],
+    "modes_available": [],
+    "variants_available": [],
+    "raw": {
+     "found": true,
+     "value": 6.0,
+     "unit": "mM",
+     "organism": "Homo sapiens",
+     "source": "brenda_exact",
+     "citation": {
+      "source": "BRENDA",
+      "reference_id": "641068",
+      "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+      "title": null,
+      "organism": "Homo sapiens",
+      "notes": null
+     },
+     "cross_species_flag": false,
+     "relatedness": [],
+     "cross_species_organisms_available": [],
+     "cross_species_candidates": [],
+     "variant_candidates_available": [],
+     "isoforms_available": [],
+     "modes_available": [],
+     "mechanism_evidence": null,
+     "effectors": [],
+     "selection_tie": {
+      "candidates": [
+       {
+        "value": 18.0,
+        "unit": "mM",
+        "organism": "Homo sapiens",
+        "reference_id": "641068",
+        "conditions": "30°C, pH 7.5, wild-type",
+        "selected": false
+       },
+       {
+        "value": 6.0,
+        "unit": "mM",
+        "organism": "Homo sapiens",
+        "reference_id": "641068",
+        "conditions": "30°C, pH 7.5, wild-type",
+        "selected": true
+       },
+       {
+        "value": 6.3,
+        "unit": "mM",
+        "organism": "Homo sapiens",
+        "reference_id": "739603",
+        "conditions": "wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C",
+        "selected": false
+       }
+      ],
+      "low": 6.0,
+      "high": 18.0,
+      "fold_range": 3.0,
+      "reason": "3 rows were equally well evidenced -- no row beats another on assay completeness, what it states about the protein, and organism match -- and their values span 6 to 18, a 3-fold range. The value returned was chosen by taking the lowest, which the evidence does not justify. That spread is disagreement in the literature, not a measurement uncertainty, and the alternatives are listed so it can be read as such."
+     },
+     "commentary": "30°C, pH 7.5, wild-type",
+     "ensemble_candidates": [
+      {
+       "value": 18.0,
+       "unit": "mM",
+       "organism": "Homo sapiens",
+       "reference_id": "641068",
+       "conditions": "30°C, pH 7.5, wild-type",
+       "substrate": "glucose",
+       "ph": 7.5,
+       "temperature_c": 30.0,
+       "buffer": null,
+       "grades": {
+        "assay_completeness": "complete",
+        "condition_proximity": "not_assessed",
+        "organism_match": "exact"
+       }
+      },
+      {
+       "value": 6.0,
+       "unit": "mM",
+       "organism": "Homo sapiens",
+       "reference_id": "641068",
+       "conditions": "30°C, pH 7.5, wild-type",
+       "substrate": "glucose",
+       "ph": 7.5,
+       "temperature_c": 30.0,
+       "buffer": null,
+       "grades": {
+        "assay_completeness": "complete",
+        "condition_proximity": "not_assessed",
+        "organism_match": "exact"
+       }
+      },
+      {
+       "value": 6.3,
+       "unit": "mM",
+       "organism": "Homo sapiens",
+       "reference_id": "739603",
+       "conditions": "wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C",
+       "substrate": "glucose",
+       "ph": 7.6,
+       "temperature_c": 25.0,
+       "buffer": null,
+       "grades": {
+        "assay_completeness": "complete",
+        "condition_proximity": "not_assessed",
+        "organism_match": "exact"
+       }
+      }
+     ],
+     "evidence_only": [],
+     "mode_default": null,
+     "selected_form": null,
+     "variant": {
+      "status": "wild_type",
+      "kind": null,
+      "evidence": "wild-type",
+      "recombinant": false,
+      "reason": "The commentary says 'wild-type': this value was measured on the enzyme as found."
+     },
+     "preparation": {
+      "status": "unstated",
+      "evidence": null,
+      "stated_not_to_affect": null
+     },
+     "effector_contrasts": [],
+     "form_mixtures": [
+      {
+       "base": "hexokinase",
+       "values_by_form": {
+        "I": [
+         0.032,
+         0.06,
+         0.5
+        ],
+        "II": [
+         0.37
+        ],
+        "III": [
+         0.034,
+         0.038
+        ],
+        "Ia": [
+         0.77
+        ],
+        "Ib": [
+         0.56
+        ],
+        "Ic": [
+         1.16
+        ]
+       },
+       "reason": "The candidate rows name 6 different forms of hexokinase: hexokinaseI = 0.032–0.5, hexokinaseII = 0.37, hexokinaseIII = 0.034–0.038, hexokinaseIa = 0.77, hexokinaseIb = 0.56, hexokinaseIc = 1.16. The values span a factor of 36. These are distinct gene products with their own kinetics, and a request for the enzyme did not ask for one of them. Returning the lowest would pick a form rather than answer the question."
+      }
+     ],
+     "organism_discrepancies": [],
+     "source_mixtures": [],
+     "substrates_available": [],
+     "source_check_unavailable": null,
+     "assay_ph": 7.5,
+     "assay_temperature_c": 30.0,
+     "assay_buffer": null,
+     "assay_unreported": [],
+     "literature_candidates": [],
+     "search_log": [
+      "BRENDA exact: 2.7.1.1, Homo sapiens, glucose (km)",
+      "Excluded 13 of 31 exact-match row(s) measuring a protein variant",
+      "1 pool(s) mixing named enzyme forms: hexokinase (I, II, III, Ia, Ib, Ic)",
+      "exact match: Discarded 0.5 (assay complete, commentary unstated, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 0.56 (assay complete, commentary unstated, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 0.77 (assay complete, commentary unstated, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 1.16 (assay complete, commentary unstated, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 0.032 (assay absent, commentary unstated, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 0.034 (assay complete, commentary unstated, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 0.038 (assay complete, commentary unstated, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 0.06 (assay complete, commentary unstated, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 0.0732 (assay partial, commentary wild_type, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 0.37 (assay absent, commentary wild_type, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 0.63 (assay partial, commentary wild_type, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 0.76 (assay partial, commentary wild_type, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 2.0 (assay absent, commentary unstated, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 3.8 (assay complete, commentary unstated, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: Discarded 8.6 (assay absent, commentary unstated, organism exact); beaten on every axis by one with assay complete, commentary wild_type, organism exact",
+      "exact match: 3 of 18 row(s) are non-dominated; choosing the lowest value among those"
+     ]
+    }
+   }
+  ],
+  "supplied": [
+   {
+    "value": 10.0,
+    "unit": "mM",
+    "provenance": {
+     "kind": "chosen",
+     "by": "default",
+     "reason": "the default of cite.py --s0; chosen for this run"
+    },
+    "id": "s0"
+   },
+   {
+    "value": 0.25,
+    "unit": "mM/s",
+    "provenance": {
+     "kind": "chosen",
+     "by": "default",
+     "reason": "the default of cite.py --vmax; chosen for this run"
+    },
+    "id": "vmax"
+   }
+  ],
+  "sourced": [
+   "km"
+  ],
+  "derived": [],
+  "refusals": [
+   "no band was produced across the 3 values the literature reports for km: no seed was supplied, and an ensemble nobody can reproduce is not evidence. Re-run with --seed N."
+  ],
+  "disagreements": [
+   "km"
+  ],
+  "defensible": true,
+  "organism_note": "Read --organism 'human' as Homo sapiens.",
+  "isozyme_notice": {
+   "ec": "2.7.1.1",
+   "organism": "HUMAN",
+   "organism_label": "human",
+   "count": 5,
+   "symbols": [
+    "HKDC1",
+    "HK1",
+    "HK2",
+    "HK3",
+    "GCK"
+   ],
+   "broad": false,
+   "headline": "EC 2.7.1.1 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them",
+   "detail": "EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK), so the constants this lookup returns may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat",
+   "remedy": "use the Isoform field of Compose to take each constant from a row that names one isozyme",
+   "text": "EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK), so the constants this lookup returns may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat."
+  }
+ },
+ "artifact_files": {}
+}

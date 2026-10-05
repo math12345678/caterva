@@ -1,0 +1,29 @@
+{
+ "request": {
+  "feature": "test"
+ },
+ "status": 200,
+ "body": {
+  "call_id": "dfd41209def67aa7",
+  "feature": "test",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "destination": {
+   "host": "api.anthropic.com",
+   "local": false,
+   "label": "Anthropic"
+  },
+  "leaves_machine": true,
+  "url": "https://api.anthropic.com/v1/messages",
+  "payload": "{\"model\":\"claude-sonnet-5-5\",\"max_tokens\":1024,\"system\":\"You are a connectivity check inside a desktop app. Reply with the single word the user asks for.\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with the single word: ready\"}]}",
+  "payload_sha256": "58b056cee03cc6178ae8e7f7f0bd4d0ef6666a612e3253d8465dd200d1ce8af0",
+  "bytes": 230,
+  "consent_required": true,
+  "include_data": false,
+  "sends": "One fixed line of text: nothing from your work.",
+  "spend": {
+   "remaining": 9
+  },
+  "fallback": {}
+ }
+}

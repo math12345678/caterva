@@ -19,6 +19,8 @@ import { describeError } from "@/lib/errors";
 import { formatCount } from "@/lib/format";
 import { readNetwork, useNetworkCheck } from "@/lib/network";
 
+import { AssistantStatusItem } from "@/components/assistant/AssistantStatusItem";
+
 import { NetworkPanel } from "./NetworkPanel";
 
 type DotState = "ok" | "off" | "unknown" | "bad";
@@ -143,6 +145,7 @@ export function StatusLine({
           label={c?.gromacs.found ? `GROMACS ${c.gromacs.version ?? ""}`.trim() : "GROMACS"}
           reason={c ? (c.gromacs.found ? `gmx at ${c.gromacs.path ?? "an unknown path"}` : (c.gromacs.reason ?? "gmx was not found")) : capsReason}
         />
+        <AssistantStatusItem />
         <span className="status-spacer" />
         <Item
           state={c ? (c.data_dir.writable ? "ok" : "bad") : "unknown"}

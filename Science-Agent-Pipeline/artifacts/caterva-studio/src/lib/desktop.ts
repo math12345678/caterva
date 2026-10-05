@@ -16,7 +16,10 @@ type BridgeMessage =
   | { action: "updateStatus" }
   | { action: "checkForUpdates" }
   | { action: "setUpdateOptions"; automatic?: boolean; prereleases?: boolean }
-  | { action: "reportActiveRuns"; count: number };
+  | { action: "reportActiveRuns"; count: number }
+  | { action: "setAssistantKey"; provider: string; key: string }
+  | { action: "clearAssistantKey"; provider: string }
+  | { action: "assistantKeyStatus"; provider: string };
 
 interface Bridge {
   postMessage(message: BridgeMessage): Promise<unknown>;
@@ -112,3 +115,42 @@ export function reportActiveRuns(count: number): void {
   const b = bridge();
   if (b) void b.postMessage({ action: "reportActiveRuns", count }).catch(() => undefined);
 }
+
+/**
+ * The assistant's key, kept by the shell in the login Keychain (CONTRACT.md 22.9). The page hands the key over
+ * once and never stores it; the shell passes it to the server over a private channel. Outside the app there is no
+ * bridge: the key then comes from the CATERVA_ASSISTANT_KEY environment variable and these return null.
+ */
+export async function setAssistantKey(provider: string, key: string): Promise<boolean | null> {
+  const b = bridge();
+  if (!b) return null;
+  try {
+    return (await b.postMessage({ action: "setAssistantKey", provider, key })) === null;
+  } catch {
+    return false;
+  }
+}
+
+export async function clearAssistantKey(provider: string): Promise<boolean | null> {
+  const b = bridge();
+  if (!b) return null;
+  try {
+    await b.postMessage({ action: "clearAssistantKey", provider });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** "present" or "absent" from the Keychain, never the value; null outside the app. */
+export async function assistantKeyStatus(provider: string): Promise<"present" | "absent" | null> {
+  const b = bridge();
+  if (!b) return null;
+  try {
+    const answer = await b.postMessage({ action: "assistantKeyStatus", provider });
+    return answer === "present" ? "present" : "absent";
+  } catch {
+    return null;
+  }
+}
+

@@ -64,11 +64,13 @@ struct ServerOrigin: Equatable {
 final class WebBridge: NSObject, WKScriptMessageHandlerWithReply {
     static let name = "caterva"
     static let actions = ["chooseDirectory", "chooseFile", "reveal", "updateStatus", "checkForUpdates",
-                          "setUpdateOptions", "reportActiveRuns"]
+                          "setUpdateOptions", "reportActiveRuns",
+                          "setAssistantKey", "clearAssistantKey", "assistantKeyStatus"]
 
     weak var window: NSWindow?
     weak var updates: UpdateBridging?
     var origin: ServerOrigin?
+    var assistantKeys: AssistantKeyBridge?
     /// Folders `reveal` may show: the server's data folder, which holds every
     /// run folder, plus each file or folder the person chose in a panel
     /// during this launch. Nothing else.
@@ -141,6 +143,20 @@ final class WebBridge: NSObject, WKScriptMessageHandlerWithReply {
             }
             updates?.setActiveRuns(count)
             replyHandler(nil, nil)
+        case "setAssistantKey":
+            guard let assistantKeys, let provider = body["provider"] as? String, let key = body["key"] as? String else {
+                replyHandler(nil, "could not store the key")
+                return
+            }
+            replyHandler(assistantKeys.set(provider: provider, key: key), nil)
+        case "clearAssistantKey":
+            guard let assistantKeys, let provider = body["provider"] as? String else {
+                replyHandler(nil, "could not remove the key")
+                return
+            }
+            replyHandler(assistantKeys.clear(provider: provider), nil)
+        case "assistantKeyStatus":
+            replyHandler((body["provider"] as? String).map { assistantKeys?.status(provider: $0) ?? "absent" } ?? "absent", nil)
         default:
             replyHandler(nil, "unknown action \(action)")
         }

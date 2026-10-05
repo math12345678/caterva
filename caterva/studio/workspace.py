@@ -695,12 +695,25 @@ class Workspace:
                 archive.writestr(info, data)
                 names.append(name)
 
-            for filename in ("run.json", "request.json", "result.json", "events.jsonl"):
+            for filename in ("run.json", "request.json", "result.json", "events.jsonl", "assistant.jsonl"):
                 path = run_dir / filename
                 if path.is_file():
                     text = path.read_bytes().decode("utf-8", errors="replace")
-                    text = tidy_events(text) if filename == "events.jsonl" else tidy_json(text)
+                    text = tidy_events(text) if filename in ("events.jsonl", "assistant.jsonl") else tidy_json(text)
                     add(filename, text.encode("utf-8"), path)
+                    if filename == "assistant.jsonl":
+                        # What the assistant did in this run, as methods sentences (docs/studio/ASSISTANT.md 7).
+                        from caterva.assistant.audit import methods_sentences
+
+                        records = []
+                        for line in text.splitlines():
+                            try:
+                                records.append(json.loads(line))
+                            except ValueError:
+                                pass
+                        sentences = methods_sentences(records)
+                        if sentences:
+                            add("assistant-methods.txt", ("\n".join(sentences) + "\n").encode("utf-8"), path)
             for artifact in record.get("artifacts") or []:
                 name = artifact.get("name") if isinstance(artifact, dict) else None
                 if not isinstance(name, str) or not _ARTIFACT_NAME.fullmatch(name):
@@ -780,6 +793,10 @@ _FILE_MEANINGS = {
                    "(docs/studio/CONTRACT.md, section 9)",
     "events.jsonl": "every progress event the run emitted, one JSON object per line, in order",
     "command.txt": "the command that reproduces this run from the repository root",
+    "assistant.jsonl": "every call the assistant made for this run: provider, model, the exact payload sent (after "
+                       "redaction), the response, the grounding result, accepted or rejected, and the person's "
+                       "confirmation; never a key",
+    "assistant-methods.txt": "sentences for a methods section saying what the assistant did and what the person confirmed",
 }
 
 
