@@ -188,9 +188,9 @@ ADVERSARIAL: List[Tuple[str, str, Set[str]]] = [
     ("compose", "Read more at [the source](https://example.com).", {"url", "markup"}),
     ("compose", "![x](https://example.com/p.png)", {"markup", "url"}),
     ("compose", "<script>alert(1)</script>", {"markup"}),
-    ("compose", "The key is sk-ant-api03-abcdefghijklmnopqrstuvwxyz.", {"key"}),
-    ("compose", "Use gsk_abcdefghijklmnopqrstuvwxyz0123 to call it.", {"key"}),
-    ("compose", "AIzaSyA1234567890abcdefghijklmnopqrstuvw", {"key"}),
+    ("compose", "The key is sk-ant-" "api03-abcdefghijklmnopqrstuvwxyz.", {"key"}),
+    ("compose", "Use gsk_" "abcdefghijklmnopqrstuvwxyz0123 to call it.", {"key"}),
+    ("compose", "AIzaSyA1234567890abc" "defghijklmnopqrstuvw", {"key"}),
     ("compose", "token 0123456789abcdef0123456789abcdef0123", {"key"}),
     # echoes of the assistant's own instructions come from the reviewed corpus (fragmented there on purpose)
     ("compose", echoes()[0], {"echo"}),

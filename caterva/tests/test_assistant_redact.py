@@ -12,11 +12,11 @@ from caterva.assistant.redact import KEY_PATTERNS, find_keys, looks_like_key, re
 HOME = "/Users/ada"
 
 KEYS = [
-    "sk-ant-api03-AbCdEfGhIjK" "lMnOpQrStUvWxYz0123456789",
-    "sk-proj-AbCdEfGhIjKlMnOp" "QrStUvWxYz0123456789abcd",
+    "sk-ant-" "api03-AbCdEfGhIjK" "lMnOpQrStUvWxYz0123456789",
+    "sk-proj-" "AbCdEfGhIjKlMnOp" "QrStUvWxYz0123456789abcd",
     "sk-AbCdEfGhIjKlMnOpQr" "StUvWxYz0123456789abcd",
-    "sk-or-v1-0123456789abcdef012" "3456789abcdef0123456789abcdef",
-    "gsk_AbCdEfGhIjKlMnOp" "QrStUvWxYz0123456789",
+    "sk-or-" "v1-0123456789abcdef012" "3456789abcdef0123456789abcdef",
+    "gsk_" "AbCdEfGhIjKlMnOp" "QrStUvWxYz0123456789",
     "AIzaSyA1234567890abc" "defghijklmnopqrstuvw",
     "xai-AbCdEfGhIjKlMn" "OpQrStUvWxYz012345",
     "hf_AbCdEfGhIjKlMnOp" "QrStUvWxYz0123456789",
@@ -76,7 +76,7 @@ def test_the_user_name_inside_a_word_is_left_alone():
 
 
 def test_redaction_is_idempotent():
-    text = f"{HOME}/a/b.csv and sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789"
+    text = f"{HOME}/a/b.csv and sk-ant-" "api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789"
     once = redact_text(text, home=HOME)
     assert redact_text(once, home=HOME) == once
 

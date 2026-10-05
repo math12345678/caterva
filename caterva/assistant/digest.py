@@ -58,6 +58,35 @@ def _prune(value: Any, depth: int, list_cap: int, string_cap: int) -> Any:
     return value
 
 
+#: The parts of a Rates result the assistant reads: the engine's findings, each number with its unit and provenance.
+#: Left out on purpose: `figure` (the drawn points), `analysis` (a second copy of the findings, bar its verdict
+#: lines and notes), `report_text` (a third copy: it stays the page's own fallback text) and the `dataset` reading,
+#: whose decisions and problems quote the person's file (its comments, headers and cells).
+RATES_KEEP = ("parameters", "comparison", "lack_of_fit", "cautions", "better", "groups", "sigma", "interval_basis",
+              "turnover", "turnover_refused", "literature", "literature_refused", "methods", "cite")
+
+
+def rates_view(result: Any, include_input: bool = False) -> Any:
+    """A Rates result cut to what the assistant may read: a subset of the result JSON, never a rewritten one."""
+    if not isinstance(result, dict):
+        return result
+    view: Dict[str, Any] = {k: result[k] for k in RATES_KEEP if k in result}
+    analysis = result.get("analysis")
+    if isinstance(analysis, dict):
+        view["verdict"] = analysis.get("verdict")
+        for key in ("notes", "uncertainty", "level", "significance"):
+            if key in analysis:
+                view[key] = analysis[key]
+    dataset = result.get("dataset")
+    if isinstance(dataset, dict):
+        summary = dataset.get("summary")
+        if isinstance(summary, dict):
+            view["data_summary"] = summary
+        if include_input:
+            view["data_reading"] = {k: dataset[k] for k in ("decisions", "problems", "mapping") if k in dataset}
+    return view
+
+
 def digest(kind: str, result: Any, record: Optional[Mapping[str, Any]] = None, *, include_input: bool = False,
            budget: int = BUDGET) -> Dict[str, Any]:
     """The bounded view of a run: kind, title, outcome, result and (optionally) the person's input."""
@@ -73,6 +102,8 @@ def digest(kind: str, result: Any, record: Optional[Mapping[str, Any]] = None, *
             trimmed = dict(result)
             trimmed["sections"] = [{k: v for k, v in sec.items() if k != "data"} if isinstance(sec, dict) else sec
                                    for sec in result["sections"]]
+        if kind == "rates":
+            trimmed = rates_view(result, include_input)
         built["result"] = _prune(trimmed, 0, cap_list, cap_str)
         ranked = ranked_experiments(result)
         if ranked:
@@ -172,4 +203,4 @@ def ranked_experiments(result: Any) -> List[Dict[str, Any]]:
     return found
 
 
-__all__ = ["BUDGET", "DROP_KEYS", "digest", "engine_text", "leaf_facts", "nearest_facts", "ranked_experiments"]
+__all__ = ["BUDGET", "DROP_KEYS", "RATES_KEEP", "digest", "rates_view", "engine_text", "leaf_facts", "nearest_facts", "ranked_experiments"]

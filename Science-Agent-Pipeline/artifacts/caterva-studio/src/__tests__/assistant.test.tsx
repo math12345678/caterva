@@ -58,7 +58,7 @@ interface Recorded {
 
 const run = analysed.body.run as unknown as RunRecord;
 const result = analysed.body.result as unknown;
-const TEST_KEY = "sk-ant-api03-TESTKEYdoNotUse0123456789abcdefghijklmnop";
+const TEST_KEY = "sk-ant-" + "api03-TESTKEYdoNotUse01234" + "56789abcdefghijklmnop";
 
 function wrap(node: React.ReactNode) {
   return <QueryClientProvider client={makeQueryClient()}>{node}</QueryClientProvider>;

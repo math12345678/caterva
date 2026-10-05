@@ -133,6 +133,25 @@ Built, each behind its own switch, each following the above, each with a determi
 - **E. What should I measure next**: the engine's ranked measurements in plain words; the model may only order
   keys the engine ranked.
 
+**On a Rates run** (B, C and D work; E does not apply). The server reads the run's own `result.json`; its digest
+(`caterva/assistant/digest.py`, `rates_view`) keeps the findings only: every constant with its estimate, interval,
+unit and provenance, the lack-of-fit and group tests, the rate laws compared by AICc, the cautions and "what to
+change" lines, the verdict lines, the error model, the engine's methods paragraph and the BRENDA rows or the reason
+none was made. It leaves out the drawn figure points, the duplicate copy of the analysis and, unless "include my
+data" is ticked, the reading of the person's file (its decisions and problems quote its comments, headers and
+cells). The group labels and the file name still reach the assistant, because the verdict and the engine's methods
+paragraph name them. A constant the data bound on one side is stated by the engine with ">" ("Vmax > 55.7"), and
+the grounding check refuses "greater than" for it (a comparison the result does not state), so the system prompt
+asks for "at least" and "at most". Tested on the real Rates fixtures in `caterva/tests/test_assistant_rates.py` and
+`src/__tests__/assistant-rates.test.tsx`. D's fallback (nearest facts) and B's fallback (the engine's own report)
+read the same result.
+
+Designed, not built, for Rates: "What should I measure next". Rates ranks nothing: its "what to change" lines are
+the engine's prose, with concentrations it computed, not a ranked list with keys. E needs ranked keys the model
+may only order; narrating prose would let it reword computed concentrations. It would need Rates to emit the
+suggestions as keyed, ranked items (a design section like Compose's) first. The button is not shown for a Rates
+run and the server answers 409 with that reason.
+
 Designed, not built: a plain-language gloss on each concern in the verdict; "why was this row excluded" for Bind;
 translating a CSV's column headings into column roles for Analyze (the schema is the intent validator's, the
 mapping shown for confirmation); a reading-list summary of a result's cited papers from their titles only; a

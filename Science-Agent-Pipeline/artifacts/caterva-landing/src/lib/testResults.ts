@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "163 test files -- kinetics & Michaelis-Menten correctness, " +
+          "169 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -223,14 +223,14 @@ export const TEST_SUITES: TestSuite[] = [
         // test_enzyme_source.py, both passing): 6074. Then the certificate
         // fix for the packaged app: 12 tests in test_tls.py, all passing in
         // a focused run on the branch (2026-10-04), which also ran the 743
-        // other studio, app and complex tests it could affect: 6086. Then the
-        // Rates screen's Python side: 149 tests: 103 in three new files
-        // (test_rates_cli_unchanged.py 17, test_rates_ingest.py 41,
-        // test_studio_rates.py 45) and the rest the contract mirror's
-        // per-shape cases for the new Rates shapes; then the md smoke
-        // verdict rule (test_md_smoke_verdicts.py); then Studio's assistant
-        // (388 tests in 8 files). PLACEHOLDER: recounted on the merged tree.
-        passed: 6474,
+        // other studio, app and complex tests it could affect: 6086. Then, on the integration of the Rates screen and Studio's assistant
+        // (2026-10-04, one full run of caterva/tests/ with stdpopsim hidden,
+        // as CI collects it, excluding test_studio_socket.py: the sandbox
+        // refuses to bind a port, so its 10 tests were NOT run here and are
+        // not counted): 6696 passed, 1 skipped, 0 failed, of the 6707 tests
+        // collected. The earlier running tally above is superseded by this
+        // one measurement.
+        passed: 6696,
         skipped: 1,
         failed: 0,
       },

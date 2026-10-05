@@ -60,25 +60,21 @@ def trust_bundled_certificates(environ: MutableMapping[str, str] = os.environ) -
 
 
 def client_context() -> ssl.SSLContext:
-    """A verifying client context that can always find certificate authorities."""
+    """A verifying TLS context for an HTTPS client that can always find certificate authorities.
+
+    A certificate setting the user made on purpose wins (a file or a folder, from any of
+    `USER_CERTIFICATE_SETTINGS`, including the ones `ssl` itself does not read). Otherwise this Python's own
+    default certificates are used when they are really there, and the bundled `certifi` file when they are not.
+    `httpx` takes it as `verify=` (the studio's assistant, which is the only code in the studio that sends text to
+    a server the person did not start themselves); `urllib` takes it as `context=`."""
+    for name in USER_CERTIFICATE_SETTINGS:
+        value = os.environ.get(name)
+        if value and os.path.exists(value):
+            return ssl.create_default_context(cafile=value) if os.path.isfile(value) \
+                else ssl.create_default_context(capath=value)
     bundle = None if default_certificates_exist() else bundled_ca_file()
     return ssl.create_default_context(cafile=bundle)
 
 
 __all__ = ["USER_CERTIFICATE_SETTINGS", "bundled_ca_file", "client_context", "default_certificates_exist",
            "trust_bundled_certificates"]
-
-
-def client_context() -> ssl.SSLContext:
-    """A verifying TLS context for an HTTPS client: the user's certificate settings if any, else the bundle.
-
-    `httpx` takes it as `verify=`. Used by the studio's assistant, which is the only code in the
-    studio that sends text to a server the person did not start themselves."""
-    for name in USER_CERTIFICATE_SETTINGS:
-        value = os.environ.get(name)
-        if value and os.path.exists(value):
-            return ssl.create_default_context(cafile=value) if os.path.isfile(value) \
-                else ssl.create_default_context(capath=value)
-    bundle = bundled_ca_file()
-    return ssl.create_default_context(cafile=bundle) if bundle else ssl.create_default_context()
-

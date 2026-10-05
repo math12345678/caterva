@@ -295,12 +295,14 @@ class AssistantService:
         return record, result
 
     def _engine_methods(self, run_id: str, record: Mapping[str, Any]) -> Optional[str]:
-        for a in record.get("artifacts") or []:
-            if isinstance(a, dict) and a.get("name") == "methods.md":
-                try:
-                    return self.ws.artifact_path(run_id, "methods.md").read_text(encoding="utf-8")[:3000]
-                except (OSError, ValueError):
-                    return None
+        # Compose writes methods.md; Rates writes methods.txt (a paragraph generated from the run).
+        for wanted in ("methods.md", "methods.txt"):
+            for a in record.get("artifacts") or []:
+                if isinstance(a, dict) and a.get("name") == wanted:
+                    try:
+                        return self.ws.artifact_path(run_id, wanted).read_text(encoding="utf-8")[:3000]
+                    except (OSError, ValueError):
+                        return None
         return None
 
     # -- prepare ----------------------------------------------------------------------------
@@ -364,8 +366,13 @@ class AssistantService:
             elif feature == "next":
                 ranked = digestmod.ranked_experiments(result)
                 if not ranked:
-                    raise AssistantError("not_applicable", "This run has no ranked measurements. Run Compose with "
-                                                           "the design analysis on to get them.", status=409)
+                    if kind == "rates":
+                        message = ("The assistant does not rank measurements for a Rates run: the engine does not "
+                                   "rank them there. What to change is in the result's own 'what to change' lines.")
+                    else:
+                        message = ("This run has no ranked measurements. Run Compose with the design analysis on "
+                                   "to get them.")
+                    raise AssistantError("not_applicable", message, status=409)
                 data["ranked_experiments"] = [{k: v for k, v in r.items()} for r in ranked[:6]]
                 dg = {**dg, "ranked_experiments": data["ranked_experiments"]}
                 data["run"] = dg

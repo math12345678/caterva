@@ -107,3 +107,29 @@ def test_the_reachability_check_passes_the_verifying_context(monkeypatch):
     monkeypatch.setattr(capabilities.urllib.request, "urlopen", fake)
     assert capabilities.https_head("rest.uniprot.org", 5) is None
     assert isinstance(seen["context"], ssl.SSLContext) and seen["context"].verify_mode == ssl.CERT_REQUIRED
+
+
+def test_one_client_context_serves_the_status_check_and_the_assistant(monkeypatch, tmp_path):
+    """Main's context (system certificates, else the bundle) and the assistant's (a certificate setting the user
+    made wins, a file or a folder) were two functions of one name; the merged one does both."""
+    assert [line for line in Path(tls.__file__).read_text(encoding="utf-8").splitlines()
+            if line.startswith("def client_context")] == ["def client_context() -> ssl.SSLContext:"]
+    for name in tls.USER_CERTIFICATE_SETTINGS:
+        monkeypatch.delenv(name, raising=False)
+    chosen = []
+    real = ssl.create_default_context
+    monkeypatch.setattr(ssl, "create_default_context", lambda **kw: chosen.append(kw) or real())
+    _no_default_certificates(monkeypatch)
+    tls.client_context()
+    assert chosen[-1] == {"cafile": certifi.where()}, "no system certificates: the bundle"
+    monkeypatch.setattr(tls, "default_certificates_exist", lambda: True)
+    tls.client_context()
+    assert chosen[-1] == {"cafile": None}, "system certificates are really there: the system's"
+    mine = tmp_path / "mine.pem"
+    mine.write_text("x", encoding="utf-8")
+    monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(mine))
+    tls.client_context()
+    assert chosen[-1] == {"cafile": str(mine)}, "the user's own file wins, including a setting ssl does not read"
+    monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(tmp_path))
+    tls.client_context()
+    assert chosen[-1] == {"capath": str(tmp_path)}, "a folder is a capath"
