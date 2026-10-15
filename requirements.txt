@@ -34,7 +34,7 @@
 # 2.9.x line dropped cp310 wheels entirely (releases start at cp311), which
 # would break the Python 3.10 floor -- the exact failure that 2.9.0 caused
 # in CI ("No matching distribution found for libroadrunner==2.9.0").
-libroadrunner==2.8.0
+libroadrunner==2.10.0
 antimony==2.14.0
 python-libsbml==5.21.1
 # SED-ML, for the COMBINE archive export. BSD (Frank Bergmann, Heidelberg),
