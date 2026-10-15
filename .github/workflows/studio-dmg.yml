@@ -194,7 +194,7 @@ jobs:
           "$mnt/Caterva.app/Contents/MacOS/Caterva" --updater-selftest
           "$mnt/Caterva.app/Contents/MacOS/Caterva" --smoke --require-page
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: studio-dmg
           path: |
