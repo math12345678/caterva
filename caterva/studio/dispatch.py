@@ -42,7 +42,8 @@ from caterva.studio import limits, routes
 from caterva.studio.adapters import EndpointRequest, load_registry
 from caterva.studio.capabilities import NOT_BUILT_YET, CapabilityProbe
 from caterva.studio.contract import (
-    MAX_BODY_BYTES, RUN_KINDS, RUN_STATUSES, SESSION_HEADER, STUDIO_API_VERSION, Malformed, NotFound, Unavailable,
+    MAX_BODY_BYTES, NO_CLAIMS_BUNDLE, RUN_KINDS, RUN_STATUSES, SESSION_HEADER, STUDIO_API_VERSION, Malformed,
+    NotFound, Unavailable,
 )
 from caterva.studio.jobs import Conflict, JobManager, QueueFull
 from caterva.studio.security import ARTIFACT_CSP, BASE_HEADERS, CSP, Guard, bootstrap_url, mint_token, url_for
@@ -599,6 +600,34 @@ class App:
         except Conflict as exc:
             raise ApiFailure(409, "conflict", str(exc)) from None
         return json_response(record, status=202)
+
+    def _h_verify_run(self, call: _Call) -> Response:
+        """POST /api/runs/{id}/verify: `caterva verify` over the run's claims
+        bundle, in-process, through the one function the command calls
+        (`caterva.check.verify.verify_bundle`, standard library only, sharing
+        no code with what wrote the bundle). It reads the bundle's own files
+        and contacts nothing. A run still going is 409, as its result is; a
+        run that wrote no bundle is 409 with NO_CLAIMS_BUNDLE; a bundle the
+        checker cannot read at all is 409 with the checker's reason, the
+        command's exit 2 (not checked, as distinct from checked and failed)."""
+        _only(call.query, ())
+        if call.body != {}:
+            raise ApiFailure(400, "malformed", "re-checking takes an empty object: {}")
+        run_id = call.params["id"]
+        record = self._record(run_id)
+        if record["status"] not in TERMINAL_STATUSES or self.manager.is_live(run_id):
+            raise ApiFailure(409, "conflict", f"the run is {record['status']}; it can be re-checked once it is done")
+        from caterva.check.verify import MANIFEST, BundleMalformed, verify_bundle
+
+        directory = self.ws.claims_dir(run_id)
+        if not (directory / MANIFEST).is_file():
+            raise ApiFailure(409, "conflict", NO_CLAIMS_BUNDLE)
+        try:
+            report = verify_bundle(directory)
+        except BundleMalformed as exc:
+            raise ApiFailure(409, "conflict",
+                             f"the run's claims bundle cannot be read, so nothing in it was checked: {exc}") from None
+        return json_response({**report.to_dict(), "ran_at": iso(utc_now())})
 
     def _h_get_artifact(self, call: _Call) -> Response:
         _only(call.query, ())

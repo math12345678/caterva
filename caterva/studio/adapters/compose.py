@@ -28,6 +28,25 @@ byte what `caterva compose ... --export FORMAT` prints, and a format that
 cannot be written (no SBML toolchain) is recorded as refused with the
 exporter's own message. The markdown report is an artefact too.
 
+THE CLAIMS BUNDLE
+-----------------
+Every run writes the claims bundle `caterva compose --claims DIR` writes
+(caterva/evidence/compose_claims.py, ADR 0179), into `<run dir>/claims/`
+(CONTRACT.md 11): the parsed request gets `claims` set to that directory
+before `compose_report` runs, so the pages the search reads are pinned as
+it reads them and the report ends with the command's own `## Claims`
+section. The recorded `cli` leaves `--claims` out, because the directory
+is the studio's and not the person's; `claims.text` in the result says
+where it is. The bundle is served two ways, both artefacts: `claims.zip`,
+the bundle directory (not the store beside it) for `caterva verify`, and
+`claims.json`, its manifest and records without the pinned bytes. And
+every number's claim is transcribed onto its provenance (`claim_infos`:
+the claim, the row, the pinned page, the paper's title and PMID from the
+literature page pinned beside it, the certificates, or the refusal), read
+from the bundle's files with the evidence layer's own readers, nothing
+decided here. The `## Claims` section is not among `sections`: it is
+`claims`, so a page draws the analyses as sections and the bundle once.
+
 WHERE A NUMBER'S CITATION COMES FROM
 ------------------------------------
 `export.provenance_of` decides every number's origin and
@@ -61,12 +80,18 @@ from __future__ import annotations
 import dataclasses
 import inspect
 import io
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+import json
+import shutil
+import zipfile
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple
 
 from caterva.studio import contract
 from caterva.studio.adapters import (
     AdapterOutcome, AdapterSpec, Artifact, EndpointRequest, RunContext, cli_parser,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 KIND = "compose"
 PROG = "caterva compose"
@@ -84,6 +109,18 @@ EXPORT_ARTIFACTS: Mapping[str, Tuple[str, str, str]] = {
 }
 REPORT_ARTIFACT = ("report.md", "text/markdown; charset=utf-8",
                    "the report caterva compose prints for this request")
+#: The claims bundle, as two artefacts (module docstring): the bundle
+#: directory zipped, and its records without the pinned bytes.
+CLAIMS_ZIP = ("claims.zip", "application/zip",
+              "the run's claims bundle (manifest.json, claims.jsonl, rows.jsonl, snapshots.jsonl, "
+              "snapshots/<hex>.gz): unzip it and run `caterva verify DIR` to re-check it offline "
+              "(caterva compose --claims DIR)")
+CLAIMS_JSON = ("claims.json", "application/json",
+               "the bundle's manifest and its claim, row and snapshot records, without the pinned bytes")
+#: The bundle's files, in the order the zip lists them; the store beside
+#: them (`store/`) is the run's own index and is not an artefact.
+BUNDLE_FILES = ("manifest.json", "claims.jsonl", "rows.jsonl", "snapshots.jsonl")
+BUNDLE_BLOBS = "snapshots"
 
 _STRINGS = ("subject", "organism", "substrate", "inhibitor", "product", "isoform", "rank_against")
 _FLAGS = ("any_mode", "no_analysis", "no_simulate", "no_ranking")
@@ -297,13 +334,21 @@ def run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
 
     args = _parsed(argv_of(request))
     args.organism, organism_note = normalise_organism(args.organism)
+    # The claims bundle goes where CONTRACT.md 11 says, as `--claims DIR`
+    # would put it (module docstring, "The claims bundle").
+    claims_dir = ctx.run_dir / contract.CLAIMS_DIR
+    args.claims = str(claims_dir)
     out, err = io.StringIO(), io.StringIO()
     try:
         composed = compose_report(args, organism_note=organism_note, stream=out, err=err,
                                   progress=ctx.progress)
     except UnrecognisedShape as exc:
         # What main prints to stderr, without print's newline. Nothing was
-        # built, so there is no result: the page shows this reason.
+        # built, so there is no result: the page shows this reason. The
+        # claims run had opened its store before composing; no claim was
+        # made and no bundle written, so the folder is not left to look
+        # like one.
+        shutil.rmtree(claims_dir, ignore_errors=True)
         reason = f"Not built.\n\n{exc}"
         return AdapterOutcome(exit_code=3, result=None, summary=_first_line(str(exc)),
                               refusal=reason)
@@ -315,8 +360,13 @@ def run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
     ctx.progress.check_cancelled()
     ctx.progress.stage("exports", "Writing the SBML, Antimony, CSV and methods exports", None)
     provenanced = provenanced_for_export(composed.model)
+    claim_set = composed.claims
+    # The ids in each artefact are the ids in the bundle, as `--export
+    # FORMAT --claims DIR` writes them: one ClaimSet, built from the same
+    # ProvenancedModel the artefacts are written from.
+    claim_ids = dict(claim_set.by_identifier) if claim_set is not None else None
     try:
-        texts = export_texts(provenanced, EXPORT_FORMATS)
+        texts = export_texts(provenanced, EXPORT_FORMATS, claim_ids=claim_ids)
     except ExportRefused as exc:  # export_texts refuses per format; this is belt only
         texts = {fmt: (None, str(exc)) for fmt in EXPORT_FORMATS}
 
@@ -334,8 +384,15 @@ def run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
         artifacts.append(Artifact(name, (text + "\n").encode("utf-8"), media, description))
         exports[fmt] = {"available": True, "artifact": name, "refused": None}
 
+    claims: Optional[Dict[str, contract.ClaimInfo]] = None
+    summary_of_claims: Optional[contract.ClaimsSummary] = None
+    if claim_set is not None:
+        artifacts += claims_artifacts(claims_dir)
+        claims = claim_infos(claims_dir)
+        summary_of_claims = claims_summary(composed)
+
     result = compose_result(composed, provenanced, markdown=markdown, exports=exports,
-                            subject=args.subject)
+                            subject=args.subject, claims=claims, claims_summary=summary_of_claims)
     code = composed.code
     name_refusal = None
     if code == 3:
@@ -365,35 +422,50 @@ def _first_line(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+#: The key of the report's `## Claims` section among `Sections.records`
+#: (caterva/compose/__main__.py): kept out of `sections` (module docstring).
+CLAIMS_SECTION = "claims"
+
+
 def compose_result(composed: Any, provenanced: Any, *, markdown: str,
                    exports: Mapping[str, contract.ExportInfo],
-                   subject: Optional[str]) -> contract.ComposeResult:
+                   subject: Optional[str],
+                   claims: Optional[Mapping[str, contract.ClaimInfo]] = None,
+                   claims_summary: Optional[contract.ClaimsSummary] = None) -> contract.ComposeResult:
     """The ComposeResult for one `compose_report` run: every field read from
-    the object the markdown was printed from."""
+    the object the markdown was printed from. `claims` maps each quantity's
+    identifier to its claim transcribed from the run's bundle (`claim_infos`)
+    and `claims_summary` is the bundle's summary (`claims_summary`); both
+    None for a run that wrote no bundle."""
     model = composed.model
     report = composed.dossier
-    return {
+    result: contract.ComposeResult = {
         "query": model.query,
         "recognition": {"rule": model.recognition.rule, "reading": model.recognition.reading},
-        "model": model_structure(model, provenanced),
+        "model": model_structure(model, provenanced, claims=claims),
         "search": search_summary(composed, subject),
         "verdict": verdict_view(report.verdict),
         "stability": stability_view(report.stability),
         "trajectory": trajectory_view(report.trajectory),
         "sensitivity": sensitivity_view(report.sensitivity),
         "sweeps": [contract.jsonable(sweep) for sweep in report.sweeps],
-        "sections": [section_view(record) for record in composed.sections.records],
+        "sections": [section_view(record) for record in composed.sections.records
+                     if record.key != CLAIMS_SECTION],
         "notes": [str(note) for note in model.recognition.composition.notes],
         "report_markdown": markdown,
         "exports": dict(exports),
+        "claims": claims_summary,
     }
+    return result
 
 
-def model_structure(model: Any, provenanced: Any) -> contract.ModelStructure:
+def model_structure(model: Any, provenanced: Any, *,
+                    claims: Optional[Mapping[str, contract.ClaimInfo]] = None) -> contract.ModelStructure:
     from caterva.compose.pipeline import _conservation_laws, _unconserved_species
 
     laws = _conservation_laws(model.network)
-    values = {origin.identifier: parameter_value(origin, model) for origin in provenanced.origins}
+    values = {origin.identifier: parameter_value(origin, model, claim=(claims or {}).get(origin.identifier))
+              for origin in provenanced.origins}
     return {
         "species": [
             {"id": origin.identifier, "initial": values[origin.identifier]}
@@ -409,9 +481,12 @@ def model_structure(model: Any, provenanced: Any) -> contract.ModelStructure:
     }
 
 
-def parameter_value(origin: Any, model: Any) -> contract.SourcedValue:
+def parameter_value(origin: Any, model: Any, *,
+                    claim: Optional[contract.ClaimInfo] = None) -> contract.SourcedValue:
     """One number of the model, with the origin `export.provenance_of`
-    decided (see the module docstring for the citation fields)."""
+    decided (see the module docstring for the citation fields) and, when
+    the run wrote a bundle, its claim from that bundle (`claim_infos`: the
+    claim whose subject starts with the origin's identifier)."""
     registry = url = reference = None
     measurement = getattr(origin, "measurement", None)
     if measurement is not None and getattr(measurement, "source", None) == "literature":
@@ -423,7 +498,7 @@ def parameter_value(origin: Any, model: Any) -> contract.SourcedValue:
         url = literature_module("citation").brenda_reference_url(reference, model.ec_number)
     not_found = dict(getattr(model, "not_found", {}) or {})
     reason = not_found.get(origin.identifier) if origin.origin == "placeholder" else None
-    value = contract.from_parameter_origin(origin, reason=reason, registry=registry, url=url)
+    value = contract.from_parameter_origin(origin, reason=reason, registry=registry, url=url, claim=claim)
     if reference is not None:
         value["provenance"]["citation"]["reference_id"] = reference
     if reason is not None:
@@ -629,6 +704,142 @@ def _without_code(obj: Any, _depth: int = 0) -> Any:
                 changes[f.name] = _without_code(value, _depth + 1)
         return dataclasses.replace(obj, **changes) if changes else obj
     return obj
+
+
+# ---------------------------------------------------------------------------
+# The claims bundle: its artefacts, and each number's claim from it
+# ---------------------------------------------------------------------------
+
+
+def bundle_files(directory: Path) -> List[Path]:
+    """The bundle's files under `directory`, in zip order: the four records
+    files, then the pinned bytes by name. The store beside them is not one."""
+    out = [directory / name for name in BUNDLE_FILES if (directory / name).is_file()]
+    blobs = directory / BUNDLE_BLOBS
+    if blobs.is_dir():
+        out += sorted(p for p in blobs.iterdir() if p.is_file() and p.suffix == ".gz")
+    return out
+
+
+def claims_artifacts(directory: Path) -> List[Artifact]:
+    """`claims.zip` and `claims.json` for the bundle at `directory`.
+
+    The zip holds the bundle's files under their own names, each dated
+    1980-01-01 so that one bundle zips to one sequence of bytes; the pinned
+    pages are already gzipped and are stored as they are. The JSON is the
+    manifest and the three record files, each line parsed and nothing else
+    done to it.
+    """
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for path in bundle_files(directory):
+            info = zipfile.ZipInfo(path.relative_to(directory).as_posix(), date_time=(1980, 1, 1, 0, 0, 0))
+            info.external_attr = 0o600 << 16
+            info.compress_type = zipfile.ZIP_STORED if path.suffix == ".gz" else zipfile.ZIP_DEFLATED
+            archive.writestr(info, path.read_bytes())
+    listing = {"manifest": json.loads((directory / BUNDLE_FILES[0]).read_text(encoding="utf-8"))}
+    for key, name in (("claims", BUNDLE_FILES[1]), ("rows", BUNDLE_FILES[2]), ("snapshots", BUNDLE_FILES[3])):
+        lines = (directory / name).read_text(encoding="utf-8").splitlines()
+        listing[key] = [json.loads(line) for line in lines if line.strip()]
+    text = json.dumps(listing, indent=1, ensure_ascii=False, allow_nan=False) + "\n"
+    return [Artifact(CLAIMS_ZIP[0], buffer.getvalue(), CLAIMS_ZIP[1], CLAIMS_ZIP[2]),
+            Artifact(CLAIMS_JSON[0], text.encode("utf-8"), CLAIMS_JSON[1], CLAIMS_JSON[2])]
+
+
+def claims_summary(composed: Any) -> Optional[contract.ClaimsSummary]:
+    """The ClaimsSummary of a `compose_report` run that wrote a bundle: the
+    ClaimSet's root and counts, and the `## Claims` section's text from
+    the record it was printed under; None without a bundle."""
+    claim_set = composed.claims
+    if claim_set is None:
+        return None
+    record = next((r for r in composed.sections.records if r.key == CLAIMS_SECTION), None)
+    return {
+        "root": str(claim_set.root),
+        "counts": {str(k): int(v) for k, v in claim_set.counts().items()},
+        "rows": int(claim_set.rows),
+        "snapshots": int(claim_set.snapshots),
+        "notes": [str(n) for n in claim_set.notes],
+        "bundle": CLAIMS_ZIP[0],
+        "listing": CLAIMS_JSON[0],
+        "text": record.text if record is not None else "",
+    }
+
+
+def claim_infos(directory: Path) -> Dict[str, contract.ClaimInfo]:
+    """Every claim in the bundle at `directory`, transcribed, keyed by the
+    quantity its subject names (`reaction_Km = Km(2.7.1.1, ...)`: the
+    text before ` = `, the identifier the exports and `ClaimSet.by_identifier`
+    use; the model claim is under `model`).
+
+    Read with the evidence layer's own readers (`bundle.read_bundle`, which
+    recomputes every id; `references.parse_reference_page`, the parser
+    `caterva why` prints the paper from) and transcribed field by field.
+    """
+    from caterva.evidence.bundle import read_bundle
+
+    bundle = read_bundle(directory)
+    papers = {s.locator: s for s in bundle.snapshots.values() if s.source == "brenda_reference"}
+    return {claim.subject.split(" = ", 1)[0]: claim_info(claim, bundle, papers)
+            for claim in bundle.claims.values()}
+
+
+def claim_info(claim: Any, bundle: Any, papers: Mapping[str, Any]) -> contract.ClaimInfo:
+    """One claim as the contract's ClaimInfo (contract.py says each field)."""
+    rule = claim.derivation.rule
+    row = snapshot = reference = None
+    rows = claim.derivation.row_inputs()
+    if claim.kind == "cited" and rows:
+        record = bundle.get(rows[0])
+        row = {"locator": record.locator, "value_text": record.value_text, "unit": record.unit,
+               "substrate": record.substrate, "organism": record.organism,
+               "commentary": record.commentary, "reference": record.reference}
+        page = bundle.get(record.snapshot)
+        snapshot = {"id": page.id, "locator": page.locator, "retrieved_at": page.retrieved_at,
+                    "licence": page.licence, "served_from": page.served_from}
+        reference = reference_view(record, bundle, papers)
+    refusal = None
+    if claim.refusal is not None:
+        refusal = {"kind": claim.refusal.kind, "requested": claim.refusal.requested,
+                   "candidates": [str(c) for c in claim.refusal.candidates]}
+    return {
+        "id": claim.ref,
+        "kind": claim.kind,
+        "rule": {"rule_id": rule.rule_id, "version": int(rule.version), "adr": rule.adr},
+        "row": row,
+        "snapshot": snapshot,
+        "reference": reference,
+        "certificates": [{"matched": c.matched} for c in claim.derivation.certificates],
+        "refusal": refusal,
+    }
+
+
+def reference_view(row: Any, bundle: Any, papers: Mapping[str, Any]) -> Optional[contract.ClaimReference]:
+    """The paper behind `row`'s reference id, from the literature page
+    pinned for it (`capture_reference` pins it under `reference_url(ec,
+    ref)`), as `caterva why` reads it; None when the bundle has no such
+    page or it holds no reference block (the run's notes say why)."""
+    from caterva.evidence.claims import EvidenceRefused
+    from caterva.evidence.references import parse_reference_page, reference_url
+    from caterva.evidence.rows import locator_ec
+
+    ec = locator_ec(row.locator)
+    if not ec or not row.reference:
+        return None
+    page = papers.get(reference_url(ec, row.reference))
+    if page is None:
+        return None
+    try:
+        found = parse_reference_page(bundle.snapshot_bytes(page.ref).decode("utf-8", errors="replace"))
+    except EvidenceRefused:
+        return None
+    return {
+        "title": found.title,
+        "pmid": found.pmid,
+        "journal": found.journal,
+        "year": found.year,
+        "url": f"https://pubmed.ncbi.nlm.nih.gov/{found.pmid}/" if found.pmid else None,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -24,6 +24,10 @@ export const MAX_VIEWER_ATOMS = 60000;
 export const MAX_SSA_EVENTS = 200000;
 export const RATES_MAX_BYTES = 524288;
 export const RATES_MAX_ROWS = 2000;
+/** The folder under a run's directory that holds its claims bundle (CONTRACT.md 11). */
+export const CLAIMS_DIR = "claims";
+/** Why POST /api/runs/{id}/verify is 409 for a run that wrote no bundle: the re-check action's disabled reason. */
+export const NO_CLAIMS_BUNDLE = "this run has no claims bundle to re-check: only a compose run that built a model writes one";
 
 // ---------------------------------------------------------------------------
 // String unions
@@ -76,6 +80,7 @@ export type Need = "network" | "literature" | "gromacs";
 export type Theme = "system" | "light" | "dark";
 export type EventName = "status" | "stage" | "log" | "result" | "error" | "end";
 export type SectionStatus = "answered" | "refused" | "partly_refused";
+export type ClaimKind = "cited" | "chosen" | "placeholder" | "refused" | "computed";
 
 // ---------------------------------------------------------------------------
 // Provenance
@@ -119,6 +124,70 @@ export interface FitInfo {
   r_squared?: number | null;
 }
 
+/** The rule a derivation applied, as the bundle records it (caterva/evidence/claims.py RuleRef). */
+export interface ClaimRule {
+  rule_id: string;
+  version: number;
+  adr: string;
+}
+
+/** The BRENDA table row a cited claim rests on, as the bundle's rows.jsonl holds it. */
+export interface ClaimRow {
+  locator: string;
+  value_text: string;
+  unit: string;
+  substrate: string;
+  organism: string;
+  commentary: string | null;
+  reference: string | null;
+}
+
+/** The pinned page the row was read from: `id` is "sha256:<hex>", the digest of its bytes. */
+export interface ClaimSnapshot {
+  id: string;
+  locator: string;
+  retrieved_at: string;
+  licence: string;
+  served_from: string | null;
+}
+
+/** The paper behind a row's reference id, read from the literature page pinned in the bundle. */
+export interface ClaimReference {
+  title: string;
+  pmid: string | null;
+  journal: string | null;
+  year: string | null;
+  /** The PubMed link for `pmid` (CONTRACT.md 9, "Citation links"), else null. */
+  url: string | null;
+}
+
+export interface ClaimCertificate {
+  matched: string;
+}
+
+export interface ClaimRefusal {
+  kind: string;
+  requested: string;
+  /** "<row ref> | <why it was not the one>", per candidate row. */
+  candidates: string[];
+}
+
+/**
+ * One number's claim, transcribed from the run's claims bundle (ADR 0179): the derivation
+ * `caterva why` prints. `id` is the claim ref ("claim:sha256:<hex>"). Parts the bundle does not
+ * hold are null, never guessed.
+ */
+export interface ClaimInfo {
+  id: string;
+  kind: ClaimKind;
+  rule: ClaimRule;
+  row: ClaimRow | null;
+  snapshot: ClaimSnapshot | null;
+  reference: ClaimReference | null;
+  certificates: ClaimCertificate[];
+  refusal: ClaimRefusal | null;
+}
+
 export interface Provenance {
   kind: ProvenanceKind;
   citation?: Citation;
@@ -136,6 +205,8 @@ export interface Provenance {
   fit?: FitInfo;
   by?: ChosenBy;
   note?: string | null;
+  /** The number's claim in the run's claims bundle, when the run wrote one (every compose run does). */
+  claim?: ClaimInfo | null;
 }
 
 export interface Interval {
@@ -523,6 +594,23 @@ export interface RunCreated {
   run: RunRecord;
 }
 
+/** One line of `caterva verify` (caterva/check/verify.py, Check). */
+export interface VerifyCheck {
+  /** "snapshot bytes", "identity", "row locator", "certificate", "dominance", "unit arithmetic", "inputs", "root", "not checked". */
+  name: string;
+  /** The claim ref the check is about, or null for a check about a snapshot or a row (its detail starts with that ref). */
+  claim: string | null;
+  ok: boolean;
+  detail: string;
+}
+
+/** POST /api/runs/{id}/verify: exactly `caterva verify DIR --json`, plus when it ran. */
+export interface VerifyReport {
+  ok: boolean;
+  checks: VerifyCheck[];
+  ran_at: string;
+}
+
 export interface StatusEvent {
   run_id: string;
   seq: number;
@@ -778,6 +866,23 @@ export interface ExportInfo {
   refused: string | null;
 }
 
+/** The claims bundle a compose run wrote: what the report's `## Claims` section says, structured. */
+export interface ClaimsSummary {
+  /** The root claim ref: the computed model claim. */
+  root: string;
+  /** Claims per kind, every ClaimKind present, zeros included. */
+  counts: Record<string, number>;
+  rows: number;
+  snapshots: number;
+  /** What could not be done (a reference page not captured), in the section's words. */
+  notes: string[];
+  /** The artifact names: the bundle as a zip, and its records without the pinned bytes. */
+  bundle: string;
+  listing: string;
+  /** The `## Claims` section's body, as the report printed it. */
+  text: string;
+}
+
 export interface ComposeResult {
   query: string;
   recognition: Recognition;
@@ -788,10 +893,13 @@ export interface ComposeResult {
   trajectory: TrajectoryView | null;
   sensitivity: SensitivityView | null;
   sweeps: Record<string, unknown>[];
+  /** The analysis sections; the report's `## Claims` section is `claims`, not one of these. */
   sections: StructuredSection[];
   notes: string[];
   report_markdown: string;
   exports: Record<string, ExportInfo>;
+  /** The run's claims bundle (amended 2026-10-17): null only on a result captured before then. */
+  claims?: ClaimsSummary | null;
 }
 
 export interface ConstantsRequest {
