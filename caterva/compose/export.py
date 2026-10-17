@@ -155,6 +155,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from dataclasses import dataclass, replace
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 from xml.sax.saxutils import escape
@@ -219,6 +220,15 @@ SBML_INSTALL_INSTRUCTION = (
     "(both are pinned in requirements.txt, so `make setup` installs them; "
     "python-libsbml imports as `libsbml`)"
 )
+
+#: The column the CSV gains when the caller hands the writers claim ids
+#: (`caterva compose --claims DIR`, ADR 0179): one claim ref per quantity,
+#: the id of the derivation that produced the number on that row, which
+#: `caterva verify` re-checks offline. NOT in `CSV_COLUMNS`, on purpose: the
+#: column exists only when ids were given, so a run without `--claims` writes
+#: the file it always wrote, byte for byte, and the tests that pin
+#: `CSV_COLUMNS[-1] == "provenance"` keep meaning what they mean.
+CLAIM_COLUMN = "claim_id"
 
 #: The CSV's columns, in order. A constant rather than a literal in the
 #: writer so a test can assert the header against the same list the exporter
@@ -1182,7 +1192,51 @@ def _antimony_provenance(model: ProvenancedModel) -> Dict[str, Any]:
     return out
 
 
-def to_antimony(model: ProvenancedModel) -> str:
+#: An annotated assignment line: `  name = value;  // trailer`. Matched after
+#: `annotate_antimony` has run, to append a claim id to the trailer and
+#: nowhere else; the model text before `;` is never touched.
+_ANNOTATED_ASSIGNMENT = re.compile(r"^(\s*)([A-Za-z_]\w*)(\s*=\s*[^;]+;)(\s+//.*)$")
+
+
+def _claim_ref(claim_ids: Optional[Mapping[str, str]], identifier: str) -> Optional[str]:
+    """The claim ref the caller gave for `identifier`, or None.
+
+    Exact match first; a case-insensitive one second, because both
+    annotators this module reuses fold case when they look a quantity up
+    (`_refuse_case_collisions` says why that is safe here).
+    """
+    if not claim_ids:
+        return None
+    found = claim_ids.get(identifier)
+    if found:
+        return str(found)
+    lowered = {str(k).lower(): v for k, v in claim_ids.items()}
+    found = lowered.get(identifier.lower())
+    return str(found) if found else None
+
+
+def _with_claim_comments(annotated: str, claim_ids: Mapping[str, str]) -> str:
+    """`annotated` with ` # claim: <ref>` on the end of each assignment's
+    trailing comment, for the quantities `claim_ids` names.
+
+    Appended INSIDE the existing `//` trailer rather than on a line of its
+    own, so `strip_annotations` (the asserted inverse of the annotation)
+    still recovers the model text unchanged: it cuts the line at `;  //`,
+    and everything added here lies after that. The marker words
+    `unsourced_parameters` scans for do not occur in it.
+    """
+    lines: List[str] = []
+    for line in annotated.splitlines():
+        match = _ANNOTATED_ASSIGNMENT.match(line)
+        ref = _claim_ref(claim_ids, match.group(2)) if match else None
+        lines.append(f"{line}  # claim: {ref}" if ref else line)
+    text = "\n".join(lines)
+    return text + "\n" if annotated.endswith("\n") else text
+
+
+def to_antimony(
+    model: ProvenancedModel, *, claim_ids: Optional[Mapping[str, str]] = None,
+) -> str:
     """The model as annotated Antimony source.
 
     Every assignment carries a trailing comment naming its origin, and the
@@ -1190,6 +1244,11 @@ def to_antimony(model: ProvenancedModel) -> str:
     `core/model_provenance.py::annotate_antimony`, which guarantees the
     annotation changes no value -- `strip_annotations` is its asserted
     inverse.
+
+    `claim_ids` (identifier -> claim ref, from `caterva compose --claims`)
+    adds ` # claim: <ref>` to each assignment's trailer and nothing else;
+    None, the default, leaves the text exactly as it was before claims
+    existed (ADR 0179).
 
     THIS FORMAT LOSES ITS PROVENANCE ON TRANSLATION TO SBML. Comments are
     not part of the SBML data model, so `antimony.getSBMLString` deletes
@@ -1232,7 +1291,9 @@ def to_antimony(model: ProvenancedModel) -> str:
             "in the compiled model: " + ", ".join(result.unannotated) + ". "
             "The origin table and the model disagree about what was built."
         )
-    return result.text
+    if claim_ids is None:
+        return result.text
+    return _with_claim_comments(result.text, claim_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -1315,13 +1376,29 @@ def _sbml_provenance(model: ProvenancedModel) -> Dict[str, Any]:
     return out
 
 
-def _species_notes(origin: ParameterOrigin) -> str:
+#: The line a quantity's SBML notes gain when a claim id is given: the ref
+#: of the derivation behind the number, as `caterva verify` names it.
+CLAIM_NOTE = "CLAIM"
+
+
+def _claim_note(ref: str) -> str:
+    """One XHTML body holding the `CLAIM <ref>` line, for `appendNotes`."""
+    return (
+        '<body xmlns="http://www.w3.org/1999/xhtml">'
+        f"<p>{CLAIM_NOTE} {escape(ref)}</p></body>"
+    )
+
+
+def _species_notes(origin: ParameterOrigin, claim_id: Optional[str] = None) -> str:
     """The XHTML `<notes>` body for one species.
 
     `annotate_sbml` annotates PARAMETERS. A species initial amount is just
     as much a number somebody decided, and leaving it bare would make the
     starting amounts the one part of an exported model that says nothing
     about itself -- in a file where every parameter beside them does.
+
+    `claim_id`, when given, adds the `CLAIM <ref>` line the parameters get
+    (ADR 0179); None adds nothing.
     """
     heading = CHOSEN_MARKER if origin.chosen else PLACEHOLDER_MARKER
     rows = [f"<p><strong>{escape(heading)}</strong></p>",
@@ -1332,6 +1409,8 @@ def _species_notes(origin: ParameterOrigin) -> str:
         f"<p>Caterva composed this model in {escape(origin.unit)}. This file "
         f"declares no units; see the note on the model itself.</p>"
     )
+    if claim_id:
+        rows.append(f"<p>{CLAIM_NOTE} {escape(claim_id)}</p>")
     return (
         '<body xmlns="http://www.w3.org/1999/xhtml">' + "".join(rows) + "</body>"
     )
@@ -1391,7 +1470,9 @@ def _model_notes(model: ProvenancedModel, annotation_summary: str) -> str:
     )
 
 
-def to_sbml(model: ProvenancedModel) -> str:
+def to_sbml(
+    model: ProvenancedModel, *, claim_ids: Optional[Mapping[str, str]] = None,
+) -> str:
     """The model as SBML Level 3, with the provenance in the annotations.
 
     Refuses rather than hand-writing XML when libSBML or Antimony is absent
@@ -1403,6 +1484,14 @@ def to_sbml(model: ProvenancedModel) -> str:
     plus MIRIAM `bqbiol:isDescribedBy` RDF where the citation has a
     resolvable identifier. Per species: `<notes>` saying the starting amount
     is the modeller's. On the model: the placeholder list, in those words.
+
+    With `claim_ids` (identifier -> claim ref, from `caterva compose
+    --claims`), each parameter's and each species' notes gain one line,
+    `CLAIM <ref>`, inside the notes body they already have (ADR 0179). The
+    id travels in the notes and NOT as a MIRIAM term: a claim ref has no
+    registry and no URI form, and minting one would change the RDF counts
+    an independent reader is held to below. None, the default, writes the
+    file exactly as before.
 
     The RDF is read back by an independent parser (`audit_annotations`)
     before this returns, because libSBML will happily write RDF that libSBML
@@ -1462,7 +1551,8 @@ def to_sbml(model: ProvenancedModel) -> str:
         if origin is None:
             unannotated_species.append(species.getId())
             continue
-        if species.setNotes(_species_notes(origin)) != libsbml.LIBSBML_OPERATION_SUCCESS:
+        notes = _species_notes(origin, _claim_ref(claim_ids, species.getId()))
+        if species.setNotes(notes) != libsbml.LIBSBML_OPERATION_SUCCESS:
             raise ExportRefused(
                 f"libSBML refused the notes for species {species.getId()!r}. "
                 f"Writing the file without them would leave a starting "
@@ -1476,6 +1566,25 @@ def to_sbml(model: ProvenancedModel) -> str:
             + ". The composition and the translated model disagree about "
             "what this model contains."
         )
+
+    if claim_ids is not None:
+        # appendNotes, for the same reason as the model notes below: the
+        # parameter's notes were written by `annotate_sbml` and replacing
+        # them would drop the origin, the conditions and the citation to
+        # add one line. A claim id whose parameter has no claim is left
+        # out, not invented; the CSV beside the file shows the gap.
+        for index in range(sbml_model.getNumParameters()):
+            parameter = sbml_model.getParameter(index)
+            ref = _claim_ref(claim_ids, parameter.getId())
+            if ref is None:
+                continue
+            if parameter.appendNotes(_claim_note(ref)) != libsbml.LIBSBML_OPERATION_SUCCESS:
+                raise ExportRefused(
+                    f"libSBML refused the claim line for parameter "
+                    f"{parameter.getId()!r}. A file carrying ids on some "
+                    f"quantities and silently none on this one would read "
+                    f"as though this one had no derivation to re-check."
+                )
 
     # appendNotes, not setNotes: annotate_sbml has already written the data
     # sources' licence attribution here, and replacing it would ship
@@ -1537,7 +1646,9 @@ def _spread_cells(measurement: Optional[Measurement]) -> List[str]:
     return [f"{spread.low:g}", f"{spread.high:g}", " ".join(spread.references)]
 
 
-def to_parameter_csv(model: ProvenancedModel) -> str:
+def to_parameter_csv(
+    model: ProvenancedModel, *, claim_ids: Optional[Mapping[str, str]] = None,
+) -> str:
     """Every number in the model, one row each, with where it came from.
 
     The artefact nothing else produces, and the one a reviewer should ask
@@ -1553,10 +1664,16 @@ def to_parameter_csv(model: ProvenancedModel) -> str:
 
     `origin` is one of `measured`, `placeholder`, `chosen`, and the
     `provenance` column spells out what that means for that row.
+
+    `claim_ids` (identifier -> claim ref, from `caterva compose --claims`)
+    adds a final `CLAIM_COLUMN` column holding each row's ref, empty for a
+    quantity it names no claim for; None, the default, writes exactly the
+    `CSV_COLUMNS` file written before claims existed (ADR 0179).
     """
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
-    writer.writerow(CSV_COLUMNS)
+    columns = CSV_COLUMNS if claim_ids is None else (*CSV_COLUMNS, CLAIM_COLUMN)
+    writer.writerow(columns)
     for origin in model.origins:
         measurement = origin.measurement
         writer.writerow(
@@ -1586,6 +1703,7 @@ def to_parameter_csv(model: ProvenancedModel) -> str:
                 (origin.scope.preparation or "") if origin.scope is not None else "",
                 *_spread_cells(measurement),
                 origin.sentence(),
+                *([_claim_ref(claim_ids, origin.identifier) or ""] if claim_ids is not None else []),
             ]
         )
     return buffer.getvalue()
@@ -1600,12 +1718,17 @@ def _quantity_line(origin: ParameterOrigin) -> str:
     return f"`{origin.identifier}` = {origin.value:g} {origin.unit}".rstrip()
 
 
-def to_methods_paragraph(model: ProvenancedModel) -> str:
+def to_methods_paragraph(
+    model: ProvenancedModel, *, claim_ids: Optional[Mapping[str, str]] = None,
+) -> str:
     """A Markdown methods section, ready to paste into a manuscript.
 
     States the structure, reproduces each motif's own basis text verbatim,
     and then lists the constants BY ORIGIN with the placeholders named
-    individually.
+    individually. With `claim_ids` (from `caterva compose --claims`) a
+    closing paragraph names each quantity's claim ref, so the manuscript's
+    reader can re-check the numbers against the bundle (ADR 0179); None, the
+    default, writes the paragraph exactly as before.
 
     WHY THE PLACEHOLDERS GET THEIR OWN PARAGRAPH
     --------------------------------------------
@@ -1745,6 +1868,17 @@ def to_methods_paragraph(model: ProvenancedModel) -> str:
         "each unmeasured constant would come from, accompanies this model as "
         "a CSV.",
     ]
+    if claim_ids is not None:
+        named = [
+            (o.identifier, _claim_ref(claim_ids, o.identifier)) for o in model.origins
+        ]
+        lines += [
+            "",
+            "Each quantity's derivation is recorded as a claim, re-checkable "
+            "offline with `caterva verify` against the pages it was read from: "
+            + ", ".join(f"`{identifier}` {ref}" for identifier, ref in named if ref)
+            + ".",
+        ]
     return "\n".join(lines) + "\n"
 
 
@@ -1760,6 +1894,8 @@ def _conservation_laws(network: Any) -> List[str]:
 
 __all__ = [
     "CHOSEN_MARKER",
+    "CLAIM_COLUMN",
+    "CLAIM_NOTE",
     "CSV_COLUMNS",
     "SCOPE_MARKER",
     "SPREAD_MARKER",

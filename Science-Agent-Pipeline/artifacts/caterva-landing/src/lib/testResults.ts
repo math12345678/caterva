@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "169 test files -- kinetics & Michaelis-Menten correctness, " +
+          "181 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -242,7 +242,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "90 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "91 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -302,7 +302,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "80 test files -- query resolution, parameter provenance, " +
+          "81 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +

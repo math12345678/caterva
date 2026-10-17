@@ -107,3 +107,13 @@ def test_arguments_after_the_command_pass_through_verbatim():
     # `--shapes` is the composer's own flag; the dispatcher must not eat it.
     rc, out, _ = _run(["compose", "--shapes"])
     assert rc == 0 and "toggle" in out.lower()
+
+
+def test_why_dispatches_to_the_evidence_layer():
+    rc, out, _ = _run(["why", "--help"])
+    assert rc == 0 and "--bundle" in out and "caterva why" in out
+
+
+def test_verify_dispatches_to_the_independent_checker():
+    rc, out, _ = _run(["verify", "--help"])
+    assert rc == 0 and "--json" in out and "caterva verify" in out

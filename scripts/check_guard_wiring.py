@@ -254,6 +254,10 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_no_orphan_modules": ("verify_build",),
     # Wired 2026-10-03: CI step and a pytest wrapper that also proves it matches.
     "check_no_machine_paths": ("ci", "pytest"),
+    # Wired 2026-10-17 (ADR 0179): verify_build's Python group, selftest
+    # first, and a pytest wrapper that drives both directions. Offline and
+    # under a second, so there is no reason for it to be anywhere narrower.
+    "check_no_placeholder_dois": ("verify_build", "pytest"),
     "check_no_silent_skips": ("ci",),
     "check_no_vacuous_tests": ("verify_build",),
     "check_plausibility_constants": ("verify_build", "pytest"),
@@ -296,6 +300,10 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     #: runner subprocess to see what is emitted, which CI has no
     #: Python environment for and a pytest wrapper would nest.
     "check_both_front_ends_read_it": ("verify_build",),
+    #: Wired 2026-10-17 (ADR 0179): verify_build's Python group, selftest
+    #: first, and a pytest wrapper that plants each kind of forbidden import.
+    #: An AST walk over three modules, offline and under a second.
+    "check_checker_independence": ("verify_build", "pytest"),
 }
 
 

@@ -136,6 +136,7 @@ def build_parser(prog: str = "python -m caterva.compose") -> argparse.ArgumentPa
             f"  {prog} 'reversible binding of a ligand to a receptor' --crnt --scale\n"
             f"  {prog} 'two enzymes competing for the same substrate' --screen\n"
             f"  {prog} 'reversible binding of a ligand to a receptor' --export sbml > model.xml\n"
+            f"  {prog} 'Michaelis Menten' --subject 2.7.1.1 --organism human --substrate glucose --claims ./claims\n"
             f"  {prog} --shapes\n"
             "\n"
             "Exit codes: 0 produced everything asked for, 2 the question was "
@@ -300,6 +301,16 @@ def build_parser(prog: str = "python -m caterva.compose") -> argparse.ArgumentPa
         "--export", choices=EXPORT_FORMATS, default=None, metavar="FORMAT",
         help=("one of: " + " | ".join(EXPORT_FORMATS) + ". Every number "
               "carries its origin -- measured, placeholder or chosen"),
+    )
+    exports.add_argument(
+        "--claims", default=None, metavar="DIR",
+        help=("keep the evidence: every BRENDA page the search read, as the "
+              "bytes it read, the rows taken from them, and one claim per "
+              "number naming its derivation, written to DIR as a bundle that "
+              "`caterva verify DIR` re-checks offline. The report ends with "
+              "a `## Claims` section; with --export, the artefact carries each "
+              "number's claim id. Without this flag nothing is written and "
+              "nothing changes"),
     )
     return parser
 
@@ -1316,13 +1327,16 @@ def provenanced_for_export(model: Any) -> Any:
 
 def export_texts(
     provenanced: Any, formats: Sequence[str] = EXPORT_FORMATS,
+    *, claim_ids: Optional[Mapping[str, str]] = None,
 ) -> Dict[str, Tuple[Optional[str], Optional[str]]]:
     """format -> (the artefact's text, None), or (None, ExportRefused's
     message) for a format that could not be written.
 
     The text is what `--export FORMAT` prints, without print's newline.
     Each format is refused on its own: the SBML toolchain being absent is
-    no reason to withhold the CSV.
+    no reason to withhold the CSV. `claim_ids` (identifier -> claim ref,
+    from `--claims`) is handed to every writer; None leaves each artefact
+    byte for byte what it was.
     """
     from caterva.compose.export import (
         ExportRefused, to_antimony, to_methods_paragraph, to_parameter_csv,
@@ -1338,7 +1352,7 @@ def export_texts(
     out: Dict[str, Tuple[Optional[str], Optional[str]]] = {}
     for fmt in formats:
         try:
-            out[fmt] = (writers[fmt](provenanced), None)
+            out[fmt] = (writers[fmt](provenanced, claim_ids=claim_ids), None)
         except ExportRefused as exc:
             out[fmt] = (None, str(exc))
     return out
@@ -1356,6 +1370,7 @@ def _export(description: str, subject: Optional[str], fmt: str,
     from caterva.compose.export import ExportRefused
     from caterva.compose.pipeline import compose
 
+    claims = _claims_run(args)
     try:
         model = compose(description, subject=subject,
                         organism=getattr(args, "organism", None),
@@ -1365,15 +1380,44 @@ def _export(description: str, subject: Optional[str], fmt: str,
             # An export that quietly carried placeholders while the report
             # beside it carried measurements would be the disagreement the
             # provenance machinery exists to prevent.
-            model, _, _ = _search_the_literature(model, args)
-        text, refused = export_texts(provenanced_for_export(model), (fmt,))[fmt]
+            if claims is not None:
+                claims.start_recording()
+            try:
+                model, _, _ = _search_the_literature(model, args)
+            finally:
+                if claims is not None:
+                    claims.stop_recording()
+        provenanced = provenanced_for_export(model)
+        # The ids in the artefact are the ids in the bundle: one ClaimSet,
+        # built from the same ProvenancedModel the artefact is written from.
+        claim_ids = claims.finish(provenanced, model).by_identifier if claims is not None else None
+        text, refused = export_texts(provenanced, (fmt,), claim_ids=claim_ids)[fmt]
         if refused is not None:
             raise ExportRefused(refused)
         print(text)
     except ExportRefused as exc:
         print(f"Not exported.\n\n{exc}", file=sys.stderr)
         return 3
+    finally:
+        if claims is not None:
+            claims.close()
     return 0
+
+
+def _claims_run(args: Any) -> Any:
+    """The `--claims DIR` run to pin pages into and write the bundle from, or
+    None without the flag.
+
+    The evidence layer is imported here and nowhere else in this module, so
+    a run without `--claims` imports nothing of it and behaves exactly as it
+    did before claims existed (ADR 0179).
+    """
+    directory = getattr(args, "claims", None)
+    if not directory:
+        return None
+    from caterva.evidence.compose_claims import ClaimsRun
+
+    return ClaimsRun(directory)
 
 
 # ---------------------------------------------------------------------------
@@ -1397,6 +1441,20 @@ def _check_combination(parser: argparse.ArgumentParser, args: Any) -> None:
             "RNG seed of a stochastic run, and no stochastic run was asked "
             "for. Add --stochastic LITRES, or drop them -- a flag accepted "
             "and then not honoured is worse than one rejected."
+        )
+
+    claims = getattr(args, "claims", None)
+    if claims is not None and not str(claims).strip():
+        parser.error("--claims needs a directory to write the bundle to.")
+    if claims is not None and args.antimony:
+        # --antimony emits the compiled source with nothing about where its
+        # numbers came from, so there is no artefact to carry a claim id and
+        # no search whose pages a bundle would pin.
+        parser.error(
+            "--antimony emits the compiled source with no provenance on it, "
+            "so there is nothing for --claims to attach an id to. Use "
+            "--export antimony --claims DIR for the annotated source with "
+            "its claim ids, or drop --claims."
         )
 
     if args.export is None:
@@ -1520,6 +1578,10 @@ class ComposedReport:
     #: The policy's `NameNotResolved` when `--subject` was refused as a name
     #: that is not exactly one enzyme; None otherwise.
     name_refusal: Optional[Any] = None
+    #: The `caterva.evidence.compose_claims.ClaimSet` written by `--claims`
+    #: (its root, every claim, the identifier -> ref map the exports take);
+    #: None without the flag.
+    claims: Optional[Any] = None
 
 
 def _quiet_stage(key: str, label: str, fraction: Optional[float] = None) -> None:
@@ -1556,6 +1618,23 @@ def compose_report(
     from caterva.compose.pipeline import compose
     from caterva.compose.report import dossier
 
+    claims = _claims_run(args)
+    try:
+        return _compose_report(
+            args, claims, at, out, err, progress, organism_note=organism_note,
+            compose=compose, dossier=dossier,
+        )
+    finally:
+        if claims is not None:
+            claims.close()
+
+
+def _compose_report(
+    args: Any, claims: Any, at: Callable[..., None], out: Any, err: Any, progress: Any,
+    *, organism_note: Optional[str], compose: Callable[..., Any], dossier: Callable[..., Any],
+) -> ComposedReport:
+    """`compose_report` with the `--claims` run (or None) already open; the
+    caller closes it whatever happens here."""
     # COMPOSE ONCE, AND RUN THE VERDICT'S INPUTS BEFORE THE VERDICT.
     #
     # The dossier's verdict page reports whether `validate` and
@@ -1577,12 +1656,27 @@ def compose_report(
         # The search runs BEFORE the analyses, so every section below --
         # stability, sensitivity, the time course, the verdict -- reads
         # the literature's numbers rather than the library's (ADR 0178).
+        # With --claims the pages it reads are pinned as it reads them,
+        # and only for the length of the search.
         at("search", f"Searching the literature for {args.subject}")
-        found = search_literature(model, args, resolve=_announcing_resolver(progress))
+        if claims is not None:
+            claims.start_recording()
+        try:
+            found = search_literature(model, args, resolve=_announcing_resolver(progress))
+        finally:
+            if claims is not None:
+                claims.stop_recording()
         model, search_note, search_refused = found.model, found.note, found.refused
         name_refusal = found.name_refusal
         if search_refused and not model.searched and model.search_refused is None:
             model = replace(model, search_refused=search_note)
+    claim_set = None
+    if claims is not None:
+        # Built now, from the same ProvenancedModel every export is written
+        # from, so the ids in the bundle are the ids an export would carry;
+        # printed after the analyses, where the report's last section goes.
+        at("claims", f"Writing the claims bundle to {args.claims}")
+        claim_set = claims.finish(provenanced_for_export(model), model)
     if args.validate or args.robustness is not None:
         at("precompute", "Running the checks the verdict reads: "
            + ", ".join(n for n, asked in (("validate", args.validate),
@@ -1628,11 +1722,20 @@ def compose_report(
             file=err,
         )
         code = 3
+    if claim_set is not None:
+        # The last section before the footer, through `Sections` so the
+        # studio gets the ClaimSet under the record it was printed from.
+        # It moves no exit code: a claims bundle that says a row was not
+        # found is a finding written down, not a run that failed.
+        sections.start("claims")
+        sections.keep("claims", claim_set)
+        sections.write("Claims", claim_set.section(str(args.claims)))
     print("\n".join(report.footer_section()), file=out)
     return ComposedReport(
         model=report.model, dossier=report, precomputed=precomputed,
         sections=sections, search_note=search_note,
         search_refused=search_refused, code=code, name_refusal=name_refusal,
+        claims=claim_set,
     )
 
 

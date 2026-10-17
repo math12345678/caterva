@@ -494,7 +494,7 @@ class CitationExplorer {
     // Example output:
     return `
 Parameter: km = ${value} mM
-Source: Smith et al. (2020), Nature Enzymology, DOI: 10.xxxx/xxxxxx
+Source: <authors> (<year>), <journal>, DOI: <the paper's DOI, as registered>   (illustrative; no such paper is cited here)
   - Extracted from: Table 2, page 156
   - Experimental conditions: 37°C, pH 7.4, substrate lactate
   - Measurement uncertainty: ±5% (0.05 mM)

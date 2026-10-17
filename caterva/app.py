@@ -47,6 +47,8 @@ COMMANDS = {
     "prepare": ("caterva.prepare.__main__", "audit a PDB entry before simulating it, defects ranked by distance to the active site"),
     "sim": ("caterva.cli", "exact stochastic chemical kinetics (Gillespie SSA)"),
     "studio": ("caterva.studio.__main__", "a local window onto all of the above, every number with its origin"),
+    "why": ("caterva.evidence.why", "why a number: its derivation down to the pinned bytes it came from"),
+    "verify": ("caterva.check.__main__", "re-check a claims bundle offline, sharing no code with what wrote it"),
 }
 
 USAGE = """caterva {version} -- mechanistic models whose every number says where it came from.

@@ -83,6 +83,9 @@ DOCS: tuple[str, ...] = (
     "docs/INTERN_ONBOARDING.md",
     "docs/CONSTITUTION.md",
     "docs/API.md",
+    # One present-tense page naming the record behind each layer (ADR
+    # 0179); every path it names in backticks must exist.
+    "docs/ARCHITECTURE.md",
     ".github/PULL_REQUEST_TEMPLATE.md",
 )
 

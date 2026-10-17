@@ -154,7 +154,22 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         "Engine Contract Guard",
         f"{PYTHON} {SCRIPTS_DIR / 'check_engine_contract.py'}"
     ))
-    
+
+    # The checker (caterva/check/, ADR 0179) re-derives every claim id and
+    # re-reads every certified span from the pinned bytes, and its worth is
+    # that it cannot share the producer's mistakes. One line, `from
+    # caterva.evidence.canonical import digest`, would make it the producer
+    # checking itself and leave every test green. The self-check runs first:
+    # an AST walk that finds nothing is green forever.
+    guards.append(run_guard(
+        "Checker Independence Guard (self-check)",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_checker_independence.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "Checker Independence Guard",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_checker_independence.py'}"
+    ))
+
     # Dependencies guard
     guards.append(run_guard(
         "Dependencies Guard",
@@ -302,6 +317,23 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     guards.append(run_guard(
         "Documented Citations Guard",
         f"{PYTHON} {SCRIPTS_DIR / 'check_documented_citations_are_real.py'}"
+    ))
+
+    # The same failure one citation format over. docs/ARCHITECTURE_RIGOR.md
+    # ended "Every citation has DOI/PMID" under a provenance example whose
+    # DOIs were the documentation example prefix, which resolves to nothing.
+    # Deleted with ADR 0179; this keeps the next one out of every tracked
+    # Markdown file. docs/archive/ is not read, as a record, and the guard
+    # names the two root documents allowed to quote a test input and why.
+    # The self-check runs first: on a clean tree a matcher that matches
+    # nothing is green forever.
+    guards.append(run_guard(
+        "Placeholder DOI Guard (self-check)",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_no_placeholder_dois.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "Placeholder DOI Guard",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_no_placeholder_dois.py'}"
     ))
 
     # The importable package is `caterva` (one r); the product is `Caterva`

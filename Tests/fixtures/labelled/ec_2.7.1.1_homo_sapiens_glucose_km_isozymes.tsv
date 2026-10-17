@@ -1,0 +1,26 @@
+reference_id	pmid	km_mM	isozyme	how_known	commentary	paper_title
+640219	2043117	0.032	hexokinase I	row_text	recombinant hexokinase I expressed in Escherichia coli
+640261	8717435	0.034	hexokinase III	row_text	hexokinase III from lymphocytes, at 37°C, pH 8.1	Purification and characterization of the carboxyl-domain of human hexokinase type III expressed as fusion protein
+640261	8717435	0.038	hexokinase III	row_text	catalytically active recombinant carboxyl-domain of hexokinase III, at 37°C, pH 8.1	Purification and characterization of the carboxyl-domain of human hexokinase type III expressed as fusion protein
+640237	3341751	0.06	hexokinase I	row_text	hexokinase I, at 37°C, pH 8.1	Purification, properties, and evidence for two subtypes of human placenta hexokinase type I
+674942	17080299	0.065	hexokinase I	reference_title	pH 8.0, mutant enzyme A464P/E465G	Function of interdomain alpha-helix in human brain hexokinase: covalent linkage and catalytic regulation between N- and C-terminal halves
+674942	17080299	0.0732	hexokinase I	reference_title	pH 8.0, wild-type enzyme	Function of interdomain alpha-helix in human brain hexokinase: covalent linkage and catalytic regulation between N- and C-terminal halves
+674942	17080299	0.0841	hexokinase I	reference_title	pH 8.0, mutant enzyme Q466_H467insHMNLAEQ	Function of interdomain alpha-helix in human brain hexokinase: covalent linkage and catalytic regulation between N- and C-terminal halves
+641068	7730377	0.15	glucokinase	reference_title	30°C, pH 7.5, S151G and N1166R-S151A	Human beta-cell glucokinase. Dual role of Ser-151 in catalysis and hexose affinity
+672188	16768451	0.23	glucokinase	reference_title	mutant enzyme Y214C
+641068	7730377	0.34	glucokinase	reference_title	30°C, pH 7.5, S151A	Human beta-cell glucokinase. Dual role of Ser-151 in catalysis and hexose affinity
+702867	19558793	0.37	hexokinase II	row_text	wild type hexokinase II	Enzymatic properties of the N- and C-terminal halves of human hexokinase II
+702314		0.63	unlabelled	not_checked	wild type enzyme, at 25°C, in the presence of 0.02 mM activator LY-2121260
+702314		0.76	unlabelled	not_checked	wild type enzyme, at 25°C, in the presence of 0.02 mM activator N-[2-amino-4-fluoro-5-[(1-methyl-1H-imidazol-2-yl)sulfanyl]benzyl]-1,3-thiazol-2-amine
+663393	12869762	2	glucokinase	reference_title	in presence of activator RO-28-1675
+641068	7730377	2.1	glucokinase	reference_title	30°C, pH 7.5, S151C and N166R	Human beta-cell glucokinase. Dual role of Ser-151 in catalysis and hexose affinity
+739603	24723372	2.5	glucokinase	accession	deletion mutant lacking residues 68-71, K0.5 value, Hill coefficient 1.2, pH 7.6, 25 °C	Role of connecting loop I in catalysis and allosteric regulation of human glucokinase
+739603	24723372	3.1	glucokinase	accession	deletion mutant lacking residue 71, K0.5 value, Hill coefficient 1.5, pH 7.6, 25 °C	Role of connecting loop I in catalysis and allosteric regulation of human glucokinase
+739603	24723372	3.2	glucokinase	accession	deletion mutant lacking residues 67-71, K0.5 value, Hill coefficient 1.1, pH 7.6, 25 °C	Role of connecting loop I in catalysis and allosteric regulation of human glucokinase
+739603	24723372	3.3	glucokinase	accession	mutant S64R/E67D/S69T, K0.5 value, Hill coefficient 1.7, pH 7.6, 25 °C	Role of connecting loop I in catalysis and allosteric regulation of human glucokinase
+739603	24723372	3.6	glucokinase	accession	deletion mutant lacking residues 66-71, K0.5 value, Hill coefficient 1.2, pH 7.6, 25 °C	Role of connecting loop I in catalysis and allosteric regulation of human glucokinase
+641067	8679719	3.8	glucokinase	reference_title	30°C, pH 7.5
+641068	7730377	6	glucokinase	reference_title	30°C, pH 7.5, wild-type	Human beta-cell glucokinase. Dual role of Ser-151 in catalysis and hexose affinity
+739603	24723372	6.3	glucokinase	accession	wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C	Role of connecting loop I in catalysis and allosteric regulation of human glucokinase
+663393	12869762	8.6	glucokinase	reference_title	in absence of activator
+739603	24723372	10.6	glucokinase	accession	deletion mutant lacking residues 70-71, K0.5 value, Hill coefficient 1.3, pH 7.6, 25 °C	Role of connecting loop I in catalysis and allosteric regulation of human glucokinase
