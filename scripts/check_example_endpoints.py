@@ -225,7 +225,36 @@ def registered_routes() -> set[str]:
             routes.add(full.rstrip("/") or "/")
 
     routes |= _web_server_routes()
+    routes |= _studio_server_routes()
     return routes
+
+
+#: The studio's route table: `Route("POST", "/api/runs/{id}/verify", ...)`.
+STUDIO_ROUTES = REPO_ROOT / "caterva" / "studio" / "routes.py"
+_STUDIO_ROUTE_RE = re.compile(r'Route\(\s*"(?:GET|POST|PUT|DELETE|PATCH)"\s*,\s*"(/api/[^"]*)"')
+
+
+def _studio_server_routes() -> set[str]:
+    """Routes served by `caterva studio` (caterva/studio/routes.py).
+
+    The studio is the third HTTP server this repository documents (the
+    first two are above), and its table is the one `docs/studio/CONTRACT.md`
+    and the changelog quote. Its `{id}` placeholders mean what `:param`
+    means here. Read directly from the table rather than hand-copied, for
+    the reason the whole guard exists: a list maintained beside the code
+    is the list that rots.
+    """
+    if not STUDIO_ROUTES.is_file():
+        raise FileNotFoundError(
+            f"{STUDIO_ROUTES} does not exist, so the studio's routes could "
+            "not be read. Refusing to check documentation against a route "
+            "table known to be incomplete."
+        )
+    text = STUDIO_ROUTES.read_text(encoding="utf-8")
+    return {
+        re.sub(r"\{[^}]*\}", ":param", match.group(1)).rstrip("/") or "/"
+        for match in _STUDIO_ROUTE_RE.finditer(text)
+    }
 
 
 def _web_server_routes() -> set[str]:
