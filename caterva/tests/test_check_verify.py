@@ -421,3 +421,34 @@ class TestTheCommand:
             app_main(["verify", "--help"])
         assert exc.value.code == 0
         assert "caterva verify" in out.getvalue() and "--json" in out.getvalue()
+
+
+def test_a_row_whose_value_prints_with_an_exponent_is_found_on_the_page(tmp_path):
+    """BRENDA writes 0.00000023; the row's value text is 2.3e-07. Held numerically."""
+    import gzip as _gzip
+
+    from caterva.evidence import rows as rows_mod
+    from caterva.evidence.store import EvidenceStore
+
+    page = _gzip.decompress((Path(__file__).resolve().parents[2] / "Tests" / "fixtures" / "recorded"
+                             / "brenda_2.7.1.1.html.gz").read_bytes())
+    store = EvidenceStore(tmp_path / "store")
+    snap = store.put_snapshot(page, source="brenda_enzyme",
+                              locator="https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+                              retrieved_at="2026-09-28T00:00:00Z", licence="CC BY 4.0")
+    rows = rows_mod.rows_from_page(page.decode("utf-8"), ec="2.7.1.1", table="km",
+                                   organism="Homo sapiens", snapshot_ref=f"snapshot:{snap.id}")
+    tiny = [r for r in rows if "e-" in r.value_text]
+    assert tiny, "the pinned page holds sub-micromolar human Km rows"
+    row = tiny[0]
+    store.put_row(row)
+    claim = make_claim("cited", f"reaction_Km = Km(2.7.1.1, {row.substrate}, Homo sapiens)",
+                       row.value_text, row.unit, None,
+                       Derivation(RuleRef("select.resolver", 1, "ADR 0047"), (f"row:{row.id}",),
+                                  rows_mod.certificates_for(row, page), {}))
+    store.put_claim(claim)
+    out = tmp_path / "bundle"
+    store.export_bundle(f"claim:{claim.id}", out)
+    report = verify.verify_bundle(out)
+    locator = [c for c in report.checks if c.name == "row locator"]
+    assert locator and all(c.ok for c in locator), [c.detail for c in locator]

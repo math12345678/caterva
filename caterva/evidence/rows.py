@@ -176,7 +176,7 @@ def same_row(row: Row, *, value: float, commentary: str | None, reference: str |
     """The compose layer's row identity: equal value, verbatim commentary,
     equal reference when both have one."""
     try:
-        if float(row.value_text) != float(value):
+        if float(row.value_text) != float(value_text_of(value)):
             return False
     except (TypeError, ValueError):
         return False

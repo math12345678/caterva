@@ -119,7 +119,11 @@ class EvidenceStore:
             licence=licence, release=release, served_from=served_from,
         )
         existing = self._db.execute("SELECT json FROM snapshots WHERE id = ?", (snapshot.id,)).fetchone()
-        if existing is not None and self._blob_path(snapshot.id).is_file():
+        if existing is not None:
+            # The first retrieval's record stands; a lost blob is rewritten
+            # from the same bytes, which is all its id promises.
+            if not self._blob_path(snapshot.id).is_file():
+                self._blob_path(snapshot.id).write_bytes(gzip.compress(bytes(data), mtime=0))
             return snapshot_from_dict(json.loads(existing[0]))
         self._blob_path(snapshot.id).write_bytes(gzip.compress(bytes(data), mtime=0))
         with self._db:

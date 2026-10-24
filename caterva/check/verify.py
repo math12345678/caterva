@@ -87,6 +87,7 @@ the checker holds a bundle to its own derivations and stated reasons.
 from __future__ import annotations
 
 import gzip
+import zlib
 import hashlib
 import json
 import re
@@ -461,7 +462,7 @@ def _lines(path: Path, reader, what: str) -> list:
     if not path.is_file():
         raise BundleMalformed(f"{path} is missing")
     out = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
         if not line.strip():
             continue
         try:
@@ -627,9 +628,11 @@ def _ordinal(value: Any) -> Decimal | None:
     if value is None:
         return None
     try:
-        return Decimal(str(value))
+        number = Decimal(str(value))
     except InvalidOperation:
         return None
+    # NaN cannot be compared and Infinity is not an ordinal: neither ranks.
+    return number if number.is_finite() else None
 
 
 def dominated(chosen: dict, alternative: dict) -> bool:
@@ -680,7 +683,7 @@ class _Pages:
         else:
             try:
                 data = gzip.decompress(path.read_bytes())
-            except (OSError, EOFError, ValueError) as exc:
+            except (OSError, EOFError, ValueError, zlib.error) as exc:
                 self.problems[snapshot.ref] = f"{path.name} does not gunzip: {exc}"
         if data is not None and digest(data) != snapshot.id:
             self.problems[snapshot.ref] = (
@@ -785,7 +788,9 @@ def _check_row_locator(bundle: BundleFiles, pages: _Pages, claim: ClaimRecord, o
         out.append(Check(name, claim.ref, False, f"{who}: the bytes of {row.snapshot} are not available to search ({pages.problems.get(row.snapshot)})"))
         return
     missing = [
-        text for text in (row.reference, row.value_text, row.commentary, row.substrate,
+        # The value is held to the row numerically by find_row_region: its
+        # printed form ("2.3e-07") is not how BRENDA spells the cell.
+        text for text in (row.reference, row.commentary, row.substrate,
                           row.organism if row.organism != "any" else None)
         if text and not occurs(page, text)
     ]

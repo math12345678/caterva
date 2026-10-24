@@ -201,7 +201,7 @@ def _records(path: Path, reader, what: str) -> list:
     if not path.is_file():
         raise BundleUnreadable(f"{path} is missing")
     out = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
         if not line.strip():
             continue
         try:
