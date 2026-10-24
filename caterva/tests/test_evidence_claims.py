@@ -11,19 +11,23 @@ What is pinned here (ADR 0179):
     tolerance instead;
   * every construction invariant raises EvidenceRefused, and a record built
     from JSON with an id its fields do not produce is refused;
+  * a constructed record cannot be changed in place, settings included, so
+    it cannot come to hold an id its contents do not produce;
   * to_dict / from_dict round-trip every field.
 
-Hypothesis is pinned in requirements-dev.txt but not installed in every
-environment this suite runs in; the order-independence property is exercised
-with seeded stdlib shuffles instead, which is the same check with a fixed
-sample.
+The order-independence properties are Hypothesis tests over permutations of
+the keys (derandomized, so a run is repeatable): the order a mapping was
+built in is exactly the input nobody thinks to vary by hand.
 """
 from __future__ import annotations
 
+import copy
 import json
-import random
+import pickle
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from caterva.evidence import canonical
 from caterva.evidence.claims import (
@@ -146,14 +150,14 @@ class TestCanonicalJson:
     def test_integers_booleans_and_none_are_exact_and_allowed(self):
         assert canonical.canonical_bytes({"n": 1, "b": False, "x": None}) == b'{"b":false,"n":1,"x":null}'
 
-    def test_key_order_does_not_change_the_bytes(self):
-        rng = random.Random(20261017)
-        keys = [f"k{i}" for i in range(12)]
-        reference = canonical.canonical_bytes({k: {"inner": k, "list": [k, "v"]} for k in keys})
-        for _ in range(50):
-            rng.shuffle(keys)
-            shuffled = {k: {"list": [k, "v"], "inner": k} for k in keys}
-            assert canonical.canonical_bytes(shuffled) == reference
+    @given(st.permutations([f"k{i}" for i in range(12)]))
+    @settings(max_examples=60, deadline=None, derandomize=True)
+    def test_key_order_does_not_change_the_bytes(self, keys):
+        reference = canonical.canonical_bytes({f"k{i}": {"inner": f"k{i}", "list": [f"k{i}", "v"]}
+                                               for i in range(12)})
+        shuffled = {k: {"list": [k, "v"], "inner": k} for k in keys}
+        assert list(shuffled) == keys
+        assert canonical.canonical_bytes(shuffled) == reference
 
     def test_digests_are_sha256_with_the_prefix(self):
         d = canonical.digest(b"abc")
@@ -216,13 +220,17 @@ class TestIdentity:
         r = row()
         assert r.id == row_id(r)
 
-    def test_settings_key_order_does_not_change_the_id(self):
-        rng = random.Random(7)
-        keys = [f"setting_{i}" for i in range(8)]
-        reference = cited(settings={k: f"v{k}" for k in keys}).id
-        for _ in range(40):
-            rng.shuffle(keys)
-            assert cited(settings={k: f"v{k}" for k in keys}).id == reference
+    @given(st.permutations([f"setting_{i}" for i in range(8)]))
+    @settings(max_examples=40, deadline=None, derandomize=True)
+    def test_settings_key_order_does_not_change_the_id(self, keys):
+        reference = cited(settings={f"setting_{i}": f"vsetting_{i}" for i in range(8)}).id
+        assert cited(settings={k: f"v{k}" for k in keys}).id == reference
+
+    def test_holding_settings_read_only_left_the_id_as_it_was(self):
+        """The id `cited()` had while Derivation held its settings as a
+        plain dict, computed by that code: the read-only view digests the
+        same bytes, so no bundle written before it changes meaning."""
+        assert cited().id == "sha256:feab84ae6c76683adc7fcddc338fa756e7197d7b6c3f26ad0a62b9c24b39948d"
 
     def test_a_changed_value_changes_a_cited_claims_id(self):
         assert cited(value_text="6").id != cited(value_text="6.3").id
@@ -364,6 +372,34 @@ class TestInvariants:
                 organism=r.organism)
         with pytest.raises(EvidenceRefused, match="not a digest"):
             Snapshot(id="nope", source="brenda_enzyme", locator="u", retrieved_at="t", licence="l")
+
+    def test_a_claims_settings_cannot_be_changed_in_place(self):
+        """A frozen dataclass stops `derivation.settings = ...`; a dict
+        inside it did not stop `settings["k"] = ...`, after which the claim
+        held an id its contents no longer produced, and nothing refused it."""
+        claim = cited(settings={"ordinals": "{}", "unit_factor": "1"})
+        with pytest.raises(TypeError):
+            claim.derivation.settings["unit_factor"] = "1000"  # type: ignore[index]
+        with pytest.raises(TypeError):
+            del claim.derivation.settings["ordinals"]  # type: ignore[attr-defined]
+        assert not hasattr(claim.derivation.settings, "update")
+        assert claim.id == claim_id(claim)
+        assert dict(claim.derivation.settings) == {"ordinals": "{}", "unit_factor": "1"}
+
+    def test_the_callers_dict_changed_afterwards_does_not_reach_the_claim(self):
+        given_settings = {"ordinals": "{}", "unit_factor": "1"}
+        claim = cited(settings=given_settings)
+        given_settings["unit_factor"] = "1000"
+        assert claim.derivation.settings["unit_factor"] == "1"
+        assert claim.id == claim_id(claim)
+
+    def test_a_claim_still_copies_and_pickles_with_its_settings_still_read_only(self):
+        claim = cited()
+        for twin in (copy.deepcopy(claim), copy.copy(claim), pickle.loads(pickle.dumps(claim))):
+            assert twin == claim
+            assert twin.id == claim_id(twin)
+            with pytest.raises(TypeError):
+                twin.derivation.settings["unit_factor"] = "1000"  # type: ignore[index]
 
     def test_a_row_names_a_known_quantity_and_a_snapshot(self):
         with pytest.raises(EvidenceRefused, match="quantity"):

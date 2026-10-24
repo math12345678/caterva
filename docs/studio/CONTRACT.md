@@ -439,8 +439,9 @@ anything was produced, a crash, a cancel, an interruption).
 finished.
 
 `POST /api/runs/{id}/verify` with `{}` -> `VerifyReport` `{ok, checks:
-[{name, claim, ok, detail}], ran_at}` (amended 2026-10-17, sci-kinetics; the
-handler is core's, in dispatch.py). Re-checks the run's claims bundle,
+[{name, claim, ok, status, detail}], ran_at}` (amended 2026-10-17,
+sci-kinetics; the handler is core's, in dispatch.py; `status` amended
+2026-10-24). Re-checks the run's claims bundle,
 `<run dir>/claims/` (section 11), through the one function `caterva verify`
 calls, `caterva.check.verify.verify_bundle`: standard library only, sharing
 no code with what wrote the bundle, reading the bundle's own files and
@@ -448,8 +449,12 @@ contacting nothing. `checks` is the command's `--json` output line for line
 (`name` is one of `snapshot bytes`, `identity`, `row locator`, `certificate`,
 `dominance`, `unit arithmetic`, `inputs`, `root`, `not checked`; `claim` the
 claim ref a check is about, or null for a check about a snapshot or a row,
-whose `detail` then starts with that ref and names the claims that hold it);
-`ok` is true when every check passed; `ran_at` is when. A POST because it
+whose `detail` then starts with that ref and names the claims that hold it;
+`status` is `ok`, `failed` or `not run`, the three states the command
+prints as `ok`, `FAIL` and `n/a`, and a check's `ok` is true exactly when
+its status is not `failed`, so a check that did not run, such as a
+dominance check on a claim that carried no ordinals, is ok without having
+held); the report's `ok` is true when no check failed; `ran_at` is when. A POST because it
 does work (it gunzips and re-digests every pinned page). 409 `conflict`
 while the run is not done (as `/result` is), 409 with the sentence
 `contract.NO_CLAIMS_BUNDLE` when the run wrote no bundle (a run of another
@@ -1145,8 +1150,10 @@ the bundle's two artifacts as downloads, the `## Claims` text behind a
 disclosure, and the action "Re-check this run", which POSTs
 `/api/runs/{id}/verify` (`src/api/verify.ts`, the answer checked against
 its schema) and lists the report as the command prints it: the verdict
-sentence, the summary line (`N checks: X ok, Y failed; Z not checked.`),
-one line per check with ok or failed, the check's name, the identifier of
+sentence, the summary line (`N checks: H ok, F failed, D did not run; S
+not checked.`, amended 2026-10-24), one line per check with ok, FAIL or
+n/a as the command prints them (drawn from `status`, never from `ok`
+alone), the check's name, the identifier of
 the number whose claim it is about when the result carries that claim
 (the root claim is `model`), and the detail verbatim, then what was not
 checked with its reason. A failed report is drawn as the command's exit 3

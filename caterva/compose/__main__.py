@@ -87,6 +87,7 @@ from dataclasses import dataclass, field, replace
 import re
 
 import argparse
+import contextlib
 import sys
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -307,10 +308,11 @@ def build_parser(prog: str = "python -m caterva.compose") -> argparse.ArgumentPa
         help=("keep the evidence: every BRENDA page the search read, as the "
               "bytes it read, the rows taken from them, and one claim per "
               "number naming its derivation, written to DIR as a bundle that "
-              "`caterva verify DIR` re-checks offline. The report ends with "
-              "a `## Claims` section; with --export, the artefact carries each "
-              "number's claim id. Without this flag nothing is written and "
-              "nothing changes"),
+              "`caterva verify DIR` re-checks offline. BRENDA's reference page "
+              "for each cited row is fetched and pinned too. The report gains a "
+              "`## Claims` section before its footer; with --export, the "
+              "artefact carries each number's claim id. Without this flag "
+              "nothing is written and nothing changes"),
     )
     return parser
 
@@ -1067,6 +1069,10 @@ def search_the_literature(
     return found.model, found.note, found.refused
 
 
+#: How many substrates the missing-substrate refusal names at most.
+SUBSTRATES_NAMED = 8
+
+
 def _substrates_brenda_lists(ec: str, organism: Optional[str]) -> str:
     """Name the substrates BRENDA holds Km rows for, so the refusal can be acted on.
 
@@ -1076,6 +1082,14 @@ def _substrates_brenda_lists(ec: str, organism: Optional[str]) -> str:
     for them: picking one would cite a Km for a reaction nobody asked about.
     Returns "" when the list cannot be built, because the refusal stands
     either way and a failed lookup must not replace it.
+
+    The order is by how many rows each substrate has, and the sentence says
+    exactly that. It used to call them "the best-measured", which a row
+    count cannot show: one row is a single measurement, however good, and
+    a substrate with one row was printed under that heading. At most
+    SUBSTRATES_NAMED are named, so a page with fifty substrates stays one
+    readable sentence; the total is stated beside them, so a reader can tell
+    when the list is not all of it.
     """
     try:
         from caterva.checkout import literature_module
@@ -1092,11 +1106,13 @@ def _substrates_brenda_lists(ec: str, organism: Optional[str]) -> str:
         counts[row.substrate] = counts.get(row.substrate, 0) + 1
     if not counts:
         return ""
-    top = sorted(counts, key=lambda k: (-counts[k], k))[:8]
+    top = sorted(counts, key=lambda k: (-counts[k], k))[:SUBSTRATES_NAMED]
     listed = "; ".join(f"{n} ({counts[n]} row{'s' if counts[n] != 1 else ''})" for n in top)
+    which = (f"the {len(top)} with the most rows" if len(top) < len(counts)
+             else "most rows first")
     where = f" for {name}" if name else ""
     return (f" BRENDA holds Km rows{where} for {len(counts)} substrate(s) of "
-            f"EC {ec}; the best-measured: {listed}. Pass one with --substrate.")
+            f"EC {ec}; {which}: {listed}. Pass one with --substrate.")
 
 
 def _search_resolved(
@@ -1370,12 +1386,15 @@ def _export(description: str, subject: Optional[str], fmt: str,
     from caterva.compose.export import ExportRefused
     from caterva.compose.pipeline import compose
 
-    claims = _claims_run(args)
+    claims = None
     try:
         model = compose(description, subject=subject,
                         organism=getattr(args, "organism", None),
                         substrate=getattr(args, "substrate", None),
                         compounds=compounds_from(args) if args is not None else None)
+        # Opened only once there is a model, as in `compose_report`: a
+        # description that builds nothing writes no store (`_claims_run`).
+        claims = _claims_run(args)
         if subject and args is not None:
             # An export that quietly carried placeholders while the report
             # beside it carried measurements would be the disagreement the
@@ -1411,6 +1430,17 @@ def _claims_run(args: Any) -> Any:
     The evidence layer is imported here and nowhere else in this module, so
     a run without `--claims` imports nothing of it and behaves exactly as it
     did before claims existed (ADR 0179).
+
+    CALLED ONLY ONCE A MODEL IS BUILT. Opening the run creates `DIR/store`,
+    and it used to be opened before `compose`, so `caterva compose
+    glycolysis --claims DIR` refused ("Not built.", exit 3) and left a
+    store with no bundle beside it, which `caterva verify DIR` then
+    rejected as not a bundle. A refused description now writes nothing:
+    no model means no number for a claim to be about, and a bundle with a
+    refused claim at its root would verify as ok while backing nothing. A
+    run that does build a model writes a bundle whatever its search or its
+    export then refuses, because that bundle is a true account of the model
+    that was built.
     """
     directory = getattr(args, "claims", None)
     if not directory:
@@ -1423,6 +1453,53 @@ def _claims_run(args: Any) -> Any:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
+
+def _not_a_directory(directory: Any) -> Optional[str]:
+    """Why `directory` cannot be made a directory, naming the path in the
+    way, or None.
+
+    `--claims DIR` makes DIR and every missing parent, so the request is
+    malformed exactly when DIR, or the nearest of its parents that exists,
+    is something other than a directory: `--claims notes.txt`, or
+    `--claims notes.txt/run1`. Only what already exists is read; whether
+    DIR can be written is the filesystem's to say when the run writes it.
+
+    TWO THINGS `Path.exists()` ALONE MISSED. A symbolic link to nothing is
+    an entry that is not a directory, and `exists()` follows the link and
+    says no, so `--claims link` was let through and the store's mkdir then
+    raised FileExistsError after the model was built: the traceback this
+    check is here to prevent. (A link to a directory is a directory here,
+    as it is to mkdir.) And a path that cannot even be looked at (an
+    ancestor without search permission) made `exists()` raise
+    PermissionError out of the argument check itself on Python 3.10 to
+    3.12, where 3.13 says False and lets it through to the same failure
+    later. The run could not have written there either, so both are refused
+    here with the reason. `stat()` is asked directly, and raises the same
+    on every Python this package supports, where `exists()` does not.
+    """
+    import stat
+    from pathlib import Path
+
+    path = Path(str(directory))
+    for candidate in (path, *path.parents):
+        try:
+            mode = candidate.stat().st_mode
+        except (FileNotFoundError, NotADirectoryError):
+            # Nothing there (the walk goes on to the parent), or a parent
+            # is a file (the walk reaches it). A link to nothing is the one
+            # entry that is there while what it names is not.
+            if candidate.is_symlink():
+                return f"{candidate} is a symbolic link, and not to a directory"
+            continue
+        except OSError as exc:
+            return f"{candidate} cannot be looked at ({exc.strerror or exc})"
+        if stat.S_ISDIR(mode):
+            return None
+        if candidate.is_symlink():
+            return f"{candidate} is a symbolic link, and not to a directory"
+        return f"{candidate} is a file, not a directory"
+    return None
 
 
 def _check_combination(parser: argparse.ArgumentParser, args: Any) -> None:
@@ -1446,6 +1523,15 @@ def _check_combination(parser: argparse.ArgumentParser, args: Any) -> None:
     claims = getattr(args, "claims", None)
     if claims is not None and not str(claims).strip():
         parser.error("--claims needs a directory to write the bundle to.")
+    blocked = _not_a_directory(claims) if claims is not None else None
+    if blocked is not None:
+        # Asked here, before anything runs, rather than when the store is
+        # opened: that was a NotADirectoryError traceback (exit 1) after the
+        # model was built, for a request that was malformed from the start.
+        parser.error(
+            f"--claims {claims}: {blocked}, so no bundle can be written under "
+            "it. Name a directory, new or existing."
+        )
     if claims is not None and args.antimony:
         # --antimony emits the compiled source with nothing about where its
         # numbers came from, so there is no artefact to carry a claim id and
@@ -1618,23 +1704,21 @@ def compose_report(
     from caterva.compose.pipeline import compose
     from caterva.compose.report import dossier
 
-    claims = _claims_run(args)
-    try:
+    with contextlib.ExitStack() as closing:
         return _compose_report(
-            args, claims, at, out, err, progress, organism_note=organism_note,
+            args, closing, at, out, err, progress, organism_note=organism_note,
             compose=compose, dossier=dossier,
         )
-    finally:
-        if claims is not None:
-            claims.close()
 
 
 def _compose_report(
-    args: Any, claims: Any, at: Callable[..., None], out: Any, err: Any, progress: Any,
-    *, organism_note: Optional[str], compose: Callable[..., Any], dossier: Callable[..., Any],
+    args: Any, closing: contextlib.ExitStack, at: Callable[..., None], out: Any, err: Any,
+    progress: Any, *, organism_note: Optional[str], compose: Callable[..., Any],
+    dossier: Callable[..., Any],
 ) -> ComposedReport:
-    """`compose_report` with the `--claims` run (or None) already open; the
-    caller closes it whatever happens here."""
+    """`compose_report` after its imports. The `--claims` run is opened here,
+    once `compose` has built a model (`_claims_run` says why not before),
+    and entered on `closing`, which the caller exits whatever happens."""
     # COMPOSE ONCE, AND RUN THE VERDICT'S INPUTS BEFORE THE VERDICT.
     #
     # The dossier's verdict page reports whether `validate` and
@@ -1649,6 +1733,9 @@ def _compose_report(
     model = compose(args.description, subject=args.subject,
                     organism=args.organism, substrate=args.substrate,
                     compounds=compounds_from(args))
+    claims = _claims_run(args)
+    if claims is not None:
+        closing.enter_context(claims)
     search_note = None
     search_refused = False
     name_refusal = None

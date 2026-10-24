@@ -212,7 +212,7 @@ def _observed(ec_number: str, html: str, served_from: str | None) -> None:
     the fetch: a page the evidence layer could not pin must not be used as
     though it had been, and nothing registers an observer unless it was asked
     to pin (`caterva compose --claims`)."""
-    for observer in list(PAGE_OBSERVERS):
+    for observer in list(PAGE_OBSERVERS):  # noqa: PERF101 - a snapshot: a Recorder may deregister while a scout thread is notifying
         observer(ec_number, html, served_from)
 
 

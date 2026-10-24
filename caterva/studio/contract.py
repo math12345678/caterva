@@ -925,7 +925,10 @@ class VerifyCheck(TypedDict):
     #: The claim ref the check is about, or null for a check about a snapshot
     #: or a row, whose detail then starts with that record's ref.
     claim: Optional[str]
+    #: "Did not fail": true for a check that held and for one that did not run.
     ok: bool
+    #: "ok", "failed" or "not run" (caterva/check/verify.py, Check.status).
+    status: str
     detail: str
 
 

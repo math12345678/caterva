@@ -72,6 +72,7 @@ try:
         capture_reference,
         enzyme_page_url,
     )
+    from caterva.checkout import LiteratureLayerUnavailable
     from caterva.evidence.claims import (
         CHOSEN_STARTING_AMOUNT,
         COMPILE_MODEL,
@@ -79,6 +80,7 @@ try:
         SELECT_RESOLVER,
         Claim,
         Derivation,
+        EvidenceRefused,
         Refusal,
         Row,
         make_claim,
@@ -100,6 +102,7 @@ except ImportError:  # pragma: no cover - flat layout
         capture_reference,
         enzyme_page_url,
     )
+    from checkout import LiteratureLayerUnavailable  # type: ignore[no-redef]
     from evidence.claims import (  # type: ignore[no-redef]
         CHOSEN_STARTING_AMOUNT,
         COMPILE_MODEL,
@@ -107,6 +110,7 @@ except ImportError:  # pragma: no cover - flat layout
         SELECT_RESOLVER,
         Claim,
         Derivation,
+        EvidenceRefused,
         Refusal,
         Row,
         make_claim,
@@ -138,7 +142,9 @@ REFERENCE_NOT_CAPTURED = "reference_page_not_captured"
 #: chosen row's grades, so no ordinals can be stated for it.
 ORDINALS_NOT_CARRIED = "not certified: chosen row's ordinals not carried"
 
-#: The line the report's `## Claims` section ends with, with the directory.
+#: The re-check line of the report's `## Claims` section, with the directory;
+#: the section's closing sentence (a claim is a derivation, not a verdict)
+#: follows it.
 RECHECK_LINE = "Re-check offline: caterva verify {directory}"
 
 
@@ -620,11 +626,14 @@ class ClaimsRun:
     (there are none today) would otherwise be pinned as the search's.
     `finish` builds the claims, captures the references and writes the
     bundle; `close` releases the store. A `with` block closes on exit.
+    `unpinned` is why no page could be pinned at all, when that is so
+    (`start_recording`), and None otherwise.
     """
 
     directory: Path
     store: EvidenceStore = field(init=False)
     recorder: SearchRecorder = field(init=False)
+    unpinned: str | None = field(default=None, init=False)
     _recording: bool = field(default=False, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -633,9 +642,32 @@ class ClaimsRun:
         self.recorder = SearchRecorder(self.store)
 
     def start_recording(self) -> None:
-        if not self._recording:
+        """Pin every page the search reads from now until `stop_recording`.
+
+        WHEN NOTHING CAN BE PINNED. An installation without the literature
+        layer (a wheel built without scripts/vendor_literature.py) has no
+        brenda_client to observe, and `literature_module` raises
+        LiteratureLayerUnavailable. That used to escape `caterva compose
+        --claims` as a traceback, exit 1, where the same run without the
+        flag refuses, exit 3, because its search cannot run either: asking
+        for claims turned a refusal into a crash. A literature copy without
+        the PAGE_OBSERVERS hook raises EvidenceRefused the same way. Either
+        is now kept in `unpinned`, said once among the bundle's notes, and
+        the search goes on exactly as it would without the flag. A value it
+        still returns gets a refused claim (page_not_pinned), never a
+        citation, because no page was pinned to cite it from.
+        """
+        if self._recording or self.unpinned is not None:
+            return
+        try:
             self.recorder.__enter__()
-            self._recording = True
+        except (LiteratureLayerUnavailable, EvidenceRefused) as exc:
+            # Observers already put on an earlier copy of the client come
+            # off again, so nothing is half-registered for the search.
+            self.recorder.__exit__(None, None, None)
+            self.unpinned = f"no BRENDA page could be pinned here, so no value can be cited: {exc}"
+            return
+        self._recording = True
 
     def stop_recording(self) -> None:
         if self._recording:
@@ -648,6 +680,8 @@ class ClaimsRun:
         self.stop_recording()
         claim_set = claims_for_model(provenanced, model, self.store, self.recorder)
         notes = capture_references(claim_set, self.store)
+        if self.unpinned is not None:
+            notes = (self.unpinned, *notes)
         claim_set = ClaimSet(root=claim_set.root, claims=claim_set.claims,
                              by_identifier=claim_set.by_identifier, notes=notes,
                              store=claim_set.store)

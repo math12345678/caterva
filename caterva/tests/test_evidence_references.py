@@ -9,10 +9,14 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import html as html_module
 import re
+import time
 from pathlib import Path
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from caterva.checkout import literature_module
 from caterva.evidence.claims import EvidenceRefused
@@ -116,6 +120,122 @@ class TestParseReferencePage:
         assert found.title == 'Km of "x"'
         assert found.pmid is None
         assert found.year == "2001"
+
+
+#: The parser as it was before it was made linear: lazy regular expressions,
+#: re.S. Kept here as the definition the linear parser is held to, so that
+#: making it fast could not change one thing it reads.
+_REGEX_TITLE = re.compile(r'class="reference__title">(.*?)</span>(.*?)</div>', re.S)
+_REGEX_AUTHORS = re.compile(r'class="reference__authors">(.*?)</div>', re.S)
+_REGEX_JOURNAL = re.compile(r"<em>(.*?)</em>", re.S)
+_REGEX_TAGS = re.compile(r"<[^>]+>")
+
+
+def _regex_text(fragment: str) -> str:
+    return html_module.unescape(_REGEX_TAGS.sub("", fragment)).strip()
+
+
+def regex_parse(html: str) -> ReferencePage | str:
+    """What the regular-expression parser read from `html`, or "refused"."""
+    title = _REGEX_TITLE.search(html)
+    authors = _REGEX_AUTHORS.search(html)
+    if title is None or authors is None:
+        return "refused"
+    tail = title.group(2)
+    year = re.search(r"\((\d{4})\)", tail)
+    journal = _REGEX_JOURNAL.search(tail)
+    pmid = re.search(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)", html)
+    page_title = re.search(r"<title>Reference to ([0-9.]+); Id = (\d+)", html, re.S)
+    return ReferencePage(
+        authors=_regex_text(authors.group(1)), title=_regex_text(title.group(1)),
+        journal=_regex_text(journal.group(1)) if journal else None,
+        year=year.group(1) if year else None, pmid=pmid.group(1) if pmid else None,
+        ec=page_title.group(1) if page_title else None,
+        reference=page_title.group(2) if page_title else None,
+    )
+
+
+def linear_parse(html: str) -> ReferencePage | str:
+    """What parse_reference_page read from `html`, or "refused"."""
+    try:
+        return parse_reference_page(html)
+    except EvidenceRefused:
+        return "refused"
+
+
+#: Pieces a reference page is made of, and the ones a malformed page misuses:
+#: closers before openers, a second opener, an unclosed tag, an empty `<>`.
+_PIECES = [
+    'class="reference__title">', 'class="reference__authors">', "</span>", "</div>",
+    "<em>", "</em>", "<sub>", "<", ">", "<>", "x", " ", "(1999)", "&amp;",
+    "<title>Reference to 2.7.1.1; Id = 7", "pubmed.ncbi.nlm.nih.gov/12",
+]
+
+
+class TestLinearInThePage:
+    """The blocks were found by lazy regular expressions whose time was
+    quadratic on a page with an opener and no closer (references.py's
+    docstring: a crafted 310 KB page took 14 s). The parser now finds them
+    with str.find; these hold it to reading exactly what the expressions
+    read, and to doing it in time linear in the page."""
+
+    @pytest.mark.parametrize("ref", sorted(EXPECTED))
+    def test_each_recorded_page_reads_as_the_regular_expressions_read_it(self, ref):
+        html = page(ref).decode("utf-8")
+        assert linear_parse(html) == regex_parse(html)
+        assert isinstance(linear_parse(html), ReferencePage)
+
+    @pytest.mark.parametrize(("html", "title", "journal"), [
+        # A </div> before the title's </span>: the title runs on to the </span>.
+        ('<div class="reference__authors">A</div><span class="reference__title">T</div>U</span>'
+         " (1999) <em>J.</em></div>", "TU", "J."),
+        # Two title openers: the first one, closed at the first </span>.
+        ('<div class="reference__authors">A</div><span class="reference__title">T</span>'
+         '<span class="reference__title">V</span><em>K</em></div>', "T", "K"),
+        # An unclosed tag after the last '>' is text, as the expression left it.
+        ('<div class="reference__authors">A</div><span class="reference__title"><b>T</b> < x'
+         "</span><em>J. <i</em></div>", "T < x", "J. <i"),
+        # An empty <> is not a tag.
+        ('<div class="reference__authors">A</div><span class="reference__title">T<></span></div>', "T<>", None),
+    ])
+    def test_the_edges_of_the_structure_read_as_the_regular_expressions_read_them(self, html, title, journal):
+        found = linear_parse(html)
+        assert found == regex_parse(html)
+        assert (found.title, found.journal, found.authors) == (title, journal, "A")
+
+    @pytest.mark.parametrize("html", [
+        '<div class="reference__authors">A</div><span class="reference__title">T</span>',  # no </div> after
+        '<div class="reference__authors">A</div><span class="reference__title">T</div>',  # no </span>
+        '<span class="reference__title">T</span></div><div class="reference__authors">A',  # authors unclosed
+    ])
+    def test_a_block_without_its_closer_is_refused_as_the_regular_expressions_refused_it(self, html):
+        assert regex_parse(html) == "refused"
+        assert linear_parse(html) == "refused"
+
+    @given(st.lists(st.sampled_from(_PIECES), max_size=40).map("".join))
+    @settings(max_examples=400, deadline=None, derandomize=True)
+    def test_any_page_of_these_pieces_reads_as_the_regular_expressions_read_it(self, html):
+        assert linear_parse(html) == regex_parse(html)
+
+    def test_a_crafted_page_of_megabytes_is_read_in_well_under_a_second(self):
+        """Each shape made the expressions retry from every later opener or
+        closer; at 100,000 repeats the old parser would take tens of minutes
+        on each (4x per doubling from 14 s at 10,000)."""
+        n = 100_000
+        authors = '<div class="reference__authors">A</div>'
+        shapes = [
+            'x<span class="reference__title">T' + "</span>" * n,
+            authors + '<span class="reference__title">' * n,
+            '<span class="reference__title">T</span>(1999)</div>' + 'class="reference__authors">' * n,
+            authors + '<span class="reference__title">T</span>' + "<em>" * n + "</div>",
+            authors + '<span class="reference__title">' + "<" * n + "</span>(1999)</div>",
+        ]
+        started = time.perf_counter()
+        outcomes = [linear_parse(html) for html in shapes]
+        elapsed = time.perf_counter() - started
+        assert elapsed < 2.0, f"{elapsed:.2f} s for five crafted pages of {sum(map(len, shapes)) // 1000} KB"
+        assert outcomes[:3] == ["refused"] * 3
+        assert outcomes[3].journal is None and outcomes[4].title == "<" * n
 
 
 class TestUrls:

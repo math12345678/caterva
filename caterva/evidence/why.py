@@ -19,9 +19,13 @@ WHAT IS REFUSED
 ---------------
 A ref that is not in the bundle or store named: exit 3 with `Refused:` and
 the ref, because a derivation that is not there cannot be shown and must
-not be made up. A directory that is not a bundle (or holds no store): exit
-2, the question could not be read. `--bundle` and `--store` together, or
-neither: a malformed question, exit 2.
+not be made up; so is a record that, read back, does not produce its own id
+(exit 3, `Refused:` and why), since printing it would show a derivation
+that is not the one the id names. A directory that is not a bundle, or
+holds no store (no index.sqlite, or one that is not an evidence store's:
+not SQLite, or without its tables): exit 2, the question could not be read.
+The store is opened read only, so asking changes nothing on disk.
+`--bundle` and `--store` together, or neither: a malformed question, exit 2.
 
 This module reads the producer's records through `caterva.evidence`; it is
 not the checker. `caterva verify` (caterva/check/) is the program that
@@ -40,13 +44,13 @@ try:
     from caterva.evidence.claims import Claim, EvidenceRefused, Row, Snapshot, ref_kind
     from caterva.evidence.references import parse_reference_page, reference_url
     from caterva.evidence.rows import ANY_ORGANISM, locator_ec
-    from caterva.evidence.store import INDEX, EvidenceStore
+    from caterva.evidence.store import EvidenceStore, StoreUnreadable
 except ImportError:  # pragma: no cover - flat layout
     from evidence.bundle import Bundle, BundleUnreadable, read_bundle  # type: ignore[no-redef]
     from evidence.claims import Claim, EvidenceRefused, Row, Snapshot, ref_kind  # type: ignore[no-redef]
     from evidence.references import parse_reference_page, reference_url  # type: ignore[no-redef]
     from evidence.rows import ANY_ORGANISM, locator_ec  # type: ignore[no-redef]
-    from evidence.store import INDEX, EvidenceStore  # type: ignore[no-redef]
+    from evidence.store import EvidenceStore, StoreUnreadable  # type: ignore[no-redef]
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -163,7 +167,13 @@ def _reference_lines(source: _Source, row: Row, indent: int) -> list[str]:
     if page is None:
         return [_row_line("reference", f"{row.reference}  (the paper's page {wanted} is not in {source.where})", indent)]
     try:
-        found = parse_reference_page(source.snapshot_bytes(page.ref).decode("utf-8", errors="replace"))
+        data = source.snapshot_bytes(page.ref)
+    except EvidenceRefused as exc:
+        # Bytes that are not the snapshot's (bundle and store both hold a blob
+        # to its id) are not the paper, so none is printed; the reason is.
+        return [_row_line("reference", f"{row.reference}  page {page.ref} pinned but unreadable: {exc}", indent)]
+    try:
+        found = parse_reference_page(data.decode("utf-8", errors="replace"))
     except EvidenceRefused as exc:
         return [_row_line("reference", f"{row.reference}  page {page.ref} pinned but holds no reference block: {exc}", indent)]
     head = f"{row.reference}  PMID {found.pmid}" if found.pmid else f"{row.reference}  no PubMed id on the page"
@@ -257,8 +267,9 @@ def build_parser(prog: str = "caterva why") -> argparse.ArgumentParser:
             f"  {prog} claim:sha256:<hex> --store ./claims/store\n"
             "\n"
             "Take the ref from the report's `## Claims` section or from an export's claim_id.\n"
-            "Exit codes: 0 printed, 2 malformed question or a directory that is not a bundle, "
-            "3 the ref is not in the bundle (Refused: and the ref), 1 a crash."
+            "Exit codes: 0 printed, 2 malformed question or a directory that is not a bundle "
+            "(or not a store), 3 refused: the ref is not in the bundle, or a record read does not "
+            "produce its own id (Refused: and why), 1 a crash."
         ),
     )
     parser.add_argument("ref", help="a claim ref, claim:sha256:<64 hex>")
@@ -271,10 +282,7 @@ def build_parser(prog: str = "caterva why") -> argparse.ArgumentParser:
 def _open(args: argparse.Namespace) -> _Source:
     if args.bundle:
         return _Source(read_bundle(args.bundle), f"the bundle {args.bundle}")
-    path = Path(args.store)
-    if not (path / INDEX).is_file():
-        raise BundleUnreadable(f"{path} holds no {INDEX}: it is not an evidence store")
-    return _Source(EvidenceStore(path), f"the store {args.store}")
+    return _Source(EvidenceStore(Path(args.store), read_only=True), f"the store {args.store}")
 
 
 def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
@@ -287,7 +295,7 @@ def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
         parser.error(str(exc))
     try:
         source = _open(args)
-    except BundleUnreadable as exc:
+    except (BundleUnreadable, StoreUnreadable) as exc:
         print(f"Not a claims bundle: {exc}", file=sys.stderr)
         return EXIT_USAGE
     try:
@@ -296,7 +304,11 @@ def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
         except KeyError as exc:
             print(f"Refused: {exc.args[0]} is not in {source.where}", file=sys.stderr)
             return EXIT_REFUSED
-        except BundleUnreadable as exc:
+        except EvidenceRefused as exc:
+            # A store record whose fields do not produce its id, or that is not
+            # JSON: a bundle's records are checked when it is read, a store's
+            # one by one as they are met, here. (A blob that is not its
+            # snapshot's bytes is reported in the reference line instead.)
             print(f"Refused: {exc}", file=sys.stderr)
             return EXIT_REFUSED
     finally:

@@ -25,23 +25,28 @@ them is wrong.
 
 THE EIGHT CHECKS, BY NAME
 -------------------------
-  snapshot bytes   each blob under snapshots/<hex>.gz gunzips and its sha256
-                   is the snapshot's id
+  snapshot bytes   each blob under snapshots/<hex>.gz gunzips to at most
+                   MAX_PAGE_BYTES and its sha256 is the snapshot's id
   identity         every row id and claim id recomputes from the stored
                    fields; a mismatch names the claim (for a row, the claims
                    that cite it)
   row locator      a cited claim's single input is a row in rows.jsonl, the
                    row's snapshot is in snapshots.jsonl, the reference id,
-                   the value and (when present) the commentary occur within
-                   ONE TABLE ROW of the page, the substrate and organism occur
-                   in the page, and the claim's value and unit are the row's
+                   the value, the substrate, the organism (unless "any") and
+                   (when present) the commentary are cells of ONE TABLE ROW
+                   of the page, and the claim's value and unit are the row's
                    (a stated unit factor moves that comparison to "unit
                    arithmetic")
   certificate      each certificate's [start, end) lies inside its snapshot
-                   and the bytes there decode to `matched`
+                   and the bytes there decode to `matched`; for a cited
+                   claim, every span also lies inside ONE table row, that row
+                   holds the cited row's five texts as the row locator finds
+                   them, and the spans certify its reference, value and
+                   commentary
   dominance        with settings["ordinals"], the chosen row is not strictly
-                   dominated by an alternative; without, "not certified" and
-                   ok, so the report shows what did not run
+                   dominated by an alternative; without, "not certified": the
+                   check did not run, and the report says so (status "not
+                   run", printed `n/a`), never that it passed
   unit arithmetic  with settings["unit_factor"], value == row value × factor
                    within the claim's tolerance, in Decimal
   inputs           a computed claim's inputs exist (an `ir:` input is the
@@ -51,6 +56,43 @@ THE EIGHT CHECKS, BY NAME
 
 and anything the checker cannot do -- regenerate the Antimony, replay the
 integration -- is listed under "not checked" with the reason, never left out.
+
+THREE STATES, NOT TWO
+---------------------
+A check held, failed, or did not run (`Check.status`: "ok", "failed", "not
+run"). The third is its own state because the alternative is a lie in one
+direction or the other: counted as ok, a dominance check that had no
+ordinals to compare reads as a pick that was compared and survived; counted
+as failed, a bundle that states honestly that it carried no ordinals could
+never be re-checked at all. A check that did not run does not fail the
+bundle (`Report.ok` is "nothing failed"), is printed `n/a` with its reason,
+and is counted apart from the checks that held.
+
+WHY A CERTIFICATE IS HELD TO THE CITED ROW
+------------------------------------------
+A span that reads as its text proves only that the page holds the text
+somewhere. Without the row tie, a claim could cite row B and carry row A's
+spans: on the recorded hexokinase page a Km claim citing the 0.63 mM
+D-glucose row of reference 702314 with the five spans of the 0.63 mM ATP
+row of reference 641068 passed every check (found 2026-10-24), because the
+value matched and every span read. `caterva why` shows those spans as "the
+bytes that say it", so they must be the cited row's bytes.
+
+Reference, value and commentary are not enough to name the row. One paper
+often reports several substrates, or species, under the same conditions
+with the same value: on the same page reference 674800 gives kcat 53.2 1/s
+at "37°C, pH 7.4, wild-type enzyme" for ATP and for D-glucose in Mus
+musculus, two table rows, and a claim citing the D-glucose row with the ATP
+row's five spans (one of them reading 'ATP') passed while the tie looked at
+three texts (found 2026-10-24). So the substrate and the organism are
+cells of the one row too, for the row locator and for the tie alike.
+Counted 2026-10-24 over the Km, kcat and Ki tables of the two recorded
+pages: every one of the 1,681 rows the producer can certify and whose
+texts the page holds (718 on hexokinase's, 963 on EC 1.4.3.4's) has a
+table row holding all five, so no honest citation is refused; and for 60
+of them (14 and 46) the producer's
+spans lie in a neighbour that shares the three texts, which the tie now
+refuses rather than passes.
 
 WHAT "ONE TABLE ROW" IS
 -----------------------
@@ -86,11 +128,10 @@ the checker holds a bundle to its own derivations and stated reasons.
 """
 from __future__ import annotations
 
-import gzip
-import zlib
 import hashlib
 import json
 import re
+import zlib
 from bisect import bisect_right
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
@@ -113,6 +154,28 @@ ROW_OPENING = re.compile(rb'<div id="tab\d+(?:_head|r\d+(?:sr\d+)?)" class="(?:r
 
 #: A number standing as a whole cell text.
 _CELL_NUMBER = re.compile(rb">(\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)(?:\n|<)")
+
+#: The most a pinned page may inflate to. A bundle is the thing people share
+#: and re-check without having written it, and gzip lets a 200 KB blob
+#: inflate to gigabytes before its hash can be compared (a 203,860-byte blob
+#: of 200 MiB of zeros grew the process by 200 MB, measured 2026-10-24). The
+#: largest BRENDA enzyme page the repository records is 5.8 MB (EC 1.4.3.4,
+#: Tests/fixtures/ki_mode/brenda_1.4.3.4.html.gz; hexokinase's is 3.7 MB),
+#: so 64 MiB is eleven times the largest real page and still a bound on
+#: what a stranger's bundle can make this process hold.
+MAX_PAGE_BYTES = 64 * 1024 * 1024
+
+#: How much of a blob is read from disk at once: the compressed file is not
+#: read whole either.
+_READ_CHUNK = 1024 * 1024
+
+#: The organism of a row read for every organism (caterva/evidence/rows.py
+#: ANY_ORGANISM, repeated rather than imported).
+ANY_ORGANISM = "any"
+
+#: `Check.status`: the check held, failed, or did not run ("THREE STATES").
+STATUS_OK, STATUS_FAILED, STATUS_NOT_RUN = "ok", "failed", "not run"
+STATUSES = (STATUS_OK, STATUS_FAILED, STATUS_NOT_RUN)
 
 #: What the checker cannot do, listed so the report says so.
 NOT_CHECKED = (
@@ -145,29 +208,58 @@ class Check:
 
     `claim` is the claim ref the check is about, or None for a check about a
     snapshot or a row, whose `detail` then starts with that record's ref.
+
+    `ok` is "did not fail"; `ran` False marks a check that did not run (its
+    `detail` says why), which is never a failure and never a pass: `status`
+    is the one answer to read ("THREE STATES" in the module docstring).
     """
 
     name: str
     claim: str | None
     ok: bool
     detail: str
+    ran: bool = True
+
+    def __post_init__(self) -> None:
+        if not self.ran and not self.ok:
+            raise ValueError(f"{self.name}: a check that did not run cannot have failed")
+
+    @property
+    def status(self) -> str:
+        """STATUS_OK, STATUS_FAILED or STATUS_NOT_RUN."""
+        if not self.ran:
+            return STATUS_NOT_RUN
+        return STATUS_OK if self.ok else STATUS_FAILED
 
 
 @dataclass
 class Report:
-    """Every check that ran, and whether all of them passed."""
+    """Every check, and whether none of them failed.
+
+    `ok` is "nothing failed", which is what exit 0 means: a check that did
+    not run does not make a bundle unreadable, and it is not counted as one
+    that held either (`held()`, `not_run()`).
+    """
 
     ok: bool
     checks: list[Check] = field(default_factory=list)
 
     def failed(self) -> list[Check]:
-        return [c for c in self.checks if not c.ok]
+        return [c for c in self.checks if c.status == STATUS_FAILED]
+
+    def held(self) -> list[Check]:
+        return [c for c in self.checks if c.status == STATUS_OK]
+
+    def not_run(self) -> list[Check]:
+        return [c for c in self.checks if c.status == STATUS_NOT_RUN]
 
     def to_dict(self) -> dict:
+        """The `--json` report. `status` is the three-way answer; `ok` stays,
+        meaning "did not fail", for readers that predate `status`."""
         return {
             "ok": self.ok,
             "checks": [
-                {"name": c.name, "claim": c.claim, "ok": c.ok, "detail": c.detail}
+                {"name": c.name, "claim": c.claim, "ok": c.ok, "status": c.status, "detail": c.detail}
                 for c in self.checks
             ],
         }
@@ -596,23 +688,75 @@ def _value_in(page: bytes, value_text: str, start: int, end: int) -> bool:
     return False
 
 
+def _cell_patterns(*texts: str | None) -> list[re.Pattern]:
+    return [_cell_pattern(text) for text in texts if text]
+
+
+def _holds(page: bytes, start: int, end: int, cells: list[re.Pattern], value_text: str) -> bool:
+    return all(cell.search(page, start, end) for cell in cells) and _value_in(page, value_text, start, end)
+
+
+def row_holds(
+    page: bytes, region: tuple[int, int], *, reference: str | None, value_text: str,
+    commentary: str | None, substrate: str | None = None, organism: str | None = None,
+) -> bool:
+    """The table row at `region` has cells holding the reference id, the value,
+    the commentary, the substrate and the organism (each that is given), by
+    the rules find_row_region uses."""
+    cells = _cell_patterns(reference, commentary, substrate, organism)
+    return _holds(page, region[0], region[1], cells, value_text)
+
+
 def find_row_region(
     page: bytes, *, reference: str | None, value_text: str, commentary: str | None,
+    substrate: str | None = None, organism: str | None = None,
 ) -> tuple[int, int] | None:
-    """The first table row whose cells hold the reference id, the value and
-    the commentary (each that is given), or None when no row holds all of them."""
+    """The first table row whose cells hold the reference id, the value, the
+    commentary, the substrate and the organism (each that is given), or None
+    when no row holds all of them.
+
+    The substrate and organism are cells of the row as the other three are:
+    one paper often reports several substrates (or species) under the same
+    conditions with the same value, so reference, value and commentary alone
+    can name a neighbour ("WHY A CERTIFICATE IS HELD TO THE CITED ROW").
+    """
     starts = row_regions(page)
-    reference_pattern = _cell_pattern(reference) if reference else None
-    commentary_pattern = _cell_pattern(commentary) if commentary else None
+    cells = _cell_patterns(reference, commentary, substrate, organism)
     for index, start in enumerate(starts):
         end = starts[index + 1] if index + 1 < len(starts) else len(page)
-        if reference_pattern is not None and not reference_pattern.search(page, start, end):
-            continue
-        if commentary_pattern is not None and not commentary_pattern.search(page, start, end):
-            continue
-        if _value_in(page, value_text, start, end):
+        if _holds(page, start, end, cells, value_text):
             return start, end
     return None
+
+
+def row_cells(row: RowRecord) -> dict[str, str | None]:
+    """The texts a row is found by in its page, as find_row_region and
+    row_holds take them. The organism is left out for a row read for any
+    organism: no cell says "any"."""
+    return {
+        "reference": row.reference,
+        "value_text": row.value_text,
+        "commentary": row.commentary,
+        "substrate": row.substrate,
+        "organism": row.organism if row.organism != ANY_ORGANISM else None,
+    }
+
+
+def _described(row: RowRecord) -> str:
+    """The row's texts as a report line names them: reference '…', value '…', …"""
+    return ", ".join(f"{what} {text!r}" for what, text in (
+        ("reference", row.reference), ("value", row.value_text), ("commentary", row.commentary),
+        ("substrate", row.substrate), ("organism", row_cells(row)["organism"]),
+    ) if text)
+
+
+def same_number(text: str, value_text: str) -> bool:
+    """`text` spells the number `value_text` names, compared as Decimals."""
+    try:
+        return Decimal(text) == Decimal(value_text)
+    except (InvalidOperation, ValueError):
+        # Not a number, or a signalling NaN, which refuses to be compared.
+        return False
 
 
 def occurs(page: bytes, text: str) -> bool:
@@ -665,6 +809,78 @@ def within_tolerance(actual: Decimal, expected: Decimal, tolerance: str | None) 
 # The checks
 # ---------------------------------------------------------------------------
 
+class PageTooLarge(ValueError):  # noqa: N818 - a refusal, named as BundleMalformed is
+    """A blob inflates past the bound it is read under (MAX_PAGE_BYTES)."""
+
+
+def _inflate(inflater: Any, data: bytes, out: bytearray, limit: int) -> None:
+    """Feed `data` to one member's inflater, taking the output a piece of at
+    most _READ_CHUNK bytes at a time into `out`; PageTooLarge past `limit`.
+
+    A piece shorter than asked for means zlib took all the input and has
+    nothing pending; a full one may leave output inside zlib, so it is asked
+    again (with the unconsumed tail, possibly empty) until it runs dry or the
+    member ends. Asking for whole remaining room at once would hand back one
+    `limit`-sized object beside `out` and double what is held.
+    """
+    while True:
+        # Never 0, which zlib reads as "no limit": len(out) <= limit here.
+        want = min(_READ_CHUNK, limit + 1 - len(out))
+        piece = inflater.decompress(data, want)
+        out += piece
+        if len(out) > limit:
+            raise PageTooLarge(
+                f"inflates past {limit:,} bytes (MAX_PAGE_BYTES) and was not read further: "
+                "no page this format pins is that large"
+            )
+        if inflater.eof or len(piece) < want:
+            return
+        data = inflater.unconsumed_tail
+
+
+def gunzip_bounded(path: Path, limit: int = MAX_PAGE_BYTES) -> bytes:
+    """The bytes the gzip file at `path` holds, read the way `gzip.decompress`
+    reads them (every member in turn, zero padding after a member allowed),
+    a piece at a time: the file is read _READ_CHUNK bytes at once and the
+    output is taken in pieces and stops one byte past `limit`, so a small
+    blob cannot make this process hold more than the bound before the hash
+    is compared.
+
+    PageTooLarge once the output would pass `limit`; EOFError when the
+    stream ends before its end-of-stream marker; zlib.error for a corrupt
+    stream, header, CRC or length. The CRC and length are zlib's own checks
+    (wbits 16 + MAX_WBITS reads the gzip wrapper).
+    """
+    out = bytearray()
+    inflater = None  # the current member's, or None between members
+    members = 0
+    with path.open("rb") as handle:
+        pending = b""
+        while True:
+            if not pending:
+                pending = handle.read(_READ_CHUNK)
+                if not pending:
+                    break
+            if inflater is None:
+                if members:
+                    # gzip.decompress strips zero padding after a member.
+                    pending = pending.lstrip(b"\x00")
+                    if not pending:
+                        continue
+                inflater = zlib.decompressobj(wbits=16 + zlib.MAX_WBITS)
+            _inflate(inflater, pending, out, limit)
+            if inflater.eof:
+                # What follows a member's trailer: padding, another member, or nothing.
+                pending = inflater.unused_data
+                inflater = None
+                members += 1
+            else:
+                pending = b""
+    if inflater is not None:
+        raise EOFError("Compressed file ended before the end-of-stream marker was reached")
+    return bytes(out)
+
+
 class _Pages:
     """Snapshot bytes, read once each; None when the blob is missing or wrong."""
 
@@ -682,7 +898,9 @@ class _Pages:
             self.problems[snapshot.ref] = f"{path.name} is missing under {BLOBS}/"
         else:
             try:
-                data = gzip.decompress(path.read_bytes())
+                data = gunzip_bounded(path)
+            except PageTooLarge as exc:
+                self.problems[snapshot.ref] = f"{path.name} {exc}"
             except (OSError, EOFError, ValueError, zlib.error) as exc:
                 self.problems[snapshot.ref] = f"{path.name} does not gunzip: {exc}"
         if data is not None and digest(data) != snapshot.id:
@@ -797,12 +1015,11 @@ def _check_row_locator(bundle: BundleFiles, pages: _Pages, claim: ClaimRecord, o
     if missing:
         out.append(Check(name, claim.ref, False, f"{who}: the page does not hold {missing[0]!r} (row {row.locator})"))
         return
-    region = find_row_region(page, reference=row.reference, value_text=row.value_text, commentary=row.commentary)
+    region = find_row_region(page, **row_cells(row))
     if region is None:
         out.append(Check(
             name, claim.ref, False,
-            f"{who}: no one table row holds reference {row.reference!r}, value {row.value_text!r}"
-            + (f" and commentary {row.commentary!r}" if row.commentary else "") + f" together (row {row.locator})",
+            f"{who}: no one table row holds {_described(row)} together (row {row.locator})",
         ))
         return
     if "unit_factor" in claim.settings:
@@ -822,7 +1039,58 @@ def _check_row_locator(bundle: BundleFiles, pages: _Pages, claim: ClaimRecord, o
     ))
 
 
-def _check_certificates(pages: _Pages, claim: ClaimRecord, out: list[Check]) -> None:
+def _row_tie(bundle: BundleFiles, pages: _Pages, claim: ClaimRecord) -> tuple[str | None, str]:
+    """(problem, where) for a cited claim with at least one span that reads.
+
+    `problem` says why the spans are not the cited row's (module docstring,
+    "WHY A CERTIFICATE IS HELD TO THE CITED ROW"), or is None when they are;
+    `where` then names the table row they lie in, for the report line.
+    """
+    rows = claim.row_inputs()
+    row = bundle.rows.get(rows[0]) if len(claim.inputs) == 1 and len(rows) == 1 else None
+    if row is None:
+        return f"no one cited row in {ROWS} to hold the spans to (see row locator)", ""
+    page = pages.get(row.snapshot)
+    if page is None:
+        return f"the bytes of the row's snapshot {row.snapshot} are not available to hold the spans to", ""
+    starts = row_regions(page)
+    regions: set[tuple[int, int]] = set()
+    for certificate in claim.certificates:
+        start, end = certificate["span"]
+        if certificate["snapshot"] != row.snapshot:
+            return f"span [{start}, {end}) is in {certificate['snapshot']}, not in the row's snapshot {row.snapshot}", ""
+        region = region_of(start, starts, len(page))
+        if region is None:
+            return f"span [{start}, {end}) ({certificate['matched']!r}) lies outside every table row of the page", ""
+        if end > region[1]:
+            return f"span [{start}, {end}) ({certificate['matched']!r}) runs past the end of the table row at bytes [{region[0]}, {region[1]})", ""
+        regions.add(region)
+    if len(regions) > 1:
+        listed = ", ".join(f"[{a}, {b})" for a, b in sorted(regions))
+        return f"the spans lie in {len(regions)} different table rows ({listed}); one row's texts lie in one", ""
+    (region,) = regions
+    if not row_holds(page, region, **row_cells(row)):
+        return (
+            f"the spans lie in the table row at bytes [{region[0]}, {region[1]}), which does not hold "
+            f"the cited row {row.locator} ({_described(row)})", ""
+        )
+    matched = [c["matched"] for c in claim.certificates]
+    for what, text in (("reference", row.reference), ("commentary", row.commentary)):
+        if text and text not in matched:
+            return f"no span certifies the cited row's {what} {text!r} (row {row.locator})", ""
+    if not any(same_number(text, row.value_text) for text in matched):
+        return f"no span certifies the cited row's value {row.value_text!r} (row {row.locator})", ""
+    return None, f"all within the table row at bytes [{region[0]}, {region[1]}) that holds row {row.locator}"
+
+
+def _check_certificates(bundle: BundleFiles, pages: _Pages, claim: ClaimRecord, out: list[Check]) -> None:
+    if claim.kind == "cited" and not claim.certificates:
+        out.append(Check(
+            "certificate", claim.ref, False,
+            f"{claim.identifier}: certifies no span; a cited claim's spans are its row's reference, "
+            "value and commentary in the pinned bytes",
+        ))
+        return
     for certificate in claim.certificates:
         start, end = certificate["span"]
         page = pages.get(certificate["snapshot"])
@@ -836,18 +1104,26 @@ def _check_certificates(pages: _Pages, claim: ClaimRecord, out: list[Check]) -> 
         if found != certificate["matched"]:
             out.append(Check("certificate", claim.ref, False, f"{claim.identifier}: span [{start}, {end}) reads {found!r}, not {certificate['matched']!r}"))
             return
-    out.append(Check(
-        "certificate", claim.ref, True,
-        f"{claim.identifier}: {len(claim.certificates)} span(s) read as their text: "
-        + ", ".join(repr(c["matched"]) for c in claim.certificates),
-    ))
+    read = (
+        f"{len(claim.certificates)} span(s) read as their text: "
+        + ", ".join(repr(c["matched"]) for c in claim.certificates)
+    )
+    where = ""
+    if claim.kind == "cited":
+        problem, where = _row_tie(bundle, pages, claim)
+        if problem is not None:
+            out.append(Check("certificate", claim.ref, False, f"{claim.identifier}: {read}, but {problem}"))
+            return
+    out.append(Check("certificate", claim.ref, True, f"{claim.identifier}: {read}" + (f", {where}" if where else "")))
 
 
 def _check_dominance(claim: ClaimRecord, out: list[Check]) -> None:
     text = claim.settings.get("ordinals")
     if text is None:
+        # Nothing to compare: the check did not run, and says so in its own
+        # state rather than as a pass ("THREE STATES").
         reason = claim.settings.get("dominance", "not certified: no ordinals were carried")
-        out.append(Check("dominance", claim.ref, True, f"{claim.identifier}: {reason}"))
+        out.append(Check("dominance", claim.ref, True, f"{claim.identifier}: {reason}", ran=False))
         return
     try:
         ordinals = json.loads(text)
@@ -953,8 +1229,11 @@ def verify_bundle(directory: str | Path) -> Report:
         _check_claim_identity(claim, checks)
         if claim.kind == "cited":
             _check_row_locator(bundle, pages, claim, checks)
-        if claim.certificates:
-            _check_certificates(pages, claim, checks)
+        # A cited claim is held to certifying its row even when it carries no
+        # span: `compose --claims` refuses (row not certified) rather than
+        # cite a row whose bytes it cannot point at.
+        if claim.certificates or claim.kind == "cited":
+            _check_certificates(bundle, pages, claim, checks)
         if claim.kind == "cited":
             _check_dominance(claim, checks)
             _check_unit_arithmetic(bundle, claim, checks)
@@ -962,25 +1241,32 @@ def verify_bundle(directory: str | Path) -> Report:
             _check_inputs(bundle, claim, checks)
     _check_root(bundle, checks)
     root = bundle.root if bundle.root in bundle.claims else None
-    checks.extend(Check("not checked", root, True, f"{what}: {why}") for what, why in NOT_CHECKED)
-    return Report(ok=all(c.ok for c in checks), checks=checks)
+    checks.extend(Check("not checked", root, True, f"{what}: {why}", ran=False) for what, why in NOT_CHECKED)
+    return Report(ok=not any(c.status == STATUS_FAILED for c in checks), checks=checks)
 
 
 __all__ = [
+    "ANY_ORGANISM",
     "BLOBS",
     "CLAIMS",
     "FORMAT",
     "KINDS",
     "MANIFEST",
+    "MAX_PAGE_BYTES",
     "NOT_CHECKED",
     "REF_KINDS",
     "ROWS",
     "ROW_OPENING",
     "SNAPSHOTS",
+    "STATUSES",
+    "STATUS_FAILED",
+    "STATUS_NOT_RUN",
+    "STATUS_OK",
     "BundleFiles",
     "BundleMalformed",
     "Check",
     "ClaimRecord",
+    "PageTooLarge",
     "Report",
     "RowRecord",
     "SnapshotRecord",
@@ -990,6 +1276,7 @@ __all__ = [
     "digest",
     "dominated",
     "find_row_region",
+    "gunzip_bounded",
     "is_digest",
     "occurs",
     "read_bundle_files",
@@ -997,9 +1284,12 @@ __all__ = [
     "ref_kind",
     "refuse_floats",
     "region_of",
+    "row_cells",
+    "row_holds",
     "row_id",
     "row_identity",
     "row_regions",
+    "same_number",
     "verify_bundle",
     "within_tolerance",
 ]

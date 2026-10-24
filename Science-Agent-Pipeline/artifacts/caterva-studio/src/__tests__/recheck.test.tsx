@@ -16,7 +16,7 @@ import verifyNoBundle from "@/__fixtures__/api/kinetics/verify-no-bundle.json";
 import { json, mockServer, setSessionToken } from "@/__tests__/helpers";
 import { ApiRequestError } from "@/api/client";
 import { type ApiError, type ComposeResult, NO_CLAIMS_BUNDLE, type RunRecord, SESSION_HEADER, type VerifyReport } from "@/api/types";
-import { failedChecks, notChecked, ranChecks, verifyRun } from "@/api/verify";
+import { failedChecks, heldChecks, notChecked, notRunChecks, ranChecks, verifyRun } from "@/api/verify";
 import { plain } from "@/lib/copy";
 import { ClaimsSection, claimNames, countsSentence } from "@/screens/kinetics/Recheck";
 
@@ -55,6 +55,16 @@ describe("verifyRun", () => {
     expect(e).toBeInstanceOf(ApiRequestError);
     expect((e as ApiRequestError).kind).toBe("contract");
     expect((e as ApiRequestError).error.field).toBe("checks.0.ok");
+  });
+
+  it("refuses a check whose ok and status disagree, rather than drawing one of them", async () => {
+    setSessionToken("t0k");
+    const [first, ...rest] = passed.checks;
+    mockServer(() => json(200, { ...passed, checks: [{ ...first, ok: true, status: "failed" }, ...rest] }));
+    const e = await verifyRun(run.id).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(ApiRequestError);
+    expect((e as ApiRequestError).kind).toBe("contract");
+    expect((e as ApiRequestError).error.field).toBe("checks.0.status");
   });
 
   it("sorts the checker's lines as the command prints them", () => {
@@ -99,8 +109,11 @@ describe("The claims section", () => {
       expect(li).toHaveTextContent(ran[i].name);
       expect(li).toHaveTextContent(plain(ran[i].detail));
     });
-    expect(screen.getByRole("status")).toHaveTextContent("every derivation and stated reason holds against the pinned bytes");
-    expect(screen.getByText(new RegExp(`^${ran.length} checks: ${ran.length} ok, 0 failed; ${notChecked(passed).length} not checked\\.`))).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("every check that ran holds against the pinned bytes");
+    expect(heldChecks(passed)).toHaveLength(ran.length);
+    expect(
+      screen.getByText(new RegExp(`^${ran.length} checks: ${ran.length} ok, 0 failed, 0 did not run; ${notChecked(passed).length} not checked\\.`)),
+    ).toBeInTheDocument();
     // The Km claim's checks carry the constant's name beside the ref the checker wrote.
     const kmChecks = ran.filter((c) => c.claim === km.id);
     expect(kmChecks.map((c) => c.name)).toEqual(expect.arrayContaining(["identity", "row locator", "certificate", "dominance"]));
@@ -128,13 +141,41 @@ describe("The claims section", () => {
     const list = screen.getByRole("list", { name: "Every check, as the checker printed it" });
     const failedItems = within(list).getAllByRole("listitem").filter((li) => li.getAttribute("data-ok") === "false");
     expect(failedItems).toHaveLength(failed.length);
-    expect(within(list).getAllByText("failed")).toHaveLength(failed.length);
+    expect(within(list).getAllByText("FAIL")).toHaveLength(failed.length);
     for (const c of failed.filter((c) => c.claim === km.id)) {
       expect(within(list).getByText(plain(c.detail))).toBeInTheDocument();
     }
-    expect(screen.getByText(new RegExp(`^${ranChecks(changed).length} checks: .* ${failed.length} failed;`))).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`^${ranChecks(changed).length} checks: .* ${failed.length} failed,`))).toBeInTheDocument();
     expect(screen.queryByRole("status")).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("draws a check that did not run as n/a, counts it apart, and never calls it held", async () => {
+    // The hexokinase run carried every ordinal, so its dominance checks ran;
+    // a run whose chosen row's ordinals were not carried gets this line
+    // instead, as caterva/check/verify.py writes it. Only the state changes.
+    const dominance = passed.checks.findIndex((c) => c.name === "dominance" && c.claim === km.id);
+    expect(dominance).toBeGreaterThanOrEqual(0);
+    const checks = passed.checks.map((c, i) => (i === dominance ? { ...c, status: "not run" as const } : c));
+    const notRun: VerifyReport = { ...passed, checks };
+    setSessionToken("t0k");
+    mockServer((req) => (req.method === "POST" && req.url === verifyPath ? json(200, notRun) : undefined));
+    render(<ClaimsSection result={result} run={run} />);
+    await userEvent.click(screen.getByRole("button", { name: "Re-check this run" }));
+    const list = await screen.findByRole("list", { name: "Every check, as the checker printed it" });
+    const ran = ranChecks(notRun);
+    const item = within(list).getAllByRole("listitem")[ran.indexOf(checks[dominance])];
+    expect(item).toHaveAttribute("data-status", "not run");
+    expect(item).toHaveTextContent(/^n\/a/);
+    expect(within(list).getAllByText("n/a")).toHaveLength(1);
+    expect(notRunChecks(notRun)).toHaveLength(1);
+    expect(heldChecks(notRun)).toHaveLength(ran.length - 1);
+    expect(
+      screen.getByText(new RegExp(`^${ran.length} checks: ${ran.length - 1} ok, 0 failed, 1 did not run;`)),
+    ).toBeInTheDocument();
+    const verdict = screen.getByRole("status");
+    expect(verdict).toHaveTextContent("every check that ran holds against the pinned bytes; what did not run is listed below");
+    expect(verdict).not.toHaveTextContent("every derivation");
   });
 
   it("is disabled with the contract's sentence for a result that carries no bundle", () => {

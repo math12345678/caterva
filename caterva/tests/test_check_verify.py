@@ -11,84 +11,51 @@ from the spec is pinned on its own: canonical bytes, dominance order
 semantics, decimal tolerance, the row search. The mutations that must FAIL
 are in `test_verify_mutations.py`.
 
-The bundle is built once per module with every network send made
-impossible, as `test_evidence_showcase.py` builds it.
+The bundle is built once per test session with every network send made
+impossible (evidence_showcase_offline.py, shared with
+test_verify_mutations.py); every test that changes a byte changes a copy.
 """
 from __future__ import annotations
 
+import gzip
 import io
 import json
-import shutil
 import subprocess
 import sys
-from contextlib import redirect_stderr, redirect_stdout
+import tracemalloc
+import zlib
+from contextlib import redirect_stdout
 from decimal import Decimal
 from pathlib import Path
 
-import httpx
 import pytest
 
 from caterva.check import verify
-from caterva.check.__main__ import main
-from caterva.evidence import showcase
-from caterva.evidence.claims import Certificate, Derivation, RuleRef, make_claim, to_dict
+from caterva.check.__main__ import main, render
+from caterva.evidence.claims import Derivation, RuleRef, make_claim
+from evidence_showcase_offline import (
+    copy_bundle, recomputed, records, run_command, showcase_built, write_records, zeros_gzip,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture(scope="module")
 def built(tmp_path_factory):
-    out = tmp_path_factory.mktemp("showcase")
-    patch = pytest.MonkeyPatch()
-
-    def no_network(self, request):
-        raise httpx.ConnectError("network disabled in this test", request=request)
-
-    patch.setattr(httpx.HTTPTransport, "handle_request", no_network)
-    patch.delenv("CATERVA_BRENDA_RECORDED", raising=False)
-    patch.delenv("CATERVA_HTTP_RECORDED", raising=False)
-    try:
-        root = showcase.showcase_bundle(out)
-    finally:
-        patch.undo()
-    return out, root
+    return showcase_built(tmp_path_factory)
 
 
 def _run(args):
-    out, err = io.StringIO(), io.StringIO()
-    with redirect_stdout(out), redirect_stderr(err):
-        try:
-            code = main(args)
-        except SystemExit as exc:  # argparse
-            code = exc.code
-    return code, out.getvalue(), err.getvalue()
+    return run_command(main, args)
 
 
-def _records(path: Path) -> list[dict]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-
-
-def _write(path: Path, records: list[dict]) -> None:
-    path.write_text("".join(json.dumps(r, sort_keys=True, ensure_ascii=False) + "\n" for r in records), encoding="utf-8")
+_records = records
+_write = write_records
+_recomputed = recomputed
 
 
 def _claim_named(records: list[dict], identifier: str) -> dict:
     return next(r for r in records if r["subject"].startswith(identifier + " = "))
-
-
-def _recomputed(record: dict) -> dict:
-    """The record with its id recomputed by the PRODUCER, so a test can state
-    a changed derivation and leave identity out of what it tests."""
-    derivation = record["derivation"]
-    claim = make_claim(
-        record["kind"], record["subject"], record["value_text"], record["unit"], record["tolerance"],
-        Derivation(
-            RuleRef(**derivation["rule"]), inputs=tuple(derivation["inputs"]),
-            certificates=tuple(Certificate(c["snapshot"], tuple(c["span"]), c["matched"]) for c in derivation["certificates"]),
-            settings=dict(derivation["settings"]),
-        ),
-    )
-    return to_dict(claim)
 
 
 def _replace_claim(directory: Path, old_ref: str, record: dict) -> str:
@@ -122,9 +89,7 @@ def _replace_claim(directory: Path, old_ref: str, record: dict) -> str:
 
 
 def _copy(built, tmp_path: Path) -> Path:
-    target = tmp_path / "bundle"
-    shutil.copytree(built[0], target, ignore=shutil.ignore_patterns("store"))
-    return target
+    return copy_bundle(built[0], tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -167,11 +132,22 @@ class TestTheShowcaseBundle:
         assert all(c.ok for c in certified)
         assert any("'641068', '6', '30°C, pH 7.5, wild-type'" in c.detail for c in certified)
 
+    def test_each_cited_claims_spans_lie_in_the_row_it_cites(self, built):
+        """The spans are tied to the cited row's own table row, and the line says which."""
+        report = verify.verify_bundle(built[0])
+        certified = {c.detail.split(":", 1)[0]: c for c in report.checks if c.name == "certificate"}
+        assert set(certified) == {"reaction_Km", "reaction_kcat"}
+        assert certified["reaction_Km"].detail.endswith(
+            "all within the table row at bytes [1980173, 1980928) that holds row "
+            "brenda:2.7.1.1:km:Homo sapiens:D-glucose:641068:6:0"
+        )
+        assert "that holds row brenda:2.7.1.1:kcat:Homo sapiens:D-glucose:739603:40.1:0" in certified["reaction_kcat"].detail
+
     def test_dominance_ran_because_the_ordinals_were_carried(self, built):
         report = verify.verify_bundle(built[0])
         dominance = [c for c in report.checks if c.name == "dominance"]
         assert len(dominance) == 2
-        assert all(c.ok and "not strictly dominated" in c.detail for c in dominance)
+        assert all(c.status == "ok" and "not strictly dominated" in c.detail for c in dominance)
 
     def test_the_root_and_the_model_inputs(self, built):
         out, root = built
@@ -186,7 +162,9 @@ class TestTheShowcaseBundle:
         assert len(skipped) == 2
         assert skipped[0].startswith("Antimony regeneration:")
         assert skipped[1].startswith("ODE replay:")
-        assert all(c.ok for c in report.checks if c.name == "not checked")
+        # Listed as what did not run, not as checks that passed.
+        assert {c.status for c in report.checks if c.name == "not checked"} == {"not run"}
+        assert len(report.not_run()) == 2 and len(report.held()) == 18
 
     def test_snapshot_checks_name_the_bytes_and_the_date(self, built):
         report = verify.verify_bundle(built[0])
@@ -253,7 +231,10 @@ class TestDominance:
         assert [(c.name, c.claim) for c in failing] == [("dominance", new_ref)]
         assert "strictly dominated by '6.3 mM ref 739603'" in failing[0].detail
 
-    def test_without_ordinals_the_check_says_not_certified_and_does_not_fail(self, built, tmp_path):
+    def test_without_ordinals_the_check_did_not_run_and_says_so_rather_than_passing(self, built, tmp_path):
+        """ADR 0179: a check that could not run is never reported as passed.
+        It does not fail the bundle either: the bundle says honestly that it
+        carried no ordinals."""
         target = _copy(built, tmp_path)
         claims = _records(target / "claims.jsonl")
         km = _claim_named(claims, "reaction_Km")
@@ -261,9 +242,30 @@ class TestDominance:
         km["derivation"]["settings"]["dominance"] = "not certified: ordinals unavailable"
         new_ref = _replace_claim(target, "claim:" + km["id"], _recomputed(km))
         report = verify.verify_bundle(target)
-        assert report.ok
+        assert report.ok and report.failed() == []
         dominance = next(c for c in report.checks if c.name == "dominance" and c.claim == new_ref)
-        assert dominance.ok and "not certified: ordinals unavailable" in dominance.detail
+        assert dominance.status == "not run" and not dominance.ran
+        assert "not certified: ordinals unavailable" in dominance.detail
+        assert dominance not in report.held() and dominance in report.not_run()
+
+        lines = render(report)
+        assert f"n/a  dominance        {new_ref}  reaction_Km: not certified: ordinals unavailable" in lines
+        assert not any(line.startswith("ok  dominance") and new_ref in line for line in lines)
+        assert lines[-1].startswith("18 checks: 17 ok, 0 failed, 1 did not run; 2 not checked. ")
+        assert "every check that ran holds" in lines[-1]
+        assert "every derivation" not in lines[-1]
+
+        code, stdout, _ = _run([str(target), "--json"])
+        assert code == 0
+        entry = next(c for c in json.loads(stdout)["checks"] if c["name"] == "dominance" and c["claim"] == new_ref)
+        assert entry["status"] == "not run"
+
+    def test_a_check_that_did_not_run_cannot_have_failed(self):
+        with pytest.raises(ValueError, match="did not run cannot have failed"):
+            verify.Check("dominance", None, False, "x", ran=False)
+        assert verify.Check("dominance", None, True, "x", ran=False).status == "not run"
+        assert verify.Check("dominance", None, False, "x").status == "failed"
+        assert verify.Check("dominance", None, True, "x").status == "ok"
 
 
 class TestUnitArithmetic:
@@ -287,6 +289,62 @@ class TestUnitArithmetic:
         assert "6 mM × 1000 = 6000 uM" in arithmetic.detail
         located = next(c for c in report.checks if c.name == "row locator" and c.claim == new_ref)
         assert "compared under unit arithmetic" in located.detail
+
+
+class TestBoundedGunzip:
+    """A blob is inflated in pieces and refused past MAX_PAGE_BYTES before its hash is compared."""
+
+    def test_it_reads_what_gzip_decompress_reads(self, tmp_path):
+        page = (REPO_ROOT / "Tests" / "fixtures" / "recorded" / "brenda_2.7.1.1.html.gz").read_bytes()
+        (tmp_path / "page.gz").write_bytes(page)
+        assert verify.gunzip_bounded(tmp_path / "page.gz") == gzip.decompress(page)
+        # Two members with zero padding after each, which gzip.decompress accepts.
+        members = gzip.compress(b"abc" * 1000) + b"\0" * 7 + gzip.compress(b"xyz") + b"\0" * 3
+        (tmp_path / "members.gz").write_bytes(members)
+        assert verify.gunzip_bounded(tmp_path / "members.gz") == gzip.decompress(members) == b"abc" * 1000 + b"xyz"
+
+    def test_the_bound_is_inclusive(self, tmp_path):
+        path = tmp_path / "x.gz"
+        path.write_bytes(gzip.compress(b"x" * 1000))
+        assert verify.gunzip_bounded(path, 1000) == b"x" * 1000
+        with pytest.raises(verify.PageTooLarge, match="inflates past 999 bytes"):
+            verify.gunzip_bounded(path, 999)
+
+    def test_a_truncated_or_corrupt_blob_raises_what_the_checker_catches(self, tmp_path):
+        page = gzip.compress(bytes(range(256)) * 4000)
+        (tmp_path / "short.gz").write_bytes(page[:-50])
+        with pytest.raises(EOFError):
+            verify.gunzip_bounded(tmp_path / "short.gz")
+        corrupt = page[:20] + bytes(b ^ 0x55 for b in page[20:400]) + page[400:]
+        (tmp_path / "corrupt.gz").write_bytes(corrupt)
+        with pytest.raises(zlib.error):
+            verify.gunzip_bounded(tmp_path / "corrupt.gz")
+        (tmp_path / "plain.gz").write_bytes(b"<html>not gzip</html>")
+        with pytest.raises(zlib.error):
+            verify.gunzip_bounded(tmp_path / "plain.gz")
+
+    def test_a_gzip_bomb_is_refused_without_holding_what_it_inflates_to(self, tmp_path):
+        """The review's case: a small blob that inflates to far more than any
+        page. `gzip.decompress` held all of it before the hash could be
+        compared; the bounded read holds at most the bound and one piece."""
+        bomb = zeros_gzip(tmp_path / "bomb.gz", 2 * verify.MAX_PAGE_BYTES)
+        assert bomb.stat().st_size < 1024 * 1024
+        tracemalloc.start()
+        try:
+            with pytest.raises(verify.PageTooLarge, match="67,108,864 bytes"):
+                verify.gunzip_bounded(bomb)
+            peak = tracemalloc.get_traced_memory()[1]
+        finally:
+            tracemalloc.stop()
+        assert peak < 1.5 * verify.MAX_PAGE_BYTES, f"held {peak:,} bytes"
+
+    def test_the_bound_is_more_than_ten_times_the_largest_recorded_page(self):
+        largest = max(
+            len(gzip.decompress(path.read_bytes()))
+            for path in [*(REPO_ROOT / "Tests" / "fixtures" / "ki_mode").glob("brenda_*.html.gz"),
+                         REPO_ROOT / "Tests" / "fixtures" / "recorded" / "brenda_2.7.1.1.html.gz"]
+        )
+        assert 5_000_000 < largest < verify.MAX_PAGE_BYTES // 10
 
 
 class TestFindingARow:
@@ -313,6 +371,23 @@ class TestFindingARow:
         assert verify.find_row_region(data, reference="641068", value_text="6.0", commentary="30°C, pH 7.5, wild-type") == region
         assert verify.find_row_region(data, reference="641068", value_text="6", commentary="30°C, pH 7.5, mutant") is None
         assert verify.find_row_region(data, reference="999999", value_text="6", commentary="30°C, pH 7.5, wild-type") is None
+
+    def test_the_substrate_and_organism_tell_apart_two_rows_of_one_paper(self, page):
+        """Reference 674800 gives kcat 53.2 1/s at "37°C, pH 7.4, wild-type
+        enzyme" for ATP and for D-glucose in Mus musculus: two table rows that
+        the reference, value and commentary alone cannot tell apart."""
+        import gzip
+
+        data = gzip.decompress(page[0].read_bytes())
+        common = {"reference": "674800", "value_text": "53.2", "commentary": "37°C, pH 7.4, wild-type enzyme"}
+        atp = verify.find_row_region(data, **common, substrate="ATP", organism="Mus musculus")
+        glucose = verify.find_row_region(data, **common, substrate="D-glucose", organism="Mus musculus")
+        assert atp == (2076961, 2077702) and glucose == (2139765, 2140513)
+        # The three texts alone stop at the first of the two, the ATP row.
+        assert verify.find_row_region(data, **common) == atp
+        assert verify.row_holds(data, atp, **common) and verify.row_holds(data, glucose, **common)
+        assert not verify.row_holds(data, atp, **common, substrate="D-glucose", organism="Mus musculus")
+        assert verify.find_row_region(data, **common, substrate="D-glucose", organism="Homo sapiens") is None
 
     def test_a_reference_inside_an_href_is_not_the_row_saying_it(self):
         row = (
@@ -352,7 +427,10 @@ class TestTheCommand:
         assert any(line.startswith("ok  row locator      claim:sha256:") and "reaction_Km" in line for line in lines)
         assert any(line.startswith("ok  dominance        claim:sha256:") for line in lines)
         assert lines[-2].startswith("not checked: Antimony regeneration")
-        assert lines[-1].startswith("18 checks: 18 ok, 0 failed; 2 not checked. Re-checkable:")
+        assert lines[-1] == (
+            "18 checks: 18 ok, 0 failed, 0 did not run; 2 not checked. Re-checkable: every check "
+            "that ran holds against the pinned bytes; what did not run is listed above with the reason."
+        )
 
     def test_json_prints_the_report(self, built):
         code, stdout, _ = _run([str(built[0]), "--json"])
@@ -360,7 +438,9 @@ class TestTheCommand:
         report = json.loads(stdout)
         assert report["ok"] is True
         assert {c["name"] for c in report["checks"]} >= {"identity", "row locator", "certificate", "root"}
-        assert all(set(c) == {"name", "claim", "ok", "detail"} for c in report["checks"])
+        assert all(set(c) == {"name", "claim", "ok", "status", "detail"} for c in report["checks"])
+        assert {c["status"] for c in report["checks"] if c["name"] != "not checked"} == {"ok"}
+        assert {c["status"] for c in report["checks"] if c["name"] == "not checked"} == {"not run"}
 
     def test_a_failed_check_is_exit_3_naming_the_first_failing_claim(self, built, tmp_path):
         target = _copy(built, tmp_path)
@@ -373,6 +453,16 @@ class TestTheCommand:
         assert f"FAIL  identity         claim:{km['id']}  reaction_Km" in stdout
         assert stderr.startswith(f"Refused: identity did not hold for claim:{km['id']}: reaction_Km")
         assert "1 failed" in stdout.splitlines()[-1]
+        assert "Re-checkable" not in stdout
+
+    def test_a_failed_snapshot_check_names_the_snapshots_ref_not_its_kind(self, built, tmp_path):
+        target = _copy(built, tmp_path)
+        snapshot = json.loads((target / "snapshots.jsonl").read_text(encoding="utf-8").split("\n")[0])
+        blob = target / "snapshots" / (snapshot["id"][len("sha256:"):] + ".gz")
+        blob.write_bytes(gzip.compress(b"other bytes", mtime=0))
+        code, _, stderr = _run([str(target)])
+        assert code == 3
+        assert stderr.startswith(f"Refused: snapshot bytes did not hold for snapshot:{snapshot['id']}: "), stderr
 
     def test_a_directory_that_is_not_a_bundle_is_exit_2(self, tmp_path):
         code, stdout, stderr = _run([str(tmp_path)])
@@ -452,3 +542,8 @@ def test_a_row_whose_value_prints_with_an_exponent_is_found_on_the_page(tmp_path
     report = verify.verify_bundle(out)
     locator = [c for c in report.checks if c.name == "row locator"]
     assert locator and all(c.ok for c in locator), [c.detail for c in locator]
+    # The value span reads "0.00000023" and the row says 2.3e-07: the row tie
+    # holds them equal as numbers, as the row locator does.
+    certified = [c for c in report.checks if c.name == "certificate"]
+    assert certified and all(c.ok for c in certified), [c.detail for c in certified]
+    assert f"that holds row {row.locator}" in certified[0].detail

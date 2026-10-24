@@ -59,6 +59,22 @@ RECORDED = TESTS / "fixtures" / "recorded"
 HTTP_RECORDED = RECORDED / "http"
 MANIFEST = json.loads((HTTP_RECORDED / "MANIFEST.json").read_text(encoding="utf-8"))
 
+#: Every directory of committed http_retry recordings, each scanned by
+#: test_no_committed_recording_holds_a_credential. The runner's are not the
+#: only ones: the compose --claims tests replay BRENDA literature pages and
+#: the studio's kinetics tests their own lookups, and both READMEs say to
+#: refresh them by re-recording with CATERVA_HTTP_RECORD, which writes
+#: whatever a request carried. test_every_directory_of_recordings_is_scanned
+#: fails when a directory is added, or one is removed, without this list.
+COMMITTED_RECORDINGS = (
+    HTTP_RECORDED,
+    TESTS.parent / "caterva" / "tests" / "fixtures" / "compose_claims" / "http",
+    TESTS.parent / "caterva" / "tests" / "fixtures" / "studio_kinetics" / "http",
+)
+
+#: How http_retry.recording_name names a recording: the key's sha256.
+_RECORDING_NAME = re.compile(r"[0-9a-f]{64}\.json\.gz")
+
 LIB_DIR = TESTS.parent / "Science-Agent-Pipeline" / "artifacts" / "api-server" / "src" / "lib"
 
 ESEARCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
@@ -516,16 +532,46 @@ def _credential_values_in_this_environment() -> dict[str, str]:
     }
 
 
+def _recording_directories() -> set[Path]:
+    """Every directory holding a committed file named as http_retry names a
+    recording, from `git ls-files` (as test_recorded_env_is_test_only reads
+    the tree) rather than from the list above, so the list can be held to
+    it. Tracked files only: a build directory's copy of the fixtures is not
+    committed, and a recording nobody added is not yet in the repository."""
+    import subprocess
+
+    listing = subprocess.run(
+        ["git", "ls-files", "-z"], cwd=TESTS.parent, capture_output=True, check=False,
+    ).stdout.decode("utf-8").split("\0")
+    assert len(listing) > 1000, (
+        f"git ls-files returned {len(listing)} entries; the listing is broken and "
+        "this would find no directory at all"
+    )
+    return {
+        (TESTS.parent / rel).parent for rel in listing
+        if rel and _RECORDING_NAME.fullmatch(Path(rel).name)
+    }
+
+
+def test_every_directory_of_recordings_is_scanned():
+    """A new directory of recordings is scanned from the commit that adds it."""
+    assert _recording_directories() == set(COMMITTED_RECORDINGS)
+
+
 def test_no_committed_recording_holds_a_credential():
     """The other direction: whatever the code says, read the files.
 
     Nothing here consults http_retry's rules. Each recording's request side
     (URL, parameter names and values, stored headers, final URL) must hold
     nothing shaped like a key, and no file may contain the value of any
-    credential variable set in this environment.
+    credential variable set in this environment. Every directory in
+    COMMITTED_RECORDINGS is read, and each must hold at least one recording,
+    or a renamed directory would leave this test reading none of it.
     """
-    names = sorted(HTTP_RECORDED.glob("*.json.gz"))
-    assert names, "no recordings found; this test would pass without reading any"
+    by_directory = {d: sorted(d.glob("*.json.gz")) for d in COMMITTED_RECORDINGS}
+    empty = [str(d) for d, found in by_directory.items() if not found]
+    assert empty == [], f"no recordings in {empty}; this test would pass without reading them"
+    names = [path for found in by_directory.values() for path in found]
     secrets = _credential_values_in_this_environment()
     for path in names:
         raw = gzip.decompress(path.read_bytes()).decode("utf-8")

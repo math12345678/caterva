@@ -1,15 +1,23 @@
 """`caterva why`: the derivation of a number, printed from the bundle down to the bytes.
 
-The layout is ADR 0179's, and the numbers in it are real: the certificate
-spans, the page's hash and the paper's PMID are read from the showcase bundle
+The layout is ADR 0179's. The command reads the showcase bundle
 (caterva/evidence/showcase.py, built once per module with the network made
-impossible), never typed into this file as expectations the code could not
-have produced.
+impossible) from the sha-pinned recordings, so the numbers it prints are the
+ones those pages produce. The expectations below type them in (the page's
+hash, the certificate spans, the PMID). The hash and the spans are held to
+the bytes as well as to the printout: the hash to the digest of the page the
+bundle holds, each span to the text that page holds at it, so a printout
+agreeing with a wrong expectation would fail the second check. The PMID is
+the one test_evidence_references.py reads from the pinned literature page.
 """
 from __future__ import annotations
 
+import gzip
+import hashlib
 import io
+import json
 import shutil
+import sqlite3
 import subprocess
 import sys
 from contextlib import redirect_stderr, redirect_stdout
@@ -21,11 +29,16 @@ import pytest
 from caterva.evidence import showcase
 from caterva.evidence.bundle import read_bundle
 from caterva.evidence.claims import SELECT_RESOLVER, Derivation, Refusal, make_claim
+from caterva.evidence.references import reference_url
 from caterva.evidence.store import EvidenceStore
 from caterva.evidence.why import RULE_MEANINGS, main
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PAGE_HASH = "sha256:3a69b492abcd7253b301d7a002f60d52a971ba9352a3a2559ec5f12f5060ef91"
+
+#: Where the Km claim's certificates sit in the recorded hexokinase page.
+KM_SPANS = (((1980757, 1980763), "641068"), ((1980265, 1980266), "6"),
+            ((1980612, 1980636), "30°C, pH 7.5, wild-type"))
 
 
 @pytest.fixture(scope="module")
@@ -77,9 +90,11 @@ class TestTheLayout:
         assert "    commentary   30°C, pH 7.5, wild-type" in lines
         assert "    reference    641068" in lines
         assert "  certificates 5, each a byte span of the snapshot that reads as its text" in lines
-        assert "                 [1980757, 1980763)  '641068'" in lines
-        assert "                 [1980265, 1980266)  '6'" in lines
-        assert "                 [1980612, 1980636)  '30°C, pH 7.5, wild-type'" in lines
+        page = read_bundle(built[0]).snapshot_bytes(f"snapshot:{PAGE_HASH}")
+        assert "sha256:" + hashlib.sha256(page).hexdigest() == PAGE_HASH
+        for (start, end), text in KM_SPANS:
+            assert f"                 [{start}, {end})  {text!r}" in lines
+            assert page[start:end].decode("utf-8") == text, "the span is where the pinned page holds the text"
         assert f"  snapshot     snapshot:{PAGE_HASH}  brenda_enzyme" in lines
         assert "    locator      https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1" in lines
         assert "    retrieved    2026-09-28   licence CC BY 4.0   release none stated" in lines
@@ -178,6 +193,75 @@ class TestRefusals:
         code, _, err = _run([refs["reaction_Km"], "--store", str(tmp_path / "nowhere")])
         assert code == 2 and "is not an evidence store" in err
         assert not (tmp_path / "nowhere").exists(), "asking must not create a store"
+
+    def test_a_store_whose_index_is_not_sqlite_is_exit_2_and_named(self, refs, tmp_path):
+        """It was a sqlite3.DatabaseError traceback, exit 1."""
+        (tmp_path / "index.sqlite").write_text("not a database", encoding="utf-8")
+        code, out, err = _run([refs["reaction_Km"], "--store", str(tmp_path)])
+        assert code == 2 and out == ""
+        assert err.startswith("Not a claims bundle: ")
+        assert f"{tmp_path / 'index.sqlite'} is not an evidence store's index: file is not a database" in err
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["index.sqlite"], "asking created nothing"
+
+    def test_a_store_that_is_another_programs_database_is_exit_2_and_left_alone(self, refs, tmp_path):
+        other = sqlite3.connect(str(tmp_path / "index.sqlite"))
+        other.execute("CREATE TABLE notes (text TEXT)")
+        other.commit()
+        other.close()
+        before = (tmp_path / "index.sqlite").read_bytes()
+        code, _, err = _run([refs["reaction_Km"], "--store", str(tmp_path)])
+        assert code == 2 and err.startswith("Not a claims bundle: ")
+        assert "is not an evidence store's index" in err
+        assert (tmp_path / "index.sqlite").read_bytes() == before, "no tables were added to it"
+
+    def test_asking_a_store_changes_nothing_in_it(self, built, refs, tmp_path):
+        target = tmp_path / "store"
+        shutil.copytree(built[0] / "store", target)
+        before = {p.name: p.read_bytes() for p in target.rglob("*") if p.is_file()}
+        code, _, _ = _run([refs["reaction_Km"], "--store", str(target)])
+        assert code == 0
+        assert {p.name: p.read_bytes() for p in target.rglob("*") if p.is_file()} == before
+
+    def test_a_store_record_that_does_not_produce_its_id_is_refused_not_a_traceback(self, built, refs, tmp_path):
+        """A store is read record by record, so a hand-edited record is met
+        while printing; it is refused (exit 3), as a bundle's blob that does
+        not digest to its ref is."""
+        target = tmp_path / "store"
+        shutil.copytree(built[0] / "store", target)
+        km = refs["reaction_Km"].split(":", 1)[1]
+        db = sqlite3.connect(str(target / "index.sqlite"))
+        (text,) = db.execute("SELECT json FROM claims WHERE id = ?", (km,)).fetchone()
+        record = json.loads(text)
+        record["value_text"] = "60"
+        db.execute("UPDATE claims SET json = ? WHERE id = ?", (json.dumps(record), km))
+        db.commit()
+        db.close()
+        code, out, err = _run([refs["reaction_Km"], "--store", str(target)])
+        assert code == 3 and out == ""
+        assert err.startswith(f"Refused: claim id {km} is not the digest of its derivation")
+
+    def test_a_store_blob_that_is_not_its_pages_bytes_prints_no_paper_from_it(self, built, refs, tmp_path):
+        """The store handed back whatever a blob file held: a blob that was
+        not gzip was a traceback, and a page edited to another PMID printed
+        that PMID as the paper. Both are now reported in the reference line,
+        as a bundle reports a blob that does not digest to its ref."""
+        target = tmp_path / "store"
+        shutil.copytree(built[0] / "store", target)
+        bundle = read_bundle(built[0])
+        paper = next(s for s in bundle.snapshots.values() if s.locator == reference_url("2.7.1.1", "641068"))
+        page = bundle.snapshot_bytes(paper.ref)
+        forged = page.replace(b"7730377", b"1234567")
+        assert forged != page
+        blob = target / "blobs" / (paper.id[len("sha256:"):] + ".gz")
+        for damaged, reason in ((gzip.compress(forged, mtime=0), "does not digest to"),
+                                (b"not gzip at all", "is not a gzip stream")):
+            blob.write_bytes(damaged)
+            code, out, err = _run([refs["reaction_Km"], "--store", str(target)])
+            assert code == 0 and err == ""
+            assert "1234567" not in out and "PMID 7730377" not in out
+            line = next(x for x in out.splitlines() if x.startswith("  reference    641068  page "))
+            assert line.startswith(f"  reference    641068  page {paper.ref} pinned but unreadable: ")
+            assert reason in line
 
     def test_one_location_exactly(self, built, refs):
         code, _, err = _run([refs["reaction_Km"]])

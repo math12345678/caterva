@@ -4,10 +4,18 @@
     caterva verify ./claims --json
 
 One line per check (`ok  identity  claim:sha256:...  reaction_Km`), a
-summary, and exit 0 when every check passed, 3 when one failed (stderr says
-`Refused:` and names the first failing claim), 2 when the directory is not a
+summary, and exit 0 when no check failed, 3 when one failed (stderr says
+`Refused:` and names the first failing check and the claim, snapshot or row
+it is about), 2 when the directory is not a
 bundle this checker can read (nothing in it was checked, which is not the
 same as a check failing), 1 a crash. `--json` prints the Report instead.
+
+A check has three states, and each prints as itself: `ok` it held, `FAIL`
+it did not, `n/a` it did not run (a dominance check on a claim that carried
+no ordinals; its detail says why). An `n/a` line does not fail the bundle
+and is not counted among the checks that held, and the verdict says "every
+check that ran", because a summary that counted a check nobody ran as a
+pass would claim more than the checker established.
 
 The imports here are relative (`from .verify import ...`) and not
 `caterva.check.verify`, because the independence guard refuses any import
@@ -21,7 +29,7 @@ import json
 import sys
 from typing import TYPE_CHECKING
 
-from .verify import BundleMalformed, Check, Report, verify_bundle
+from .verify import STATUS_FAILED, STATUS_NOT_RUN, STATUS_OK, BundleMalformed, Check, Report, verify_bundle
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -30,6 +38,13 @@ EXIT_OK, EXIT_CRASH, EXIT_MALFORMED, EXIT_REFUSED = 0, 1, 2, 3
 
 #: Width of the check-name column: "unit arithmetic" is the longest name.
 _NAME_WIDTH = 15
+
+#: What each state prints as. "n/a" and not "ok" for a check that did not
+#: run: the line has to say that nothing was compared.
+_PRINTED = {STATUS_OK: "ok", STATUS_FAILED: "FAIL", STATUS_NOT_RUN: "n/a"}
+
+#: The name of the lines that list what this checker can never do.
+_NOT_CHECKED = "not checked"
 
 
 def build_parser(prog: str = "caterva verify") -> argparse.ArgumentParser:
@@ -48,10 +63,12 @@ def build_parser(prog: str = "caterva verify") -> argparse.ArgumentParser:
             f"  {prog} ./claims\n"
             f"  {prog} ./claims --json\n"
             "\n"
-            "Exit codes: 0 every check passed, 3 a check failed (stderr names the first "
-            "failing claim), 2 the directory is not a bundle this checker can read, 1 a crash.\n"
-            "A bundle that passes is re-checkable: its derivations and stated reasons hold "
-            "against the pinned bytes. Whether the biology is right is not checked."
+            "Exit codes: 0 no check failed, 3 a check failed (stderr names the first "
+            "failing check and what it is about), 2 the directory is not a bundle this checker "
+            "can read, 1 a crash.\n"
+            "A check prints ok (it held), FAIL (it did not) or n/a (it did not run, with the "
+            "reason; never counted as held). A bundle with no failed check is re-checkable: every "
+            "check that ran holds against the pinned bytes. Whether the biology is right is not checked."
         ),
     )
     parser.add_argument("directory", help="the bundle directory (manifest.json, claims.jsonl, rows.jsonl, snapshots.jsonl, snapshots/)")
@@ -60,8 +77,7 @@ def build_parser(prog: str = "caterva verify") -> argparse.ArgumentParser:
 
 
 def _line(check: Check) -> str:
-    status = "ok" if check.ok else "FAIL"
-    columns = [status, check.name.ljust(_NAME_WIDTH)]
+    columns = [_PRINTED[check.status], check.name.ljust(_NAME_WIDTH)]
     if check.claim is not None:
         columns.append(check.claim)
     columns.append(check.detail)
@@ -69,26 +85,41 @@ def _line(check: Check) -> str:
 
 
 def render(report: Report) -> list[str]:
-    """The lines `caterva verify` prints: one per check, the not-checked line, the summary."""
-    ran = [c for c in report.checks if c.name != "not checked"]
-    skipped = [c for c in report.checks if c.name == "not checked"]
-    lines = [_line(c) for c in ran]
+    """The lines `caterva verify` prints: one per check, the not-checked line, the summary.
+
+    The summary counts the three states apart (`N checks: H ok, F failed, D
+    did not run; S not checked.`), and with nothing failed the verdict
+    speaks for the checks that ran and points at the rest, never "every
+    derivation holds" while a line above says one was not compared.
+    """
+    shown = [c for c in report.checks if c.name != _NOT_CHECKED]
+    skipped = [c for c in report.checks if c.name == _NOT_CHECKED]
+    lines = [_line(c) for c in shown]
     if skipped:
         lines.append("not checked: " + "; ".join(c.detail for c in skipped))
-    failed = [c for c in ran if not c.ok]
+    failed = [c for c in shown if c.status == STATUS_FAILED]
+    not_run = [c for c in shown if c.status == STATUS_NOT_RUN]
+    held = [c for c in shown if c.status == STATUS_OK]
     verdict = (
-        "Re-checkable: every derivation and stated reason holds against the pinned bytes."
+        "Re-checkable: every check that ran holds against the pinned bytes; "
+        "what did not run is listed above with the reason."
         if not failed else
         f"{len(failed)} check(s) did not hold; the first is named on stderr."
     )
-    lines.append(f"{len(ran)} checks: {len(ran) - len(failed)} ok, {len(failed)} failed; {len(skipped)} not checked. {verdict}")
+    lines.append(
+        f"{len(shown)} checks: {len(held)} ok, {len(failed)} failed, {len(not_run)} did not run; "
+        f"{len(skipped)} not checked. {verdict}"
+    )
     return lines
 
 
 def refusal(report: Report) -> str:
     """The stderr line for exit 3: the first failing check and the claim it names."""
     first = report.failed()[0]
-    about = first.claim if first.claim is not None else first.detail.split(":", 1)[0]
+    # A check with no claim is about a snapshot or a row: its detail starts
+    # with that record's ref ("snapshot:sha256:<hex>: ..."), which is a ref
+    # with colons in it, so the split is on ": ".
+    about = first.claim if first.claim is not None else first.detail.split(": ", 1)[0]
     return f"Refused: {first.name} did not hold for {about}: {first.detail}"
 
 

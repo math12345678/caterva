@@ -83,7 +83,22 @@ def test_a_binary_file_is_not_read(tmp_path):
     assert guard.findings(tmp_path, ["blob.md"]) == []
 
 
+#: The allowances as they stood on 2026-10-24. The guard says its lists may
+#: only shrink, and until then nothing held them to it: a new entry for a
+#: file that does print a placeholder passed every check in the loops below.
+ALLOWED_AT_MOST = frozenset({"TESTING_AND_ROADMAP.md", "SCIENTIFIC_VALIDATION_FRAMEWORK.md"})
+EXCLUDED_AT_MOST = frozenset({"docs/archive/"})
+
+
 def test_every_allowance_names_a_tracked_file_that_still_needs_it():
+    """The lists only shrink, and every entry left is still needed.
+
+    The first two asserts sit outside the loops on purpose: with both lists
+    emptied the loops check nothing, and the guard's own rule still holds.
+    Removing an entry needs no edit here; adding one fails until this set is
+    widened in review, which is the point."""
+    assert set(guard.ALLOWED) <= ALLOWED_AT_MOST, sorted(set(guard.ALLOWED) - ALLOWED_AT_MOST)
+    assert set(guard.EXCLUDED) <= EXCLUDED_AT_MOST, sorted(set(guard.EXCLUDED) - EXCLUDED_AT_MOST)
     tracked = set(guard.tracked_markdown(REPO))
     for key, reason in guard.ALLOWED.items():
         assert len(reason) > 40, key

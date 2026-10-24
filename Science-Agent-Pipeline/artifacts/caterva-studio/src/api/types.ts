@@ -595,12 +595,18 @@ export interface RunCreated {
 }
 
 /** One line of `caterva verify` (caterva/check/verify.py, Check). */
+/** A check held, failed, or did not run (caterva/check/verify.py `Check.status`). */
+export type VerifyStatus = "ok" | "failed" | "not run";
+
 export interface VerifyCheck {
   /** "snapshot bytes", "identity", "row locator", "certificate", "dominance", "unit arithmetic", "inputs", "root", "not checked". */
   name: string;
   /** The claim ref the check is about, or null for a check about a snapshot or a row (its detail starts with that ref). */
   claim: string | null;
+  /** "Did not fail": true for a check that held and for one that did not run. */
   ok: boolean;
+  /** What the page draws: a check that did not run is never drawn as held. */
+  status: VerifyStatus;
   detail: string;
 }
 

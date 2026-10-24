@@ -345,9 +345,9 @@ def run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
     except UnrecognisedShape as exc:
         # What main prints to stderr, without print's newline. Nothing was
         # built, so there is no result: the page shows this reason. The
-        # claims run had opened its store before composing; no claim was
-        # made and no bundle written, so the folder is not left to look
-        # like one.
+        # claims run opens its store only once a model is built
+        # (compose/__main__.py `_claims_run`), so nothing was written under
+        # claims_dir; the rmtree is only a guard.
         shutil.rmtree(claims_dir, ignore_errors=True)
         reason = f"Not built.\n\n{exc}"
         return AdapterOutcome(exit_code=3, result=None, summary=_first_line(str(exc)),

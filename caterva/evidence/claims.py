@@ -52,6 +52,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, fields
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from types import MappingProxyType
 from typing import Any
 
 try:
@@ -379,7 +380,16 @@ def _strings_only(settings: Mapping[str, Any], what: str) -> dict[str, str]:
 
 @dataclass(frozen=True)
 class Derivation:
-    """The rule applied, to which inputs, with which certificates and settings."""
+    """The rule applied, to which inputs, with which certificates and settings.
+
+    `settings` is held as a read-only view of a private copy. A frozen
+    dataclass stops `derivation.settings = ...` but not
+    `derivation.settings["k"] = ...`, and a claim's id digests its settings:
+    a dict here let a Claim keep an id its contents no longer produced, which
+    the bundle writer would then store and the checker refuse. The copy also
+    means the caller's dict, changed later, cannot reach in. The id is
+    unchanged: `to_dict` reads any Mapping as the dict it always wrote.
+    """
 
     rule: RuleRef
     inputs: tuple[str, ...] = ()
@@ -398,7 +408,14 @@ class Derivation:
             if not isinstance(certificate, Certificate):
                 raise EvidenceRefused("a derivation's certificates must be Certificates")
         object.__setattr__(self, "certificates", certificates)
-        object.__setattr__(self, "settings", _strings_only(self.settings, "a derivation's"))
+        object.__setattr__(
+            self, "settings", MappingProxyType(_strings_only(self.settings, "a derivation's")),
+        )
+
+    def __reduce__(self) -> tuple:
+        # A read-only view cannot be pickled or deep-copied, so a copy of a
+        # derivation is rebuilt through the constructor, checks and all.
+        return (Derivation, (self.rule, self.inputs, self.certificates, dict(self.settings)))
 
     def row_inputs(self) -> tuple[str, ...]:
         return tuple(ref for ref in self.inputs if ref_kind(ref) == "row")

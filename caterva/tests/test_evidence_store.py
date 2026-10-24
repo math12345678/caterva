@@ -15,6 +15,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -35,7 +36,7 @@ from caterva.evidence.claims import (
     make_row,
 )
 from caterva.evidence.references import reference_url
-from caterva.evidence.store import EvidenceStore
+from caterva.evidence.store import EvidenceStore, StoreUnreadable
 
 REPO = Path(__file__).resolve().parents[2]
 RECORDED = REPO / "Tests" / "fixtures" / "recorded"
@@ -114,8 +115,12 @@ class TestStore:
         assert store.dependents(row.ref) == [km.ref, root.ref]
         assert store.dependents(root.ref) == []
         assert store.inputs_of(root.ref) == [km.ref]
-        assert store.closure(root.ref) == [root.ref, km.ref, snap.ref, row.ref] or set(
-            store.closure(root.ref)) == {root.ref, km.ref, snap.ref, row.ref}
+        # Depth first, the last input pushed is the first visited: the km
+        # claim's edges are its row, then its certificate's page, so the page
+        # comes before the row. The order is the contract because the bundle
+        # writes its records in it, which is what makes an export the same
+        # bytes each time (TestBundle).
+        assert store.closure(root.ref) == [root.ref, km.ref, snap.ref, row.ref]
 
     def test_export_writes_the_closure_and_the_reference_page_for_the_cited_row(self, tmp_path):
         store, snap, row, km, root = filled(tmp_path / "s")
@@ -137,6 +142,96 @@ class TestStore:
         assert read.get(km.ref) == km
         with pytest.raises(EvidenceRefused, match="root is a claim"):
             store.export_bundle(row.ref, tmp_path / "no")
+
+
+class TestAnIndexThatIsNotAStores:
+    """sqlite3 connects to any file and fails at the first statement, so a
+    store opened on a file that is not its index raised a bare
+    sqlite3.DatabaseError, which `caterva why --store` printed as a
+    traceback. It is StoreUnreadable, naming the file; and a store opened
+    read only writes nothing, so asking cannot turn another program's
+    database into a store."""
+
+    def test_a_text_file_named_index_sqlite_is_unreadable_in_either_mode(self, tmp_path):
+        (tmp_path / "index.sqlite").write_text("not a database", encoding="utf-8")
+        for read_only in (False, True):
+            with pytest.raises(StoreUnreadable, match=r"index\.sqlite is not an evidence store's index"):
+                EvidenceStore(tmp_path, read_only=read_only)
+        assert issubclass(StoreUnreadable, EvidenceRefused)
+        assert (tmp_path / "index.sqlite").read_text(encoding="utf-8") == "not a database"
+
+    def test_read_only_needs_an_index_and_creates_nothing(self, tmp_path):
+        with pytest.raises(StoreUnreadable, match=r"holds no index\.sqlite"):
+            EvidenceStore(tmp_path / "nowhere", read_only=True)
+        assert not (tmp_path / "nowhere").exists()
+
+    def test_read_only_on_another_programs_database_leaves_it_as_it_was(self, tmp_path):
+        other = sqlite3.connect(str(tmp_path / "index.sqlite"))
+        other.execute("CREATE TABLE notes (text TEXT)")
+        other.commit()
+        other.close()
+        before = (tmp_path / "index.sqlite").read_bytes()
+        with pytest.raises(StoreUnreadable, match="without the snapshots, rows, claims, edges table"):
+            EvidenceStore(tmp_path, read_only=True)
+        assert (tmp_path / "index.sqlite").read_bytes() == before
+        assert not (tmp_path / "blobs").exists()
+
+    def test_read_only_reads_every_record_and_refuses_to_write(self, tmp_path):
+        store, snap, row, km, root = filled(tmp_path / "s")
+        store.close()
+        before = (tmp_path / "s" / "index.sqlite").read_bytes()
+        with EvidenceStore(tmp_path / "s", read_only=True) as reader:
+            assert reader.get(root.ref) == root and reader.get(km.ref) == km and reader.get(row.ref) == row
+            assert reader.snapshot_bytes(snap.ref) == PAGE
+            assert reader.closure(root.ref) == [root.ref, km.ref, snap.ref, row.ref]
+            with pytest.raises(EvidenceRefused, match="opened read only"):
+                reader.put_snapshot(b"new bytes", source="brenda_enzyme", locator="u",
+                                    retrieved_at="2026-10-17T05:00:00Z", licence="CC BY 4.0")
+            with pytest.raises(EvidenceRefused, match="opened read only"):
+                reader.put_claim(km)
+        assert (tmp_path / "s" / "index.sqlite").read_bytes() == before
+        assert sorted(p.name for p in (tmp_path / "s" / "blobs").iterdir()) == [snap.id[len("sha256:"):] + ".gz"]
+
+    def test_a_record_that_is_not_json_is_unreadable_and_named(self, tmp_path):
+        store, _snap, _row, km, _root = filled(tmp_path / "s")
+        with store._db:  # noqa: SLF001 - the damage a hand edit or a cut-off write leaves
+            store._db.execute("UPDATE claims SET json = ? WHERE id = ?", ("{cut off", km.id))  # noqa: SLF001
+        with pytest.raises(StoreUnreadable, match=f"the claim record {km.id} in the store's index is not JSON"):
+            store.get(km.ref)
+        with pytest.raises(StoreUnreadable, match="is not JSON"):
+            store.claims()
+
+    def test_a_blob_that_is_not_its_snapshots_bytes_is_unreadable_and_named(self, tmp_path):
+        """A bundle holds each blob to its id; the store handed back whatever
+        the file held: other bytes as the snapshot's, or a gzip error."""
+        store, snap, _row, _km, root = filled(tmp_path / "s")
+        blob = tmp_path / "s" / "blobs" / (snap.id[len("sha256:"):] + ".gz")
+        blob.write_bytes(gzip.compress(PAGE.replace(b"641068", b"641067"), mtime=0))
+        with pytest.raises(StoreUnreadable, match=f"does not digest to {snap.ref}"):
+            store.snapshot_bytes(snap.ref)
+        with pytest.raises(StoreUnreadable, match="does not digest"):
+            store.export_bundle(root.ref, tmp_path / "b")
+        whole = gzip.compress(PAGE, mtime=0)
+        # Not gzip (BadGzipFile), cut off (EOFError), a broken deflate block (zlib.error).
+        for damaged in (b"not gzip at all", whole[:-12], whole[:10] + b"\xff" * 6 + whole[16:]):
+            blob.write_bytes(damaged)
+            with pytest.raises(StoreUnreadable, match=f"{blob.name} is not a gzip stream"):
+                store.snapshot_bytes(snap.ref)
+        blob.write_bytes(gzip.compress(PAGE, mtime=0))
+        assert store.snapshot_bytes(snap.ref) == PAGE
+
+    def test_a_blob_that_inflates_past_the_bound_is_refused_not_read_whole(self, tmp_path, monkeypatch):
+        store, snap, _row, _km, root = filled(tmp_path / "s")
+        bundle_dir = store.export_bundle(root.ref, tmp_path / "b")
+        monkeypatch.setattr(bundle_module, "MAX_PAGE_BYTES", len(PAGE) - 1)
+        blob = tmp_path / "s" / "blobs" / (snap.id[len("sha256:"):] + ".gz")
+        with pytest.raises(StoreUnreadable, match=f"{blob.name}: it inflates past {len(PAGE) - 1} bytes"):
+            store.snapshot_bytes(snap.ref)
+        with pytest.raises(BundleUnreadable, match=f"it inflates past {len(PAGE) - 1} bytes"):
+            read_bundle(bundle_dir).snapshot_bytes(snap.ref)
+        monkeypatch.setattr(bundle_module, "MAX_PAGE_BYTES", len(PAGE))
+        assert store.snapshot_bytes(snap.ref) == PAGE
+        assert read_bundle(bundle_dir).snapshot_bytes(snap.ref) == PAGE
 
 
 class TestBundle:
@@ -277,7 +372,7 @@ class TestRecorder:
         assert snap.served_from is None
         assert snap.locator == "https://www.brenda-enzymes.org/enzyme.php?ecno=9.9.9.9"
         assert store.snapshot_bytes(snap.ref) == b"<html>live page</html>"
-        assert client.PAGE_OBSERVERS == [] or recorder._observe not in client.PAGE_OBSERVERS  # noqa: SLF001
+        assert recorder._observe not in client.PAGE_OBSERVERS  # noqa: SLF001
 
     def test_outside_the_block_nothing_is_observed(self, tmp_path, monkeypatch):
         monkeypatch.setenv("CATERVA_BRENDA_RECORDED", str(RECORDED))

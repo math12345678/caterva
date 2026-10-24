@@ -39,12 +39,14 @@ the product working, not failing (ADR 0024).
 
 4. **Claims over pinned evidence** (`caterva/evidence/`, `caterva/check/`).
    With `--claims DIR`, every BRENDA page the search read is pinned as a
-   dated snapshot, each constant becomes a claim whose identity is the hash
-   of its derivation, a refusal is recorded as a claim, and `caterva verify`
-   re-checks the bundle offline with a program that imports nothing of the
-   code that wrote it. `caterva why` prints a claim's derivation down to the
-   bytes (ADR 0179). The search itself still fetches live: a snapshot is a
-   record of what was read, never a cache served as current.
+   dated snapshot (with BRENDA's literature page for each cited reference,
+   fetched for the purpose), each constant becomes a claim whose identity
+   is the hash of its derivation, a refusal is recorded as a claim, and
+   `caterva verify` re-checks the bundle offline with a checker whose own
+   imports are the standard library and nothing of the code that wrote it.
+   `caterva why` prints a claim's derivation down to the bytes (ADR 0179).
+   The search itself still fetches live: a snapshot is a record of what was
+   read, never a cache served as current.
 
 5. **Caterva Studio** (`caterva/studio/`). A local server on 127.0.0.1 and
    a page that marks each number by its origin. Its contract with the page
@@ -71,12 +73,16 @@ the product working, not failing (ADR 0024).
   refused).
 - The checker in `caterva/check/` imports only the standard library, so a
   defect in the producer cannot be reproduced in the thing that checks it.
-- Recorded pages and recorded answers are read by tests and by nothing
-  else; a file outside test configuration that so much as names the
-  variables fails a test.
+- Recorded pages and recorded answers are served to tests and to nothing
+  else. The one module of the package that reads recorded pages, the
+  evidence layer's offline showcase (`caterva/evidence/showcase.py`),
+  reads them directly to build an example bundle dated as the recordings
+  are, and nothing a person types calls it. A file outside test
+  configuration that so much as names the replay variables fails a test.
 - Nothing is shipped under a claim stronger than what was measured: the
   words are "re-checkable" and "within stated tolerances", and a check that
-  could not run is reported as not run, never as passed.
+  could not run is reported as not run, never as passed (`caterva verify`
+  prints it `n/a` and counts it apart).
 
 ## Releases
 

@@ -11,8 +11,9 @@
  * verify` runs, which reads only the bundle's own files and shares no code
  * with what wrote them. The report comes back as the command prints it,
  * one line per check; the page adds the constant's name beside a claim ref
- * it knows, and nothing else. A passing report says each stated reason
- * still holds against the pinned bytes, not that the paper was right.
+ * it knows, and nothing else. A report with nothing failed says each check
+ * that ran still holds against the pinned bytes, not that the paper was
+ * right, and lists what did not run.
  *
  * A result captured before bundles existed carries no `claims`: the action
  * is then disabled with the contract's sentence for a run without a bundle,
@@ -23,7 +24,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { downloadArtifact } from "@/api/runs";
 import { type ClaimKind, type ClaimsSummary, type ComposeResult, NO_CLAIMS_BUNDLE, type RunRecord, type VerifyReport } from "@/api/types";
-import { failedChecks, notChecked, ranChecks, verifyRun } from "@/api/verify";
+import { PRINTED, failedChecks, heldChecks, notChecked, notRunChecks, ranChecks, verifyRun } from "@/api/verify";
 import { Disclosure } from "@/components/forms/Disclosure";
 import { shortDigest } from "@/components/provenance/ProvenanceDetail";
 import { MarkdownReport } from "@/components/report/Report";
@@ -131,18 +132,22 @@ export function Recheck({ run, claims, names }: { run: RunRecord; claims: Claims
 
 /**
  * A verify report as a plain list: the command's verdict sentence, its
- * summary line, then one line per check (ok or failed, the check's name,
- * the number it is about when the page knows it, and the detail as the
- * checker wrote it), and what was not checked, with the reason. A failure
- * is drawn as the command draws it (exit 3, "Refused"): the first failing
- * check named, in its own words, never as a red error.
+ * summary line, then one line per check (ok, FAIL or n/a as the command
+ * prints them, the check's name, the number it is about when the page
+ * knows it, and the detail as the checker wrote it), and what was not
+ * checked, with the reason. A check that did not run is n/a and counted
+ * apart, never as held. A failure is drawn as the command draws it (exit
+ * 3, "Refused"): the first failing check named, in its own words, never as
+ * a red error.
  */
 export function VerifyReportView({ report, names }: { report: VerifyReport; names: Map<string, string> }) {
   const ran = ranChecks(report);
   const skipped = notChecked(report);
   const failed = failedChecks(report);
   const first = failed[0];
-  const summary = `${ran.length} checks: ${ran.length - failed.length} ok, ${failed.length} failed; ${skipped.length} not checked.`;
+  const summary =
+    `${ran.length} checks: ${heldChecks(report).length} ok, ${failed.length} failed, ` +
+    `${notRunChecks(report).length} did not run; ${skipped.length} not checked.`;
   return (
     <div className="k-verify" data-ok={report.ok ? "true" : "false"}>
       {first ? (
@@ -154,7 +159,7 @@ export function VerifyReportView({ report, names }: { report: VerifyReport; name
       ) : (
         <p className="k-verify-verdict" role="status">
           <span className="state-kicker">Re-checkable</span>
-          every derivation and stated reason holds against the pinned bytes.
+          every check that ran holds against the pinned bytes; what did not run is listed below with the reason.
         </p>
       )}
       <p className="k-verify-summary muted">
@@ -162,8 +167,8 @@ export function VerifyReportView({ report, names }: { report: VerifyReport; name
       </p>
       <ol className="k-checks" aria-label="Every check, as the checker printed it">
         {ran.map((c, i) => (
-          <li key={`${i}-${c.name}`} data-ok={c.ok ? "true" : "false"}>
-            <span className="k-check-ok">{c.ok ? "ok" : "failed"}</span>
+          <li key={`${i}-${c.name}`} data-ok={c.ok ? "true" : "false"} data-status={c.status}>
+            <span className="k-check-ok">{PRINTED[c.status]}</span>
             <span className="k-check-name">{c.name}</span>
             <span className="k-check-about font-mono" title={c.claim ?? undefined}>
               {c.claim ? (names.get(c.claim) ?? shortDigest(c.claim)) : ""}

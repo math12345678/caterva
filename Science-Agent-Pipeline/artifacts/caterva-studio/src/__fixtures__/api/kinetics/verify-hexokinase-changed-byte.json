@@ -7,147 +7,171 @@
     "name": "snapshot bytes",
     "claim": null,
     "ok": false,
+    "status": "failed",
     "detail": "snapshot:sha256:3a69b492abcd7253b301d7a002f60d52a971ba9352a3a2559ec5f12f5060ef91: 3a69b492abcd7253b301d7a002f60d52a971ba9352a3a2559ec5f12f5060ef91.gz gunzips to 3,725,554 bytes whose sha256 is sha256:7c32ea04d587919b2f991cc0e1a88815afa7433d921b5024712e5d7cf1578f02, not the snapshot's id; held by reaction_Km (claim:sha256:c6290e72b4318f55c09fc952f91f81e43f25fb9f053bd5f7bdc993f0db743cd5), reaction_kcat (claim:sha256:b73bbb32a8bb289625044c2d591bb5b7c150914f49cd958d97f48c789051e0f3)"
    },
    {
     "name": "snapshot bytes",
     "claim": null,
     "ok": true,
-    "detail": "snapshot:sha256:0857c7d6843a94a6f9c6ea2955efe84b8db432a97eb1e6e31219507ee6c4b2bf: 26,134 bytes, brenda_reference, retrieved 2026-10-17T07:39:08Z"
+    "status": "ok",
+    "detail": "snapshot:sha256:0857c7d6843a94a6f9c6ea2955efe84b8db432a97eb1e6e31219507ee6c4b2bf: 26,134 bytes, brenda_reference, retrieved 2026-10-24T23:30:46Z"
    },
    {
     "name": "snapshot bytes",
     "claim": null,
     "ok": true,
-    "detail": "snapshot:sha256:51b090e935ddc1bc0a07a1bffef04a3143567cf06db392086a18a70e3633fd38: 29,510 bytes, brenda_reference, retrieved 2026-10-17T07:39:08Z"
+    "status": "ok",
+    "detail": "snapshot:sha256:51b090e935ddc1bc0a07a1bffef04a3143567cf06db392086a18a70e3633fd38: 29,510 bytes, brenda_reference, retrieved 2026-10-24T23:30:46Z"
    },
    {
     "name": "identity",
     "claim": null,
     "ok": true,
+    "status": "ok",
     "detail": "row:sha256:8dbc83ff1baa7a5853a3d56b06c617e302167a76b16ab91c9c73d89df966fb2f: recomputes from its fields; brenda:2.7.1.1:km:Homo sapiens:D-glucose:641068:6:0"
    },
    {
     "name": "identity",
     "claim": null,
     "ok": true,
+    "status": "ok",
     "detail": "row:sha256:849d375e3b02a7a28ad3359bd8c1139164577939c3be2ecd4c61f03aacf14776: recomputes from its fields; brenda:2.7.1.1:kcat:Homo sapiens:D-glucose:739603:40.1:0"
    },
    {
     "name": "identity",
     "claim": "claim:sha256:68403166b9a501da3d076851b8b0f2a272997b3be2e6064138b47fa79c1d46e7",
     "ok": true,
+    "status": "ok",
     "detail": "model: recomputes from its derivation"
    },
    {
     "name": "inputs",
     "claim": "claim:sha256:68403166b9a501da3d076851b8b0f2a272997b3be2e6064138b47fa79c1d46e7",
     "ok": true,
+    "status": "ok",
     "detail": "model: 6 input(s) present"
    },
    {
     "name": "identity",
     "claim": "claim:sha256:c6290e72b4318f55c09fc952f91f81e43f25fb9f053bd5f7bdc993f0db743cd5",
     "ok": true,
+    "status": "ok",
     "detail": "reaction_Km: recomputes from its derivation"
    },
    {
     "name": "row locator",
     "claim": "claim:sha256:c6290e72b4318f55c09fc952f91f81e43f25fb9f053bd5f7bdc993f0db743cd5",
     "ok": false,
-    "detail": "reaction_Km: no one table row holds reference '641068', value '6' and commentary '30°C, pH 7.5, wild-type' together (row brenda:2.7.1.1:km:Homo sapiens:D-glucose:641068:6:0)"
+    "status": "failed",
+    "detail": "reaction_Km: no one table row holds reference '641068', value '6', commentary '30°C, pH 7.5, wild-type', substrate 'D-glucose', organism 'Homo sapiens' together (row brenda:2.7.1.1:km:Homo sapiens:D-glucose:641068:6:0)"
    },
    {
     "name": "certificate",
     "claim": "claim:sha256:c6290e72b4318f55c09fc952f91f81e43f25fb9f053bd5f7bdc993f0db743cd5",
     "ok": false,
+    "status": "failed",
     "detail": "reaction_Km: span [1980757, 1980763) reads '641069', not '641068'"
    },
    {
     "name": "dominance",
     "claim": "claim:sha256:c6290e72b4318f55c09fc952f91f81e43f25fb9f053bd5f7bdc993f0db743cd5",
     "ok": true,
+    "status": "ok",
     "detail": "reaction_Km: not strictly dominated by any of 2 alternative(s)"
    },
    {
     "name": "identity",
     "claim": "claim:sha256:b73bbb32a8bb289625044c2d591bb5b7c150914f49cd958d97f48c789051e0f3",
     "ok": true,
+    "status": "ok",
     "detail": "reaction_kcat: recomputes from its derivation"
    },
    {
     "name": "row locator",
     "claim": "claim:sha256:b73bbb32a8bb289625044c2d591bb5b7c150914f49cd958d97f48c789051e0f3",
     "ok": true,
+    "status": "ok",
     "detail": "reaction_kcat: row brenda:2.7.1.1:kcat:Homo sapiens:D-glucose:739603:40.1:0 found in bytes [2129348, 2130166) of snapshot:sha256:3a69b492abcd7253b301d7a002f60d52a971ba9352a3a2559ec5f12f5060ef91; value 40.1 1/s is the row's"
    },
    {
     "name": "certificate",
     "claim": "claim:sha256:b73bbb32a8bb289625044c2d591bb5b7c150914f49cd958d97f48c789051e0f3",
     "ok": true,
-    "detail": "reaction_kcat: 5 span(s) read as their text: '739603', '40.1', 'wild-type, pH 7.6, 25 °C', 'D-glucose', 'Homo sapiens'"
+    "status": "ok",
+    "detail": "reaction_kcat: 5 span(s) read as their text: '739603', '40.1', 'wild-type, pH 7.6, 25 °C', 'D-glucose', 'Homo sapiens', all within the table row at bytes [2129348, 2130166) that holds row brenda:2.7.1.1:kcat:Homo sapiens:D-glucose:739603:40.1:0"
    },
    {
     "name": "dominance",
     "claim": "claim:sha256:b73bbb32a8bb289625044c2d591bb5b7c150914f49cd958d97f48c789051e0f3",
     "ok": true,
+    "status": "ok",
     "detail": "reaction_kcat: not strictly dominated by any of 3 alternative(s)"
    },
    {
     "name": "identity",
     "claim": "claim:sha256:ca36762339a105ba639ea1a21a74a5f08adc6fc40860aba2720c2d276e1d8139",
     "ok": true,
+    "status": "ok",
     "detail": "reaction_E: recomputes from its derivation"
    },
    {
     "name": "inputs",
     "claim": "claim:sha256:ca36762339a105ba639ea1a21a74a5f08adc6fc40860aba2720c2d276e1d8139",
     "ok": true,
+    "status": "ok",
     "detail": "reaction_E: cites no row, as a chosen value must not"
    },
    {
     "name": "identity",
     "claim": "claim:sha256:684079f228e29a31b1200e49a802b26fcdcbcd0aa45f18be281f3e1ea5d2d2d2",
     "ok": true,
+    "status": "ok",
     "detail": "reaction_P: recomputes from its derivation"
    },
    {
     "name": "inputs",
     "claim": "claim:sha256:684079f228e29a31b1200e49a802b26fcdcbcd0aa45f18be281f3e1ea5d2d2d2",
     "ok": true,
+    "status": "ok",
     "detail": "reaction_P: cites no row, as a chosen value must not"
    },
    {
     "name": "identity",
     "claim": "claim:sha256:449e3895c597b8db0e00715cd1866aed8f5913cbb4410efbecd67e34c7d9097b",
     "ok": true,
+    "status": "ok",
     "detail": "reaction_S: recomputes from its derivation"
    },
    {
     "name": "inputs",
     "claim": "claim:sha256:449e3895c597b8db0e00715cd1866aed8f5913cbb4410efbecd67e34c7d9097b",
     "ok": true,
+    "status": "ok",
     "detail": "reaction_S: cites no row, as a chosen value must not"
    },
    {
     "name": "root",
     "claim": "claim:sha256:68403166b9a501da3d076851b8b0f2a272997b3be2e6064138b47fa79c1d46e7",
     "ok": true,
+    "status": "ok",
     "detail": "model: the root is a computed claim with 6 input(s)"
    },
    {
     "name": "not checked",
     "claim": "claim:sha256:68403166b9a501da3d076851b8b0f2a272997b3be2e6064138b47fa79c1d46e7",
     "ok": true,
+    "status": "not run",
     "detail": "Antimony regeneration: the computed claim names its compiled source by digest (settings[\"ir\"]); regenerating the source needs the composer, which this checker does not import, so the digest is read and not reproduced"
    },
    {
     "name": "not checked",
     "claim": "claim:sha256:68403166b9a501da3d076851b8b0f2a272997b3be2e6064138b47fa79c1d46e7",
     "ok": true,
+    "status": "not run",
     "detail": "ODE replay: a computed value is held to the claim's tolerance by whoever re-integrates the model; this checker imports no integrator and replays nothing"
    }
   ],
-  "ran_at": "2026-10-17T07:39:09.113Z"
+  "ran_at": "2026-10-24T23:30:46.711Z"
  }
 }

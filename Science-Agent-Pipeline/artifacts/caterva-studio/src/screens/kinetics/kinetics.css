@@ -916,6 +916,9 @@
 .k-checks li[data-ok="false"] .k-check-ok {
   color: var(--caution);
 }
+.k-checks li[data-status="not run"] .k-check-ok {
+  color: var(--fg-soft);
+}
 .k-check-name {
   color: var(--fg);
 }

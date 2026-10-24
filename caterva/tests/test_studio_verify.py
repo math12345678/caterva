@@ -119,7 +119,7 @@ def test_verify_answers_the_checkers_report_and_it_passes(hexokinase_run):
     report = response.json()
     assert set(report) == {"ok", "checks", "ran_at"}
     assert report["ok"] is True and report["ran_at"].endswith("Z")
-    assert all(set(c) == {"name", "claim", "ok", "detail"} for c in report["checks"])
+    assert all(set(c) == {"name", "claim", "ok", "status", "detail"} for c in report["checks"])
     assert all(c["ok"] for c in report["checks"])
     names = {c["name"] for c in report["checks"]}
     assert {"snapshot bytes", "identity", "row locator", "certificate", "dominance", "inputs", "root",

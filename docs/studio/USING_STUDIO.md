@@ -141,11 +141,13 @@ runs over the run's bundle, on your computer, reading nothing but the
 bundle's own files and sharing no code with what wrote them. The report is
 the command's: one line per check (each pinned page hashes to its id,
 every row and claim id recomputes from its fields, a cited claim's row is
-on its page, every certified span reads as its text, and so on), what was
-not checked and why, and a verdict. A check that did not hold is shown
-first, in the checker's words, naming the claim it is about. A passing
-report means each stated reason still holds against the pinned bytes, not
-that the paper was right.
+on its page, every certified span reads as its text, and so on), each
+marked ok, FAIL or n/a, what was not checked and why, and a verdict. n/a is
+a check that could not run, with the reason (a dominance check on a claim
+that carried no ordinals): it is counted apart and never as held. A check
+that did not hold is shown first, in the checker's words, naming the claim
+it is about. A report with nothing failed means each check that ran still
+holds against the pinned bytes, not that the paper was right.
 
 A run reopened from before bundles existed has none: the button says so
 and stays disabled. Runs of other kinds write no bundle.

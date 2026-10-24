@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -76,8 +77,28 @@ SNAPSHOTS = "snapshots.jsonl"
 BLOBS = "snapshots"
 
 
+#: The most a pinned page may inflate to when it is read back: the checker's
+#: bound (caterva/check/verify.py MAX_PAGE_BYTES, which says why 64 MiB), so a
+#: small blob cannot make `caterva why` or the Studio hold more than that.
+MAX_PAGE_BYTES = 64 * 1024 * 1024
+
+
 class BundleUnreadable(EvidenceRefused):
     """The directory is not a bundle of this format, or a record in it lies."""
+
+
+def read_gzip(path: Path, limit: int | None = None) -> bytes:
+    """The bytes the gzip file at `path` holds, as gzip.decompress reads them,
+    taken through gzip's streaming reader so no more than `limit` + 1 bytes
+    are ever inflated (MAX_PAGE_BYTES when no limit is given). ValueError
+    past the limit; OSError (BadGzipFile), EOFError or zlib.error for a file
+    that is not a whole gzip stream."""
+    limit = MAX_PAGE_BYTES if limit is None else limit
+    with gzip.open(path, "rb") as handle:
+        data = handle.read(limit + 1)
+    if len(data) > limit:
+        raise ValueError(f"it inflates past {limit} bytes, the most a pinned page is read to")
+    return data
 
 
 def caterva_version() -> str:
@@ -121,7 +142,12 @@ class Bundle:
         path = self.blob_path(ref)
         if not path.is_file():
             raise BundleUnreadable(f"{path} is missing: the bundle names a snapshot it does not hold")
-        data = gzip.decompress(path.read_bytes())
+        try:
+            data = read_gzip(path)
+        except ValueError as exc:
+            raise BundleUnreadable(f"{path}: {exc}") from exc
+        except (OSError, EOFError, zlib.error) as exc:  # BadGzipFile is an OSError
+            raise BundleUnreadable(f"{path} is not a gzip stream: {exc}") from exc
         if digest(data) != ref_digest(ref):
             raise BundleUnreadable(f"{path} does not digest to {ref}: the bytes are not the snapshot's")
         return data

@@ -428,24 +428,64 @@ class TestAValueTheRowDoesNotSupport:
             assert km.refusal.candidates == ()
 
 
+@pytest.fixture(scope="module")
+def unanswered(tmp_path_factory):
+    """The showcase's command, once, with the runner's recordings and not
+    the two literature pages."""
+    directory = tmp_path_factory.mktemp("no-literature-pages") / "claims"
+    with offline(RECORDED_HTTP):
+        report = run_report([*ARGS, "--claims", str(directory)])
+    return SimpleNamespace(directory=directory, report=report)
+
+
 class TestAReferencePageNoRecordingAnswers:
-    def test_it_is_a_note_and_a_refused_claim_and_the_run_still_succeeds(self, showcase, tmp_path):
-        # The showcase's store, copied, with only the runner's recordings
-        # on: the literature page is asked for again, nothing answers, and
-        # httpx refuses to go live.
-        store_dir = tmp_path / "store"
-        shutil.copytree(showcase.first / compose_claims.STORE_DIR, store_dir)
-        with EvidenceStore(store_dir) as store, offline(RECORDED_HTTP):
-            cited = store.claims(kind="cited")
-            assert len(cited) == 2
-            claim_set = compose_claims.ClaimSet(root=cited[0].ref, claims=tuple(cited),
-                                                by_identifier={})
-            notes = compose_claims.capture_references(claim_set, store)
-            assert len(notes) == 2
-            for note in notes:
-                assert note.startswith("reference page not captured for BRENDA ref ")
-                assert "no recording answers" in note
-                assert "`caterva why` will name the reference id, not the paper" in note
+    """The real run, with the runner's recordings and not the two literature
+    pages: each capture is asked for, nothing answers, httpx refuses to go
+    live, and the run still succeeds.
+
+    This used to call `capture_references` on a copied store, which showed
+    the notes and the refused claims but never ran the run its name said
+    still succeeds, nor showed where those refused claims end up. They are
+    in the run's store and not in the bundle: the bundle is the closure of
+    the model claim, and the paper's page is an input of no derivation
+    (compose_claims's module docstring), so a reader of the bundle learns of
+    the missing pages from the report's notes, and `caterva why` names the
+    reference id instead of the paper.
+    """
+
+    def test_the_run_still_succeeds_with_nothing_on_stderr(self, unanswered):
+        assert unanswered.report.code == 0
+        assert unanswered.report.err == ""
+
+    def test_each_uncaptured_page_is_a_note_in_the_claims_section(self, unanswered):
+        section = unanswered.report.out.split("\n## Claims\n", 1)[1]
+        notes = [line for line in section.splitlines()
+                 if line.startswith("- reference page not captured for BRENDA ref ")]
+        assert sorted(n.split(" of EC ", 1)[0] for n in notes) == [
+            "- reference page not captured for BRENDA ref 641068",
+            "- reference page not captured for BRENDA ref 739603",
+        ]
+        for note in notes:
+            assert "no recording answers" in note
+            assert note.endswith("`caterva why` will name the reference id, not the paper.")
+
+    def test_the_bundle_still_cites_both_values_and_verifies(self, unanswered, showcase):
+        from caterva.check.verify import verify_bundle
+
+        bundle = read_bundle(unanswered.directory)
+        by = claims_by_identifier(bundle)
+        assert by["reaction_Km"].kind == "cited" and by["reaction_kcat"].kind == "cited"
+        assert [s for s in bundle.snapshots.values() if s.source == "brenda_reference"] == []
+        assert verify_bundle(unanswered.directory).failed() == []
+        # The paper's page is an input of nothing, so whether it was
+        # captured cannot move the model claim's id.
+        assert bundle.root == read_bundle(showcase.first).root
+
+    def test_the_refused_reference_claims_are_in_the_store_and_not_the_bundle(self, unanswered):
+        bundle = read_bundle(unanswered.directory)
+        assert [c for c in bundle.claims.values() if c.kind == "refused"] == []
+        assert "0 refused" in unanswered.report.out.split("\n## Claims\n", 1)[1]
+        with EvidenceStore(unanswered.directory / compose_claims.STORE_DIR) as store:
             refused = [c for c in store.claims(kind="refused")
                        if c.refusal.kind == compose_claims.REFERENCE_NOT_CAPTURED]
             assert {c.subject for c in refused} == {
@@ -453,6 +493,7 @@ class TestAReferencePageNoRecordingAnswers:
                 "reference 739603 = paper(2.7.1.1, 739603)",
             }
             assert all("no recording answers" in c.derivation.settings["why"] for c in refused)
+            assert {c.ref for c in refused}.isdisjoint(bundle.claims)
 
 
 # ---------------------------------------------------------------------------
@@ -512,3 +553,215 @@ class TestTheFlag:
         args = parser.parse_args(["Michaelis Menten", "--export", "csv", "--claims", "dir"])
         check_request(parser, args)
         assert args.claims == "dir" and args.export == "csv"
+
+    @pytest.mark.parametrize("below", [None, "run1"], ids=["the-file", "under-the-file"])
+    def test_a_claims_path_that_is_or_is_under_a_file_is_not_well_formed(self, tmp_path, below):
+        # It used to be accepted and then fail where the store was opened,
+        # as a NotADirectoryError traceback (exit 1) after the model was built.
+        afile = tmp_path / "notes.txt"
+        afile.write_text("mine\n", encoding="utf-8")
+        target = afile if below is None else afile / below
+        out, err = io.StringIO(), io.StringIO()
+        with pytest.raises(SystemExit) as raised, \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            main(["Michaelis Menten", "--no-simulate", "--no-ranking", "--no-analysis",
+                  "--claims", str(target)])
+        assert raised.value.code == 2
+        assert f"--claims {target}: {afile} is a file, not a directory" in err.getvalue()
+        assert out.getvalue() == ""
+        assert afile.read_text(encoding="utf-8") == "mine\n"
+
+    def test_an_existing_directory_and_a_new_one_under_it_are_well_formed(self, tmp_path):
+        parser = build_parser()
+        existing = parser.parse_args(["Michaelis Menten", "--claims", str(tmp_path)])
+        check_request(parser, existing)
+        new = parser.parse_args(["Michaelis Menten", "--claims", str(tmp_path / "new" / "deeper")])
+        check_request(parser, new)
+        assert existing.claims == str(tmp_path)
+        assert not (tmp_path / "new").exists(), "checking a path creates nothing"
+
+    @staticmethod
+    def _refused(target):
+        """`main` on a well-formed run but for `--claims target`: its exit
+        code, stdout and stderr, the parser having refused before any work."""
+        out, err = io.StringIO(), io.StringIO()
+        with pytest.raises(SystemExit) as raised, \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            main(["Michaelis Menten", "--no-simulate", "--no-ranking", "--no-analysis",
+                  "--claims", str(target)])
+        return raised.value.code, out.getvalue(), err.getvalue()
+
+    @pytest.mark.parametrize("below", [None, "run1"], ids=["the-link", "under-the-link"])
+    def test_a_claims_path_that_is_or_is_under_a_link_to_nothing_is_not_well_formed(
+        self, tmp_path, below,
+    ):
+        # `Path.exists()` follows the link and says there is nothing there,
+        # so this was let through, and the store's mkdir then raised
+        # FileExistsError (exit 1) after the model was built.
+        link = tmp_path / "bundle"
+        link.symlink_to(tmp_path / "nowhere")
+        target = link if below is None else link / below
+        code, out, err = self._refused(target)
+        assert code == 2
+        assert f"--claims {target}: {link} is a symbolic link, and not to a directory" in err
+        assert out == ""
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["bundle"], "nothing was made"
+
+    def test_a_link_to_a_directory_is_a_directory(self, tmp_path):
+        (tmp_path / "real").mkdir()
+        (tmp_path / "bundle").symlink_to(tmp_path / "real")
+        parser = build_parser()
+        args = parser.parse_args(["Michaelis Menten", "--claims", str(tmp_path / "bundle" / "run1")])
+        check_request(parser, args)
+        assert args.claims == str(tmp_path / "bundle" / "run1")
+
+    def test_a_claims_path_that_cannot_be_looked_at_is_not_well_formed(self, tmp_path, monkeypatch):
+        # An ancestor without search permission. `Path.exists()` raised
+        # PermissionError out of the argument check on Python 3.10-3.12 (and
+        # said False on 3.13, letting the run fail at mkdir after the build).
+        # Simulated, because a test running as root is never refused a stat.
+        import errno
+        import os
+
+        locked = tmp_path / "locked"
+        locked.mkdir()
+        real_stat = os.stat
+
+        def stat(path, *args, **kwargs):
+            if str(path).startswith(str(locked) + os.sep):
+                raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), str(path))
+            return real_stat(path, *args, **kwargs)
+
+        monkeypatch.setattr(os, "stat", stat)
+        target = locked / "run1"
+        code, out, err = self._refused(target)
+        assert code == 2
+        assert (f"--claims {target}: {target} cannot be looked at "
+                f"({os.strerror(errno.EACCES)}), so no bundle can be written under it") in err
+        assert out == ""
+
+
+# ---------------------------------------------------------------------------
+# A refused run writes no half-bundle
+# ---------------------------------------------------------------------------
+
+class TestARefusedRun:
+    """A description that builds nothing writes nothing under `--claims DIR`.
+
+    The run used to open its store before composing, so `glycolysis
+    --claims DIR` refused (exit 3, "Not built.") and left `DIR/store` with
+    no bundle beside it, which `caterva verify DIR` rejected as not a
+    bundle. Nothing is written now, rather than a bundle whose root is a
+    refused claim: no model was built, so there is no number for a claim to
+    be about, and such a bundle would verify as ok while backing nothing.
+    """
+
+    @pytest.mark.parametrize("argv", [["glycolysis"], ["glycolysis", "--export", "csv"]],
+                             ids=["report", "export"])
+    def test_a_description_that_builds_nothing_writes_nothing(self, tmp_path, argv):
+        directory = tmp_path / "claims"
+        result = run_cli([*argv, "--claims", str(directory)])
+        assert result.code == 3
+        assert result.err.startswith("Not built.")
+        assert result.out == ""
+        assert not directory.exists(), sorted(str(p) for p in tmp_path.rglob("*"))
+
+    def test_a_directory_that_was_there_is_left_as_it_was(self, tmp_path):
+        result = run_cli(["glycolysis", "--claims", str(tmp_path)])
+        assert result.code == 3
+        assert list(tmp_path.iterdir()) == []
+
+
+# ---------------------------------------------------------------------------
+# No literature layer, or one that cannot be observed
+# ---------------------------------------------------------------------------
+
+class TestNothingCanBePinned:
+    """`--claims` where no page can be pinned is still the run it would be
+    without the flag, plus a bundle that says why it cites nothing.
+
+    From a wheel built without the literature layer, the recorder's
+    `literature_module("brenda_client")` raised LiteratureLayerUnavailable
+    outside every handler, so `--claims` turned the search's refusal (exit
+    3) into a traceback (exit 1), and `--export csv --claims` printed
+    nothing where the export without it exits 0.
+    """
+
+    UNAVAILABLE = "no literature layer in this test"
+
+    def _unavailable(self, monkeypatch):
+        """The layer made unreachable where each part reaches for it: the
+        recorder for the client it observes, and the search for its
+        resolvers (`compose_and_parameterise` raises what
+        `literature_module` raises from a wheel), as
+        test_compose_literature's unreachable-layer test does."""
+        from caterva.checkout import LiteratureLayerUnavailable
+        from caterva.compose import pipeline
+        from caterva.evidence import capture
+
+        def unavailable(*args, **kwargs):
+            raise LiteratureLayerUnavailable(self.UNAVAILABLE)
+
+        monkeypatch.setattr(capture, "literature_module", unavailable)
+        monkeypatch.setattr(pipeline, "compose_and_parameterise", unavailable)
+
+    def test_the_report_is_still_a_refusal_and_its_bundle_says_why(self, monkeypatch, tmp_path):
+        from caterva.check.verify import verify_bundle
+
+        self._unavailable(monkeypatch)
+        with offline(RECORDED_HTTP):
+            without = run_cli(ARGS)
+            result = run_cli([*ARGS, "--claims", str(tmp_path / "claims")])
+        assert without.code == 3
+        assert result.code == 3, result.err
+        assert "1 refusal(s) in 1 section(s)" in result.err
+        section = result.out.split("\n## Claims\n", 1)[1]
+        assert ("- no BRENDA page could be pinned here, so no value can be cited: "
+                f"{self.UNAVAILABLE}") in section
+        assert "0 cited, 3 chosen, 2 placeholder, 0 refused, 1 computed" in section
+        assert verify_bundle(tmp_path / "claims").failed() == []
+
+    def test_the_export_exits_as_it_does_without_the_flag_and_carries_the_ids(
+        self, monkeypatch, tmp_path,
+    ):
+        self._unavailable(monkeypatch)
+        with offline(RECORDED_HTTP):
+            without = run_cli([*ARGS, "--export", "csv"])
+            result = run_cli([*ARGS, "--export", "csv", "--claims", str(tmp_path / "claims")])
+        assert without.code == 0
+        assert result.code == 0, result.err
+        rows = [row for row in csv.reader(io.StringIO(result.out)) if row]
+        assert rows[0][-1] == CLAIM_COLUMN
+        km = claims_by_identifier(read_bundle(tmp_path / "claims"))["reaction_Km"]
+        assert km.kind == "placeholder"
+        assert {row[0]: row[-1] for row in rows[1:]}["reaction_Km"] == km.ref
+
+    def test_a_client_without_the_observer_hook_pins_nothing_and_cites_nothing(
+        self, monkeypatch, tmp_path,
+    ):
+        # A literature copy from before ADR 0179 has no PAGE_OBSERVERS. The
+        # recorder registers on each client in turn, so the copies before
+        # the hookless one already hold its observer when it raises; they
+        # must not keep it.
+        from caterva.check.verify import verify_bundle
+        from caterva.evidence import capture
+
+        real = capture.client_modules()
+        before = [list(client.PAGE_OBSERVERS) for client in real]
+        hookless = SimpleNamespace(__name__="brenda_client_before_adr_0179")
+        monkeypatch.setattr(capture, "client_modules", lambda: [*real, hookless])
+        provenanced, model = _measured_model(Measurement(
+            6.0, "mM", "BRENDA ref 641068", organism="Homo sapiens",
+            commentary="30°C, pH 7.5, wild-type",
+        ))
+        with compose_claims.ClaimsRun(tmp_path / "claims") as run:
+            run.start_recording()
+            during = [list(client.PAGE_OBSERVERS) for client in real]
+            claim_set = run.finish(provenanced, model)
+        assert during == before, "an observer was left on a client"
+        assert run.unpinned.startswith("no BRENDA page could be pinned here, so no value can be cited: ")
+        assert "brenda_client_before_adr_0179 has no PAGE_OBSERVERS hook" in run.unpinned
+        assert claim_set.notes[0] == run.unpinned
+        km = claims_by_identifier(read_bundle(tmp_path / "claims"))["reaction_Km"]
+        assert km.kind == "refused" and km.refusal.kind == compose_claims.PAGE_NOT_PINNED
+        assert verify_bundle(tmp_path / "claims").failed() == []

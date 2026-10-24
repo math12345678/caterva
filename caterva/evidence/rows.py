@@ -18,10 +18,12 @@ WHAT A LOCATOR IS
     brenda:<ec>:<table>:<organism>:<substrate>:<reference>:<value_text>:<n>
 
 `n` is the index among rows that share every preceding field, in parse
-order, because the recorded hexokinase page lists one paper's value twice
-in places (18 mM and 6 mM, ref 641068, one commentary) and a locator that
-could name two rows would let a claim cite either. The structured fields on
-the Row are the form to re-find by; the locator is one line for a reader.
+order, because one paper can give one substrate the same value more than
+once: on the recorded hexokinase page ref 721735 gives 7.1e-07 mM for ATP
+for two mutants (W167F/W257F and W99R/W167F), told apart only by the
+commentary, which the locator does not carry. A locator that could name two
+rows would let a claim cite either. The structured fields on the Row are
+the form to re-find by; the locator is one line for a reader.
 
 CERTIFICATES
 ------------
@@ -269,7 +271,8 @@ def _anchors(page: bytes, row: Row) -> list[int]:
 def certificates_for(row: Row, page_bytes: bytes) -> tuple[Certificate, ...]:
     """Byte spans in `page_bytes` for the row's reference id, value, commentary,
     substrate and organism, all within one table row; () when no row of the
-    page holds the reference, the value and the commentary together."""
+    page holds them together (the organism is not looked for when it is
+    "any")."""
     page = bytes(page_bytes)
     starts = _row_bounds(page)
     tried: set[tuple[int, int]] = set()
@@ -288,17 +291,19 @@ def certificates_for(row: Row, page_bytes: bytes) -> tuple[Certificate, ...]:
         commentary = _cell_text(page, row.commentary, start, end) if row.commentary else None
         if row.commentary and commentary is None:
             continue
+        # The substrate and organism tie the region to this row: a neighbour
+        # with the same reference, value and commentary is another row.
+        organism = row.organism if row.organism != ANY_ORGANISM else None
+        named = [(text, _cell_text(page, text, start, end)) for text in (row.substrate, organism) if text]
+        if any(span is None for _, span in named):
+            continue
         found: list[Certificate] = []
         if reference is not None:
             found.append(Certificate(row.snapshot, reference, row.reference))
         found.append(Certificate(row.snapshot, value[0], value[1]))
         if commentary is not None:
             found.append(Certificate(row.snapshot, commentary, row.commentary))
-        for text in (row.substrate, row.organism if row.organism != ANY_ORGANISM else None):
-            if text:
-                span = _cell_text(page, text, start, end)
-                if span is not None:
-                    found.append(Certificate(row.snapshot, span, text))
+        found.extend(Certificate(row.snapshot, span, text) for text, span in named)
         return tuple(found)
     return ()
 
