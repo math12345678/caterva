@@ -68,6 +68,19 @@ SKIP_PARTS = {
     ".freebuff",
 }
 
+#: Directories kept as a record and compiled by nothing, on purpose.
+#: `archive/legacy_domains/` holds the domains Caterva dropped on 2026-09-27
+#: "as they were when they left" (its README): nothing imports them, their
+#: import paths name modules that no longer hold them, and the release that
+#: runs them is v0.4.0. A tsconfig that included them could only fail, and
+#: deleting them would discard the record. So the orphan sweep below does
+#: not read them -- as check_no_placeholder_dois.py does not read
+#: docs/archive/. Workspace discovery is unaffected: nothing under here has
+#: a tsconfig.json. Measured 2026-10-17: 21 .ts/.tsx files, every one
+#: reported as "TypeScript that NO tsconfig.json actually compiles" since
+#: the sweep and the archive landed in the same commit.
+ARCHIVED_RECORDS = {"archive"}
+
 #: How long a single workspace's type check may take before we call it
 #: hung. tsc on this repo's largest workspace runs in well under 30s; the
 #: ceiling is generous so a cold run on a slow machine does not flake.
@@ -242,6 +255,10 @@ def first_party_typescript() -> set[pathlib.Path]:
     sources: set[pathlib.Path] = set()
     for current, directories, files in os.walk(REPO_ROOT):
         directories[:] = [d for d in directories if d not in SKIP_PARTS]
+        if pathlib.Path(current) == REPO_ROOT:
+            # Only at the top: a nested directory named `archive` is not a
+            # record, and must stay in the sweep.
+            directories[:] = [d for d in directories if d not in ARCHIVED_RECORDS]
         here = pathlib.Path(current)
         for name in files:
             if name.endswith(".d.ts"):

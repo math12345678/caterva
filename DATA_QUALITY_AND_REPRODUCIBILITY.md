@@ -258,7 +258,7 @@ Date:   Wed Aug 09 12:34:56 2026 +0000
 
     Add literature-backed Km parameter for LDH
 
-    - Source: Smith et al. (2020), DOI: 10.xxxx/xxxxxx
+    - Source: <authors> (<year>), DOI: <the paper's DOI, as registered>  (an example commit; no such paper is cited here)
     - Value: 5.2 mM (range: 4.9-5.5 mM)
     - Conditions: 37°C, pH 7.4
     - Confidence: 0.96

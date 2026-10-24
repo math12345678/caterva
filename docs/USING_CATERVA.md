@@ -1701,6 +1701,106 @@ recorded as one rather than papered over.
 
 ---
 
+## Keeping the evidence: `--claims`, `caterva why`, `caterva verify`
+
+A cited number in the report is a sentence about a page BRENDA served that
+day. `--claims` keeps the page, the row and the reason, so that the sentence
+can be re-checked later by someone who was not there:
+
+```bash
+caterva compose "Michaelis Menten" --subject 2.7.1.1 --organism human --substrate glucose --claims ./claims
+```
+
+The report is as before and ends with a `## Claims` section: the root
+claim's ref, how many claims of each kind were written, the directory, and
+the line `Re-check offline: caterva verify ./claims`.
+
+What is in `./claims`: every BRENDA page the search read, as the bytes it
+read (gzipped, named by their hash, with the URL, the day they were fetched
+and the licence beside the hash); the rows it took from them; and one claim
+per constant. A *cited* claim names its row and the byte spans in the page
+where the reference id, the value and the commentary were found. A value
+you set is a *chosen* claim. A *placeholder* says which table would have
+supplied it and did not. And when no row on the kept page matches what the
+resolver reported, the constant gets a *refused* claim naming the candidate
+rows, never a citation. A claim's id is the hash of its derivation (the
+rule, with its version and the decision record behind it; what it consumed;
+what it certifies; and, for a cited or chosen value, the value), so a stored
+claim whose contents were edited no longer matches its own id.
+
+Three things it does not do. It does not change the search: the pages are
+fetched live, and a kept page is a dated record, never read back as the
+current answer. It does not keep NCBI, UniProt or PubChem answers; only
+BRENDA's pages. And without `--claims` nothing is written and nothing
+changes.
+
+**With an export**, the ids ride along:
+
+```bash
+caterva compose "Michaelis Menten" --subject 2.7.1.1 --organism human --substrate glucose --claims ./claims --export csv
+```
+
+gives the CSV a final `claim_id` column; SBML gains a `CLAIM <ref>` line in
+each parameter's notes, Antimony a `# claim: <ref>` comment. Without
+`--claims` the exports are byte for byte what they were.
+
+### `caterva why`: a number's derivation, down to the bytes
+
+```bash
+caterva why claim:sha256:<hex> --bundle ./claims
+```
+
+prints the claim, its rule with the decision record that decided it, each
+certified span and the text at it, the row's own fields (value, substrate,
+organism, commentary, reference id), the page's URL, the day it was
+retrieved, its hash and licence, and, when the bundle holds BRENDA's
+literature page for the reference, the paper's title and PubMed id read from
+that page. Take the ref from the report's `## Claims` section or from an
+export. A ref that is not in the bundle is refused (exit 3, `Refused:` and
+the ref). `--store DIR` reads a store directory instead of a bundle.
+
+### `caterva verify`: re-check a bundle offline
+
+```bash
+caterva verify ./claims
+caterva verify ./claims --json
+```
+
+needs no network and imports nothing of the code that wrote the bundle (the
+checker is standard library only, and a guard keeps it so). It prints one
+line per check and a summary, in this shape:
+
+```
+ok  snapshot bytes  snapshot:sha256:…
+ok  identity        claim:sha256:…  reaction_Km
+ok  row locator     claim:sha256:…  reaction_Km
+ok  certificate     claim:sha256:…  reaction_Km
+ok  dominance       claim:sha256:…  reaction_Km  not certified
+ok  inputs          claim:sha256:…  model
+ok  root            claim:sha256:…  model
+not checked: Antimony regeneration (needs the composer); ODE replay (needs the integrator)
+```
+
+What the lines mean. *snapshot bytes*: the kept page hashes to its id.
+*identity*: the claim's id recomputes from its stored fields. *row
+locator*: the reference id and the value occur within one table row of the
+page. *certificate*: every certified span lies inside the page and reads as
+its text. *dominance*: the chosen row is not beaten on every evidence axis
+by an alternative, when the ordinals were kept; `not certified` means that
+check did not run, and the line says so rather than passing it. *unit
+arithmetic*: a stated unit factor multiplies out within the claim's
+tolerance. *inputs* and *root*: the computed model claim's inputs exist and
+the manifest's root is it. What it cannot check it lists as *not checked*,
+with the reason.
+
+Exit `0` when every check passed, `3` when one failed (the first failing
+claim is named on stderr), `2` for a bundle it cannot read. The word for a
+bundle that passes is **re-checkable**: the derivations and the stated
+reasons hold against the kept bytes. Whether the biology is right is not
+something it checks.
+
+---
+
 ## Your own rates: `caterva rates`
 
 Everything above asks the literature for a constant. `caterva rates` is the
@@ -1918,6 +2018,9 @@ These are decisions, not gaps, and each refusal says why:
 - **Claim a simulation was verified when nothing verified it** — if a model
   has no conservation law, the time course says so: *"there is no independent
   check on the integration here."*
+- **Serve a kept page as the current answer** — `--claims` keeps what the
+  search read, dated; the search itself always fetches live, and
+  `caterva verify` re-checks the kept bytes without fetching anything.
 
 If you find Caterva doing any of these, that is a bug worth reporting.
 
@@ -1932,6 +2035,8 @@ If you find Caterva doing any of these, that is a bug worth reporting.
 | `Not exported.` | The export refused and the reason is printed above it. The report still ran. |
 | Exit code 3 | Something refused and said why; the rest of the report is still there and still valid. A **refused literature search** is one of these: an enzyme name that means more than one enzyme, or a model needing a Km with no `--substrate`. A search that ran and found nothing is *not* a refusal — it produced its answer, and the provenance table states it per constant. |
 | `caterva rates`: "no uncertainty was given for the rates" | Exit 3. Add a `sigma` column, or pass `--sigma-from replicates` or `--sigma-from residuals`; the refusal names all three and what each assumes. |
+| `caterva verify`: `Refused:` + a claim ref | Exit 3. A check failed and the first failing claim is named; the line above says which check. The bundle's contents no longer match their own derivations, or the kept page does not hold what a claim says it does. |
+| `caterva why`: `Refused:` + a ref | Exit 3. The ref is not in the bundle (or store) you named. |
 | Exit code 2 | The question was not well formed. |
 | macOS: "cannot be opened because the developer cannot be verified" | The folder is unsigned. `xattr -dr com.apple.quarantine .` inside the folder. "Open Anyway" in System Settings clears one file, not the libraries, so it will not work. |
 | Windows: "Windows protected your PC" | SmartScreen. More info > Run anyway. Run `.\caterva.exe` from a terminal. |

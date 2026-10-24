@@ -452,6 +452,23 @@ WHERE BRENDA DATA APPEARS IN THIS REPOSITORY
       fetches live. Each page is listed with its URL, fetch date and hash in
       Tests/fixtures/recorded/README.md.
 
+  Tests/fixtures/recorded/brenda_reference_*.html.gz
+  caterva/tests/fixtures/compose_claims/http/*.json.gz
+      BRENDA literature pages (authors, title, journal, year, PubMed id)
+      for references of EC 2.7.1.1, stored unmodified. The first set is
+      read by the evidence layer's tests and its offline showcase, the
+      second replayed by the `compose --claims` test; no environment
+      variable serves either to the product, which fetches the same pages
+      live. Each is listed with its URL, fetch date and hash in
+      Tests/fixtures/recorded/README.md and
+      caterva/tests/fixtures/compose_claims/README.md.
+
+  Tests/fixtures/labelled/ec_2.7.1.1_homo_sapiens_glucose_km_isozymes.tsv
+      The 25 human D-glucose Km rows of the recorded hexokinase page, each
+      with its BRENDA reference id and the value as the page states it,
+      labelled by hand with the isozyme the paper reports; the README
+      beside it says how each label was read and on which date.
+
   docs/literature-inventory.toml
       Golden-tuple entries recording BRENDA values and reference ids, e.g.
       the LDH/lactate Km (ref 740253) and the LDH/gossypol Ki (ref 711801).

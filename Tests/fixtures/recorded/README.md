@@ -20,6 +20,21 @@ Read by `Tests/brenda_client.py` `fetch_brenda_html` when
 | file | source | fetched | sha256 of the uncompressed page |
 |---|---|---|---|
 | brenda_2.7.1.1.html.gz | https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1 | 2026-09-28 | 3a69b492abcd7253b301d7a002f60d52a971ba9352a3a2559ec5f12f5060ef91 |
+| brenda_reference_2.7.1.1_641068.html.gz | https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=641068 | 2026-10-17 | 71fac47bc48e1ce9454639cc75ff871c2893f7dda1c0ce4ef75d9932b62215fe |
+| brenda_reference_2.7.1.1_739603.html.gz | https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=739603 | 2026-10-17 | 0857c7d6843a94a6f9c6ea2955efe84b8db432a97eb1e6e31219507ee6c4b2bf |
+| brenda_reference_2.7.1.1_640237.html.gz | https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=640237 | 2026-10-17 | a5bc9b1f76b3ca069dea1a828b0aa2e738f516d8ba6070ae651f3d4f4447f932 |
+| brenda_reference_2.7.1.1_674942.html.gz | https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=674942 | 2026-10-17 | d9021946708b8b2083846a4afa71fbffad030eeae037863bcdde3715a72a41ab |
+| brenda_reference_2.7.1.1_702867.html.gz | https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=702867 | 2026-10-17 | b7d8f386837d86e515b9a9d2ba105d03295b93bf39c186a69877252e0c5d694e |
+| brenda_reference_2.7.1.1_640261.html.gz | https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=640261 | 2026-10-17 | d4c6a701af32602e67302264ce26fe59722eb4407d8bd2269307c56253448e8f |
+
+The `brenda_reference_2.7.1.1_<ref>.html.gz` pages are BRENDA's literature
+pages for six references of EC 2.7.1.1 (authors, title, journal, year,
+PubMed link), fetched 2026-10-17. They are not read by `fetch_brenda_html`
+and no environment variable serves them: `caterva/evidence/showcase.py`
+reads them directly to pin the cited papers beside the enzyme page, and
+`caterva/tests/test_evidence_references.py` parses them. The product
+fetches the same URL live through `http_retry.retry_get`
+(`caterva/evidence/capture.py`, `capture_reference`).
 
 Recorded after BRENDA returned HTTP 500 for this page in three CI runs on
 2026-09-28 (five hexokinase tests failed on an outage, not a defect). BRENDA
