@@ -36,4 +36,4 @@ repository-code: "https://github.com/math12345678/caterva"
 # verify). The date is the day the version was set; the tag is cut after
 # a release candidate has shipped every artifact (docs/releases/v0.6.0.md).
 version: 0.6.0
-date-released: 2026-10-17
+date-released: 2026-10-25

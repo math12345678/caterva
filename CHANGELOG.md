@@ -12,7 +12,7 @@ onward and [Keep a Changelog](https://keepachangelog.com/) in shape.
 Entries before 0.1.0 are grouped by date, because that is how the work was
 done: there was no release to version.
 
-## [0.6.0] - unreleased
+## [0.6.0] - 2026-10-25
 
 Claims over pinned evidence: `caterva compose --claims DIR`, `caterva why`
 and `caterva verify`; in Caterva Studio, each number's derivation and a
