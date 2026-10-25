@@ -229,8 +229,11 @@ export const TEST_SUITES: TestSuite[] = [
         // refuses to bind a port, so its 10 tests were NOT run here and are
         // not counted): 6696 passed, 1 skipped, 0 failed, of the 6707 tests
         // collected. The earlier running tally above is superseded by this
-        // one measurement.
-        passed: 6696,
+        // one measurement. Then the md smoke run's rule for areas printed
+        // alike either side of a rounding edge: 2 tests added to
+        // test_md_smoke_verdicts.py, all 7 there and the 74 in test_sasa.py
+        // passing in a focused run (2026-10-25): 6698.
+        passed: 6698,
         skipped: 1,
         failed: 0,
       },
