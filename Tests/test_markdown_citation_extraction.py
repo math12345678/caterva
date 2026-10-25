@@ -4,9 +4,9 @@ WHY THIS EXISTS
 ---------------
 `verify_citations_live.py` checks every DOI Caterva cites. Until
 2026-09-05 its `DOI_SOURCE_FILES` list held only `.ts` and `.py` sources,
-so `LITERATURE_BACKING_DATABASE.md` -- the one document in the repository
-whose entire purpose is to enumerate Caterva's citations -- was never read
-by the citation checker.
+so `docs/science/LITERATURE_BACKING_DATABASE.md` -- the one document in the
+repository whose entire purpose is to enumerate Caterva's citations -- was
+never read by the citation checker.
 
 The cost is measurable. `domain-literature.ts` was corrected on 2026-08-09
 from `10.1038/ng.3285` (CrossRef: Polderman et al. 2015, a twin-studies
@@ -54,8 +54,8 @@ def _load():
 
 verify = _load()
 
-# The real Harter line from LITERATURE_BACKING_DATABASE.md: one asserted
-# DOI and one discussed DOI, in a single sentence.
+# The real Harter line from docs/science/LITERATURE_BACKING_DATABASE.md: one
+# asserted DOI and one discussed DOI, in a single sentence.
 HARTER_LINE = (
     "- **Citation**: https://doi.org/10.2307/1403077 (corrected 2026-09-05: "
     "`10.2307/1402059` resolves to Wilks, Kendall & Stuart (1959))"
@@ -116,7 +116,8 @@ def test_code_files_are_unaffected() -> None:
 
 
 def test_the_document_is_actually_enrolled() -> None:
-    doc = _ROOT / "LITERATURE_BACKING_DATABASE.md"
+    doc = _ROOT / "docs" / "science" / "LITERATURE_BACKING_DATABASE.md"
+    assert doc.is_file(), f"{doc} is gone; the citation list moved again"
     assert doc in verify.DOI_SOURCE_FILES, (
         "LITERATURE_BACKING_DATABASE.md was dropped from DOI_SOURCE_FILES; "
         "the file that lists Caterva's citations would stop being checked"

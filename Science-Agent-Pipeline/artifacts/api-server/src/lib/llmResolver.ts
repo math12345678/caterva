@@ -16,8 +16,39 @@ export interface EntityExtraction {
    * refused (runner source "isoform_withheld").
    */
   isoform?: string;
+  /**
+   * The organism the QUERY names, or "" when it names none.
+   *
+   * Empty is the true reading, not a gap to fill: this resolver applies no
+   * default, because a default applied here would reach the lookup looking
+   * exactly like an organism the person typed. Until 2026-10-17 the prompt
+   * said "else Homo sapiens" and `normalizeEntities` filled the same value
+   * when the model returned none, so every query that named no organism
+   * was answered about humans with nothing in the response saying so. The
+   * caller that runs the lookup (queryResolver) applies the API's documented
+   * default and reports it in the response's flags, the way `caterva
+   * compose` reports "which the search chose" when no --organism was given.
+   */
   organism: string;
+  /**
+   * An EC number the query TEXT contains, copied out of it. Never one the
+   * model inferred from the enzyme name: `parseLLMResponse` drops any EC
+   * number the query does not contain and records the drop on the resolved
+   * object (`ecNumberDropped`). A model may propose an EC number, never
+   * supply one (ADR 0011): an EC number is the identity of the protein every
+   * citation downstream refers to, and a plausible wrong one is a correctly
+   * formatted citation for a different enzyme (ADR 0126). The enzyme name is
+   * sent instead, and the one finder every Caterva command uses decides
+   * which enzyme it is (science_agent_runner.resolve_enzyme, ADR 0127).
+   */
   ecNumber?: string;
+  /**
+   * Set by the CALLER that applied an organism default because neither the
+   * query nor the model named one, so the lookup can say so in the
+   * response. The model path never sets it: this resolver leaves `organism`
+   * empty instead of assuming.
+   */
+  organismAssumed?: boolean;
 }
 
 export interface LLMResolvedSimulation {
@@ -26,6 +57,15 @@ export interface LLMResolvedSimulation {
   reasoning: string;
   modelCitations: string[];
   entities?: EntityExtraction;
+  /**
+   * True when the model returned an EC number the query text does not
+   * contain and `parseLLMResponse` dropped it; `ecNumberDroppedReason` names
+   * the number and says why. Recorded rather than silently discarded so the
+   * response can say a proposal was made and not used -- the same courtesy
+   * `modelCitations` gets when they are discarded (queryResolver).
+   */
+  ecNumberDropped?: boolean;
+  ecNumberDroppedReason?: string;
 }
 
 interface OpenAIMessage {
@@ -78,10 +118,10 @@ Given a natural-language query, return a single JSON object (no markdown, no pro
   "reasoning": "short explanation of how you mapped the query",
   "modelCitations": ["optional literature reference"],
   "entities": {
-    "enzymeName": "full enzyme name if mentioned",
+    "enzymeName": "the enzyme's name as the query states it, if it names one",
     "substrate": "specific substrate if mentioned",
-    "organism": "organism if mentioned, else Homo sapiens",
-    "ecNumber": "EC number if known or inferable"
+    "organism": "the organism only if the query names one, else null",
+    "ecNumber": "an EC number only if the query text itself contains one, copied verbatim; never one you infer from the enzyme name"
   }
 }
 
@@ -95,7 +135,7 @@ Rules:
 1. Return numeric values only for parameters the query explicitly states. The pipeline hard-blocks any value that is not user-supplied or literature-backed, so never invent numbers: omit a parameter entirely rather than guessing a value. Return an empty "parameters" object when the query states no numbers.
 2. Return only the JSON object. Do not wrap it in markdown code fences.
 3. If the query is ambiguous between these domains, choose the most likely one and explain in "reasoning". If it is about none of them -- an epidemic, population genetics, PCR, a gene circuit, anything that is not enzyme kinetics or stochastic chemical kinetics -- return "domain": "out_of_scope". Caterva is focused on enzymes; forcing such a question into an enzyme model would answer a question nobody asked.
-4. Populate "entities" with any enzyme information you can extract from the query; omit or set to null if none is present.`;
+4. Populate "entities" with what the query states; omit or set to null what it does not state. Do not infer an EC number or an organism from the enzyme name: an EC number the query does not contain is dropped before any lookup, and the enzyme name is resolved by Caterva's own enzyme finder.`;
 
 /**
  * Known OpenAI-compatible providers, selected via LLM_PROVIDER. This is
@@ -403,34 +443,7 @@ export async function resolveQueryWithLLM(
       return null;
     }
 
-    const parsed = JSON.parse(content) as Partial<LLMResolvedSimulation>;
-
-    // Validate domain is in the supported list
-    if (
-      !parsed.domain ||
-      !SUPPORTED_DOMAINS.includes(parsed.domain as (typeof SUPPORTED_DOMAINS)[number])
-    ) {
-      logger.warn(
-        { parsed, supported: SUPPORTED_DOMAINS },
-        "LLM resolver returned unsupported domain",
-      );
-      return null;
-    }
-
-    if (!parsed.parameters || typeof parsed.parameters !== "object") {
-      logger.warn({ parsed }, "LLM resolver returned invalid parameters");
-      return null;
-    }
-
-    return {
-      domain: parsed.domain,
-      parameters: normalizeParameters(parsed.parameters),
-      reasoning: parsed.reasoning || "Resolved via LLM.",
-      modelCitations: Array.isArray(parsed.modelCitations)
-        ? parsed.modelCitations
-        : [],
-      entities: normalizeEntities(parsed.entities),
-    };
+    return parseLLMResponse(content, query);
   } catch (err) {
     logger.warn(
       { err },
@@ -438,6 +451,61 @@ export async function resolveQueryWithLLM(
     );
     return null;
   }
+}
+
+/**
+ * The model's reply, checked against the query it answered.
+ *
+ * Separate from the transport (since 2026-10-17) because what it refuses is
+ * policy rather than parsing, and policy needs tests that do not mock a
+ * network: a domain outside SUPPORTED_DOMAINS or a missing parameters
+ * object returns null (the caller falls back to the keyword resolver, as
+ * before), and an EC number the query text does not contain is dropped by
+ * `normalizeEntities` and recorded on the result. Throws on malformed JSON;
+ * `resolveQueryWithLLM` catches that and returns null.
+ */
+export function parseLLMResponse(
+  content: string,
+  query: string,
+): LLMResolvedSimulation | null {
+  const parsed = JSON.parse(content) as Partial<LLMResolvedSimulation>;
+
+  // Validate domain is in the supported list
+  if (
+    !parsed.domain ||
+    !SUPPORTED_DOMAINS.includes(parsed.domain as (typeof SUPPORTED_DOMAINS)[number])
+  ) {
+    logger.warn(
+      { parsed, supported: SUPPORTED_DOMAINS },
+      "LLM resolver returned unsupported domain",
+    );
+    return null;
+  }
+
+  if (!parsed.parameters || typeof parsed.parameters !== "object") {
+    logger.warn({ parsed }, "LLM resolver returned invalid parameters");
+    return null;
+  }
+
+  const { entities, ecNumberDroppedReason } = normalizeEntities(
+    parsed.entities,
+    query,
+  );
+  const result: LLMResolvedSimulation = {
+    domain: parsed.domain,
+    parameters: normalizeParameters(parsed.parameters),
+    reasoning: parsed.reasoning || "Resolved via LLM.",
+    modelCitations: Array.isArray(parsed.modelCitations)
+      ? parsed.modelCitations
+      : [],
+    entities,
+  };
+  if (ecNumberDroppedReason) {
+    result.ecNumberDropped = true;
+    result.ecNumberDroppedReason = ecNumberDroppedReason;
+    logger.warn({ reason: ecNumberDroppedReason }, "LLM resolver dropped a proposed EC number");
+  }
+  return result;
 }
 
 function normalizeParameters(
@@ -465,13 +533,78 @@ function extractString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-function normalizeEntities(input: unknown): EntityExtraction | undefined {
-  if (!input || typeof input !== "object") return undefined;
+/** The shape of an EC number: four fields, the last of which may be "-". */
+const EC_NUMBER = /^\d+\.\d+\.\d+\.(?:\d+|-)$/;
+
+/**
+ * Strings a model returns to mean "the query named none". Read as none:
+ * forwarding the word "null" as an organism would send BRENDA a species
+ * that does not exist.
+ */
+const NOT_AN_ORGANISM = new Set(["null", "none", "unknown", "n/a", "not specified", "unspecified"]);
+
+/**
+ * Whether the query text contains `ec` as a whole EC number -- "1.1.1.27"
+ * in a query that says "1.1.1.270" is not present in it.
+ */
+function queryContainsEc(query: string, ec: string): boolean {
+  const escaped = ec.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+  return new RegExp(`(?<![\\d.])${escaped}(?![\\d.])`).test(query);
+}
+
+/**
+ * The entities the model extracted, kept to what the query states.
+ *
+ * Two things are refused here, and both are the same rule -- a model may
+ * propose, never supply (ADR 0011):
+ *
+ *   * An EC number the query text does not contain is dropped, whatever the
+ *     model's confidence. Measured before this existed: the prompt asked for
+ *     an "EC number if known or inferable" and the reply was forwarded to
+ *     the runner under `ecNumber`, where a supplied number skips the enzyme
+ *     finder entirely -- so a model that wrote 1.1.1.27 for "lactate
+ *     dehydrogenase" chose between the L- and D- enzymes silently, the
+ *     exact pick ADR 0126/0127 took out of the Python finder. The drop is
+ *     reported in `ecNumberDroppedReason`, not hidden.
+ *   * No organism default. The query's organism or nothing; the caller
+ *     decides what to do with nothing and says so.
+ */
+function normalizeEntities(
+  input: unknown,
+  query: string,
+): { entities?: EntityExtraction; ecNumberDroppedReason?: string } {
+  if (!input || typeof input !== "object") return {};
   const raw = input as Record<string, unknown>;
+
+  const organismText = extractString(raw.organism)?.trim() ?? "";
+  const organism = NOT_AN_ORGANISM.has(organismText.toLowerCase()) ? "" : organismText;
+
+  const proposed = extractString(raw.ecNumber)?.replace(/^\s*EC\s*/i, "").trim();
+  let ecNumber: string | undefined;
+  let ecNumberDroppedReason: string | undefined;
+  if (proposed) {
+    if (!EC_NUMBER.test(proposed)) {
+      ecNumberDroppedReason =
+        `The model returned "${proposed}" as an EC number, which is not one, ` +
+        `so it was not used.`;
+    } else if (queryContainsEc(query, proposed)) {
+      ecNumber = proposed;
+    } else {
+      ecNumberDroppedReason =
+        `The model proposed EC ${proposed}, which the query text does not ` +
+        `contain, so it was not used: a model may propose an EC number, ` +
+        `never supply one (ADR 0011). The enzyme name is sent instead, and ` +
+        `the enzyme finder decides which enzyme it is.`;
+    }
+  }
+
   return {
-    enzymeName: extractString(raw.enzymeName),
-    substrate: extractString(raw.substrate),
-    organism: extractString(raw.organism) || "Homo sapiens",
-    ecNumber: extractString(raw.ecNumber),
+    entities: {
+      enzymeName: extractString(raw.enzymeName),
+      substrate: extractString(raw.substrate),
+      organism,
+      ecNumber,
+    },
+    ecNumberDroppedReason,
   };
 }

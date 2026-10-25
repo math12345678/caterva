@@ -6,7 +6,7 @@
  * `LiteratureService` is an in-memory `Map`. A caller must hand it
  * `Literature` objects before it can recommend anything, and it reaches no
  * database, registry or API of its own -- despite the name, and despite
- * `LITERATURE_INTEGRATION_GUIDE.md` describing a literature integration.
+ * `docs/science/LITERATURE_INTEGRATION_GUIDE.md` describing a literature integration.
  * Everything it "recommends" is something the caller already had.
  *
  * Caterva's actual literature layer is `Tests/fallback_logic.py`

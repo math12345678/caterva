@@ -435,8 +435,16 @@ def _emitted_keys() -> set[str] | None:
     # Run the runner itself with the populated result patched in.
     runner_probe = textwrap.dedent(
         """
-        import io, json, sys, importlib.util, contextlib, typing
+        import io, json, sys, importlib.util, contextlib, typing, pathlib
         sys.path.insert(0, %r)
+        # The repository root beside Tests/, as every launcher of the runner
+        # sets PYTHONPATH (scienceAgent.ts, literatureResolver.ts,
+        # record_http_fixtures.py): the runner's enzyme finder imports
+        # `caterva.enzymes.policy`, and since 2026-10-17 it runs for a
+        # payload that pairs an enzyme name with an EC number -- this one.
+        # Without it the probe reads {"ok": false, "error": "No module
+        # named 'caterva'"} and reports every field undelivered.
+        sys.path.insert(1, str(pathlib.Path(sys.path[0]).parent))
         import fallback_logic
         from fallback_logic import KineticResult
         from pydantic import BaseModel

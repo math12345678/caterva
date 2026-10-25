@@ -1,10 +1,11 @@
 /**
  * A `caterva compose` result, in the order a reader decides whether to
  * trust it: the verdict (what the model can answer, and the worst thing
- * wrong with it), then where every number came from, then what the model
- * does (time course, influence, steady states, sweeps), then each analysis
- * that was asked for under its own heading with its chart, then the report
- * the terminal prints.
+ * wrong with it), then where every number came from, then the claims
+ * behind those numbers with the action that re-checks them (Recheck.tsx),
+ * then what the model does (time course, influence, steady states,
+ * sweeps), then each analysis that was asked for under its own heading
+ * with its chart, then the report the terminal prints.
  *
  * Every number drawn as a value is a SourcedValue from the server and goes
  * through <Value>, so it wears its provenance mark and its citation or
@@ -32,6 +33,7 @@ import { networkFailureOf, plural, PLACEHOLDER_SHARED, plain, placeholderRowReas
 import { formatNumber } from "@/lib/format";
 
 import type { ExportChoice } from "./kit";
+import { ClaimsSection } from "./Recheck";
 import { SectionFigure, SweepFigure } from "./sections";
 
 /** compose.verdict: broken names a defect; structural rests on placeholders. */
@@ -667,6 +669,7 @@ export function ComposeResultView({ result, run, onChooseEnzyme }: { result: Res
       </p>
       <Search result={result} />
       <NumbersLedger result={result} />
+      <ClaimsSection result={result} run={run} />
       <TimeCourse result={result} />
       <Influence result={result} />
       <SteadyStates result={result} />

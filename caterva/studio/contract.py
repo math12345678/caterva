@@ -262,6 +262,115 @@ class FitInfo(_FitInfoRequired, total=False):
     r_squared: Optional[float]
 
 
+# ---------------------------------------------------------------------------
+# A number's claim: its derivation in the run's claims bundle (ADR 0179)
+# ---------------------------------------------------------------------------
+
+#: Claim.kind in caterva/evidence/claims.py (KINDS), in that order.
+CLAIM_KINDS: Tuple[str, ...] = ("cited", "chosen", "placeholder", "refused", "computed")
+ClaimKind = Literal["cited", "chosen", "placeholder", "refused", "computed"]
+
+#: The folder under a run's directory where a compose run writes its
+#: claims bundle (CONTRACT.md 11): `<data dir>/runs/<id>/claims/`, the
+#: directory `caterva verify` and `caterva why --bundle` take.
+CLAIMS_DIR = "claims"
+
+#: Why `POST /api/runs/{id}/verify` is 409 for a run that wrote no bundle:
+#: the sentence the page shows on its disabled re-check action.
+NO_CLAIMS_BUNDLE = ("this run has no claims bundle to re-check: only a compose run that built a model "
+                    "writes one")
+
+
+class ClaimRule(TypedDict):
+    """The rule a derivation applied, as the bundle records it (RuleRef)."""
+
+    #: "select.resolver", "placeholder.motif_library", "chosen.starting_amount", "compile.model".
+    rule_id: str
+    version: int
+    #: The decision record that states the rule ("ADR 0047").
+    adr: str
+
+
+class ClaimRow(TypedDict):
+    """The BRENDA table row a cited claim rests on, as rows.jsonl holds it."""
+
+    #: "brenda:<ec>:<table>:<organism>:<substrate>:<reference>:<value>:<index>".
+    locator: str
+    #: The parser's decimal string of the value, as the row records it.
+    value_text: str
+    unit: str
+    substrate: str
+    organism: str
+    #: The row's commentary cell, verbatim, or null when the row has none.
+    commentary: Optional[str]
+    #: The BRENDA reference id ("641068"), or null when the row names none.
+    reference: Optional[str]
+
+
+class ClaimSnapshot(TypedDict):
+    """The pinned page the row was read from, as snapshots.jsonl holds it."""
+
+    #: "sha256:<hex>": the digest of the raw bytes, which names the blob
+    #: `claims/snapshots/<hex>.gz`.
+    id: str
+    #: The URL fetched.
+    locator: str
+    #: ISO-8601 UTC, beside the id and never inside it.
+    retrieved_at: str
+    licence: str
+    #: The recording a test replayed, or null when the page was fetched live.
+    served_from: Optional[str]
+
+
+class ClaimReference(TypedDict):
+    """The paper behind a row's reference id, read from the BRENDA literature
+    page pinned beside the enzyme page (caterva/evidence/references.py)."""
+
+    title: str
+    pmid: Optional[str]
+    journal: Optional[str]
+    #: The year as the page prints it ("1995"); a string because it is transcribed, not parsed.
+    year: Optional[str]
+    #: The PubMed link for `pmid` (CONTRACT.md 9, "Citation links"), else null.
+    url: Optional[str]
+
+
+class ClaimCertificate(TypedDict):
+    """A text the bundle certifies is in the pinned bytes: the span is in the bundle."""
+
+    matched: str
+
+
+class ClaimRefusal(TypedDict):
+    """Why a refused claim cites nothing (caterva/evidence/compose_claims.py names the kinds)."""
+
+    kind: str
+    requested: str
+    #: "<row ref> | <why it was not the one>", per candidate row.
+    candidates: List[str]
+
+
+class ClaimInfo(TypedDict):
+    """One number's claim, transcribed from the run's claims bundle: the
+    derivation `caterva why` prints, with nothing computed here. Every field
+    is read from manifest.json, claims.jsonl, rows.jsonl, snapshots.jsonl and
+    the pinned literature page; absent parts are null, never guessed."""
+
+    #: The claim ref, "claim:sha256:<hex>", as `caterva why` and the exports' claim_id column carry it.
+    id: str
+    kind: ClaimKind
+    rule: ClaimRule
+    #: The cited row; null for every other kind.
+    row: Optional[ClaimRow]
+    #: The page the cited row was read from; null for every other kind.
+    snapshot: Optional[ClaimSnapshot]
+    #: The paper, when its literature page is in the bundle and holds a reference block; else null.
+    reference: Optional[ClaimReference]
+    certificates: List[ClaimCertificate]
+    #: Set only for kind "refused".
+    refusal: Optional[ClaimRefusal]
+
+
 class _ProvenanceRequired(TypedDict):
     kind: ProvenanceKind
 
@@ -294,6 +403,11 @@ class Provenance(_ProvenanceRequired, total=False):
     by: ChosenBy
     #: Anything else the library said about this number, verbatim.
     note: Optional[str]
+    #: The number's claim in the run's claims bundle (ADR 0179), when the run
+    #: wrote one (every compose run in the studio does): the row, the pinned
+    #: page, the paper and the certificates behind it, transcribed. Absent
+    #: from a number no bundle covers.
+    claim: Optional[ClaimInfo]
 
 
 class Interval(TypedDict):
@@ -802,6 +916,31 @@ class RunCreated(TypedDict):
     run: RunRecord
 
 
+class VerifyCheck(TypedDict):
+    """One line of `caterva verify` (caterva/check/verify.py, Check)."""
+
+    #: "snapshot bytes", "identity", "row locator", "certificate", "dominance",
+    #: "unit arithmetic", "inputs", "root", "not checked".
+    name: str
+    #: The claim ref the check is about, or null for a check about a snapshot
+    #: or a row, whose detail then starts with that record's ref.
+    claim: Optional[str]
+    #: "Did not fail": true for a check that held and for one that did not run.
+    ok: bool
+    #: "ok", "failed" or "not run" (caterva/check/verify.py, Check.status).
+    status: str
+    detail: str
+
+
+class VerifyReport(TypedDict):
+    """`POST /api/runs/{id}/verify`: the checker's report on the run's bundle,
+    exactly `caterva verify DIR --json` plus when it ran."""
+
+    ok: bool
+    checks: List[VerifyCheck]
+    ran_at: str
+
+
 class _StatusEventRequired(TypedDict):
     run_id: str
     seq: int
@@ -1104,7 +1243,28 @@ class ExportInfo(TypedDict):
     refused: Optional[str]
 
 
-class ComposeResult(TypedDict):
+class ClaimsSummary(TypedDict):
+    """The claims bundle a compose run wrote (CONTRACT.md 11): what the
+    report's `## Claims` section says, structured, and the artifacts it is
+    served as. Each number's own claim is on its provenance (`ClaimInfo`)."""
+
+    #: The root claim ref, "claim:sha256:<hex>": the computed model claim.
+    root: str
+    #: Claims per kind, every CLAIM_KINDS key present, zeros included.
+    counts: Dict[str, int]
+    #: Rows and pinned pages in the bundle.
+    rows: int
+    snapshots: int
+    #: What could not be done (a reference page not captured), in the section's words.
+    notes: List[str]
+    #: The artifact names: the bundle as a zip, and its records without the pinned bytes.
+    bundle: str
+    listing: str
+    #: The `## Claims` section's body, as the report printed it.
+    text: str
+
+
+class _ComposeResultRequired(TypedDict):
     query: str
     recognition: Recognition
     model: ModelStructure
@@ -1115,11 +1275,19 @@ class ComposeResult(TypedDict):
     sensitivity: Optional[SensitivityView]
     #: bifurcation.SweepReport per swept parameter, through `jsonable`.
     sweeps: List[Dict[str, Any]]
+    #: The analysis sections. The report's `## Claims` section is not among
+    #: them: it is `claims`, and its text is there.
     sections: List[StructuredSection]
     notes: List[str]
     #: What `caterva compose` prints to stdout for the same request.
     report_markdown: str
     exports: Dict[str, ExportInfo]
+
+
+class ComposeResult(_ComposeResultRequired, total=False):
+    #: The run's claims bundle (amended 2026-10-17; every studio compose run
+    #: writes one, so it is null only on a result captured before then).
+    claims: Optional[ClaimsSummary]
 
 
 class _ConstantsRequestRequired(TypedDict):
@@ -2512,6 +2680,7 @@ def from_parameter_origin(
     reason: Optional[str] = None,
     registry: Optional[str] = None,
     url: Optional[str] = None,
+    claim: Optional[ClaimInfo] = None,
 ) -> SourcedValue:
     """One number of a composed model, from `export.ParameterOrigin`.
 
@@ -2520,7 +2689,10 @@ def from_parameter_origin(
     reason text for a placeholder or a chosen value is `reason` when the
     adapter has the resolver's words for it (ComposedModel.not_found),
     otherwise the origin's own `sentence()`, the same sentence the SBML,
-    Antimony and CSV exports carry.
+    Antimony and CSV exports carry. `claim`, when the run wrote a claims
+    bundle, is the number's claim transcribed from it (the adapter reads the
+    bundle; nothing here decides what a claim says) and is attached as
+    `provenance.claim`.
     """
     kind = origin.origin
     if kind == "measured":
@@ -2533,6 +2705,8 @@ def from_parameter_origin(
         prov = chosen("default", reason or origin.sentence())
     else:  # export.ParameterOrigin refuses any other origin at construction
         raise ValueError(f"unknown origin {kind!r} on {origin.identifier!r}")
+    if claim is not None:
+        prov["claim"] = claim
     label = getattr(origin, "symbol", "") or None
     return sourced(origin.value, str(origin.unit or ""), prov, ident=str(origin.identifier), label=label)
 
@@ -2628,6 +2802,7 @@ MIRRORED_UNIONS: Mapping[str, Tuple[str, ...]] = {
     "Theme": THEMES,
     "EventName": EVENT_NAMES,
     "SectionStatus": SECTION_STATUSES,
+    "ClaimKind": CLAIM_KINDS,
 }
 
 #: Constants the page mirrors, by name.
@@ -2643,4 +2818,6 @@ MIRRORED_CONSTANTS: Mapping[str, Any] = {
     "MAX_SSA_EVENTS": MAX_SSA_EVENTS,
     "RATES_MAX_BYTES": RATES_MAX_BYTES,
     "RATES_MAX_ROWS": RATES_MAX_ROWS,
+    "CLAIMS_DIR": CLAIMS_DIR,
+    "NO_CLAIMS_BUNDLE": NO_CLAIMS_BUNDLE,
 }

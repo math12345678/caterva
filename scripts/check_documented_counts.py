@@ -103,7 +103,6 @@ PRESENT_TENSE_DOCS = [
 HISTORICAL_DOCS_NOT_CHECKED = [
     "docs/EXPERT_FEEDBACK.md",
     "docs/ARCHIVE_TRIAGE.md",
-    "docs/ARCHITECTURE_RIGOR.md",
     "docs/adr/",
     "Business/build-stages/",
 ]

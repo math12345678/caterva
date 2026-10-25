@@ -551,6 +551,10 @@ def build_report(
                 "no EC number could be found for that name, so no database "
                 "was asked"
             ),
+            "ec_mismatch": (
+                "the enzyme name and the EC number given are two different "
+                "enzymes, so nothing was looked up"
+            ),
             "literature_candidates": (
                 "no database value was found; candidate papers were located "
                 "but no number was read out of them"

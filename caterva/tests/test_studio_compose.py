@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import csv
 import io
+from pathlib import Path
 from typing import Any, Dict, List
 
 import pytest
@@ -34,12 +35,33 @@ from studio_kinetics_offline import (
 
 BINDING = "reversible binding of a ligand to a receptor"
 LDH = {"subject": "1.1.1.27", "organism": "human", "substrate": "pyruvate"}
+HEXOKINASE = {"description": "Michaelis Menten", "subject": "2.7.1.1", "organism": "human",
+              "substrate": "glucose"}
+#: The sha256 of the recorded hexokinase page (Tests/fixtures/recorded/README.md).
+HEXOKINASE_SHA256 = "3a69b492abcd7253b301d7a002f60d52a971ba9352a3a2559ec5f12f5060ef91"
+
+
+def with_claims(argv: List[str], directory) -> List[str]:
+    """`argv` with `--claims DIR`, before a `--` when the argv ends in one."""
+    flags = ["--claims", str(directory)]
+    if "--" in argv:
+        i = argv.index("--")
+        return argv[:i] + flags + argv[i:]
+    return argv + flags
 
 
 def both(request: Dict[str, Any], tmp_path, progress: Recorder = None):
-    """(cli code, stdout, stderr, adapter outcome) for one request."""
+    """(cli code, stdout, stderr, adapter outcome) for one request.
+
+    The studio writes every run's claims bundle to `<run dir>/claims`
+    (CONTRACT.md 11), so the command is run with `--claims` into that same
+    directory, `tmp_path/claims`: the report's `## Claims` section names the
+    directory it wrote to, and two runs of one request into one directory
+    give one bundle (claim ids are deterministic and the store is reused),
+    so the whole report, claims section included, is held byte for byte.
+    """
     argv = adapter.argv(request)
-    code, out, err = run_cli(main, argv)
+    code, out, err = run_cli(main, with_claims(argv, tmp_path / contract.CLAIMS_DIR))
     outcome = adapter.run(request, context(tmp_path, progress))
     return code, out, err, outcome
 
@@ -84,7 +106,10 @@ def test_every_request_key_becomes_the_flag_the_cli_reads():
         assert argv[i:i + 2] == pair
     for flag in ("--any-mode", "--no-ranking", "--crnt", "--validate"):
         assert flag in argv
-    for never in ("--export", "--antimony", "--shapes"):
+    # --claims is never in the request's argv either: the studio sets the
+    # bundle's directory itself (its run folder), and the recorded command
+    # line is the person's question, not where the studio keeps its files.
+    for never in ("--export", "--antimony", "--shapes", "--claims"):
         assert never not in argv
 
 
@@ -224,11 +249,13 @@ def test_the_parameters_are_the_exports_origins(every_analysis):
 
 
 def test_every_export_is_what_export_prints(every_analysis, tmp_path):
+    # With `--claims`, as the studio writes them: each artefact carries its
+    # claim ids, which are the same in any directory (test_compose_claims).
     _, _, _, outcome, _ = every_analysis
     artifacts = {a.name: a for a in outcome.artifacts}
     assert artifacts["report.md"].content.decode("utf-8") == outcome.result["report_markdown"]
     for fmt, info in outcome.result["exports"].items():
-        code, out, err = run_cli(main, ["--export", fmt, BINDING])
+        code, out, err = run_cli(main, ["--export", fmt, "--claims", str(tmp_path / "claims"), BINDING])
         if code == 0:
             assert info == {"available": True, "artifact": adapter.EXPORT_ARTIFACTS[fmt][0], "refused": None}
             assert artifacts[info["artifact"]].content.decode("utf-8") == out
@@ -251,6 +278,73 @@ def test_progress_reports_each_stage_then_each_section(every_analysis):
 def test_a_cancel_at_a_section_stops_the_run(tmp_path):
     with pytest.raises(Cancelled):
         adapter.run(EVERY_ANALYSIS, context(tmp_path, Recorder(cancel_at="section:scale")))
+
+
+# ---------------------------------------------------------------------------
+# the claims bundle: every run writes one, beside its artefacts
+# ---------------------------------------------------------------------------
+
+
+def test_a_run_without_a_search_still_writes_its_bundle_and_claims(every_analysis):
+    from caterva.check.verify import verify_bundle
+    from caterva.evidence.bundle import read_bundle
+
+    _, out, _, outcome, _ = every_analysis
+    result = outcome.result
+    claims = result["claims"]
+    assert claims["counts"] == {"cited": 0, "chosen": 3, "placeholder": 2, "refused": 0, "computed": 1}
+    assert claims["root"].startswith("claim:sha256:") and claims["notes"] == []
+    assert claims["bundle"] == "claims.zip" and claims["listing"] == "claims.json"
+    # The section is the report's, kept out of `sections` and carried whole.
+    assert f"\n## Claims\n\n{claims['text']}\n" in out
+    assert "claims" not in [s["key"] for s in result["sections"]]
+    for param in result["model"]["parameters"]:
+        claim = param["provenance"]["claim"]
+        assert claim["kind"] == "placeholder" and claim["rule"]["rule_id"] == "placeholder.motif_library"
+        assert claim["rule"]["adr"] == "ADR 0013"
+        assert claim["row"] is None and claim["snapshot"] is None and claim["reference"] is None
+        assert claim["certificates"] == [] and claim["refusal"] is None
+    for species in result["model"]["species"]:
+        claim = species["initial"]["provenance"]["claim"]
+        assert claim["kind"] == "chosen" and claim["rule"]["rule_id"] == "chosen.starting_amount"
+    # The bundle on disk is what the artefacts carry, and the checker accepts it.
+    bundle = read_bundle(every_analysis_dir(every_analysis))
+    assert bundle.root == claims["root"]
+    assert verify_bundle(bundle.directory).ok
+
+
+def every_analysis_dir(every_analysis):
+    """The run directory the module fixture ran in, read back from the
+    section's own `Bundle:` line."""
+    _, out, _, _, _ = every_analysis
+    line = next(line for line in out.splitlines() if line.startswith("Bundle: "))
+    return line[len("Bundle: "):]
+
+
+def test_the_two_claims_artefacts_are_the_bundle_on_disk(every_analysis):
+    import json
+    import zipfile
+
+    _, _, _, outcome, _ = every_analysis
+    artifacts = {a.name: a for a in outcome.artifacts}
+    directory = Path(every_analysis_dir(every_analysis))
+    with zipfile.ZipFile(io.BytesIO(artifacts["claims.zip"].content)) as archive:
+        names = archive.namelist()
+        assert names[:4] == ["manifest.json", "claims.jsonl", "rows.jsonl", "snapshots.jsonl"]
+        assert all(n.startswith("snapshots/") and n.endswith(".gz") for n in names[4:])
+        assert not any(n.startswith("store") for n in names), "the store is the run's index, not the bundle"
+        for name in names:
+            assert archive.read(name) == (directory / name).read_bytes()
+    listing = json.loads(artifacts["claims.json"].content.decode("utf-8"))
+    assert set(listing) == {"manifest", "claims", "rows", "snapshots"}
+    assert listing["manifest"] == json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    assert [c["id"] for c in listing["claims"]] == [
+        json.loads(line)["id"] for line in (directory / "claims.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert artifacts["claims.zip"].content_type == "application/zip"
+    assert artifacts["claims.json"].content_type == "application/json"
+    # The same bundle zips to the same bytes.
+    again = {a.name: a for a in adapter.claims_artifacts(directory)}
+    assert again["claims.zip"].content == artifacts["claims.zip"].content
 
 
 # ---------------------------------------------------------------------------
@@ -322,6 +416,82 @@ def test_human_hexokinase_carries_brenda_ref_641068(tmp_path):
     assert "| `reaction_Km` | 6.0 mM | literature (Homo sapiens) | BRENDA ref 641068 |" in out
     looked_up = [c[2] for c in progress.calls if c[0] == "stage" and c[1] == "search"]
     assert "Looking up reaction_Km in BRENDA's km table for EC 2.7.1.1" in looked_up
+
+
+@pytest.fixture(scope="module")
+def hexokinase_claims(tmp_path_factory):
+    """The hexokinase run with the literature pages answered too, so the
+    cited claims carry their papers; no analysis, to keep it to the search."""
+    tmp = tmp_path_factory.mktemp("hexokinase")
+    request = {**HEXOKINASE, "no_analysis": True, "no_simulate": True, "no_ranking": True}
+    with hexokinase_offline(literature=True):
+        return (*both(request, tmp), tmp)
+
+
+def test_the_km_claim_is_the_641068_row_its_page_its_paper_and_its_certificates(hexokinase_claims):
+    code, out, err, outcome, _ = hexokinase_claims
+    assert_parity(code, out, err, outcome)
+    assert code == 0
+    claim = parameter(outcome.result, "reaction_Km")["provenance"]["claim"]
+    assert claim["kind"] == "cited" and claim["id"].startswith("claim:sha256:")
+    assert claim["rule"] == {"rule_id": "select.resolver", "version": 1, "adr": "ADR 0047"}
+    assert claim["row"]["reference"] == "641068"
+    assert claim["row"] == {
+        "locator": "brenda:2.7.1.1:km:Homo sapiens:D-glucose:641068:6:0", "value_text": "6", "unit": "mM",
+        "substrate": "D-glucose", "organism": "Homo sapiens", "commentary": "30°C, pH 7.5, wild-type",
+        "reference": "641068"}
+    snapshot = claim["snapshot"]
+    assert snapshot["id"] == f"sha256:{HEXOKINASE_SHA256}"
+    assert snapshot["locator"] == "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1"
+    assert snapshot["licence"] == "CC BY 4.0" and snapshot["retrieved_at"].endswith("Z")
+    assert snapshot["served_from"].endswith("brenda_2.7.1.1.html.gz")
+    assert {c["matched"] for c in claim["certificates"]} >= {"641068", "6", "30°C, pH 7.5, wild-type"}
+    assert claim["refusal"] is None
+    paper = claim["reference"]
+    assert paper["pmid"] == "7730377" and paper["url"] == "https://pubmed.ncbi.nlm.nih.gov/7730377/"
+    assert paper["title"].startswith("Human beta-cell glucokinase") and paper["year"] == "1995"
+    assert paper["journal"]
+    kcat = parameter(outcome.result, "reaction_kcat")["provenance"]["claim"]
+    assert kcat["kind"] == "cited" and kcat["row"]["reference"] == "739603" and kcat["row"]["value_text"] == "40.1"
+
+
+def test_the_claim_on_a_number_is_the_claim_in_the_bundle_and_the_export(hexokinase_claims):
+    from caterva.evidence.bundle import read_bundle
+
+    _, _, _, outcome, tmp = hexokinase_claims
+    bundle = read_bundle(tmp / contract.CLAIMS_DIR)
+    by_identifier = {c.subject.split(" = ", 1)[0]: c for c in bundle.claims.values()}
+    result = outcome.result
+    for param in result["model"]["parameters"] + [s["initial"] for s in result["model"]["species"]]:
+        assert param["provenance"]["claim"]["id"] == by_identifier[param["id"]].ref
+    assert result["claims"]["root"] == bundle.root
+    assert result["claims"]["counts"] == {"cited": 2, "chosen": 3, "placeholder": 0, "refused": 0, "computed": 1}
+    assert result["claims"]["snapshots"] == 3, "the enzyme page and the two literature pages"
+    assert result["claims"]["notes"] == []
+    csv_text = next(a for a in outcome.artifacts if a.name == "parameters.csv").content.decode("utf-8")
+    rows = {r["identifier"]: r for r in csv.DictReader(io.StringIO(csv_text))}
+    km = parameter(result, "reaction_Km")
+    assert rows["reaction_Km"]["claim_id"] == km["provenance"]["claim"]["id"]
+    assert km["provenance"]["citation"]["reference_id"] == km["provenance"]["claim"]["row"]["reference"]
+
+
+def test_without_the_literature_pages_the_paper_is_null_and_the_section_says_so(tmp_path):
+    request = {**HEXOKINASE, "no_analysis": True, "no_simulate": True, "no_ranking": True}
+    with hexokinase_offline():
+        code, out, err, outcome = both(request, tmp_path)
+    assert_parity(code, out, err, outcome)
+    km = parameter(outcome.result, "reaction_Km")["provenance"]["claim"]
+    assert km["kind"] == "cited" and km["row"]["reference"] == "641068"
+    assert km["reference"] is None
+    notes = outcome.result["claims"]["notes"]
+    assert len(notes) == 2 and all(n.startswith("reference page not captured for BRENDA ref ") for n in notes)
+    assert outcome.result["claims"]["counts"]["cited"] == 2
+
+
+def test_an_unrecognised_shape_leaves_no_claims_folder_behind(tmp_path):
+    outcome = adapter.run({"description": "glycolysis"}, context(tmp_path))
+    assert outcome.result is None
+    assert not (tmp_path / contract.CLAIMS_DIR).exists()
 
 
 def test_a_compound_the_mechanism_has_no_step_for_is_not_echoed_as_searched(tmp_path):

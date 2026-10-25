@@ -183,6 +183,7 @@ def test_a_run_id_that_does_not_exist_is_404_on_every_run_route(app):
                            ("GET", f"/api/runs/{rid}/artifacts/report.md"), ("GET", f"/api/runs/{rid}/bundle")):
         assert call(app, method, target).status == 404, target
     assert call(app, "POST", f"/api/runs/{rid}/cancel", {}).status == 404
+    assert call(app, "POST", f"/api/runs/{rid}/verify", {}).status == 404
 
 
 # -- the page ---------------------------------------------------------------------------

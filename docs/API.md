@@ -183,9 +183,9 @@ sweep reaches for the plural export and gets a 404 with no hint that one
 letter is the problem.
 
 That is not hypothetical — it caught the author of
-`API_QUICK_REFERENCE.md`, who documented the plural forms throughout because
-they were the reasonable guess. The document was right about what the API
-*should* serve; the API was the inconsistent thing.
+`docs/api/API_QUICK_REFERENCE.md`, who documented the plural forms
+throughout because they were the reasonable guess. The document was right
+about what the API *should* serve; the API was the inconsistent thing.
 
 Both spellings now route, rather than one being renamed, so any existing
 caller using the singular form keeps working.

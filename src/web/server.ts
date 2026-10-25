@@ -851,7 +851,7 @@ const server = http.createServer(async (req, res) => {
     // that one letter is the problem.
     //
     // That is not hypothetical: it caught the person writing
-    // API_QUICK_REFERENCE.md, who documented the plural form throughout.
+    // docs/api/API_QUICK_REFERENCE.md, who documented the plural form throughout.
     // check_example_endpoints.py flagged the doc, but the doc was the
     // reasonable guess and the API was the inconsistent thing.
     //
@@ -1000,7 +1000,7 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/metrics (Overall performance metrics)
     // GET /api/perf (per-endpoint timing; documented in
-    // API_PERFORMANCE_GUIDE.md long before it existed)
+    // docs/api/API_PERFORMANCE_GUIDE.md long before it existed)
     if (pathname === '/api/perf' && req.method === 'GET') {
       const limitRaw = url.searchParams.get('limit');
       const parsedLimit = limitRaw === null ? 5 : Number.parseInt(limitRaw, 10);

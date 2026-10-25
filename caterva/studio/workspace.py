@@ -69,7 +69,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from caterva.studio.contract import (
-    RUN_KINDS, RUN_RECORD_SCHEMA, RUN_STATUSES, THEMES, Malformed,
+    CLAIMS_DIR, RUN_KINDS, RUN_RECORD_SCHEMA, RUN_STATUSES, THEMES, Malformed,
 )
 from caterva.studio.routes import ARTIFACT_NAME_PATTERN, RUN_ID_PATTERN
 
@@ -344,6 +344,11 @@ class Workspace:
         if not _RUN_ID.fullmatch(run_id):
             raise ValueError(f"{run_id!r} is not a run id")
         return self.runs_dir / run_id
+
+    def claims_dir(self, run_id: str) -> Path:
+        """Where a compose run writes its claims bundle (CONTRACT.md 11): the
+        directory `caterva verify` and `POST /api/runs/{id}/verify` read."""
+        return self.run_dir(run_id) / CLAIMS_DIR
 
     # -- setup ---------------------------------------------------------------
 

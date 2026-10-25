@@ -408,13 +408,13 @@ pr: guards test
 	@echo ""
 	@echo "  - scripts/check_codegen_loads.py   (needs Node + pnpm install)"
 	@echo "  - pnpm run typecheck               (does the TypeScript COMPILE)"
-	@echo "  - the api-server TypeScript suite  (see RUN_TESTS.md)"
+	@echo "  - the api-server TypeScript suite  (see docs/guides/RUN_TESTS.md)"
 	@echo "  - make test-ts                     (the root package, src/)"
 	@echo ""
 	@echo "The first three need a pnpm install in Science-Agent-Pipeline. If"
 	@echo "you touched the API server, the landing app or the OpenAPI spec,"
-	@echo "run them; see RUN_TESTS.md. The fourth needs Node; run it if you"
-	@echo "touched src/ or examples/."
+	@echo "run them; see docs/guides/RUN_TESTS.md. The fourth needs Node; run"
+	@echo "it if you touched src/ or examples/."
 
 # The first thing to run, and the only one that needs nothing but `make
 # setup`. No network, no BRENDA account, no Node: it drives the same

@@ -194,6 +194,55 @@ valid before any other step.
 
 ---
 
+### `check_checker_independence.py`
+
+**Purpose**: `caterva/check/` (the `caterva verify` re-checker, ADR 0179)
+may import only the standard library and its own siblings. One import of
+`caterva.evidence.canonical` would make it the producer checking itself
+while every test stayed green.
+
+**Checks**: an AST walk of every module under `caterva/check/`: absolute
+imports must be in `sys.stdlib_module_names` and must not name `caterva`,
+`Tests`, `bs4`, `pydantic` or `numpy` in any dotted position; relative
+imports only of an existing sibling; `importlib` and `__import__` are
+refused because a dynamic import hides producer code from the walk. An
+empty scan is a failure, never a pass.
+
+**Usage**:
+```bash
+python scripts/check_checker_independence.py
+python scripts/check_checker_independence.py --selftest
+```
+
+**Scope**: `caterva/check/*.py`. Wired in `verify_build.py` (self-check
+then plain) and `caterva/tests/test_checker_independence.py`.
+
+---
+
+### `check_no_placeholder_dois.py`
+
+**Purpose**: no tracked Markdown may print a DOI under the documentation
+example prefixes (the 1234 and 0000 registrant codes followed by a slash, or
+an x-ed-out suffix after `doi:`), which resolve to nothing. `docs/ARCHITECTURE_RIGOR.md` ended "Every citation has DOI/PMID"
+beneath two such DOIs; it is deleted with ADR 0179.
+
+**Rules**: every `*.md` that `git ls-files` lists is read; `docs/archive/`
+is not, as a record, with the reason in the script; two documents in
+`docs/science/` that quote a test's own input are allowed, each with its
+reason, and an allowance that stops matching fails (shrink-only). Fewer than 50 tracked
+Markdown files is a broken scan, not a clean tree.
+
+**Usage**:
+```bash
+python scripts/check_no_placeholder_dois.py
+python scripts/check_no_placeholder_dois.py --selftest
+```
+
+**Scope**: tracked Markdown. Wired in `verify_build.py` (self-check then
+plain) and `caterva/tests/test_no_placeholder_dois.py`.
+
+---
+
 ## Composite Verification
 
 ### 🚀 `verify_build.py`

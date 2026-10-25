@@ -594,6 +594,15 @@ export interface ParameterProvenance {
     | "ec_not_resolved"
     | "ec_ambiguous"
     /**
+     * `ec_mismatch` — an EC number and an enzyme name were both given and
+     *                 the name identifies a different enzyme (the runner's
+     *                 check_ec_against_name, by the one enzyme finder). Same
+     *                 stage, same reason to be here: nothing downstream of
+     *                 the name was consulted, and a lookup under the number
+     *                 would have cited a protein the name does not denote.
+     */
+    | "ec_mismatch"
+    /**
      * Nothing was found anywhere. The plain case, and the only one the
      * generic sentence actually describes — named explicitly so the union
      * covers what `buildUnresolvedKineticProvenance` can produce, rather

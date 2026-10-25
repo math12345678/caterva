@@ -40,6 +40,9 @@ from typing import Any, Callable, Iterator, List, Optional, Sequence, Tuple
 REPO = Path(__file__).resolve().parents[2]
 RECORDED = REPO / "Tests" / "fixtures" / "recorded"
 RECORDED_HTTP = RECORDED / "http"
+#: BRENDA's literature pages for the two references the hexokinase run
+#: cites (README there): what `--claims` captures beside the enzyme page.
+LITERATURE_HTTP = Path(__file__).resolve().parent / "fixtures" / "compose_claims" / "http"
 KI_MODE_PAGES = REPO / "Tests" / "fixtures" / "ki_mode"
 LDH_HTTP = Path(__file__).resolve().parent / "fixtures" / "studio_kinetics" / "http"
 LDH_KI_PAGE = REPO / "Tests" / "fixtures" / "brenda_ldh_ki_fixture.html"
@@ -149,10 +152,29 @@ def _page_directory(name: str, text: str) -> Path:
     return directory
 
 
-def hexokinase_offline() -> Any:
-    """Answers for EC 2.7.1.1 from Tests/fixtures/recorded/."""
-    return _patched({"CATERVA_BRENDA_RECORDED": str(RECORDED),
-                     "CATERVA_HTTP_RECORDED": str(RECORDED_HTTP)})
+def _replay_directory(*sources: Path) -> Path:
+    """One temporary directory holding every recording of `sources`: the
+    replay variable names one directory, and the literature-page recordings
+    live apart from the runner's (fixtures/compose_claims/README.md)."""
+    target = Path(tempfile.mkdtemp(prefix="caterva-replay-"))
+    for source in sources:
+        for path in sorted(source.glob("*.json.gz")):
+            shutil.copy2(path, target / path.name)
+    return target
+
+
+def hexokinase_offline(*, literature: bool = False) -> Any:
+    """Answers for EC 2.7.1.1 from Tests/fixtures/recorded/.
+
+    With `literature`, the two BRENDA literature pages the run's claims
+    bundle captures (LITERATURE_HTTP) answer too, from one merged replay
+    directory; without it the bundle says, honestly, that those pages were
+    not captured."""
+    if not literature:
+        return _patched({"CATERVA_BRENDA_RECORDED": str(RECORDED),
+                         "CATERVA_HTTP_RECORDED": str(RECORDED_HTTP)})
+    replay = _replay_directory(RECORDED_HTTP, LITERATURE_HTTP)
+    return _patched({"CATERVA_BRENDA_RECORDED": str(RECORDED), "CATERVA_HTTP_RECORDED": str(replay)}, replay)
 
 
 def ldh_offline() -> Any:

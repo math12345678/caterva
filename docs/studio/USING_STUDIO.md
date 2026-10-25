@@ -109,6 +109,49 @@ band, not a band for the whole curve at once; a table with groups and an
 inhibitor in wide layout is not read (use one row per measurement); and a
 cancel stops the fit between laws, not inside one.
 
+## Where a number came from, down to the bytes
+
+Every compose run writes a claims bundle beside its files, the one
+`caterva compose --claims DIR` writes: the BRENDA pages the search read, as
+the bytes it read them, the rows taken from those pages, and one claim per
+constant and starting amount, each identified by its derivation. On the
+Compose screen, activate a number in "Where the numbers come from": under
+its citation and conditions, "Derivation" shows the claim as the bundle
+holds it. The claim id, with a button that copies it (it is what `caterva
+why` takes, and what the CSV export's `claim_id` column carries); the rule
+that produced it, with its version and the decision record behind it; the
+row's locator and the row's own words; the pinned page's address, the day
+it was retrieved, its licence and the first characters of its digest; the
+paper's title and PubMed id, linked, when the bundle holds BRENDA's
+literature page for the reference; and the texts the bundle certifies are
+in the pinned page. A part the bundle does not hold is left out, not
+guessed, and the run's claims section says why (a literature page that
+could not be fetched, for instance).
+
+The section "The claims behind the numbers", under the ledger, counts the
+claims per kind, offers the bundle as two files (`claims.zip`, which
+unzips to the folder `caterva verify` and `caterva why --bundle` take, and
+`claims.json`, its records without the pinned bytes) and shows the
+report's own `## Claims` section.
+
+## Re-check a run
+
+"Re-check this run", in that section, runs the checker `caterva verify`
+runs over the run's bundle, on your computer, reading nothing but the
+bundle's own files and sharing no code with what wrote them. The report is
+the command's: one line per check (each pinned page hashes to its id,
+every row and claim id recomputes from its fields, a cited claim's row is
+on its page, every certified span reads as its text, and so on), each
+marked ok, FAIL or n/a, what was not checked and why, and a verdict. n/a is
+a check that could not run, with the reason (a dominance check on a claim
+that carried no ordinals): it is counted apart and never as held. A check
+that did not hold is shown first, in the checker's words, naming the claim
+it is about. A report with nothing failed means each check that ran still
+holds against the pinned bytes, not that the paper was right.
+
+A run reopened from before bundles existed has none: the button says so
+and stays disabled. Runs of other kinds write no bundle.
+
 ## Where things are kept
 
 ```
@@ -116,7 +159,8 @@ cancel stops the fit between laws, not inside one.
   settings.json     theme, how many runs at once, the GROMACS path, offline mode
   studio.log        the server's log (rotated at 5 MB, one old copy kept)
   runs/<run id>/    one folder per run: run.json, request.json, result.json,
-                    events.jsonl, artifacts/
+                    events.jsonl, artifacts/, and for a compose run claims/
+                    (its claims bundle) beside store/ (the index it was exported from)
   trash/            runs deleted from History; delete this folder yourself to free the space
 ```
 

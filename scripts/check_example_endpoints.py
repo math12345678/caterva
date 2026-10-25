@@ -3,8 +3,8 @@
 WHAT THIS CAUGHT ON ITS FIRST RUN
 
 `examples/python_integration.py` is the client example
-`QUICK_START_DEPLOYMENT.md` points readers at. Ten of the eleven endpoints
-it called did not exist:
+`docs/operations/QUICK_START_DEPLOYMENT.md` points readers at. Ten of the
+eleven endpoints it called did not exist:
 
     /api/health           -> the route is /api/healthz
     /api/jobs/<id>        -> the route is /api/simulate/<jobId>
@@ -25,8 +25,9 @@ simultaneously unreachable and wrong, and the two conditions hid each other.
 
 WHAT IT CHECKS
 
-Every `{base_url}/api/...` path in `EXAMPLE_FILES` and in every markdown
-document at the repository root, resolved against the routes actually
+Every `{base_url}/api/...` path in `EXAMPLE_FILES`, in every markdown
+document at the repository root and in the `docs/` folders the root's
+documents moved to (`MOVED_DOC_GLOBS`), resolved against the routes actually
 registered by BOTH HTTP servers, with `:param` segments and `{placeholder}`,
 `${placeholder}` and `<placeholder>` spellings treated as wildcards.
 
@@ -88,8 +89,9 @@ EXAMPLE_FILES = [
 #:
 #: A sweep of the repository root found **two** documents asserting an
 #: endpoint that exists on neither server (`/api/literature/search`, in
-#: `READY_TO_SHIP.md` and `WEB_INTERFACE.md`). Both are fixed; PubMed search
-#: is not a route, it happens inside `POST /api/simulate`.
+#: `READY_TO_SHIP.md` and `docs/api/WEB_INTERFACE.md`, then both at the
+#: root). Both are fixed; PubMed search is not a route, it happens inside
+#: `POST /api/simulate`.
 #:
 #: An EARLIER version of this comment said "242 of 294 mentions wrong — 82%".
 #: That figure was produced by this guard when it parsed only the Express
@@ -121,18 +123,39 @@ EXAMPLE_FILES = [
 #: finding.
 ROOT_DOC_GLOB = "*.md"
 
+#: Where the root's loose documents went on 2026-10-24, with `git mv`: the
+#: API, operations, guide, science and history documents that used to match
+#: ROOT_DOC_GLOB. Moving them must not move them out of this guard's sight —
+#: a root-only glob would have dropped 32 of the 42 documents it read, and
+#: printed OK on the 10 left. Globbed per folder and into its subfolders,
+#: for the same reason the root is: a document added to one of these
+#: folders, at any depth, is covered on the day it arrives. `docs/archive/`
+#: is not here; it is the narrative record.
+#:
+#: Each folder must yield at least one document. A folder renamed or emptied
+#: is the same silent shrinkage as a list nobody updates, so
+#: `documentation_files()` refuses rather than reading fewer files.
+MOVED_DOC_GLOBS = (
+    "docs/api/**/*.md",
+    "docs/operations/**/*.md",
+    "docs/guides/**/*.md",
+    "docs/science/**/*.md",
+    "docs/history/**/*.md",
+)
+
 #: Extra documents outside the root that must also be true.
 EXTRA_DOC_FILES = [REPO_ROOT / "docs" / "API.md"]
 
 #: Documents that must name at least one endpoint.
 #:
 #: `docs/API.md` is the reference: if it stops naming any endpoint, the
-#: reference has been gutted and that is a failure. `API_DOCUMENTATION.md`
-#: is now a signpost pointing at it, and legitimately names none — but if
-#: fabricated endpoints reappear there, they must still be caught. So the
-#: two questions are separated: "does this file describe the API" and "is
-#: what it describes true". Most root documents answer "no" to the first
-#: and that is fine; only the reference is held to it.
+#: reference has been gutted and that is a failure.
+#: `docs/api/API_DOCUMENTATION.md` is now a signpost pointing at it, and
+#: legitimately names none — but if fabricated endpoints reappear there,
+#: they must still be caught. So the two questions are separated: "does
+#: this file describe the API" and "is what it describes true". Most of the
+#: documents read here answer "no" to the first and that is fine; only the
+#: reference is held to it.
 MUST_DOCUMENT_ENDPOINTS = {REPO_ROOT / "docs" / "API.md"}
 
 #: `router.get("/simulate/:jobId", ...)` across several formatting styles,
@@ -225,7 +248,36 @@ def registered_routes() -> set[str]:
             routes.add(full.rstrip("/") or "/")
 
     routes |= _web_server_routes()
+    routes |= _studio_server_routes()
     return routes
+
+
+#: The studio's route table: `Route("POST", "/api/runs/{id}/verify", ...)`.
+STUDIO_ROUTES = REPO_ROOT / "caterva" / "studio" / "routes.py"
+_STUDIO_ROUTE_RE = re.compile(r'Route\(\s*"(?:GET|POST|PUT|DELETE|PATCH)"\s*,\s*"(/api/[^"]*)"')
+
+
+def _studio_server_routes() -> set[str]:
+    """Routes served by `caterva studio` (caterva/studio/routes.py).
+
+    The studio is the third HTTP server this repository documents (the
+    first two are above), and its table is the one `docs/studio/CONTRACT.md`
+    and the changelog quote. Its `{id}` placeholders mean what `:param`
+    means here. Read directly from the table rather than hand-copied, for
+    the reason the whole guard exists: a list maintained beside the code
+    is the list that rots.
+    """
+    if not STUDIO_ROUTES.is_file():
+        raise FileNotFoundError(
+            f"{STUDIO_ROUTES} does not exist, so the studio's routes could "
+            "not be read. Refusing to check documentation against a route "
+            "table known to be incomplete."
+        )
+    text = STUDIO_ROUTES.read_text(encoding="utf-8")
+    return {
+        re.sub(r"\{[^}]*\}", ":param", match.group(1)).rstrip("/") or "/"
+        for match in _STUDIO_ROUTE_RE.finditer(text)
+    }
 
 
 def _web_server_routes() -> set[str]:
@@ -406,8 +458,8 @@ FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
 #:
 #:     if (pathname === '/api/custom' && req.method === 'POST') {
 #:
-#: `COMPLETE_GUIDE.md` and `WEB_INTERFACE.md` both have a section titled
-#: "Add a New API Endpoint" whose sample code invents `/api/custom` on the
+#: `COMPLETE_GUIDE.md` and `docs/api/WEB_INTERFACE.md` both have a section
+#: titled "Add a New API Endpoint" whose sample code invents `/api/custom` on the
 #: spot. Reporting that as a nonexistent endpoint is backwards: the whole
 #: point of the passage is that it does not exist yet and here is how you
 #: would add it. Only endpoints the block itself defines are excused, and
@@ -489,13 +541,40 @@ HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.*)")
 #: wildcard test is `/` immediately before the `*`, not `*` anywhere.
 DOC_MENTION_RE = re.compile(r"(/api/[A-Za-z0-9_/:$.*<>{}-]*)")
 
+#: `docs/api/` is a FOLDER in this repository: the root's API documents
+#: moved there on 2026-10-24. So `docs/api/WEB_INTERFACE.md`,
+#: `../api/OPENAPI_GUIDE.md` and `/docs/api/OPENAPI_GUIDE.md` all contain
+#: `/api/`, and DOC_MENTION_RE reads each one as an endpoint. On the first
+#: run after the move this guard reported three of them as addresses the
+#: API does not serve -- true, and beside the point: they are files.
+#:
+#: Two tests, both required. The path segment written immediately before
+#: `/api/` is `docs` or `..`; and what follows names something that exists
+#: under docs/api/ in this tree (a document there, or the folder itself).
+#: The first alone was not enough: `fetch('../api/x')` is a relative call
+#: and `http://host/docs/api/x` a URL, and both were excused as file paths.
+#: A call names a route, not a file in docs/api/, so the second test keeps
+#: it a claim. Like every other exclusion this is consulted only for a
+#: mention the route table fails to resolve, and `--verbose` lists each one
+#: it applied.
+_REPOSITORY_PATH_BEFORE_RE = re.compile(r"(?:^|[\s(\[`'\"/])(?:docs|\.\.)$")
+
+
+def _is_repository_path(line: str, start: int, mention: str) -> bool:
+    """Whether the `/api/...` match `mention`, starting at `start`, is a path
+    to something under this tree's docs/api/ rather than an address."""
+    if not _REPOSITORY_PATH_BEFORE_RE.search(line[:start]):
+        return False
+    target = REPO_ROOT / "docs" / mention.lstrip("/").rstrip(".")
+    return target.exists()
+
 
 #: Ports the Caterva HTTP servers listen on. A `/api/...` path preceded by an
 #: explicit host on any OTHER port is addressed at a different service and
 #: says nothing about Caterva's route table.
 #:
 #: This exists because the guard reported seven confident failures in
-#: MONITORING_SETUP.md for lines like
+#: docs/operations/MONITORING_SETUP.md for lines like
 #:
 #:     curl http://localhost:9090/api/v1/query?query=caterva_success_rate
 #:
@@ -569,7 +648,8 @@ def _normalise_mention(raw: str) -> tuple[str, bool]:
     """`(endpoint, names_a_family)` for one raw `/api/...` match.
 
     A family is a prefix rather than an address: `/api/jobs/*` in a summary
-    table, `location /api/ {` in the nginx config in `DEPLOYMENT_AND_OPS.md`,
+    table, `location /api/ {` in the nginx config in
+    `docs/operations/DEPLOYMENT_AND_OPS.md`,
     `http://localhost:3000/api/*` in a "what is running" list. None of them
     can be looked up in a route table, and none of them is wrong.
     """
@@ -579,7 +659,7 @@ def _normalise_mention(raw: str) -> tuple[str, bool]:
     # `{job_id}` (Python), `${jobId}` (JS template literal) and `<jobId>`
     # (prose) are all the value the caller supplies -- the same role `:jobId`
     # plays on the server. Prose is the one that matters here: without it
-    # `curl http://localhost:3000/api/jobs/<jobId>` in WEB_INTERFACE.md
+    # `curl http://localhost:3000/api/jobs/<jobId>` in docs/api/WEB_INTERFACE.md
     # truncates at the `<` to `/api/jobs`, which is not a route, and a
     # correct instruction gets reported as a 404.
     endpoint = re.sub(r"\$?\{[^}]*\}|<[^>]*>", ":param", core)
@@ -702,6 +782,7 @@ def doc_mentions(path: pathlib.Path) -> list[tuple[int, str, str | None]]:
                     paragraph=(scrubbed_blob, height),
                     heading=heading,
                     defined_here=definitions.get(index, set()),
+                    repository_path=_is_repository_path(line, match.start(), match.group(1)),
                 ))
             )
 
@@ -717,6 +798,7 @@ def _exclusion(
     paragraph: tuple[str, int],
     heading: str,
     defined_here: set[str],
+    repository_path: bool = False,
 ) -> str | None:
     """Why this mention is not a claim that the endpoint exists, or None.
 
@@ -724,6 +806,9 @@ def _exclusion(
     see the note in `doc_mentions` for why the keyword rules must not be
     allowed to read the endpoint's own name.
     """
+    if repository_path:
+        return "a path into this repository's docs/api/ folder, not an address"
+
     if family:
         return "names a family/prefix, not an address"
 
@@ -757,13 +842,26 @@ def documentation_files() -> list[pathlib.Path]:
     read fifty, and the difference is invisible from the outside.
     """
     root_docs = sorted(REPO_ROOT.glob(ROOT_DOC_GLOB))
-    docs = root_docs + [path for path in EXTRA_DOC_FILES if path not in set(root_docs)]
-    if not docs:
+    if not root_docs:
         raise FileNotFoundError(
             f"no {ROOT_DOC_GLOB} documents found at {REPO_ROOT}. Refusing to "
             "report success on an empty document set."
         )
-    return docs
+    moved_docs: list[pathlib.Path] = []
+    for pattern in MOVED_DOC_GLOBS:
+        found = sorted(REPO_ROOT.glob(pattern))
+        if not found:
+            raise FileNotFoundError(
+                f"no documents match {pattern} under {REPO_ROOT}. The root's "
+                "documents were moved there and this guard reads them there; "
+                "a folder that is renamed or emptied would shrink what is "
+                "checked without a word. Update MOVED_DOC_GLOBS to where they "
+                "went, rather than reporting success on fewer files."
+            )
+        moved_docs.extend(found)
+    docs = root_docs + moved_docs
+    seen = set(docs)
+    return docs + [path for path in EXTRA_DOC_FILES if path not in seen]
 
 
 def check(verbose: bool = False) -> list[str]:
@@ -876,8 +974,8 @@ def check(verbose: bool = False) -> list[str]:
             f"example file(s) and {len(documents)} doc(s) all exist among the "
             f"{len(routes)} routes the API registers. {len(excluded)} further "
             "mention(s) name no route but are wildcards, config, tutorials, "
-            "proposals or corrections rather than claims (--verbose to list "
-            "them)."
+            "proposals, corrections or paths into docs/api/ rather than "
+            "claims (--verbose to list them)."
         )
     return violations
 

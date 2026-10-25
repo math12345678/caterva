@@ -1,6 +1,6 @@
 # Where to look
 
-The repository root holds 41 markdown files. It held 81 when
+The repository root holds 9 markdown files. It held 81 when
 `docs/ARCHIVE_TRIAGE.md` was written and 98 by the time that triage was
 executed; most were session reports from earlier in the build, and 58 were
 read, classified and found to contain claims that are stale, superseded or
@@ -27,12 +27,12 @@ replaced by the short list of documents that are actually true.
 | understand the ground rules | [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) |
 | find my way around the tree | [`docs/REPO_MAP.md`](docs/REPO_MAP.md) |
 | know why something is built that way | [`docs/adr/`](docs/adr/) — the decision records, indexed in its README |
-| use the CLI | [`COMPREHENSIVE_GUIDE.md`](COMPREHENSIVE_GUIDE.md) |
+| use the CLI | [`docs/guides/COMPREHENSIVE_GUIDE.md`](docs/guides/COMPREHENSIVE_GUIDE.md) |
 | call the HTTP API | [`docs/API.md`](docs/API.md) — kept true by `check_example_endpoints.py` |
-| run the api-server tests | [`RUN_TESTS.md`](RUN_TESTS.md) |
+| run the api-server tests | [`docs/guides/RUN_TESTS.md`](docs/guides/RUN_TESTS.md) |
 | report a vulnerability | [`SECURITY.md`](SECURITY.md) |
 
-## The rest of the root, honestly labelled
+## The rest of the old root, honestly labelled
 
 Fourteen documents are current and accurate (`KEEP`), three describe
 deployment wiring that is partly verified and partly aspirational
@@ -46,10 +46,24 @@ a dated statement about the move, not a live count. Only this file stayed
 behind, on purpose — [`docs/archive/README.md`](docs/archive/README.md)
 says why, and records the mistaken reason four others were delayed a pass.
 
+**On 2026-10-24 the loose documents left at the root moved too**, again
+with `git mv`: the KEEP, WIRING and MISC files other than the standard set
+that stays at the root (README, CHANGELOG, CONTRIBUTING, SECURITY and the
+like), and the fifteen metrics, monitoring and OpenAPI guides and delivery
+summaries that arrived after the triage, with FINAL_STATUS.txt. These are
+not the list above, and not all of them are current: the triage's classes
+apply to the ones it covers, and the later fifteen are unclassified. API
+documents are in [`docs/api/`](docs/api/), deployment, monitoring and
+metrics in [`docs/operations/`](docs/operations/), guides in
+[`docs/guides/`](docs/guides/), the literature and validation documents in
+[`docs/science/`](docs/science/), and status records in
+[`docs/history/`](docs/history/). The guards that read them at the root
+read them there.
+
 **`docs/ARCHIVE_TRIAGE.md` is the authority.** It lists all 81 by name with
-a one-line reason for each classification. If a root document is not
-mentioned in the table above, check the triage before trusting a number in
-it.
+a one-line reason for each classification, under the names they had at the
+root. If a document is not mentioned in the table above, check the triage
+before trusting a number in it.
 
 Nothing has been deleted. Several of the archived documents are worth
 keeping precisely because their mistakes are instructive — inflated line
@@ -71,8 +85,9 @@ claims mechanically checkable so they cannot rot silently:
 - `check_example_endpoints.py` fails when `docs/API.md` describes an
   endpoint the server does not serve. That is why that file, alone among
   the API documents, carries no correction banner.
-- `check_doc_paths_resolve.py` fails when any document in the list above
-  names a file that does not exist.
+- `check_doc_paths_resolve.py` fails when one of the contributor-facing
+  documents in its `DOCS` list, this index among them, names a file that
+  does not exist.
 - `check_ci_reproducible_locally.py` fails when CI grows a step a
   contributor has no documented way to run.
 - `check_commands_runnable.py` fails when a document or a guard's own error
