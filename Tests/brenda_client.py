@@ -192,10 +192,28 @@ def fetch_brenda_html(ec_number: str, timeout: float = 15) -> str:
         from pathlib import Path
         page = Path(recorded) / f"brenda_{ec_number}.html.gz"
         if page.is_file():
-            return gzip.decompress(page.read_bytes()).decode("utf-8")
+            html = gzip.decompress(page.read_bytes()).decode("utf-8")
+            _observed(ec_number, html, str(page))
+            return html
     r = retry_get(BRENDA_ENZYME_URL, params={"ecno": ec_number}, timeout=timeout)
     r.raise_for_status()
+    _observed(ec_number, r.text, None)
     return r.text
+
+
+#: Observers called with (ec_number, html, served_from) after every page fetch_brenda_html
+#: returns, live or recorded. The evidence layer registers one to pin what the resolver
+#: read (ADR 0179). Nothing else reads this.
+PAGE_OBSERVERS: list = []
+
+
+def _observed(ec_number: str, html: str, served_from: str | None) -> None:
+    """Tell each observer what was just fetched. An observer that raises stops
+    the fetch: a page the evidence layer could not pin must not be used as
+    though it had been, and nothing registers an observer unless it was asked
+    to pin (`caterva compose --claims`)."""
+    for observer in list(PAGE_OBSERVERS):  # noqa: PERF101 - a snapshot: a Recorder may deregister while a scout thread is notifying
+        observer(ec_number, html, served_from)
 
 
 # Generic binomial-nomenclature pattern ("Genus species", optionally

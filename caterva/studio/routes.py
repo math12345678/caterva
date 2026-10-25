@@ -97,6 +97,9 @@ ROUTES: Tuple[Route, ...] = (
           summary="SSE: replay from the start or Last-Event-ID, then live"),
     Route("POST", "/api/runs/{id}/cancel", "cancel_run", "RunRecord",
           summary="202; 409 when already finished"),
+    Route("POST", "/api/runs/{id}/verify", "verify_run", "VerifyReport",
+          summary="re-check the run's claims bundle against its own pinned bytes, offline, with "
+                  "caterva.check.verify (body {}); 409 while the run is not done or when it wrote no bundle"),
     Route("GET", "/api/runs/{id}/artifacts/{name}", "get_artifact", "<artifact media type>",
           summary="a file the run produced, by its recorded name"),
     Route("GET", "/api/runs/{id}/bundle", "get_bundle", "application/zip",

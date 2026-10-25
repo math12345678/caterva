@@ -600,7 +600,8 @@ function buildUnresolvedKineticProvenance(
     | "isoform_withheld"
     | "mode_withheld"
     | "ec_not_resolved"
-    | "ec_ambiguous",
+    | "ec_ambiguous"
+    | "ec_mismatch",
   organismsAvailable?: string[],
   relatedness?: RelatednessVerdict[],
   substratesAvailable?: string[],
@@ -785,6 +786,29 @@ function buildUnresolvedKineticProvenance(
     };
   }
 
+  // The name and the number sent beside it are two enzymes (the runner's
+  // check_ec_against_name, by the one enzyme finder; ADR 0126/0127). Same
+  // stage as the two refusals above -- before any database was asked --
+  // and the runner's sentence, which names both numbers and the re-run
+  // that would accept either, is forwarded rather than reworded.
+  if (reason === "ec_mismatch") {
+    const named = ecCandidates && ecCandidates.length > 0
+      ? ecCandidates.join(", ")
+      : "a different EC number";
+    return {
+      origin: "default",
+      unresolvedReason: "ec_mismatch",
+      note:
+        `The EC number and the enzyme name you gave are not the same enzyme ` +
+        `(the name identifies ${named}), so no ${K} was looked up — BRENDA, ` +
+        `KEGG and PubMed were never asked. A number the name contradicts is ` +
+        `a citation for the wrong protein, not merely a wrong value. ` +
+        (ecRefusal ??
+          `Re-run with the EC number you meant, or with the name of the ` +
+          `enzyme that number is.`),
+    };
+  }
+
   // "BRENDA has nothing for this enzyme" and "BRENDA has plenty, under a
   // name you did not type" are different facts, and the second is the one
   // a student hits most.
@@ -853,6 +877,10 @@ async function applyKineticResolution(
   const kineticKeys = resolvable.filter((k) => !(k in overrides));
   if (kineticKeys.length === 0) {
     return { parameters, parameterProvenance, flags };
+  }
+
+  if (entities.organismAssumed) {
+    flags.push(assumedOrganismFlag(entities.organism, kineticKeys));
   }
 
   // Accumulate parameter changes to avoid repeated object spreading
@@ -935,7 +963,8 @@ async function applyKineticResolution(
         );
       } else if (
         agentResult.source === "ec_ambiguous" ||
-        agentResult.source === "ec_not_resolved"
+        agentResult.source === "ec_not_resolved" ||
+        agentResult.source === "ec_mismatch"
       ) {
         provenanceUpdates[key] = buildUnresolvedKineticProvenance(
           key,
@@ -2248,6 +2277,26 @@ export function extractInhibitor(query: string): string | undefined {
   return undefined;
 }
 
+/**
+ * The organism a lookup used because the query named none.
+ *
+ * Mirrors `caterva compose`'s "No --organism was given, so these come from
+ * X, which the search chose; pass --organism to choose it yourself"
+ * (caterva/compose/__main__.py). The API's default is documented and
+ * deliberate (extractEntitiesFromQuery), and until 2026-10-17 the LLM path
+ * had a second, undocumented one in the model's prompt; what was wrong with
+ * both was that the response never said a choice had been made. An
+ * assumption a reader can see is one they can replace.
+ */
+function assumedOrganismFlag(organism: string, keys: string[]): string {
+  const K = keys.map((k) => k.toUpperCase()).join(" and ");
+  return (
+    `assumed: organism = ${organism}. The query names no organism, so the ` +
+    `${K} lookup used ${organism}, chosen for you; a kinetic constant is ` +
+    `species-specific, so name the organism in the query to choose it yourself.`
+  );
+}
+
 function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
   // The organism the query NAMES wins over the table's default.
   //
@@ -2283,6 +2332,7 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
       inhibitor: extractInhibitor(query),
       isoform: extractIsoform(query),
       organism: namedOrganism ?? matched.organism,
+      organismAssumed: namedOrganism === undefined,
       ecNumber: matched.ecNumber,
     };
   }
@@ -2293,6 +2343,7 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
     enzymeName: guess,
     substrate: "",
     organism: namedOrganism ?? "Homo sapiens",
+    organismAssumed: namedOrganism === undefined,
     ecNumber: undefined,
   };
 }
@@ -2686,6 +2737,29 @@ export async function resolveQuery(
       statedPhrases,
     );
 
+    // The organism the lookups are for, decided once so the kinetic and the
+    // kcat lookups agree. The model names one only when the query does
+    // (llmResolver leaves `organism` empty otherwise; it applies no default,
+    // ADR 0011). The query's own wording is read first, the way the
+    // deterministic path reads it, so a species the person typed outranks
+    // the model's reading of it; when neither names one, the API's
+    // documented default applies and applyKineticResolution reports it as
+    // an assumption in `flags`.
+    const organismNamed =
+      matchOrganism(query) ?? (llmResult.entities?.organism || undefined);
+    const llmEntities: EntityExtraction | undefined = llmResult.entities
+      ? {
+          ...llmResult.entities,
+          organism: organismNamed ?? "Homo sapiens",
+          organismAssumed: organismNamed === undefined,
+        }
+      : undefined;
+    // A proposal the model made and the resolver did not use. Said, not
+    // hidden: the same courtesy the discarded modelCitations get below.
+    if (llmResult.ecNumberDropped && llmResult.ecNumberDroppedReason) {
+      flags.push(`dropped: ${llmResult.ecNumberDroppedReason}`);
+    }
+
     const resolvableForDomain = RESOLVABLE_FIELDS[llmResult.domain] ?? [];
     const hasUnoverriddenKinetic = resolvableForDomain.some(
       (k) => !(k in effectiveOverrides),
@@ -2693,14 +2767,14 @@ export async function resolveQuery(
     if (
       (llmResult.domain === "mm" ||
         llmResult.domain === "mm_competitive_inhibition") &&
-      (llmResult.entities?.ecNumber || llmResult.entities?.enzymeName) &&
+      (llmEntities?.ecNumber || llmEntities?.enzymeName) &&
       hasUnoverriddenKinetic
     ) {
       const result = await applyKineticResolution(
         {
-          ...llmResult.entities,
-          inhibitor: llmResult.entities?.inhibitor ?? extractInhibitor(query),
-          isoform: llmResult.entities?.isoform ?? extractIsoform(query),
+          ...llmEntities,
+          inhibitor: llmEntities?.inhibitor ?? extractInhibitor(query),
+          isoform: llmEntities?.isoform ?? extractIsoform(query),
         },
         effectiveOverrides,
         llmResult.domain,
@@ -2720,7 +2794,7 @@ export async function resolveQuery(
     // itself supplied enzyme_conc — never resolved, never defaulted.
     {
       const vmaxResult = await applyVmaxFromKcatResolution(
-        llmResult.entities,
+        llmEntities,
         effectiveOverrides,
         llmResult.domain,
         parameters,

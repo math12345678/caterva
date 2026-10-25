@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "169 test files -- kinetics & Michaelis-Menten correctness, " +
+          "182 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -229,11 +229,8 @@ export const TEST_SUITES: TestSuite[] = [
         // refuses to bind a port, so its 10 tests were NOT run here and are
         // not counted): 6696 passed, 1 skipped, 0 failed, of the 6707 tests
         // collected. The earlier running tally above is superseded by this
-        // one measurement. Then the md smoke run's rule for areas printed
-        // alike either side of a rounding edge: 2 tests added to
-        // test_md_smoke_verdicts.py, all 7 there and the 74 in test_sasa.py
-        // passing in a focused run (2026-10-25): 6698.
-        passed: 6698,
+        // one measurement.
+        passed: 6696,
         skipped: 1,
         failed: 0,
       },
@@ -245,7 +242,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "90 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "92 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -305,7 +302,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "80 test files -- query resolution, parameter provenance, " +
+          "81 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +

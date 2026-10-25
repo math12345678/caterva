@@ -272,8 +272,9 @@ stops being run at all. A *new* unlicensed dependency does still fail.
 
 Two things `make pr` does **not** run, and it says so when it finishes:
 `check_codegen_loads.py` and the api-server TypeScript suite, both of which
-need a `pnpm install` in `Science-Agent-Pipeline` (see `RUN_TESTS.md`). Run
-those too if you touched the API server or the OpenAPI spec.
+need a `pnpm install` in `Science-Agent-Pipeline` (see
+`docs/guides/RUN_TESTS.md`). Run those too if you touched the API server or
+the OpenAPI spec.
 
 If you add a step to CI, `scripts/check_ci_reproducible_locally.py` will
 tell you to give it a local route or to write down why it cannot have one.

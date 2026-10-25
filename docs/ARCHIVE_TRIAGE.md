@@ -117,3 +117,18 @@ The fix for a false claim is to make it true or remove it, and then to make
 it mechanically checkable so it cannot rot again. That is why
 `docs/API.md` carries no banner: `check_example_endpoints.py` fails the
 build if it stops being true.
+
+**2026-10-24.** The table above names each file as it was at the root and
+is left as written. The documents it did not archive (KEEP, WIRING and
+MISC), which stayed at the root, have since moved into `docs/` with
+`git mv`, except the standard set (README, CHANGELOG,
+CODE_OF_CONDUCT, CONTRIBUTING, SECURITY, START_HERE), which stays:
+API_DOCUMENTATION, API_QUICK_REFERENCE, EXPORT_AND_ANALYSIS_GUIDE and
+WEB_INTERFACE are in [`api/`](api/); DEPLOYMENT_AND_OPS and
+QUICK_START_DEPLOYMENT in [`operations/`](operations/); COMPREHENSIVE_GUIDE,
+DEVELOPER_EXPERIENCE_GUIDE, FEATURE_MODEL_COMPARISON,
+PHASE_5A_INTEGRATION_GUIDE and RUN_TESTS in [`guides/`](guides/);
+LITERATURE_BACKING_DATABASE, LITERATURE_INTEGRATION_GUIDE,
+SCIENTIFIC_VALIDATION_FRAMEWORK, DATA_QUALITY_AND_REPRODUCIBILITY and
+TESTING_AND_ROADMAP in [`science/`](science/); REFACTOR_STATUS in
+[`history/`](history/).

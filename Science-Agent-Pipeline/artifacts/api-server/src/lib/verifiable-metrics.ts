@@ -21,7 +21,7 @@ import { logger } from "./logger";
 
 /**
  * Literature Reference for each metric
- * Maps to entries in LITERATURE_BACKING_DATABASE.md
+ * Maps to entries in docs/science/LITERATURE_BACKING_DATABASE.md
  */
 interface LiteratureReference {
   authors: string;

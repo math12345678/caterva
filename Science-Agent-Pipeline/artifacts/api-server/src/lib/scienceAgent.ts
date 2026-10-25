@@ -130,7 +130,13 @@ export interface ScienceAgentResult {
   substratesAvailable?: string[];
   /** EC numbers UniProt indexed under the enzyme NAME, when it matched more
    *  than one. An EC number is the identity of the protein every citation
-   *  refers to, so the runner refuses to pick and names them (ADR 0127). */
+   *  refers to, so the runner refuses to pick and names them (ADR 0127).
+   *
+   *  Also populated for `source === "ec_mismatch"`: the enzyme the NAME
+   *  identifies (one number, or the several it could mean) when an
+   *  `ecNumber` was sent beside it and is none of them. The runner checks
+   *  a supplied number against the name with the same finder, and refuses
+   *  rather than look up a protein the name contradicts. */
   ecCandidates?: string[];
   /** The same candidates, named by the Python enzyme finder: `ec`, `name`,
    *  `label` ("EC 1.1.1.27 L-lactate dehydrogenase (human: LDHA, LDHB)"),
@@ -456,7 +462,17 @@ export interface RelatednessVerdict {
 export interface EntityExtraction {
   enzymeName?: string;
   substrate?: string;
+  /** The organism the lookup is for. Forwarded as given, "" included: the
+   * runner applies no default (Tests/test_no_default_organism.py), so a
+   * caller that has none must decide one BEFORE calling and say so --
+   * queryResolver applies the API's documented default and flags it. */
   organism: string;
+  /** An EC number the person or a verified table supplied. Never the
+   * model's: llmResolver drops any EC number the query text does not
+   * contain (ADR 0011, "a model may propose, never supply"). When both this
+   * and `enzymeName` are sent the runner checks the name against it with
+   * the one enzyme finder and answers `source: "ec_mismatch"` when the name
+   * identifies a different enzyme. */
   ecNumber?: string;
   /** For population genetics: parameter type to resolve (e.g., 'mutation_rate') */
   parameterType?: string;
@@ -591,10 +607,14 @@ export function runnerError(stdout: string): string | null {
  * than two copies that could drift.
  *
  * This function uses BRENDA/KEGG/PubMed lookups in Tests/fallback_logic.py.
- * If an EC number isn't known, the Python side resolves one live via UniProt's
- * name search (Tests/enzyme_lookup.py::fetch_ec_number_by_name) before
+ * If an EC number isn't known, the Python side resolves one from the enzyme
+ * name with the finder every Caterva command uses (the enzyme nomenclature,
+ * then UniProt's name search; science_agent_runner.resolve_enzyme) before
  * attempting BRENDA -- this lets enzyme names outside the hardcoded pattern
- * list in enzymes.ts still reach real literature lookups.
+ * list in enzymes.ts still reach real literature lookups. When BOTH are
+ * sent, the runner checks the name against the number with the same finder
+ * and refuses (`source: "ec_mismatch"`) when the name identifies a different
+ * enzyme, since a wrong EC number is a citation for the wrong protein.
  */
 async function spawnScienceAgent(
   payload: Record<string, unknown>,

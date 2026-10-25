@@ -18,12 +18,47 @@ present the placeholder as though a paper stood behind it.
 """
 from __future__ import annotations
 
+import argparse
+import os
+from pathlib import Path
+
 import pytest
 
 from caterva.compose.export import Measurement
 from caterva.compose.pipeline import compose
 
 QUERY = "Michaelis-Menten with a competitive inhibitor"
+
+#: The committed BRENDA pages (Tests/fixtures/recorded/README.md). EC 2.7.1.1
+#: is the one enzyme page recorded there.
+RECORDED = Path(__file__).resolve().parents[2] / "Tests" / "fixtures" / "recorded"
+
+#: Port 9 (discard) on loopback: nothing listens, so a request a child
+#: process sends through this proxy fails at once instead of going live.
+CLOSED_PROXY = "http://127.0.0.1:9"
+PROXY_VARIABLES = ("HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "all_proxy")
+
+
+def _network_made_impossible(monkeypatch):
+    """BRENDA's page for EC 2.7.1.1 served from the committed recording, and
+    every real send raising instead of leaving the machine.
+
+    Returns the list of URLs a send was attempted for, which the caller
+    holds to be empty: the missing-substrate refusal reads BRENDA's page to
+    name the substrates it holds, and a test of that refusal used to fetch
+    the page for EC 1.1.1.27 live on every run.
+    """
+    import httpx
+
+    attempts = []
+
+    def no_network(self, request):
+        attempts.append(str(request.url))
+        raise httpx.ConnectError("network disabled in this test", request=request)
+
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", no_network)
+    monkeypatch.setenv("CATERVA_BRENDA_RECORDED", str(RECORDED))
+    return attempts
 
 
 def test_a_model_with_no_subject_asks_for_nothing():
@@ -542,12 +577,27 @@ class TestTheExitCodeWhenASearchIsRefused:
 
         return _search_the_literature(model, self._args(**overrides))
 
-    def test_a_model_needing_a_substrate_without_one_is_a_refusal(self):
-        model = compose(QUERY, subject="1.1.1.27")
-        _, note, refused = self._search(model, substrate=None)
+    def test_a_model_needing_a_substrate_without_one_is_a_refusal(self, monkeypatch):
+        """And it names the substrates the recorded page holds, offline.
+
+        The refusal looks the enzyme's page up to list the candidates, so
+        this asks for the enzyme whose page is committed, with every real
+        send made impossible, and holds the list to what that page says.
+        """
+        attempts = _network_made_impossible(monkeypatch)
+        model = compose(QUERY, subject="2.7.1.1")
+        _, note, refused = self._search(model, subject="2.7.1.1", substrate=None)
+        assert attempts == [], f"the refusal went to the network: {attempts}"
         assert refused is True
         assert "No search was run" in note
         assert "--substrate" in note, "the note must say what to do about it"
+        assert (
+            "BRENDA holds Km rows for Homo sapiens for 10 substrate(s) of EC 2.7.1.1; "
+            "the 8 with the most rows: ATP (106 rows); D-glucose (25 rows); "
+            "D-mannose (9 rows); D-fructose (7 rows); 2-deoxy-D-glucose (5 rows); "
+            "D-glucosamine (3 rows); 2-deoxyglucose (1 row); CTP (1 row). "
+            "Pass one with --substrate."
+        ) in note
 
     def test_an_unreachable_literature_layer_is_a_refusal(self, monkeypatch):
         """From a wheel there is no Tests/ directory, and that is a refusal
@@ -560,7 +610,7 @@ class TestTheExitCodeWhenASearchIsRefused:
         on `literature_module` alone is skipped once an earlier test in the
         session has imported the layer.
         """
-        import caterva.checkout as checkout
+        from caterva import checkout
         from caterva.compose import pipeline
 
         def unavailable(*args, **kwargs):
@@ -578,7 +628,7 @@ class TestTheExitCodeWhenASearchIsRefused:
     ):
         """The nomenclature ships in the package, so the installed app names
         the choices too; only the UniProt fallback needs the checkout."""
-        import caterva.checkout as checkout
+        from caterva import checkout
 
         def unavailable(name):
             raise checkout.LiteratureLayerUnavailable("no Tests/ here")
@@ -614,24 +664,100 @@ class TestTheExitCodeWhenASearchIsRefused:
         A unit test on `_search_the_literature` passes while the caller
         ignores what it returns -- measured: deleting the `if search_refused`
         branch in `main` left every unit test green and the process exiting
-        0. This runs the CLI. The missing-substrate case refuses before any
-        network call, so it is offline and fast.
+        0. This runs the CLI. The missing-substrate case runs no search, but
+        its refusal reads BRENDA's page to name the substrates there, so the
+        child is pointed at the committed page for EC 2.7.1.1 and every
+        proxy variable at a closed port. The list it prints can then only
+        have come from the recording: a live fetch would fail, and the
+        refusal would carry no list.
         """
         import subprocess
         import sys
-        from pathlib import Path
 
         root = Path(__file__).resolve().parents[2]
+        env = {name: value for name, value in os.environ.items()
+               if name not in ("CATERVA_HTTP_RECORD", "CATERVA_HTTP_RECORDED")}
+        env["CATERVA_BRENDA_RECORDED"] = str(RECORDED)
+        env.update(dict.fromkeys(PROXY_VARIABLES, CLOSED_PROXY))
+        env["NO_PROXY"] = env["no_proxy"] = ""
         run = subprocess.run(
             [sys.executable, "-m", "caterva.compose",
              "Michaelis-Menten with a competitive inhibitor",
-             "--subject", "1.1.1.27", "--no-simulate", "--no-ranking",
+             "--subject", "2.7.1.1", "--no-simulate", "--no-ranking",
              "--no-analysis"],
-            capture_output=True, text=True, cwd=str(root), timeout=600,
+            capture_output=True, text=True, cwd=str(root), timeout=600, env=env,
         )
         assert run.returncode == 3, (
             f"a refused search must exit 3 per this CLI's own --help; "
             f"got {run.returncode}. stderr: {run.stderr[-300:]}"
         )
         assert "--substrate" in run.stdout, "the reason belongs in the report"
+        assert ("BRENDA holds Km rows for 20 substrate(s) of EC 2.7.1.1; the 8 with "
+                "the most rows: ATP (181 rows); D-glucose (109 rows);") in run.stdout, (
+            "the substrates are named, from the recorded page")
         assert "refusal(s)" in run.stderr, "and a script is told to look"
+
+
+def _missing_substrate_note(monkeypatch, brenda_client):
+    """The note `search_the_literature` returns for a model that needs a Km
+    and was given no substrate, with `brenda_client()` answering the
+    checkout's request for that module (and only that one), so the page the
+    refusal reads is whatever it serves."""
+    from caterva import checkout
+    from caterva.compose.__main__ import search_the_literature
+
+    real = checkout.literature_module
+
+    def literature_module(name):
+        return brenda_client() if name == "brenda_client" else real(name)
+
+    monkeypatch.setattr(checkout, "literature_module", literature_module)
+    model = compose(QUERY, subject="3.4.21.79")
+    args = argparse.Namespace(subject="3.4.21.79", organism="Homo sapiens", substrate=None)
+    _, note, refused = search_the_literature(model, args)
+    assert refused is True
+    assert note.startswith("No search was run"), note
+    return note
+
+
+def _client_with_km_rows(counts):
+    """A brenda_client whose page yields `counts[substrate]` Km rows each."""
+    from types import SimpleNamespace
+
+    rows = [SimpleNamespace(substrate=name) for name, n in counts.items() for _ in range(n)]
+    return SimpleNamespace(
+        fetch_brenda_html=lambda ec: "<html/>",
+        parse_brenda_km_html=lambda *a, **k: rows,
+    )
+
+
+def test_missing_substrate_refusal_names_what_brenda_holds(monkeypatch):
+    """The refusal must be actionable: it lists substrates BRENDA has rows
+    for, ordered by row count and saying so, never as "the best-measured"
+    (a count of rows says nothing about how well any one was measured)."""
+    client = _client_with_km_rows({"VEID-p-nitroanilide": 1, "Boc-Ala-Ala-Asp-SBzl": 3})
+    note = _missing_substrate_note(monkeypatch, lambda: client)
+    assert (" BRENDA holds Km rows for Homo sapiens for 2 substrate(s) of EC 3.4.21.79; "
+            "most rows first: Boc-Ala-Ala-Asp-SBzl (3 rows); VEID-p-nitroanilide (1 row). "
+            "Pass one with --substrate.") in note
+    assert "best-measured" not in note
+
+
+def test_more_substrates_than_are_named_says_how_many_were_named(monkeypatch):
+    from caterva.compose.__main__ import SUBSTRATES_NAMED
+
+    counts = {f"substrate-{n:02d}": n for n in range(1, SUBSTRATES_NAMED + 3)}
+    note = _missing_substrate_note(monkeypatch, lambda: _client_with_km_rows(counts))
+    assert f"for {SUBSTRATES_NAMED + 2} substrate(s) of EC 3.4.21.79; " in note
+    assert f"the {SUBSTRATES_NAMED} with the most rows: substrate-{SUBSTRATES_NAMED + 2:02d} (" in note
+    assert "substrate-03 (3 rows). Pass one with --substrate." in note
+    assert "substrate-02" not in note and "substrate-01" not in note
+
+
+def test_missing_substrate_list_failure_does_not_replace_refusal(monkeypatch):
+    def boom():
+        raise RuntimeError("offline")
+
+    note = _missing_substrate_note(monkeypatch, boom)
+    assert "Re-run with --substrate NAME." in note
+    assert "BRENDA holds" not in note and "offline" not in note

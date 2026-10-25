@@ -26,7 +26,8 @@ export function doiUrl(doi: string): string | null {
   return /^10\.\d{4,9}\/\S+$/.test(bare) ? `https://doi.org/${bare}` : null;
 }
 
-function External({ href, children, label }: { href: string; children: ReactNode; label?: string }) {
+/** A link that leaves the app, marked as one; used by the citation and by a claim's paper (ProvenanceDetail). */
+export function External({ href, children, label }: { href: string; children: ReactNode; label?: string }) {
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label}>
       {children}

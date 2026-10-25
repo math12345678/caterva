@@ -4,7 +4,7 @@
  *
  * WHY IT EXISTS
  * -------------
- * API_PERFORMANCE_GUIDE.md documented `/api/cache/stats` in seven places
+ * docs/api/API_PERFORMANCE_GUIDE.md documented `/api/cache/stats` in seven places
  * and a caching layer that made metrics endpoints "98.8% faster", and
  * neither existed. This implements what was already promised.
  *

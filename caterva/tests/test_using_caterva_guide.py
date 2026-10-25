@@ -115,6 +115,26 @@ def test_every_flag_and_shape_in_the_guide_still_exists(line: str):
         assert not unknown, f"the guide uses {sorted(unknown)}, which `caterva enzyme` no longer defines"
         assert positionals, f"`caterva enzyme` in the guide names no query: {line}"
 
+    elif command == "why":
+        from caterva.evidence.why import build_parser as why_parser
+
+        parser = why_parser("caterva why")
+        known = {opt for action in parser._actions for opt in action.option_strings}
+        unknown = flags - known
+        assert not unknown, f"the guide uses {sorted(unknown)}, which `caterva why` no longer defines"
+        assert positionals and positionals[0].startswith("claim:"), (
+            f"`caterva why` in the guide names no claim ref: {line}"
+        )
+
+    elif command == "verify":
+        from caterva.check.__main__ import build_parser as verify_parser
+
+        parser = verify_parser("caterva verify")
+        known = {opt for action in parser._actions for opt in action.option_strings}
+        unknown = flags - known
+        assert not unknown, f"the guide uses {sorted(unknown)}, which `caterva verify` no longer defines"
+        assert positionals, f"`caterva verify` in the guide names no bundle directory: {line}"
+
     elif command == "sim":
         from caterva.cli import main as _engine_main  # noqa: F401 - import proves the module loads
 

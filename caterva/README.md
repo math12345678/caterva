@@ -39,6 +39,8 @@ project's own name and permitted the package it exists to block.
 | `continuous/` | `model_building.py`, `simulations.py` — ODE domains |
 | `discrete/` | `gillespie_ssa.py`: exact stochastic kinetics |
 | `structure/`, `md/` | `caterva structure` and `caterva md` |
+| `evidence/` | claims over pinned evidence (ADR 0179): canonical JSON and digests, the claim, row and snapshot records, the store, the bundle, what `compose --claims` writes, and `caterva why` |
+| `check/` | `caterva verify`: re-checks a claims bundle offline and imports only the standard library, which `scripts/check_checker_independence.py` holds it to |
 | `tests/` | the engine's own suite |
 
 ## What "correct" means here

@@ -438,6 +438,34 @@ anything was produced, a crash, a cancel, an interruption).
 `POST /api/runs/{id}/cancel` with `{}` -> 202 `RunRecord`. 409 when already
 finished.
 
+`POST /api/runs/{id}/verify` with `{}` -> `VerifyReport` `{ok, checks:
+[{name, claim, ok, status, detail}], ran_at}` (amended 2026-10-17,
+sci-kinetics; the handler is core's, in dispatch.py; `status` amended
+2026-10-24). Re-checks the run's claims bundle,
+`<run dir>/claims/` (section 11), through the one function `caterva verify`
+calls, `caterva.check.verify.verify_bundle`: standard library only, sharing
+no code with what wrote the bundle, reading the bundle's own files and
+contacting nothing. `checks` is the command's `--json` output line for line
+(`name` is one of `snapshot bytes`, `identity`, `row locator`, `certificate`,
+`dominance`, `unit arithmetic`, `inputs`, `root`, `not checked`; `claim` the
+claim ref a check is about, or null for a check about a snapshot or a row,
+whose `detail` then starts with that ref and names the claims that hold it;
+`status` is `ok`, `failed` or `not run`, the three states the command
+prints as `ok`, `FAIL` and `n/a`, and a check's `ok` is true exactly when
+its status is not `failed`, so a check that did not run, such as a
+dominance check on a claim that carried no ordinals, is ok without having
+held); the report's `ok` is true when no check failed; `ran_at` is when. A POST because it
+does work (it gunzips and re-digests every pinned page). 409 `conflict`
+while the run is not done (as `/result` is), 409 with the sentence
+`contract.NO_CLAIMS_BUNDLE` when the run wrote no bundle (a run of another
+kind, a compose that built nothing, a run from before bundles existed: the
+page disables its re-check action with that sentence), and 409 with the
+checker's reason when the folder is not a bundle it can read (the command's
+exit 2: not checked, as distinct from checked and failed). What a check does
+and does not prove is caterva/check/verify.py's docstring: a passing report
+says each stated reason still holds against the pinned bytes, not that the
+paper was right.
+
 `GET /api/runs/{id}/artifacts/{name}` -> the file, with the recorded
 `content_type` and `Content-Disposition: attachment; filename="<name>"`.
 `name` must be in the run's `artifacts` list; else 404.
@@ -643,6 +671,51 @@ enzyme page it was read from,
 reference; the page lists the reference by number). Otherwise null, never a
 guessed link.
 
+**The claim object** (amended 2026-10-17, sci-kinetics). `Provenance.claim`
+is an optional `ClaimInfo`, present on every number of a compose run (the
+run's claims bundle, section 11, covers each parameter and starting amount)
+and absent from a number no bundle covers (every other kind, and compose
+results captured before this amendment). It is the number's claim
+transcribed from the bundle's files, field for field, with the evidence
+layer's own readers (`caterva.evidence.bundle.read_bundle`, which recomputes
+every id; `caterva.evidence.references.parse_reference_page`, the parser
+`caterva why` prints the paper from), by `adapters/compose.py::claim_infos`,
+matched to the number by the claim's subject (`<identifier> = ...`). Nothing
+on it is computed by the adapter or the page:
+
+- `id`: the claim ref, `claim:sha256:<hex>`, as `caterva why` takes it and
+  the exports' `claim_id` column carries it; `kind`: one of `ClaimKind`
+  (`cited`, `chosen`, `placeholder`, `refused`, `computed`); `rule`: `{rule_id,
+  version, adr}`, the rule the derivation applied and the decision record
+  that states it.
+- `row` (a cited claim; null otherwise): the BRENDA row as `rows.jsonl`
+  holds it, `{locator, value_text, unit, substrate, organism, commentary,
+  reference}`; `commentary` and `reference` null when the row has none.
+- `snapshot` (a cited claim; null otherwise): the page the row was read
+  from, `{id, locator, retrieved_at, licence, served_from}`; `id` is
+  `sha256:<hex>`, the digest of the raw bytes, which names the blob
+  `claims/snapshots/<hex>.gz`; `served_from` is the recording a test
+  replayed, null when fetched live.
+- `reference`: `{title, pmid, journal, year, url}` from the BRENDA
+  literature page the run pinned beside the enzyme page, when the bundle
+  holds that page and it carries a reference block; else null (the run's
+  `claims.notes` say the page was not captured). `year` is the page's text,
+  a string. `url` is the PubMed link for `pmid`, of the form above, else
+  null.
+- `certificates`: `[{matched}]`, the texts the bundle certifies are in the
+  pinned bytes (the spans stay in the bundle); empty for every kind but
+  cited.
+- `refusal` (a refused claim; null otherwise): `{kind, requested,
+  candidates}` with `candidates` as `"<row ref> | <why it was not the one>"`
+  strings. A refused claim is never drawn as a citation: the number still
+  carries its `measured` provenance from the resolver, and the claim says,
+  re-checkably, that the pinned page does not hold what the resolver reported.
+
+What is not on it: the derivation's settings (the ordinals, a unit factor,
+the IR digest) and the certificate spans, which the bundle holds and the
+checker reads; the page shows what the number rests on and offers the
+bundle for the rest.
+
 **On the page** every SourcedValue is drawn by one component
 (`src/components/provenance/Value.tsx`), which cannot draw a value without
 its mark. Section 17.3.
@@ -688,6 +761,11 @@ Default data dir: macOS `~/Library/Application Support/Caterva`; Linux
                                  (redacted), response, grounding result, outcome, confirmation; never a key
     artifacts/<name>             every file listed in run.artifacts
     md-setup/                    md.setup's default output directory
+    claims/                      a compose run's claims bundle (amended 2026-10-17, sci-kinetics):
+                                 manifest.json, claims.jsonl, rows.jsonl, snapshots.jsonl and
+                                 snapshots/<hex>.gz, exactly what `caterva compose --claims DIR`
+                                 writes (ADR 0179), beside the run's own store/ (its SQLite
+                                 index and blobs, which the bundle was exported from)
 ```
 
 - Directories are created 0700, files 0600. Every JSON file is written to a
@@ -700,6 +778,23 @@ Default data dir: macOS `~/Library/Application Support/Caterva`; Linux
 - History reopens a run from `run.json` + `result.json`; a rerun is a new
   `POST /api/runs` with the stored request. The engine's own caches stay
   where the CLI keeps them (`caterva prepare`'s `~/.cache/caterva/prepare`).
+- `claims/` (amended 2026-10-17): every compose run writes its claims
+  bundle there, the second exception (after `md-setup/`) to the rule that an
+  adapter writes into the run directory only through `artifacts`. The
+  adapter sets the parsed request's `claims` to that directory before
+  `compose_report` runs, so the report ends with the command's `## Claims`
+  section naming it, and the recorded `cli` leaves `--claims` out (the
+  directory is the studio's, not the person's). Artifact names cannot hold
+  a slash (`ARTIFACT_NAME_PATTERN`), so the bundle is served as two
+  artifacts: `claims.zip`, the bundle directory (not `store/`) with each
+  entry dated 1980-01-01 so one bundle is one sequence of bytes, which
+  unzips to a directory `caterva verify` and `caterva why --bundle` take;
+  and `claims.json`, `{manifest, claims, rows, snapshots}`, the manifest and
+  the three record files parsed line by line, without the pinned bytes.
+  `POST /api/runs/{id}/verify` reads the folder itself. A compose that
+  built nothing (UnrecognisedShape) removes the folder it had opened, so a
+  run without a result has no `claims/`. Trashing a run moves the folder
+  with it; the run's zip export carries the bundle inside `artifacts/`.
 
 ## 12. Adapters
 
@@ -814,7 +909,9 @@ Request to argv mapping, stated where it is not one flag per key:
   spreadsheet would run as a formula.
 
 Stage keys (the owner may add, never rename once shipped): compose
-`compose`, `search`, `precompute`, `dossier`, `section:<flag>`, `exports`;
+`compose`, `search`, `claims` (amended 2026-10-17: writing the bundle, after
+the search and before `precompute`), `precompute`, `dossier`,
+`section:<flag>`, `exports`;
 constants `resolve`, `document`; sim `simulate`; bind `fetch`, `rows`,
 `target`, `judge`; structure `search`, `rank`; prepare `fetch`, `audit`;
 md.setup `conditions`, `write`; md.summarise `read`, `summarise`; analyze
@@ -826,6 +923,20 @@ Result shapes are the TypedDicts in contract.py's "Kinetics kinds" and
 "Structure kinds" sections. Every Result that has a CLI report carries it
 verbatim (`report_markdown` or `report_text`) so the page can show "the same
 document the terminal prints" and a parity test can compare them.
+
+`ComposeResult.claims` (amended 2026-10-17, sci-kinetics; optional, null
+only on a result captured before then) is a `ClaimsSummary` `{root, counts,
+rows, snapshots, notes, bundle, listing, text}`: the root claim ref (the
+computed model claim), the claims per kind (every `ClaimKind`, zeros
+included), the rows and pinned pages in the bundle, what could not be done
+(a reference page not captured, in the section's own words), the two
+artifact names (`claims.zip`, `claims.json`), and the `## Claims` section's
+body as the report printed it. That section is not among `sections`, which
+stay the analysis sections; the markdown still holds it, and the parity
+test holds the whole report, section included, to the command run with
+`--claims` into the same directory. The exports carry each number's claim
+id as `--export FORMAT --claims DIR` writes them (the CSV's `claim_id`
+column, the SBML notes' `CLAIM` line, the Antimony `# claim:` comment).
 
 ## 14. Gaps: what the CLI prints that has no structured form yet
 
@@ -957,6 +1068,12 @@ red error.
 | `/settings` | theme, parallel runs, where the workspace is | save | settings, capabilities (data_dir) | | | 400 per field | |
 | `/about` | version, licences (Caterva, fonts, BRENDA terms), what this installation can reach | probe the network | health, capabilities?probe=network | | probing | | each unreachable host named |
 
+(Amended 2026-10-17, sci-kinetics.) `/compose` also calls `POST
+/api/runs/{id}/verify`, from the result's section "The claims behind the
+numbers" (section 17.3): the action "Re-check this run", disabled with
+`contract.NO_CLAIMS_BUNDLE` as its reason for a result that carries no
+`claims`, and the bundle's two artifacts as downloads.
+
 ### 17.2 Look and behaviour
 
 Identity from `Science-Agent-Pipeline/artifacts/caterva-landing`
@@ -1009,6 +1126,41 @@ still differ.
 A number is formatted for display only by `src/lib/format.ts`, from the
 value the API sent; the full-precision value is one hover away and is what
 is copied.
+
+**The derivation** (amended 2026-10-17, sci-kinetics). A number that
+carries a `claim` (section 9: every number of a compose run) shows it at
+the end of its provenance detail, in the same dt/dd rows as the citation
+and the conditions, under the label "Derivation"
+(`src/components/provenance/ProvenanceDetail.tsx`, `Derivation`): the
+claim id with a button that copies it whole (what `caterva why` takes);
+its kind; the rule with its version and decision record; the row's locator
+and its own words, verbatim; the pinned page's URL, retrieval date, licence
+and digest prefix, the whole digest one hover away; the paper's title,
+journal, year and PMID, linked to PubMed only by the form section 9 allows
+and only when the bundle's own link is that one; the texts the bundle
+certifies are in the pinned bytes; and for a refused claim its kind, what
+was asked for and the rows that were not it. Every sentence is the
+bundle's; a part the bundle does not hold is left out, never guessed. A
+number without a claim shows no such block.
+
+The compose result draws a section "The claims behind the numbers" after
+the ledger (`src/screens/kinetics/Recheck.tsx`): the server's counts per
+kind in one sentence, the run's `claims.notes` as the engine wrote them,
+the bundle's two artifacts as downloads, the `## Claims` text behind a
+disclosure, and the action "Re-check this run", which POSTs
+`/api/runs/{id}/verify` (`src/api/verify.ts`, the answer checked against
+its schema) and lists the report as the command prints it: the verdict
+sentence, the summary line (`N checks: H ok, F failed, D did not run; S
+not checked.`, amended 2026-10-24), one line per check with ok, FAIL or
+n/a as the command prints them (drawn from `status`, never from `ok`
+alone), the check's name, the identifier of
+the number whose claim it is about when the result carries that claim
+(the root claim is `model`), and the detail verbatim, then what was not
+checked with its reason. A failed report is drawn as the command's exit 3
+is, a refusal naming the first failing check in its own words, never as a
+red error. The action is disabled, pointing at `NO_CLAIMS_BUNDLE` as its
+reason, for a result that carries no `claims` (one captured before bundles
+existed); a 409 that arrives anyway is shown whole, as any error is.
 
 ### 17.4 Test fixtures
 
@@ -1103,6 +1255,24 @@ to edit them; changing one is a contract amendment (section 21).
   and new files under `src/screens/kinetics/`
 - tests `caterva/tests/test_studio_{compose,constants,sim,bind}.py`; UI
   fixtures under `src/__fixtures__/api/kinetics/`
+- (amended 2026-10-17) the claims bundle in a compose run and each number's
+  `claim` (`adapters/compose.py::claim_infos`, `claims_artifacts`,
+  `claims_summary`), `caterva/tests/test_studio_verify.py` (the verify
+  route over a real run), `caterva/tests/capture_studio_kinetics_fixtures.py`
+  (the kinetics fixtures' capture script), and the derivation block and the
+  re-check action on the page (`src/components/provenance/ProvenanceDetail.tsx`,
+  `src/screens/kinetics/`). The `verify_run` handler in `dispatch.py`,
+  `Workspace.claims_dir` and the `VerifyReport`, `ClaimInfo` and
+  `ClaimsSummary` shapes were applied as a contract amendment (section 21),
+  so core and the shared files carry them. On the page (amended
+  2026-10-17, the page side): `src/api/verify.ts` (the verify call and its
+  schema), `src/screens/kinetics/Recheck.tsx` (the claims section, the
+  action and the report view), `src/__tests__/derivation.test.tsx` and
+  `src/__tests__/recheck.test.tsx`, and the fixtures
+  `compose-hexokinase-claims.json` and `verify-*.json` under
+  `src/__fixtures__/api/kinetics/`. One ui-owned file was touched for it,
+  as an amendment: `src/components/provenance/Citation.tsx` now exports its
+  `External` link, which the derivation's paper uses rather than copying it.
 
 **sci-structure** (worktree `wt-studio-str`, `studio-str-backend`/`studio-str-ui`):
 - `caterva/studio/adapters/structure.py`, `prepare.py`, `md.py`,

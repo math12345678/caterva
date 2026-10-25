@@ -11,6 +11,7 @@ test_fallback_logic.py.
 from brenda_client import BRENDAKmEntry
 from citation import (
     Citation,
+    brenda_literature_url,
     brenda_reference_url,
     citation_from_brenda_entry,
     pubmed_url,
@@ -101,3 +102,29 @@ def test_citation_is_json_serializable():
     # Downstream code (API responses, exports) needs this to just work.
     payload = citation.model_dump_json()
     assert "BRENDA" in payload
+
+
+def test_brenda_literature_url_builds_the_per_reference_page():
+    # literature.php?e=<EC>&r=<ref> is the per-reference form that returns
+    # the reference (checked 2026-10-17; six pages of EC 2.7.1.1 are
+    # recorded under Tests/fixtures/recorded/). The refid form tested
+    # above is the one that does not.
+    url = brenda_literature_url("2.7.1.1", "641068")
+    assert url == "https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=641068"
+
+
+def test_brenda_literature_url_needs_both_ids():
+    # Half a locator is no locator: None rather than a page that is not
+    # the reference.
+    assert brenda_literature_url(None, "641068") is None
+    assert brenda_literature_url("2.7.1.1", None) is None
+    assert brenda_literature_url("", "") is None
+
+
+def test_the_citation_link_is_still_the_enzyme_page():
+    """The per-reference form exists, and the Citation's url does not move
+    to it: that output is pinned across the TypeScript contract
+    (citeVerify.ts, the runner contract test)."""
+    citation = citation_from_brenda_entry(_make_entry())
+    assert citation.url == brenda_reference_url("740253", "1.1.1.27")
+    assert citation.url != brenda_literature_url("1.1.1.27", "740253")

@@ -261,7 +261,11 @@ const INHIBITION_MODEL_NOT_EXPORTED =
  * "no inhibition constant for gossypol in the literature for this system"
  * about human LDH, whose BRENDA page files three gossypol Ki rows (ref
  * 711801): the search that sentence reports on never ran. The runner's own
- * sentence is printed instead, and the next step names `--ec`.
+ * sentence is printed instead, and the next step names `--ec`. Since
+ * 2026-10-17 the runner also answers "ec_mismatch" when a name and an EC
+ * number sent together are two different enzymes (its
+ * check_ec_against_name, by the one finder); the sentence in `logs[0]`
+ * names both numbers and the re-run, and is printed the same way.
  */
 function notFoundBecause(
   result: UnresolvedKinetic,
@@ -269,7 +273,11 @@ function notFoundBecause(
 ): { sentence: string; why: string } | null {
   const withheld = withheldSentence(result, advice);
   if (withheld) return { sentence: withheld, why: WITHHELD_WHY };
-  if (result.source === 'ec_ambiguous' || result.source === 'ec_not_resolved') {
+  if (
+    result.source === 'ec_ambiguous' ||
+    result.source === 'ec_not_resolved' ||
+    result.source === 'ec_mismatch'
+  ) {
     return {
       sentence:
         result.logs[0] ??

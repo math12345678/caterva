@@ -142,4 +142,35 @@ describe("runner-boundary contract (Stage 5 Part 4)", () => {
   it("malformed JSON throws", () => {
     expect(() => parseAgentOutput("{not json")).toThrow();
   });
+
+  it("carries the runner's ec_mismatch refusal under the keys the ambiguity refusal uses", () => {
+    // The Python half is test_science_agent_runner.py's
+    // TestMainWithBothNameAndNumber: an enzyme name and an EC number sent
+    // together that the finder says are two enzymes. No new wire key --
+    // the candidates and the sentence travel as they do for ec_ambiguous.
+    const refusal =
+      "The enzyme name and the EC number given are not the same enzyme: " +
+      "'hexokinase' is EC 2.7.1.1 hexokinase by nomenclature's reading " +
+      "(accepted name matches exactly), and ecNumber 1.1.1.27 was given.";
+    const result = parseAgentOutput(
+      JSON.stringify({
+        ok: true,
+        found: false,
+        source: "ec_mismatch",
+        ecCandidates: ["2.7.1.1"],
+        ecCandidateNames: [
+          { ec: "2.7.1.1", name: "hexokinase", label: "EC 2.7.1.1 hexokinase", why: "accepted name matches exactly" },
+        ],
+        ecRefusal: refusal,
+        literatureCandidates: [],
+        logs: [refusal],
+      }),
+    );
+    expect(result.found).toBe(false);
+    expect(result.source).toBe("ec_mismatch");
+    expect(result.ecCandidates).toEqual(["2.7.1.1"]);
+    expect(result.ecCandidateNames![0]!.ec).toBe("2.7.1.1");
+    expect(result.ecRefusal).toBe(refusal);
+    expect(result.km).toBeUndefined();
+  });
 });

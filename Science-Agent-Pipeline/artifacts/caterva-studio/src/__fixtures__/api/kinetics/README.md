@@ -71,3 +71,62 @@ It is the one fixture whose sections carry a figure each (robustness draws,
 the knockout screen, the measurement design, the identifiability spectrum,
 a stochastic trajectory) and a sweep. Only the data directory's path was
 replaced by `<data dir>`.
+
+## Re-captured on 2026-10-17: the claims bundle
+
+Every compose run in the studio now writes its claims bundle (ADR 0179;
+docs/studio/CONTRACT.md 9, 11), so the six compose fixtures were written
+again by `caterva/tests/capture_studio_kinetics_fixtures.py`, the recipe
+above as a script (from the repository root, `PYTHONPATH=$PWD python
+caterva/tests/capture_studio_kinetics_fixtures.py`; core is merged, so no
+scratch tree), with the same requests through `App.dispatch`:
+`compose-ldh-gossypol`, `compose-ldh-noncompetitive`,
+`compose-binding-analyses`, `compose-binding-charts`, `compose-unrecognised`
+and `compose-malformed` (which came out byte for byte as it was). The
+constants, sim and bind fixtures were not touched. What changed in the
+others:
+
+- `run.artifacts` lists `claims.zip` and `claims.json` after the exports;
+  `caterva_version` is 0.6.0; the stage events include `claims`.
+- `result.claims` is the `ClaimsSummary` (root claim, counts, the `## Claims`
+  section's text), and every parameter's and starting amount's
+  `provenance.claim` is its `ClaimInfo`: for the LDH runs, `reaction_Km` is
+  cited from the row of BRENDA ref 286469 (0.03 mM) and `reaction_Ki` from
+  ref 711801 (0.0014 mM, gossypol) or 739793 (0.00252 mM, noncompetitive),
+  each with its certificates in the pinned page; `reaction_kcat` is a
+  placeholder claim; the binding runs' claims are placeholders and chosen
+  starting amounts, with no row and no page.
+- `claim.reference` is null in the LDH runs and `result.claims.notes` says
+  why: BRENDA's literature pages for refs 286469, 711801 and 739793 are not
+  among the recordings, so the run's attempt to capture them met the offline
+  context's refusal ("no recording answers ..."), which the bundle records
+  as a note and a refused claim rather than a paper. A fixture with a paper
+  on a claim is the hexokinase run of
+  `caterva/tests/test_studio_compose.py` (recordings under
+  `caterva/tests/fixtures/compose_claims/http/`), not captured here.
+- `report_markdown` ends with the `## Claims` section naming the bundle's
+  directory under `<data dir>`.
+
+Two replacements were made in what was written, and no other edit: the
+scratch data directory is `<data dir>`, and the temporary folder the offline
+context serves the LDH page from (a claim's `snapshot.served_from`) is
+`<recorded pages>`.
+
+## Added on 2026-10-17: the hexokinase run and its re-check
+
+The same script, the same day, also writes the fixtures the page's
+derivation block and its "Re-check this run" action are tested over
+(`src/__tests__/derivation.test.tsx`, `recheck.test.tsx`):
+
+| file | request | where its answers came from |
+|---|---|---|
+| `compose-hexokinase-claims.json` | `caterva compose "Michaelis Menten" --subject 2.7.1.1 --organism human --substrate glucose --no-analysis --no-simulate --no-ranking` (the run of `caterva/tests/test_studio_verify.py`): Km 6 mM from the row of BRENDA ref 641068, kcat 40.1 1/s from ref 739603, each a cited claim whose `reference` is the paper (title, journal, year, PMID and the PubMed link), because BRENDA's literature pages for both refs are recorded | `Tests/fixtures/recorded/` and `caterva/tests/fixtures/compose_claims/http/`, through `hexokinase_offline(literature=True)` |
+| `verify-hexokinase.json` | `POST /api/runs/{id}/verify` with `{}` on that run, as written: 200, `ok` true, 24 checks | the run's own bundle, re-read by `caterva/check/verify.py` |
+| `verify-hexokinase-changed-byte.json` | the same after the last digit of the certified reference id in the pinned page (`641068`, the span the Km claim's certificate names) was changed on disk, the gzip rewritten, and before it was put back: 200, `ok` false; the first failing check is the page's bytes and names the Km claim that rests on them | the same |
+| `verify-no-bundle.json` | `POST /api/runs/{id}/verify` on the unrecognised-shape run, which built nothing and wrote no bundle: 409 with `contract.NO_CLAIMS_BUNDLE` | |
+
+The verify fixtures are `{"status", "body"}`, as `compose-malformed.json`
+is. One more replacement, and no other edit: the hexokinase page is served
+from the repository's own recordings, so the Km claim's
+`snapshot.served_from` names the checkout; that prefix is written as
+`<repository>`.

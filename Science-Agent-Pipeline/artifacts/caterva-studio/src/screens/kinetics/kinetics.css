@@ -851,3 +851,85 @@
   color: var(--muted);
   overflow-wrap: anywhere;
 }
+
+/* ---------------------------------------------- the claims, and re-checking them */
+
+/* The re-check action, its report, and the list of checks: one line per
+   check as the command prints it, told apart by a word, never by colour
+   alone. No colour is defined here; the ok word takes the signal token and
+   a failure the caution one, as a negative finding does. */
+.k-recheck {
+  display: grid;
+  gap: 0.875rem;
+  margin-top: 1rem;
+}
+.k-recheck-bar {
+  display: grid;
+  gap: 0.375rem;
+  justify-items: start;
+}
+.k-recheck-hint {
+  margin: 0;
+  max-width: 72ch;
+  font-size: var(--text-xs);
+  color: var(--fg-soft);
+}
+.k-verify {
+  display: grid;
+  gap: 0.625rem;
+}
+.k-verify-verdict {
+  margin: 0;
+  max-width: 72ch;
+}
+.k-verify-verdict .state-kicker {
+  margin-right: 0.375rem;
+  color: var(--signal-deep);
+}
+.k-verify-summary {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.k-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1px;
+  font-size: var(--text-sm);
+}
+.k-checks li {
+  display: grid;
+  grid-template-columns: 3.5rem 8.5rem minmax(0, 1fr);
+  gap: 0.125rem 0.75rem;
+  align-items: baseline;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+.k-check-ok {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--signal-deep);
+}
+.k-checks li[data-ok="false"] .k-check-ok {
+  color: var(--caution);
+}
+.k-checks li[data-status="not run"] .k-check-ok {
+  color: var(--fg-soft);
+}
+.k-check-name {
+  color: var(--fg);
+}
+.k-check-about {
+  font-size: var(--text-xs);
+  color: var(--fg-soft);
+  overflow-wrap: anywhere;
+}
+.k-check-detail {
+  grid-column: 1 / -1;
+  max-width: 80ch;
+  color: var(--fg-soft);
+  overflow-wrap: anywhere;
+}

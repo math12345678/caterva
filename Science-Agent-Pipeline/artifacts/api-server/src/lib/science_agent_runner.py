@@ -45,6 +45,20 @@ source "ec_ambiguous" with the candidates, named. If BOTH "ecNumber" and
 "enzymeName" are missing, that's a hard error: there is nothing to search
 for at all.
 
+If BOTH arrive, the name is checked against the number with that same
+finder before anything is looked up (check_ec_against_name, 2026-10-17).
+A name that identifies a different enzyme -- "hexokinase" beside ecNumber
+1.1.1.27 -- is refused as source "ec_mismatch", naming both numbers: a
+number the name contradicts is a citation for the wrong protein, however
+well formatted. A name that could be several enzymes, the number among
+them -- "lactate dehydrogenase" beside 1.1.1.27 -- proceeds silently: that
+is exactly the re-run the "ec_ambiguous" refusal asks for. A name the
+finder cannot resolve or cannot check cannot contradict anything, so the
+number is used as given and the log says the name did not confirm it. A
+language model's EC number never arrives here at all unless the query text
+itself contains it: llmResolver.ts drops the rest before the request is
+made (ADR 0011 -- a model may propose an EC number, never supply one).
+
 Output JSON shape (success, quantity="km"):
     {
       "ok": true,
@@ -82,6 +96,7 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
 import enzyme_lookup
@@ -103,6 +118,101 @@ def resolve_ec_number(enzyme_name: str, organism: str) -> str | None:
         return resolve_enzyme(enzyme_name, organism).ec
     except enzyme_lookup.EnzymeNameNotResolved:
         return None
+
+
+@dataclass
+class EcAgreement:
+    """Whether an enzyme name agrees with a supplied EC number, and in what
+    words. `agrees` is False only when the name identifies a different
+    enzyme; `checked` is False when the finder could not say (the name is
+    unknown to it, or UniProt could not be asked), which is not a
+    contradiction. `candidates` are the EC numbers the name identifies when
+    it disagrees -- one, or the several it could mean -- for the refusal to
+    name; `named` are the finder's descriptions of them, forwarded."""
+
+    agrees: bool
+    checked: bool
+    note: str
+    candidates: list = field(default_factory=list)
+    named: list = field(default_factory=list)
+
+
+def check_ec_against_name(enzyme_name: str, organism: str, ec_number: str) -> EcAgreement:
+    """Does this name contradict this EC number? Decided by the one finder.
+
+    THE ONLY QUESTION ASKED IS WHETHER THE NAME CONTRADICTS THE NUMBER. The
+    number was supplied -- by a person, by a verified table, or by the query
+    text itself (llmResolver.ts keeps a model's EC number only when the
+    query contains it, ADR 0011) -- and is the stronger identifier. The name
+    is checked because a name and a number that disagree are two enzymes,
+    and a lookup under the number would then cite a protein the person did
+    not name (ADR 0126). So:
+
+      * the finder resolves the name to one enzyme: agrees when it is this
+        number, disagrees when it is another;
+      * the name could be several enzymes (`ambiguous`): agrees when this
+        number is one of them -- the number is the disambiguation the
+        `ec_ambiguous` refusal asked for -- and disagrees when it is none;
+      * the finder has no answer (`none`, `suggestions`, `lookup_failed`,
+        `unknown_ec`): nothing contradicts, so the number stands, unchecked,
+        and the note says so. A refusal here would turn a network failure
+        into "your EC number is wrong", which it is not.
+
+    Asking `resolve_ec_number` for equality instead would refuse every call
+    that pairs "lactate dehydrogenase" with 1.1.1.27 (the finder holds
+    twelve enzymes under that name and returns None), including the re-run
+    its own ambiguity refusal recommends. Membership is the policy that
+    agrees with the finder rather than fighting it.
+
+    Offline for every name the enzyme nomenclature holds; UniProt is asked
+    only for a name it does not, exactly as the name-only path does.
+    """
+    ec = str(ec_number).strip()
+    try:
+        named = resolve_enzyme(enzyme_name, organism)
+    except enzyme_lookup.EnzymeNameNotResolved as exc:
+        if exc.kind == "ambiguous":
+            if ec in exc.candidates:
+                return EcAgreement(
+                    True, True,
+                    f"'{enzyme_name}' could be {len(exc.candidates)} enzymes and "
+                    f"EC {ec} is one of them, so EC {ec} is used as given.",
+                    list(exc.candidates), list(exc.named_candidates),
+                )
+            listed = ", ".join(exc.candidates)
+            return EcAgreement(
+                False, True,
+                f"The enzyme name and the EC number given are not the same "
+                f"enzyme: '{enzyme_name}' names {len(exc.candidates)} enzymes "
+                f"({listed}), and ecNumber {ec} is none of them. A number the "
+                f"name contradicts is a citation for the wrong protein, so "
+                f"nothing was looked up. Re-run with ecNumber "
+                f"{exc.recommended or exc.candidates[0]} for '{enzyme_name}', "
+                f"or with the name of the enzyme EC {ec} is.",
+                list(exc.candidates), list(exc.named_candidates),
+            )
+        return EcAgreement(
+            True, False,
+            f"EC {ec} is used as given, unchecked against the name: "
+            f"'{enzyme_name}' did not resolve ({exc.kind}): {exc}",
+        )
+    if named.ec == ec:
+        return EcAgreement(True, True, f"EC {ec} confirmed by the name '{enzyme_name}': {named.how}.")
+    label = f"EC {named.ec} {named.name}".rstrip()
+    # Keyword form rather than `{"ec": ...}`: scripts/check_runner_boundary.py
+    # reads every `"key": ` literal in this file as a wire key the API must
+    # receive, and these are the fields of one candidate, not new keys.
+    candidate = dict(ec=named.ec, name=named.name, label=label, why=named.how)
+    return EcAgreement(
+        False, True,
+        f"The enzyme name and the EC number given are not the same enzyme: "
+        f"'{enzyme_name}' is {label} by {named.source}'s reading "
+        f"({named.how}), and ecNumber {ec} was given. A number the name "
+        f"contradicts is a citation for the wrong protein, so nothing was "
+        f"looked up. Re-run with ecNumber {named.ec} for '{enzyme_name}', "
+        f"or with the name of the enzyme EC {ec} is.",
+        [named.ec], [candidate],
+    )
 
 
 def resolve_enzyme(enzyme_name: str, organism: str):
@@ -670,7 +780,7 @@ def main() -> None:
                             "title": popgen_result["citation"],
                         },
                         "literatureCandidates": [],
-                        "logs": resolution_log + [f"Resolved mutation_rate from literature: {popgen_result['citation']}"],
+                        "logs": [*resolution_log, f"Resolved mutation_rate from literature: {popgen_result['citation']}"],
                     }
                 )
             )
@@ -834,6 +944,33 @@ def main() -> None:
                         f"No KEGG substrate found for EC {ec_number}; "
                         "BRENDA lookup will be unfiltered by substrate."
                     )
+
+        elif enzyme_name:
+            # Both arrived. The number is used only when the name does not
+            # contradict it -- see check_ec_against_name for the policy and
+            # the module docstring for why a contradiction is refused rather
+            # than resolved in the number's favour. Silent when they agree:
+            # the common case must stay silent, or the refusal is worthless
+            # (test_one_candidate_is_not_an_ambiguity).
+            agreement = check_ec_against_name(enzyme_name, organism, ec_number)
+            if not agreement.agrees:
+                print(
+                    json.dumps(
+                        {
+                            "ok": True,
+                            "found": False,
+                            "source": "ec_mismatch",
+                            "ecCandidates": agreement.candidates,
+                            "ecCandidateNames": agreement.named,
+                            "ecRefusal": agreement.note,
+                            "literatureCandidates": [],
+                            "logs": [agreement.note],
+                        }
+                    )
+                )
+                return
+            if not agreement.checked:
+                resolution_log.append(agreement.note)
 
         result = resolve_kinetic_value(
             enzyme_name, substrate, organism, ec_number,
