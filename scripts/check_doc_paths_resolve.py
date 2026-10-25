@@ -62,10 +62,11 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 #: The documents a newcomer is actually pointed at. Not every markdown file
-#: in the repository: dozens sit at the root, most of them archived session
-#: reports (see docs/ARCHIVE_TRIAGE.md), and holding a superseded 2026
-#: status report to this standard would bury the two live defects in
-#: hundreds of stale ones. These are the ones that must be right.
+#: in the repository: most are topic documents and records under docs/
+#: (docs/history/ and docs/archive/ among them; see DOCUMENTATION_INDEX.md
+#: and docs/ARCHIVE_TRIAGE.md), and holding a superseded 2026 status report
+#: to this standard would bury the two live defects in hundreds of stale
+#: ones. These are the ones that must be right.
 #:
 #: The count is deliberately not written here. It was "81" for a pass after
 #: the archive move made it 41, in a comment nobody reads while running --

@@ -119,8 +119,9 @@ it mechanically checkable so it cannot rot again. That is why
 build if it stops being true.
 
 **2026-10-24.** The table above names each file as it was at the root and
-is left as written. The documents it kept at the root have since moved into
-`docs/` with `git mv`, except the standard set (README, CHANGELOG,
+is left as written. The documents it did not archive (KEEP, WIRING and
+MISC), which stayed at the root, have since moved into `docs/` with
+`git mv`, except the standard set (README, CHANGELOG,
 CODE_OF_CONDUCT, CONTRIBUTING, SECURITY, START_HERE), which stays:
 API_DOCUMENTATION, API_QUICK_REFERENCE, EXPORT_AND_ANALYSIS_GUIDE and
 WEB_INTERFACE are in [`api/`](api/); DEPLOYMENT_AND_OPS and

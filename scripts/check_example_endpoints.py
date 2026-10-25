@@ -127,19 +127,20 @@ ROOT_DOC_GLOB = "*.md"
 #: API, operations, guide, science and history documents that used to match
 #: ROOT_DOC_GLOB. Moving them must not move them out of this guard's sight —
 #: a root-only glob would have dropped 32 of the 42 documents it read, and
-#: printed OK on the 10 left. Globbed per folder, for the same reason the
-#: root is: a document added to one of these folders is covered on the day
-#: it arrives. `docs/archive/` is not here; it is the narrative record.
+#: printed OK on the 10 left. Globbed per folder and into its subfolders,
+#: for the same reason the root is: a document added to one of these
+#: folders, at any depth, is covered on the day it arrives. `docs/archive/`
+#: is not here; it is the narrative record.
 #:
 #: Each folder must yield at least one document. A folder renamed or emptied
 #: is the same silent shrinkage as a list nobody updates, so
 #: `documentation_files()` refuses rather than reading fewer files.
 MOVED_DOC_GLOBS = (
-    "docs/api/*.md",
-    "docs/operations/*.md",
-    "docs/guides/*.md",
-    "docs/science/*.md",
-    "docs/history/*.md",
+    "docs/api/**/*.md",
+    "docs/operations/**/*.md",
+    "docs/guides/**/*.md",
+    "docs/science/**/*.md",
+    "docs/history/**/*.md",
 )
 
 #: Extra documents outside the root that must also be true.
@@ -547,18 +548,25 @@ DOC_MENTION_RE = re.compile(r"(/api/[A-Za-z0-9_/:$.*<>{}-]*)")
 #: run after the move this guard reported three of them as addresses the
 #: API does not serve -- true, and beside the point: they are files.
 #:
-#: The test is the path segment written immediately before `/api/`: `docs`
-#: or `..`. No address on either server is spelled that way -- both mount
-#: under `/api`, and `/api/docs` (the OpenAPI UI) has the segments the other
-#: way round -- so this cannot excuse a call. Like every other exclusion it
-#: is consulted only for a mention the route table fails to resolve, and
-#: `--verbose` lists each one it applied.
+#: Two tests, both required. The path segment written immediately before
+#: `/api/` is `docs` or `..`; and what follows names something that exists
+#: under docs/api/ in this tree (a document there, or the folder itself).
+#: The first alone was not enough: `fetch('../api/x')` is a relative call
+#: and `http://host/docs/api/x` a URL, and both were excused as file paths.
+#: A call names a route, not a file in docs/api/, so the second test keeps
+#: it a claim. Like every other exclusion this is consulted only for a
+#: mention the route table fails to resolve, and `--verbose` lists each one
+#: it applied.
 _REPOSITORY_PATH_BEFORE_RE = re.compile(r"(?:^|[\s(\[`'\"/])(?:docs|\.\.)$")
 
 
-def _is_repository_path(line: str, start: int) -> bool:
-    """Whether the `/api/...` match starting at `start` is a path in this tree."""
-    return bool(_REPOSITORY_PATH_BEFORE_RE.search(line[:start]))
+def _is_repository_path(line: str, start: int, mention: str) -> bool:
+    """Whether the `/api/...` match `mention`, starting at `start`, is a path
+    to something under this tree's docs/api/ rather than an address."""
+    if not _REPOSITORY_PATH_BEFORE_RE.search(line[:start]):
+        return False
+    target = REPO_ROOT / "docs" / mention.lstrip("/").rstrip(".")
+    return target.exists()
 
 
 #: Ports the Caterva HTTP servers listen on. A `/api/...` path preceded by an
@@ -774,7 +782,7 @@ def doc_mentions(path: pathlib.Path) -> list[tuple[int, str, str | None]]:
                     paragraph=(scrubbed_blob, height),
                     heading=heading,
                     defined_here=definitions.get(index, set()),
-                    repository_path=_is_repository_path(line, match.start()),
+                    repository_path=_is_repository_path(line, match.start(), match.group(1)),
                 ))
             )
 

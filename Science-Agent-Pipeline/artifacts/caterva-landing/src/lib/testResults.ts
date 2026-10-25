@@ -242,7 +242,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "91 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "92 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",

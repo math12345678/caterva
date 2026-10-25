@@ -31,7 +31,6 @@ replaced by the short list of documents that are actually true.
 | call the HTTP API | [`docs/API.md`](docs/API.md) — kept true by `check_example_endpoints.py` |
 | run the api-server tests | [`docs/guides/RUN_TESTS.md`](docs/guides/RUN_TESTS.md) |
 | report a vulnerability | [`SECURITY.md`](SECURITY.md) |
-| find a topic guide that used to sit at the root | [`docs/api/`](docs/api/), [`docs/operations/`](docs/operations/), [`docs/guides/`](docs/guides/), [`docs/science/`](docs/science/), [`docs/history/`](docs/history/) |
 
 ## The rest of the old root, honestly labelled
 
@@ -50,7 +49,10 @@ says why, and records the mistaken reason four others were delayed a pass.
 **On 2026-10-24 the loose documents left at the root moved too**, again
 with `git mv`: the KEEP, WIRING and MISC files other than the standard set
 that stays at the root (README, CHANGELOG, CONTRIBUTING, SECURITY and the
-like), and the delivery summaries that arrived after the triage. API
+like), and the fifteen metrics, monitoring and OpenAPI guides and delivery
+summaries that arrived after the triage, with FINAL_STATUS.txt. These are
+not the list above, and not all of them are current: the triage's classes
+apply to the ones it covers, and the later fifteen are unclassified. API
 documents are in [`docs/api/`](docs/api/), deployment, monitoring and
 metrics in [`docs/operations/`](docs/operations/), guides in
 [`docs/guides/`](docs/guides/), the literature and validation documents in
@@ -83,8 +85,9 @@ claims mechanically checkable so they cannot rot silently:
 - `check_example_endpoints.py` fails when `docs/API.md` describes an
   endpoint the server does not serve. That is why that file, alone among
   the API documents, carries no correction banner.
-- `check_doc_paths_resolve.py` fails when any document in the list above
-  names a file that does not exist.
+- `check_doc_paths_resolve.py` fails when one of the contributor-facing
+  documents in its `DOCS` list, this index among them, names a file that
+  does not exist.
 - `check_ci_reproducible_locally.py` fails when CI grows a step a
   contributor has no documented way to run.
 - `check_commands_runnable.py` fails when a document or a guard's own error
