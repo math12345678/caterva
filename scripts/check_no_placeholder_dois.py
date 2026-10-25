@@ -76,13 +76,13 @@ EXCLUDED: dict[str, str] = {
 #: Tracked Markdown files allowed to contain a match, and why. Each reason
 #: names what the match is, so a reader can decide whether it still holds.
 ALLOWED: dict[str, str] = {
-    "TESTING_AND_ROADMAP.md": (
+    "docs/science/TESTING_AND_ROADMAP.md": (
         "quotes jest examples in which the invented DOI is a test INPUT -- the "
         "value the api-server's literature-verifier.test.ts and the root "
         "critical-paths.test.ts use; the document mirrors those tests, and a "
         "different DOI here would misdescribe them"
     ),
-    "SCIENTIFIC_VALIDATION_FRAMEWORK.md": (
+    "docs/science/SCIENTIFIC_VALIDATION_FRAMEWORK.md": (
         "shows the refusal printed for a DOI that cannot be resolved, with an "
         "invented DOI as the thing being refused; an example of a bad citation "
         "being rejected is not a bad citation"
@@ -199,13 +199,14 @@ def selftest() -> int:
         (root / "docs" / "archive").mkdir(parents=True)
         (root / "docs" / "archive" / "old.md").write_text(planted, encoding="utf-8")
         (root / "docs" / "live.md").write_text(planted, encoding="utf-8")
-        (root / "TESTING_AND_ROADMAP.md").write_text(planted, encoding="utf-8")
-        names = ["docs/archive/old.md", "docs/live.md", "TESTING_AND_ROADMAP.md"]
+        (root / "docs" / "science").mkdir(parents=True)
+        (root / "docs" / "science" / "TESTING_AND_ROADMAP.md").write_text(planted, encoding="utf-8")
+        names = ["docs/archive/old.md", "docs/live.md", "docs/science/TESTING_AND_ROADMAP.md"]
         problems = findings(root, names)
         if [p.split(":")[0] for p in problems] != ["docs/live.md"] * 3:
             print(f"selftest FAILED: expected three findings in docs/live.md only, got {problems}")
             return 1
-        stale = stale_allowances(root, {"TESTING_AND_ROADMAP.md": "x", "missing.md": "y"})
+        stale = stale_allowances(root, {"docs/science/TESTING_AND_ROADMAP.md": "x", "missing.md": "y"})
         if len(stale) != 1 or not stale[0].startswith("missing.md"):
             print(f"selftest FAILED: expected exactly the missing allowance to be stale, got {stale}")
             return 1

@@ -437,7 +437,7 @@ Deploy `dist/` folder or run with ts-node directly.
 
 For additional information:
 - See `IMPLEMENTATION_COMPLETE.md` for architecture details
-- See `FINAL_STATUS.txt` for production readiness checklist
+- See `docs/history/FINAL_STATUS.txt` for production readiness checklist
 - See `QUICK_START.md` for beginner guide
 - Check git commit messages for rationale on design decisions
 

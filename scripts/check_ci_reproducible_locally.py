@@ -168,7 +168,7 @@ CI_ONLY: dict[str, str] = {
     ),
     "pnpm install --frozen-lockfile": (
         "Needs a network install of the JS workspace. Documented in "
-        "RUN_TESTS.md for the api-server workspace."
+        "docs/guides/RUN_TESTS.md for the api-server workspace."
     ),
     "pnpm run typecheck": (
         "Compiles the TypeScript workspace, so it needs the Node toolchain "
@@ -181,7 +181,8 @@ CI_ONLY: dict[str, str] = {
     ),
     "pnpm --filter @workspace/api-server run test": (
         "The TypeScript suite runs under pnpm in Science-Agent-Pipeline, "
-        "outside the Python Makefile's world. RUN_TESTS.md covers it."
+        "outside the Python Makefile's world. docs/guides/RUN_TESTS.md "
+        "covers it."
     ),
     "check_identifier_patterns_fresh.py": (
         "Consults the live identifiers.org registry, so it needs network "

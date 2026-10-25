@@ -1,6 +1,6 @@
 # Caterva API Documentation
 
-**The API reference lives at [`docs/API.md`](docs/API.md).**
+**The API reference lives at [`docs/API.md`](../API.md).**
 
 Every endpoint there is checked against the server's Express route table on
 every build by `scripts/check_example_endpoints.py`, so a renamed or removed
@@ -74,10 +74,10 @@ acts on it.
 
 | What | Where |
 |---|---|
-| HTTP API reference | [`docs/API.md`](docs/API.md) |
+| HTTP API reference | [`docs/API.md`](../API.md) |
 | The server itself | `Science-Agent-Pipeline/artifacts/api-server/src/routes/` |
-| Python client example | [`examples/python_integration.py`](examples/python_integration.py) |
-| Node client example | [`examples/nodejs_integration.js`](examples/nodejs_integration.js) |
-| The CLI (the root `src/` tree) | `src/cli/scientificCLI.ts`, and the "Using it" section of [`README.md`](README.md) |
+| Python client example | [`examples/python_integration.py`](../../examples/python_integration.py) |
+| Node client example | [`examples/nodejs_integration.js`](../../examples/nodejs_integration.js) |
+| The CLI (the root `src/` tree) | `src/cli/scientificCLI.ts`, and the "Using it" section of [`README.md`](../../README.md) |
 
 Both client examples are covered by the same guard as `docs/API.md`.

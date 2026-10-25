@@ -4,8 +4,8 @@
  * WHY IT EXISTS
  * -------------
  * `/api/perf` and `/api/cache/stats` were documented in
- * API_PERFORMANCE_GUIDE.md and API_ENHANCEMENT_SUMMARY.md with full
- * response bodies, and neither route was ever registered. Eighteen
+ * docs/api/API_PERFORMANCE_GUIDE.md and docs/api/API_ENHANCEMENT_SUMMARY.md
+ * with full response bodies, and neither route was ever registered. Eighteen
  * documented mentions, zero implementations. A reader following the guide
  * got a 404 and reasonably concluded the product was broken.
  *

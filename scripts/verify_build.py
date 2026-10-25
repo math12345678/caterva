@@ -324,7 +324,8 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # DOIs were the documentation example prefix, which resolves to nothing.
     # Deleted with ADR 0179; this keeps the next one out of every tracked
     # Markdown file. docs/archive/ is not read, as a record, and the guard
-    # names the two root documents allowed to quote a test input and why.
+    # names the two docs/science/ documents allowed to quote a test input
+    # and why.
     # The self-check runs first: on a clean tree a matcher that matches
     # nothing is green forever.
     guards.append(run_guard(
@@ -422,9 +423,9 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"{PYTHON} {SCRIPTS_DIR / 'check_documented_counts.py'}"
     ))
 
-    # The equations LITERATURE_BACKING_DATABASE.md documents must be the
-    # ones the engine solves. Added 2026-09-05, after an audit found four
-    # model sections describing maths the engine does not compute: PCR
+    # The equations docs/science/LITERATURE_BACKING_DATABASE.md documents
+    # must be the ones the engine solves. Added 2026-09-05, after an audit
+    # found four model sections describing maths the engine does not compute: PCR
     # written as N0 x E^n (a DECAY formula -- 1.2e10 off the implemented
     # `(1 + efficiency) ** cycle` at 30 cycles), SIR and SEIR written
     # density-dependent while model_building.py emits beta*S*I/N (R0 wrong

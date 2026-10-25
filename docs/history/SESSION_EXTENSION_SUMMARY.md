@@ -250,10 +250,10 @@ Dashboard visualization
 | **Alternative UI** | http://localhost:3000/api/docs/redoc |
 | **View metrics** | http://localhost:3000/api/metrics |
 | **Generate client** | `npm run generate:client:ts` |
-| **API reference** | `./API_QUICK_REFERENCE.md` |
-| **Integration guide** | `./OPENAPI_GUIDE.md` |
-| **Metrics guide** | `./METRICS_GUIDE.md` |
-| **Full OpenAPI spec** | `./openapi.yaml` |
+| **API reference** | `../api/API_QUICK_REFERENCE.md` |
+| **Integration guide** | `../api/OPENAPI_GUIDE.md` |
+| **Metrics guide** | `../operations/METRICS_GUIDE.md` |
+| **Full OpenAPI spec** | `../../openapi.yaml` |
 
 ---
 

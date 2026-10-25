@@ -441,7 +441,7 @@ docker logs caterva | grep -i "database\|storage"
 
 1. **Read the docs:** See `START_HERE.md` for complete feature overview
 2. **Try the dashboard:** Visit http://localhost:3000
-3. **Explore the API:** See `API_QUICK_REFERENCE.md`
+3. **Explore the API:** See `docs/api/API_QUICK_REFERENCE.md`
 4. **Integrate with Python/Node.js:** See examples/ directory
 5. **Deploy to production:** Follow cloud platform guide above
 
@@ -450,7 +450,7 @@ docker logs caterva | grep -i "database\|storage"
 **Questions? See the comprehensive guides:**
 - `START_HERE.md` — Feature overview
 - `VERIFIED_SYSTEM_STATUS.md` — All 19 endpoints
-- `EXPORT_AND_ANALYSIS_GUIDE.md` — Data export and analysis
+- `docs/api/EXPORT_AND_ANALYSIS_GUIDE.md` — Data export and analysis
 - `DEPLOYMENT_AND_OPS.md` — Production operations
 
 🚀 **Ready to go. Start with local, scale with Docker, deploy to cloud.**

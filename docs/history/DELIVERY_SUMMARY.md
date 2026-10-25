@@ -267,7 +267,7 @@ curl http://localhost:3000/api/metrics/sweeps
 curl http://localhost:3000/api/metrics/batches
 ```
 
-See `SWEEP_BATCH_METRICS.md` for complete API reference and usage examples.
+See `docs/operations/SWEEP_BATCH_METRICS.md` for complete API reference and usage examples.
 
 ---
 

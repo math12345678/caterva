@@ -4,7 +4,7 @@
 > `POST /api/simulate`, via the `enzyme` and `substrate` fields.
 >
 > Its "178/178 tests passing" figure is unverified; run `npm test`. Real
-> routes it omits are listed in [`docs/API.md`](docs/API.md), which is
+> routes it omits are listed in [`docs/API.md`](../API.md), which is
 > checked against the servers on every build.
 
 # Caterva Web Interface

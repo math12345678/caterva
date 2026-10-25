@@ -85,7 +85,7 @@
       "_claimed": "caught",
       "_note": "The verbatim historical text. A guard that cannot fail on the thing it was written for is decoration.",
       "file": "DOCUMENTATION_INDEX.md",
-      "find": "root holds 41 markdown files",
+      "find": "root holds 9 markdown files",
       "replace": "root holds 81 markdown files"
     },
     {
@@ -94,7 +94,7 @@
       "_claimed": "caught",
       "_note": "Deleting the claim satisfies a naive count check by removing what it counts. Both the presence test and the value test have to fire.",
       "file": "DOCUMENTATION_INDEX.md",
-      "find": "The repository root holds 41 markdown files. ",
+      "find": "The repository root holds 9 markdown files. ",
       "replace": ""
     },
     {
@@ -103,8 +103,8 @@
       "_claimed": "caught",
       "_note": "The subtler escape: rewrite `holds 41` as `held 41 as of 2026-08-16` and the live claim is gone while the file still looks careful. Dating a number is the right move for a finished migration and the wrong move for a directory that changes.",
       "file": "DOCUMENTATION_INDEX.md",
-      "find": "The repository root holds 41 markdown files.",
-      "replace": "The root held 41 markdown files as of 2026-08-16."
+      "find": "The repository root holds 9 markdown files.",
+      "replace": "The root held 9 markdown files as of 2026-10-24."
     },
     {
       "id": "A9",

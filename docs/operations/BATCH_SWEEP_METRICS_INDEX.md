@@ -31,7 +31,7 @@ All files listed below were created during the Batch/Sweep Metrics Recording imp
 
 ### 📋 What Was Built
 
-**[DELIVERY_SUMMARY.md](./DELIVERY_SUMMARY.md)**
+**[DELIVERY_SUMMARY.md](../history/DELIVERY_SUMMARY.md)**
 - High-level overview of deliverables
 - Key features list
 - Technical highlights
@@ -43,7 +43,7 @@ All files listed below were created during the Batch/Sweep Metrics Recording imp
 
 ### ✅ Implementation Details
 
-**[IMPLEMENTATION_CHECKLIST.md](./IMPLEMENTATION_CHECKLIST.md)**
+**[IMPLEMENTATION_CHECKLIST.md](../history/IMPLEMENTATION_CHECKLIST.md)**
 - Complete checklist of what was built
 - Test verification results
 - Backward compatibility confirmation
@@ -54,7 +54,7 @@ All files listed below were created during the Batch/Sweep Metrics Recording imp
 
 ### 💻 Code-Level Documentation
 
-**[CODE_OVERVIEW.md](./CODE_OVERVIEW.md)**
+**[CODE_OVERVIEW.md](../guides/CODE_OVERVIEW.md)**
 - Architecture diagram
 - Module descriptions
 - Key types and interfaces
@@ -173,10 +173,10 @@ openapi.yaml (+1 line)
 | Goal | Document |
 |------|----------|
 | **Use the feature now** | [QUICK_START_METRICS.md](./QUICK_START_METRICS.md) |
-| **Understand architecture** | [CODE_OVERVIEW.md](./CODE_OVERVIEW.md) |
+| **Understand architecture** | [CODE_OVERVIEW.md](../guides/CODE_OVERVIEW.md) |
 | **Read complete reference** | [SWEEP_BATCH_METRICS.md](./SWEEP_BATCH_METRICS.md) |
-| **See what was delivered** | [DELIVERY_SUMMARY.md](./DELIVERY_SUMMARY.md) |
-| **Verify implementation** | [IMPLEMENTATION_CHECKLIST.md](./IMPLEMENTATION_CHECKLIST.md) |
+| **See what was delivered** | [DELIVERY_SUMMARY.md](../history/DELIVERY_SUMMARY.md) |
+| **Verify implementation** | [IMPLEMENTATION_CHECKLIST.md](../history/IMPLEMENTATION_CHECKLIST.md) |
 
 ---
 
@@ -262,16 +262,16 @@ Grafana visualizes trends
 
 1. **New to metrics?** Start with [QUICK_START_METRICS.md](./QUICK_START_METRICS.md)
 2. **Want full picture?** Read [SWEEP_BATCH_METRICS.md](./SWEEP_BATCH_METRICS.md)
-3. **Need to modify?** Study [CODE_OVERVIEW.md](./CODE_OVERVIEW.md)
-4. **Verifying implementation?** Check [IMPLEMENTATION_CHECKLIST.md](./IMPLEMENTATION_CHECKLIST.md)
+3. **Need to modify?** Study [CODE_OVERVIEW.md](../guides/CODE_OVERVIEW.md)
+4. **Verifying implementation?** Check [IMPLEMENTATION_CHECKLIST.md](../history/IMPLEMENTATION_CHECKLIST.md)
 
 ---
 
 ## 🔗 Related Documentation
 
-- [METRICS.md](./METRICS.md) — Core metrics collector system
-- [MONITORING.md](./MONITORING.md) — Prometheus & Grafana setup
-- [START_HERE.md](./START_HERE.md) — Caterva project overview
+- [METRICS_GUIDE.md](./METRICS_GUIDE.md) — Core metrics collector system
+- [MONITORING_SETUP.md](./MONITORING_SETUP.md) — Prometheus & Grafana setup
+- [START_HERE.md](../../START_HERE.md) — Caterva project overview
 
 ---
 

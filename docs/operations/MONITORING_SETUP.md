@@ -461,7 +461,7 @@ caterva_failed_queries_total                 # Failed queries
 - **Prometheus docs:** https://prometheus.io/docs/
 - **Grafana docs:** https://grafana.com/docs/
 - **Docker Compose:** https://docs.docker.com/compose/
-- **Caterva API:** See `/OPENAPI_GUIDE.md`
+- **Caterva API:** See `/docs/api/OPENAPI_GUIDE.md`
 
 ---
 

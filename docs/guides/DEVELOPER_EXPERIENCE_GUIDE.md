@@ -540,10 +540,10 @@ Proposed / Accepted / Deprecated
 ## Quick Links
 
 - **Patterns:** See "Common Patterns" section above
-- **Testing:** See TESTING_AND_ROADMAP.md
+- **Testing:** See docs/science/TESTING_AND_ROADMAP.md
 - **Architecture:** See COMPLETE_REFACTORING_SUMMARY.md
 - **Quality:** See CODE_QUALITY_IMPROVEMENTS_FINAL.md
-- **Roadmap:** See TESTING_AND_ROADMAP.md (Phase 4+)
+- **Roadmap:** See docs/science/TESTING_AND_ROADMAP.md (Phase 4+)
 
 ---
 

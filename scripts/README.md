@@ -227,9 +227,9 @@ an x-ed-out suffix after `doi:`), which resolve to nothing. `docs/ARCHITECTURE_R
 beneath two such DOIs; it is deleted with ADR 0179.
 
 **Rules**: every `*.md` that `git ls-files` lists is read; `docs/archive/`
-is not, as a record, with the reason in the script; two root documents
-that quote a test's own input are allowed, each with its reason, and an
-allowance that stops matching fails (shrink-only). Fewer than 50 tracked
+is not, as a record, with the reason in the script; two documents in
+`docs/science/` that quote a test's own input are allowed, each with its
+reason, and an allowance that stops matching fails (shrink-only). Fewer than 50 tracked
 Markdown files is a broken scan, not a clean tree.
 
 **Usage**:

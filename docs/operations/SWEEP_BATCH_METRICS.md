@@ -428,6 +428,6 @@ A: The sweep/batch response includes the `sweepId`/`batchId`. Cross-reference wi
 
 ## See Also
 
-- [Metrics Collector Documentation](./METRICS.md) — Core metrics system
-- [Monitoring & Dashboards](./MONITORING.md) — Prometheus & Grafana setup
-- [OpenAPI Reference](./openapi.yaml) — Complete API specification
+- [Metrics Collector Documentation](./METRICS_GUIDE.md) — Core metrics system
+- [Monitoring & Dashboards](./MONITORING_SETUP.md) — Prometheus & Grafana setup
+- [OpenAPI Reference](../../openapi.yaml) — Complete API specification

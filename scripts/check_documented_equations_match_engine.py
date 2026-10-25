@@ -3,10 +3,10 @@
 
 WHAT THIS COMES FROM
 --------------------
-`LITERATURE_BACKING_DATABASE.md` is the document that says every number in
-this product is traceable to literature. Audited on 2026-09-05 against the
-engine it describes, four of its model sections described something the
-engine does not compute:
+`docs/science/LITERATURE_BACKING_DATABASE.md` is the document that says
+every number in this product is traceable to literature. Audited on
+2026-09-05 against the engine it describes, four of its model sections
+described something the engine does not compute:
 
   PCR        Documented `N(n) = N0 x E^n` with E in [0.85, 1.0] -- a DECAY
              formula. At 30 cycles with E = 0.9 that is 0.042*N0: a PCR
@@ -68,7 +68,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DOC = REPO_ROOT / "LITERATURE_BACKING_DATABASE.md"
+DOC = REPO_ROOT / "docs" / "science" / "LITERATURE_BACKING_DATABASE.md"
 
 PCR_PY = REPO_ROOT / "caterva" / "discrete" / "pcr.py"
 MODEL_BUILDING_PY = REPO_ROOT / "caterva" / "continuous" / "model_building.py"

@@ -18,6 +18,7 @@ that makes no sense.
 | [`AGENT_BRIEF.md`](AGENT_BRIEF.md) | you are an AI agent working on this repo, or setting one going |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | you want the shape of the system on one page: which layer does what, and which decision record decided it |
 | [`PUBLISHING.md`](PUBLISHING.md), [`INFRASTRUCTURE_DECISION.md`](INFRASTRUCTURE_DECISION.md), [`ARCHIVE_TRIAGE.md`](ARCHIVE_TRIAGE.md) | narrower, one-topic records |
+| [`api/`](api/), [`operations/`](operations/), [`guides/`](guides/), [`science/`](science/), [`history/`](history/) | you want one of the topic documents that used to sit at the repository root; [`../DOCUMENTATION_INDEX.md`](../DOCUMENTATION_INDEX.md) says which of them are current |
 | [`releases/`](releases/v0.3.0.md) | you want to know what a tagged version contains, and what it does not |
 | [`status/`](status/2026-09-21.md) | you want a dated snapshot of where the repository stands: figures, open problems, next steps, and what going public still needs |
 

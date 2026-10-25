@@ -331,9 +331,9 @@ With OpenAPI in place, the following become trivial:
 | Alternative UI (ReDoc) | http://localhost:3000/api/docs/redoc |
 | Raw Specification | http://localhost:3000/api/openapi.json |
 | Integration Guide | `./OPENAPI_GUIDE.md` |
-| TypeScript Generator | `./scripts/generate-openapi-clients.ts` |
-| Bash Generator | `./scripts/generate-client.sh` |
-| OpenAPI Spec | `./openapi.yaml` |
+| TypeScript Generator | `../../scripts/generate-openapi-clients.ts` |
+| Bash Generator | `../../scripts/generate-client.sh` |
+| OpenAPI Spec | `../../openapi.yaml` |
 
 ---
 

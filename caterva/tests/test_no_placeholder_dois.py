@@ -66,9 +66,10 @@ def test_a_real_doi_and_a_prefix_without_a_slash_are_clean(tmp_path):
 def test_the_archive_is_not_read_and_an_allowed_file_is_skipped(tmp_path):
     (tmp_path / "docs" / "archive").mkdir(parents=True)
     (tmp_path / "docs" / "archive" / "old.md").write_text(EXAMPLE_LINE, encoding="utf-8")
-    (tmp_path / "TESTING_AND_ROADMAP.md").write_text(EXAMPLE_LINE, encoding="utf-8")
+    (tmp_path / "docs" / "science").mkdir(parents=True)
+    (tmp_path / "docs" / "science" / "TESTING_AND_ROADMAP.md").write_text(EXAMPLE_LINE, encoding="utf-8")
     (tmp_path / "docs" / "live.md").write_text(EXAMPLE_LINE, encoding="utf-8")
-    names = ["docs/archive/old.md", "TESTING_AND_ROADMAP.md", "docs/live.md"]
+    names = ["docs/archive/old.md", "docs/science/TESTING_AND_ROADMAP.md", "docs/live.md"]
     assert guard.findings(tmp_path, names) == [f"docs/live.md:1: {EXAMPLE_LINE}"]
 
 
@@ -86,7 +87,13 @@ def test_a_binary_file_is_not_read(tmp_path):
 #: The allowances as they stood on 2026-10-24. The guard says its lists may
 #: only shrink, and until then nothing held them to it: a new entry for a
 #: file that does print a placeholder passed every check in the loops below.
-ALLOWED_AT_MOST = frozenset({"TESTING_AND_ROADMAP.md", "SCIENTIFIC_VALIDATION_FRAMEWORK.md"})
+#: The same two files at the paths they moved to that day, when the root's
+#: loose documents went into docs/ subfolders: a move renames an allowance,
+#: it does not add one.
+ALLOWED_AT_MOST = frozenset({
+    "docs/science/TESTING_AND_ROADMAP.md",
+    "docs/science/SCIENTIFIC_VALIDATION_FRAMEWORK.md",
+})
 EXCLUDED_AT_MOST = frozenset({"docs/archive/"})
 
 

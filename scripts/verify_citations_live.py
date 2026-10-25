@@ -164,7 +164,11 @@ DOI_SOURCE_FILES = [
     # citation surviving in two markdown files after the code was fixed" as
     # a known symptom. It survived in THIS file for another month, because
     # nothing read it.
-    ROOT / "LITERATURE_BACKING_DATABASE.md",
+    #
+    # Moved from the root to docs/science/ on 2026-10-24. A path that stops
+    # existing raises in discovered_dois() rather than shrinking this list,
+    # so the move had to be followed here for the check to run at all.
+    ROOT / "docs" / "science" / "LITERATURE_BACKING_DATABASE.md",
 ]
 
 #: A DOI is `10.<registrant>/<suffix>`. The suffix is deliberately not
@@ -205,8 +209,8 @@ _COMMENT_PREFIXES = ("#", "//", "*", "/*")
 #: The same rule, for markdown. A `>` blockquote is this repository's
 #: house style for "here is what this entry USED to say and why it was
 #: wrong" -- see the correction notes throughout
-#: LITERATURE_BACKING_DATABASE.md -- so it is the markdown equivalent of a
-#: comment: discussion, not assertion.
+#: docs/science/LITERATURE_BACKING_DATABASE.md -- so it is the markdown
+#: equivalent of a comment: discussion, not assertion.
 #:
 #: Note that `*` is deliberately NOT reused here even though it appears in
 #: _COMMENT_PREFIXES: in C-family sources it continues a block comment, but
@@ -216,7 +220,8 @@ _MARKDOWN_PROSE_PREFIXES = (">",)
 
 #: In markdown, a DOI is ASSERTED only when written as a resolvable link.
 #: A bare or backticked DOI in running text is being named, usually to
-#: record that it was wrong: LITERATURE_BACKING_DATABASE.md's Harter entry
+#: record that it was wrong: the Harter entry in
+#: docs/science/LITERATURE_BACKING_DATABASE.md
 #: cites `https://doi.org/10.2307/1403077` and, on the very same line,
 #: backticks `10.2307/1402059` to say that DOI resolves to a different
 #: paper. A line-level prose rule cannot separate those two; the link form

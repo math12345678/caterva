@@ -246,7 +246,7 @@ job = api.simulate({
 | Alternative UI | http://localhost:3000/api/docs/redoc |
 | Raw Spec | http://localhost:3000/api/openapi.json |
 | Full Guide | `./OPENAPI_GUIDE.md` |
-| Integration Guide | `./QUICK_START_DEPLOYMENT.md` |
+| Integration Guide | `../operations/QUICK_START_DEPLOYMENT.md` |
 
 ---
 
