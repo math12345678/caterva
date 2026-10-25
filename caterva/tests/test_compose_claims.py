@@ -620,19 +620,23 @@ class TestTheFlag:
         # PermissionError out of the argument check on Python 3.10-3.12 (and
         # said False on 3.13, letting the run fail at mkdir after the build).
         # Simulated, because a test running as root is never refused a stat.
+        # Path.stat is what is patched: on Python 3.10 pathlib bound os.stat
+        # when it was imported (_NormalAccessor.stat), so patching os.stat
+        # never reached the check there and this test failed on 3.10 alone.
         import errno
         import os
+        import pathlib
 
         locked = tmp_path / "locked"
         locked.mkdir()
-        real_stat = os.stat
+        real_stat = pathlib.Path.stat
 
-        def stat(path, *args, **kwargs):
-            if str(path).startswith(str(locked) + os.sep):
-                raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), str(path))
-            return real_stat(path, *args, **kwargs)
+        def stat(self, *args, **kwargs):
+            if str(self).startswith(str(locked) + os.sep):
+                raise PermissionError(errno.EACCES, os.strerror(errno.EACCES), str(self))
+            return real_stat(self, *args, **kwargs)
 
-        monkeypatch.setattr(os, "stat", stat)
+        monkeypatch.setattr(pathlib.Path, "stat", stat)
         target = locked / "run1"
         code, out, err = self._refused(target)
         assert code == 2
