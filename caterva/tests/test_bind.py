@@ -174,7 +174,7 @@ def test_survey_finds_no_sound_benchmark_among_human_ldh_kis(capsys):
 
 def test_survey_never_pools_species(capsys):
     from caterva.bind.__main__ import survey
-    rows = survey(KI_PAGE.read_text(), "1.1.1.27", "", "free")
+    rows = survey(KI_PAGE.read_text(encoding="utf-8"), "1.1.1.27", "", "free")
     gossypol = [(r["organism"], r["isoform"]) for r in rows if r["compound"] == "gossypol"]
     assert len(gossypol) == len(set(gossypol)) == 5
     assert ("Plasmodium falciparum", None) in gossypol
