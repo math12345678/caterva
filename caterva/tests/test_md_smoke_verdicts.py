@@ -64,6 +64,21 @@ def test_identical_areas_on_both_routes_near_a_threshold_but_clear_of_its_roundi
     assert _differ(rows, list(rows)) == ([], ["Asn46"])
 
 
+def test_areas_equal_as_printed_but_on_either_side_of_a_judged_boundary_are_explained():
+    """The CI run that failed: rep1's 97.5th percentile printed 0.38 on both routes (Asn46, 1.95 nm2), the
+    routes' unprinted digits were 0.3815 and 0.3790, and the share is judged rounded to a whole per cent, so
+    the boundary is 19.5% of 1.95 = 0.38025 nm2."""
+    rows = [0.47, 0.35, 0.32, 0.38, 0.40, 0.37, 0.44]
+    assert abs(0.38 - (BURIED - 0.005) * LARGEST) <= 0.005
+    assert _differ(rows, list(rows)) == (["Asn46"], [])
+
+
+def test_areas_equal_as_printed_a_few_hundredths_from_the_boundary_are_still_a_failure():
+    rows = [0.47, 0.35, 0.32, 0.40, 0.42, 0.37, 0.44]
+    assert min(abs(a - (s - 0.005) * LARGEST) for a in rows for s in (BURIED, EXPOSED)) > 0.005
+    assert _differ(rows, list(rows)) == ([], ["Asn46"])
+
+
 def test_areas_printed_alike_either_side_of_the_rounding_edge_explain_a_difference():
     """Every printed pair is equal and in one state, but rep1's 97.5th percentile lies either side of 19.5% of
     the maximum on the two routes (0.3815 and 0.3790 nm^2, both printed 0.38). The verdict judges the share

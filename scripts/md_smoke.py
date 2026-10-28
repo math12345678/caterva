@@ -278,16 +278,11 @@ def _verdicts_differ(native: dict, gromacs: dict, rows_n: dict, rows_g: dict) ->
     pair of the routes' areas falls in different states, or when the
     routes' areas differ and a threshold lies within their allowed
     disagreement of the span (some frame can then sit either side of it on
-    each route), or when every pair is equal as printed and one of them
-    lies within half a printed unit (0.005 nm²) of the area whose share
-    rounds onto a threshold (19.5% or 39.5%). The verdict judges the
-    unprinted area's share rounded to a whole per cent, so two areas
-    printed alike can sit either side of that line: Asn46 (maximum
-    1.95 nm²) at 0.3815 nm² on one route and 0.3790 nm² on the other, both
-    printed 0.38, failed the md-setup CI job on 2026-10-24. Identical areas
-    anywhere else cannot explain a different verdict, and neither can
-    areas clear of both thresholds: that is the verdict logic disagreeing
-    with itself, which is a failure."""
+    each route). Areas that are identical as printed explain a different
+    verdict only when one lies within half a printed unit (0.005 nm2) of a
+    judged boundary, where the routes' unprinted digits can fall either side;
+    away from both boundaries, and for areas clear of both thresholds, that is
+    the verdict logic disagreeing with itself, which is a failure."""
     explained, unexplained = [], []
     for label in native:
         if native[label][1] == gromacs.get(label, (None, None))[1]:
@@ -302,9 +297,10 @@ def _verdicts_differ(native: dict, gromacs: dict, rows_n: dict, rows_g: dict) ->
             near = any(min(areas) - allowance <= share * largest <= max(areas) + allowance
                        for share in (BURIED, EXPOSED))
         if not near and largest and pairs and all(a == b for a, b in pairs):
-            # Equal as printed (0.01 nm²) is not equal: each route's area lies
+            # Equal as printed (0.01 nm2) is not equal: each route's area lies
             # within half a printed unit of its cell, and the verdict judges
-            # the share rounded to a whole per cent.
+            # the share rounded to a whole per cent, so its boundaries sit at
+            # 19.5% and 39.5% of the largest area.
             near = any(abs(a - (share - 0.005) * largest) <= 0.005
                        for a, _ in pairs for share in (BURIED, EXPOSED))
         (explained if near else unexplained).append(label)
