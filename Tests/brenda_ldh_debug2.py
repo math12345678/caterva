@@ -47,7 +47,10 @@ print(f"Page <title>: {title.get_text(strip=True) if title else 'NOT FOUND'}")
 print("\nAll showTable nav links found on this page:")
 nav_links = []
 for a in soup.find_all("a", href=True):
-    m = _SHOW_TABLE_HREF_PATTERN.search(a["href"])
+    href = a["href"]
+    if isinstance(href, list):
+        href = href[0] if href else ""
+    m = _SHOW_TABLE_HREF_PATTERN.search(str(href))
     if m:
         label = a.get_text(strip=True)
         nav_links.append((label, m.group(1)))

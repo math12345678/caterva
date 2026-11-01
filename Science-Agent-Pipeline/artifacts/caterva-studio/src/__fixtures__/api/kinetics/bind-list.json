@@ -1,0 +1,142 @@
+{
+ "captured": {
+  "via": "caterva.studio.dispatch.App.dispatch",
+  "request": {
+   "kind": "bind",
+   "request": {
+    "ec": "1.1.1.27",
+    "organism": "human",
+    "mode": "list"
+   }
+  }
+ },
+ "run": {
+  "schema": "caterva.studio.run/1",
+  "id": "20261001-073714-bind-96c1e8f9",
+  "kind": "bind",
+  "title": "EC 1.1.1.27, compounds with a Ki, human",
+  "status": "done",
+  "created_at": "2026-10-01T07:37:14.453Z",
+  "started_at": "2026-10-01T07:37:14.455Z",
+  "finished_at": "2026-10-01T07:37:14.462Z",
+  "caterva_version": "0.4.0",
+  "cli": [
+   "caterva",
+   "bind",
+   "--ec=1.1.1.27",
+   "--organism=human",
+   "--list"
+  ],
+  "request": {
+   "ec": "1.1.1.27",
+   "organism": "human",
+   "mode": "list"
+  },
+  "outcome": {
+   "exit_code": 0,
+   "meaning": "produced",
+   "summary": "Compounds with a recorded Ki for EC 1.1.1.27 in Homo sapiens:",
+   "reason": null
+  },
+  "error": null,
+  "artifacts": [],
+  "progress": {
+   "stage": "rows",
+   "label": "Reading the Ki rows for EC 1.1.1.27 in Homo sapiens",
+   "fraction": null
+  }
+ },
+ "result_status": 200,
+ "result": {
+  "mode": "list",
+  "compounds": [
+   "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid",
+   "gossypol"
+  ],
+  "survey": [],
+  "target": null,
+  "verdict": null,
+  "report_text": "Compounds with a recorded Ki for EC 1.1.1.27 in Homo sapiens:\n  3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid\n  gossypol"
+ },
+ "error": null,
+ "events": [
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-073714-bind-96c1e8f9",
+    "seq": 1,
+    "at": "2026-10-01T07:37:14.454Z",
+    "status": "queued"
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-073714-bind-96c1e8f9",
+    "seq": 2,
+    "at": "2026-10-01T07:37:14.456Z",
+    "status": "running"
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261001-073714-bind-96c1e8f9",
+    "seq": 3,
+    "at": "2026-10-01T07:37:14.457Z",
+    "stage": "fetch",
+    "label": "Reading BRENDA's page for EC 1.1.1.27",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261001-073714-bind-96c1e8f9",
+    "seq": 4,
+    "at": "2026-10-01T07:37:14.458Z",
+    "stage": "rows",
+    "label": "Reading the Ki rows for EC 1.1.1.27 in Homo sapiens",
+    "fraction": null
+   }
+  },
+  {
+   "event": "result",
+   "data": {
+    "run_id": "20261001-073714-bind-96c1e8f9",
+    "seq": 5,
+    "at": "2026-10-01T07:37:14.462Z",
+    "outcome": {
+     "exit_code": 0,
+     "meaning": "produced",
+     "summary": "Compounds with a recorded Ki for EC 1.1.1.27 in Homo sapiens:",
+     "reason": null
+    }
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-073714-bind-96c1e8f9",
+    "seq": 6,
+    "at": "2026-10-01T07:37:14.463Z",
+    "status": "done",
+    "outcome": {
+     "exit_code": 0,
+     "meaning": "produced",
+     "summary": "Compounds with a recorded Ki for EC 1.1.1.27 in Homo sapiens:",
+     "reason": null
+    }
+   }
+  },
+  {
+   "event": "end",
+   "data": {
+    "run_id": "20261001-073714-bind-96c1e8f9",
+    "seq": 7,
+    "at": "2026-10-01T07:37:14.463Z",
+    "status": "done"
+   }
+  }
+ ]
+}

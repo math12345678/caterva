@@ -19,20 +19,31 @@ Also exercised by tests/test_dependencies_declared.py in both suites.
 from __future__ import annotations
 
 import ast
+import os
 import pathlib
 import sys
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
-# Directories that hold source we care about. Exploratory one-off scripts
-# (Tests/big_test*.py) are deliberately excluded from pytest collection by
-# Tests/pytest.ini and are excluded here for the same reason: they're not
-# part of what CI actually runs, so their imports (e.g. openai) don't need
-# to be production dependencies.
+# Directories that hold source we care about. Exploratory scripts
+# (Tests/big_test*.py) are excluded from pytest collection via
+# Tests/pytest.ini. They are also excluded from this check because they
+# are not CI dependencies. Their imports are not required to be in
+# production dependencies.
 SOURCE_DIRS = [
-    REPO_ROOT / "Tellurium",
+    REPO_ROOT / "caterva",
     REPO_ROOT / "Tests",
 ]
+
+# api-server's science-agent bridge is Python product code that Tests/
+# imports directly (Tests/test_runner_contract.py, Stage 5 Part 4) but that
+# lives outside SOURCE_DIRS. Like scripts/, it's local code — its imports
+# are stdlib-only — so its stems belong in the local set, not in
+# requirements. If it ever grows third-party imports, those must be
+# declared; this listing only covers its module names.
+API_SERVER_LIB = (
+    REPO_ROOT / "Science-Agent-Pipeline" / "artifacts" / "api-server" / "src" / "lib"
+)
 
 EXCLUDE_NAME_PREFIXES = ("big_test",)
 EXCLUDE_DIR_NAMES = {"__pycache__", ".pytest_cache", ".hypothesis", "node_modules", ".venv"}
@@ -43,13 +54,49 @@ EXCLUDE_DIR_NAMES = {"__pycache__", ".pytest_cache", ".hypothesis", "node_module
 IMPORT_TO_DISTRIBUTION = {
     "roadrunner": "libroadrunner",
     "libsbml": "python-libsbml",
+    # Same shape: the distribution is `python-libsedml`, the module is
+    # `libsedml`. Without this the guard reports a declared dependency as
+    # undeclared, which is a false accusation and trains people to ignore it.
+    "libsedml": "python-libsedml",
     "bs4": "beautifulsoup4",
     "yaml": "pyyaml",
 }
 
 
 def _stdlib_names() -> set[str]:
-    names = set(sys.stdlib_module_names) | set(sys.builtin_module_names)
+    # sys.stdlib_module_names was added in Python 3.10.
+    if hasattr(sys, "stdlib_module_names"):
+        names = set(sys.stdlib_module_names)
+    else:
+        # Fallback for Python 3.9: discover stdlib modules by walking
+        # the stdlib directory and checking builtins.
+        names = set()
+        # Builtins are always available.
+        names.update(sys.builtin_module_names)
+        # Walk the stdlib package directory to discover pure-Python modules.
+        stdlib_path = os.path.dirname(os.__file__)
+        if stdlib_path:
+            for entry in pathlib.Path(stdlib_path).iterdir():
+                if entry.is_file() and entry.suffix == ".py":
+                    names.add(entry.stem)
+                elif entry.is_dir() and (entry / "__init__.py").exists():
+                    names.add(entry.name)
+        # Also discover C extension modules (like math, cmath, etc.) by
+        # checking common known stdlib modules that aren't in the directory.
+        # This is a pragmatic list of modules that are part of the stdlib
+        # but implemented in C and not discoverable by directory walking.
+        known_stdlib_c_extensions = {
+            "math", "cmath", "_math", "_cmath", "_socket", "_ssl",
+            "_hashlib", "_hmac", "_sha1", "_sha256", "_sha512",
+            "_md5", "_blake2", "_crypt", "_dbm", "_gdbm", "_sqlite3",
+            "_decimal", "_elementtree", "_csv", "_json", "_pickle",
+            "_struct", "_multibytecodec", "_codecs_cn", "_codecs_hk",
+            "_codecs_jp", "_codecs_kr", "_codecs_tw", "_tkinter",
+            "_curses", "_curses_panel", "_bz2", "_lzma", "zlib",
+            "_queue", "_heapq", "_bisect", "_random", "_statistics",
+            "_datetime", "_zoneinfo", "_sha3", "_keccak",
+        }
+        names.update(known_stdlib_c_extensions)
     names.add("__future__")  # pseudo-module, not listed in stdlib_module_names
     return {n.lower() for n in names if not n.startswith("_") or n == "__future__"}
 
@@ -59,13 +106,28 @@ def _local_module_stems() -> set[str]:
     # scripts/ isn't scanned for imports (it's tooling, not product code or
     # tests) but its modules (e.g. check_dependencies_declared itself, used
     # by tests/test_dependencies_declared.py) are still local, not pip deps.
-    for src_dir in [*SOURCE_DIRS, REPO_ROOT / "scripts"]:
+    for src_dir in [*SOURCE_DIRS, REPO_ROOT / "scripts", API_SERVER_LIB]:
         if not src_dir.exists():
             continue
+        # The directory itself is a local package root when something
+        # imports it by name (e.g. `from caterva.caterva_engine import
+        # ...`, used by caterva/cli.py when run as `python -m
+        # caterva.cli` from the repo root) -- not just its file stems.
+        stems.add(src_dir.name.lower())
         for path in src_dir.rglob("*.py"):
             if any(part in EXCLUDE_DIR_NAMES for part in path.parts):
                 continue
             stems.add(path.stem.lower())
+            # Any directory holding an __init__.py is an importable package,
+            # at any depth. After the engine was split into subpackages
+            # (core/, continuous/, discrete/, scenarios/) a bare
+            # `from continuous.simulations import ...` looked like a
+            # third-party import to this guard purely because only the top
+            # source directory was registered. Register every package
+            # directory instead -- the same blind spot as the package-level
+            # import fixed in Stage 4 Part 1, one level deeper.
+            if path.name == "__init__.py":
+                stems.add(path.parent.name.lower())
     return stems
 
 
@@ -114,10 +176,19 @@ def collect_third_party_imports() -> dict[str, list[str]]:
 
 def declared_distributions() -> set[str]:
     declared: set[str] = set()
-    for req_file in ("requirements.txt", "requirements-dev.txt"):
-        req_path = REPO_ROOT / req_file
-        if not req_path.exists():
-            continue
+    # Every requirements file in the repository root, not a fixed pair.
+    #
+    # `requirements-popgen.txt` was added when stdpopsim was split out on
+    # licence grounds (GPL-3.0-or-later against Caterva's Apache-2.0). It is
+    # a real declaration -- it names the package, pins it, and explains the
+    # obligation -- but this guard only read two filenames, so it reported a
+    # DECLARED dependency as undeclared for two days.
+    #
+    # A false accusation is worse than a missed one: it trains people to
+    # ignore the guard, and this one sits in `make guards`. Globbing means
+    # the next optional-extras file is covered on the day it is created
+    # rather than on the day someone remembers this list exists.
+    for req_path in sorted(REPO_ROOT.glob("requirements*.txt")):
         for line in req_path.read_text().splitlines():
             line = line.strip()
             if not line or line.startswith("#") or line.startswith("-r"):
@@ -143,8 +214,7 @@ def find_undeclared() -> dict[str, list[str]]:
 def main() -> int:
     undeclared = find_undeclared()
     if not undeclared:
-        print("OK: every third-party import is declared in requirements.txt "
-              "or requirements-dev.txt.")
+        print("OK: every third-party import is declared in a requirements file.")
         return 0
 
     print("Undeclared dependencies found:\n")
@@ -155,8 +225,8 @@ def main() -> int:
         if len(files) > 3:
             print(f"    ...and {len(files) - 3} more file(s)")
     print(
-        "\nThese modules are imported somewhere in Tellurium/ or Tests/ but "
-        "are not listed in requirements.txt or requirements-dev.txt. A fresh "
+        "\nThese modules are imported somewhere in caterva/ or Tests/ but "
+        "are not listed in any requirements*.txt file. A fresh "
         "install (like CI does) will fail to collect the affected tests."
     )
     return 1

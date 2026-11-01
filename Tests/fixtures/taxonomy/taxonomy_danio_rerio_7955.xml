@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SOURCE
+  Lineage captured 2026-08-13 from the NCBI Taxonomy browser
+  (https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Info&id=7955).
+  Taxon ids, scientific names and ranks are reproduced exactly as NCBI
+  served them, including ranks that look unusual ("cellular root",
+  "domain" where older records said "superkingdom", and the kingdom-level
+  bacterial names NCBI introduced in its recent revisions).
+
+  STRUCTURE
+  Wrapped in NCBI's eFetch taxonomy XML shape (TaxaSet/Taxon/LineageEx)
+  so that taxonomy.parse_taxon_lineage is exercised against the format it
+  will actually receive at runtime. The wrapper is reconstructed; the
+  lineage content is captured. That distinction is stated here rather than
+  left to be discovered, because a fixture that quietly mixes captured and
+  invented data is exactly the failure this project is about.
+
+  NCBI Taxonomy data is produced by the National Center for Biotechnology
+  Information, U.S. National Library of Medicine, and is in the public
+  domain. See NOTICE at the repository root.
+
+  DO NOT hand-edit. Regenerate from the capture if NCBI's taxonomy changes.
+-->
+<TaxaSet>
+  <Taxon>
+    <TaxId>7955</TaxId>
+    <ScientificName>Danio rerio</ScientificName>
+    <ParentTaxId>7954</ParentTaxId>
+    <Rank>species</Rank>
+    <Lineage>cellular organisms; Eukaryota; Opisthokonta; Metazoa; Eumetazoa; Bilateria; Deuterostomia; Chordata; Craniata; Vertebrata; Gnathostomata; Teleostomi; Euteleostomi; Actinopterygii; Actinopteri; Neopterygii; Teleostei; Osteoglossocephalai; Clupeocephala; Otomorpha; Ostariophysi; Otophysi; Cypriniphysae; Cypriniformes; Cyprinoidei; Danionidae; Danioninae; Danio</Lineage>
+    <LineageEx>
+      <Taxon><TaxId>131567</TaxId><ScientificName>cellular organisms</ScientificName><Rank>cellular root</Rank></Taxon>
+      <Taxon><TaxId>2759</TaxId><ScientificName>Eukaryota</ScientificName><Rank>domain</Rank></Taxon>
+      <Taxon><TaxId>33154</TaxId><ScientificName>Opisthokonta</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>33208</TaxId><ScientificName>Metazoa</ScientificName><Rank>kingdom</Rank></Taxon>
+      <Taxon><TaxId>6072</TaxId><ScientificName>Eumetazoa</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>33213</TaxId><ScientificName>Bilateria</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>33511</TaxId><ScientificName>Deuterostomia</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>7711</TaxId><ScientificName>Chordata</ScientificName><Rank>phylum</Rank></Taxon>
+      <Taxon><TaxId>89593</TaxId><ScientificName>Craniata</ScientificName><Rank>subphylum</Rank></Taxon>
+      <Taxon><TaxId>7742</TaxId><ScientificName>Vertebrata</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>7776</TaxId><ScientificName>Gnathostomata</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>117570</TaxId><ScientificName>Teleostomi</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>117571</TaxId><ScientificName>Euteleostomi</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>7898</TaxId><ScientificName>Actinopterygii</ScientificName><Rank>superclass</Rank></Taxon>
+      <Taxon><TaxId>186623</TaxId><ScientificName>Actinopteri</ScientificName><Rank>class</Rank></Taxon>
+      <Taxon><TaxId>41665</TaxId><ScientificName>Neopterygii</ScientificName><Rank>subclass</Rank></Taxon>
+      <Taxon><TaxId>32443</TaxId><ScientificName>Teleostei</ScientificName><Rank>infraclass</Rank></Taxon>
+      <Taxon><TaxId>1489341</TaxId><ScientificName>Osteoglossocephalai</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>186625</TaxId><ScientificName>Clupeocephala</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>186634</TaxId><ScientificName>Otomorpha</ScientificName><Rank>cohort</Rank></Taxon>
+      <Taxon><TaxId>32519</TaxId><ScientificName>Ostariophysi</ScientificName><Rank>subcohort</Rank></Taxon>
+      <Taxon><TaxId>186626</TaxId><ScientificName>Otophysi</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>186627</TaxId><ScientificName>Cypriniphysae</ScientificName><Rank>superorder</Rank></Taxon>
+      <Taxon><TaxId>7952</TaxId><ScientificName>Cypriniformes</ScientificName><Rank>order</Rank></Taxon>
+      <Taxon><TaxId>30727</TaxId><ScientificName>Cyprinoidei</ScientificName><Rank>suborder</Rank></Taxon>
+      <Taxon><TaxId>2743709</TaxId><ScientificName>Danionidae</ScientificName><Rank>family</Rank></Taxon>
+      <Taxon><TaxId>2743711</TaxId><ScientificName>Danioninae</ScientificName><Rank>subfamily</Rank></Taxon>
+      <Taxon><TaxId>7954</TaxId><ScientificName>Danio</ScientificName><Rank>genus</Rank></Taxon>
+    </LineageEx>
+  </Taxon>
+</TaxaSet>

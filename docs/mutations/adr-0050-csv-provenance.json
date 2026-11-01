@@ -1,0 +1,42 @@
+{
+  "_why": [
+    "ADR 0050's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "The row worth re-deriving is C5, which is the only entry in this project",
+    "resolved by DELETING code rather than adding a test.",
+    "",
+    "C5 removed `.replace(/\\r?\\n/g, \" \")` and no test failed. The line was",
+    "dead: `\\s` matches `\\n` in JavaScript, so the `.replace(/\\s+/g, \" \")`",
+    "below it had always done the whole job. Deleting a dead line is right,",
+    "but it leaves a claim behind -- the ADR says the test was re-pointed at",
+    "the surviving mechanism and 'now fails 1 test'.",
+    "",
+    "That claim is what C5R checks. If the re-point did not take, the",
+    "flattening would be untested and nobody would know, because the original",
+    "mutation can no longer be run against a line that no longer exists.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0050-csv-provenance.json"
+  ],
+  "covers": ["0050"],
+  "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/trajectoryCsv.test.ts",
+  "mutations": [
+    {
+      "id": "C5R",
+      "description": "remove the SURVIVING flattener (the re-pointed C5)",
+      "_claimed": "1 failed, after C5's dead line was deleted and the test re-pointed",
+      "_note": "A note containing a newline would otherwise emit a bare data row into the middle of the `#` header, and pandas would read it as data.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/trajectoryCsv.ts",
+      "find": "    .replace(/\\s+/g, \" \")\n",
+      "replace": ""
+    },
+    {
+      "id": "C6",
+      "description": "missing provenance reads as resolved rather than unknown",
+      "_claimed": "1 failed",
+      "_note": "`origin ?? \"unknown\"`. A parameter with no provenance entry must not read as resolved -- the same rule as ADR 0029's `unstated` not being `wild_type`.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/trajectoryCsv.ts",
+      "find": "  const origin = provenance?.origin ?? \"unknown\";",
+      "replace": "  const origin = provenance?.origin ?? \"resolved\";"
+    }
+  ]
+}

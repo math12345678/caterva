@@ -1,0 +1,36 @@
+{
+  // landing/ held hand-written TypeScript that no tsconfig.json covered, so
+  // nothing type-checked it -- including `src/lib/drift.ts`, which
+  // reimplements Wright-Fisher neutral drift for the browser. That file
+  // makes a numerical claim the product also makes in Python, so it is
+  // exactly the kind of code that should not go unchecked.
+  "compilerOptions": {
+    "lib": ["es2022", "dom"],
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "useUnknownInCatchVariables": true,
+
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": []
+  },
+  // Covers the whole tree, including src/components/VerificationConsole.tsx.
+  //
+  // This was `["src/lib"]` because the component imports `react` and
+  // neither react nor @types/react was installed anywhere in the
+  // repository, so including it would have failed with TS2307 on every run
+  // -- a guard permanently red for a missing dependency rather than for a
+  // defect. `@types/react` is now a devDependency of the root package.json
+  // (Node resolution walks up from landing/ and finds it), so the JSX
+  // shell is type-checked alongside the numerical core it wraps.
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

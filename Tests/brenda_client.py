@@ -40,14 +40,20 @@ intentionally permissive (case-insensitive substring), and callers should
 pass every known spelling variant for a substrate name when they have one.
 """
 
+from __future__ import annotations
+
 import re
-from typing import Optional
+from typing import List
 
 import httpx
 from bs4 import BeautifulSoup
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import enzyme_lookup
+from effector import Effector, extract_effectors
+from protein_variant import VariantVerdict, classify as classify_variant
+from assay_conditions import parse_assay_conditions
+from http_retry import retry_get
 
 
 class BRENDAKmEntry(BaseModel):
@@ -55,12 +61,40 @@ class BRENDAKmEntry(BaseModel):
     unit: str = "mM"
     substrate: str
     organism: str
-    uniprot: Optional[str] = None
-    conditions: Optional[str] = None
-    reference_id: Optional[str] = None
-    ec_number: Optional[str] = None
+    uniprot: str | None = None
+    #: Raw commentary cell from BRENDA, e.g. "pH 8.5, 25°C, isozyme H4".
+    conditions: str | None = None
+    # --- Structured assay conditions, parsed from `conditions` -------------
+    #
+    # STRENDA requires temperature and pH for all reported kinetic data
+    # ("...MUST always be included, even if previously published",
+    # Guidelines v1.4.0). Km is a property of an enzyme *measured under
+    # conditions* and moves with both, so a Km without them cannot be
+    # reproduced or compared. BRENDA supplies them in the commentary; before
+    # this they were captured as raw text and never read. See ADR 0010.
+    #
+    # None means "not available", never a default. Nothing here is guessed.
+    assay_ph: float | None = None
+    assay_temperature_c: float | None = None
+    assay_buffer: str | None = None
+    #: Fields BRENDA explicitly states the original publication did not
+    #: report -- a fact about the literature, distinct from a parse failure.
+    assay_unreported: List[str] = Field(default_factory=list)
+    #: Cofactors and allosteric effectors named in the commentary, with
+    #: their presence state. The same string that yields pH, temperature and
+    #: buffer also says "in absence of fructose 1,6-bisphosphate", and that
+    #: clause was discarded until ADR 0032.
+    effectors: "list[Effector]" = Field(default_factory=list)
+    #: Which protein this row measured: the enzyme, or a variant of it.
+    #:
+    #: The same commentary cell that yields pH and temperature also says
+    #: "Y124C mutant" or "isozyme H4", and that half of it used to be
+    #: discarded. See protein_variant.py and ADR 0029.
+    variant: "VariantVerdict | None" = None
+    reference_id: str | None = None
+    ec_number: str | None = None
     flagged: bool = False
-    flag_reason: Optional[str] = None
+    flag_reason: str | None = None
     # False when this row was NOT matched against a known substrate name
     # (or synonym) and was instead included via the unfiltered fallback -
     # see fetch_and_parse_brenda_km. When False, `substrate` is a
@@ -119,15 +153,67 @@ def classify_substrate(substrate_name: str) -> str:
 KM_PLAUSIBLE_MIN_MM = 0.0000001
 KM_PLAUSIBLE_MAX_MM = 1000
 
+# kcat (turnover number), s^-1. Must match caterva/core/data_structures.py
+# exactly -- ADR 0003 makes these a cross-layer contract, and
+# scripts/check_plausibility_constants.py enforces the agreement.
+#
+# Anchored to Bar-Even et al. (2011), Biochemistry 50(21), 4402-4410
+# (median kcat ~10 s^-1 across several thousand enzymes); catalase, the
+# fastest known enzyme, is ~4e7 s^-1; the diffusion-limited ceiling is
+# ~1e8-1e9 s^-1. Above that a number cannot be a turnover rate at all.
+KCAT_PLAUSIBLE_MIN_PER_S = 0.000001
+KCAT_PLAUSIBLE_MAX_PER_S = 1000000000
+
+#: BRENDA's navigation label for the Michaelis constant table.
+KM_TABLE_LABEL = "KM Values"
+
+#: BRENDA's navigation label for the turnover-number table.
+TURNOVER_TABLE_LABEL = "Turnover Numbers"
+
+#: BRENDA's navigation label for the inhibition-constant table.
+KI_TABLE_LABEL = "Ki Values"
+
 BRENDA_ENZYME_URL = "https://www.brenda-enzymes.org/enzyme.php"
 
 
 def fetch_brenda_html(ec_number: str, timeout: float = 15) -> str:
     """Fetch the raw HTML for a BRENDA enzyme page. The only network call
-    in this module - keep it isolated so parsing stays testable offline."""
-    r = httpx.get(BRENDA_ENZYME_URL, params={"ecno": ec_number}, timeout=timeout)
+    in this module - keep it isolated so parsing stays testable offline.
+
+    When CATERVA_BRENDA_RECORDED names a directory holding
+    brenda_<ec>.html.gz, that recorded real page is returned instead (see
+    Tests/fixtures/recorded/README.md). Only test configurations set it;
+    an EC with no recording there is still fetched live.
+    """
+    import os
+    recorded = os.environ.get("CATERVA_BRENDA_RECORDED")
+    if recorded:
+        import gzip
+        from pathlib import Path
+        page = Path(recorded) / f"brenda_{ec_number}.html.gz"
+        if page.is_file():
+            html = gzip.decompress(page.read_bytes()).decode("utf-8")
+            _observed(ec_number, html, str(page))
+            return html
+    r = retry_get(BRENDA_ENZYME_URL, params={"ecno": ec_number}, timeout=timeout)
     r.raise_for_status()
+    _observed(ec_number, r.text, None)
     return r.text
+
+
+#: Observers called with (ec_number, html, served_from) after every page fetch_brenda_html
+#: returns, live or recorded. The evidence layer registers one to pin what the resolver
+#: read (ADR 0179). Nothing else reads this.
+PAGE_OBSERVERS: list = []
+
+
+def _observed(ec_number: str, html: str, served_from: str | None) -> None:
+    """Tell each observer what was just fetched. An observer that raises stops
+    the fetch: a page the evidence layer could not pin must not be used as
+    though it had been, and nothing registers an observer unless it was asked
+    to pin (`caterva compose --claims`)."""
+    for observer in list(PAGE_OBSERVERS):  # noqa: PERF101 - a snapshot: a Recorder may deregister while a scout thread is notifying
+        observer(ec_number, html, served_from)
 
 
 # Generic binomial-nomenclature pattern ("Genus species", optionally
@@ -194,7 +280,10 @@ def _find_table_container(soup: BeautifulSoup, label: str):
     for a in soup.find_all("a", href=True):
         if a.get_text(strip=True).strip().lower() != label.lower():
             continue
-        match = _SHOW_TABLE_HREF_PATTERN.search(a["href"])
+        href = a["href"]
+        if isinstance(href, list):
+            href = href[0] if href else ""
+        match = _SHOW_TABLE_HREF_PATTERN.search(str(href))
         if not match:
             continue
         tab_id = match.group(1)
@@ -204,13 +293,55 @@ def _find_table_container(soup: BeautifulSoup, label: str):
     return None
 
 
+def has_data_table(html: str, table_label: str) -> bool:
+    """Whether this page actually carries the named table.
+
+    WHY A CALLER WOULD NEED TO ASK
+    ------------------------------
+    `_find_table_container` returns None when the label is absent, and its
+    docstring tells the caller to "fall back to whole-page scanning and
+    treat results as less trustworthy". `parse_brenda_km_html` does exactly
+    that, which is right for the resolver: with a target substrate and a
+    target organism, rows from the wrong table are filtered out anyway.
+
+    It is NOT right for a caller running in permissive mode, where nothing
+    filters. Measured: `parse_brenda_km_html(..., table_label="Ki Values",
+    target_substrates=[], target_organism=None,
+    require_substrate_match=False)` on an LDH page that has only a "KM
+    Values" table returns 8 rows -- the Km table's -- and a caller that
+    reports them as Ki data is describing measurements that do not exist.
+
+    "This enzyme has no Ki table" is also a better answer than a corrected
+    list would be: it diagnoses the QUANTITY rather than the substrate
+    name, which is what the reader actually got wrong.
+    """
+    return _find_table_container(BeautifulSoup(html, "html.parser"), table_label) is not None
+
+
+def _compound_cell(cell_texts: list, target_organism: str | None) -> str | None:
+    """The compound named by a data row: the first cell after the value that
+    is not an organism, an accession, a placeholder or a bare number. None
+    when the row has no such cell before its commentary would begin."""
+    for cell in cell_texts[1:3]:
+        c = cell.strip()
+        if not c or c == "-":
+            continue
+        if GENERIC_ORGANISM_PATTERN.fullmatch(c) or (target_organism and c == target_organism):
+            return None
+        if UNIPROT_CELL_PATTERN.match(c) or re.match(r"^\d+\.?\d*$", c):
+            continue
+        return c
+    return None
+
+
 def parse_brenda_km_html(
     html: str,
     ec_number: str,
     target_substrates: list,
-    target_organism: Optional[str] = "Homo sapiens",
-    fallback_uniprot: Optional[str] = None,
+    target_organism: str | None = "Homo sapiens",
+    fallback_uniprot: str | None = None,
     require_substrate_match: bool = True,
+    table_label: str = KM_TABLE_LABEL,
 ) -> list[BRENDAKmEntry]:
     """Pure parsing function: HTML string in, structured Km entries out.
     No network access, no built-in knowledge of any specific enzyme.
@@ -245,9 +376,24 @@ def parse_brenda_km_html(
     downstream code can decide whether to trust it.
     """
 
+    # Plausibility bounds and labelling depend on which table is parsed.
+    # Km and Ki are both concentrations in mM; kcat is a turnover number in
+    # s^-1, so the Km range is meaningless for it -- a kcat of 6500 is
+    # ordinary, a Km of 6500 mM is a unit error. Sharing the Km bounds
+    # across all three would flag every fast enzyme.
+    if table_label == TURNOVER_TABLE_LABEL:
+        _quantity, _unit = "kcat", "1/s"
+        _min_value, _max_value = KCAT_PLAUSIBLE_MIN_PER_S, KCAT_PLAUSIBLE_MAX_PER_S
+    elif table_label == KI_TABLE_LABEL:
+        _quantity, _unit = "Ki", "mM"
+        _min_value, _max_value = KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM
+    else:
+        _quantity, _unit = "Km", "mM"
+        _min_value, _max_value = KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM
+
     soup = BeautifulSoup(html, "lxml")
 
-    km_table = _find_table_container(soup, "KM Values")
+    km_table = _find_table_container(soup, table_label)
     if km_table is not None:
         search_root = km_table
         table_scoped = True
@@ -277,7 +423,15 @@ def parse_brenda_km_html(
     # conditions, ref id). Pull them in so aggregate substrates aren't
     # silently dropped.
     subrows = search_root.find_all("div", id=re.compile(r"sr\d+$"))
-    rows = rows + subrows
+
+    # Deduplicate by identity. A sub-row that ALSO carries a "row" class is
+    # matched by both selectors, and plain concatenation then parsed it
+    # twice -- the same measurement returned as two entries. The Km fixtures
+    # never tripped this; the AChE Turnover Numbers capture has 11 such rows.
+    _seen: dict = {}
+    for _row in rows + subrows:
+        _seen.setdefault(id(_row), _row)
+    rows = list(_seen.values())
 
     results = []
     for row in rows:
@@ -287,7 +441,17 @@ def parse_brenda_km_html(
         cell_texts = [c.get_text(strip=True) for c in cells]
         full_text = " | ".join(cell_texts)
 
-        if target_organism is not None:
+        # A falsy target_organism is "any organism", exactly like None. An
+        # empty string MUST NOT be treated as a filter: "" is a substring of
+        # every row, so `if target_organism not in full_text` would match
+        # everything, and then assigning `row_organism = target_organism`
+        # would overwrite every row's real organism label with "" -- the
+        # empty-organism call into `resolve_kinetic_value` returned a
+        # cross-species minimum wearing a brenda_exact badge and no
+        # organism. This is the organism twin of the documented "" substrate
+        # pitfall below ("require_substrate_match = bool(substrate)").
+        # Deeper rationale: ADR 0174.
+        if target_organism:
             if target_organism not in full_text:
                 continue
             row_organism = target_organism
@@ -306,9 +470,21 @@ def parse_brenda_km_html(
             continue
         km_value = float(km_match.group(1))
 
+        # Match the target against the row's COMPOUND cell, not the whole
+        # row. The commentary names other molecules too: BRENDA's LDH Ki row
+        # "0.00059 | 3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-
+        # 4-yl]aminobenzoic acid | Homo sapiens | P00338 | competitive versus
+        # NADH, ..." was matched on "NADH" in its commentary and relabelled
+        # the Ki OF NADH. It is the Ki of the quinoline, measured against
+        # NADH -- a different molecule and a different claim, and the
+        # website then called it oxamate. Only a row with no identifiable
+        # compound cell (organism in cell 1, as on EC 3.1.1.7) falls back to
+        # the whole row, which is the only text it has.
+        compound_cell = _compound_cell(cell_texts, target_organism)
+        haystack = (compound_cell if compound_cell is not None else full_text).lower()
         matched_substrate = None
         for sub in target_substrates:
-            if sub.lower() in full_text.lower():
+            if sub.lower() in haystack:
                 matched_substrate = sub
                 break
 
@@ -358,7 +534,54 @@ def parse_brenda_km_html(
         if uniprot is None:
             uniprot = fallback_uniprot
 
-        conditions = max(cell_texts, key=len) if cell_texts else None
+        # The commentary cell, by POSITION rather than by length.
+        #
+        # BRENDA's row layout is fixed:
+        #   value | substrate | organism | uniprot | commentary | reference id
+        # so the commentary is the cell after the organism and before the
+        # six-digit reference id.
+        #
+        # This was `max(cell_texts, key=len)` -- pick the longest cell -- which
+        # silently returns the SUBSTRATE whenever the substrate name happens to
+        # be longer than the commentary. Real case from the AChE turnover
+        # table: three Mus musculus sub-rows whose commentaries are
+        # "wild-type enzyme", "A262C mutant" and "E81C mutant" (16, 12 and 11
+        # characters) all lost to "acetylthiocholine iodide" (24). The three
+        # became indistinguishable, and every assay condition on an aggregate
+        # sub-row was discarded -- exactly the STRENDA data ADR 0010 exists to
+        # preserve.
+        conditions = None
+        if cell_texts:
+            ref_index = None
+            for idx in range(len(cell_texts) - 1, -1, -1):
+                if re.match(r"^\d{6}$", cell_texts[idx].strip()):
+                    ref_index = idx
+                    break
+            if ref_index is not None and ref_index >= 1:
+                candidate = cell_texts[ref_index - 1].strip()
+                # Guard against a row missing its commentary entirely, where
+                # cell[ref-1] would be the uniprot or a placeholder.
+                if (
+                    candidate
+                    and candidate != "-"
+                    and not UNIPROT_CELL_PATTERN.match(candidate)
+                ):
+                    conditions = candidate
+            if conditions is None and ref_index is None:
+                # Layout did not match at all (unusual page, or a fixture
+                # without a reference cell). Fall back to the old heuristic
+                # rather than dropping the commentary altogether.
+                conditions = max(cell_texts, key=len)
+            # When the layout DID match and the commentary cell was empty or
+            # "-", conditions stays None. That is the honest answer: BRENDA
+            # reported no commentary for this row.
+            #
+            # Previously the longest-cell heuristic filled it with whatever
+            # else was on the row -- usually the ORGANISM. Two real LDH
+            # pyruvate rows came back with conditions="Homo sapiens", which
+            # parse_assay_conditions then dutifully searched for a pH and a
+            # temperature. It found none, so nothing was fabricated, but the
+            # field claimed a commentary that did not exist.
 
         ref_id = None
         for cell in reversed(cell_texts):
@@ -369,20 +592,24 @@ def parse_brenda_km_html(
         flagged = False
         flag_reason = None
         scope_note = (
-            "row is inside BRENDA's actual KM Values table"
+            f"row is inside BRENDA's actual {table_label} table"
             if table_scoped
-            else "row-selection could not confirm this came from the KM "
-                 "Values table specifically (whole-page fallback scan) - "
-                 "this may genuinely be a Ki/Turnover Number/IC50 value"
+            else f"row-selection could not confirm this came from the {table_label} table "
+                 "specifically (whole-page fallback scan) - this may genuinely be a "
+                 "different kind of value (Km/Ki/Turnover Number/IC50)"
         )
-        if km_value > KM_PLAUSIBLE_MAX_MM or km_value < KM_PLAUSIBLE_MIN_MM:
+        if km_value > _max_value or km_value < _min_value:
             flagged = True
             flag_reason = (
-                f"Km value {km_value} mM is outside plausible range "
-                f"({KM_PLAUSIBLE_MIN_MM}-{KM_PLAUSIBLE_MAX_MM} mM); "
+                f"{_quantity} value {km_value} {_unit} is outside plausible range "
+                f"({_min_value}-{_max_value} {_unit}); "
                 f"likely a unit error or an anomalous entry ({scope_note})"
             )
-        elif conditions and re.search(r"\bkcat\b", conditions, re.IGNORECASE):
+        elif (
+            _quantity == "Km"
+            and conditions
+            and re.search(r"\bkcat\b", conditions, re.IGNORECASE)
+        ):
             flagged = True
             flag_reason = (
                 "conditions text mentions Kcat; row may report a turnover "
@@ -396,20 +623,44 @@ def parse_brenda_km_html(
             flagged = True
             flag_reason = (
                 "row-selection fell back to a whole-page scan (BRENDA's "
-                "'KM Values' table container could not be located in this "
+                f"'{table_label}' table container could not be located in this "
                 "HTML), so rows from other tables (Ki, Turnover Number, "
                 "IC50, Inhibitors) were not structurally excluded - this "
-                "value has not been confirmed to be a true Km"
+                f"value has not been confirmed to be a true {_quantity}"
             )
+
+        # Parse the commentary into structured assay conditions (ADR 0010).
+        # Never raises; absent fields stay None rather than being defaulted.
+        parsed_conditions = parse_assay_conditions(conditions)
 
         results.append(
             BRENDAKmEntry(
                 km_value=km_value,
-                unit="mM",
+                # `_unit`, not a hardcoded "mM". This read `unit="mM"`
+                # unconditionally, while `_unit` -- correctly derived above
+                # as "1/s" for the Turnover Numbers table and "mM" for
+                # Km/Ki -- reached only the plausibility-flag message.
+                #
+                # So every kcat parsed from BRENDA was labelled a
+                # millimolar concentration: the real AChE turnover number
+                # 6500 s^-1 was emitted as `6500 mM`. The wrong unit then
+                # travelled through KineticResult.unit and
+                # science_agent_runner.py into the API response, and any
+                # downstream unit check reading `.unit` was structurally
+                # incapable of failing because the field was a constant.
+                unit=_unit,
                 substrate=matched_substrate,
                 organism=row_organism,
                 uniprot=uniprot,
                 conditions=conditions,
+                assay_ph=parsed_conditions.ph,
+                assay_temperature_c=parsed_conditions.temperature_c,
+                assay_buffer=parsed_conditions.buffer,
+                assay_unreported=parsed_conditions.explicitly_unreported,
+                variant=classify_variant(conditions),
+                # Extraction only. Identity resolution needs PubChem and is
+                # done by the runner, so parsing a fixture stays offline.
+                effectors=extract_effectors(conditions),
                 reference_id=ref_id,
                 ec_number=ec_number,
                 flagged=flagged,
@@ -423,13 +674,99 @@ def parse_brenda_km_html(
     return results
 
 
+def parse_brenda_turnover_html(
+    html: str,
+    ec_number: str,
+    target_substrates: list,
+    target_organism: str | None = "Homo sapiens",
+    fallback_uniprot: str | None = None,
+    require_substrate_match: bool = True,
+) -> list[BRENDAKmEntry]:
+    """Parse BRENDA's "Turnover Numbers" table into structured entries.
+
+    kcat is a turnover number in s^-1, not a concentration -- but BRENDA
+    serves it with the identical six-cell row layout as KM Values (value,
+    substrate, organism, uniprot, commentary, reference id), including the
+    same aggregate "N entries" summary rows and the same free-text
+    commentary carrying pH and temperature.
+
+    So this delegates to the Km parser with a different table label and
+    different plausibility bounds, rather than duplicating ~250 lines of
+    row-scoping, aggregate expansion and assay-condition logic that would
+    then drift out of sync.
+
+    ``km_value`` on the returned entries carries the kcat in s^-1. The field
+    name is inherited from the shared row model; the unit is NOT mM.
+
+    STRENDA governs kcat exactly as it governs Km (ADR 0010): a turnover
+    number measured at an unreported pH or temperature cannot be reproduced
+    or compared, so assay conditions are parsed here too and travel with
+    the value.
+    """
+    return parse_brenda_km_html(
+        html=html,
+        ec_number=ec_number,
+        target_substrates=target_substrates,
+        target_organism=target_organism,
+        fallback_uniprot=fallback_uniprot,
+        require_substrate_match=require_substrate_match,
+        table_label=TURNOVER_TABLE_LABEL,
+    )
+
+
+def parse_brenda_ki_html(
+    html: str,
+    ec_number: str,
+    target_substrates: list,
+    target_organism: str | None = "Homo sapiens",
+    fallback_uniprot: str | None = None,
+    require_substrate_match: bool = True,
+) -> list[BRENDAKmEntry]:
+    """Parse BRENDA's "Ki Values" table into structured entries.
+
+    Ki (the inhibition constant) is a concentration in mM, and BRENDA
+    serves the Ki table with the same six-cell row layout as KM Values
+    (value, substrate, organism, uniprot, commentary, reference id) --
+    confirmed live 2026-08 against the LDH page (1.1.1.27, "Ki Values"
+    nav tab): the rows are identical in shape to Km rows, including the
+    same aggregate "N entries" summary rows (whose range in cell 1 the
+    numeric matcher already skips) and the same free-text commentary
+    carrying pH and temperature. The only structural difference is a
+    seventh icon cell on the aggregate rows, which the cell-position
+    logic ignores.
+
+    So this delegates to the Km parser with a different table label and
+    the same mM plausibility bounds, rather than duplicating ~250 lines
+    of row-scoping, aggregate expansion and assay-condition logic that
+    would then drift out of sync.
+
+    ``km_value`` on the returned entries carries the Ki in mM. The field
+    name is inherited from the shared row model; the quantity is Ki.
+
+    STRENDA governs Ki exactly as it governs Km (ADR 0010): an inhibition
+    constant measured at an unreported pH or temperature cannot be
+    reproduced or compared, so assay conditions are parsed here too and
+    travel with the value.
+    """
+    return parse_brenda_km_html(
+        html=html,
+        ec_number=ec_number,
+        target_substrates=target_substrates,
+        target_organism=target_organism,
+        fallback_uniprot=fallback_uniprot,
+        require_substrate_match=require_substrate_match,
+        table_label=KI_TABLE_LABEL,
+    )
+
+
 def fetch_and_parse_brenda_km(
     ec_number: str,
-    target_organism: Optional[str] = "Homo sapiens",
-    target_substrates: Optional[list] = None,
-    taxon_id: str = enzyme_lookup.DEFAULT_TAXON_ID,
+    target_organism: str | None = "Homo sapiens",
+    target_substrates: list | None = None,
+    taxon_id: str | None = None,
     expand_synonyms: bool = True,
     allow_unverified_fallback: bool = True,
+    table_label: str = "KM Values",
 ) -> list[BRENDAKmEntry]:
     """Orchestrator: given just an EC number, dynamically resolve its real
     substrate name(s) (via KEGG) and canonical UniProt accession (via the
@@ -479,11 +816,31 @@ def fetch_and_parse_brenda_km(
             # substrate_verified=False rather than hiding it entirely.
             target_substrates = []
 
-    fallback_uniprot = enzyme_lookup.fetch_uniprot_accession(ec_number, taxon_id)
+    # `taxon_id` used to default to 9606 (Homo sapiens) independently of
+    # `target_organism`. Two defaults for one fact, and they could disagree:
+    # a caller passing target_organism="Thermus aquaticus" and omitting
+    # taxon_id got a thermophile's rows stamped with the human accession.
+    #
+    # The organism is now the single source of truth and the taxon is
+    # derived from it. When it cannot be derived there is NO fallback
+    # accession -- rows carry uniprot=None, which is true, rather than a
+    # confident accession for a species nobody asked about.
+    if taxon_id is None and target_organism:
+        try:
+            taxon_id = enzyme_lookup.fetch_taxon_id(target_organism)
+        except Exception:
+            taxon_id = None
+
+    fallback_uniprot = (
+        enzyme_lookup.fetch_uniprot_accession(ec_number, taxon_id)
+        if taxon_id
+        else None
+    )
     html = fetch_brenda_html(ec_number)
 
     entries = parse_brenda_km_html(
-        html, ec_number, target_substrates, target_organism, fallback_uniprot
+        html, ec_number, target_substrates, target_organism, fallback_uniprot,
+        table_label=table_label,
     )
     if entries:
         return entries
@@ -493,7 +850,8 @@ def fetch_and_parse_brenda_km(
             target_substrates
         )
         entries = parse_brenda_km_html(
-            html, ec_number, expanded_substrates, target_organism, fallback_uniprot
+            html, ec_number, expanded_substrates, target_organism, fallback_uniprot,
+            table_label=table_label,
         )
         if entries:
             return entries
@@ -506,9 +864,93 @@ def fetch_and_parse_brenda_km(
             target_organism,
             fallback_uniprot,
             require_substrate_match=False,
+            table_label=table_label,
         )
 
     return []
+
+
+def fetch_and_parse_brenda_kcat(
+    ec_number: str,
+    target_organism: str | None = "Homo sapiens",
+    target_substrates: list | None = None,
+    taxon_id: str | None = None,
+    expand_synonyms: bool = True,
+    allow_unverified_fallback: bool = True,
+) -> list[BRENDAKmEntry]:
+    """Orchestrator for turnover numbers: EC number in, kcat entries out.
+
+    The kcat counterpart of ``fetch_and_parse_brenda_km``. Identical
+    strategy -- KEGG substrate resolution, UniProt fallback accession, then
+    the three-tier match (strict -> synonym-expanded -> unverified
+    fallback) -- pointed at BRENDA's "Turnover Numbers" table instead of
+    "KM Values".
+
+    Implemented by delegation rather than duplication: the two differ only
+    in which table is read and which plausibility bounds apply, and an
+    80-line copy would drift the moment either strategy changed.
+
+    ``km_value`` on the returned entries carries the kcat in **s^-1**, not
+    mM -- the field name is inherited from the shared row model. Assay
+    conditions travel with each entry, because STRENDA governs kcat exactly
+    as it governs Km (ADR 0010).
+
+    Note this returns literature values; it does NOT feed the simulation
+    engine. Vmax = kcat * [E]0 needs an enzyme concentration Caterva does
+    not have, so kcat is deliberately absent from RESOLVABLE_FIELDS.
+    See ADR 0012.
+    """
+    return fetch_and_parse_brenda_km(
+        ec_number=ec_number,
+        target_organism=target_organism,
+        target_substrates=target_substrates,
+        taxon_id=taxon_id,
+        expand_synonyms=expand_synonyms,
+        allow_unverified_fallback=allow_unverified_fallback,
+        table_label=TURNOVER_TABLE_LABEL,
+    )
+
+
+def fetch_and_parse_brenda_ki(
+    ec_number: str,
+    target_organism: str | None = "Homo sapiens",
+    target_substrates: list | None = None,
+    taxon_id: str | None = None,
+    expand_synonyms: bool = True,
+    allow_unverified_fallback: bool = True,
+) -> list[BRENDAKmEntry]:
+    """Orchestrator for inhibition constants: EC number in, Ki entries out.
+
+    The Ki counterpart of ``fetch_and_parse_brenda_km``. Identical
+    strategy -- KEGG substrate resolution, UniProt fallback accession, then
+    the three-tier match (strict -> synonym-expanded -> unverified
+    fallback) -- pointed at BRENDA's "Ki Values" table instead of
+    "KM Values". Ki is the inhibition constant for the same enzyme, and
+    the substrate filter matters just as much here: BRENDA's Ki table
+    lists every compound anyone has ever tested as an inhibitor, most of
+    which are drug-screening noise rather than the enzyme's real
+    substrate. Filtering to the substrate name(s) keeps the "what does it
+    bind" signal.
+
+    ``km_value`` on the returned entries carries the Ki in **mM** -- the
+    field name is inherited from the shared row model. Assay conditions
+    travel with each entry, because STRENDA governs Ki exactly as it
+    governs Km (ADR 0010).
+
+    Unlike kcat (excluded per ADR 0012), Ki IS resolvable in the product:
+    competitive-inhibition simulations need a real inhibition constant,
+    so this feeds RESOLVABLE_FIELDS.mm_competitive_inhibition via
+    quantity="ki" (fallback_logic.py -> science_agent_runner.py).
+    """
+    return fetch_and_parse_brenda_km(
+        ec_number=ec_number,
+        target_organism=target_organism,
+        target_substrates=target_substrates,
+        taxon_id=taxon_id,
+        expand_synonyms=expand_synonyms,
+        allow_unverified_fallback=allow_unverified_fallback,
+        table_label=KI_TABLE_LABEL,
+    )
 
 
 if __name__ == "__main__":

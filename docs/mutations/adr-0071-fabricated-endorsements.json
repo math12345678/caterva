@@ -1,0 +1,68 @@
+{
+  "_why": [
+    "ADR 0071's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "The table in that ADR was produced by a hand-run loop before the",
+    "harness existed. Two of its rows are the ones worth being able to",
+    "re-run rather than trust: the citation exemption that would have let",
+    "the real fabricated testimonials through, and the record-match that",
+    "was satisfied by the table of REMOVED fabrications.",
+    "",
+    "One row of the original table was a no-op that reported a false 'not",
+    "caught' -- moving the block delimiters in a direction that changed",
+    "nothing, because the block sits above the removal table. The harness",
+    "reports INDETERMINATE for a patch that does not change the bytes,",
+    "which is the whole reason it exists. That row is deliberately not",
+    "reproduced here; F5 below is the corrected version.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0071-fabricated-endorsements.json"
+  ],
+  "test": "python3 -m pytest Tests/test_no_fabricated_endorsements.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "F1",
+      "description": "the citation exemption reverts to a case-insensitive substring",
+      "_claimed": "2 failed",
+      "_note": "The near-miss. `Source: Hoare & Pal (1971)` is a citation; `source: \"Stanford University\"` is a testimonial field. Matched case-insensitively, one rule exempts both -- so the guard would have passed the exact carousel it was written to catch. An exemption added to stop crying wolf had switched off the alarm.",
+      "file": "scripts/check_no_fabricated_endorsements.py",
+      "find": "    r\"^\\s*Source: [A-Z]\": (",
+      "replace": "    r\"(?i)source:\": ("
+    },
+    {
+      "id": "F2",
+      "description": "the institution list is emptied",
+      "_claimed": "3 failed",
+      "_note": "A checklist with nothing on it passes everything. The floor exists so that deleting the list is not a way to pass.",
+      "file": "scripts/check_no_fabricated_endorsements.py",
+      "find": "    \"Stanford\", \"MIT\", \"Johns Hopkins\", \"UC Berkeley\", \"Berkeley\",",
+      "replace": "    "
+    },
+    {
+      "id": "F3",
+      "description": "a claim is found but never reported",
+      "_claimed": "3 failed",
+      "_note": "The silent-detector shape: everything is examined, nothing is said, the run is green.",
+      "file": "scripts/check_no_fabricated_endorsements.py",
+      "find": "                problems.append(f\"{rel}:{line_no} names {name!r}: {line.strip()[:90]}\")",
+      "replace": "                pass"
+    },
+    {
+      "id": "F4",
+      "description": "the whole ENDORSEMENTS.md counts as the allowlist again",
+      "_claimed": "2 failed",
+      "_note": "The live hole, not a hypothetical: the file's table of REMOVED fabrications contains rows like `| Stanford University |`, so `\"| Stanford\" in recorded` matched it. Four of the five institutions were already exempt on every public page -- the document written to condemn them was excusing them.",
+      "file": "scripts/check_no_fabricated_endorsements.py",
+      "find": "    if _BLOCK_START not in text or _BLOCK_END not in text:\n        return None\n    start = text.index(_BLOCK_START) + len(_BLOCK_START)\n    return text[start : text.index(_BLOCK_END, start)]",
+      "replace": "    return text"
+    },
+    {
+      "id": "F5",
+      "description": "a missing allowlist block reads as an empty, permissive one",
+      "_claimed": "1 failed",
+      "_note": "The corrected form of the original table's no-op row. 'No block' must not mean 'no rules' -- deleting the checklist is the easiest way to pass a checklist.",
+      "file": "scripts/check_no_fabricated_endorsements.py",
+      "find": "    if _BLOCK_START not in text or _BLOCK_END not in text:\n        return None",
+      "replace": "    if _BLOCK_START not in text or _BLOCK_END not in text:\n        return \"\""
+    }
+  ]
+}

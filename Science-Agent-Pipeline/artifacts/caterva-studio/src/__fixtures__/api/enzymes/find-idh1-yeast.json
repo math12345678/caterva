@@ -1,0 +1,60 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=IDH1&organism=yeast"
+ },
+ "status": 200,
+ "body": {
+  "query": "IDH1",
+  "organism": "yeast",
+  "organism_code": "YEAST",
+  "organism_label": "yeast",
+  "release": "02-Sep-2026",
+  "outcome": "ambiguous",
+  "resolved_ec": null,
+  "how": null,
+  "cautions": [],
+  "reason": "'IDH1' is an abbreviation or symbol, not an enzyme name, and Caterva does not resolve one by itself",
+  "recommended_ec": null,
+  "confirm_only": true,
+  "candidates_total": 1,
+  "candidates": [
+   {
+    "ec": "1.1.1.41",
+    "name": "isocitrate dehydrogenase (NAD(+))",
+    "why": "IDH1 is the yeast gene symbol of Isocitrate dehydrogenase [NAD] subunit 1, mitochondrial (UniProtKB P28834), which UniProt files under this EC number",
+    "tier": 2,
+    "reaction": "D-threo-isocitrate + NAD(+) = 2-oxoglutarate + CO2 + NADH.",
+    "class_path": "Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor",
+    "alternative_names": [],
+    "organism": "YEAST",
+    "organism_proteins": [
+     {
+      "accession": "P28834",
+      "entry_name": "IDH1_YEAST",
+      "symbol": "IDH1",
+      "gene": "IDH1",
+      "label": "IDH1"
+     },
+     {
+      "accession": "P28241",
+      "entry_name": "IDH2_YEAST",
+      "symbol": "IDH2",
+      "gene": "IDH2",
+      "label": "IDH2"
+     }
+    ],
+    "organism_protein_count": 2,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "abbreviation",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.41 --organism yeast --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   }
+  ],
+  "fallback": null
+ }
+}

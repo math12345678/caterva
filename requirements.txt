@@ -1,34 +1,89 @@
-# Terrium runtime dependencies.
+# Caterva runtime dependencies.
 # Pinned to versions verified working together on 2026-07-22.
 #
-# Python 3.10-3.12 is required. See requirements-dev.txt and README for the
-# reason (prebuilt wheels for the SBML C extensions stop at cp312).
+# Python 3.10-3.13 is required.
+#
+# The reason, verified against PyPI 2026-08-02 -- an earlier version of this
+# comment named the wrong cause:
+#
+#   libroadrunner 2.8.0   cp310-cp313          covers the full window
+#   numpy         2.2.6   cp310-cp313          covers the full window
+#   python-libsbml 5.21.1 cp38-cp314          NOT a blocker
+#   antimony      2.14.0  py3-none-<platform> NOT a blocker (version-agnostic)
+#
+# So it is NOT "the SBML C extensions stop at cp312", which this file, the
+# README and CONTRIBUTING.md all claimed. python-libsbml already ships cp314
+# wheels, and antimony's wheels are Python-version agnostic.
+#
+# 3.13 support landed via the NumPy 2.x upgrade (ADR 0014): libroadrunner is
+# on the 2.8.0 line and numpy on 2.2.x -- the first lines that publish cp313
+# wheels while still covering the cp310 floor. numpy must stay on 2.2.x:
+# libroadrunner 2.8.0 pins numpy~=2.2, and numpy 2.2.x is the last line that
+# also satisfies scipy 1.15.3's numpy<2.5 cap with a single pin for every
+# supported interpreter. See docs/adr/0014-python-version-support.md.
 
 # --- Simulation engines (Tier 2 ODE domains) -------------------------------
 # NOTE: do NOT `pip install tellurium`. The umbrella package pulls in
 # python-libcombine and python-libnuml, which are only needed for COMBINE
-# archives and numerical markup -- neither of which Terrium uses. On any
+# archives and numerical markup -- neither of which Caterva uses. On any
 # platform without prebuilt wheels for them, that install fails at the cmake
 # step. These three packages are the parts that actually do the work.
 #
-# libroadrunner is pinned to 2.7.0, not the newer 2.9.x line. 2.9.0/2.9.2
-# dropped cp310 wheels entirely (their PyPI releases start at cp311), which
-# breaks installation on Python 3.10 -- the floor this project claims to
-# support. This was caught because CI failed on the 3.10 job with
-# "No matching distribution found for libroadrunner==2.9.0". 2.7.0 ships
-# wheels for cp39 through cp312 and is what the full test suite has actually
-# been verified against.
-libroadrunner==2.7.0
+# libroadrunner is pinned to 2.8.0 because it is the only release line that
+# still ships cp310 wheels while adding cp313 (verified against PyPI). The
+# 2.9.x line dropped cp310 wheels entirely (releases start at cp311), which
+# would break the Python 3.10 floor -- the exact failure that 2.9.0 caused
+# in CI ("No matching distribution found for libroadrunner==2.9.0").
+libroadrunner==2.8.0
 antimony==2.14.0
 python-libsbml==5.21.1
+# SED-ML, for the COMBINE archive export. BSD (Frank Bergmann, Heidelberg),
+# so it sits under Apache-2.0 without the separation stdpopsim needed --
+# see requirements-popgen.txt for the GPL case and docs/LICENSING.md.
+#
+# A hard dependency rather than optional: the archive is built THROUGH
+# libSEDML rather than string-formatted, so the document is correct by
+# construction and validated before it is written. Hand-writing the XML
+# would remove the dependency and replace it with an unverifiable claim
+# that the output is valid SED-ML.
+python-libsedml==2.0.33
 
 # --- Numerics --------------------------------------------------------------
-numpy==1.26.4
+numpy==2.2.6
 scipy==1.15.3
 
 # --- Literature layer (BRENDA / KEGG / PubMed scraping) --------------------
 requests==2.34.2
+certifi==2026.10.19
 beautifulsoup4==4.15.0
 lxml==6.1.1
 httpx==0.28.1
 pydantic==2.13.4
+
+# --- Population genetics -----------------------------------------------
+#
+# stdpopsim MOVED to requirements-popgen.txt on 2026-08-15. It is NOT
+# installed by default, and that is a licence decision rather than a
+# packaging preference.
+#
+# stdpopsim is GPL-3.0-or-later. Caterva is Apache-2.0. Those licences are
+# compatible in one direction only: Apache-2.0 code may be taken into a
+# GPLv3 work, but GPLv3 code cannot be folded into a work distributed under
+# Apache-2.0 without the combination becoming GPLv3. Listing it here made
+# `make setup` place GPL code into the default environment of a project that
+# declares Apache-2.0 — a tension a reader would have had to discover by
+# reading two licence files and inferring the interaction.
+#
+# The code has always treated it as optional. `Tests/popgen_resolver.py`
+# wraps `import stdpopsim` in try/except ImportError and returns
+# `found=False` with a search log saying so; the 19 popgen tests skip
+# cleanly and `make check` already reports the absence as a warning. So the
+# manifest was the only place claiming it was required, and it was the only
+# place that was wrong.
+#
+# To use the population-genetics resolver:
+#
+#     pip install -r requirements-popgen.txt
+#
+# See NOTICE, "Third-party software", and
+# docs/adr/0061-gpl-out-of-the-default-install.md.

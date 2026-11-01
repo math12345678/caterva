@@ -1,0 +1,1831 @@
+{
+ "captured": {
+  "kind": "compose",
+  "request": {
+   "description": "reversible binding of a ligand to a receptor",
+   "analyses": {
+    "crnt": true,
+    "scale": true,
+    "validate": true,
+    "reduction": true,
+    "robustness": {
+     "samples": 5
+    }
+   }
+  }
+ },
+ "run": {
+  "schema": "caterva.studio.run/1",
+  "id": "20261017-073850-compose-d4f2770b",
+  "kind": "compose",
+  "title": "reversible binding of a ligand to a receptor",
+  "status": "done",
+  "created_at": "2026-10-17T07:38:50.097Z",
+  "started_at": "2026-10-17T07:38:50.103Z",
+  "finished_at": "2026-10-17T07:38:50.807Z",
+  "caterva_version": "0.6.0",
+  "cli": [
+   "caterva",
+   "compose",
+   "reversible binding of a ligand to a receptor",
+   "--scale",
+   "--crnt",
+   "--reduction",
+   "--validate",
+   "--robustness",
+   "5"
+  ],
+  "request": {
+   "description": "reversible binding of a ligand to a receptor",
+   "analyses": {
+    "crnt": true,
+    "scale": true,
+    "validate": true,
+    "reduction": true,
+    "robustness": {
+     "samples": 5
+    }
+   }
+  },
+  "outcome": {
+   "exit_code": 3,
+   "meaning": "refused",
+   "summary": "1 refusal(s) in 1 section(s), each explained where it belongs in the report: Timescale separation.",
+   "reason": "1 refusal(s) in 1 section(s), each explained where it belongs in the report: Timescale separation.",
+   "has_result": true
+  },
+  "error": null,
+  "artifacts": [
+   {
+    "name": "report.md",
+    "content_type": "text/markdown; charset=utf-8",
+    "bytes": 13795,
+    "description": "the report caterva compose prints for this request"
+   },
+   {
+    "name": "model.xml",
+    "content_type": "application/xml",
+    "bytes": 7478,
+    "description": "SBML Level 3, every value's origin in its notes (caterva compose --export sbml)"
+   },
+   {
+    "name": "model.ant",
+    "content_type": "text/plain; charset=utf-8",
+    "bytes": 4318,
+    "description": "Antimony source, every value's origin beside it (caterva compose --export antimony)"
+   },
+   {
+    "name": "parameters.csv",
+    "content_type": "text/csv; charset=utf-8",
+    "bytes": 2617,
+    "description": "every number, its origin and its citation (caterva compose --export csv)"
+   },
+   {
+    "name": "methods.md",
+    "content_type": "text/markdown; charset=utf-8",
+    "bytes": 2773,
+    "description": "a methods paragraph grouped by origin (caterva compose --export methods)"
+   },
+   {
+    "name": "claims.zip",
+    "content_type": "application/zip",
+    "bytes": 1444,
+    "description": "the run's claims bundle (manifest.json, claims.jsonl, rows.jsonl, snapshots.jsonl, snapshots/<hex>.gz): unzip it and run `caterva verify DIR` to re-check it offline (caterva compose --claims DIR)"
+   },
+   {
+    "name": "claims.json",
+    "content_type": "application/json",
+    "bytes": 4324,
+    "description": "the bundle's manifest and its claim, row and snapshot records, without the pinned bytes"
+   }
+  ],
+  "progress": {
+   "stage": "exports",
+   "label": "Writing the SBML, Antimony, CSV and methods exports",
+   "fraction": null
+  }
+ },
+ "result_status": 200,
+ "result": {
+  "query": "reversible binding of a ligand to a receptor",
+  "recognition": {
+   "rule": "reversible_binding",
+   "reading": "two partners and a complex"
+  },
+  "model": {
+   "species": [
+    {
+     "id": "complex_A",
+     "initial": {
+      "value": 1.0,
+      "unit": "mM",
+      "provenance": {
+       "kind": "chosen",
+       "by": "default",
+       "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model.",
+       "claim": {
+        "id": "claim:sha256:65aba5a4de53720838dbfc8476dabb7774ae349758d2a70774e9646e3ae9650b",
+        "kind": "chosen",
+        "rule": {
+         "rule_id": "chosen.starting_amount",
+         "version": 1,
+         "adr": "ADR 0044"
+        },
+        "row": null,
+        "snapshot": null,
+        "reference": null,
+        "certificates": [],
+        "refusal": null
+       }
+      },
+      "id": "complex_A",
+      "label": "A"
+     }
+    },
+    {
+     "id": "complex_B",
+     "initial": {
+      "value": 1.0,
+      "unit": "mM",
+      "provenance": {
+       "kind": "chosen",
+       "by": "default",
+       "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model.",
+       "claim": {
+        "id": "claim:sha256:accb62627e09aecb79db7ae0ee212e90b7aec32095414833103f76890e396aab",
+        "kind": "chosen",
+        "rule": {
+         "rule_id": "chosen.starting_amount",
+         "version": 1,
+         "adr": "ADR 0044"
+        },
+        "row": null,
+        "snapshot": null,
+        "reference": null,
+        "certificates": [],
+        "refusal": null
+       }
+      },
+      "id": "complex_B",
+      "label": "B"
+     }
+    },
+    {
+     "id": "complex_AB",
+     "initial": {
+      "value": 0.0,
+      "unit": "mM",
+      "provenance": {
+       "kind": "chosen",
+       "by": "default",
+       "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model.",
+       "claim": {
+        "id": "claim:sha256:7ffc0794516f3b9001a5f56f91e662bb9710f544d0246ec9077f8b2e05df9973",
+        "kind": "chosen",
+        "rule": {
+         "rule_id": "chosen.starting_amount",
+         "version": 1,
+         "adr": "ADR 0044"
+        },
+        "row": null,
+        "snapshot": null,
+        "reference": null,
+        "certificates": [],
+        "refusal": null
+       }
+      },
+      "id": "complex_AB",
+      "label": "AB"
+     }
+    }
+   ],
+   "reactions": [
+    {
+     "id": "complex_association",
+     "rate_law": "complex_kon * complex_A * complex_B"
+    },
+    {
+     "id": "complex_dissociation",
+     "rate_law": "complex_koff * complex_AB"
+    }
+   ],
+   "parameters": [
+    {
+     "value": 1.0,
+     "unit": "1/(mM*s)",
+     "provenance": {
+      "kind": "placeholder",
+      "reason": "ILLUSTRATIVE PLACEHOLDER: Caterva's motif library value for reversible_binding.kon. No publication supplies this number and nobody measured it. It is here so the structure can be checked, dimensioned and simulated; no database table serves it, so it is resolvable only from a paper.",
+      "claim": {
+       "id": "claim:sha256:d1356a164fba3abc94e93665303dca7af9996d5f20d3b6492fde8bfa64b41df0",
+       "kind": "placeholder",
+       "rule": {
+        "rule_id": "placeholder.motif_library",
+        "version": 1,
+        "adr": "ADR 0013"
+       },
+       "row": null,
+       "snapshot": null,
+       "reference": null,
+       "certificates": [],
+       "refusal": null
+      }
+     },
+     "id": "complex_kon",
+     "label": "kon"
+    },
+    {
+     "value": 0.1,
+     "unit": "1/s",
+     "provenance": {
+      "kind": "placeholder",
+      "reason": "ILLUSTRATIVE PLACEHOLDER: Caterva's motif library value for reversible_binding.koff. No publication supplies this number and nobody measured it. It is here so the structure can be checked, dimensioned and simulated; no database table serves it, so it is resolvable only from a paper.",
+      "claim": {
+       "id": "claim:sha256:3e9aa3fd4d2550608cc3f7cf341fb94b5e8b72686935043ce71d804d17fc8d9d",
+       "kind": "placeholder",
+       "rule": {
+        "rule_id": "placeholder.motif_library",
+        "version": 1,
+        "adr": "ADR 0013"
+       },
+       "row": null,
+       "snapshot": null,
+       "reference": null,
+       "certificates": [],
+       "refusal": null
+      }
+     },
+     "id": "complex_koff",
+     "label": "koff"
+    }
+   ],
+   "conservation_laws": [
+    "complex_A + -1 complex_B",
+    "complex_A + complex_AB"
+   ],
+   "unconserved": [],
+   "concentration_unit": "mM",
+   "motifs": [
+    {
+     "name": "reversible_binding",
+     "basis": "Mass action in both directions. Kd = koff / kon, so a measured Kd constrains the pair but not either rate alone -- which is why both are declared resolvable rather than one being derived from the other and a Kd.",
+     "copies": 1
+    }
+   ]
+  },
+  "search": {
+   "asked": false,
+   "refused": false,
+   "note": null,
+   "subject": null,
+   "ec": null,
+   "organism": null,
+   "substrate": null,
+   "isoform": null,
+   "compounds": {},
+   "unused_compounds": {},
+   "measured": 0,
+   "placeholders": 2
+  },
+  "verdict": {
+   "verdict": "structural",
+   "licence": "Questions about the MECHANISM: can this shape oscillate, can it switch, which constants would matter if you measured them. Not questions about any particular enzyme or cell, because the constants are the library's illustrative values.",
+   "behaviour": "one stable state was found, and the search did not find another -- which is not the same as there being none",
+   "conclusion": "exactly one stable state",
+   "concerns": [
+    {
+     "source": "provenance",
+     "severity": "structural",
+     "detail": "all 2 rate constant(s) are the motif library's illustrative values: this mechanism has no enzyme step, and its constants are not kept in an enzyme database",
+     "remedy": "supply the constants the provenance table lists, from your own measurements or a paper -- start with the top of its influence ranking"
+    }
+   ],
+   "next_step": "supply the constants the provenance table lists, from your own measurements or a paper -- start with the top of its influence ranking",
+   "consulted": {
+    "units": "all 2 rate law(s) balance",
+    "scale": "all 5 numbers examined are possible",
+    "predictions": "all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold",
+    "provenance": "2 constant(s) unmeasured",
+    "assumptions": "none checkable",
+    "validate": "cross-checks agree",
+    "stability": "1 stable state(s) from 24 starting points",
+    "robustness": "5/5 samples"
+   },
+   "unavailable": {},
+   "text": "VERDICT: STRUCTURAL\n\nWhat this supports: Questions about the MECHANISM: can this shape oscillate, can it switch, which constants would matter if you measured them. Not questions about any particular enzyme or cell, because the constants are the library's illustrative values.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\nThe conclusion tested: exactly one stable state\n\n1 concern(s), worst first:\n  - [provenance] all 2 rate constant(s) are the motif library's illustrative values: this mechanism has no enzyme step, and its constants are not kept in an enzyme database -- supply the constants the provenance table lists, from your own measurements or a paper -- start with the top of its influence ranking\n\nDo this next: supply the constants the provenance table lists, from your own measurements or a paper -- start with the top of its influence ranking\n\nChecked: assumptions (none checkable); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold); provenance (2 constant(s) unmeasured); robustness (5/5 samples); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 2 rate law(s) balance); validate (cross-checks agree).\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point."
+  },
+  "stability": {
+   "rounding_tolerance": 1e-06,
+   "count_caveat": null,
+   "starts_tried": 24,
+   "species": [
+    "complex_A",
+    "complex_B",
+    "complex_AB"
+   ],
+   "notes": [],
+   "fixed_points": [
+    {
+     "state": {
+      "complex_A": 0.27015621187164246,
+      "complex_B": 0.27015621187164246,
+      "complex_AB": 0.7298437881283576
+     },
+     "residual": 1.3877787807814457e-17,
+     "eigenvalues": [
+      {
+       "re": -0.640312423463911,
+       "im": 0.0
+      }
+     ],
+     "classification": "stable",
+     "physical": true,
+     "stable": true,
+     "oscillatory": false,
+     "slowest_timescale": 1.5617376195674602,
+     "description": "stable at complex_A=0.2702, complex_AB=0.7298, complex_B=0.2702; settles over ~1.56 time units"
+    }
+   ],
+   "text": "1 steady state(s) found from 24 starting points:   - stable at complex_A=0.2702, complex_AB=0.7298, complex_B=0.2702; settles over ~1.56 time units These are numerical results from a root find, not derived facts. The conservation laws this model reports ARE derived; these are what a solver converged to, with the residuals shown."
+  },
+  "trajectory": {
+   "times": [
+    0.0,
+    0.031234752391349204,
+    0.06246950478269841,
+    0.09370425717404761,
+    0.12493900956539682,
+    0.156173761956746,
+    0.18740851434809522,
+    0.21864326673944443,
+    0.24987801913079363,
+    0.2811127715221428,
+    0.312347523913492,
+    0.3435822763048412,
+    0.37481702869619044,
+    0.40605178108753964,
+    0.43728653347888885,
+    0.46852128587023806,
+    0.49975603826158727,
+    0.5309907906529364,
+    0.5622255430442856,
+    0.5934602954356348,
+    0.624695047826984,
+    0.6559298002183332,
+    0.6871645526096825,
+    0.7183993050010317,
+    0.7496340573923809,
+    0.7808688097837301,
+    0.8121035621750793,
+    0.8433383145664285,
+    0.8745730669577777,
+    0.9058078193491269,
+    0.9370425717404761,
+    0.9682773241318253,
+    0.9995120765231745,
+    1.0307468289145236,
+    1.0619815813058728,
+    1.093216333697222,
+    1.1244510860885712,
+    1.1556858384799205,
+    1.1869205908712697,
+    1.2181553432626189,
+    1.249390095653968,
+    1.2806248480453173,
+    1.3118596004366665,
+    1.3430943528280157,
+    1.374329105219365,
+    1.4055638576107141,
+    1.4367986100020633,
+    1.4680333623934125,
+    1.4992681147847617,
+    1.530502867176111,
+    1.5617376195674602,
+    1.5929723719588094,
+    1.6242071243501586,
+    1.6554418767415078,
+    1.686676629132857,
+    1.7179113815242062,
+    1.7491461339155554,
+    1.7803808863069046,
+    1.8116156386982538,
+    1.842850391089603,
+    1.8740851434809522,
+    1.9053198958723014,
+    1.9365546482636506,
+    1.9677894006549999,
+    1.999024153046349,
+    2.030258905437698,
+    2.0614936578290473,
+    2.0927284102203965,
+    2.1239631626117457,
+    2.155197915003095,
+    2.186432667394444,
+    2.2176674197857933,
+    2.2489021721771425,
+    2.2801369245684917,
+    2.311371676959841,
+    2.34260642935119,
+    2.3738411817425393,
+    2.4050759341338885,
+    2.4363106865252377,
+    2.467545438916587,
+    2.498780191307936,
+    2.5300149436992854,
+    2.5612496960906346,
+    2.592484448481984,
+    2.623719200873333,
+    2.654953953264682,
+    2.6861887056560314,
+    2.7174234580473806,
+    2.74865821043873,
+    2.779892962830079,
+    2.8111277152214282,
+    2.8423624676127774,
+    2.8735972200041267,
+    2.904831972395476,
+    2.936066724786825,
+    2.9673014771781743,
+    2.9985362295695235,
+    3.0297709819608727,
+    3.061005734352222,
+    3.092240486743571,
+    3.1234752391349203,
+    3.1547099915262695,
+    3.1859447439176187,
+    3.217179496308968,
+    3.248414248700317,
+    3.2796490010916663,
+    3.3108837534830156,
+    3.3421185058743648,
+    3.373353258265714,
+    3.404588010657063,
+    3.4358227630484124,
+    3.4670575154397616,
+    3.498292267831111,
+    3.52952702022246,
+    3.560761772613809,
+    3.5919965250051584,
+    3.6232312773965076,
+    3.654466029787857,
+    3.685700782179206,
+    3.7169355345705553,
+    3.7481702869619045,
+    3.7794050393532537,
+    3.810639791744603,
+    3.841874544135952,
+    3.8731092965273013,
+    3.9043440489186505,
+    3.9355788013099997,
+    3.966813553701349,
+    3.998048306092698,
+    4.029283058484047,
+    4.060517810875396,
+    4.091752563266746,
+    4.1229873156580945,
+    4.154222068049444,
+    4.185456820440793,
+    4.216691572832143,
+    4.247926325223491,
+    4.279161077614841,
+    4.31039583000619,
+    4.341630582397539,
+    4.372865334788888,
+    4.404100087180238,
+    4.435334839571587,
+    4.466569591962936,
+    4.497804344354285,
+    4.529039096745635,
+    4.560273849136983,
+    4.591508601528333,
+    4.622743353919682,
+    4.6539781063110315,
+    4.68521285870238,
+    4.71644761109373,
+    4.747682363485079,
+    4.778917115876428,
+    4.810151868267777,
+    4.841386620659127,
+    4.8726213730504755,
+    4.903856125441825,
+    4.935090877833174,
+    4.966325630224524,
+    4.997560382615872,
+    5.028795135007222,
+    5.060029887398571,
+    5.09126463978992,
+    5.122499392181269,
+    5.153734144572619,
+    5.184968896963968,
+    5.216203649355317,
+    5.247438401746666,
+    5.278673154138016,
+    5.309907906529364,
+    5.341142658920714,
+    5.372377411312063,
+    5.4036121637034125,
+    5.434846916094761,
+    5.466081668486111,
+    5.49731642087746,
+    5.528551173268809,
+    5.559785925660158,
+    5.591020678051508,
+    5.6222554304428565,
+    5.653490182834206,
+    5.684724935225555,
+    5.7159596876169045,
+    5.747194440008253,
+    5.778429192399603,
+    5.809663944790952,
+    5.840898697182301,
+    5.87213344957365,
+    5.903368201965,
+    5.9346029543563485,
+    5.965837706747698,
+    5.997072459139047,
+    6.028307211530397,
+    6.059541963921745,
+    6.090776716313095,
+    6.122011468704444,
+    6.1532462210957934,
+    6.184480973487142,
+    6.215715725878492,
+    6.246950478269841
+   ],
+   "columns": {
+    "complex_A": [
+     1.0,
+     0.9697580843323254,
+     0.941383163534795,
+     0.914712699785584,
+     0.8896024690166408,
+     0.86592405199419,
+     0.8435627264251373,
+     0.8224156879710636,
+     0.8023905413145411,
+     0.7834040149126579,
+     0.7653808615874883,
+     0.7482529143576098,
+     0.7319582725201662,
+     0.7164405974945787,
+     0.7016485015380146,
+     0.6875350153497602,
+     0.6740571229363033,
+     0.6611753540549329,
+     0.6488534259850259,
+     0.6370579279153543,
+     0.6257580422033907,
+     0.6149252973400391,
+     0.6045333487082878,
+     0.5945577834574373,
+     0.5849759464894482,
+     0.5757667849177529,
+     0.5669107087612556,
+     0.5583894659260619,
+     0.5501860298026993,
+     0.5422844980056484,
+     0.534670000995045,
+     0.5273286194727844,
+     0.5202473095856899,
+     0.5134138350855747,
+     0.5068167057043986,
+     0.5004451210922413,
+     0.49428891974311423,
+     0.48833853240524383,
+     0.4825849394207887,
+     0.47701963185298735,
+     0.4716345758031008,
+     0.46642217962930416,
+     0.4613752639082723,
+     0.45648703379888067,
+     0.4517510535916309,
+     0.4471612232661405,
+     0.442711756858304,
+     0.4383971624802757,
+     0.43421222385268193,
+     0.43015198321103276,
+     0.42621172547001246,
+     0.422386963540187,
+     0.41867342470034913,
+     0.41506703793479344,
+     0.4115639221641866,
+     0.4081603752886025,
+     0.4048528639831633,
+     0.40163801418566675,
+     0.39851260222100227,
+     0.3954735465149272,
+     0.3925178998511186,
+     0.3896428421295786,
+     0.3868456735900488,
+     0.3841238084657936,
+     0.3814747690349026,
+     0.3788961800432265,
+     0.3763857634695886,
+     0.3739413336187095,
+     0.3715607924810472,
+     0.369242125382151,
+     0.3669833969232146,
+     0.3647827471343639,
+     0.3626383878287152,
+     0.3605485991873326,
+     0.3585117265410359,
+     0.3565261773310554,
+     0.3545904182331814,
+     0.35270297244080057,
+     0.3508624171038778,
+     0.3490673809023108,
+     0.34731654175124366,
+     0.345608624624685,
+     0.34394239949770106,
+     0.34231667939623694,
+     0.3407303185466818,
+     0.33918221062274845,
+     0.3376712870761087,
+     0.3361965155581246,
+     0.33475689841696415,
+     0.3333514712703366,
+     0.3319793016488216,
+     0.3306394877028698,
+     0.3293311569762223,
+     0.32805346523599493,
+     0.32680559535943504,
+     0.32558675627247846,
+     0.32439618193780223,
+     0.32323313039140456,
+     0.3220968828225146,
+     0.32098674269644945,
+     0.3199020349157365,
+     0.31884210502043797,
+     0.31780631842399304,
+     0.31679405968270447,
+     0.3158047317980417,
+     0.3148377555475779,
+     0.31389256884721695,
+     0.31296862613962306,
+     0.3120653978091458,
+     0.3111823696215792,
+     0.310319042187867,
+     0.30947493045066204,
+     0.3086495631898978,
+     0.3078424825440853,
+     0.3070532435579831,
+     0.30628141376005513,
+     0.3055265727386867,
+     0.3047883117406019,
+     0.3040662332851353,
+     0.30335995079080363,
+     0.3026690882261373,
+     0.30199327976679285,
+     0.3013321694672452,
+     0.30068541094610174,
+     0.3000526670784982,
+     0.29943360970905974,
+     0.29882791936865566,
+     0.2982352850039631,
+     0.29765540371783444,
+     0.297087980515364,
+     0.29653272806599484,
+     0.29598936646898427,
+     0.29545762302878886,
+     0.2949372320392506,
+     0.29442793457281546,
+     0.2939294782816703,
+     0.2934416172028379,
+     0.29296411157041524,
+     0.29249672763509293,
+     0.292039237488191,
+     0.2915914188942989,
+     0.29115305512844286,
+     0.2907239348182471,
+     0.29030385179214413,
+     0.28989260493169505,
+     0.28948999802991693,
+     0.28909583965452074,
+     0.2887099430145136,
+     0.28833212583185686,
+     0.28796221021690066,
+     0.2876000225478043,
+     0.2872453933551056,
+     0.28689815720840256,
+     0.28655815260729034,
+     0.286225221875797,
+     0.2858992110592272,
+     0.2855799698262917,
+     0.2852673513723818,
+     0.28496121232647775,
+     0.2846614126611598,
+     0.28436781560419033,
+     0.28408028755491627,
+     0.28379869800146573,
+     0.283522919440944,
+     0.2832528273022228,
+     0.28298829987017,
+     0.2827292182135937,
+     0.28247546611423807,
+     0.28222692999805105,
+     0.2819834988686653,
+     0.28174506424221574,
+     0.28151152008496816,
+     0.2812827627527408,
+     0.2810586909322732,
+     0.2808392055793177,
+     0.28062420986882003,
+     0.28041360913156105,
+     0.2802073108113577,
+     0.28000522440646686,
+     0.2798072614237643,
+     0.279613335331258,
+     0.2794233615043842,
+     0.27923725719008013,
+     0.27905494144849424,
+     0.2788763351243769,
+     0.27870136078910734,
+     0.27852994271529424,
+     0.27836200682174855,
+     0.27819748064817645,
+     0.2780362933056871,
+     0.27787837544865057,
+     0.2777236592325831,
+     0.27757207828204983,
+     0.2774235676565772,
+     0.2772780638139558,
+     0.277135504584823,
+     0.2769958291309437,
+     0.2768589779262196,
+     0.2767248927150516,
+     0.2765935164939867,
+     0.2764647934732954
+    ],
+    "complex_B": [
+     1.0,
+     0.9697580843323254,
+     0.941383163534795,
+     0.914712699785584,
+     0.8896024690166408,
+     0.86592405199419,
+     0.8435627264251373,
+     0.8224156879710636,
+     0.8023905413145411,
+     0.7834040149126579,
+     0.7653808615874883,
+     0.7482529143576098,
+     0.7319582725201662,
+     0.7164405974945787,
+     0.7016485015380146,
+     0.6875350153497602,
+     0.6740571229363033,
+     0.6611753540549329,
+     0.6488534259850259,
+     0.6370579279153543,
+     0.6257580422033907,
+     0.6149252973400391,
+     0.6045333487082878,
+     0.5945577834574373,
+     0.5849759464894482,
+     0.5757667849177529,
+     0.5669107087612556,
+     0.5583894659260619,
+     0.5501860298026993,
+     0.5422844980056484,
+     0.534670000995045,
+     0.5273286194727844,
+     0.5202473095856899,
+     0.5134138350855747,
+     0.5068167057043986,
+     0.5004451210922413,
+     0.49428891974311423,
+     0.48833853240524383,
+     0.4825849394207887,
+     0.47701963185298735,
+     0.4716345758031008,
+     0.46642217962930416,
+     0.4613752639082723,
+     0.45648703379888067,
+     0.4517510535916309,
+     0.4471612232661405,
+     0.442711756858304,
+     0.43839716248027577,
+     0.434212223852682,
+     0.4301519832110328,
+     0.4262117254700125,
+     0.42238696354018707,
+     0.4186734247003492,
+     0.4150670379347935,
+     0.41156392216418664,
+     0.4081603752886026,
+     0.40485286398316334,
+     0.4016380141856668,
+     0.3985126022210023,
+     0.3954735465149273,
+     0.3925178998511187,
+     0.38964284212957867,
+     0.38684567359004884,
+     0.38412380846579364,
+     0.3814747690349027,
+     0.37889618004322656,
+     0.37638576346958863,
+     0.37394133361870957,
+     0.37156079248104723,
+     0.36924212538215107,
+     0.36698339692321463,
+     0.364782747134364,
+     0.36263838782871527,
+     0.3605485991873327,
+     0.35851172654103597,
+     0.35652617733105546,
+     0.35459041823318144,
+     0.3527029724408006,
+     0.35086241710387783,
+     0.3490673809023109,
+     0.3473165417512437,
+     0.34560862462468506,
+     0.3439423994977011,
+     0.342316679396237,
+     0.34073031854668184,
+     0.3391822106227485,
+     0.3376712870761088,
+     0.33619651555812463,
+     0.3347568984169642,
+     0.33335147127033665,
+     0.33197930164882167,
+     0.3306394877028699,
+     0.32933115697622234,
+     0.328053465235995,
+     0.3268055953594351,
+     0.3255867562724785,
+     0.3243961819378023,
+     0.3232331303914046,
+     0.32209688282251464,
+     0.3209867426964495,
+     0.31990203491573654,
+     0.318842105020438,
+     0.3178063184239931,
+     0.3167940596827045,
+     0.31580473179804175,
+     0.314837755547578,
+     0.313892568847217,
+     0.3129686261396231,
+     0.31206539780914583,
+     0.31118236962157925,
+     0.31031904218786704,
+     0.3094749304506621,
+     0.30864956318989784,
+     0.30784248254408536,
+     0.30705324355798314,
+     0.3062814137600552,
+     0.3055265727386868,
+     0.30478831174060195,
+     0.3040662332851354,
+     0.3033599507908037,
+     0.30266908822613736,
+     0.3019932797667929,
+     0.3013321694672453,
+     0.3006854109461018,
+     0.30005266707849826,
+     0.2994336097090598,
+     0.2988279193686557,
+     0.2982352850039632,
+     0.2976554037178345,
+     0.29708798051536406,
+     0.2965327280659949,
+     0.2959893664689843,
+     0.2954576230287889,
+     0.29493723203925065,
+     0.2944279345728155,
+     0.2939294782816704,
+     0.29344161720283796,
+     0.2929641115704153,
+     0.292496727635093,
+     0.29203923748819105,
+     0.29159141889429896,
+     0.2911530551284429,
+     0.29072393481824715,
+     0.2903038517921442,
+     0.2898926049316951,
+     0.289489998029917,
+     0.2890958396545208,
+     0.28870994301451364,
+     0.2883321258318569,
+     0.2879622102169007,
+     0.28760002254780437,
+     0.2872453933551057,
+     0.2868981572084026,
+     0.2865581526072904,
+     0.2862252218757971,
+     0.2858992110592273,
+     0.28557996982629175,
+     0.28526735137238185,
+     0.2849612123264778,
+     0.28466141266115985,
+     0.2843678156041904,
+     0.2840802875549163,
+     0.2837986980014658,
+     0.28352291944094404,
+     0.28325282730222284,
+     0.28298829987017005,
+     0.28272921821359376,
+     0.2824754661142381,
+     0.2822269299980511,
+     0.28198349886866536,
+     0.2817450642422158,
+     0.2815115200849682,
+     0.28128276275274083,
+     0.28105869093227326,
+     0.28083920557931774,
+     0.2806242098688201,
+     0.2804136091315611,
+     0.28020731081135775,
+     0.2800052244064669,
+     0.27980726142376433,
+     0.27961333533125804,
+     0.27942336150438424,
+     0.2792372571900802,
+     0.2790549414484943,
+     0.27887633512437693,
+     0.2787013607891074,
+     0.2785299427152943,
+     0.2783620068217486,
+     0.2781974806481765,
+     0.27803629330568713,
+     0.2778783754486506,
+     0.27772365923258313,
+     0.2775720782820499,
+     0.2774235676565773,
+     0.27727806381395587,
+     0.27713550458482306,
+     0.2769958291309438,
+     0.27685897792621966,
+     0.27672489271505163,
+     0.2765935164939868,
+     0.27646479347329544
+    ],
+    "complex_AB": [
+     0.0,
+     0.03024191566767525,
+     0.058616836465205484,
+     0.08528730021441625,
+     0.1103975309833595,
+     0.13407594800581027,
+     0.15643727357486287,
+     0.17758431202893682,
+     0.1976094586854593,
+     0.2165959850873425,
+     0.23461913841251195,
+     0.25174708564239057,
+     0.2680417274798341,
+     0.2835594025054218,
+     0.2983514984619857,
+     0.31246498465024003,
+     0.3259428770636972,
+     0.33882464594506767,
+     0.3511465740149747,
+     0.3629420720846462,
+     0.3742419577966099,
+     0.38507470265996147,
+     0.3954666512917128,
+     0.4054422165425632,
+     0.4150240535105524,
+     0.4242332150822477,
+     0.43308929123874507,
+     0.4416105340739388,
+     0.4498139701973015,
+     0.45771550199435246,
+     0.46532999900495553,
+     0.47267138052721624,
+     0.47975269041431057,
+     0.48658616491442575,
+     0.49318329429560176,
+     0.4995548789077593,
+     0.5057110802568862,
+     0.5116614675947566,
+     0.5174150605792116,
+     0.522980368147013,
+     0.5283654241968995,
+     0.533577820370696,
+     0.5386247360917278,
+     0.5435129662011194,
+     0.5482489464083692,
+     0.5528387767338595,
+     0.557288243141696,
+     0.5616028375197243,
+     0.565787776147318,
+     0.569848016788967,
+     0.5737882745299873,
+     0.5776130364598128,
+     0.5813265752996506,
+     0.5849329620652064,
+     0.588436077835813,
+     0.5918396247113973,
+     0.5951471360168363,
+     0.598361985814333,
+     0.6014873977789975,
+     0.6045264534850727,
+     0.6074821001488813,
+     0.6103571578704213,
+     0.613154326409951,
+     0.6158761915342061,
+     0.618525230965097,
+     0.6211038199567731,
+     0.6236142365304109,
+     0.6260586663812899,
+     0.6284392075189523,
+     0.6307578746178484,
+     0.6330166030767849,
+     0.6352172528656357,
+     0.6373616121712843,
+     0.6394514008126669,
+     0.6414882734589636,
+     0.6434738226689442,
+     0.6454095817668183,
+     0.6472970275591992,
+     0.6491375828961219,
+     0.6509326190976888,
+     0.652683458248756,
+     0.6543913753753146,
+     0.6560576005022984,
+     0.6576833206037626,
+     0.6592696814533178,
+     0.6608177893772512,
+     0.662328712923891,
+     0.6638034844418751,
+     0.6652431015830356,
+     0.6666485287296631,
+     0.668020698351178,
+     0.6693605122971299,
+     0.6706688430237775,
+     0.671946534764005,
+     0.673194404640565,
+     0.6744132437275215,
+     0.6756038180621977,
+     0.6767668696085956,
+     0.6779031171774855,
+     0.6790132573035508,
+     0.6800979650842639,
+     0.6811578949795625,
+     0.6821936815760073,
+     0.6832059403172959,
+     0.6841952682019586,
+     0.6851622444524224,
+     0.6861074311527833,
+     0.6870313738603773,
+     0.6879346021908546,
+     0.6888176303784211,
+     0.6896809578121333,
+     0.6905250695493382,
+     0.6913504368101024,
+     0.692157517455915,
+     0.6929467564420172,
+     0.6937185862399452,
+     0.6944734272613134,
+     0.6952116882593983,
+     0.695933766714865,
+     0.6966400492091965,
+     0.6973309117738629,
+     0.6980067202332073,
+     0.6986678305327549,
+     0.6993145890538984,
+     0.699947332921502,
+     0.7005663902909405,
+     0.7011720806313446,
+     0.7017647149960371,
+     0.7023445962821657,
+     0.7029120194846362,
+     0.7034672719340055,
+     0.7040106335310161,
+     0.7045423769712115,
+     0.7050627679607497,
+     0.7055720654271849,
+     0.70607052171833,
+     0.7065583827971625,
+     0.7070358884295852,
+     0.7075032723649075,
+     0.7079607625118094,
+     0.7084085811057015,
+     0.7088469448715575,
+     0.7092760651817533,
+     0.7096961482078564,
+     0.7101073950683054,
+     0.7105100019700835,
+     0.7109041603454798,
+     0.7112900569854869,
+     0.7116678741681437,
+     0.7120377897831,
+     0.7123999774521962,
+     0.712754606644895,
+     0.713101842791598,
+     0.7134418473927102,
+     0.7137747781242035,
+     0.7141007889407733,
+     0.7144200301737089,
+     0.7147326486276189,
+     0.7150387876735229,
+     0.7153385873388408,
+     0.7156321843958104,
+     0.7159197124450846,
+     0.716201301998535,
+     0.7164770805590568,
+     0.7167471726977781,
+     0.7170117001298308,
+     0.7172707817864071,
+     0.7175245338857628,
+     0.7177730700019497,
+     0.7180165011313354,
+     0.718254935757785,
+     0.7184884799150325,
+     0.7187172372472599,
+     0.7189413090677275,
+     0.719160794420683,
+     0.7193757901311807,
+     0.7195863908684398,
+     0.719792689188643,
+     0.7199947755935339,
+     0.7201927385762364,
+     0.7203866646687428,
+     0.7205766384956165,
+     0.7207627428099206,
+     0.7209450585515065,
+     0.7211236648756238,
+     0.7212986392108933,
+     0.7214700572847065,
+     0.7216379931782523,
+     0.7218025193518244,
+     0.7219637066943136,
+     0.7221216245513501,
+     0.7222763407674176,
+     0.7224279217179509,
+     0.7225764323434234,
+     0.7227219361860449,
+     0.7228644954151777,
+     0.723004170869057,
+     0.7231410220737812,
+     0.7232751072849493,
+     0.7234064835060141,
+     0.7235352065267054
+    ]
+   },
+   "end": 6.246950478269841,
+   "points": 201,
+   "window_basis": "4 x the slowest settling time (1.56), derived from the Jacobian's smallest non-zero eigenvalue",
+   "invariants": [
+    {
+     "law": "complex_A + -1 complex_B",
+     "initial": 0.0,
+     "final": -5.551115123125783e-17,
+     "worst_drift": 1.1102230246251565e-16,
+     "held": true
+    },
+    {
+     "law": "complex_A + complex_AB",
+     "initial": 1.0,
+     "final": 1.0000000000000009,
+     "worst_drift": 8.881784197001252e-16,
+     "held": true
+    }
+   ],
+   "checked": true,
+   "sound": true,
+   "unmeasured": [
+    "complex_kon",
+    "complex_koff"
+   ],
+   "text": "Integrated to t=6.247 in 201 points (4 x the slowest settling time (1.56), derived from the Jacobian's smallest non-zero eigenvalue). Final state: complex_A=0.2765, complex_AB=0.7235, complex_B=0.2765. All 2 conservation law(s) survived the integration: `complex_A + -1 complex_B` held to 1.11e-04; `complex_A + complex_AB` held to 8.88e-16. The integrator does not know these exist, so this is an independent check that the numbers are right. 2 of these constants are the motif library's illustrative values, not measurements: complex_kon, complex_koff. The SHAPE of this curve is a property of the mechanism; its scale is a property of numbers nobody measured."
+  },
+  "sensitivity": {
+   "quantity": "steady-state complex_AB",
+   "base_value": 0.7298437881283576,
+   "sensitivities": [
+    {
+     "parameter": "complex_kon",
+     "value": 1.0,
+     "relative": 0.15617376188464882,
+     "absolute": 0.11398244998014821,
+     "negligible": false,
+     "unresolvable": false
+    },
+    {
+     "parameter": "complex_koff",
+     "value": 0.1,
+     "relative": -0.15617376188464885,
+     "absolute": -1.1398244998014821,
+     "negligible": false,
+     "unresolvable": false
+    }
+   ],
+   "skipped": {},
+   "conserved_by": null,
+   "resolution": 3.6668528625010357e-10
+  },
+  "sweeps": [],
+  "sections": [
+   {
+    "key": "crnt",
+    "title": "Reaction network structure",
+    "status": "answered",
+    "text": "2 complex(es): complex_A + complex_B, complex_AB. 1 linkage class(es): {complex_A + complex_B, complex_AB}. Stoichiometric subspace has rank 1, computed exactly over the rationals. Deficiency = n - l - s = 2 - 1 - 1 = 0. Weakly reversible: yes. All 2 rate law(s) are mass action, so the deficiency theorems are available.\n\nNothing above reads a parameter value. Deficiency is a property of the wiring, so it holds for EVERY choice of positive rate constants -- including the placeholders this model is carrying.\n\nDeficiency Zero Theorem: APPLIES. For EVERY choice of strictly positive rate constants, the mass-action system of this network has exactly one steady state in the interior of each positive stoichiometric compatibility class; that steady state is asymptotically stable relative to its class; and no non-trivial cyclic trajectory lies in the positive orthant, so this network cannot oscillate. None of that depends on a rate constant being known, which is why it survives the 2 placeholder constant(s) this model still carries. Not claimed: global convergence -- where this theorem asserts stability at all, the stability is LOCAL, relative to the steady state's own stoichiometric compatibility class, and whether every positive trajectory reaches it is the Global Attractor Conjecture, which this theorem does not settle; anything about WHERE the steady state sits, which depends on rate constants this model has not measured; anything about trajectories on the boundary of the positive orthant, where one or more species is exactly zero; and anything about whether the mechanism is the right one -- a wrong model of deficiency zero has all of these properties too. Hypotheses: [yes] mass-action kinetics: every rate law was shown to be a positive constant times its reactant complex [yes] deficiency zero: delta = n - l - s = 2 - 1 - 1 = 0 [yes] weakly reversible: every linkage class is strongly connected\n\nDeficiency One Theorem: APPLIES. For EVERY choice of strictly positive rate constants, the mass-action system of this network has exactly one steady state in the interior of each positive stoichiometric compatibility class. This network is weakly reversible, so existence as well as uniqueness is asserted. Not claimed: STABILITY, of any kind. Unlike the Deficiency Zero Theorem this one counts positive steady states and stops there: the unique steady state it gives may be unstable, and the system may have sustained oscillations around it. It also does not claim a steady state EXISTS unless the network is weakly reversible -- 'at most one' is satisfied by none -- and it says nothing about where the steady state sits or about the boundary of the positive orthant. Hypotheses: [yes] mass-action kinetics: every rate law was shown to be a positive constant times its reactant complex [yes] one terminal strong linkage class per linkage class: terminal strong linkage classes per linkage class: 1 [yes] every linkage class has deficiency at most 1: linkage-class deficiencies: 0 [yes] the linkage-class deficiencies sum to the network deficiency: sum of linkage-class deficiencies = 0, network deficiency = 0 [yes] weakly reversible: decides existence as well as uniqueness",
+    "refusals": [],
+    "data": {
+     "description": "2 complex(es): complex_A + complex_B, complex_AB. 1 linkage class(es): {complex_A + complex_B, complex_AB}. Stoichiometric subspace has rank 1, computed exactly over the rationals. Deficiency = n - l - s = 2 - 1 - 1 = 0. Weakly reversible: yes. All 2 rate law(s) are mass action, so the deficiency theorems are available.",
+     "Deficiency Zero Theorem": {
+      "theorem": "Deficiency Zero Theorem",
+      "applies": true,
+      "hypotheses": [
+       {
+        "name": "mass-action kinetics",
+        "holds": true,
+        "detail": "every rate law was shown to be a positive constant times its reactant complex"
+       },
+       {
+        "name": "deficiency zero",
+        "holds": true,
+        "detail": "delta = n - l - s = 2 - 1 - 1 = 0"
+       },
+       {
+        "name": "weakly reversible",
+        "holds": true,
+        "detail": "every linkage class is strongly connected"
+       }
+      ],
+      "conclusion": "For EVERY choice of strictly positive rate constants, the mass-action system of this network has exactly one steady state in the interior of each positive stoichiometric compatibility class; that steady state is asymptotically stable relative to its class; and no non-trivial cyclic trajectory lies in the positive orthant, so this network cannot oscillate. None of that depends on a rate constant being known, which is why it survives the 2 placeholder constant(s) this model still carries.",
+      "reason": "",
+      "not_claimed": "global convergence -- where this theorem asserts stability at all, the stability is LOCAL, relative to the steady state's own stoichiometric compatibility class, and whether every positive trajectory reaches it is the Global Attractor Conjecture, which this theorem does not settle; anything about WHERE the steady state sits, which depends on rate constants this model has not measured; anything about trajectories on the boundary of the positive orthant, where one or more species is exactly zero; and anything about whether the mechanism is the right one -- a wrong model of deficiency zero has all of these properties too.",
+      "caveats": []
+     },
+     "Deficiency One Theorem": {
+      "theorem": "Deficiency One Theorem",
+      "applies": true,
+      "hypotheses": [
+       {
+        "name": "mass-action kinetics",
+        "holds": true,
+        "detail": "every rate law was shown to be a positive constant times its reactant complex"
+       },
+       {
+        "name": "one terminal strong linkage class per linkage class",
+        "holds": true,
+        "detail": "terminal strong linkage classes per linkage class: 1"
+       },
+       {
+        "name": "every linkage class has deficiency at most 1",
+        "holds": true,
+        "detail": "linkage-class deficiencies: 0"
+       },
+       {
+        "name": "the linkage-class deficiencies sum to the network deficiency",
+        "holds": true,
+        "detail": "sum of linkage-class deficiencies = 0, network deficiency = 0"
+       },
+       {
+        "name": "weakly reversible",
+        "holds": true,
+        "detail": "decides existence as well as uniqueness"
+       }
+      ],
+      "conclusion": "For EVERY choice of strictly positive rate constants, the mass-action system of this network has exactly one steady state in the interior of each positive stoichiometric compatibility class. This network is weakly reversible, so existence as well as uniqueness is asserted.",
+      "reason": "",
+      "not_claimed": "STABILITY, of any kind. Unlike the Deficiency Zero Theorem this one counts positive steady states and stops there: the unique steady state it gives may be unstable, and the system may have sustained oscillations around it. It also does not claim a steady state EXISTS unless the network is weakly reversible -- 'at most one' is satisfied by none -- and it says nothing about where the steady state sits or about the boundary of the positive orthant.",
+      "caveats": []
+     }
+    }
+   },
+   {
+    "key": "scale",
+    "title": "Physical scale",
+    "status": "answered",
+    "text": "All 5 of the numbers examined are physically possible and within the ranges these constants describe.\nEvery bound above is stated to one significant figure, which is the resolution these questions are asked at. Nothing here is a measurement; they are bounds and ranges used to ask whether a number is off by orders of magnitude.\n\nThe units came from the motifs that declared them. `core.network.Parameter` carries the unit through, so a COMPOSED network describes itself; a network built outside the composer carries none, and every parameter in it is reported unchecked rather than assumed to be a concentration. See `scale.units_from_model`.",
+    "refusals": [],
+    "data": {
+     "report": {
+      "findings": [],
+      "unchecked": {},
+      "checked": [
+       "complex_kon",
+       "complex_koff",
+       "complex_A",
+       "complex_B",
+       "complex_AB"
+      ],
+      "examined_nothing": false,
+      "coverage": "5 examined, none skipped",
+      "errors": [],
+      "questions": [],
+      "physically_possible": true
+     }
+    }
+   },
+   {
+    "key": "reduction",
+    "title": "Timescale separation",
+    "status": "refused",
+    "text": "**Refused.** this model has one dynamic mode, at tau = 1.56. A timescale separation is a ratio between two of them, so there is none to report: nothing here is fast RELATIVE to anything, and a model with one mode is already as small as a quasi-steady-state argument can make it. The other 2 species are fixed by conservation laws rather than being slow.",
+    "refusals": [
+     "this model has one dynamic mode, at tau = 1.56. A timescale separation is a ratio between two of them, so there is none to report: nothing here is fast RELATIVE to anything, and a model with one mode is already as small as a quasi-steady-state argument can make it. The other 2 species are fixed by conservation laws rather than being slow."
+    ],
+    "data": {}
+   },
+   {
+    "key": "robustness",
+    "title": "Robustness to the placeholders",
+    "status": "answered",
+    "text": "'exactly one stable state' held in every one of the 5 sample(s) evaluated, with 2 parameter(s) varied log-uniformly over +/-1 decade(s) around the model's current values (seed 0). Every draw was judged by a steady-state search from 8 starting point(s) per species. A conclusion about how many stable states exist is an answer from a search, and a shallower one finds fewer -- so a fraction produced at one depth cannot be compared against a headline produced at another. This is a count over a stated box, not a probability. The box is a range chosen for want of a measured one, so surviving it is evidence about the mechanism and failing it is evidence about how much the answer rests on numbers nobody has measured -- neither is a proof, and a conclusion that survives every sample here may still fail just outside.\n\nThe conclusion resampled -- 'exactly one stable state' -- is the one this model's own steady-state search produced, not a fixed question asked of every model. Asking a monostable model whether it stays bistable returns a true 0% about something nobody claimed.",
+    "refusals": [],
+    "data": {
+     "report": {
+      "conclusion": "exactly one stable state",
+      "samples": [
+       {
+        "values": {
+         "complex_kon": 0.15973405640395538,
+         "complex_koff": 0.16242266994309754
+        },
+        "held": true,
+        "reason": ""
+       },
+       {
+        "values": {
+         "complex_kon": 0.6345011409757866,
+         "complex_koff": 0.058512895986829044
+        },
+        "held": true,
+        "reason": ""
+       },
+       {
+        "values": {
+         "complex_kon": 1.3234857410510632,
+         "complex_koff": 0.014395299370230902
+        },
+        "held": true,
+        "reason": ""
+       },
+       {
+        "values": {
+         "complex_kon": 0.5151798071768583,
+         "complex_koff": 0.09238194683281901
+        },
+        "held": true,
+        "reason": ""
+       },
+       {
+        "values": {
+         "complex_kon": 0.7819072553455229,
+         "complex_koff": 0.18475903682511968
+        },
+        "held": true,
+        "reason": ""
+       }
+      ],
+      "varied": [
+       "complex_kon",
+       "complex_koff"
+      ],
+      "spread_decades": 1.0,
+      "seed": 0,
+      "fixed": {},
+      "starts_per_species": 8,
+      "held_at_centre": true,
+      "evaluated": [
+       {
+        "values": {
+         "complex_kon": 0.15973405640395538,
+         "complex_koff": 0.16242266994309754
+        },
+        "held": true,
+        "reason": ""
+       },
+       {
+        "values": {
+         "complex_kon": 0.6345011409757866,
+         "complex_koff": 0.058512895986829044
+        },
+        "held": true,
+        "reason": ""
+       },
+       {
+        "values": {
+         "complex_kon": 1.3234857410510632,
+         "complex_koff": 0.014395299370230902
+        },
+        "held": true,
+        "reason": ""
+       },
+       {
+        "values": {
+         "complex_kon": 0.5151798071768583,
+         "complex_koff": 0.09238194683281901
+        },
+        "held": true,
+        "reason": ""
+       },
+       {
+        "values": {
+         "complex_kon": 0.7819072553455229,
+         "complex_koff": 0.18475903682511968
+        },
+        "held": true,
+        "reason": ""
+       }
+      ],
+      "failed": [],
+      "held_count": 5,
+      "fraction": 1.0,
+      "uncertainty": 0.0
+     },
+     "conclusion": "exactly one stable state"
+    }
+   },
+   {
+    "key": "validate",
+    "title": "Cross-checks",
+    "status": "answered",
+    "text": "Cross-checked reversible_binding_of_a_ligand_to_a_receptor: 5 agreement(s), 0 contradiction(s), 0 divergence(s), 1 check(s) that did not run. 1 check(s) did not run, which is not the same as passing: sensitivity (no quantity was named. A sensitivity cross-check needs a scalar to differentiate, and choosing one here would choose which of this model's conclusions gets checked without saying so. Pass `species=`). 4 of 5 checks produced a result (dimensions, conservation, fixed point, settling time). Every one of them compares Caterva against Caterva. Agreement means the package is self-consistent here, not that the model is right: the routes share the rate laws, the stoichiometry and the parameter values, so a mechanism written down wrongly is reproduced faithfully by all of them.\n\nNo species was named, so the sensitivity cross-check did not run. Pass --rank-against SPECIES to choose the quantity it differentiates -- choosing one here would pick which of this model's conclusions gets checked without saying which.",
+    "refusals": [],
+    "data": {
+     "report": {
+      "model": "reversible_binding_of_a_ligand_to_a_receptor",
+      "findings": [
+       {
+        "check": "dimensions",
+        "severity": "agree",
+        "subject": "reversible_binding_of_a_ligand_to_a_receptor",
+        "detail": "all 2 rate laws evaluate to an amount per volume per time, in the unit the composition declares, with the units its motifs declare for their own constants. Dimensions and SCALE both: mM and uM have the same dimensions and differ by a thousand, so a check that looked only at dimensions would pass a model that is wrong by that factor.",
+        "doubt": "",
+        "measured": {},
+        "agreed": true
+       },
+       {
+        "check": "conservation",
+        "severity": "agree",
+        "subject": "complex_A + -1 complex_B",
+        "detail": "held to 1.11e-04 over the run, against a tolerance of 0.001. The integrator does not know this law exists -- it is the left null space of the stoichiometry over rationals -- so this is an independent check and not a restatement.",
+        "doubt": "",
+        "measured": {
+         "initial": 0.0,
+         "final": -5.551115123125783e-17,
+         "worst_drift": 1.1102230246251565e-16,
+         "relative": 0.00011102230246251565
+        },
+        "agreed": true
+       },
+       {
+        "check": "conservation",
+        "severity": "agree",
+        "subject": "complex_A + complex_AB",
+        "detail": "held to 8.88e-16 over the run, against a tolerance of 0.001. The integrator does not know this law exists -- it is the left null space of the stoichiometry over rationals -- so this is an independent check and not a restatement.",
+        "doubt": "",
+        "measured": {
+         "initial": 1.0,
+         "final": 1.0,
+         "worst_drift": 8.881784197001252e-16,
+         "relative": 8.881784197001252e-16
+        },
+        "agreed": true
+       },
+       {
+        "check": "fixed point",
+        "severity": "agree",
+        "subject": "complex_A=0.2702, complex_AB=0.7298, complex_B=0.2702",
+        "detail": "the state does not move: the trajectory stays within 6.08e-16 of it, against a tolerance of 0.0001. The root finder and the integrator agree about where this system rests, having reached it by different arithmetic over different compilations of the same rate laws. (integrated to t=6.247.)",
+        "doubt": "",
+        "measured": {
+         "residual": 1.3877787807814457e-17,
+         "drift": 4.440892098500626e-16,
+         "scale": 0.7298437881283576,
+         "relative_drift": 6.084715895012326e-16,
+         "end": 6.246950478269841
+        },
+        "agreed": true
+       },
+       {
+        "check": "settling time",
+        "severity": "agree",
+        "subject": "complex_A=0.2702, complex_AB=0.7298, complex_B=0.2702",
+        "detail": "the trajectory settles with a time constant of 1.194 against the 1.562 the Jacobian's slowest eigenvalue predicts, a ratio of 0.765. The linearisation is describing the approach the integrator actually takes.",
+        "doubt": "",
+        "measured": {
+         "predicted": 1.5617376195674602,
+         "observed": 1.1940528779587012,
+         "initial_deviation": 1.2641265226268503,
+         "final_deviation": 0.00019821405736506045,
+         "window": 12.493900956539681
+        },
+        "agreed": true
+       },
+       {
+        "check": "sensitivity",
+        "severity": "unchecked",
+        "subject": "reversible_binding_of_a_ligand_to_a_receptor",
+        "detail": "no quantity was named. A sensitivity cross-check needs a scalar to differentiate, and choosing one here would choose which of this model's conclusions gets checked without saying so. Pass `species=`",
+        "doubt": "",
+        "measured": {},
+        "agreed": false
+       }
+      ],
+      "contradictions": [],
+      "divergences": [],
+      "unchecked": [
+       {
+        "check": "sensitivity",
+        "severity": "unchecked",
+        "subject": "reversible_binding_of_a_ligand_to_a_receptor",
+        "detail": "no quantity was named. A sensitivity cross-check needs a scalar to differentiate, and choosing one here would choose which of this model's conclusions gets checked without saying so. Pass `species=`",
+        "doubt": "",
+        "measured": {},
+        "agreed": false
+       }
+      ],
+      "agreements": [
+       {
+        "check": "dimensions",
+        "severity": "agree",
+        "subject": "reversible_binding_of_a_ligand_to_a_receptor",
+        "detail": "all 2 rate laws evaluate to an amount per volume per time, in the unit the composition declares, with the units its motifs declare for their own constants. Dimensions and SCALE both: mM and uM have the same dimensions and differ by a thousand, so a check that looked only at dimensions would pass a model that is wrong by that factor.",
+        "doubt": "",
+        "measured": {},
+        "agreed": true
+       },
+       {
+        "check": "conservation",
+        "severity": "agree",
+        "subject": "complex_A + -1 complex_B",
+        "detail": "held to 1.11e-04 over the run, against a tolerance of 0.001. The integrator does not know this law exists -- it is the left null space of the stoichiometry over rationals -- so this is an independent check and not a restatement.",
+        "doubt": "",
+        "measured": {
+         "initial": 0.0,
+         "final": -5.551115123125783e-17,
+         "worst_drift": 1.1102230246251565e-16,
+         "relative": 0.00011102230246251565
+        },
+        "agreed": true
+       },
+       {
+        "check": "conservation",
+        "severity": "agree",
+        "subject": "complex_A + complex_AB",
+        "detail": "held to 8.88e-16 over the run, against a tolerance of 0.001. The integrator does not know this law exists -- it is the left null space of the stoichiometry over rationals -- so this is an independent check and not a restatement.",
+        "doubt": "",
+        "measured": {
+         "initial": 1.0,
+         "final": 1.0,
+         "worst_drift": 8.881784197001252e-16,
+         "relative": 8.881784197001252e-16
+        },
+        "agreed": true
+       },
+       {
+        "check": "fixed point",
+        "severity": "agree",
+        "subject": "complex_A=0.2702, complex_AB=0.7298, complex_B=0.2702",
+        "detail": "the state does not move: the trajectory stays within 6.08e-16 of it, against a tolerance of 0.0001. The root finder and the integrator agree about where this system rests, having reached it by different arithmetic over different compilations of the same rate laws. (integrated to t=6.247.)",
+        "doubt": "",
+        "measured": {
+         "residual": 1.3877787807814457e-17,
+         "drift": 4.440892098500626e-16,
+         "scale": 0.7298437881283576,
+         "relative_drift": 6.084715895012326e-16,
+         "end": 6.246950478269841
+        },
+        "agreed": true
+       },
+       {
+        "check": "settling time",
+        "severity": "agree",
+        "subject": "complex_A=0.2702, complex_AB=0.7298, complex_B=0.2702",
+        "detail": "the trajectory settles with a time constant of 1.194 against the 1.562 the Jacobian's slowest eigenvalue predicts, a ratio of 0.765. The linearisation is describing the approach the integrator actually takes.",
+        "doubt": "",
+        "measured": {
+         "predicted": 1.5617376195674602,
+         "observed": 1.1940528779587012,
+         "initial_deviation": 1.2641265226268503,
+         "final_deviation": 0.00019821405736506045,
+         "window": 12.493900956539681
+        },
+        "agreed": true
+       }
+      ]
+     }
+    }
+   }
+  ],
+  "notes": [
+   "association and dissociation as mass action in both directions. Kd is koff/kon, so a published Kd constrains the pair but neither rate alone"
+  ],
+  "report_markdown": "# reversible_binding_of_a_ligand_to_a_receptor\n\n> reversible binding of a ligand to a receptor\n\n## Verdict\n\n```\nVERDICT: STRUCTURAL\n\nWhat this supports: Questions about the MECHANISM: can this shape oscillate, can it switch, which constants would matter if you measured them. Not questions about any particular enzyme or cell, because the constants are the library's illustrative values.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\nThe conclusion tested: exactly one stable state\n\n1 concern(s), worst first:\n  - [provenance] all 2 rate constant(s) are the motif library's illustrative values: this mechanism has no enzyme step, and its constants are not kept in an enzyme database -- supply the constants the provenance table lists, from your own measurements or a paper -- start with the top of its influence ranking\n\nDo this next: supply the constants the provenance table lists, from your own measurements or a paper -- start with the top of its influence ranking\n\nChecked: assumptions (none checkable); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold); provenance (2 constant(s) unmeasured); robustness (5/5 samples); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 2 rate law(s) balance); validate (cross-checks agree).\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point.\n```\n\n## Structure\n\nRecognised as: **reversible binding** (two partners and a complex).\n\n3 species, 2 reactions, 2 parameters.\n\n| reaction | rate law |\n|---|---|\n| `complex_association` | `complex_kon * complex_A * complex_B` |\n| `complex_dissociation` | `complex_koff * complex_AB` |\n\n- association and dissociation as mass action in both directions. Kd is koff/kon, so a published Kd constrains the pair but neither rate alone.\n\n## Invariants\n\nThese are **derived**, not asserted: they are the left null space of this model's own stoichiometry matrix, computed exactly over rationals.\n\n- `complex_A + -1 complex_B` is constant\n- `complex_A + complex_AB` is constant\n\n## Dimensions\n\nAll 2 rate laws balance, in dimension and in scale. Checked before compilation: a law with the wrong dimensions integrates perfectly well and is wrong by whatever factor the mistake introduced.\n\n## Where the numbers come from\n\n**Nothing was searched for.** No enzyme was named, so there is nothing whose measured constants could be looked up. These are the measurements that would complete the model:\n\n| quantity | what it is | unit | source table | influence |\n|---|---|---|---|---|\n| `complex_koff` | dissociation rate constant (no database table serves this; it is resolvable only from a paper) | 1/s | _no table_ | **S = -0.16** |\n| `complex_kon` | association rate constant (no database table serves this; it is resolvable only from a paper) | 1/(mM*s) | _no table_ | **S = +0.16** |\n\nOrdered by influence on **steady-state complex_AB**: S is the fractional change in it per fractional change in the constant, so S = +2 means a 1% increase raises the answer by 2%.\n\nMeasuring the top of this list buys more than measuring the bottom of it.\n\nTwo things this ordering is not. It is **local** — computed at the library's illustrative values, and a constant that is negligible there can dominate two decades away. And it ranks influence, not **priority**: a constant with high influence that BRENDA already holds is not work, while a modest one nobody has ever measured is. A row marked _below the noise floor_ (|S| < 4e-10) is one the arithmetic could not tell from its own rounding, which is not the same as one measured to be small.\n\n**Yours to set** (3): `complex_A`, `complex_B`, `complex_AB`. Starting amounts and any cooperativity — no paper supplies these, and they are recorded as your choices rather than as measurements.\n\n## Behaviour\n\n1 steady state(s) found from 24 starting points:   - stable at complex_A=0.2702, complex_AB=0.7298, complex_B=0.2702; settles over ~1.56 time units These are numerical results from a root find, not derived facts. The conservation laws this model reports ARE derived; these are what a solver converged to, with the residuals shown.\n\n**These conclusions are about the model's SHAPE, not about any real system.** All 2 rate constants are the motif library's illustrative values, because this mechanism has no enzyme step, so its constants are not kept in an enzyme database. Whether a real instance of this mechanism behaves this way depends on its actual constants, and this says nothing about that. What it does say is what the mechanism CAN do — which is the question a structural model is asked.\n\n## Time course\n\nIntegrated to t=6.247 in 201 points (4 x the slowest settling time (1.56), derived from the Jacobian's smallest non-zero eigenvalue). Final state: complex_A=0.2765, complex_AB=0.7235, complex_B=0.2765. All 2 conservation law(s) survived the integration: `complex_A + -1 complex_B` held to 1.11e-04; `complex_A + complex_AB` held to 8.88e-16. The integrator does not know these exist, so this is an independent check that the numbers are right. 2 of these constants are the motif library's illustrative values, not measurements: complex_kon, complex_koff. The SHAPE of this curve is a property of the mechanism; its scale is a property of numbers nobody measured.\n\nEvery species stays inside what a cell can hold for the whole run (3 examined, none skipped). A capacity check, not a claim the curve is right.\n\n## Reaction network structure\n\n2 complex(es): complex_A + complex_B, complex_AB. 1 linkage class(es): {complex_A + complex_B, complex_AB}. Stoichiometric subspace has rank 1, computed exactly over the rationals. Deficiency = n - l - s = 2 - 1 - 1 = 0. Weakly reversible: yes. All 2 rate law(s) are mass action, so the deficiency theorems are available.\n\nNothing above reads a parameter value. Deficiency is a property of the wiring, so it holds for EVERY choice of positive rate constants -- including the placeholders this model is carrying.\n\nDeficiency Zero Theorem: APPLIES. For EVERY choice of strictly positive rate constants, the mass-action system of this network has exactly one steady state in the interior of each positive stoichiometric compatibility class; that steady state is asymptotically stable relative to its class; and no non-trivial cyclic trajectory lies in the positive orthant, so this network cannot oscillate. None of that depends on a rate constant being known, which is why it survives the 2 placeholder constant(s) this model still carries. Not claimed: global convergence -- where this theorem asserts stability at all, the stability is LOCAL, relative to the steady state's own stoichiometric compatibility class, and whether every positive trajectory reaches it is the Global Attractor Conjecture, which this theorem does not settle; anything about WHERE the steady state sits, which depends on rate constants this model has not measured; anything about trajectories on the boundary of the positive orthant, where one or more species is exactly zero; and anything about whether the mechanism is the right one -- a wrong model of deficiency zero has all of these properties too. Hypotheses: [yes] mass-action kinetics: every rate law was shown to be a positive constant times its reactant complex [yes] deficiency zero: delta = n - l - s = 2 - 1 - 1 = 0 [yes] weakly reversible: every linkage class is strongly connected\n\nDeficiency One Theorem: APPLIES. For EVERY choice of strictly positive rate constants, the mass-action system of this network has exactly one steady state in the interior of each positive stoichiometric compatibility class. This network is weakly reversible, so existence as well as uniqueness is asserted. Not claimed: STABILITY, of any kind. Unlike the Deficiency Zero Theorem this one counts positive steady states and stops there: the unique steady state it gives may be unstable, and the system may have sustained oscillations around it. It also does not claim a steady state EXISTS unless the network is weakly reversible -- 'at most one' is satisfied by none -- and it says nothing about where the steady state sits or about the boundary of the positive orthant. Hypotheses: [yes] mass-action kinetics: every rate law was shown to be a positive constant times its reactant complex [yes] one terminal strong linkage class per linkage class: terminal strong linkage classes per linkage class: 1 [yes] every linkage class has deficiency at most 1: linkage-class deficiencies: 0 [yes] the linkage-class deficiencies sum to the network deficiency: sum of linkage-class deficiencies = 0, network deficiency = 0 [yes] weakly reversible: decides existence as well as uniqueness\n\n## Physical scale\n\nAll 5 of the numbers examined are physically possible and within the ranges these constants describe.\nEvery bound above is stated to one significant figure, which is the resolution these questions are asked at. Nothing here is a measurement; they are bounds and ranges used to ask whether a number is off by orders of magnitude.\n\nThe units came from the motifs that declared them. `core.network.Parameter` carries the unit through, so a COMPOSED network describes itself; a network built outside the composer carries none, and every parameter in it is reported unchecked rather than assumed to be a concentration. See `scale.units_from_model`.\n\n## Timescale separation\n\n**Refused.** this model has one dynamic mode, at tau = 1.56. A timescale separation is a ratio between two of them, so there is none to report: nothing here is fast RELATIVE to anything, and a model with one mode is already as small as a quasi-steady-state argument can make it. The other 2 species are fixed by conservation laws rather than being slow.\n\n## Robustness to the placeholders\n\n'exactly one stable state' held in every one of the 5 sample(s) evaluated, with 2 parameter(s) varied log-uniformly over +/-1 decade(s) around the model's current values (seed 0). Every draw was judged by a steady-state search from 8 starting point(s) per species. A conclusion about how many stable states exist is an answer from a search, and a shallower one finds fewer -- so a fraction produced at one depth cannot be compared against a headline produced at another. This is a count over a stated box, not a probability. The box is a range chosen for want of a measured one, so surviving it is evidence about the mechanism and failing it is evidence about how much the answer rests on numbers nobody has measured -- neither is a proof, and a conclusion that survives every sample here may still fail just outside.\n\nThe conclusion resampled -- 'exactly one stable state' -- is the one this model's own steady-state search produced, not a fixed question asked of every model. Asking a monostable model whether it stays bistable returns a true 0% about something nobody claimed.\n\n## Cross-checks\n\nCross-checked reversible_binding_of_a_ligand_to_a_receptor: 5 agreement(s), 0 contradiction(s), 0 divergence(s), 1 check(s) that did not run. 1 check(s) did not run, which is not the same as passing: sensitivity (no quantity was named. A sensitivity cross-check needs a scalar to differentiate, and choosing one here would choose which of this model's conclusions gets checked without saying so. Pass `species=`). 4 of 5 checks produced a result (dimensions, conservation, fixed point, settling time). Every one of them compares Caterva against Caterva. Agreement means the package is self-consistent here, not that the model is right: the routes share the rate laws, the stoichiometry and the parameter values, so a mechanism written down wrongly is reproduced faithfully by all of them.\n\nNo species was named, so the sensitivity cross-check did not run. Pass --rank-against SPECIES to choose the quantity it differentiates -- choosing one here would pick which of this model's conclusions gets checked without saying which.\n\n## Claims\n\nRoot claim: `claim:sha256:2716cef866d7247867c0f201e2a74cdad3d0bec318d29ad035953b307153e284` (computed; model = reversible_binding_of_a_ligand_to_a_receptor(no subject, no compound, no organism))\nClaims written: 6 -- 0 cited, 3 chosen, 2 placeholder, 0 refused, 1 computed; 0 row(s) and 0 pinned page(s) in the bundle.\n\n- `complex_A`: chosen, 1 mM -- `claim:sha256:65aba5a4de53720838dbfc8476dabb7774ae349758d2a70774e9646e3ae9650b`\n- `complex_B`: chosen, 1 mM -- `claim:sha256:accb62627e09aecb79db7ae0ee212e90b7aec32095414833103f76890e396aab`\n- `complex_AB`: chosen, 0 mM -- `claim:sha256:7ffc0794516f3b9001a5f56f91e662bb9710f544d0246ec9077f8b2e05df9973`\n- `complex_kon`: placeholder, 1 1/(mM*s) -- `claim:sha256:d1356a164fba3abc94e93665303dca7af9996d5f20d3b6492fde8bfa64b41df0`\n- `complex_koff`: placeholder, 0.1 1/s -- `claim:sha256:3e9aa3fd4d2550608cc3f7cf341fb94b5e8b72686935043ce71d804d17fc8d9d`\n\nBundle: <data dir>/runs/20261017-073850-compose-d4f2770b/claims\nRe-check offline: caterva verify <data dir>/runs/20261017-073850-compose-d4f2770b/claims\n\nA claim is a derivation, not a verdict: `caterva verify` re-checks that each stated reason still holds against the pinned bytes, not whether the paper was right.\n\n---\n\nBuilt by Caterva's compositional model builder. The structure was recognised deterministically from the description — no language model was involved and no API key is required. Conservation laws are exact; steady states and sweeps are numerical, and say so where they appear.\n",
+  "exports": {
+   "sbml": {
+    "available": true,
+    "artifact": "model.xml",
+    "refused": null
+   },
+   "antimony": {
+    "available": true,
+    "artifact": "model.ant",
+    "refused": null
+   },
+   "csv": {
+    "available": true,
+    "artifact": "parameters.csv",
+    "refused": null
+   },
+   "methods": {
+    "available": true,
+    "artifact": "methods.md",
+    "refused": null
+   }
+  },
+  "claims": {
+   "root": "claim:sha256:2716cef866d7247867c0f201e2a74cdad3d0bec318d29ad035953b307153e284",
+   "counts": {
+    "cited": 0,
+    "chosen": 3,
+    "placeholder": 2,
+    "refused": 0,
+    "computed": 1
+   },
+   "rows": 0,
+   "snapshots": 0,
+   "notes": [],
+   "bundle": "claims.zip",
+   "listing": "claims.json",
+   "text": "Root claim: `claim:sha256:2716cef866d7247867c0f201e2a74cdad3d0bec318d29ad035953b307153e284` (computed; model = reversible_binding_of_a_ligand_to_a_receptor(no subject, no compound, no organism))\nClaims written: 6 -- 0 cited, 3 chosen, 2 placeholder, 0 refused, 1 computed; 0 row(s) and 0 pinned page(s) in the bundle.\n\n- `complex_A`: chosen, 1 mM -- `claim:sha256:65aba5a4de53720838dbfc8476dabb7774ae349758d2a70774e9646e3ae9650b`\n- `complex_B`: chosen, 1 mM -- `claim:sha256:accb62627e09aecb79db7ae0ee212e90b7aec32095414833103f76890e396aab`\n- `complex_AB`: chosen, 0 mM -- `claim:sha256:7ffc0794516f3b9001a5f56f91e662bb9710f544d0246ec9077f8b2e05df9973`\n- `complex_kon`: placeholder, 1 1/(mM*s) -- `claim:sha256:d1356a164fba3abc94e93665303dca7af9996d5f20d3b6492fde8bfa64b41df0`\n- `complex_koff`: placeholder, 0.1 1/s -- `claim:sha256:3e9aa3fd4d2550608cc3f7cf341fb94b5e8b72686935043ce71d804d17fc8d9d`\n\nBundle: <data dir>/runs/20261017-073850-compose-d4f2770b/claims\nRe-check offline: caterva verify <data dir>/runs/20261017-073850-compose-d4f2770b/claims\n\nA claim is a derivation, not a verdict: `caterva verify` re-checks that each stated reason still holds against the pinned bytes, not whether the paper was right."
+  }
+ },
+ "error": null,
+ "events": [
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 1,
+    "at": "2026-10-17T07:38:50.101Z",
+    "status": "queued"
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 2,
+    "at": "2026-10-17T07:38:50.104Z",
+    "status": "running"
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 3,
+    "at": "2026-10-17T07:38:50.117Z",
+    "stage": "compose",
+    "label": "Composing the model from its description",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 4,
+    "at": "2026-10-17T07:38:50.119Z",
+    "stage": "claims",
+    "label": "Writing the claims bundle to <data dir>/runs/20261017-073850-compose-d4f2770b/claims",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 5,
+    "at": "2026-10-17T07:38:50.134Z",
+    "stage": "precompute",
+    "label": "Running the checks the verdict reads: validate, robustness",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 6,
+    "at": "2026-10-17T07:38:50.577Z",
+    "stage": "dossier",
+    "label": "Building the dossier: stability, time course, influence ranking, sweeps, verdict",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 7,
+    "at": "2026-10-17T07:38:50.724Z",
+    "stage": "section:crnt",
+    "label": "Reaction network structure",
+    "fraction": 0.0
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 8,
+    "at": "2026-10-17T07:38:50.734Z",
+    "stage": "section:scale",
+    "label": "Physical scale",
+    "fraction": 0.2
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 9,
+    "at": "2026-10-17T07:38:50.737Z",
+    "stage": "section:reduction",
+    "label": "Timescale separation",
+    "fraction": 0.4
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 10,
+    "at": "2026-10-17T07:38:50.774Z",
+    "stage": "section:robustness",
+    "label": "Robustness to the placeholders",
+    "fraction": 0.6
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 11,
+    "at": "2026-10-17T07:38:50.776Z",
+    "stage": "section:validate",
+    "label": "Cross-checks",
+    "fraction": 0.8
+   }
+  },
+  {
+   "event": "log",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 12,
+    "at": "2026-10-17T07:38:50.777Z",
+    "line": "1 refusal(s) in 1 section(s), each explained where it belongs in the report: Timescale separation."
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 13,
+    "at": "2026-10-17T07:38:50.780Z",
+    "stage": "exports",
+    "label": "Writing the SBML, Antimony, CSV and methods exports",
+    "fraction": null
+   }
+  },
+  {
+   "event": "result",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 14,
+    "at": "2026-10-17T07:38:50.807Z",
+    "outcome": {
+     "exit_code": 3,
+     "meaning": "refused",
+     "summary": "1 refusal(s) in 1 section(s), each explained where it belongs in the report: Timescale separation.",
+     "reason": "1 refusal(s) in 1 section(s), each explained where it belongs in the report: Timescale separation.",
+     "has_result": true
+    }
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 15,
+    "at": "2026-10-17T07:38:50.809Z",
+    "status": "done",
+    "outcome": {
+     "exit_code": 3,
+     "meaning": "refused",
+     "summary": "1 refusal(s) in 1 section(s), each explained where it belongs in the report: Timescale separation.",
+     "reason": "1 refusal(s) in 1 section(s), each explained where it belongs in the report: Timescale separation.",
+     "has_result": true
+    }
+   }
+  },
+  {
+   "event": "end",
+   "data": {
+    "run_id": "20261017-073850-compose-d4f2770b",
+    "seq": 16,
+    "at": "2026-10-17T07:38:50.809Z",
+    "status": "done"
+   }
+  }
+ ]
+}

@@ -1,0 +1,17 @@
+{
+  // Covers this workspace's build-tool config files, which the application
+  // tsconfig deliberately excludes: they are loaded and type-stripped by
+  // their own tool at runtime rather than compiled into the app, so they
+  // sat outside every project's `include` and nothing type-checked them.
+  "compilerOptions": {
+    "lib": ["es2022"],
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["vite.config.ts", "vitest.config.ts"]
+}

@@ -1,0 +1,10 @@
+{
+  "status": 400,
+  "body": {
+    "error": {
+      "code": "malformed",
+      "message": "theme must be one of system, light, dark",
+      "field": "theme"
+    }
+  }
+}

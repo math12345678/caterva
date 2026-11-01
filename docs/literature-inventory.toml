@@ -1,0 +1,146 @@
+# Literature provenance inventory
+#
+# Every hardcoded number in DOMAIN_DEFAULTS (queryResolver.ts) declares here
+# where it came from. Enforced by scripts/check_literature_inventory.py: a
+# number in the code but not in this file fails the build.
+#
+# This file exists because the project claimed "everything is backed by
+# literature" while 64 numbers underneath were chosen by hand, and
+# domain-literature.ts attached justifications like "per Lehninger (2008)"
+# that nothing ever checked. Five of that file's DOIs turned out to be
+# wrong. An unfalsifiable claim of rigour is worth less than an honest
+# admission of its absence.
+#
+# status is exactly one of:
+#   RESOLVED       fetched live per query from a primary source, with a
+#                  citation attached to the value. Not really a default —
+#                  the listed value is only what sits in the table before
+#                  resolution replaces it.
+#   VERIFIED       a constant checked against a named primary source, with
+#                  the check automated.
+#   UNVERIFIED     a teaching default chosen for pedagogy. Legitimate, but
+#                  it must never be described as literature-backed.
+#   NOT_SCIENTIFIC a numerical or presentational parameter (grid points,
+#                  integration window, RNG seed). Carries no scientific
+#                  claim, so a citation would be a fabrication.
+#
+# RESOLVED and VERIFIED must name a `source`.
+
+# ---------------------------------------------------------------------------
+# Michaelis-Menten. km IS resolved live from BRENDA (RESOLVABLE_FIELDS.mm);
+# the hard rule blocks the query unless it resolves or the user supplies it.
+# vmax is reachable via the ADR 0019 kcat x [E]0 bridge, but only when the
+# caller supplies enzyme_conc — so its listed default is never simulated.
+# ---------------------------------------------------------------------------
+[mm.km]
+value = "2"
+status = "RESOLVED"
+source = "BRENDA KM Values table via Tests/fallback_logic.py; golden tuple G1 = LDH/lactate/Homo sapiens, ref 740253, re-verified live by scripts/verify_citations_live.py"
+
+[mm.vmax]
+value = "5"
+status = "UNVERIFIED"
+note = "Teaching default. Vmax is assay-specific (Vmax = kcat x [E]0) and no source can supply it without an enzyme concentration; ADR 0013 refuses to invent one. Resolvable only via the ADR 0019 bridge when the caller supplies enzyme_conc."
+
+[mm.s0]
+value = "10"
+status = "UNVERIFIED"
+note = "Teaching default: initial substrate concentration is a property of an experiment the user is designing, not of the enzyme."
+
+[mm.end]
+value = "10"
+status = "NOT_SCIENTIFIC"
+note = "Integration window."
+
+[mm.points]
+value = "51"
+status = "NOT_SCIENTIFIC"
+note = "Output grid resolution."
+
+# ---------------------------------------------------------------------------
+# Competitive inhibition. Both km and ki resolve live (ADR 0018).
+# ---------------------------------------------------------------------------
+[mm_competitive_inhibition.km]
+value = "2"
+status = "RESOLVED"
+source = "BRENDA KM Values table; see mm.km"
+
+[mm_competitive_inhibition.ki]
+value = "1.0"
+status = "RESOLVED"
+source = "BRENDA Ki Values table via quantity='ki' (ADR 0018); golden tuple G4 = LDH/gossypol/Homo sapiens, Ki 0.0014 mM, ref 711801"
+
+[mm_competitive_inhibition.vmax]
+value = "5"
+status = "UNVERIFIED"
+note = "See mm.vmax."
+
+[mm_competitive_inhibition.s0]
+value = "10"
+status = "UNVERIFIED"
+note = "See mm.s0."
+
+[mm_competitive_inhibition.i0]
+value = "0.1"
+status = "UNVERIFIED"
+note = "Teaching default: inhibitor concentration is an experimental choice, not a literature constant."
+
+[mm_competitive_inhibition.end]
+value = "10"
+status = "NOT_SCIENTIFIC"
+
+[mm_competitive_inhibition.points]
+value = "51"
+status = "NOT_SCIENTIFIC"
+
+# ---------------------------------------------------------------------------
+# Gillespie SSA. Rate constants here are illustrative, not measured.
+# ---------------------------------------------------------------------------
+[gillespie_ssa.a0]
+value = "1000"
+status = "UNVERIFIED"
+note = "Teaching default: initial molecule count."
+
+[gillespie_ssa.k]
+value = "0.5"
+status = "UNVERIFIED"
+note = "Teaching default. An illustrative first-order decay rate, not a measured constant for any real species."
+
+[gillespie_ssa.end]
+value = "10"
+status = "NOT_SCIENTIFIC"
+
+[gillespie_ssa_bimolecular.a0]
+value = "100"
+status = "UNVERIFIED"
+
+[gillespie_ssa_bimolecular.b0]
+value = "100"
+status = "UNVERIFIED"
+
+[gillespie_ssa_bimolecular.k]
+value = "0.005"
+status = "UNVERIFIED"
+note = "Illustrative second-order rate constant."
+
+[gillespie_ssa_bimolecular.end]
+value = "10"
+status = "NOT_SCIENTIFIC"
+
+[gillespie_ssa_replicates.a0]
+value = "100"
+status = "UNVERIFIED"
+
+[gillespie_ssa_replicates.k]
+value = "0.5"
+status = "UNVERIFIED"
+note = "See gillespie_ssa.k."
+
+[gillespie_ssa_replicates.end]
+value = "10"
+status = "NOT_SCIENTIFIC"
+
+[gillespie_ssa_replicates.n_replicates]
+value = "100"
+status = "NOT_SCIENTIFIC"
+note = "Ensemble size."

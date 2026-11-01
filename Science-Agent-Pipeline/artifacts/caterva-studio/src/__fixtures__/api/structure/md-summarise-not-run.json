@@ -1,0 +1,19 @@
+{
+ "kind": "md.summarise",
+ "request": {
+  "directory": "/tmp/caterva-fixtures/lyso-md"
+ },
+ "cli": [
+  "caterva",
+  "md",
+  "--summarise",
+  "/tmp/caterva-fixtures/lyso-md"
+ ],
+ "outcome": {
+  "exit_code": 3,
+  "meaning": "refused",
+  "summary": "Refused: no rep*/rmsd.xvg under /tmp/caterva-fixtures/lyso-md. Run its run.sh first.",
+  "reason": "Refused: no rep*/rmsd.xvg under /tmp/caterva-fixtures/lyso-md. Run its run.sh first."
+ },
+ "result": null
+}

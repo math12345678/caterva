@@ -1,0 +1,83 @@
+{
+  "_adr": "0098-evidence-the-guard-could-not-recognise.md",
+
+  "verdict": "exit_code",
+  "test": "python3 scripts/check_mutation_tables_reproducible.py --selftest && python3 scripts/claim_adr.py --selftest",
+
+  "_why_this_command": [
+    "Both self-tests, not just the one that looks most relevant. ADR 0026's set",
+    "ran a narrower command on its first attempt and produced a confident NOT",
+    "CAUGHT, because the test closing the mutation lived in the second of the",
+    "two files the record named. This record covers two scripts, so it runs",
+    "both."
+  ],
+
+  "_why_exit_code": [
+    "The first attempt used the default `test_count` verdict and the harness",
+    "refused to run at all: `The baseline suite did not execute any tests.`",
+    "",
+    "That refusal is ADR 0069 working. These self-tests are not pytest and",
+    "emit no `N passed` line, so the harness could not establish that anything",
+    "had been judged -- and rather than read 'no count' as 'nothing failed',",
+    "it stopped. The `exit_code` mode added for ADR 0045 is the right verdict",
+    "for a guard script, and it is more careful than reading `$?`: a mutation",
+    "that makes a script CRASH also exits non-zero, and calling that 'caught'",
+    "would certify a check that no longer runs."
+  ],
+
+  "mutations": [
+    {
+      "id": "M1",
+      "_claim": "The `reproduced_by` escape hatch is checked, not trusted.",
+      "file": "scripts/check_mutation_tables_reproducible.py",
+      "find": "    for line in VERIFY_BUILD.read_text(encoding=\"utf-8\").splitlines():\n        if script in line and all(arg in line for arg in tokens[1:]):\n            return None",
+      "replace": "    for line in VERIFY_BUILD.read_text(encoding=\"utf-8\").splitlines():\n        if script in line or all(arg in line for arg in tokens[1:]):\n            return None",
+      "_note": [
+        "`and` -> `or`. The mutant accepts any `reproduced_by` whose ARGUMENTS",
+        "appear on some line of verify_build.py even if the script does not,",
+        "which is the escape hatch reopened. If this is not caught, the field",
+        "is a way out of the guard rather than a second way of satisfying it."
+      ]
+    },
+    {
+      "id": "M2",
+      "_claim": "A set file with neither mutations nor reproduced_by still fails.",
+      "file": "scripts/check_mutation_tables_reproducible.py",
+      "find": "        elif not spec.get(\"test\") or not spec.get(\"mutations\"):",
+      "replace": "        elif False:",
+      "_note": [
+        "Deletes the unrunnable-set check entirely. This is the branch the new",
+        "`reproduced_by` clause sits in front of, and adding an `if` in front",
+        "of an existing check is exactly how a check quietly stops running --",
+        "so the mutation asks whether anything would notice."
+      ]
+    },
+    {
+      "id": "M4",
+      "_claim": "A set file is judged runnable by its CONTENTS, not its outer shape.",
+      "file": "scripts/check_mutation_tables_reproducible.py",
+      "find": "                    absent = sorted(REQUIRED_MUTATION_KEYS - mutation.keys())",
+      "replace": "                    absent = []",
+      "_note": [
+        "Neuters the per-entry key check while leaving it visibly present --",
+        "the shape of a check that cannot fail. This set file itself was the",
+        "historical failure: its entries were keyed `search` instead of",
+        "`find`, the guard called it reproducible, and mutate.py died on",
+        "`KeyError: 'find'` after the baseline had already run."
+      ]
+    },
+    {
+      "id": "M3",
+      "_claim": "A quoted title cannot become a filename with spaces in it.",
+      "file": "scripts/claim_adr.py",
+      "find": "    text = re.sub(r\"[^a-zA-Z0-9]+\", \"-\", text).strip(\"-\").lower()",
+      "replace": "    text = text.strip(\"-\").lower()",
+      "_note": [
+        "Reverts slugify to what the tool shipped with: strip and lowercase,",
+        "no hyphenation. This is the exact historical failure -- it produced",
+        "`docs/adr/0098-evidence the guard could not recognise.md` on this",
+        "repository, before the file was deleted and the tool fixed."
+      ]
+    }
+  ]
+}

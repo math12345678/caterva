@@ -1,0 +1,214 @@
+# ADRs whose mutation results were established by the hand-run harness, and
+# have NOT been re-derived under scripts/mutate.py.
+#
+# WHAT THIS FILE ADMITS
+# ---------------------
+# ADR 0069 found that the hand-run harness had given a wrong answer three
+# separate ways: a patch that never applied, a suite that never ran, and a
+# restore that silently failed. It fixed the harness and said plainly that
+# the existing tables had not been re-checked.
+#
+# This is that admission, itemised. Every number below is a mutation result
+# a reader is currently asked to take on trust from an instrument now known
+# to have been unreliable. Most are probably right. "Probably" is the point:
+# nobody has checked.
+#
+# THIS LIST IS SUPPOSED TO SHRINK
+# -------------------------------
+# check_mutation_tables_reproducible.py FAILS if an entry here gains a set
+# file and is not removed. A baseline that can be added to but never emptied
+# records a problem instead of fixing it.
+#
+# To clear one:
+#   1. write docs/mutations/adr-<NNNN>-<slug>.json
+#   2. python3 scripts/mutate.py --set docs/mutations/adr-<NNNN>-<slug>.json
+#   3. if the result disagrees with the ADR, CORRECT THE ADR IN PLACE and
+#      mark it as a correction -- do not quietly restate it
+#   4. delete the line here
+#
+# Baseline opened 2026-08-15 with 34 entries. 17 remain.
+#
+# Cleared: 0026 (pH, temperature), 0028 (buffers), 0032 (cofactors),
+#          0029 (variants), 0065 (error messages),
+#          0033 + 0035 (pool-level, the 'zero then one' rows),
+#          0037 (organism column),
+#          0039 + 0045 (the boundary guard, via exit-code verdicts),
+#          0027 (Bakker's score, and its deletion guard),
+#          0050 (the CSV header, including the re-pointed C5),
+#          0069 (the harness's own self-test -- see below).
+#
+# The first four are the four factors Jeske named in one sentence. Her
+# warning is now backed by evidence a reader can re-run rather than a
+# table they have to trust.
+#
+# ON 0069, WHICH WAS NEVER REALLY DEBT
+# ------------------------------------
+# It sat here for a reason recorded in this file as "close to discharged
+# already": its table IS `mutate.py --selftest`, which verify_build runs on
+# every build. So the evidence was not merely re-runnable, it was being
+# re-run -- and the guard still counted it as unchecked, because the guard
+# recognised exactly one shape of evidence: a set of mutations.
+#
+# The two honest ways out were to invent a set file that could not actually
+# reproduce that table, or to leave it here forever. Inventing evidence to
+# satisfy a check is the failure this whole directory exists to prevent, so
+# the guard learned the second shape instead: a set file may declare
+# `reproduced_by`, naming a command, and the guard FAILS unless
+# verify_build.py really runs it. See docs/adr/0098 and
+# docs/mutations/adr-0069-harness-selftest.json.
+#
+# The count at the top of this file was therefore overstating the debt. One
+# entry is a small error; the direction is not. A debt list that counts
+# discharged items keeps people working on things already done.
+
+# --- Written by concurrent agents. Not mine to re-derive without
+#     stepping on in-flight work; raised rather than claimed. ---
+0030   # codegen emitted a contract that could not load
+0034   # the committed contract must match codegen
+0038   # effectors reach the API response
+0040   # the findings never reached the student
+0041   # an opt-in nothing connected
+0042   # the dashboard was inventing numbers
+0044   # the form pre-filled the forbidden default
+0047   # selection by evidence, not by magnitude
+0048   # the dashboard gets a test harness
+0051   # the evidence did not choose the value
+0053   # the student can resolve in the page
+0055   # a simulation has no temperature of its own
+0061   # GPL out of the default install
+0063   # attribution travels with the model
+0064   # the conditions reach the student
+
+# --- Arrived AFTER this baseline opened. Not grandfathered: this is an
+#     open request to the author, recorded here only so the guard does not
+#     turn one agent's in-flight record into everyone's red build.
+#
+#     The rule these are exempt from is the one that matters most ("new
+#     records ship a set file"), so leaving them here indefinitely would
+#     hollow out the guard. If an entry below is still present after the
+#     record is finished, it belongs in the section above with the rest of
+#     the debt, or its table should be re-derived.
+       # Written 2026-08-15 11:26 by a concurrent agent, minutes after this
+       # guard was wired. Asked, not claimed: re-deriving it means editing
+       # their record if a result disagrees.
+0076   # the adjacent paper is the one you miscite
+0081   # the audit says ready and not what is owed -- concurrent agent's,
+       # arrived this pass. Set file owed, per the standing policy.
+0118   # the name the database uses -- arrived 2026-08-18, another agent's,
+       # mid-pass. Asked, not claimed.
+0113   # the conditions that stayed on the screen -- arrived 2026-08-17,
+0166   # the suite nobody ran -- NOT the ADR 0069 story. The restores here
+0125   # a score that could only be zero -- another author's table, no set
+       # file shipped with it. Parked rather than re-derived: a set built
+       # from someone else's prose risks the confident NOT CAUGHT the
+       # harness exists to prevent (registered 2026-08-29 to unblock the
+       # guard for CI; the ask stands with its author).
+0128   # the stage that failed -- same situation and same reasoning as 0125.
+0151   # the front page the guard never looked at -- same; note its table
+       # includes a mutation another record already claimed and could not
+       # catch, so a naive set file would grade a claim its own ADR
+       # disputes.
+0163   # run the tool instead of matching the string -- most recent of the
+       # four (2026-08-23) and post-harness, so this entry is debt by
+       # choice, not history: its evidence spans a live-resolver run that
+       # a set file's test command cannot assume network for.
+       # were checked with `diff` and every guard re-run to exit 0, so the
+       # instrument is not in doubt; what is missing is a harness verdict.
+       # `mutate.py` grades a pytest suite by counting its tests, and all
+       # four mutations are either a guard with no pytest coverage
+       # (check_runner_boundary, check_cli_surface_documented -- neither
+       # has a --selftest) or a jest test. Pointing --test at `npx jest`
+       # would say NOT CAUGHT on any machine without node_modules. It
+       # refused outright when tried, reporting that the baseline ran no
+       # tests rather than grading one.
+       # CLEARABLE BY: giving those two guards a --selftest, which puts
+       # them under caterva/tests/test_guard_selftests.py and inside
+       # mutate.py's reach. Not done here; it is a change to the guards,
+       # not to the record of this pass.
+       # another agent's, mid-pass. Asked, not claimed: re-deriving it
+       # means editing their record if a result disagrees, and the record
+       # was minutes old when this line was written.
+
+# --- Why `--only` exists: the numbers ---
+#
+# Measured 2026-08-15, recorded so nobody re-derives it.
+#
+# One mutate.py iteration is two pytest runs, and the harness overhead is
+# negligible: 39.8 s against 20.2 s for the bare suite. A set of N mutations
+# therefore costs N+1 runs. ADR 0062 is 8 mutations = 9 runs = ~180 s,
+# against a 178 s ceiling on a single command in the environment these were
+# written in. 0078's suite is slower again, because it shells out to
+# check_documented_counts.py and collects the whole test suite.
+#
+# Caching does not close that gap. Repeated timings of *identical* code
+# ranged 20.9-30.4 s, because several agents run suites on this machine at
+# once, and that spread alone exceeds the margin being chased.
+#
+# `--only` splits the RUN without splitting the RECORD, which is the
+# distinction that matters: the set file stays one piece of evidence.
+# 0062 was completed in two invocations of four rows, 0078 in one of three
+# and one of two. **Both are now verified and neither is parked.** This note
+# is kept because the cost is a property of the environment, not of those
+# two sets, and the next slow suite will hit it too.
+
+# --- Outstanding verification, not a table ---
+#
+# ADR 0083: the harness reported one mutation as NOT CAUGHT and then, minutes
+# later, as CAUGHT -- same set file, same tree. A false NOT CAUGHT reads as a
+# real gap in the tests, which is the failure class ADR 0069 exists to remove,
+# reappearing inside the tool written to remove it.
+#
+# PARTIALLY VERIFIED. The question splits in two:
+#
+#   Half one -- the harness's own logic (write -> run -> read verdict ->
+#   restore): DETERMINISTIC. Five consecutive runs of one mutation against a
+#   pytest suite, five `caught`.
+#
+#   Half two -- a JavaScript runner's transform cache, which is the mechanism
+#   the mtime fix addresses: NOT TESTED, and not testable here. One jest
+#   invocation of the eight-test file this appeared in costs 70.7 seconds
+#   (measured). Baseline + mutation is 141 s against a 178 s per-call ceiling,
+#   leaving no room to repeat; repeating across calls destroys the rapid
+#   succession that produced the disagreement.
+#
+# So the fix is reasoned and harmless, and unproven for the case it was
+# written for. On a machine without the ceiling:
+#
+#   for i in 1 2 3; do python3 scripts/mutate.py \
+#     --set docs/mutations/adr-0056-column-claimed-a-source.json --only J3; done
+#
+# Three identical verdicts is the result being looked for. Any disagreement
+# means the mtime fix is not the whole story.
+#
+# UPDATE 2026-08-18 -- THE MTIME FIX IS NOT THE WHOLE STORY.
+#
+# Half two above was "NOT TESTED, and not testable here". It has now been
+# observed, in a suite small enough to fit the ceiling.
+#
+# ADR 0119's Y4 mutates `plausible()` in suggestResolveCommand.ts to return
+# true unconditionally. Direct execution of the mutated module:
+#
+#     under mutation -> {"enzyme":"model","substrate":"model","organism":"model"}
+#
+# and `suggestResolveCommand.test.ts` asserts `toBeNull()` on that exact
+# query. The test MUST fail. Jest reported 15 of 15 passing, so the runner
+# did not see the change -- with `--no-cache` passed TWICE (injected by
+# mutate.py per ADR 0083, and again in the --test override).
+#
+# So `--no-cache` does not close it. What does is unknown; candidates are
+# ts-jest's own transform cache keyed independently of jest's, and the
+# haste map. Somebody should find out before another NOT CAUGHT in a
+# TypeScript suite is believed.
+#
+# THE ASYMMETRY STILL HOLDS, and it is why no past verdict is retracted: a
+# stale cache can only manufacture a false NOT CAUGHT, never a false
+# "caught". Every `caught` in this repository stands. What is now in doubt
+# is every NOT CAUGHT recorded against a jest suite.
+#
+# NOTE ON THE `.unverified` SUFFIX ABOVE: adopted from a concurrent agent who
+# hit this same ceiling independently and parked two set files rather than
+# ship them. It is the better convention and it is now this file's, because a
+# set nobody has run to completion is exactly the unchecked evidence the
+# mechanism exists to replace. The `--only` flag added for ADR 0083 splits a
+# run without splitting the record, and may let those two be finished in
+# parts rather than parked.

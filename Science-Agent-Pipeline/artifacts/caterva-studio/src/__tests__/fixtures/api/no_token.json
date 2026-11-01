@@ -1,0 +1,9 @@
+{
+  "status": 401,
+  "body": {
+    "error": {
+      "code": "unauthorized",
+      "message": "this request needs the session token from the address `caterva studio` printed, in the X-Caterva-Session header"
+    }
+  }
+}

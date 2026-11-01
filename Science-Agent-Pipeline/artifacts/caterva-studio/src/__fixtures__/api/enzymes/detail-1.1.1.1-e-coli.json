@@ -1,0 +1,104 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/1.1.1.1?organism=E.+coli"
+ },
+ "status": 200,
+ "body": {
+  "ec": "1.1.1.1",
+  "name": "alcohol dehydrogenase",
+  "name_note": null,
+  "replaced_by": [],
+  "alternative_names": [
+   "aldehyde reductase"
+  ],
+  "reaction": "(1) a primary alcohol + NAD(+) = an aldehyde + NADH + H(+). (2) a secondary alcohol + NAD(+) = a ketone + NADH + H(+).",
+  "class_path": "Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor",
+  "status": "active",
+  "superseded_by": [],
+  "release": "02-Sep-2026",
+  "isozymes": {
+   "organism": "ECOLI",
+   "organism_label": "E. coli",
+   "count": 5,
+   "proteins": [
+    {
+     "accession": "P37686",
+     "entry_name": "ADH2_ECOLI",
+     "symbol": "ADH2",
+     "gene": "yiaY",
+     "label": "yiaY",
+     "names": [
+      "yiaY",
+      "ADH2",
+      "ORF_f382"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P0A9Q7",
+     "entry_name": "ADHE_ECOLI",
+     "symbol": "ADHE",
+     "gene": "adhE",
+     "label": "adhE",
+     "names": [
+      "adhE",
+      "ADHE",
+      "ana",
+      "Alcohol dehydrogenase E"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P39451",
+     "entry_name": "ADHP_ECOLI",
+     "symbol": "ADHP",
+     "gene": "adhP",
+     "label": "adhP",
+     "names": [
+      "adhP",
+      "ADHP",
+      "yddN"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P76553",
+     "entry_name": "EUTG_ECOLI",
+     "symbol": "EUTG",
+     "gene": "eutG",
+     "label": "eutG",
+     "names": [
+      "eutG",
+      "EUTG",
+      "yffV"
+     ],
+     "engine_matches": true
+    },
+    {
+     "accession": "P25437",
+     "entry_name": "FRMA_ECOLI",
+     "symbol": "FRMA",
+     "gene": "frmA",
+     "label": "frmA",
+     "names": [
+      "frmA",
+      "FRMA",
+      "adhC",
+      "FALDH",
+      "FDH",
+      "GSH-FDH",
+      "Alcohol dehydrogenase class-3",
+      "Alcohol dehydrogenase class-III"
+     ],
+     "engine_matches": true
+    }
+   ],
+   "organism_known": true,
+   "broad": false,
+   "note": "EC 1.1.1.1 has 5 E. coli K-12 isozymes in the enzyme nomenclature's UniProt entries (yiaY, adhE, adhP, eutG, frmA) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat. Pass --isoform with one of these names (for example --isoform yiaY) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused.",
+   "organism_scope": "E. coli K-12 (UniProt code ECOLI; proteins of other E. coli strains are filed under other codes and are not counted)",
+   "filed_elsewhere": null
+  }
+ }
+}

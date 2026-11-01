@@ -1,0 +1,2142 @@
+{
+ "recorded": "2026-10-01",
+ "url": "https://rest.uniprot.org/uniprotkb/search",
+ "note": "UniProt REST answers to fetch_ec_numbers_by_name's query (fields accession,ec; size 25), recorded for caterva/tests/test_studio_structure.py",
+ "answers": {
+  "lactate dehydrogenase": {
+   "results": [
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "Q86WU2",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000305",
+          "source": "PubMed",
+          "id": "38373542"
+         }
+        ],
+        "value": "D-lactate dehydrogenase, mitochondrial"
+       },
+       "shortNames": [
+        {
+         "value": "DLD"
+        },
+        {
+         "value": "Lactate dehydrogenase D"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "38373542"
+          }
+         ],
+         "value": "1.1.98.-"
+        }
+       ]
+      },
+      "flag": "Precursor"
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI0000062302"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "Q9BYZ2",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A-like 6B"
+       },
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "Q6ZMR3"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000012E326"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "Q7TNG8",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000305",
+          "source": "PubMed",
+          "id": "12127981"
+         },
+         {
+          "evidenceCode": "ECO:0000305",
+          "source": "PubMed",
+          "id": "37863926"
+         }
+        ],
+        "value": "D-lactate dehydrogenase, mitochondrial"
+       },
+       "shortNames": [
+        {
+         "value": "DLD"
+        },
+        {
+         "value": "Lactate dehydrogenase D"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "37863926"
+          }
+         ],
+         "value": "1.1.98.-"
+        }
+       ]
+      },
+      "flag": "Precursor"
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI00001B944C"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "F1QXM5",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000305",
+          "source": "PubMed",
+          "id": "30931947"
+         }
+        ],
+        "value": "D-lactate dehydrogenase, mitochondrial"
+       },
+       "shortNames": [
+        {
+         "value": "DLD"
+        },
+        {
+         "value": "Lactate dehydrogenase D"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "30931947"
+          }
+         ],
+         "value": "1.1.98.-"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000056C7E1"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P52643",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "D-lactate dehydrogenase"
+       },
+       "shortNames": [
+        {
+         "value": "D-LDH"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "value": "1.1.1.28"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "Fermentative lactate dehydrogenase"
+        }
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000012E31F"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "Q95028",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000312",
+          "source": "FlyBase",
+          "id": "FBgn0001258"
+         }
+        ],
+        "value": "L-lactate dehydrogenase"
+       },
+       "ecNumbers": [
+        {
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000012458F"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P33232",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000255",
+          "source": "HAMAP-Rule",
+          "id": "MF_01559"
+         }
+        ],
+        "value": "L-lactate dehydrogenase"
+       },
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_01559"
+          }
+         ],
+         "value": "1.1.-.-"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000012E757"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P06149",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000255",
+          "source": "HAMAP-Rule",
+          "id": "MF_02092"
+         },
+         {
+          "evidenceCode": "ECO:0000305"
+         }
+        ],
+        "value": "Quinone-dependent D-lactate dehydrogenase"
+       },
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_02092"
+          },
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "3013300"
+          },
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "7578233"
+          }
+         ],
+         "value": "1.1.5.12"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000305"
+          }
+         ],
+         "value": "(R)-lactate:quinone 2-oxidoreductase"
+        }
+       },
+       {
+        "fullName": {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_02092"
+          },
+          {
+           "evidenceCode": "ECO:0000303",
+           "source": "PubMed",
+           "id": "4575624"
+          },
+          {
+           "evidenceCode": "ECO:0000303",
+           "source": "PubMed",
+           "id": "4582730"
+          }
+         ],
+         "value": "D-lactate dehydrogenase"
+        },
+        "shortNames": [
+         {
+          "evidences": [
+           {
+            "evidenceCode": "ECO:0000255",
+            "source": "HAMAP-Rule",
+            "id": "MF_02092"
+           },
+           {
+            "evidenceCode": "ECO:0000303",
+            "source": "PubMed",
+            "id": "3882663"
+           }
+          ],
+          "value": "D-LDH"
+         }
+        ]
+       },
+       {
+        "fullName": {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000305"
+          }
+         ],
+         "value": "Respiratory D-lactate dehydrogenase"
+        }
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI00001114B6"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P07864",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase C chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-C"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "Cancer/testis antigen 32"
+        },
+        "shortNames": [
+         {
+          "value": "CT32"
+         }
+        ]
+       },
+       {
+        "fullName": {
+         "value": "LDH testis subunit"
+        }
+       },
+       {
+        "fullName": {
+         "value": "LDH-X"
+        }
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000013DC34"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P07195",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase B chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-B"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "11276087"
+          },
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "27618187"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "LDH heart subunit"
+        },
+        "shortNames": [
+         {
+          "evidences": [
+           {
+            "evidenceCode": "ECO:0000303",
+            "source": "PubMed",
+            "id": "11276087"
+           }
+          ],
+          "value": "LDH-H"
+         }
+        ]
+       },
+       {
+        "fullName": {
+         "value": "Renal carcinoma antigen NY-REN-46"
+        }
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000013C8F6"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "Q7SI97",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000303",
+          "source": "PubMed",
+          "id": "12967707"
+         }
+        ],
+        "value": "L-lactate dehydrogenase"
+       },
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "12967707"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000046CB77"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P00338",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000305"
+         }
+        ],
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "11276087"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "Cell proliferation-inducing gene 19 protein"
+        }
+       },
+       {
+        "fullName": {
+         "value": "LDH muscle subunit"
+        },
+        "shortNames": [
+         {
+          "evidences": [
+           {
+            "evidenceCode": "ECO:0000303",
+            "source": "PubMed",
+            "id": "11276087"
+           }
+          ],
+          "value": "LDH-M"
+         }
+        ]
+       },
+       {
+        "fullName": {
+         "value": "Renal carcinoma antigen NY-REN-59"
+        }
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000013C8AF"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P04642",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "LDH muscle subunit"
+        },
+        "shortNames": [
+         {
+          "value": "LDH-M"
+         }
+        ]
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000012E2FA"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P42123",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase B chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-B"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P07195"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "LDH heart subunit"
+        },
+        "shortNames": [
+         {
+          "value": "LDH-H"
+         }
+        ]
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI0000167A2C"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P16125",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase B chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-B"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P07195"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "LDH heart subunit"
+        },
+        "shortNames": [
+         {
+          "value": "LDH-H"
+         }
+        ]
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI0000003E38"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P06151",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "LDH muscle subunit"
+        },
+        "shortNames": [
+         {
+          "value": "LDH-M"
+         }
+        ]
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI00000041D9"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P00342",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase C chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-C"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "LDH testis subunit"
+        }
+       },
+       {
+        "fullName": {
+         "value": "LDH-X"
+        }
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000000091E"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P19629",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase C chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-C"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "LDH testis subunit"
+        }
+       },
+       {
+        "fullName": {
+         "value": "LDH-X"
+        }
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI0000167A3D"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P00344",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000255",
+          "source": "HAMAP-Rule",
+          "id": "MF_00488"
+         },
+         {
+          "evidenceCode": "ECO:0000303",
+          "source": "PubMed",
+          "id": "3026926"
+         }
+        ],
+        "value": "L-lactate dehydrogenase"
+       },
+       "shortNames": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_00488"
+          },
+          {
+           "evidenceCode": "ECO:0000303",
+           "source": "PubMed",
+           "id": "3026926"
+          }
+         ],
+         "value": "L-LDH"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_00488"
+          },
+          {
+           "evidenceCode": "ECO:0000305",
+           "source": "PubMed",
+           "id": "3580377"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI00001123D8"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P56511",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000255",
+          "source": "HAMAP-Rule",
+          "id": "MF_00488"
+         },
+         {
+          "evidenceCode": "ECO:0000303",
+          "source": "PubMed",
+          "id": "1840590"
+         }
+        ],
+        "value": "L-lactate dehydrogenase"
+       },
+       "shortNames": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_00488"
+          },
+          {
+           "evidenceCode": "ECO:0000303",
+           "source": "PubMed",
+           "id": "1840590"
+          }
+         ],
+         "value": "L-LDH"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_00488"
+          },
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "1425707"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000012E338"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P06150",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000255",
+          "source": "HAMAP-Rule",
+          "id": "MF_00488"
+         },
+         {
+          "evidenceCode": "ECO:0000303",
+          "source": "PubMed",
+          "id": "3533539"
+         }
+        ],
+        "value": "L-lactate dehydrogenase"
+       },
+       "shortNames": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_00488"
+          },
+          {
+           "evidenceCode": "ECO:0000303",
+           "source": "PubMed",
+           "id": "3533539"
+          }
+         ],
+         "value": "L-LDH"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_00488"
+          },
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "25258319"
+          },
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "3377774"
+          },
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "Reference",
+           "id": "Ref.4"
+          },
+          {
+           "evidenceCode": "ECO:0000305",
+           "source": "PubMed",
+           "id": "6499843"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000012E34A"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "O32765",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000255",
+          "source": "HAMAP-Rule",
+          "id": "MF_00488"
+         },
+         {
+          "evidenceCode": "ECO:0000303",
+          "source": "PubMed",
+          "id": "9212432"
+         }
+        ],
+        "value": "L-lactate dehydrogenase"
+       },
+       "shortNames": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_00488"
+          },
+          {
+           "evidenceCode": "ECO:0000303",
+           "source": "PubMed",
+           "id": "9212432"
+          }
+         ],
+         "value": "L-LDH"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_00488"
+          },
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "9212432"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000012E336"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P00343",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000255",
+          "source": "HAMAP-Rule",
+          "id": "MF_00488"
+         },
+         {
+          "evidenceCode": "ECO:0000303",
+          "source": "PubMed",
+          "id": "1768113"
+         }
+        ],
+        "value": "L-lactate dehydrogenase"
+       },
+       "shortNames": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_00488"
+          },
+          {
+           "evidenceCode": "ECO:0000303",
+           "source": "PubMed",
+           "id": "1768113"
+          }
+         ],
+         "value": "L-LDH"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_00488"
+          },
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "14601"
+          },
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "7766183"
+          },
+          {
+           "evidenceCode": "ECO:0000305",
+           "source": "PubMed",
+           "id": "19787773"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000016F87B"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P16115",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000255",
+          "source": "HAMAP-Rule",
+          "id": "MF_00488"
+         },
+         {
+          "evidenceCode": "ECO:0000303",
+          "source": "PubMed",
+          "id": "2318202"
+         }
+        ],
+        "value": "L-lactate dehydrogenase"
+       },
+       "shortNames": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_00488"
+          },
+          {
+           "evidenceCode": "ECO:0000303",
+           "source": "PubMed",
+           "id": "2318202"
+          }
+         ],
+         "value": "L-LDH"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000255",
+           "source": "HAMAP-Rule",
+           "id": "MF_00488"
+          },
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "2318202"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000012E34B"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "Q94AX4",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000303",
+          "source": "PubMed",
+          "id": "19586914"
+         }
+        ],
+        "value": "D-lactate dehydrogenase [cytochrome], mitochondrial"
+       },
+       "shortNames": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000303",
+           "source": "PubMed",
+           "id": "19586914"
+          }
+         ],
+         "value": "AtD-LDH"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "14966218"
+          },
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "19586914"
+          }
+         ],
+         "value": "1.1.2.4"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000303",
+           "source": "PubMed",
+           "id": "19586914"
+          }
+         ],
+         "value": "D-lactate ferricytochrome C oxidoreductase"
+        }
+       },
+       {
+        "fullName": {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000303",
+           "source": "PubMed",
+           "id": "14966218"
+          }
+         ],
+         "value": "Glycolate dehydrogenase"
+        }
+       }
+      ],
+      "flag": "Precursor"
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI00000A7D9D"
+     }
+    }
+   ]
+  },
+  "L-lactate dehydrogenase A chain": {
+   "results": [
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P04642",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "LDH muscle subunit"
+        },
+        "shortNames": [
+         {
+          "value": "LDH-M"
+         }
+        ]
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000012E2FA"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P06151",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "LDH muscle subunit"
+        },
+        "shortNames": [
+         {
+          "value": "LDH-M"
+         }
+        ]
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI00000041D9"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P00341",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "LDH-M"
+        }
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000017148F"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P00338",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "evidences": [
+         {
+          "evidenceCode": "ECO:0000305"
+         }
+        ],
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000269",
+           "source": "PubMed",
+           "id": "11276087"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "Cell proliferation-inducing gene 19 protein"
+        }
+       },
+       {
+        "fullName": {
+         "value": "LDH muscle subunit"
+        },
+        "shortNames": [
+         {
+          "evidences": [
+           {
+            "evidenceCode": "ECO:0000303",
+            "source": "PubMed",
+            "id": "11276087"
+           }
+          ],
+          "value": "LDH-M"
+         }
+        ]
+       },
+       {
+        "fullName": {
+         "value": "Renal carcinoma antigen NY-REN-59"
+        }
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000013C8AF"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P00339",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "LDH muscle subunit"
+        },
+        "shortNames": [
+         {
+          "value": "LDH-M"
+         }
+        ]
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000016C651"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P00340",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000017135E"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P13491",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      },
+      "alternativeNames": [
+       {
+        "fullName": {
+         "value": "LDH muscle subunit"
+        },
+        "shortNames": [
+         {
+          "value": "LDH-M"
+         }
+        ]
+       }
+      ]
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000016C581"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "Q9PVK5",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI0000167923"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "O13276",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI0000171493"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "O93537",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000017115E"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "O93539",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI0000171160"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P69083",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000017115B"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P69084",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000017115B"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "Q9PT43",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI0000171400"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "Q9PW06",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI00001713FE"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "Q9W7L3",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI0000171153"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "Q9W7L5",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI0000171151"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "O13277",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI00001714A6"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "O13278",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI00001714A7"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "O93538",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000017115F"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "O93541",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI0000171162"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "O93545",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI0000171166"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P69081",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI000017115D"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P69086",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI0000171176"
+     }
+    },
+    {
+     "entryType": "UniProtKB reviewed (Swiss-Prot)",
+     "primaryAccession": "P79912",
+     "proteinDescription": {
+      "recommendedName": {
+       "fullName": {
+        "value": "L-lactate dehydrogenase A chain"
+       },
+       "shortNames": [
+        {
+         "value": "LDH-A"
+        }
+       ],
+       "ecNumbers": [
+        {
+         "evidences": [
+          {
+           "evidenceCode": "ECO:0000250",
+           "source": "UniProtKB",
+           "id": "P00338"
+          }
+         ],
+         "value": "1.1.1.27"
+        }
+       ]
+      }
+     },
+     "extraAttributes": {
+      "uniParcId": "UPI00001714B4"
+     }
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,123 @@
+{
+ "captured": {
+  "via": "caterva.studio.dispatch.App.dispatch",
+  "request": {
+   "kind": "constants",
+   "request": {
+    "ec": "2.7.1.1",
+    "substrate": "glucose"
+   }
+  }
+ },
+ "run": {
+  "schema": "caterva.studio.run/1",
+  "id": "20261001-073713-constants-7f5d3fe8",
+  "kind": "constants",
+  "title": "km of EC 2.7.1.1, glucose",
+  "status": "done",
+  "created_at": "2026-10-01T07:37:13.135Z",
+  "started_at": "2026-10-01T07:37:13.140Z",
+  "finished_at": "2026-10-01T07:37:13.147Z",
+  "caterva_version": "0.4.0",
+  "cli": [
+   "python3",
+   "scripts/cite.py",
+   "--ec=2.7.1.1",
+   "--substrate=glucose"
+  ],
+  "request": {
+   "ec": "2.7.1.1",
+   "substrate": "glucose"
+  },
+  "outcome": {
+   "exit_code": 3,
+   "meaning": "refused",
+   "summary": "A report needs an enzyme and an organism. Give the enzyme as an EC number ('ec') or as a name ('enzyme') — a name is looked up in UniProt, and refused if it matches more than one enzyme. The organism is not inferred from free text: guessing it would attach real citations to a system nobody named.",
+   "reason": "Not produced.\n\nA report needs an enzyme and an organism. Give the enzyme as an EC number ('ec') or as a name ('enzyme') — a name is looked up in UniProt, and refused if it matches more than one enzyme. The organism is not inferred from free text: guessing it would attach real citations to a system nobody named."
+  },
+  "error": null,
+  "artifacts": [],
+  "progress": {
+   "stage": "resolve",
+   "label": "Resolving km of EC 2.7.1.1 for glucose from BRENDA",
+   "fraction": null
+  }
+ },
+ "result_status": 404,
+ "result": null,
+ "error": {
+  "error": {
+   "code": "not_found",
+   "message": "the run finished without a result: Not produced.\n\nA report needs an enzyme and an organism. Give the enzyme as an EC number ('ec') or as a name ('enzyme') — a name is looked up in UniProt, and refused if it matches more than one enzyme. The organism is not inferred from free text: guessing it would attach real citations to a system nobody named."
+  }
+ },
+ "events": [
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-073713-constants-7f5d3fe8",
+    "seq": 1,
+    "at": "2026-10-01T07:37:13.136Z",
+    "status": "queued"
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-073713-constants-7f5d3fe8",
+    "seq": 2,
+    "at": "2026-10-01T07:37:13.146Z",
+    "status": "running"
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261001-073713-constants-7f5d3fe8",
+    "seq": 3,
+    "at": "2026-10-01T07:37:13.147Z",
+    "stage": "resolve",
+    "label": "Resolving km of EC 2.7.1.1 for glucose from BRENDA",
+    "fraction": null
+   }
+  },
+  {
+   "event": "result",
+   "data": {
+    "run_id": "20261001-073713-constants-7f5d3fe8",
+    "seq": 4,
+    "at": "2026-10-01T07:37:13.147Z",
+    "outcome": {
+     "exit_code": 3,
+     "meaning": "refused",
+     "summary": "A report needs an enzyme and an organism. Give the enzyme as an EC number ('ec') or as a name ('enzyme') — a name is looked up in UniProt, and refused if it matches more than one enzyme. The organism is not inferred from free text: guessing it would attach real citations to a system nobody named.",
+     "reason": "Not produced.\n\nA report needs an enzyme and an organism. Give the enzyme as an EC number ('ec') or as a name ('enzyme') — a name is looked up in UniProt, and refused if it matches more than one enzyme. The organism is not inferred from free text: guessing it would attach real citations to a system nobody named."
+    }
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-073713-constants-7f5d3fe8",
+    "seq": 5,
+    "at": "2026-10-01T07:37:13.148Z",
+    "status": "done",
+    "outcome": {
+     "exit_code": 3,
+     "meaning": "refused",
+     "summary": "A report needs an enzyme and an organism. Give the enzyme as an EC number ('ec') or as a name ('enzyme') — a name is looked up in UniProt, and refused if it matches more than one enzyme. The organism is not inferred from free text: guessing it would attach real citations to a system nobody named.",
+     "reason": "Not produced.\n\nA report needs an enzyme and an organism. Give the enzyme as an EC number ('ec') or as a name ('enzyme') — a name is looked up in UniProt, and refused if it matches more than one enzyme. The organism is not inferred from free text: guessing it would attach real citations to a system nobody named."
+    }
+   }
+  },
+  {
+   "event": "end",
+   "data": {
+    "run_id": "20261001-073713-constants-7f5d3fe8",
+    "seq": 6,
+    "at": "2026-10-01T07:37:13.148Z",
+    "status": "done"
+   }
+  }
+ ]
+}

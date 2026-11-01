@@ -1,0 +1,139 @@
+{
+ "captured": {
+  "via": "caterva.studio.dispatch.App.dispatch",
+  "request": {
+   "kind": "bind",
+   "request": {
+    "ec": "1.1.1.27",
+    "organism": "human",
+    "mode": "inhibitor",
+    "inhibitor": "NADH"
+   }
+  }
+ },
+ "run": {
+  "schema": "caterva.studio.run/1",
+  "id": "20261001-073714-bind-d03f7ca9",
+  "kind": "bind",
+  "title": "EC 1.1.1.27, NADH, human",
+  "status": "done",
+  "created_at": "2026-10-01T07:37:14.675Z",
+  "started_at": "2026-10-01T07:37:14.682Z",
+  "finished_at": "2026-10-01T07:37:14.693Z",
+  "caterva_version": "0.4.0",
+  "cli": [
+   "caterva",
+   "bind",
+   "--ec=1.1.1.27",
+   "--organism=human",
+   "--inhibitor=NADH"
+  ],
+  "request": {
+   "ec": "1.1.1.27",
+   "organism": "human",
+   "mode": "inhibitor",
+   "inhibitor": "NADH"
+  },
+  "outcome": {
+   "exit_code": 3,
+   "meaning": "refused",
+   "summary": "No Ki for 'NADH' with EC 1.1.1.27 in Homo sapiens.",
+   "reason": "No Ki for 'NADH' with EC 1.1.1.27 in Homo sapiens.\nCompounds that do have one: 3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid; gossypol"
+  },
+  "error": null,
+  "artifacts": [],
+  "progress": {
+   "stage": "rows",
+   "label": "Reading the Ki rows for EC 1.1.1.27 in Homo sapiens",
+   "fraction": null
+  }
+ },
+ "result_status": 404,
+ "result": null,
+ "error": {
+  "error": {
+   "code": "not_found",
+   "message": "the run finished without a result: No Ki for 'NADH' with EC 1.1.1.27 in Homo sapiens.\nCompounds that do have one: 3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid; gossypol"
+  }
+ },
+ "events": [
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-073714-bind-d03f7ca9",
+    "seq": 1,
+    "at": "2026-10-01T07:37:14.676Z",
+    "status": "queued"
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-073714-bind-d03f7ca9",
+    "seq": 2,
+    "at": "2026-10-01T07:37:14.683Z",
+    "status": "running"
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261001-073714-bind-d03f7ca9",
+    "seq": 3,
+    "at": "2026-10-01T07:37:14.685Z",
+    "stage": "fetch",
+    "label": "Reading BRENDA's page for EC 1.1.1.27",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261001-073714-bind-d03f7ca9",
+    "seq": 4,
+    "at": "2026-10-01T07:37:14.685Z",
+    "stage": "rows",
+    "label": "Reading the Ki rows for EC 1.1.1.27 in Homo sapiens",
+    "fraction": null
+   }
+  },
+  {
+   "event": "result",
+   "data": {
+    "run_id": "20261001-073714-bind-d03f7ca9",
+    "seq": 5,
+    "at": "2026-10-01T07:37:14.693Z",
+    "outcome": {
+     "exit_code": 3,
+     "meaning": "refused",
+     "summary": "No Ki for 'NADH' with EC 1.1.1.27 in Homo sapiens.",
+     "reason": "No Ki for 'NADH' with EC 1.1.1.27 in Homo sapiens.\nCompounds that do have one: 3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid; gossypol"
+    }
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-073714-bind-d03f7ca9",
+    "seq": 6,
+    "at": "2026-10-01T07:37:14.694Z",
+    "status": "done",
+    "outcome": {
+     "exit_code": 3,
+     "meaning": "refused",
+     "summary": "No Ki for 'NADH' with EC 1.1.1.27 in Homo sapiens.",
+     "reason": "No Ki for 'NADH' with EC 1.1.1.27 in Homo sapiens.\nCompounds that do have one: 3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid; gossypol"
+    }
+   }
+  },
+  {
+   "event": "end",
+   "data": {
+    "run_id": "20261001-073714-bind-d03f7ca9",
+    "seq": 7,
+    "at": "2026-10-01T07:37:14.694Z",
+    "status": "done"
+   }
+  }
+ ]
+}

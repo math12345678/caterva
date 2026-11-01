@@ -1,0 +1,101 @@
+{
+  "_why": [
+    "ADR 0095's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "check_documented_counts.py grew an ADR-count matcher and applied it to",
+    "every present-tense contributor document except README.md, which it",
+    "skipped as 'already checked above, in more detail'. The detailed check",
+    "covered test counts, domain counts and guard counts and never covered",
+    "ADRs. README.md:449 said '23 decision records' while docs/adr/ held 93.",
+    "",
+    "The matcher was never broken. --selftest asserts it catches the exact",
+    "string '`docs/adr/` — 23 decision records' and had been passing the",
+    "whole time. The guard proved it could find that sentence and was never",
+    "pointed at the file containing it.",
+    "",
+    "W3, W4 and W5 are the rows that matter. --write is a script that edits",
+    "the README, so the tests worth having are the ones proving what it",
+    "REFUSES to touch: the domain count (a judgment call the guard",
+    "deliberately does not derive), a quoted example (evidence, not a",
+    "claim), and an approximate figure inside its tolerance. A --write that",
+    "rewrote any of those would make a guess look verified, which is worse",
+    "than the drift it fixes.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0095-the-exemption-inside-the-widening.json"
+  ],
+  "test": "python3 -m pytest Tests/test_documented_counts.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "R1",
+      "description": "the README is exempted from the ADR rule again",
+      "_claimed": "caught",
+      "_note": "The defect itself. adr_failures returning nothing for README is how '23 decision records' outlived seventy ADRs.",
+      "file": "scripts/check_documented_counts.py",
+      "find": "    failures: List[str] = []\n    for lineno, claimed in documented_adr_counts(text):",
+      "replace": "    failures: List[str] = []\n    if relative == \"README\":\n        return failures\n    for lineno, claimed in documented_adr_counts(text):"
+    },
+    {
+      "id": "R2",
+      "description": "the ADR tolerance widens far enough to swallow the real gap",
+      "_claimed": "caught",
+      "_note": "23 against 93 is a gap of 70. A guard whose tolerance is wide enough to accept it is reporting on nothing, and a tolerance is the easiest thing in a check to loosen without noticing.",
+      "file": "scripts/check_documented_counts.py",
+      "find": "        tolerance = 3 if approximate else 0\n        if abs(value - actual) > tolerance:",
+      "replace": "        tolerance = 300 if approximate else 300\n        if abs(value - actual) > tolerance:"
+    },
+    {
+      "id": "W3",
+      "description": "--write starts rewriting the simulation-domain count",
+      "_claimed": "caught",
+      "_note": "The count the guard refuses to derive, because DISPATCH includes a run-mode and a generic ingest path that are not teaching domains. Automating it would bury a judgment call inside a script and present the result as measured.",
+      "file": "scripts/check_documented_counts.py",
+      "find": "    text = apply(\n        text, re.compile(r\"(~)?\\s*(\\d+) guard scripts?\\b\", re.IGNORECASE),\n        guards, \"guard scripts\",\n    )",
+      "replace": "    text = apply(\n        text, re.compile(r\"(~)?\\s*(\\d+) guard scripts?\\b\", re.IGNORECASE),\n        guards, \"guard scripts\",\n    )\n    text = apply(\n        text, re.compile(r\"(~)?\\s*(\\d+) simulation domains\\b\", re.IGNORECASE),\n        guards, \"domains\",\n    )"
+    },
+    {
+      "id": "W4",
+      "description": "--write corrects quoted examples along with real claims",
+      "_claimed": "caught",
+      "_note": "docs/README.md explains an exclusion by quoting a stale figure. Rewriting the quotation edits the evidence to match the claim -- the failure mode this whole project exists to find, performed by a tool.",
+      "file": "scripts/check_documented_counts.py",
+      "find": "                if abs(was - value) <= tolerance or is_quoted(_l, m.start(), m.end()):",
+      "replace": "                if abs(was - value) <= tolerance:"
+    },
+    {
+      "id": "W5",
+      "description": "--write sharpens an approximate figure inside its tolerance",
+      "_claimed": "caught",
+      "_note": "`~60 guard scripts` becoming `~62` converts a deliberately loose statement into a false-precise one, and teaches writers that hedging buys nothing.",
+      "file": "scripts/check_documented_counts.py",
+      "find": "                tolerance = 3 if m.group(1) else 0",
+      "replace": "                tolerance = 0"
+    },
+    {
+      "id": "W6",
+      "description": "--write writes a test count from an incomplete collection",
+      "_claimed": "caught",
+      "_note": "The rule that matters. An invented number a tool has just written reads as freshly verified, which is strictly worse than a stale one. The first version of this test drove it through main() by stubbing collect_count, and the branch turned out to be unreachable -- with no test counts to compare there were no failures, so --write was never entered. The rule was moved into rewrite(), where it belongs, and the wholesale refusal was deleted: guard and ADR counts come from file globs and have nothing to do with whether pytest can collect.",
+      "file": "scripts/check_documented_counts.py",
+      "find": "    if {\"make_test\", \"engine\", \"literature\"} <= set(actual):",
+      "replace": "    if set(actual):"
+    },
+    {
+      "id": "W7",
+      "description": "--write drops thousands separators from the tree diagram",
+      "_claimed": "caught",
+      "_note": "`1,141` becoming `1141` shifts an aligned column and puts a formatting diff in every PR that adds a test. A fixer that makes a mess is a fixer nobody runs.",
+      "file": "scripts/check_documented_counts.py",
+      "find": "                shown = f\"{value:,}\" if \",\" in m.group(2) else str(value)",
+      "replace": "                shown = str(value)"
+    },
+    {
+      "id": "W8",
+      "description": "--write is not idempotent",
+      "_claimed": "caught",
+      "_note": "A second run finding more to change means the first run's output was not stable, and `make counts-fix; make guards` would still fail.",
+      "file": "scripts/check_documented_counts.py",
+      "find": "                if abs(was - value) <= tolerance or is_quoted(_l, m.start(), m.end()):\n                    return m.group(0)",
+      "replace": "                if is_quoted(_l, m.start(), m.end()):\n                    return m.group(0)\n                if abs(was - value) <= tolerance:\n                    changed.append(f\"line {_n}: {label} {was} -> {value + 1}\")\n                    return m.group(0).replace(m.group(2), str(value + 1), 1)"
+    }
+  ]
+}

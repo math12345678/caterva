@@ -1,0 +1,31 @@
+{
+ "request": {
+  "call_id": "da9e1626b2572b18",
+  "payload_sha256": "0e59425440a3f6c62c4884dac530e78cd8f932f5c42a7017861820408669ccfd",
+  "consent": true
+ },
+ "status": 200,
+ "body": {
+  "call_id": "da9e1626b2572b18",
+  "feature": "describe",
+  "outcome": "rejected",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "local": false,
+  "latency_ms": 0,
+  "content": null,
+  "rejection": {
+   "kind": "intent",
+   "message": "The assistant's proposal was rejected by the engine's own rules.",
+   "detail": "the shape is not one of the grammar's shapes",
+   "reasons": [
+    "the shape is not one of the grammar's shapes"
+   ],
+   "rejected_text": "{\"shape\": \"glycolysis\"}"
+  },
+  "error": null,
+  "fallback": {},
+  "grounding": null,
+  "run_id": null
+ }
+}

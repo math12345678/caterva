@@ -1,0 +1,53 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=ACHE&organism=human"
+ },
+ "status": 200,
+ "body": {
+  "query": "ACHE",
+  "organism": "human",
+  "organism_code": "HUMAN",
+  "organism_label": "human",
+  "release": "02-Sep-2026",
+  "outcome": "ambiguous",
+  "resolved_ec": null,
+  "how": null,
+  "cautions": [],
+  "reason": "'ACHE' is an abbreviation or symbol, not an enzyme name, and Caterva does not resolve one by itself",
+  "recommended_ec": null,
+  "confirm_only": true,
+  "candidates_total": 1,
+  "candidates": [
+   {
+    "ec": "3.1.1.7",
+    "name": "acetylcholinesterase",
+    "why": "ACHE is the human gene symbol of Acetylcholinesterase (UniProtKB P22303), which UniProt files under this EC number",
+    "tier": 2,
+    "reaction": "acetylcholine + H2O = choline + acetate + H(+).",
+    "class_path": "Hydrolases > acting on ester bonds > carboxylic ester hydrolases",
+    "alternative_names": [],
+    "organism": "HUMAN",
+    "organism_proteins": [
+     {
+      "accession": "P22303",
+      "entry_name": "ACES_HUMAN",
+      "symbol": "ACES",
+      "gene": "ACHE",
+      "label": "ACHE"
+     }
+    ],
+    "organism_protein_count": 1,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "abbreviation",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 3.1.1.7 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   }
+  ],
+  "fallback": null
+ }
+}

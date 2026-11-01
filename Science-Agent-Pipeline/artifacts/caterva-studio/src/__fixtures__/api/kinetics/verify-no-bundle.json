@@ -1,0 +1,9 @@
+{
+ "status": 409,
+ "body": {
+  "error": {
+   "code": "conflict",
+   "message": "this run has no claims bundle to re-check: only a compose run that built a model writes one"
+  }
+ }
+}

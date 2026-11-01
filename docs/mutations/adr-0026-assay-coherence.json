@@ -1,0 +1,55 @@
+{
+  "_why": [
+    "ADR 0026's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "This is Jeske's 'fantasy numbers' warning made executable -- she wrote",
+    "that pH, temperature, cofactors and buffers play a huge role and that",
+    "simply mixing values ends up calculating with fantasy numbers. Coherence",
+    "is the check that says so when a model's parameters came from",
+    "incompatible experiments.",
+    "",
+    "It is also the highest-risk table in the debt list: one of its eight",
+    "mutations was originally NOT CAUGHT, and it was the first of the six",
+    "'checks that cannot fail' this project has found.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0026-assay-coherence.json",
+    "",
+    "The runner is vitest rather than jest -- a deliberate second use of the",
+    "harness's runner detection, since a COUNT_PATTERNS entry that never",
+    "matches would make every verdict INDETERMINATE and look like a spec",
+    "problem rather than a harness one."
+  ],
+  "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/assayCoherence.test.ts src/__tests__/coherenceEndToEnd.test.ts",
+  "mutations": [
+    {
+      "id": "K1",
+      "description": "the `origin === resolved` filter is deleted",
+      "_claimed": "0 failed originally. A defaulted parameter also has no assay conditions and was dropped by the next check anyway, so the end-to-end test that claimed to cover this filter passed for an unrelated reason.",
+      "_note": "The first of the six checks-that-cannot-fail. Tested at its own level against the state the resolver does not yet produce and the next feature might.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/assayCoherence.ts",
+      "find": "    .filter(([, p]) => p?.origin === \"resolved\")",
+      "replace": "    .filter(() => true)"
+    },
+    {
+      "id": "K2",
+      "description": "`unassessable` becomes a pass when fewer than two parameters report conditions",
+      "_claimed": "1 failed",
+      "_note": "The inversion the reason text argues against in prose: a gap in the sources is NOT a finding that the model is sound.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/assayCoherence.ts",
+      "find": "  if (usable.length < 2) {\n    return {\n      verdict: \"unassessable\",",
+      "replace": "  if (usable.length < 2) {\n    return {\n      verdict: \"coherent\","
+    }
+  ],
+  "_a_narrow_test_command_produces_a_false_not_caught": [
+    "The first version of this file ran only assayCoherence.test.ts and",
+    "reported K1 NOT CAUGHT. That was the SET FILE being wrong, not the ADR:",
+    "the test that closes K1 lives in coherenceEndToEnd.test.ts, which ADR",
+    "0026 names in the same sentence as the other file.",
+    "",
+    "Worth keeping because it is the failure mode a set file has that a",
+    "hand-run mutation does not. Running a narrower suite than the record",
+    "claims produces a confident NOT CAUGHT that looks like a real gap, and",
+    "it would have been recorded as one. The rule: a set's `test` command",
+    "must cover every suite the ADR cites, not the one that seems relevant."
+  ]
+}

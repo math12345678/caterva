@@ -12,16 +12,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.10 is the floor Terrium supports; 3.12 is the ceiling with
-        # prebuilt wheels for the SBML C extensions. Testing both ends
-        # catches version drift before it reaches anyone's laptop.
-        python-version: ["3.10", "3.12"]
+        # 3.10 is the floor Caterva supports; 3.13 is the ceiling. Testing
+        # across the window catches version drift before it reaches anyone's
+        # laptop; the 3.10 job also guards the libroadrunner==2.8.0 floor.
+        python-version: ["3.10", "3.12", "3.13"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -31,13 +31,618 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
+      # Records what the runner ACTUALLY resolved, before anything can fail
+      # on it. Three passes have been spent guessing at this job from the
+      # outside: the pins were misread once from an aarch64 sandbox
+      # (ADR 0140), and every guard in this job is green on a developer
+      # machine, so the difference lives in the installed set and nowhere a
+      # local run can see it.
+      #
+      # `always()` because the interesting case is the failing one, and a
+      # diagnostic that only runs on success describes the run nobody needed
+      # explained.
+      - name: Record the resolved environment
+        if: always()
+        run: |
+          {
+            echo "### Resolved environment — python ${{ matrix.python-version }}"
+            echo '```'
+            python -c "import sys, platform; print(sys.version); print(platform.platform())"
+            python -m pip --version
+            python -m pip list --format=freeze | grep -Ei 'libroadrunner|antimony|libsbml|libsedml|numpy|scipy|pytest|hypothesis|cffconvert' || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Verify the environment is genuinely working
         run: python scripts/check_env.py
 
+      - name: Citation-format guard
+        run: python scripts/check_citation_format.py
+
+      # No user input may reach a shell (no shell:true, no execSync).
+      - name: Subprocess-safety guard (self-check)
+        run: python scripts/check_subprocess_safety.py --selftest
+
+      - name: Subprocess-safety guard
+        run: python scripts/check_subprocess_safety.py
+
+      # Code that can send user text to a third party must disclose it.
+      - name: LLM-disclosure guard (self-check)
+        run: python scripts/check_llm_disclosure.py --selftest
+
+      - name: LLM-disclosure guard
+        run: python scripts/check_llm_disclosure.py
+
+      # A form collecting an email must say what happens to it.
+      - name: Privacy-notice guard (self-check)
+        run: python scripts/check_privacy_notice.py --selftest
+
+      - name: Privacy-notice guard
+        run: python scripts/check_privacy_notice.py
+
+      # No auth -> the compose file must bind to loopback.
+      - name: Port-binding guard (self-check)
+        run: python scripts/check_port_binding.py --selftest
+
+      - name: Port-binding guard
+        run: python scripts/check_port_binding.py
+
+      # No auth on the web server -> SECURITY.md must say so.
+      - name: Deployment-warning guard (self-check)
+        run: python scripts/check_deployment_warning.py --selftest
+
+      - name: Deployment-warning guard
+        run: python scripts/check_deployment_warning.py
+
+      # No public page claims an endorsement that is not on record.
+      - name: Fabricated-endorsement guard
+        run: python scripts/check_no_fabricated_endorsements.py
+
+      # The seventeen split-repo READMEs -- what a stranger lands on.
+      - name: Published-repo README guard (self-check)
+        run: python scripts/check_published_repo_readmes.py --selftest
+
+      - name: Published-repo README guard
+        run: python scripts/check_published_repo_readmes.py
+
+      # Apache-2.0 4(a) and 4(d): every published repo ships LICENSE and
+      # NOTICE, not just the umbrella. Seventeen of eighteen shipped neither.
+      - name: Split-repo legal files guard (self-check)
+        run: python scripts/check_split_repo_legal_files.py --selftest
+
+      - name: Split-repo legal files guard
+        run: python scripts/check_split_repo_legal_files.py
+
+      # No published document may claim Caterva is built on Tellurium while
+      # NOTICE says it is not. Reads .docx/.pptx, because that is where two
+      # such claims sat unread through twenty-five audits.
+      - name: Tellurium integration-claim guard (self-check)
+        run: python scripts/check_no_tellurium_integration_claims.py --selftest
+
+      - name: Tellurium integration-claim guard
+        run: python scripts/check_no_tellurium_integration_claims.py
+
+      # Every shipping surface carries the Tellurium non-affiliation
+      # notice. A naming question, not a licensing one -- see ADR 0001.
+      - name: Non-affiliation notice guard
+        run: python scripts/check_non_affiliation_notice.py
+
+      # `import Caterva` is always wrong -- the package is `caterva`.
+      - name: Package-spelling guard (self-check)
+        run: python scripts/check_package_spelling.py --selftest
+
+      - name: Package-spelling guard
+        run: python scripts/check_package_spelling.py
+
+      # Data-source attribution: BRENDA's CC BY 4.0 obligations, checked.
+      - name: Data-source attribution guard
+        run: python scripts/check_data_source_attribution.py
+
+      # A modelCitation must cite the model, not the database (ADR 0008).
+      - name: Model-citation guard
+        run: python scripts/check_model_citations_cite_models.py
+
+      # Every dependency carries a recorded grant of permission to use
+      # it. Unrecorded fails, deliberately.
+      - name: Dependency-licence guard
+        run: python scripts/check_dependency_licenses.py
+
+      # No tracked file names a person's home directory or a scratch folder.
+      - name: Machine-path guard (self-check)
+        run: python scripts/check_no_machine_paths.py --selftest
+
+      - name: Machine-path guard
+        run: python scripts/check_no_machine_paths.py
+
+      # Every pinned version exists on PyPI. Written after CI failed on six
+      # consecutive pushes and the pin was "fixed" by misreading pip: `from
+      # versions: 2.7.0` means "for this interpreter on this architecture",
+      # not "in the index". It then ran in no harness at all, which
+      # check_guard_wiring reports and which is why THIS step exists.
+      - name: Pinned-version resolution guard
+        run: python scripts/check_pins_resolve.py
+
+      # The quickstart-clone guard — now the LAST step in this job, see the
+      # note there — tells the MAINTAINER, in a log only somebody with push
+      # access opens. This one checks the thing that tells the STRANGER: the
+      # "Not public yet" notice on README.md and START_HERE.md.
+      #
+      # Unlike the step above, this one is GREEN today and is expected to
+      # stay green in both directions. It fails if the repositories are
+      # private and the front page does not say so, and it fails again the
+      # day they are published and the notice is left standing -- a warning
+      # turning away visitors who can plainly clone the thing. Nothing else
+      # in the tree goes red when a true sentence stops being true.
+      - name: Availability-notice guard (self-check)
+        run: python scripts/check_availability_notice_matches_reality.py --selftest
+
+      - name: Availability-notice guard
+        run: python scripts/check_availability_notice_matches_reality.py || [ $? -eq 3 ]
+
+      # A step named "Install pnpm" that installs no pnpm and exits 0 is the
+      # exact shape this project calls worse than no check, and it cost two
+      # days of red builds. Runs in the Python job because it is pure Python
+      # and reads YAML -- it needs to fail BEFORE the job it describes.
+      - name: CI-toolchain guard (self-check)
+        run: python scripts/check_ci_toolchain.py --selftest
+
+      - name: CI-toolchain guard
+        run: python scripts/check_ci_toolchain.py
+
+      # Publishing a build artifact changes Caterva's licence
+      # obligations. Nothing publishes today, which is the whole reason the
+      # LGPL/GPL terms of the dependencies impose nothing -- so the day that
+      # changes must not be silent.
+      - name: Release-artifact guard (self-check)
+        run: python scripts/check_release_artifacts.py --selftest
+
+      - name: Release-artifact guard
+        run: python scripts/check_release_artifacts.py
+
+      # Every relative link in a contributor doc resolves. START_HERE.md is
+      # the first thing a newcomer reads and is almost entirely links; a dead
+      # one tells them, before they have written a line, that this project's
+      # claims about checking things are decoration. Written after
+      # caterva/README.md shipped a confident, plausible, wrong path to
+      # ADR 0001.
+      - name: Doc-links guard (self-check)
+        run: python scripts/check_doc_links.py --selftest
+
+      - name: Doc-links guard
+        run: python scripts/check_doc_links.py
+
+      # Documented test/domain counts, across every present-tense
+      # contributor doc. Runs after the suites would have changed them, and
+      # catches the silent drift found in the Stage 7 audit (three stale
+      # counts, plus two conflicting domain counts in the same file).
+      #
+      # The scope was README.md alone until 2026-08-15, and it worked -- while
+      # three onboarding documents beside it drifted to "22 guards" and
+      # "1,291 tests" against a real 36 and 1,735. A correct guard on too
+      # narrow a scope, which is the third time this project has shipped one.
+      #
+      # --selftest first on both: on a clean tree these report zero findings
+      # forever, and a matcher that matched nothing would report zero too.
+      - name: Documented-counts guard (self-check)
+        run: python scripts/check_documented_counts.py --selftest
+
+      - name: Documented-counts guard
+        run: python scripts/check_documented_counts.py
+
+      # The stated reason for the 3.10-3.12 window was wrong in three files
+      # at once ("the SBML C extensions stop at cp312" -- python-libsbml
+      # already ships cp314). Offline here so CI cannot flake on PyPI; run
+      # with --online when changing a pin.
+      - name: Python-support-claim guard
+        run: python scripts/check_python_support_claim.py
+
+      # Rule 7 of the constitution, made executable. It had an ADR and a
+      # paragraph in requirements.txt, and adding `tellurium` to a manifest
+      # passed every other guard.
+      - name: Constitution Rules 7 and 8 guard
+        run: python scripts/check_forbidden_packages.py
+
+      # The Stage 4 amendment: a guard is not delivered until something runs
+      # it unasked. check_rng_convention sat wired to nothing for a whole
+      # stage before a test wrapped it.
+      - name: Guard-wiring guard
+        run: python scripts/check_guard_wiring.py
+
+      # The remaining guards (RNG convention, dependencies, engine contract,
+      # plausibility constants) run in one step via the build-verification
+      # script. --quick runs the guards only, not the test suites.
+      #
+      # --no-typescript, and the flag now means what it says (ADR 0167
+      # moved four unrelated guard groups out of it): this job installs
+      # Python and no Node toolchain, and check_typescript_compiles
+      # correctly reports every workspace as NOT type-checked when there
+      # is no local node_modules/typescript — which is Rule 2 behaviour,
+      # not a defect, and reddened this step on every push after it was
+      # added on 2026-08-22. TypeScript compilation is checked where the
+      # toolchain exists: the api-server job below runs `pnpm run
+      # typecheck` after its pnpm install.
+      - name: Build guards
+        run: python scripts/verify_build.py --quick --no-typescript
+
       - name: Simulation engine tests
-        working-directory: Tellurium
+        working-directory: caterva
         run: python -m pytest -v
 
       - name: Literature layer tests
         working-directory: Tests
         run: python -m pytest -v
+
+      # A green suite cannot distinguish "ran and passed" from "declined to
+      # run". test_flagged_brenda_entries_do_not_become_confident_numbers
+      # skipped itself on every run for months while being counted in the
+      # total, and it guarded a real contract. This fails the build when the
+      # skip count rises, and names what stopped running.
+      - name: Silent-skip guard
+        run: python scripts/check_no_silent_skips.py
+
+      # The generated zod contract every request is parsed against. Two
+      # halves, both of which had failed: the freshly generated module did
+      # not import at all (orval's `zod.version: "auto"` detected v4 against
+      # a v3 install), and the committed files had drifted from the spec.
+      # It runs orval, so it needs the Node toolchain and a real install --
+      # which is why it belongs in CI rather than in `verify_build --quick`,
+      # the fast path that stops getting run the moment it stops being fast.
+      # The codegen guard runs orval against the installed workspace, so it
+      # lives in the api-server job, which runs `pnpm install`; this job has
+      # no JavaScript packages, so here it could only report "cannot verify".
+
+      # The identifiers.org accession patterns are a DATED COPY, and they are
+      # the only thing standing between a resolvable citation and a
+      # fabricated one -- BRENDA's namespace covers EC numbers, so a BRENDA
+      # reference id has no URI form and minting one would point at nothing.
+      # A copy is right on the day it is taken and drifts silently after.
+      #
+      # `continue-on-error` because it consults a third-party registry: an
+      # outage there is not a defect here, and a guard that reddens the build
+      # on someone else's downtime gets muted, which costs more than it saves.
+      # It exits 1 for "unreachable" and 2 for "drifted" precisely so the two
+      # are distinguishable in the log.
+      - name: Identifier pattern freshness
+        continue-on-error: true
+        run: python scripts/check_identifier_patterns_fresh.py
+
+      # The job's failure, as ONE annotation on the run page, so the cause is
+      # legible without opening a log. Every failure here so far has been
+      # read second-hand from a notification email that carries only a count
+      # of annotations, never their text.
+      - name: Name the failing step
+        if: failure()
+        run: |
+          echo "::error title=tests/${{ matrix.python-version }} failed::\
+          A step above this one failed. The resolved environment is in the \
+          job summary. Every guard in this job passes on a developer machine \
+          (checked 2026-08-21), so suspect the installed set or the pip cache \
+          restored by setup-python, which the api-server job does not use."
+
+      # Runs standalone as well as via the pytest wrapper: this job fails
+      # fast on a bad citation rather than waiting out the full suite.
+
+      # ADR 0144 closed the flagrant half — a ref that exists nowhere.
+      # This closes the subtle half it said it could not: a REAL reference
+      # printed under the wrong enzyme, which is what actually happened
+      # (`ref 649716`, acetylcholinesterase, under a lactate dehydrogenase
+      # example on the front page). Offline: no reference id in the eleven
+      # committed fixtures occurs under more than one EC.
+      - name: Citation-enzyme guard (self-check)
+        run: python scripts/check_citations_match_their_enzyme.py --selftest
+
+      - name: Citation-enzyme guard
+        run: python scripts/check_citations_match_their_enzyme.py
+
+      # Wired ABOVE the step it protects, on purpose: a guard that runs
+      # after the expected-red step would itself never run, which is the
+      # bug it exists to catch, committed by the fix for it.
+      - name: CI ordering guard (self-check)
+        run: python scripts/check_ci_red_step_is_last.py --selftest
+
+      - name: CI ordering guard
+        run: python scripts/check_ci_red_step_is_last.py
+
+      # ---------------------------------------------------------------
+      # LAST, AND THE POSITION IS THE WHOLE POINT.
+      # ---------------------------------------------------------------
+      #
+      # The only claim that has to be true before any other claim matters:
+      # that a stranger can obtain this at all. START_HERE.md opens by
+      # addressing "a stranger who found this on GitHub" and hands them a
+      # `git clone` of a repository that is not readable anonymously.
+      #
+      # THIS STEP IS EXPECTED TO FAIL UNTIL THE REPOSITORY IS PUBLISHED.
+      # That is deliberate (ADR 0143) and is not changed here.
+      #
+      # WHAT IS CHANGED IS WHERE IT SITS. It was step 32 of 52. A GitHub
+      # Actions job stops at its first failing step, so the twenty steps
+      # after it never ran -- including `verify_build.py --quick` and BOTH
+      # test suites. Measured: every run since 2026-08-21 finished in about
+      # 55 seconds, and a real suite takes seven minutes.
+      #
+      # So a deliberately-red guard, wired to name a true problem, had been
+      # quietly costing this repository its entire test run on every push.
+      # ADR 0143 argued for keeping the finding visible and said nothing
+      # about ordering, because the cost of the ordering was not noticed.
+      #
+      # Running it last keeps every word of that argument -- the build is
+      # still red, on every push, until the repository is published -- and
+      # gives back the 2,278 tests. `check_ci_red_step_is_last.py` now
+      # fails if anything is added after it.
+      #
+      # Exit 3 means "could not check" (no network, GitHub down) and is NOT
+      # a failure -- the guard probes known-public controls first precisely
+      # so an outage cannot masquerade as a broken URL.
+      - name: Quickstart-clone guard (self-check)
+        run: python scripts/check_quickstart_clone_works.py --selftest || [ $? -eq 3 ]
+
+      - name: Quickstart-clone guard
+        run: python scripts/check_quickstart_clone_works.py || [ $? -eq 3 ]
+
+  api-server:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # `corepack enable`, NOT `corepack prepare pnpm@X --activate`.
+      #
+      # `prepare --activate` exits 0 and writes no shim, so the step named
+      # "Install pnpm" reported success while every later step died on
+      # `pnpm: command not found`. That is what reddened this build on every
+      # push for two days. Reproduced on the runner's own Node major before
+      # this line was changed; see scripts/check_ci_toolchain.py.
+      #
+      # No version is named here on purpose. Corepack reads
+      # `packageManager` from Science-Agent-Pipeline/package.json and runs
+      # THAT version regardless -- so a version written here could only ever
+      # agree with the manifest or lie about it. The old line said 11.4.0
+      # while the manifest said 11.20.0.
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      - name: Install workspace dependencies
+        working-directory: Science-Agent-Pipeline
+        run: pnpm install --frozen-lockfile
+
+      # The TypeScript sources have to COMPILE, which the suite above does
+      # not establish: vitest only ever loads the modules a test imports,
+      # and nothing imports the landing app. `CliApp.tsx` sat on main with
+      # an unterminated JSX comment -- `{/* ... */` with no closing brace --
+      # from 2026-08-18 to 2026-08-23. `pnpm run build` and
+      # `pnpm run typecheck` both failed the whole time, the site could not
+      # be built at all, and nothing went red: the Makefile's world is
+      # Python, and this job ran the api-server tests and stopped.
+      #
+      # A parse error is the cheapest possible thing to catch and it
+      # survived five days, which is the argument for the step rather than
+      # for remembering to run it.
+      - name: TypeScript compiles
+        working-directory: Science-Agent-Pipeline
+        run: pnpm run typecheck
+
+      - name: Application layer tests
+        working-directory: Science-Agent-Pipeline
+        run: pnpm --filter @workspace/api-server run test
+
+      # The codegen load check's selftest needs npx and an installed zod, so
+      # the Python jobs report it as "could not run". This job has both, so it
+      # proves here that the check can fail -- a skip elsewhere, never a gap.
+      - name: Codegen load check (self-check)
+        run: python scripts/check_codegen_loads.py --selftest
+
+      # Moved here 2026-09-27 from the Python jobs, which never install the
+      # workspace: there it could only exit 2 ("cannot verify").
+      - name: Codegen guard
+        run: python scripts/check_codegen_loads.py
+
+      # Reads licences out of the installed JavaScript packages, so it can
+      # only run where they are installed; the Python jobs report it as a
+      # skip with that reason.
+      - name: Dependency licences (installed packages)
+        run: python -m pytest Tests/test_dependency_licenses.py -p no:cacheprovider -q
+
+  # The root TypeScript package: src/, which is the `scientific` CLI that
+  # START_HERE.md hands a new user, and the resolver, engine bridge and
+  # exporters behind it. Its tests are jest suites under src/**/__tests__,
+  # and until 2026-09-30 NO job ran them: `test` runs caterva/ and Tests/,
+  # `api-server` runs that workspace's vitest suite and stops, `md-setup`
+  # runs GROMACS. check_typescript_suites_discovered checked, on a laptop
+  # and nowhere else, that jest COLLECTS every file; nothing checked that
+  # any of them passed. This job runs both questions.
+  #
+  # jest, not vitest, because it is this package's runner ("test": "jest")
+  # and all but four files were written for it. Those four were written
+  # for vitest on 2026-09-29 and 30, in a sandbox where bunx could fetch vitest
+  # and the root package had no node_modules. Moving them was four files;
+  # moving the package to vitest meant rewriting the twenty-one that call
+  # jest.mock, jest.fn or jest.requireActual. The commit that added this
+  # job says more.
+  root-typescript:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The suites are not TypeScript-only. catervaBridge, inhibitionModels,
+      # the CLI end-to-end tests and the offline resolver spawn the REAL
+      # Python -- caterva_runner.py, science_agent_runner.py, report_lab.py
+      # and the export scripts -- through resolvePythonExecutable(), which
+      # falls back to `python3` on PATH when there is no repository .venv.
+      # setup-python puts its interpreter first on PATH, so that is the one
+      # they get, with the requirements-dev.txt the other jobs install.
+      #
+      # No `cache: pip`, for the reason the `test` job's failure annotation
+      # gives: the restored cache is the first suspect when that job goes
+      # red, and the api-server job, which also spawns Python, runs without.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # `npm ci`, not `npm install`: it installs exactly package-lock.json
+      # and fails if package.json has drifted from it, so the jest, ts-jest
+      # and typescript that run here are the versions the lockfile names.
+      - name: Install root package dependencies
+        run: npm ci
+
+      # The root tree is in no other compile step. The api-server job's
+      # `pnpm run typecheck` covers the pnpm workspace only, and
+      # check_typescript_compiles -- which does cover this tsconfig --
+      # runs inside verify_build, which the `test` job calls with
+      # --no-typescript because it has no node_modules. ts-jest checks
+      # the types of what a suite imports; this checks everything
+      # tsconfig.json includes, examples/ as well, whether a test imports
+      # it or not.
+      - name: Root package type-checks
+        run: npm run type-check
+
+      # --ci: a missing snapshot fails instead of being written. --json:
+      # the counts the next step reads, written to a file so the human
+      # summary still prints to the log as usual.
+      - name: Root package tests (jest)
+        run: npm test -- --ci --json --outputFile=root-jest-results.json
+
+      # A green jest step says every file it COLLECTED passed; it cannot say
+      # every file was collected. testMatch is `**/__tests__/**/*.test.ts`
+      # under roots `src`, so a test file renamed or moved out of a
+      # __tests__ directory, or a narrowed testMatch, roots or "test"
+      # script, drops files and the step stays green over the rest.
+      # check_typescript_suites_discovered is the guard for exactly that,
+      # and until this step it ran in no CI job: verify_build runs it in
+      # its TypeScript group, which the `test` job skips with
+      # --no-typescript. Here it reads the report the step above wrote, so
+      # it checks the run that happened rather than asking jest to list
+      # again, and fails naming every file under src/ that did not run.
+      - name: Every root test file ran
+        run: python scripts/check_typescript_suites_discovered.py --jest-results root-jest-results.json
+
+      # jest counts a skipped test as not failed, so a green step cannot say
+      # whether every test ran. Three suites skip on purpose when the Python
+      # engine will not import on the machine running them -- loudly, which
+      # check_no_disabled_tests requires -- and that is right on a laptop
+      # without `make setup`. Here the engine was installed earlier in this
+      # job, so a skip means it stopped importing and those tests stopped
+      # running: the case check_no_silent_skips exists for on the Python
+      # side, which counts pytest only. Prints the counts, names every test
+      # that did not run, then fails if there was one.
+      - name: Root suite skipped nothing
+        run: |
+          jq -r '"\(.numTotalTestSuites) files, \(.numTotalTests) tests: \(.numPassedTests) passed, \(.numFailedTests) failed, \(.numPendingTests) skipped, \(.numTodoTests) todo"' root-jest-results.json
+          jq -r '.testResults[] | .name as $file | .assertionResults[] | select(.status != "passed" and .status != "failed") | "  did not run (\(.status)): \($file) > \(.fullName)"' root-jest-results.json
+          jq -e '.numPendingTests == 0 and .numTodoTests == 0' root-jest-results.json > /dev/null
+
+  # Caterva Studio: the page (Science-Agent-Pipeline/artifacts/caterva-studio)
+  # and the server that serves it (caterva/studio). The page is checked the
+  # three ways that each catch something the others cannot: tsc over every
+  # file (vitest compiles only what a test imports), vitest under jsdom, and
+  # the production build, which writes caterva/studio/static/. The Python
+  # studio tests then run against THAT build, so the server's static
+  # serving, token injection and CSP are exercised on the real page rather
+  # than on the not-built page every other job sees. test_studio_socket.py
+  # binds real loopback sockets here; a sandbox that refuses to bind makes it
+  # fail loudly, never skip, and this runner can bind.
+  #
+  # Ubuntu, not macOS: nothing here is macOS-specific, and the macOS shell
+  # and DMG are built by studio-dmg.yml. `make test-studio` runs the same
+  # commands locally.
+  studio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # `corepack enable`, for the reason the api-server job gives.
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      # --frozen-lockfile proves the lockfile satisfies every package.json
+      # and never rewrites it; the filter installs the studio package and
+      # its workspace dependencies only (docs/studio/CONTRACT.md, section 19).
+      - name: Install the studio package
+        working-directory: Science-Agent-Pipeline
+        run: pnpm install --frozen-lockfile --filter @workspace/caterva-studio...
+
+      - name: Studio page type-checks
+        working-directory: Science-Agent-Pipeline/artifacts/caterva-studio
+        run: pnpm run typecheck
+
+      - name: Studio page tests (vitest)
+        working-directory: Science-Agent-Pipeline/artifacts/caterva-studio
+        run: pnpm run test
+
+      - name: Studio page builds into caterva/studio/static
+        working-directory: Science-Agent-Pipeline/artifacts/caterva-studio
+        run: pnpm run build
+
+      - name: Studio server tests against the built page
+        run: python -m pytest -p no:cacheprovider -o addopts="" caterva/tests/test_studio_*.py -q
+
+      # The same self-test the frozen app runs before it is packaged; here
+      # it must find the built page, not the not-built one.
+      - name: Studio self-test over a real socket
+        run: python -m caterva.app studio --self-test
+
+  # `caterva md` writes a GROMACS setup; this runs it, every stage, with
+  # Ubuntu's GROMACS, on hen lysozyme (1AKI, EC 3.2.1.17: small, one chain,
+  # the standard GROMACS test protein). Steps are capped so each stage is
+  # exercised in seconds; the inputs and topology are the real ones.
+  md-setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install GROMACS
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq gromacs
+          gmx --version | head -3
+      - name: Set up Caterva
+        run: make setup
+      - name: Run every stage (capped)
+        run: make md-smoke

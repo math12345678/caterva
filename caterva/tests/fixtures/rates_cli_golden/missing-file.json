@@ -1,0 +1,10 @@
+{
+ "argv": [
+  "no-such-file.csv",
+  "--sigma-from",
+  "residuals"
+ ],
+ "exit": 2,
+ "stdout": "",
+ "stderr": "caterva rates: no-such-file.csv: no such file\n"
+}

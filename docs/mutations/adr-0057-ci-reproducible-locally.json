@@ -1,0 +1,76 @@
+{
+  "_why": [
+    "ADR 0057's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "CONTRIBUTING told contributors to run `make test` before opening a PR.",
+    "That is 2 of the 11 steps in CI's `test` job; across the workflow, 1 of",
+    "18 run-steps appeared in any Makefile recipe. `make guards` and",
+    "`make pr` closed it and this guard keeps it closed.",
+    "",
+    "C6 is the row that escaped the original hand-run table. Counting",
+    "unclassified CI steps as reachable removes the guard's entire purpose,",
+    "and all eight tests accepted it -- because the repository was clean at",
+    "the time, so main() returned 0 either way. Every test agreed with a",
+    "guard that had stopped guarding. The fix was to extract classify() so",
+    "a test could hand it a step with no local route.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0057-ci-reproducible-locally.json"
+  ],
+  "test": "python3 -m pytest Tests/test_ci_reproducible_locally.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "C1",
+      "description": "a CI step exempted with an empty reason",
+      "_claimed": "1 failed",
+      "_note": "'CI only' without a reason is how a step nobody can reproduce becomes permanent by default.",
+      "file": "scripts/check_ci_reproducible_locally.py",
+      "find": "    \"corepack prepare pnpm\": (\n        \"Toolchain activation. `make doctor` reports whether pnpm is \"\n        \"present and prints this exact command as the fix.\"\n    ),",
+      "replace": "    \"corepack prepare pnpm\": (\"\"),"
+    },
+    {
+      "id": "C2",
+      "description": "the workflow parser silently returns nothing",
+      "_claimed": "3 failed",
+      "_note": "A hand-rolled reader that returns [] makes the guard report 'all clear' on a repository it never examined. The floor exists for exactly this.",
+      "file": "scripts/check_ci_reproducible_locally.py",
+      "find": "    out: list[str] = []\n    lines = text.splitlines()",
+      "replace": "    out: list[str] = []\n    lines = []"
+    },
+    {
+      "id": "C3",
+      "description": "normalisation collapses every command to one string",
+      "_claimed": "1 failed",
+      "_note": "The failure mode of a fuzzy matcher is matching everything: every CI step would then appear covered by any recipe at all.",
+      "file": "scripts/check_ci_reproducible_locally.py",
+      "find": "    return re.sub(r\"\\s+\", \" \", c).strip()",
+      "replace": "    return \"python\""
+    },
+    {
+      "id": "C4",
+      "description": "a stale CI_ONLY entry matching no step is tolerated",
+      "_claimed": "2 failed",
+      "_note": "If CI drops a step, a leftover exemption silently covers the next step whose text happens to contain that substring.",
+      "file": "scripts/check_ci_reproducible_locally.py",
+      "find": "    \"check_codegen_loads.py\": (",
+      "replace": "    \"npm run deploy --prod\": ("
+    },
+    {
+      "id": "C5",
+      "description": "an exemption also counts as locally runnable",
+      "_claimed": "1 failed",
+      "_note": "CI-only and reachable are different facts. Merging them lets `make pr` quietly stop running something while the guard still reports it handled.",
+      "file": "scripts/check_ci_reproducible_locally.py",
+      "find": "            ci_only.append(step)\n            continue",
+      "replace": "            ci_only.append(step)\n            reachable.append(step)\n            continue"
+    },
+    {
+      "id": "C6",
+      "description": "unclassified CI steps are counted as reachable",
+      "_claimed": "1 failed (NOT caught before classify() was extracted)",
+      "_note": "The escape. This removes the guard's whole purpose and was invisible to all eight of its original tests, because the repository was clean so the return value was 0 regardless.",
+      "file": "scripts/check_ci_reproducible_locally.py",
+      "find": "        else:\n            unreachable.append(step)",
+      "replace": "        else:\n            reachable.append(step)"
+    }
+  ]
+}

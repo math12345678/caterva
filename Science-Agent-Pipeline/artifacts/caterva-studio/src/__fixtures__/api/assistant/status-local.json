@@ -1,0 +1,99 @@
+{
+ "request": null,
+ "status": 200,
+ "body": {
+  "state": "ready",
+  "indicator": "Assistant active: local model, nothing leaves this computer",
+  "leaves_machine": false,
+  "destination": {
+   "host": "this computer",
+   "local": true,
+   "label": "A model on this computer"
+  },
+  "provider": "local",
+  "model": "llama3",
+  "providers": [
+   {
+    "name": "anthropic",
+    "label": "Anthropic",
+    "local": false,
+    "needs_key": true
+   },
+   {
+    "name": "openai",
+    "label": "OpenAI",
+    "local": false,
+    "needs_key": true
+   },
+   {
+    "name": "groq",
+    "label": "Groq",
+    "local": false,
+    "needs_key": true
+   },
+   {
+    "name": "openrouter",
+    "label": "OpenRouter",
+    "local": false,
+    "needs_key": true
+   },
+   {
+    "name": "mistral",
+    "label": "Mistral",
+    "local": false,
+    "needs_key": true
+   },
+   {
+    "name": "local",
+    "label": "A model on this computer",
+    "local": true,
+    "needs_key": false
+   }
+  ],
+  "key": {
+   "present": true,
+   "needed": false,
+   "source": null,
+   "provider": "local",
+   "note": null
+  },
+  "features": {
+   "describe": {
+    "label": "Describe it (Compose)",
+    "on": true,
+    "sends": "The sentence you typed, the list of mechanism shapes Caterva can build, and enzyme names the finder matched.",
+    "consented_at": "2026-10-04T22:32:51.531Z"
+   },
+   "explain": {
+    "label": "Explain this result",
+    "on": true,
+    "sends": "The run's result (its figures, units, verdict, concerns, and where each figure came from).",
+    "consented_at": "2026-10-04T22:32:50.381Z"
+   },
+   "methods": {
+    "label": "Draft my methods",
+    "on": true,
+    "sends": "The run's result and Caterva's own methods text for it.",
+    "consented_at": "2026-10-04T22:32:50.501Z"
+   },
+   "ask": {
+    "label": "Ask this run",
+    "on": true,
+    "sends": "Your question and the run's result.",
+    "consented_at": "2026-10-04T22:32:50.563Z"
+   },
+   "next": {
+    "label": "What should I measure next",
+    "on": true,
+    "sends": "The run's ranked next measurements, with their figures.",
+    "consented_at": "2026-10-04T22:32:50.650Z"
+   }
+  },
+  "spend": {
+   "remaining": 8,
+   "max_calls_per_hour": 20,
+   "max_tokens": 1024
+  },
+  "note": null
+ }
+}

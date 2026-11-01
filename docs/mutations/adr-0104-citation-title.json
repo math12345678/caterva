@@ -1,0 +1,78 @@
+{
+  "_why": [
+    "ADR 0104's table. The title of the paper backing a value now reaches the",
+    "person reading the citation, and these are the ways that could silently",
+    "stop being true.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0103-citation-title.json"
+  ],
+  "test": "npx vitest run src/__tests__/citationTitleReachesReader.test.ts src/__tests__/provenance.test.ts src/__tests__/citeVerify.test.ts --root Science-Agent-Pipeline/artifacts/api-server",
+  "_why_three_files": [
+    "Not just the new one. The change edits a string that THREE parsers read,",
+    "and the tests pinning those parsers live in the other two files. ADR",
+    "0026's set ran a narrower command on its first attempt and produced a",
+    "confident NOT CAUGHT because the test closing the mutation lived in the",
+    "second of the two files the record named."
+  ],
+  "mutations": [
+    {
+      "id": "T1",
+      "description": "the title stops being appended (the original defect)",
+      "_note": [
+        "Exactly the state this repository shipped in: `Citation.title`",
+        "resolved, emitted, typed, and dropped by the display composer. A",
+        "student read `BRENDA (ref 740253)` and could not tell what paper it",
+        "was.",
+        "",
+        "If this is NOT caught, the new test is decoration."
+      ],
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "  const titlePart = title ? ` \"${title}\"` : \"\";",
+      "replace": "  const titlePart = \"\";"
+    },
+    {
+      "id": "T2",
+      "description": "the title is placed BEFORE the ref group, where the parsers read",
+      "_note": [
+        "The real risk of this change, and the reason position is commented",
+        "as load-bearing. `/\\(ref ([^)]*)\\)/` reads the ref id out of the",
+        "first parenthesis; a title containing a bracket, or simply sitting",
+        "ahead of the group, moves what those three parsers see.",
+        "",
+        "This mutation is what a well-meaning tidy-up would produce -- title",
+        "first reads more naturally -- and it must fail loudly rather than",
+        "quietly returning a wrong reference id."
+      ],
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "  return `${citation.source}${refPart}${titlePart}${urlPart}`;",
+      "replace": "  return `${citation.source}${titlePart} (ref x)${refPart}${urlPart}`;"
+    }
+  ],
+  "_t3_withdrawn_and_why": [
+    "T3 moved the locator gate below the title, so a citation with a name and",
+    "nothing to find it by would be admitted. It ran, and came back NOT",
+    "CAUGHT -- correctly, and the reason is a property of the code worth",
+    "recording rather than a gap worth filing.",
+    "",
+    "`locatableCitation` has TWO independent gates:",
+    "",
+    "    const display = formatResolvedCitation(citation);",
+    "    if (display === undefined) return undefined;",
+    "    const locators = buildCitationLocators(citation);",
+    "    if (locators.length === 0) return undefined;",
+    "",
+    "A title-only citation produces no locators either, so the second gate",
+    "refuses it whatever the first one does. Mutating either alone changes no",
+    "observable behaviour, and mutating both would only prove that removing",
+    "all the protection removes the protection.",
+    "",
+    "So the double gate is defence in depth that a mutation DEMONSTRATED",
+    "rather than assumed -- the same shape as ADR 0100's G2, which also could",
+    "not be expressed as a single mutation because the weakness was",
+    "conditional. Recording it as NOT CAUGHT would put a gap in this table",
+    "that does not exist."
+  ],
+  "covers": [
+    "0104"
+  ]
+}

@@ -11,10 +11,32 @@ import { pgTable, text, timestamp, uuid, jsonb } from "drizzle-orm/pg-core";
 export const simulationsTable = pgTable("simulations", {
   id: uuid("id").primaryKey().defaultRandom(),
   query: text("query").notNull(),
-  domain: text("domain", { enum: ["mm", "sir", "seir"] }).notNull(),
+  domain: text("domain", {
+    enum: [
+      "mm",
+      "sir",
+      "seir",
+      "pcr",
+      "monte_carlo_pi",
+      "wright_fisher",
+      "two_locus_wright_fisher",
+      "molecular_dynamics",
+      "gillespie_ssa",
+      "gillespie_ssa_bimolecular",
+      "gillespie_ssa_replicates",
+      "lotka_volterra",
+      "cell_cycle_oscillator",
+      "repressilator",
+      "sbml",
+      "mm_competitive_inhibition",
+    ],
+  }).notNull(),
   parameters: jsonb("parameters").notNull().default({}),
   trajectory: jsonb("trajectory").notNull().default([]),
   provenance: jsonb("provenance").notNull().default({}),
+  // Nullable per-parameter provenance. Default null (not {}), so after migration
+  // we can distinguish "never written" (null) from "written empty" ({}).
+  parameterProvenance: jsonb("parameter_provenance").default(null),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

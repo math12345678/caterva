@@ -1,0 +1,322 @@
+{
+  "_comment": [
+    "SHARED GRADING CASES. Read by BOTH implementations of Bakker's",
+    "reliability axes:",
+    "",
+    "  Tests/reliability.py                       (Python, used by the CLI)",
+    "  Science-Agent-Pipeline/.../reliabilityScore.ts (TypeScript, used by the API)",
+    "",
+    "Two implementations exist because the resolver is Python and the API",
+    "server is TypeScript, and neither can import the other. That is a",
+    "boundary, not a choice. What IS a choice is whether the two are allowed",
+    "to drift apart silently, and this file is the answer: both test suites",
+    "read these cases and assert the same grades.",
+    "",
+    "Same pattern as ADR 0003 (shared plausibility bounds), which exists",
+    "because two copies of a numeric constant in two files went out of sync.",
+    "A grading rule is worse than a constant to duplicate, because the",
+    "divergence shows up as two dashboards quietly disagreeing about the",
+    "same measurement rather than as an obvious wrong number.",
+    "",
+    "Adding a case here is how you add a rule. A rule added to only one",
+    "implementation fails the other's test."
+  ],
+  "cases": [
+    {
+      "id": "both conditions reported",
+      "assay": { "ph": 7.4, "temperature_c": 37.0 },
+      "unreported": [],
+      "reference": null,
+      "requested_organism": "Homo sapiens",
+      "measured_organism": "Homo sapiens",
+      "cross_species": false,
+      "relatedness": null,
+      "expect": {
+        "assay_completeness": "complete",
+        "condition_proximity": "not_assessed",
+        "organism_match": "exact"
+      }
+    },
+    {
+      "id": "temperature only is PARTIAL, not absent",
+      "why": "The state the old binary could not express. Weak evidence still constrains a range.",
+      "assay": { "temperature_c": 25.0 },
+      "unreported": ["pH"],
+      "reference": null,
+      "requested_organism": "Homo sapiens",
+      "measured_organism": "Homo sapiens",
+      "cross_species": false,
+      "relatedness": null,
+      "expect": {
+        "assay_completeness": "partial",
+        "condition_proximity": "not_assessed",
+        "organism_match": "exact"
+      }
+    },
+    {
+      "id": "pH only is PARTIAL",
+      "assay": { "ph": 7.4 },
+      "unreported": [],
+      "reference": null,
+      "requested_organism": "Homo sapiens",
+      "measured_organism": "Homo sapiens",
+      "cross_species": false,
+      "relatedness": null,
+      "expect": {
+        "assay_completeness": "partial",
+        "condition_proximity": "not_assessed",
+        "organism_match": "exact"
+      }
+    },
+    {
+      "id": "neither condition reported",
+      "assay": {},
+      "unreported": ["pH", "temperature"],
+      "reference": null,
+      "requested_organism": "Homo sapiens",
+      "measured_organism": "Homo sapiens",
+      "cross_species": false,
+      "relatedness": null,
+      "expect": {
+        "assay_completeness": "absent",
+        "condition_proximity": "not_assessed",
+        "organism_match": "exact"
+      }
+    },
+    {
+      "id": "pH 0 is a real value, not a missing one",
+      "why": "A truthiness test would call this missing. Same family as the `|| 0` bugs already found twice in this codebase.",
+      "assay": { "ph": 0.0, "temperature_c": 25.0 },
+      "unreported": [],
+      "reference": null,
+      "requested_organism": "Homo sapiens",
+      "measured_organism": "Homo sapiens",
+      "cross_species": false,
+      "relatedness": null,
+      "expect": {
+        "assay_completeness": "complete",
+        "condition_proximity": "not_assessed",
+        "organism_match": "exact"
+      }
+    },
+    {
+      "id": "0 C is a real temperature",
+      "assay": { "ph": 7.0, "temperature_c": 0.0 },
+      "unreported": [],
+      "reference": null,
+      "requested_organism": "Homo sapiens",
+      "measured_organism": "Homo sapiens",
+      "cross_species": false,
+      "relatedness": null,
+      "expect": {
+        "assay_completeness": "complete",
+        "condition_proximity": "not_assessed",
+        "organism_match": "exact"
+      }
+    },
+    {
+      "id": "within tolerance of a supplied human reference",
+      "assay": { "ph": 7.2, "temperature_c": 35.0 },
+      "unreported": [],
+      "reference": {
+        "ph": 7.4,
+        "temperature_c": 37.0,
+        "ph_tolerance": 0.4,
+        "temperature_tolerance_c": 5.0,
+        "basis": "human blood plasma, stated by the caller"
+      },
+      "requested_organism": "Homo sapiens",
+      "measured_organism": "Homo sapiens",
+      "cross_species": false,
+      "relatedness": null,
+      "expect": {
+        "assay_completeness": "complete",
+        "condition_proximity": "near",
+        "organism_match": "exact"
+      }
+    },
+    {
+      "id": "outside pH tolerance",
+      "assay": { "ph": 5.0, "temperature_c": 37.0 },
+      "unreported": [],
+      "reference": {
+        "ph": 7.4,
+        "temperature_c": 37.0,
+        "ph_tolerance": 0.4,
+        "temperature_tolerance_c": 5.0,
+        "basis": "human blood plasma, stated by the caller"
+      },
+      "requested_organism": "Homo sapiens",
+      "measured_organism": "Homo sapiens",
+      "cross_species": false,
+      "relatedness": null,
+      "expect": {
+        "assay_completeness": "complete",
+        "condition_proximity": "far",
+        "organism_match": "exact"
+      }
+    },
+    {
+      "id": "a thermophile assay is NEAR when the reference is a thermophile",
+      "why": "The case a hardcoded 7.4/37 gets exactly backwards. 72 C is ideal for Thermus thermophilus and would be graded `far` against a mammalian default.",
+      "assay": { "ph": 7.0, "temperature_c": 72.0 },
+      "unreported": [],
+      "reference": {
+        "ph": 7.0,
+        "temperature_c": 70.0,
+        "ph_tolerance": 0.5,
+        "temperature_tolerance_c": 10.0,
+        "basis": "Thermus thermophilus growth optimum, supplied by the caller"
+      },
+      "requested_organism": "Thermus thermophilus",
+      "measured_organism": "Thermus thermophilus",
+      "cross_species": false,
+      "relatedness": null,
+      "expect": {
+        "assay_completeness": "complete",
+        "condition_proximity": "near",
+        "organism_match": "exact"
+      }
+    },
+    {
+      "id": "the same thermophile assay is FAR against a human reference",
+      "assay": { "ph": 7.0, "temperature_c": 72.0 },
+      "unreported": [],
+      "reference": {
+        "ph": 7.4,
+        "temperature_c": 37.0,
+        "ph_tolerance": 0.4,
+        "temperature_tolerance_c": 5.0,
+        "basis": "human blood plasma, stated by the caller"
+      },
+      "requested_organism": "Homo sapiens",
+      "measured_organism": "Homo sapiens",
+      "cross_species": false,
+      "relatedness": null,
+      "expect": {
+        "assay_completeness": "complete",
+        "condition_proximity": "far",
+        "organism_match": "exact"
+      }
+    },
+    {
+      "id": "proximity judges what is reported and does not double-penalise a gap",
+      "why": "Missing temperature is the completeness axis's finding. Penalising it here too would make one gap look like two.",
+      "assay": { "ph": 7.4 },
+      "unreported": ["temperature"],
+      "reference": {
+        "ph": 7.4,
+        "temperature_c": 37.0,
+        "ph_tolerance": 0.4,
+        "temperature_tolerance_c": 5.0,
+        "basis": "human blood plasma, stated by the caller"
+      },
+      "requested_organism": "Homo sapiens",
+      "measured_organism": "Homo sapiens",
+      "cross_species": false,
+      "relatedness": null,
+      "expect": {
+        "assay_completeness": "partial",
+        "condition_proximity": "near",
+        "organism_match": "exact"
+      }
+    },
+    {
+      "id": "nothing to compare against the reference",
+      "assay": {},
+      "unreported": ["pH", "temperature"],
+      "reference": {
+        "ph": 7.4,
+        "temperature_c": 37.0,
+        "ph_tolerance": 0.4,
+        "temperature_tolerance_c": 5.0,
+        "basis": "human blood plasma, stated by the caller"
+      },
+      "requested_organism": "Homo sapiens",
+      "measured_organism": "Homo sapiens",
+      "cross_species": false,
+      "relatedness": null,
+      "expect": {
+        "assay_completeness": "absent",
+        "condition_proximity": "not_assessed",
+        "organism_match": "exact"
+      }
+    },
+    {
+      "id": "a related cross-species value",
+      "assay": { "ph": 7.4, "temperature_c": 37.0 },
+      "unreported": [],
+      "reference": null,
+      "requested_organism": "Mus musculus",
+      "measured_organism": "Homo sapiens",
+      "cross_species": true,
+      "relatedness": {
+        "status": "close_enough",
+        "shared_rank": "superorder",
+        "shared_name": "Euarchontoglires",
+        "reason": "share the superorder Euarchontoglires"
+      },
+      "expect": {
+        "assay_completeness": "complete",
+        "condition_proximity": "not_assessed",
+        "organism_match": "related"
+      }
+    },
+    {
+      "id": "a too-distant cross-species value",
+      "assay": { "temperature_c": 25.0 },
+      "unreported": ["pH"],
+      "reference": null,
+      "requested_organism": "Mus musculus",
+      "measured_organism": "Plasmodium falciparum",
+      "cross_species": true,
+      "relatedness": {
+        "status": "too_distant",
+        "shared_rank": "domain",
+        "shared_name": "Eukaryota",
+        "reason": "diverge above the class level"
+      },
+      "expect": {
+        "assay_completeness": "partial",
+        "condition_proximity": "not_assessed",
+        "organism_match": "distant"
+      }
+    },
+    {
+      "id": "cross-species with NO relatedness verdict is unknown, never a match",
+      "why": "Absence of a verdict is not evidence of a match.",
+      "assay": { "ph": 7.4, "temperature_c": 37.0 },
+      "unreported": [],
+      "reference": null,
+      "requested_organism": "Mus musculus",
+      "measured_organism": "Homo sapiens",
+      "cross_species": true,
+      "relatedness": null,
+      "expect": {
+        "assay_completeness": "complete",
+        "condition_proximity": "not_assessed",
+        "organism_match": "unknown"
+      }
+    },
+    {
+      "id": "an unresolvable relatedness verdict is unknown, not related",
+      "assay": { "ph": 7.4, "temperature_c": 37.0 },
+      "unreported": [],
+      "reference": null,
+      "requested_organism": "Mus musculus",
+      "measured_organism": "Homo sapiens",
+      "cross_species": true,
+      "relatedness": {
+        "status": "unknown",
+        "shared_rank": null,
+        "shared_name": null,
+        "reason": "NCBI unreachable"
+      },
+      "expect": {
+        "assay_completeness": "complete",
+        "condition_proximity": "not_assessed",
+        "organism_match": "unknown"
+      }
+    }
+  ]
+}

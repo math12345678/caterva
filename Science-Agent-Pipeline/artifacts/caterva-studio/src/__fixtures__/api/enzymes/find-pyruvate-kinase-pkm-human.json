@@ -1,0 +1,40 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=pyruvate%20kinase%20PKM&organism=human"
+ },
+ "status": 200,
+ "body": {
+  "query": "pyruvate kinase PKM",
+  "organism": "human",
+  "organism_code": "HUMAN",
+  "organism_label": "human",
+  "release": "02-Sep-2026",
+  "outcome": "none",
+  "resolved_ec": null,
+  "how": null,
+  "cautions": [],
+  "reason": "no enzyme name in the nomenclature (ExPASy ENZYME release 02-Sep-2026) matches 'pyruvate kinase PKM'.",
+  "recommended_ec": null,
+  "candidates_total": 0,
+  "candidates": [],
+  "fallback": {
+   "kind": "uniprot",
+   "suggestions": [
+    {
+     "ec": "2.7.1.40",
+     "name": "pyruvate kinase"
+    },
+    {
+     "ec": "2.7.11.1",
+     "name": "non-specific serine/threonine protein kinase"
+    },
+    {
+     "ec": "2.7.10.2",
+     "name": "non-specific protein-tyrosine kinase"
+    }
+   ],
+   "note": "UniProt files reviewed proteins named 'pyruvate kinase PKM' under 3 EC numbers. These are different enzymes: choose the one you mean."
+  }
+ }
+}

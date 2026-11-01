@@ -1,0 +1,28 @@
+{
+ "request": null,
+ "status": 200,
+ "body": {
+  "enabled": false,
+  "provider": "anthropic",
+  "models": {
+   "anthropic": "claude-sonnet-5-5"
+  },
+  "model_lists": {
+   "anthropic": [
+    "claude-sonnet-5-5"
+   ]
+  },
+  "local_url": "http://127.0.0.1:11434/v1/chat/completions",
+  "local_only": false,
+  "features": {
+   "describe": false,
+   "explain": false,
+   "methods": false,
+   "ask": false,
+   "next": false
+  },
+  "max_calls_per_hour": 20,
+  "max_tokens": 1024,
+  "consent": {}
+ }
+}

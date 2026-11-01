@@ -1,6 +1,7 @@
 import httpx
 from bs4 import BeautifulSoup
 import re
+from typing import List
 
 r = httpx.get(
     "https://www.brenda-enzymes.org/enzyme.php",
@@ -20,9 +21,9 @@ for tag in soup.find_all(["h2", "h3", "div"], class_=re.compile(r"header|title|s
 
 rows = soup.find_all("div", class_=re.compile(r"row"))
 
-real_km_rows = []
-for row in rows:
-    cells = row.find_all("div", class_="cell")
+real_km_rows: List[List[str]] = []
+for row_tag in rows:
+    cells = row_tag.find_all("div", class_="cell")
     if len(cells) < 3:
         continue
     
@@ -43,5 +44,5 @@ for row in rows:
 
 print(f"\nFiltered real Km rows (human, numeric, short substrate name): {len(real_km_rows)}")
 print("\nFirst 15:")
-for row in real_km_rows[:15]:
-    print(" ", " | ".join(row[:5]))
+for row_cells in real_km_rows[:15]:
+    print(" ", " | ".join(row_cells[:5]))

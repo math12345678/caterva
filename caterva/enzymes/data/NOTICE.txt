@@ -1,0 +1,51 @@
+enzyme_index.json.gz -- attribution
+
+This index is derived from the ENZYME nomenclature database
+(https://enzyme.expasy.org/), which distributes the IUBMB enzyme
+nomenclature.
+
+Release:    Release of 02-Sep-2026 (as printed in the header of enzyme.dat)
+Creator:    the SIB Swiss Institute of Bioinformatics (ExPASy ENZYME database,
+            Bridge and Axelsen), which distributes the IUBMB enzyme
+            nomenclature
+Copyright:  SIB Swiss Institute of Bioinformatics
+Licence:    Creative Commons Attribution 4.0 International (CC BY 4.0),
+            https://creativecommons.org/licenses/by/4.0/
+Source:     https://ftp.expasy.org/databases/enzyme/enzyme.dat
+            https://ftp.expasy.org/databases/enzyme/enzclass.txt
+
+Modifications (CC BY 4.0 section 3(a)(1)(B)): reduced to accepted names,
+alternative names, reactions, status (active, transferred with the new number,
+or deleted), enzyme-class names and the UniProt entry names listed per EC
+number. Comment lines are dropped. UniProt entries are kept as a count per
+organism code and, in full, for HUMAN, MOUSE, RAT, YEAST, ECOLI, BOVIN, PIG,
+CHICK, ARATH, BACSU, DROME, CAEEL and RABIT. scripts/build_enzyme_index.py
+makes the reduction, and the same facts are stored inside the index.
+
+Nothing here states or implies that the SIB Swiss Institute of Bioinformatics
+endorses Caterva. If you use the nomenclature in scientific work, cite the
+ENZYME database (https://enzyme.expasy.org/). To rebuild this index from a
+newer release: make enzyme-index.
+
+
+symbols.json and protein_names.json.gz -- attribution
+
+These two files are read from UniProtKB (https://www.uniprot.org/), through
+the EBI Proteins API (https://www.ebi.ac.uk/proteins/api), by
+scripts/build_enzyme_symbols.py on the date each file records in `fetched`.
+
+Creator:    the UniProt Consortium (UniProtKB/Swiss-Prot reviewed entries)
+Licence:    Creative Commons Attribution 4.0 International (CC BY 4.0),
+            https://creativecommons.org/licenses/by/4.0/
+Source:     https://www.ebi.ac.uk/proteins/api/proteins
+
+Modifications: protein_names.json.gz keeps, for the proteins the enzyme index
+lists for HUMAN, MOUSE, YEAST and ECOLI, only the gene symbol and the names
+(recommended name, short names, alternative names up to 60 characters, gene
+synonyms). symbols.json keeps, for the gene symbols and abbreviations it lists,
+the accession of the reviewed entry, its EC numbers and the source of each
+reading; its abbreviation rows were chosen by hand and each states its basis.
+
+Nothing here states or implies that the UniProt Consortium endorses Caterva.
+If you use these names in scientific work, cite UniProt. To rebuild the files:
+make enzyme-symbols.

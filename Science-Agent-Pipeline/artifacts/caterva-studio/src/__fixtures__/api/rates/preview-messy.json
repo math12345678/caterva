@@ -1,0 +1,346 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "/api/rates/preview",
+  "body": {
+   "text": "substrate (ppm)\trate (counts/min/min)\tstate\n0.02\t76\ttreated\n0.02\t47\ttreated\n\n0.06\tn/a\ttreated\n0.06\t97\ttreated\n0.06\t107\ttreated\n0.11\t\ttreated\n0.11\t123\ttreated\n0.11\t139\ttreated\n0.22\t159\ttreated\n0.22\t152\ttreated\n0,56\t200\ttreated\n0.56\t191\ttreated\n0.56\t201\ttreated\n1.10\t207\ttreated\n1.10\t200\ttreated\n",
+   "filename": "treated-messy.tsv"
+  }
+ },
+ "status": 200,
+ "body": {
+  "ok": true,
+  "ready": true,
+  "refusal": null,
+  "bytes": 294,
+  "lines": 16,
+  "filename": "treated-messy.tsv",
+  "shape": "long",
+  "format": {
+   "bom": false,
+   "line_ending": "LF",
+   "comment_text": [],
+   "blank_lines": 1,
+   "comment_lines": 0,
+   "delimiter": "tab",
+   "decimal": ".",
+   "header": true
+  },
+  "columns": [
+   {
+    "index": 0,
+    "header": "substrate (ppm)",
+    "name": "substrate",
+    "unit": "ppm",
+    "role": "substrate",
+    "role_reason": "its name, 'substrate', reads as the substrate",
+    "numeric": 14,
+    "non_numeric": 1,
+    "blank": 0
+   },
+   {
+    "index": 1,
+    "header": "rate (counts/min/min)",
+    "name": "rate",
+    "unit": "counts/min/min",
+    "role": "rate",
+    "role_reason": "its name, 'rate', reads as the rate",
+    "numeric": 13,
+    "non_numeric": 1,
+    "blank": 1
+   },
+   {
+    "index": 2,
+    "header": "state",
+    "name": "state",
+    "unit": null,
+    "role": "group",
+    "role_reason": "its name, 'state', reads as the group",
+    "numeric": 0,
+    "non_numeric": 15,
+    "blank": 0
+   }
+  ],
+  "mapping": {
+   "delimiter": "tab",
+   "decimal": ".",
+   "header": true,
+   "roles": {
+    "substrate": 0,
+    "rate": 1,
+    "sigma": null,
+    "inhibitor": null,
+    "group": 2,
+    "replicate": null,
+    "rates": []
+   },
+   "units": {
+    "substrate": "ppm",
+    "rate": "counts/min/min"
+   },
+   "target": {
+    "substrate": "ppm",
+    "rate": "counts/min/min"
+   }
+  },
+  "units": {
+   "substrate": {
+    "given": "ppm",
+    "read_as": "ppm",
+    "kind": "arbitrary",
+    "convertible": false,
+    "problem": null,
+    "target": "ppm",
+    "factor": 1.0
+   },
+   "rate": {
+    "given": "counts/min/min",
+    "read_as": "counts/min/min",
+    "kind": "arbitrary",
+    "convertible": false,
+    "problem": null,
+    "target": "counts/min/min",
+    "factor": 1.0
+   }
+  },
+  "decisions": [
+   "1 blank line(s) were skipped (line 4).",
+   "Fields are split at tabs: every line has 3 fields when split at tabs.",
+   "The table mixes decimal commas (1) and decimal points (14); the more common, the point, was used, and the others are listed as problems below. Choose the decimal mark to change this.",
+   "The first row is a header: it has text where numbers would be.",
+   "One row per measurement (long layout).",
+   "Column 1 ('substrate') is the substrate: its name, 'substrate', reads as the substrate.",
+   "Column 2 ('rate') is the rate: its name, 'rate', reads as the rate.",
+   "Column 3 ('state') is the group: its name, 'state', reads as the group.",
+   "3 row(s) were skipped, never silently changed: line 5: 'n/a' is not a number; line 8: the rate is blank; line 13: '0,56' has a comma where this table's decimal point would be; the rest of the table uses points, so it was not read as a decimal."
+  ],
+  "problems": [
+   {
+    "line": 5,
+    "column": "rate",
+    "severity": "skipped",
+    "message": "'n/a' is not a number"
+   },
+   {
+    "line": 8,
+    "column": "rate",
+    "severity": "skipped",
+    "message": "the rate is blank"
+   },
+   {
+    "line": 13,
+    "column": "substrate",
+    "severity": "skipped",
+    "message": "'0,56' has a comma where this table's decimal point would be; the rest of the table uses points, so it was not read as a decimal"
+   }
+  ],
+  "problems_total": 3,
+  "preview": {
+   "headers": [
+    "substrate (ppm)",
+    "rate (counts/min/min)",
+    "state"
+   ],
+   "rows": [
+    {
+     "line": 2,
+     "cells": [
+      "0.02",
+      "76",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 3,
+     "cells": [
+      "0.02",
+      "47",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 5,
+     "cells": [
+      "0.06",
+      "n/a",
+      "treated"
+     ],
+     "used": false,
+     "flags": {
+      "1": "'n/a' is not a number"
+     }
+    },
+    {
+     "line": 6,
+     "cells": [
+      "0.06",
+      "97",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 7,
+     "cells": [
+      "0.06",
+      "107",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 8,
+     "cells": [
+      "0.11",
+      "",
+      "treated"
+     ],
+     "used": false,
+     "flags": {
+      "1": "the rate is blank"
+     }
+    },
+    {
+     "line": 9,
+     "cells": [
+      "0.11",
+      "123",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 10,
+     "cells": [
+      "0.11",
+      "139",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 11,
+     "cells": [
+      "0.22",
+      "159",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 12,
+     "cells": [
+      "0.22",
+      "152",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 13,
+     "cells": [
+      "0,56",
+      "200",
+      "treated"
+     ],
+     "used": false,
+     "flags": {
+      "0": "'0,56' has a comma where this table's decimal point would be; the rest of the table uses points, so it was not read as a decimal"
+     }
+    },
+    {
+     "line": 14,
+     "cells": [
+      "0.56",
+      "191",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 15,
+     "cells": [
+      "0.56",
+      "201",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 16,
+     "cells": [
+      "1.10",
+      "207",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 17,
+     "cells": [
+      "1.10",
+      "200",
+      "treated"
+     ],
+     "used": true,
+     "flags": {}
+    }
+   ],
+   "shown": 15,
+   "total": 15
+  },
+  "summary": {
+   "rows_used": 12,
+   "conditions": 6,
+   "replicate_rows": 6,
+   "inhibitor": false,
+   "groups": [
+    {
+     "label": "treated",
+     "rows": 12
+    }
+   ],
+   "substrate_unit": "ppm",
+   "rate_unit": "counts/min/min",
+   "substrate_convertible": false,
+   "rate_convertible": false,
+   "rate_kind": "arbitrary",
+   "highest_substrate": 1.1,
+   "lowest_substrate": 0.02,
+   "rows_read": 15,
+   "rows_skipped": 3,
+   "wide_measurements_skipped": 0
+  },
+  "canonical": "# Read by Caterva Studio from treated-messy.tsv; the table below is what was fitted.\n# 1 blank line(s) were skipped (line 4).\n# Fields are split at tabs: every line has 3 fields when split at tabs.\n# The table mixes decimal commas (1) and decimal points (14); the more common, the point, was used, and the others are listed as problems below. Choose the decimal mark to change this.\n# The first row is a header: it has text where numbers would be.\n# One row per measurement (long layout).\n# Column 1 ('substrate') is the substrate: its name, 'substrate', reads as the substrate.\n# Column 2 ('rate') is the rate: its name, 'rate', reads as the rate.\n# Column 3 ('state') is the group: its name, 'state', reads as the group.\n# 3 row(s) were skipped, never silently changed: line 5: 'n/a' is not a number; line 8: the rate is blank; line 13: '0,56' has a comma where this table's decimal point would be; the rest of the table uses points, so it was not read as a decimal.\n# skipped line 5: 'n/a' is not a number\n# skipped line 8: the rate is blank\n# skipped line 13: '0,56' has a comma where this table's decimal point would be; the rest of the table uses points, so it was not read as a decimal\nsubstrate (ppm),rate (counts/min/min),state\n0.02,76,treated\n0.02,47,treated\n0.06,97,treated\n0.06,107,treated\n0.11,123,treated\n0.11,139,treated\n0.22,159,treated\n0.22,152,treated\n0.56,191,treated\n0.56,201,treated\n1.10,207,treated\n1.10,200,treated\n",
+  "sigma_options": {
+   "column": false,
+   "replicate_sets": 6,
+   "replicate_dof": 6,
+   "replicates": true,
+   "residuals": true
+  },
+  "group_column": "state",
+  "column_names": {
+   "substrate": "substrate",
+   "rate": "rate"
+  },
+  "units_needed": false,
+  "limits": {
+   "bytes": 524288,
+   "rows": 2000
+  }
+ }
+}

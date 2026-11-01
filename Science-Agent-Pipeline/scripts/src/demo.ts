@@ -8,7 +8,7 @@
 const BASE_URL = "http://localhost:3000/api";
 
 async function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 interface SimJob {
@@ -27,7 +27,7 @@ async function submit(query: string): Promise<SimJob> {
   const res = await fetch(`${BASE_URL}/simulate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query })
+    body: JSON.stringify({ query }),
   });
   if (!res.ok) throw new Error(`Submit failed: ${res.status}`);
   return res.json() as Promise<SimJob>;
@@ -38,10 +38,11 @@ async function poll(jobId: string): Promise<SimJob["result"]> {
     await sleep(500);
     const res = await fetch(`${BASE_URL}/simulate/${jobId}`);
     if (!res.ok) throw new Error(`Poll failed: ${res.status}`);
-    const job = await res.json() as SimJob;
+    const job = (await res.json()) as SimJob;
     console.log(`  ${job.status} (${job.progress}%)`);
     if (job.status === "completed" && job.result) return job.result;
-    if (job.status === "failed") throw new Error(job.error?.message ?? "Failed");
+    if (job.status === "failed")
+      throw new Error(job.error?.message ?? "Failed");
   }
 }
 
@@ -63,7 +64,9 @@ async function main() {
       const result = await poll(job.jobId);
       console.log(`  ✅ Domain: ${result?.domain}`);
       console.log(`  ✅ Points: ${result?.trajectory.length}`);
-      console.log(`  ✅ Flags: ${result?.provenance.flags.join("; ") || "none"}`);
+      console.log(
+        `  ✅ Flags: ${result?.provenance.flags.join("; ") || "none"}`,
+      );
     } catch (err) {
       console.error(`  ❌ ${err instanceof Error ? err.message : String(err)}`);
     }

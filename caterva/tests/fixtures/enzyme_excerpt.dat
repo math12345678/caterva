@@ -1,0 +1,189 @@
+CC   -----------------------------------------------------------------------
+CC
+CC   ENZYME nomenclature database
+CC
+CC   -----------------------------------------------------------------------
+CC   Release of 02-Sep-2026
+CC   -----------------------------------------------------------------------
+CC
+CC   Alan Bridge and Kristian Axelsen
+CC   SIB Swiss Institute of Bioinformatics
+CC   Centre Medical Universitaire (CMU)
+CC   1, rue Michel Servet
+CC   1211 Geneva 4
+CC   Switzerland
+CC
+CC   Email: enzyme@expasy.org
+CC
+CC   WWW server: https://enzyme.expasy.org/
+CC
+CC   -----------------------------------------------------------------------
+CC   Copyrighted by the SIB Swiss Institute of Bioinformatics and
+CC   distributed under the Creative Commons Attribution (CC BY 4.0) License
+CC   -----------------------------------------------------------------------
+//
+ID   1.1.1.5
+DE   Transferred entry: 1.1.1.303 and 1.1.1.304.
+//
+ID   1.1.1.28
+DE   D-lactate dehydrogenase.
+AN   D-lactic acid dehydrogenase.
+AN   D-lactic dehydrogenase.
+CA   (R)-lactate + NAD(+) = pyruvate + NADH + H(+).
+DR   A5CAL1, 2KGR_VITVI ;  Q54UF7, LDHD_DICDI ;  P52643, LDHD_ECOLI ;
+DR   P26297, LDHD_LACDA ;  P30901, LDHD_LACHE ;  P26298, LDHD_LACPE ;
+DR   Q88VJ2, LDHD_LACPL ;  P51011, LDHD_LEUMC ;  Q59642, LDHD_PEDAC ;
+DR   Q5HD29, LDHD_STAAC ;  P63940, LDHD_STAAM ;  P99116, LDHD_STAAN ;
+DR   Q6GDS2, LDHD_STAAR ;  Q6G6F1, LDHD_STAAS ;  P72357, LDHD_STAAU ;
+DR   Q8NUT2, LDHD_STAAW ;  Q5HLA0, LDHD_STAEQ ;  Q8CN22, LDHD_STAES ;
+DR   Q8E6A9, LDHD_STRA3 ;  Q8E0N5, LDHD_STRA5 ;  Q99ZM2, LDHD_STRP1 ;
+DR   O83080, LDHD_TREPA ;  Q05709, VANH_ENTFC ;
+//
+ID   1.1.1.32
+DE   Transferred entry: 1.1.1.1.
+//
+ID   1.1.1.34
+DE   hydroxymethylglutaryl-CoA reductase (NADPH).
+AN   3-hydroxy-3-methylglutaryl-coenzyme A reductase.
+AN   HMG-CoA reductase.
+CA   (R)-mevalonate + 2 NADP(+) + CoA = (3S)-3-hydroxy-3-methylglutaryl-CoA +
+CA   2 NADPH + 2 H(+).
+CC   -!- The enzyme is inactivated by EC 2.7.11.31 and reactivated by
+CC       EC 3.1.3.47.
+DR   P14891, HMDH1_ARATH;  Q4WHZ1, HMDH1_ASPFU;  P34135, HMDH1_DICDI;
+DR   I1RXX1, HMDH1_GIBZE;  O64966, HMDH1_GOSHI;  P29057, HMDH1_HEVBR;
+DR   A2X8W3, HMDH1_ORYSI;  Q0DY59, HMDH1_ORYSJ;  P48020, HMDH1_SOLTU;
+DR   P12683, HMDH1_YEAST;  P43256, HMDH2_ARATH;  Q4WSY2, HMDH2_ASPFU;
+DR   Q9XEL8, HMDH2_CAPAN;  P34136, HMDH2_DICDI;  O64967, HMDH2_GOSHI;
+DR   P29058, HMDH2_HEVBR;  P48022, HMDH2_SOLLC;  Q41437, HMDH2_SOLTU;
+DR   P12684, HMDH2_YEAST;  Q00583, HMDH3_HEVBR;  Q9XHL5, HMDH3_ORYSJ;
+DR   Q41438, HMDH3_SOLTU;  Q9YAS4, HMDH_AERPE ;  O76819, HMDH_AGRIP ;
+DR   O28538, HMDH_ARCFU ;  Q9Y7D2, HMDH_ASPTE ;  Q0C8L9, HMDH_ASPTN ;
+DR   P54960, HMDH_BLAGE ;  A7Z064, HMDH_BOVIN ;  P48021, HMDH_CAMAC ;
+DR   A0A1D8PD39, HMDH_CANAL ;  Q03163, HMDH_CATRO ;  P00347, HMDH_CRIGR ;
+DR   O74164, HMDH_CYBJA ;  P14773, HMDH_DROME ;  P0CT44, HMDH_FUSFU ;
+DR   B2KX91, HMDH_GANLU ;  S0DQM8, HMDH_GIBF5 ;  B0R6J9, HMDH_HALS3 ;
+DR   Q59468, HMDH_HALVD ;  P04035, HMDH_HUMAN ;  O24594, HMDH_MAIZE ;
+DR   P09610, HMDH_MESAU ;  Q58116, HMDH_METJA ;  O26662, HMDH_METTH ;
+DR   Q01237, HMDH_MOUSE ;  Q01559, HMDH_NICSY ;  Q12649, HMDH_PHYB8 ;
+DR   Q1W675, HMDH_PIG   ;  Q5R6N3, HMDH_PONAB ;  Q9V1R3, HMDH_PYRAB ;
+DR   O59469, HMDH_PYRHO ;  Q29512, HMDH_RABIT ;  P51639, HMDH_RAT   ;
+DR   O08424, HMDH_SACS2 ;  P16237, HMDH_SCHMA ;  Q10283, HMDH_SCHPO ;
+DR   P16393, HMDH_STRPU ;  P20715, HMDH_XENLA ;  A0A7J6H013, HMGR1_CANSA;
+DR   A0A0A1C3I2, HMGR1_PANGI;  A0A803NI27, HMGR2_CANSA;  A0A0A1C930, HMR2A_PANGI;
+DR   U5JCC6, HMR2B_PANGI;  Q8J0F4, MLCD_PENCI ;  Q3S2U3, MOKG_MONPI ;
+DR   C8VN86, PBCC_EMENI ;
+//
+ID   1.1.1.42
+DE   isocitrate dehydrogenase (NADP(+)).
+AN   dual-cofactor-specific isocitrate dehydrogenase.
+AN   IDH.
+AN   IDP.
+AN   isocitrate (NADP) dehydrogenase.
+AN   isocitrate (nicotinamide adenine dinucleotide phosphate) dehydrogenase.
+AN   isocitrate dehydrogenase (NADP).
+AN   isocitrate dehydrogenase (NADP-dependent).
+AN   NADP(+)-ICDH.
+AN   NADP(+)-IDH.
+AN   NADP(+)-linked isocitrate dehydrogenase.
+AN   NADP-dependent isocitrate dehydrogenase.
+AN   NADP-dependent isocitric dehydrogenase.
+AN   NADP isocitric dehydrogenase.
+AN   NADP-linked isocitrate dehydrogenase.
+AN   NADP-specific isocitrate dehydrogenase.
+AN   oxalosuccinate decarboxylase.
+AN   oxalsuccinic decarboxylase.
+AN   triphosphopyridine nucleotide-linked isocitrate dehydrogenase-
+AN   oxalosuccinate carboxylase.
+CA   D-threo-isocitrate + NADP(+) = 2-oxoglutarate + CO2 + NADPH.
+CC   -!- Unlike EC 1.1.1.41, oxalosuccinate can be used as a substrate.
+CC   -!- In eukaryotes, isocitrate dehydrogenase exists in two forms: an
+CC       NAD(+)-linked enzyme found only in mitochondria and displaying
+CC       allosteric properties, and a non-allosteric, NADP(+)-linked enzyme
+CC       that is found in both mitochondria and cytoplasm.
+CC   -!- The enzyme from some species can also use NAD(+) but much more
+CC       slowly.
+DR   Q9SRZ6, ICDHC_ARATH;  Q8LPJ5, ICDHP_ARATH;  Q9SLK0, ICDHX_ARATH;
+DR   O13285, IDH1_CANTR ;  P41560, IDH1_COLMA ;  P65098, IDH1_MYCBO ;
+DR   P9WKL0, IDH1_MYCTO ;  P9WKL1, IDH1_MYCTU ;  A0A5A4WIX0, IDH1_PSYS3 ;
+DR   O13294, IDH2_CANTR ;  P41561, IDH2_COLMA ;  O53611, IDH2_MYCTU ;
+DR   A0A5A4WIZ7, IDH2_PSYS3 ;  Q9XSG3, IDHC_BOVIN ;  Q75JR3, IDHC_DICDI ;
+DR   O75874, IDHC_HUMAN ;  Q9Z2K9, IDHC_MICME ;  Q9Z2K8, IDHC_MICOH ;
+DR   O88844, IDHC_MOUSE ;  P83726, IDHC_NAEFO ;  P20304, IDHC_PIG   ;
+DR   Q5R9C5, IDHC_PONAB ;  P41562, IDHC_RAT   ;  Q6XUZ5, IDHC_SHEEP ;
+DR   P50217, IDHC_SOLTU ;  Q06197, IDHC_SOYBN ;  P50218, IDHC_TOBAC ;
+DR   P41939, IDHC_YEAST ;  P53982, IDHH_YEAST ;  P79089, IDHP_ASPNG ;
+DR   Q04467, IDHP_BOVIN ;  Q75JR2, IDHP_DICDI ;  P48735, IDHP_HUMAN ;
+DR   Q4R502, IDHP_MACFA ;  Q40345, IDHP_MEDSA ;  P54071, IDHP_MOUSE ;
+DR   P33198, IDHP_PIG   ;  P56574, IDHP_RAT   ;  O14254, IDHP_SCHPO ;
+DR   P21954, IDHP_YEAST ;  O67480, IDH_AQUAE  ;  O29610, IDH_ARCFU  ;
+DR   P16100, IDH_AZOVI  ;  P39126, IDH_BACSU  ;  P96318, IDH_CALNO  ;
+DR   Q8RQL9, IDH_COREF  ;  P50216, IDH_CORGL  ;  Q9ZH99, IDH_COXBU  ;
+DR   P08200, IDH_ECOLI  ;  D4GU92, IDH_HALVD  ;  Q9ZN36, IDH_HELPJ  ;
+DR   P56063, IDH_HELPY  ;  P50214, IDH_NOSS1  ;  Q02NB5, IDH_PSEAB  ;
+DR   Q1RJU4, IDH_RICBR  ;  Q92IR7, IDH_RICCN  ;  Q4UKR1, IDH_RICFE  ;
+DR   Q9ZDR0, IDH_RICPR  ;  Q68XA5, IDH_RICTY  ;  P50215, IDH_SPHYA  ;
+DR   Q5HF79, IDH_STAAC  ;  P65099, IDH_STAAM  ;  P99167, IDH_STAAN  ;
+DR   Q6GG12, IDH_STAAR  ;  Q6G8N2, IDH_STAAS  ;  Q8NW61, IDH_STAAW  ;
+DR   Q5HNL1, IDH_STAEQ  ;  Q8CNX4, IDH_STAES  ;  Q59940, IDH_STRMU  ;
+DR   Q59985, IDH_STRSL  ;  P80046, IDH_SYNY3  ;  P33197, IDH_THET8  ;
+//
+ID   1.1.1.74
+DE   Deleted entry.
+//
+ID   1.1.1.n5
+DE   3-methylmalate dehydrogenase.
+CA   (2R,3S)-3-methylmalate + NAD(+) = 2-oxobutanoate + CO2 + NADH.
+CC   -!- The enzyme from Methanocaldococcus jannaschii also catalyzes the
+CC       reaction of EC 1.1.1.85 and EC 1.1.1.83.
+DR   Q58130, LEU3_METJA ;
+//
+ID   1.3.1.67
+DE   cis-1,2-dihydroxy-4-methylcyclohexa-3,5-diene-1-carboxylate
+DE   dehydrogenase.
+CA   (1) (1R,6S)-1,6-dihydroxy-4-methylcyclohexa-2,4-diene-1-carboxylate +
+CA   NADP(+) = 4-methylcatechol + CO2 + NADPH.
+CA   (2) (1R,6S)-1,6-dihydroxy-4-methylcyclohexa-2,4-diene-1-carboxylate +
+CA   NAD(+) = 4-methylcatechol + CO2 + NADH.
+CC   -!- Involved in the p-xylene degradation pathway in bacteria.
+//
+ID   2.7.1.1
+DE   hexokinase.
+AN   hexokinase type I.
+AN   hexokinase type II.
+AN   hexokinase type III.
+AN   hexokinase type IV (glucokinase).
+CA   a D-hexose + ATP = a D-hexose 6-phosphate + ADP + H(+).
+CC   -!- D-glucose, D-mannose, D-fructose, sorbitol and D-glucosamine can act
+CC       as acceptors.
+CC   -!- ITP and dATP can act as donors.
+DR   Q2TB90, HKDC1_HUMAN;  Q91W97, HKDC1_MOUSE;  Q2KNB5, HXK10_ORYSJ;
+DR   Q42525, HXK1_ARATH ;  Q4U3Y2, HXK1_ASPFU ;  P27595, HXK1_BOVIN ;
+DR   Q59RW5, HXK1_CANAL ;  P19367, HXK1_HUMAN ;  P17710, HXK1_MOUSE ;
+DR   Q8LH82, HXK1_ORYSJ ;  Q5RC71, HXK1_PONAB ;  P05708, HXK1_RAT   ;
+DR   Q09756, HXK1_SCHPO ;  O64390, HXK1_SOLTU ;  Q9SEK3, HXK1_SPIOL ;
+DR   Q9SEK2, HXK1_TOBAC ;  P93834, HXK2_ARATH ;  Q9NFT7, HXK2_DROME ;
+DR   A2PYL8, HXK2_EQUGR ;  A2PYL7, HXK2_EQUZE ;  A2PYL6, HXK2_HORSE ;
+DR   P52789, HXK2_HUMAN ;  O08528, HXK2_MOUSE ;  Q2KNB9, HXK2_ORYSJ ;
+DR   Q1W674, HXK2_PIG   ;  P27881, HXK2_RAT   ;  P50521, HXK2_SCHPO ;
+DR   Q9SQ76, HXK2_SOLTU ;  Q6Q8A5, HXK2_TOBAC ;  Q9LPS1, HXK3_ARATH ;
+DR   P52790, HXK3_HUMAN ;  Q3TRM8, HXK3_MOUSE ;  Q2KNB4, HXK3_ORYSJ ;
+DR   P27926, HXK3_RAT   ;  Q56XE8, HXK4_ARATH ;  P35557, HXK4_HUMAN ;
+DR   P52792, HXK4_MOUSE ;  Q6Z398, HXK4_ORYSJ ;  P17712, HXK4_RAT   ;
+DR   Q5W676, HXK5_ORYSJ ;  Q8LQ68, HXK6_ORYSJ ;  Q1WM16, HXK7_ORYSJ ;
+DR   Q1WM15, HXK8_ORYSJ ;  Q2KNB7, HXK9_ORYSJ ;  P04806, HXKA_YEAST ;
+DR   P83776, HXKB_CANAL ;  P04807, HXKB_YEAST ;  Q92407, HXKG_ASPNG ;
+DR   Q6CUZ3, HXKG_KLULA ;  Q9FZG4, HXKL1_ARATH;  Q9T071, HXKL2_ARATH;
+DR   A0A0K0JFP3, HXK_BRUMA  ;  P80581, HXK_EMENI  ;  P33284, HXK_KLULA  ;
+DR   Q02155, HXK_PLAFA  ;  Q26609, HXK_SCHMA  ;  P50506, HXK_SCHOC  ;
+DR   Q969A8, HXK_TOXGO  ;
+//
+ID   2.7.1.37
+DE   Transferred entry: 2.7.11.1, 2.7.11.8, 2.7.11.9, 2.7.11.10, 2.7.11.11,
+DE   2.7.11.12, 2.7.11.13, 2.7.11.21, 2.7.11.22, 2.7.11.24, 2.7.11.25,
+DE   2.7.11.30 and 2.7.12.1.
+//
+ID   3.4.21.14
+DE   Transferred entry: 3.4.21.62, 3.4.21.63, 3.4.21.64, 3.4.21.65 and
+DE   3.4.21.67.
+//

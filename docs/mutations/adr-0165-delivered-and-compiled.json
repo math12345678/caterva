@@ -1,0 +1,38 @@
+{
+  "_why": [
+    "ADR 0165's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "Two of the three defects in that record are pure Python and live here.",
+    "The third -- the unterminated JSX comment in CliApp.tsx -- is NOT in this",
+    "set, and its absence is deliberate. Grading it means running",
+    "`pnpm run typecheck`, which needs the Node toolchain and a completed pnpm",
+    "install; a set file that shelled out to pnpm would report NOT CAUGHT on",
+    "every machine that had not run one, which is the confident-wrong answer",
+    "mutate.py exists to prevent. It was verified by hand instead, by restoring",
+    "the byte that caused it, and the ADR records the exact compiler error and",
+    "says this is where the evidence is weaker.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0165-delivered-and-compiled.json"
+  ],
+  "test": "cd Tests && python3 -m pytest test_runner_contract.py test_lab_report.py --no-header -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "T1",
+      "description": "the runner resolves a taxon id and then emits null instead",
+      "_claimed": "caught by test_a_resolved_taxon_reaches_the_output",
+      "_note": "The house defect -- computed and not delivered. Before this pass no test in the file could see it: every other test ran with the NCBI lookup returning nothing, so null was the expected output everywhere and deleting the two assignments changed nothing any assertion looked at.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/science_agent_runner.py",
+      "find": "                \"taxonId\": taxon_id_for(result.organism),\n                \"requestedTaxonId\": taxon_id_for(organism),",
+      "replace": "                \"taxonId\": None,\n                \"requestedTaxonId\": None,"
+    },
+    {
+      "id": "T2",
+      "description": "the report leaves the refusals section blank instead of stating that nothing was withheld",
+      "_claimed": "caught by test_the_absence_of_refusals_is_stated_rather_than_left_blank",
+      "_note": "The branch this mutates was unreachable from the suite before this pass: the shared report() fixture now carries a source-mixture refusal, so every test that built a report exercised the OTHER branch, and the test named for this one was asserting the no-refusal sentence against a document that had a refusal in it.",
+      "file": "Tests/lab_report.py",
+      "find": "            \"Nothing was withheld: every parameter resolved to a cited value \"\n            \"or was supplied by you.\",",
+      "replace": "            \"\","
+    }
+  ]
+}

@@ -1,0 +1,179 @@
+{
+  "_source": "caterva/studio/contract.py from_parameter_origin over export.provenance_of; see README.md in this directory",
+  "searched": {
+    "description": "Michaelis Menten",
+    "subject": "2.7.1.1",
+    "organism": "Homo sapiens",
+    "substrate": "glucose",
+    "search_note": "2 constant(s) resolved from the literature: reaction_Km, reaction_kcat",
+    "search_refused": false,
+    "parameters": [
+      {
+        "value": 1.0,
+        "unit": "mM",
+        "provenance": {
+          "kind": "chosen",
+          "by": "default",
+          "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model."
+        },
+        "id": "reaction_S",
+        "label": "S"
+      },
+      {
+        "value": 0.0,
+        "unit": "mM",
+        "provenance": {
+          "kind": "chosen",
+          "by": "default",
+          "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model."
+        },
+        "id": "reaction_P",
+        "label": "P"
+      },
+      {
+        "value": 0.001,
+        "unit": "mM",
+        "provenance": {
+          "kind": "chosen",
+          "by": "default",
+          "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model."
+        },
+        "id": "reaction_E",
+        "label": "E"
+      },
+      {
+        "value": 40.1,
+        "unit": "1/s",
+        "provenance": {
+          "kind": "measured",
+          "citation": {
+            "text": "BRENDA ref 739603",
+            "via": "literature"
+          },
+          "organism": "Homo sapiens",
+          "cross_species": false,
+          "conditions": {
+            "ph": 7.6,
+            "temperature_c": 25.0,
+            "buffer": null,
+            "unreported": []
+          },
+          "commentary": "wild-type, pH 7.6, 25 \u00b0C",
+          "scope": [],
+          "chosen_because": null,
+          "spread": {
+            "low": 40.1,
+            "high": 101.0,
+            "unit": "1/s",
+            "carried": 40.1,
+            "n_values": 4,
+            "references": [
+              "702282",
+              "703624",
+              "739603"
+            ],
+            "sentence": "3 sources report 4 values (BRENDA ref 702282, 703624, 739603), spanning 40.1 to 101 1/s (2.52-fold); this model carries 40.1, the resolver's pick, not a verdict; which one is right is a question about the papers. The range is not an uncertainty estimate: it is bounded by which rows are in the database"
+          }
+        },
+        "id": "reaction_kcat",
+        "label": "kcat"
+      },
+      {
+        "value": 6.0,
+        "unit": "mM",
+        "provenance": {
+          "kind": "measured",
+          "citation": {
+            "text": "BRENDA ref 641068",
+            "via": "literature"
+          },
+          "organism": "Homo sapiens",
+          "cross_species": false,
+          "conditions": {
+            "ph": 7.5,
+            "temperature_c": 30.0,
+            "buffer": null,
+            "unreported": []
+          },
+          "commentary": "30\u00b0C, pH 7.5, wild-type",
+          "scope": [],
+          "chosen_because": null,
+          "spread": {
+            "low": 6.0,
+            "high": 18.0,
+            "unit": "mM",
+            "carried": 6.0,
+            "n_values": 3,
+            "references": [
+              "641068",
+              "739603"
+            ],
+            "sentence": "2 sources report 3 values (BRENDA ref 641068, 739603), spanning 6 to 18 mM (3-fold); this model carries 6, the resolver's pick, not a verdict; which one is right is a question about the papers. The range is not an uncertainty estimate: it is bounded by which rows are in the database"
+          }
+        },
+        "id": "reaction_Km",
+        "label": "Km"
+      }
+    ]
+  },
+  "structure_only": {
+    "description": "Michaelis Menten",
+    "parameters": [
+      {
+        "value": 1.0,
+        "unit": "mM",
+        "provenance": {
+          "kind": "chosen",
+          "by": "default",
+          "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model."
+        },
+        "id": "reaction_S",
+        "label": "S"
+      },
+      {
+        "value": 0.0,
+        "unit": "mM",
+        "provenance": {
+          "kind": "chosen",
+          "by": "default",
+          "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model."
+        },
+        "id": "reaction_P",
+        "label": "P"
+      },
+      {
+        "value": 0.001,
+        "unit": "mM",
+        "provenance": {
+          "kind": "chosen",
+          "by": "default",
+          "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model."
+        },
+        "id": "reaction_E",
+        "label": "E"
+      },
+      {
+        "value": 100.0,
+        "unit": "1/s",
+        "provenance": {
+          "kind": "placeholder",
+          "reason": "ILLUSTRATIVE PLACEHOLDER: Caterva's motif library value for catalytic_step.kcat. No publication supplies this number and nobody measured it. It is here so the structure can be checked, dimensioned and simulated; the measurement that would replace it is in the kcat table.",
+          "table": "kcat"
+        },
+        "id": "reaction_kcat",
+        "label": "kcat"
+      },
+      {
+        "value": 0.1,
+        "unit": "mM",
+        "provenance": {
+          "kind": "placeholder",
+          "reason": "ILLUSTRATIVE PLACEHOLDER: Caterva's motif library value for catalytic_step.Km. No publication supplies this number and nobody measured it. It is here so the structure can be checked, dimensioned and simulated; the measurement that would replace it is in the km table.",
+          "table": "km"
+        },
+        "id": "reaction_Km",
+        "label": "Km"
+      }
+    ]
+  }
+}

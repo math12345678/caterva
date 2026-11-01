@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  caterva:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      # Bound to the LOOPBACK interface, not every interface.
+      #
+      # This said "3000:3000", which Docker binds to 0.0.0.0 -- every network
+      # interface on the host. Combined with NODE_ENV=production and
+      # restart: unless-stopped, the shipped configuration published a server
+      # with NO AUTHENTICATION to the whole local network, and on a cloud
+      # host to the internet.
+      #
+      # `GET /api/jobs/history` returns the last 50 jobs, including the query
+      # text somebody typed, to any caller. See SECURITY.md.
+      #
+      # The rest of this file is carefully hardened -- cap_drop: ALL,
+      # read_only, non-root USER, tmpfs. That hardening is about what a
+      # compromised container can do. None of it addresses who can reach the
+      # port, which for this server is the risk that actually matters.
+      #
+      # To expose it deliberately, change this line AND put authentication in
+      # front of it. Changing this line alone is the state that existed here.
+      - "127.0.0.1:3000:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+    volumes:
+      - ./caterva-jobs.jsonl:/app/caterva-jobs.jsonl
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+
+  # Optional: PostgreSQL for production job storage
+  # postgres:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     POSTGRES_DB: caterva
+  #     POSTGRES_PASSWORD: change_me
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+
+# volumes:
+#   postgres_data:

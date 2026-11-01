@@ -1,0 +1,32 @@
+# Initial rates of galactosyltransferase in Golgi membranes, from cells
+# treated with puromycin and from untreated cells.
+# Treloar MA (1974) Effects of Puromycin on Galactosyltransferase in Golgi
+# Membranes. M.Sc. thesis, University of Toronto. Published in Bates DM &
+# Watts DG (1988) Nonlinear Regression Analysis and Its Applications, Wiley,
+# Appendix A1.3, and distributed as R's datasets::Puromycin, where the
+# substrate column is called conc and the grouping column state.
+# Substrate concentration in parts per million; rate in counts/min/min.
+substrate (ppm),rate (counts/min/min),state
+0.02,76,treated
+0.02,47,treated
+0.06,97,treated
+0.06,107,treated
+0.11,123,treated
+0.11,139,treated
+0.22,159,treated
+0.22,152,treated
+0.56,191,treated
+0.56,201,treated
+1.10,207,treated
+1.10,200,treated
+0.02,67,untreated
+0.02,51,untreated
+0.06,84,untreated
+0.06,86,untreated
+0.11,98,untreated
+0.11,115,untreated
+0.22,131,untreated
+0.22,124,untreated
+0.56,144,untreated
+0.56,158,untreated
+1.10,160,untreated

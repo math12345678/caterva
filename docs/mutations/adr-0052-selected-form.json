@@ -1,0 +1,65 @@
+{
+  "_why": [
+    "ADR 0052's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "`FormMixture.reason` warned that returning the lowest value 'would pick",
+    "a form rather than answer the question' -- conditionally, with nothing",
+    "anywhere saying whether it did. `name_selected_form()` answers that.",
+    "",
+    "The corpus test attached to this ADR is worth more than the table: it",
+    "was written to prove the pipeline currently returns hexokinase I out of",
+    "three forms, and it does not. The minimum is 2.3e-07 from a row with no",
+    "designator. The claim the function was built on was wrong, and the test",
+    "is what found that.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0052-selected-form.json"
+  ],
+  "test": "python3 -m pytest Tests/test_selected_form.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "S1",
+      "description": "a value appearing under two forms names one of them anyway",
+      "_claimed": "1 failed",
+      "_note": "Two forms reporting the same number is a coincidence the data cannot resolve. Naming one invents the distinction the module exists to preserve.",
+      "file": "Tests/form_mixture.py",
+      "find": "    if len(hits) != 1:\n        return None",
+      "replace": "    if not hits:\n        return None"
+    },
+    {
+      "id": "S2",
+      "description": "a value from no named form is reported as one",
+      "_claimed": "4 failed",
+      "_note": "The inversion. Not coming from a named form is the outcome the warning hoped for; reporting it turns good news into a finding.",
+      "file": "Tests/form_mixture.py",
+      "find": "        if any(v == selected_value for v in values)",
+      "replace": "        if True"
+    },
+    {
+      "id": "S3",
+      "description": "the reason stops saying the warning was not hypothetical",
+      "_claimed": "1 failed",
+      "_note": "The whole point of the field. `FormMixture.reason` says returning the lowest *would* pick a form; this says it did.",
+      "file": "Tests/form_mixture.py",
+      "find": "\"The warning above is not hypothetical for this result: a form was \"",
+      "replace": "\"Note: \""
+    },
+    {
+      "id": "S4",
+      "description": "the sibling designators are not listed",
+      "_claimed": "1 failed",
+      "_note": "'One of three forms' is a claim a reader cannot check without the other two.",
+      "file": "Tests/form_mixture.py",
+      "find": "        sibling_designators=siblings,",
+      "replace": "        sibling_designators=[],"
+    },
+    {
+      "id": "S5",
+      "description": "a one-form mixture claims a sibling gene product",
+      "_claimed": "1 failed",
+      "_note": "Defensive: a single-designator mixture must not produce '...and LDH is a different gene product' with an empty name.",
+      "file": "Tests/form_mixture.py",
+      "find": "                if others else \".\"",
+      "replace": "                if True else \".\""
+    }
+  ]
+}

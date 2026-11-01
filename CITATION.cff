@@ -1,19 +1,39 @@
 cff-version: 1.2.0
 message: >-
-  If you use Terrium in academic or research work, please cite it as below.
+  If you use Caterva in academic or research work, please cite it as below.
   This file exists for the same reason the test suite checks every number
   against an exact solution: a claim should be traceable back to something
   concrete, and "cite this project" deserves the same treatment as "cite
   this Km value."
-title: Terrium
+title: Caterva
 abstract: >-
   A biology simulation engine built on antimony/SBML/roadrunner, providing
   validated enzyme kinetics (Michaelis-Menten), epidemiology (SIR/SEIR), and
   PCR amplification models with literature-grounded parameter plausibility
   checks.
+
+  Caterva is NOT Tellurium. Tellurium is a separate, established
+  systems-biology environment from the Sauro lab at the University of
+  Washington and collaborators. Caterva is an unaffiliated personal
+  project: not a fork of Tellurium, not endorsed by its authors, and
+  making no claim to their work. Caterva is a consumer of that ecosystem,
+  running on libRoadRunner (Apache 2.0, University of Washington) and
+  generating Antimony (MIT). The project was called Terrium until 2026-09-27, too close to Tellurium's name; it has been Caterva since.
 authors:
-  - name: Terrium
-    website: "https://github.com/math12345678/terrium"
-license: LicenseRef-Terrium-Proprietary
-repository-code: "https://github.com/math12345678/terrium"
-date-released: 2026-07-25
+  - name: Caterva
+    website: "https://github.com/math12345678/caterva"
+license: Apache-2.0
+repository-code: "https://github.com/math12345678/caterva"
+# The version matches caterva.__version__ (which pyproject.toml reads) and
+# package.json, kept equal to the release tag so "cite the version you
+# used" resolves to a real tag. package.json said 1.0.0 until 2026-08-29;
+# 0.1.0 was the source-only release of that date; 0.2.0 the first with
+# built artifacts (2026-09-19); 0.3.0 the first on GitHub's Releases page
+# with app folders (2026-09-21); 0.3.1 adds the user's guide (2026-09-22);
+# 0.4.0 is the rename to Caterva (2026-09-27); 0.5.0 adds Caterva Studio and
+# the enzyme finder; 0.5.1 adds updates inside Caterva.app; 0.6.0 adds
+# claims over pinned evidence (compose --claims, caterva why, caterva
+# verify). The date is the day the version was set; the tag is cut after
+# a release candidate has shipped every artifact (docs/releases/v0.6.0.md).
+version: 0.6.0
+date-released: 2026-10-25

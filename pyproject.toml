@@ -1,0 +1,189 @@
+[project]
+name = "caterva"
+dynamic = ["version"]
+description = "Scientific computing for teaching labs. Unaffiliated with Tellurium."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.10,<3.14"
+authors = [{ name = "Caterva contributors" }]
+keywords = ["systems-biology", "enzyme-kinetics", "sbml", "simulation", "teaching"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "libroadrunner==2.8.0",
+    "antimony==2.14.0",
+    "python-libsbml==5.21.1",
+    "numpy==2.2.6",
+    "scipy==1.15.3",
+    "requests==2.34.2",
+    "certifi==2026.10.19",
+    "beautifulsoup4==4.15.0",
+    "lxml==6.1.1",
+    "httpx==0.28.1",
+    "pydantic==2.13.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/math12345678/caterva"
+Repository = "https://github.com/math12345678/caterva"
+Issues = "https://github.com/math12345678/caterva/issues"
+Changelog = "https://github.com/math12345678/caterva/blob/main/CHANGELOG.md"
+
+# The app. Two commands, because the repository has two front doors and a
+# capability nobody can reach is not a capability (ADR 0090):
+#   caterva-sim      the stochastic simulation engine (Gillespie SSA)
+#   caterva-compose  the compositional model builder and its analyses
+[project.scripts]
+# `caterva` is the one command every document teaches, and the name of the
+# executable in the downloadable app folder. It dispatches to the two below,
+# which stay for anyone who wants one directly.
+caterva = "caterva.app:main"
+caterva-sim = "caterva.cli:console_main"
+caterva-compose = "caterva.compose.__main__:console_main"
+# The project was called Terrium until 2026-09-27. The old command keeps
+# working so nobody's notes or scripts break on the rename.
+terrium = "caterva.app:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-timeout==2.4.0",
+    "hypothesis==6.160.0",
+    "ruff==0.11.11",
+    "mypy==1.15.0",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "C4", "C9", "SIM", "T20", "ARG", "PTH", "ERA", "PL", "TRY", "NPY", "TID", "PYI", "RSE", "RET", "ASYNC", "LOG", "PERF", "PD", "FLY", "ISC", "ICN", "PIE", "TCH", "EXE", "Q", "D", "N", "PT", "RUF", "FA", "INT", "A", "SLF", "SLOT", "YTT"]
+ignore = ["D100", "D101", "D102", "D103", "D105", "D202", "D205", "D208", "D209", "D212", "D213", "D301", "D400", "D401", "D403", "D404", "D413", "D415", "T201", "PLR2004", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "C901", "ERA001", "PIE810", "PERF203", "PLC0415", "PLW2901", "RUF100", "EXE001", "C408", "ARG001", "ARG005", "TRY003", "TRY004", "UP045", "UP035", "UP038", "UP006", "RET507", "ISC002", "RUF013", "RUF002", "RUF003", "RUF001", "RUF046", "Q000", "W291", "W292", "W293", "B905", "RUF007", "PT011", "PT018", "PT006", "PT017", "PTH118", "PTH120", "PTH123", "I001", "N806", "N802", "SIM108", "PIE790", "PLW1510", "E501", "N999"]
+
+[tool.ruff.lint.per-file-ignores]
+"Tests/*.py" = ["S101", "T201"]
+"caterva/tests/*.py" = ["S101", "T201"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = false
+warn_unused_configs = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+no_implicit_optional = false
+strict_optional = false
+implicit_reexport = false
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "scipy.*",
+    "libsbml",
+    "antimony",
+    "libroadrunner",
+    "roadrunner",
+    "check_dependencies_declared",
+    "check_rng_convention",
+    "caterva_engine",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "caterva.caterva_engine"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "caterva.core.data_structures",
+    "caterva.core.validation",
+    "caterva.core.utils",
+    "caterva.continuous.model_building",
+    "caterva.continuous.simulations",
+    "caterva.discrete.pcr",
+    "caterva.discrete.monte_carlo",
+    "caterva.discrete.molecular_dynamics",
+    "caterva.discrete.gillespie_ssa",
+    "caterva.discrete.population_genetics.core",
+    "caterva.discrete.population_genetics.analysis",
+    "caterva.discrete.population_genetics.probability",
+    "caterva.discrete.population_genetics.theoretical",
+    "caterva.discrete.population_genetics.two_locus",
+    "caterva.scenarios.wf_scenarios",
+]
+ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = ["caterva/tests", "Tests"]
+timeout = 300
+addopts = "-v --tb=short"
+# Tests/ also holds one-off exploratory scripts (pubmed_test.py,
+# brenda_test.py) that match pytest's default *_test.py collection pattern
+# and run live network calls at import time -- not inside a test function,
+# so they execute unconditionally the moment pytest imports the module.
+# Tests/pytest.ini already restricts this locally, with a comment naming
+# these two files, but that only takes effect when pytest resolves config
+# from Tests/pytest.ini directly. The documented, sanctioned invocation
+# (`pytest caterva/tests Tests` from repo root -- see docs/CONSTITUTION.md
+# and the testpaths above) resolves config from THIS file instead, where
+# the restriction was absent, so the local fix never covered the real
+# command: `python -m pytest caterva/tests Tests -q` hit a live 403 from an
+# outbound-network-restricted environment during collection, not even
+# inside a test. Reproduced directly, not from a report.
+python_files = ["test_*.py"]
+
+[tool.setuptools.dynamic]
+version = { attr = "caterva.__version__" }
+
+# NAMED, NOT DISCOVERED. This repository is flat: caterva/ sits beside
+# Tests/, Business/, landing/, node_modules/, benchmark_results/ and a dozen
+# more, and setuptools' flat-layout discovery picked up all of them --
+# verified with FlatLayoutPackageFinder on 2026-09-19. The result was an
+# editable install that registered dist-info and nothing else: `import
+# Caterva` failed from any directory but the repository root, and a wheel
+# built from it would have been an empty release.
+#
+# caterva.tests is excluded because it is not a package (no __init__.py) and
+# a test tree is not part of the thing a user installs. Tests/ -- the
+# literature layer -- is excluded because it is not a package either; the
+# few call sites in caterva.agents that reach into it do so lazily and are
+# documented as needing the source checkout.
+[tool.setuptools.packages.find]
+include = ["caterva", "caterva.*"]
+exclude = ["caterva.tests", "caterva.tests.*"]
+
+# `caterva/conftest.py` exists to make the repository's own test tree import
+# (it edits sys.path to find the flat `caterva_engine`). It is not part of
+# the software and must not ship: installed into site-packages it would,
+# if pytest ever loaded it, put site-packages' PARENT on sys.path.
+[tool.setuptools.package-data]
+# Two data files the engine reads at import (docs/data-sources.json and the
+# identifiers.org capture) as packaged copies; see caterva/core/data/README.md.
+# Caterva Studio's built page (caterva/studio/static/, written by the Vite
+# build in Science-Agent-Pipeline/artifacts/caterva-studio and not
+# committed). Absent from a wheel built without it; `caterva studio` then
+# serves a page saying how to build it. The enzyme finder's packaged index, protein names and gene-symbol table
+# (caterva/enzymes/data) are read at query time. The literature layer's modules
+# (caterva/_literature/, copied from Tests/ by scripts/vendor_literature.py,
+# git-ignored) are flat modules imported by caterva.checkout, so they ship as
+# data beside the package rather than as a subpackage.
+caterva = ["core/data/*.json", "core/data/README.md", "enzymes/data/enzyme_index.json.gz", "enzymes/data/protein_names.json.gz", "enzymes/data/symbols.json", "enzymes/data/NOTICE.txt", "studio/static/*", "studio/static/**/*", "_literature/*.py", "_literature/README.txt"]
+
+[tool.setuptools.exclude-package-data]
+caterva = ["conftest.py", "pytest.ini", ".coverage"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

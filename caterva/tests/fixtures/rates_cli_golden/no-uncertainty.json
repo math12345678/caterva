@@ -1,0 +1,8 @@
+{
+ "argv": [
+  "examples/rates/puromycin.csv"
+ ],
+ "exit": 3,
+ "stdout": "",
+ "stderr": "caterva rates: no uncertainty was given for the rates, and this fit will not invent one: the weights, every interval and every test are expressed in units of the error bars, so a chosen sigma would appear in the answer as if measured. Give exactly one of: (1) a per-row standard deviation column in the file, e.g. 'sigma (uM/min)'; (2) --sigma-from replicates, which pools the spread of rows with identical conditions (add --error-model proportional if the noise grows with the rate); (3) --sigma-from residuals, ordinary least squares with sigma estimated from the fit's own scatter, which assumes the model is right.\n"
+}

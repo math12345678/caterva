@@ -1,0 +1,31 @@
+{
+  "_why": [
+    "ADR 0080's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "NOT MY RECORD -- a concurrent agent's, and written for them rather than",
+    "asked for, per the policy set when the fifth such ADR arrived: asking",
+    "costs a line in NOT-YET-REPRODUCIBLE.txt every pass and moves nothing;",
+    "writing the set costs one additive file and closes the entry.",
+    "",
+    "This one is squarely Jeske's territory. BRENDA is CC BY 4.0 and its",
+    "citation_request is an instruction -- 'cite BRENDA's current",
+    "publication' -- so a bibliography that lists every paper a value came",
+    "from while omitting the database itself omits the one citation the",
+    "source actually asks for.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0080-database-in-bibliography.json"
+  ],
+  "covers": ["0080"],
+  "test": "python3 -m pytest Tests/test_citation_export.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "D1",
+      "description": "every described source credited, contributed or not",
+      "_claimed": "1 failed",
+      "_note": "The over-claiming direction. An entry for a database that supplied nothing puts a citation in someone's paper for data they did not use -- the same shape as ADR 0056's `literatureFound` column, pointed the other way.",
+      "file": "Tests/citation_export.py",
+      "find": "        if source.citation_request\n        and any(\n            token in label for label in labels for token in source.tokens\n        )",
+      "replace": "        if source.citation_request"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=HIV%20protease"
+ },
+ "status": 200,
+ "body": {
+  "query": "HIV protease",
+  "organism": null,
+  "organism_code": null,
+  "organism_label": null,
+  "release": "02-Sep-2026",
+  "outcome": "ambiguous",
+  "resolved_ec": null,
+  "how": null,
+  "cautions": [],
+  "reason": "'HIV protease' is an abbreviation or symbol, not an enzyme name, and Caterva does not resolve one by itself",
+  "recommended_ec": null,
+  "confirm_only": true,
+  "candidates_total": 1,
+  "candidates": [
+   {
+    "ec": "3.4.23.16",
+    "name": "HIV-1 retropepsin",
+    "why": "HIV protease is a common abbreviation for HIV-1 retropepsin",
+    "tier": 2,
+    "reaction": "Specific for a P1 residue that is hydrophobic, and P1' variable, but often Pro.",
+    "class_path": "Hydrolases > acting on peptide bonds (peptidases) > aspartic endopeptidases",
+    "alternative_names": [],
+    "organism": null,
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "abbreviation",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 3.4.23.16 --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   }
+  ],
+  "fallback": null
+ }
+}

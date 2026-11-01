@@ -1,0 +1,66 @@
+{
+  "_why": [
+    "ADR 0045's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "This one needed a new capability. Its 'suite' is not a test runner -- it",
+    "is the guard script `check_findings_reach_a_surface.py`, which walks",
+    "every KineticResult field from the resolver, through the runner, across",
+    "the Python/TypeScript boundary, to a rendering surface. The verdict is",
+    "the guard's exit status.",
+    "",
+    "The harness now supports `\"verdict\": \"exit_code\"` for exactly this",
+    "shape, and it is deliberately more careful than reading the exit code:",
+    "a mutation that makes a guard CRASH also exits non-zero, and calling",
+    "that 'caught' would certify a check that no longer runs at all. Crashes",
+    "are detected and reported INDETERMINATE. Verified by breaking the",
+    "guard's own syntax and confirming the harness refuses to call it caught.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0045-boundary-guard.json",
+    "",
+    "ADR 0100 shares this set rather than opening a second one: G2 IS that record's table, and the two mutations belong together -- G2 only became expressible once the invariant it protects was stated, and G1 is the defect it nearly excused. Two files would split one finding.",
+    "ADR 0102 shares it too: that pass changed the fixture, the path matcher and the TypeScript sources read, and G1/G2 re-run unchanged are the evidence it did not quietly stop catching anything."
+  ],
+  "covers": [
+    "0039",
+    "0045",
+    "0100",
+    "0102"
+  ],
+  "verdict": "exit_code",
+  "test": "python3 scripts/check_findings_reach_a_surface.py --selftest && python3 scripts/check_findings_reach_a_surface.py",
+  "mutations": [
+    {
+      "id": "G1",
+      "description": "the runner stops emitting poolFindings (ADR 0039's original defect)",
+      "_claimed": "fails now; PASSED under guard v1 and v2",
+      "_note": "The defect the guard exists for: four pool-level detectors computed correctly and dropped at the Python/TypeScript boundary, invisible from both sides. Two earlier versions of the guard passed this mutation, which is why the third executes the runner rather than reading names.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/science_agent_runner.py",
+      "find": "                \"poolFindings\": {",
+      "replace": "                \"poolFindingsDisabledByMutation\": {"
+    },
+    {
+      "id": "G2",
+      "description": "the 'not measurable' state decided by the WIRE path, so a deleted emission excuses a top-level field",
+      "_claimed": "fails now; this mutation IS the bug it re-creates",
+      "_note": [
+        "The historical failure, verbatim. Descending into nested models added",
+        "a third state, and its first version tested the wire path.",
+        "`effector_contrasts` is TOP-LEVEL with the dotted alias",
+        "`poolFindings.effectorContrasts`, so deleting that emission emptied",
+        "`measurable_parents`, reclassified the field 'not measurable', and",
+        "skipped it. G1 flipped to NOT CAUGHT: the new state swallowed the",
+        "exact defect the guard exists for, and the excuse got STRONGER the",
+        "more thoroughly the emission was deleted.",
+        "",
+        "This was first written as a mutation of the closure and came back NOT",
+        "CAUGHT -- correctly, because the weakness is conditional on G1 and",
+        "changes no output on its own. The invariant moved into `--selftest`,",
+        "which asserts it directly, and only then did the mutation become",
+        "expressible."
+      ],
+      "file": "scripts/check_findings_reach_a_surface.py",
+      "find": "    if \".\" not in field:\n        return True\n    parent = aliases.get(field, field).rsplit(\".\", 1)[0]",
+      "replace": "    if \".\" not in aliases.get(field, field):\n        return True\n    parent = aliases.get(field, field).rsplit(\".\", 1)[0]"
+    }
+  ]
+}

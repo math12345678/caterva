@@ -15,10 +15,51 @@ Expected input JSON shape:
       "enzymeName": "lactate dehydrogenase",
       "substrate": "pyruvate",
       "organism": "Homo sapiens",
-      "ecNumber": "1.1.1.27"
+      "ecNumber": "1.1.1.27",
+      "quantity": "km"
     }
 
-Output JSON shape (success):
+"quantity" selects which constant is resolved: "km" (default) reads
+BRENDA's "KM Values" table, "ki" reads the "Ki Values" table (the
+inhibition constant), "kcat" reads the "Turnover Numbers" table. All three
+use the same exact/cross-species/literature chain. Each call resolves
+exactly one quantity, and the output value is emitted under the matching
+key ("km", "ki", or "kcat") -- so a cross-species Ki never borrows a
+verified Km's provenance (see provenance.ts / ADR 0008).
+
+A resolved "kcat" is a real, citable literature value but is NOT a
+simulation-ready parameter: the MM engine takes Vmax, and
+Vmax = kcat * [E]0 needs an enzyme concentration BRENDA does not supply
+and Caterva never defaults or infers (ADR 0012 / ADR 0013). "kcat" is
+therefore deliberately absent from RESOLVABLE_FIELDS -- resolvable and
+displayable, not yet wired to a simulation. See ADR 0019.
+
+"ecNumber" is optional. If omitted (or empty) and "enzymeName" is present,
+this script resolves an EC number from it with the same policy every
+Caterva command uses (enzyme_lookup.resolve_name: the enzyme nomenclature
+first, UniProt's name search only for a name it does not hold) before
+attempting BRENDA/KEGG/PubMed -- see resolve_enzyme() below. If the name
+identifies no enzyme, the result is an honest {"found": false}, never a
+fabricated EC number or Km/Ki; if it identifies several, the result is
+source "ec_ambiguous" with the candidates, named. If BOTH "ecNumber" and
+"enzymeName" are missing, that's a hard error: there is nothing to search
+for at all.
+
+If BOTH arrive, the name is checked against the number with that same
+finder before anything is looked up (check_ec_against_name, 2026-10-17).
+A name that identifies a different enzyme -- "hexokinase" beside ecNumber
+1.1.1.27 -- is refused as source "ec_mismatch", naming both numbers: a
+number the name contradicts is a citation for the wrong protein, however
+well formatted. A name that could be several enzymes, the number among
+them -- "lactate dehydrogenase" beside 1.1.1.27 -- proceeds silently: that
+is exactly the re-run the "ec_ambiguous" refusal asks for. A name the
+finder cannot resolve or cannot check cannot contradict anything, so the
+number is used as given and the log says the name did not confirm it. A
+language model's EC number never arrives here at all unless the query text
+itself contains it: llmResolver.ts drops the rest before the request is
+made (ADR 0011 -- a model may propose an EC number, never supply one).
+
+Output JSON shape (success, quantity="km"):
     {
       "ok": true,
       "found": true,
@@ -26,10 +67,16 @@ Output JSON shape (success):
       "unit": "mM",
       "organism": "Homo sapiens",
       "source": "brenda_exact",
-      "citation": { "source": "BRENDA", "reference_id": "...", "url": "..." },
+      "citation": { "source": "BRENDA", "referenceId": "...", "url": "..." },
       "literatureCandidates": [],
       "logs": []
     }
+
+With quantity="ki" the value is emitted under "ki" instead of "km".
+
+The citation's keys are camelCase, as `_citation_to_dict` writes them. This
+example said "reference_id" until 2026-09-30, and the TypeScript CLI, written
+against it, dropped every reference id the runner sent.
 
 Output JSON shape (not found):
     {
@@ -49,10 +96,230 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
+import enzyme_lookup
+import epidemiology_resolver
 import fallback_logic
+import reliability
 from fallback_logic import KineticResult
+import httpx
+import popgen_resolver
+
+
+def resolve_ec_number(enzyme_name: str, organism: str) -> str | None:
+    """The EC number for an enzyme name, or None when the name does not
+    identify exactly one enzyme. Never guesses.
+
+    Kept for callers that only want the number; `resolve_enzyme` is the
+    function that says why when there is none."""
+    try:
+        return resolve_enzyme(enzyme_name, organism).ec
+    except enzyme_lookup.EnzymeNameNotResolved:
+        return None
+
+
+@dataclass
+class EcAgreement:
+    """Whether an enzyme name agrees with a supplied EC number, and in what
+    words. `agrees` is False only when the name identifies a different
+    enzyme; `checked` is False when the finder could not say (the name is
+    unknown to it, or UniProt could not be asked), which is not a
+    contradiction. `candidates` are the EC numbers the name identifies when
+    it disagrees -- one, or the several it could mean -- for the refusal to
+    name; `named` are the finder's descriptions of them, forwarded."""
+
+    agrees: bool
+    checked: bool
+    note: str
+    candidates: list = field(default_factory=list)
+    named: list = field(default_factory=list)
+
+
+def check_ec_against_name(enzyme_name: str, organism: str, ec_number: str) -> EcAgreement:
+    """Does this name contradict this EC number? Decided by the one finder.
+
+    THE ONLY QUESTION ASKED IS WHETHER THE NAME CONTRADICTS THE NUMBER. The
+    number was supplied -- by a person, by a verified table, or by the query
+    text itself (llmResolver.ts keeps a model's EC number only when the
+    query contains it, ADR 0011) -- and is the stronger identifier. The name
+    is checked because a name and a number that disagree are two enzymes,
+    and a lookup under the number would then cite a protein the person did
+    not name (ADR 0126). So:
+
+      * the finder resolves the name to one enzyme: agrees when it is this
+        number, disagrees when it is another;
+      * the name could be several enzymes (`ambiguous`): agrees when this
+        number is one of them -- the number is the disambiguation the
+        `ec_ambiguous` refusal asked for -- and disagrees when it is none;
+      * the finder has no answer (`none`, `suggestions`, `lookup_failed`,
+        `unknown_ec`): nothing contradicts, so the number stands, unchecked,
+        and the note says so. A refusal here would turn a network failure
+        into "your EC number is wrong", which it is not.
+
+    Asking `resolve_ec_number` for equality instead would refuse every call
+    that pairs "lactate dehydrogenase" with 1.1.1.27 (the finder holds
+    twelve enzymes under that name and returns None), including the re-run
+    its own ambiguity refusal recommends. Membership is the policy that
+    agrees with the finder rather than fighting it.
+
+    Offline for every name the enzyme nomenclature holds; UniProt is asked
+    only for a name it does not, exactly as the name-only path does.
+    """
+    ec = str(ec_number).strip()
+    try:
+        named = resolve_enzyme(enzyme_name, organism)
+    except enzyme_lookup.EnzymeNameNotResolved as exc:
+        if exc.kind == "ambiguous":
+            if ec in exc.candidates:
+                return EcAgreement(
+                    True, True,
+                    f"'{enzyme_name}' could be {len(exc.candidates)} enzymes and "
+                    f"EC {ec} is one of them, so EC {ec} is used as given.",
+                    list(exc.candidates), list(exc.named_candidates),
+                )
+            listed = ", ".join(exc.candidates)
+            return EcAgreement(
+                False, True,
+                f"The enzyme name and the EC number given are not the same "
+                f"enzyme: '{enzyme_name}' names {len(exc.candidates)} enzymes "
+                f"({listed}), and ecNumber {ec} is none of them. A number the "
+                f"name contradicts is a citation for the wrong protein, so "
+                f"nothing was looked up. Re-run with ecNumber "
+                f"{exc.recommended or exc.candidates[0]} for '{enzyme_name}', "
+                f"or with the name of the enzyme EC {ec} is.",
+                list(exc.candidates), list(exc.named_candidates),
+            )
+        return EcAgreement(
+            True, False,
+            f"EC {ec} is used as given, unchecked against the name: "
+            f"'{enzyme_name}' did not resolve ({exc.kind}): {exc}",
+        )
+    if named.ec == ec:
+        return EcAgreement(True, True, f"EC {ec} confirmed by the name '{enzyme_name}': {named.how}.")
+    label = f"EC {named.ec} {named.name}".rstrip()
+    # Keyword form rather than `{"ec": ...}`: scripts/check_runner_boundary.py
+    # reads every `"key": ` literal in this file as a wire key the API must
+    # receive, and these are the fields of one candidate, not new keys.
+    candidate = dict(ec=named.ec, name=named.name, label=label, why=named.how)
+    return EcAgreement(
+        False, True,
+        f"The enzyme name and the EC number given are not the same enzyme: "
+        f"'{enzyme_name}' is {label} by {named.source}'s reading "
+        f"({named.how}), and ecNumber {ec} was given. A number the name "
+        f"contradicts is a citation for the wrong protein, so nothing was "
+        f"looked up. Re-run with ecNumber {named.ec} for '{enzyme_name}', "
+        f"or with the name of the enzyme EC {ec} is.",
+        [named.ec], [candidate],
+    )
+
+
+def resolve_enzyme(enzyme_name: str, organism: str):
+    """Enzyme name -> `NameResolution`, or `EnzymeNameNotResolved` naming the candidates.
+
+    THE SAME POLICY EVERY OTHER COMMAND USES, NOT A COPY OF IT
+    ----------------------------------------------------------
+    The decision is `enzyme_lookup.resolve_name`, which asks the enzyme
+    nomenclature first (the one `caterva enzyme` and `caterva compose` ask)
+    and UniProt's protein-name search only for a name the nomenclature does
+    not hold. This function adds only the way THIS caller asks UniProt: the
+    query's stated organism first, then an unrestricted search, so a
+    mismatch between the caller's organism guess and what UniProt has
+    indexed does not sink an otherwise-real match.
+
+    The TypeScript layer does not re-derive any of it. When the name is
+    several enzymes the exception carries the candidates, named, and the
+    runner forwards them (`ecCandidates`, `ecCandidateNames`, `ecRefusal`).
+
+    An EC number is not a parameter. It is the identity of the protein every
+    citation downstream refers to, so a name that is several enzymes
+    ("lactate dehydrogenase" is EC 1.1.1.27 and EC 1.1.1.28, among others)
+    is refused rather than resolved to the first (ADR 0126, ADR 0127).
+
+    Referenced via the enzyme_lookup module (not imported by name) so
+    tests can monkeypatch enzyme_lookup.fetch_taxon_id /
+    enzyme_lookup.fetch_ec_numbers_by_name and stay offline.
+    """
+
+    def uniprot(name: str, _taxon_id: str | None) -> list:
+        taxon_id = enzyme_lookup.fetch_taxon_id(organism) if organism else None
+        if taxon_id:
+            narrowed = enzyme_lookup.fetch_ec_numbers_by_name(name, taxon_id)
+            if narrowed:
+                return narrowed
+        return enzyme_lookup.fetch_ec_numbers_by_name(name, None)
+
+    return enzyme_lookup.resolve_name(
+        enzyme_name, None, organism=organism, fetch=uniprot, rerun="ecNumber {ec}"
+    )
+
+
+def taxon_id_for(organism: str | None) -> str | None:
+    """NCBI Taxonomy id for an organism name, or None if it cannot be got.
+
+    None means "not resolved". It never means "assume human" -- that
+    substitution used to live in `enzyme_lookup.DEFAULT_TAXON_ID` and fired
+    on a *network failure*, stamping a human identifier onto a thermophile's
+    measurement (see Tests/test_no_default_organism.py).
+
+    Emitted so the SBML exporter can write `bqbiol:hasTaxon` on each
+    parameter. Without it the cross-species mismatch is prose only, and
+    prose is invisible to a pipeline. The runner already resolved this id
+    for its own EC lookup and threw it away.
+
+    Referenced through the `enzyme_lookup` module rather than by name so the
+    test suite can monkeypatch it and stay offline.
+    """
+    if not organism:
+        return None
+    try:
+        return enzyme_lookup.fetch_taxon_id(organism)
+    except Exception:
+        # A failed taxonomy lookup must not sink a resolution that
+        # otherwise succeeded. The annotation is an addition to the answer,
+        # not a precondition for it -- so its absence is reported by being
+        # absent, and the Km is still returned.
+        return None
+
+
+def resolve_substrate_from_kegg(ec_number: str) -> str | None:
+    """Live substrate-name lookup for an EC number via KEGG, used to fill
+    in a substrate name when the caller didn't supply one -- which happens
+    whenever the enzyme name came from the free-text guess in
+    queryResolver.ts rather than the hardcoded enzymes.ts list (that list
+    bundles a substrate per entry; a live-resolved enzyme has none yet).
+
+    This matters, not just fills a gap cosmetically: brenda_client.py
+    filters BRENDA's results by substrate name, and enzyme_lookup.py's own
+    module docstring explains why that filter exists -- without it, a
+    BRENDA enzyme page's Km data is dominated by every inhibitor and assay
+    surrogate anyone has ever tested, not the enzyme's real substrate. A
+    live-resolved enzyme with no substrate would silently get the same
+    noise a hardcoded entry is built to avoid.
+
+    Returns None -- never guesses -- if KEGG has no SUBSTRATE field for
+    this EC number, or the lookup fails outright (network error, unknown
+    EC). A failure here degrades to the unfiltered BRENDA fallback that
+    already exists for this exact case (see brenda_client.py); it must
+    never crash the whole resolution."""
+    try:
+        text = enzyme_lookup.fetch_kegg_enzyme_text(ec_number)
+    except httpx.HTTPError:
+        return None
+    except enzyme_lookup.KeggLicenceNotConfigured:
+        # KEGG is OFF by default because Caterva has no licence position for
+        # it (ADR 0068, NOTICE, docs/LICENSING.md). This is a deliberate
+        # abstention, not a swallowed failure, which is why it is caught by
+        # NAME rather than by widening the clause above -- widening it is
+        # what `test_programming_error_is_not_swallowed` exists to prevent.
+        #
+        # Degrading to None is already the designed behaviour for "KEGG did
+        # not give us a substrate", and the unfiltered BRENDA fallback below
+        # handles it. The user sees a broader BRENDA result set, not a crash.
+        return None
+    substrates = enzyme_lookup.parse_kegg_substrates(text)
+    return substrates[0] if substrates else None
 
 
 def resolve_kinetic_value(
@@ -60,22 +327,335 @@ def resolve_kinetic_value(
     substrate: str,
     organism: str,
     ec_number: str,
+    quantity: str = "km",
+    allow_cross_species: bool = False,
+    allow_variants: bool = False,
+    isoform: Optional[str] = None,
+    inhibition_mode: Optional[str] = None,
+    model_substrate: Optional[str] = None,
 ) -> KineticResult:
     """Thin wrapper around the real fallback logic in Tests/fallback_logic.py.
+
+    ``quantity`` selects which BRENDA table is read ("km" -> KM Values,
+    "ki" -> Ki Values). One call resolves exactly one quantity, so Km and
+    Ki get independent lookups and independent citations.
 
     We keep the orchestrator thin so that OpenCode can swap it out for a
     different resolver (e.g., a local model or another database) without
     touching the Node/TypeScript side.
+
+    ``quantity`` ("km" or "ki") passes straight through to
+    fallback_logic.resolve_kinetic_value, which owns the mapping to a
+    BRENDA table label (QUANTITY_TABLE_LABELS in fallback_logic.py) and to
+    the PubMed query term. This wrapper does no translation of its own so
+    there's exactly one place that mapping can drift.
+
+    ``allow_cross_species`` defaults to False and passes straight through
+    for the same reason: fallback_logic owns the policy and this wrapper
+    owns nothing. Defaulting it True here would silently re-enable the
+    behaviour ADR 0024 disabled, in a file nobody would think to check.
     """
     return fallback_logic.resolve_kinetic_value(
         enzyme_ec=ec_number,
         organism=organism,
         substrate=substrate,
         enzyme_name=enzyme_name,
+        quantity=quantity,
+        allow_cross_species=allow_cross_species,
+        allow_variants=allow_variants,
+        isoform=isoform,
+        inhibition_mode=inhibition_mode,
+        model_substrate=model_substrate,
     )
 
 
-def _citation_to_dict(citation) -> Optional[Dict[str, Any]]:
+
+def _string_or_absent(payload: dict, key: str) -> Optional[str]:
+    """`payload[key]` when it is a string, None when it is absent or null,
+    and ValueError for anything else. For keys whose silent absence changes
+    the answer (`inhibitionMode`, `modelSubstrate`): ["competitive"] read as
+    no mode would choose a Ki the caller did not ask for, and say nothing."""
+    value = payload.get(key)
+    if value is None or isinstance(value, str):
+        return value
+    raise ValueError(f"{key} must be a string; got {value!r}")
+
+
+def _parse_physiological(payload: dict):
+    """Build a PhysiologicalReference from the caller's payload, or None.
+
+    ALL FIVE FIELDS ARE REQUIRED, and a partial reference is refused rather
+    than completed.
+
+    A caller who supplies a pH and no temperature has stated half of what
+    the model represents. Filling the other half -- with 37 C, say -- would
+    silently assume a mammal, which is the exact assumption this axis was
+    designed not to make: 37 C misdescribes Thermus thermophilus, whose
+    enzymes are measured near 70 C. Tolerances are equally not defaultable:
+    how far a Km may drift before it stops representing the modelled system
+    is a property of the enzyme.
+
+    So a partial reference produces None, and the axis reports
+    `not_assessed` with its reason -- which is true, rather than a
+    confident grade against a reference nobody fully stated.
+    """
+    spec = payload.get("physiologicalReference")
+    if not isinstance(spec, dict):
+        return None
+
+    required = ("ph", "temperatureC", "basis", "phTolerance", "temperatureToleranceC")
+    if any(spec.get(field) is None for field in required):
+        return None
+
+    try:
+        return reliability.PhysiologicalReference(
+            ph=float(spec["ph"]),
+            temperature_c=float(spec["temperatureC"]),
+            basis=str(spec["basis"]),
+            ph_tolerance=float(spec["phTolerance"]),
+            temperature_tolerance_c=float(spec["temperatureToleranceC"]),
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolved_effectors_dict(effectors):
+    """Resolve each effector to a PubChem compound, or pass it through.
+
+    Network failure is NOT an error. A resolved kinetic value with an
+    unresolved effector is still a resolved kinetic value; refusing the
+    lookup because PubChem was slow would turn an enrichment into a
+    dependency. `compare_effectors` reads an unresolved identity as
+    "could not check", never as "the conditions agree".
+    """
+    if not effectors:
+        return []
+    try:
+        import effector as effector_module
+        return [e.model_dump() for e in effector_module.resolve_effectors(effectors)]
+    except Exception:  # noqa: BLE001
+        return [e.model_dump() for e in effectors]
+
+
+def _row_scope(commentary):
+    """{isoform, inhibitionMode, versus, kitzWilson} from a BRENDA row's
+    commentary, or None when there is no commentary.
+
+    Read by caterva.compose.ki_mode.read_row, which reads with
+    caterva.bind.core (the one implementation of this reading) and is what
+    the resolver ranked the row by when a Ki was asked for by mode, so the
+    flags describe the row by the reading that chose it.
+
+    `kitzWilson` is True for a row "determined from Kitz-Wilson plots" (ref
+    702238): the K_I of an irreversible inactivation, filed in BRENDA's Ki
+    table and stating no mode. Without it the row reads only as "states no
+    inhibition mode", which is true of its words and hides what it is. A
+    mode-aware lookup takes one only when nothing else is left, and says so
+    here when it does."""
+    if not commentary:
+        return None
+    try:
+        from caterva.compose.ki_mode import read_row
+    except ImportError:
+        return None
+    row = read_row(commentary)
+    return {"isoform": row.isoform, "inhibitionMode": row.mode, "versus": row.versus,
+            "kitzWilson": row.kitz_wilson}
+
+
+def _mechanism_evidence_dict(evidence):
+    """The resolver's MechanismEvidence on the wire, or None when it found
+    none: a row stating another inhibition mode measured versus the model's
+    substrate, for a Ki asked for by mode (`inhibitionMode`) and model
+    substrate (`modelSubstrate`).
+
+    Decided in the literature layer by caterva.compose.ki_mode's
+    `evidence_against`, the function `caterva compose` notes the same
+    finding with, because only the resolver holds the row: the mode step
+    removes a row of another mode before anything else sees it
+    (fallback_logic._mechanism_evidence). Nothing here judges it. Keys are
+    camelCase beside `rowScope`, whose `inhibitionMode` and `versus` say
+    the same things of the row returned."""
+    if evidence is None:
+        return None
+    return {
+        "value": evidence.value,
+        "unit": evidence.unit,
+        "organism": evidence.organism,
+        "referenceId": evidence.reference_id,
+        "inhibitionMode": evidence.inhibition_mode,
+        "versus": evidence.versus,
+        "conditions": evidence.conditions,
+        "modelMode": evidence.model_mode,
+        "modelSubstrate": evidence.model_substrate,
+    }
+
+
+def _buffer_identity_dict(raw_buffer):
+    """Resolve a reported buffer string to a comparable identity, or None.
+
+    NETWORK FAILURE IS NOT AN ERROR HERE. A resolved kinetic value with an
+    unresolved buffer is still a resolved kinetic value; refusing the whole
+    lookup because PubChem was slow would turn an enrichment into a
+    dependency. buffer_identity's own three states carry the failure
+    forward, and the coherence check reads `unresolvable` as "could not
+    check", never as "buffers agree".
+    """
+    if not raw_buffer:
+        return None
+    try:
+        import buffer_identity
+        return buffer_identity.resolve_identity(raw_buffer).model_dump()
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "raw": raw_buffer,
+            "status": "unresolvable",
+            "reason": (
+                f"Buffer identity lookup failed ({type(exc).__name__}). "
+                "The buffer was reported; it could not be resolved to a "
+                "compound."
+            ),
+        }
+
+
+def _reliability_dict(result, requested_organism: str, physiological=None) -> dict:
+    """Grade the resolved value on Bakker's three axes (ADR 0024).
+
+    No physiological reference is passed, and that is not an oversight: it
+    is an experimental condition the caller states, not something this layer
+    may assume. Absent one, the proximity axis reports `not_assessed` and
+    says why. See Tests/reliability.py.
+    """
+    verdict = next(
+        (
+            v.model_dump()
+            for v in result.relatedness
+            if v.candidate_organism == result.organism
+        ),
+        None,
+    )
+    score = reliability.score_reliability(
+        ph=result.assay_ph,
+        temperature_c=result.assay_temperature_c,
+        unreported=list(result.assay_unreported),
+        reference=physiological,
+        requested_organism=requested_organism,
+        measured_organism=result.organism,
+        cross_species=result.cross_species_flag,
+        relatedness=verdict,
+    )
+    return {
+        "assayCompleteness": {
+            "grade": score.assay_completeness.grade,
+            "reason": score.assay_completeness.reason,
+        },
+        "conditionProximity": {
+            "grade": score.condition_proximity.grade,
+            "reason": score.condition_proximity.reason,
+        },
+        "organismMatch": {
+            "grade": score.organism_match.grade,
+            "reason": score.organism_match.reason,
+        },
+        "noAggregateReason": score.no_aggregate_reason,
+    }
+
+
+def _ensure_caterva_path() -> str:
+    """Ensure caterva/ directory is in sys.path for validation imports.
+
+    Returns the Caterva directory path. This is shared by vmax and beta_gamma bridges
+    to avoid duplicating the import setup logic.
+    """
+    import pathlib
+    import sys
+
+    caterva_dir = str(pathlib.Path(__file__).resolve().parents[5] / "caterva")
+    if caterva_dir not in sys.path:
+        sys.path.insert(0, caterva_dir)
+    return caterva_dir
+
+
+def bridge_vmax_from_kcat(kcat: float, enzyme_conc: float) -> tuple[float, bool, bool, str | None]:
+    """Compute Vmax = kcat * [E]0 via the SAME implementation the engine
+    itself uses (caterva.core.validation.vmax_from_kcat), rather than a
+    second copy of the arithmetic and its Rule 2 bounds in TypeScript. See
+    ADR 0019.
+
+    Imported lazily as ``core.validation`` with the caterva/ directory
+    (not the Caterva package root) added to sys.path -- this reaches
+    caterva/core/validation.py directly as validation.py's own module
+    docstring anticipates (its imports already try
+    ``caterva.core.data_structures`` first, falling back to
+    ``core.data_structures``) WITHOUT executing caterva/__init__.py's
+    full antimony-dependent import chain, which the public
+    ``caterva_engine`` entry point requires just to expose one
+    pure-arithmetic function. This keeps every non-kcat lookup (km, ki,
+    mutation_rate) free of an antimony dependency it never needed.
+
+    Returns (vmax, ok, flagged, flag_reason_or_error). ``ok=False`` means
+    the inputs were rejected (non-finite/non-positive); the caller must
+    not treat the returned vmax as usable in that case.
+    """
+    _ensure_caterva_path()
+    from core import validation as caterva_validation  # noqa: PLC0415
+
+    vmax, result = caterva_validation.vmax_from_kcat(kcat, enzyme_conc)
+    if not result.ok:
+        return 0.0, False, False, "; ".join(result.errors)
+    return vmax, True, result.flagged, result.flag_reason
+
+
+def bridge_beta_gamma_from_r0(
+    r0: float, infectious_period_days: float
+) -> tuple[float, float, bool, bool, str | None]:
+    """Compute (beta, gamma) = R0/infectious-period bridge via the SAME
+    implementation the SIR engine itself uses
+    (caterva.core.validation.beta_gamma_from_r0), imported the same
+    lightweight way bridge_vmax_from_kcat() reaches vmax_from_kcat -- as
+    ``core.validation`` with caterva/ (not the Caterva package root) on
+    sys.path, never executing caterva/__init__.py's antimony-dependent
+    chain. See ADR 0017 for the resolver, ADR 0020 for this bridge.
+
+    Returns (beta, gamma, ok, flagged, flag_reason_or_error).
+    """
+    _ensure_caterva_path()
+    from core import validation as caterva_validation  # noqa: PLC0415
+
+    beta, gamma, result = caterva_validation.beta_gamma_from_r0(
+        r0, infectious_period_days
+    )
+    if not result.ok:
+        return 0.0, 0.0, False, False, "; ".join(result.errors)
+    return beta, gamma, True, result.flagged, result.flag_reason
+
+
+def resolve_popgen_parameter(param_type: str, organism: str) -> dict | None:
+    """Resolve a population genetics parameter from literature.
+    
+    Args:
+        param_type: Parameter type (e.g., 'mutation_rate')
+        organism: Organism name
+        
+    Returns:
+        Dict with value, unit, citation info, or None if not found.
+    """
+    if param_type == 'mutation_rate':
+        result = popgen_resolver.resolve_mutation_rate(organism)
+        if not result.found:
+            return None
+        return {
+            'value': result.value,
+            'unit': result.unit,
+            'source': result.source,
+            'citation': result.citation,
+            'organism': result.organism,
+            'doi': result.doi,
+        }
+    return None
+
+
+def _citation_to_dict(citation) -> Dict[str, Any] | None:
     if citation is None:
         return None
     return {
@@ -89,11 +669,17 @@ def _citation_to_dict(citation) -> Optional[Dict[str, Any]]:
 
 
 def _candidates_to_dict(candidates) -> list:
+    # source/pmid/doi added when CORE open-access search started
+    # supplementing PubMed (fallback_logic.py) -- pmid and doi are each
+    # None on the source that doesn't provide them (CORE has no PMID;
+    # PubMed's esummary response has no DOI), never fabricated as "".
     return [
         {
             "pmid": c.pmid,
             "title": c.title,
             "url": c.url,
+            "source": c.source,
+            "doi": c.doi,
         }
         for c in candidates
     ]
@@ -103,35 +689,516 @@ def main() -> None:
     try:
         raw = sys.stdin.read()
         if not raw:
-            raise ValueError("no input JSON provided")
+            raise ValueError("no input JSON provided")  # noqa: TRY301
         payload = json.loads(raw)
 
         enzyme_name = payload.get("enzymeName", "")
         substrate = payload.get("substrate", "")
-        organism = payload.get("organism", "Homo sapiens")
+        # NOT `payload.get("organism", "Homo sapiens")`. That default sat
+        # here until 2026-08-15 and answered about humans whenever a caller
+        # omitted the organism -- the same defect as DEFAULT_TAXON_ID one
+        # layer up, and in a tool whose headline behaviour is refusing to
+        # substitute one organism for another. An empty organism now flows
+        # through as empty and the resolver refuses, which is the true
+        # answer to a question nobody finished asking.
+        organism = payload.get("organism") or ""
         ec_number = payload.get("ecNumber", "")
+        parameter_type = payload.get("parameterType", "")
+        quantity = payload.get("quantity", "km")
+        if quantity not in ("km", "ki", "kcat"):
+            quantity = "km"
+        enzyme_conc = payload.get("enzymeConc")
+        #: Opt-in for cross-species values (ADR 0024). Absent means False:
+        #: reading a missing flag permissively is exactly how the old
+        #: automatic fallback would creep back in.
+        allow_cross_species = payload.get("allowCrossSpecies") is True
+        #: Opt in to values measured on a sequence variant -- a point mutant
+        #: or a named isozyme (ADR 0029). Absent means False, for the same
+        #: reason allowCrossSpecies reads that way: the permissive reading of
+        #: a missing flag is how the old behaviour returns silently.
+        allow_variants = payload.get("allowVariants") is True
+        #: The isoform the query is about ("LDH-A"), when it names one. Rows
+        #: measuring it are used; a constant only measured on other isoforms
+        #: is refused, source "isoform_withheld" (fallback_logic).
+        isoform = payload.get("isoform") if isinstance(payload.get("isoform"), str) else None
+        #: The inhibition mode of the model a Ki is for ("competitive" for
+        #: the API's mm_competitive_inhibition, `scientific resolve --mode`),
+        #: and that model's substrate; the payload's `substrate` is the
+        #: inhibitor for a Ki. With a mode the resolver takes a Ki row whose
+        #: stated mode fits the model, by `caterva compose`'s ranking, and
+        #: refuses, source "mode_withheld", when every row states another.
+        #:
+        #: Absent is no mode. Anything else that is not a mode a model can be
+        #: of is an error, reported as {"ok": false}, not a request dropped:
+        #: dropped, the Ki is chosen with no mode while the caller believes
+        #: it was chosen by one. A value that is not a string is refused
+        #: here, and a string naming no model's mode ("mixed", "") by the
+        #: resolver, for a Km or kcat lookup as for a Ki (`_mode_asked`).
+        #: The model's substrate is read the same way, since without it a
+        #: row "versus pyruvate" and one "versus NADH" rank alike.
+        inhibition_mode = _string_or_absent(payload, "inhibitionMode")
+        model_substrate = _string_or_absent(payload, "modelSubstrate")
+        #: The conditions the model represents. An experimental condition
+        #: the caller states, never assumed here (ADR 0012/0013).
+        physiological = _parse_physiological(payload)
+        resolution_log: list[str] = []
 
-        if not ec_number:
-            raise ValueError("ecNumber is required to resolve real enzyme parameters")
-
-        result = resolve_kinetic_value(enzyme_name, substrate, organism, ec_number)
-
-        if result.found and result.value is not None:
+        # Handle population genetics parameter resolution
+        if parameter_type == "mutation_rate":
+            popgen_result = resolve_popgen_parameter("mutation_rate", organism)
+            if popgen_result is None:
+                print(
+                    json.dumps(
+                        {
+                            "ok": True,
+                            "found": False,
+                            "source": "popgen_not_found",
+                            "literatureCandidates": [],
+                            "logs": [
+                                f"No literature value found for mutation_rate in '{organism}'"
+                            ],
+                        }
+                    )
+                )
+                return
             print(
                 json.dumps(
                     {
                         "ok": True,
                         "found": True,
-                        "km": result.value,
-                        "unit": result.unit,
-                        "organism": result.organism,
-                        "source": result.source,
-                        "citation": _citation_to_dict(result.citation),
-                        "literatureCandidates": _candidates_to_dict(result.literature_candidates),
-                        "logs": result.search_log,
+                        "km": popgen_result["value"],  # Reuse km field for the value
+                        "ki": None,
+                        "unit": popgen_result["unit"],
+                        "organism": popgen_result["organism"],
+                        "source": "popgen_literature",
+                        "crossSpecies": False,
+                        "assayConditions": {},
+                        "citation": {
+                            "source": popgen_result["source"],
+                            "referenceId": popgen_result["doi"],
+                            "url": f"https://doi.org/{popgen_result['doi']}" if popgen_result['doi'] else None,
+                            "title": popgen_result["citation"],
+                        },
+                        "literatureCandidates": [],
+                        "logs": [*resolution_log, f"Resolved mutation_rate from literature: {popgen_result['citation']}"],
                     }
                 )
             )
+            return
+
+        # Handle epidemiology parameter resolution (ADR 0017 / ADR 0020):
+        # a disease name resolves to a hand-curated (R0, infectious period)
+        # golden tuple, then bridges to the SIR engine's own (beta, gamma)
+        # via the exact same beta_gamma_from_r0() the engine uses. Only
+        # diseases in the registry resolve; everything else is an honest
+        # found=False, never a fabricated R0.
+        if parameter_type == "disease_parameters":
+            disease = payload.get("disease", "")
+            epi_result = epidemiology_resolver.resolve_disease_parameters(disease)
+            if not epi_result.found:
+                print(
+                    json.dumps(
+                        {
+                            "ok": True,
+                            "found": False,
+                            "source": "epidemiology_not_found",
+                            "literatureCandidates": [],
+                            "logs": epi_result.search_log,
+                        }
+                    )
+                )
+                return
+
+            beta, gamma, bg_ok, bg_flagged, bg_reason = bridge_beta_gamma_from_r0(
+                epi_result.r0, epi_result.infectious_period_days
+            )
+            output = {
+                "ok": True,
+                "found": True,
+                "disease": epi_result.disease,
+                "r0": epi_result.r0,
+                "infectiousPeriodDays": epi_result.infectious_period_days,
+                "organism": None,
+                "source": epi_result.source,
+                "crossSpecies": False,
+                "assayConditions": {},
+                "citation": {
+                    "source": epi_result.source,
+                    "referenceId": epi_result.pmid,
+                    "url": f"https://doi.org/{epi_result.doi}" if epi_result.doi else None,
+                    "title": epi_result.citation,
+                },
+                # ADR 0169: a cross-study composite carries BOTH sources
+                # and must surface flagged, never verified. The secondary
+                # citation is the serial-interval half; omitting it would
+                # present a two-paper number as if one paper supported it.
+                "crossStudyComposite": epi_result.cross_study_composite,
+                "compositeNote": epi_result.composite_note,
+                "secondaryCitation": (
+                    {
+                        "source": epi_result.source,
+                        "referenceId": epi_result.secondary_pmid,
+                        "url": (
+                            f"https://doi.org/{epi_result.secondary_doi}"
+                            if epi_result.secondary_doi
+                            else None
+                        ),
+                        "title": epi_result.secondary_citation,
+                    }
+                    if epi_result.secondary_pmid
+                    else None
+                ),
+                "betaGammaValidation": {
+                    "ok": bg_ok,
+                    "flagged": bg_flagged,
+                    "reason": bg_reason,
+                },
+                "literatureCandidates": [],
+                "logs": epi_result.search_log,
+            }
+            if bg_ok:
+                output["beta"] = beta
+                # "gamma" here, NOT "gamma_rate" -- gamma_rate is only the
+                # Antimony-emitted model-string name (ADR 0004); the
+                # Python/TS API surface takes "gamma".
+                output["gamma"] = gamma
+                output["logs"] = output["logs"] + [
+                    f"Bridged beta={beta:g}, gamma={gamma:g} from R0="
+                    f"{epi_result.r0:g} and infectious_period="
+                    f"{epi_result.infectious_period_days:g} days."
+                ]
+            print(json.dumps(output))
+            return
+
+        if not ec_number:
+            if not enzyme_name:
+                raise ValueError(  # noqa: TRY301
+                    "enzymeName or ecNumber is required to resolve real enzyme parameters"
+                )
+            try:
+                named = resolve_enzyme(enzyme_name, organism)
+            except enzyme_lookup.EnzymeNameNotResolved as exc:
+                if exc.kind == "lookup_failed":
+                    # UniProt could not be asked: an error, as it always was,
+                    # not a statement that the name matches nothing.
+                    raise
+                if exc.kind == "ambiguous":
+                    # NOT `ec_not_resolved`. The name resolved fine -- to
+                    # more than one enzyme. Reporting that as "could not
+                    # resolve" would be a worse message than the silent pick
+                    # it replaces, because it denies the existence of the
+                    # answer instead of asking which one was meant.
+                    #
+                    # The candidates are the ones the Python finder named;
+                    # the TypeScript layer forwards them and derives nothing.
+                    print(
+                        json.dumps(
+                            {
+                                "ok": True,
+                                "found": False,
+                                "source": "ec_ambiguous",
+                                "ecCandidates": exc.candidates,
+                                "ecCandidateNames": exc.named_candidates,
+                                "ecRefusal": str(exc),
+                                "literatureCandidates": [],
+                                "logs": [str(exc)],
+                            }
+                        )
+                    )
+                    return
+                not_resolved: Dict[str, Any] = {
+                    "ok": True,
+                    "found": False,
+                    "source": "ec_not_resolved",
+                    "literatureCandidates": [],
+                    "logs": [
+                        f"Could not resolve an EC number for '{enzyme_name}': {exc} "
+                        "No BRENDA/KEGG/PubMed lookup is possible without one."
+                    ],
+                }
+                if exc.candidates:
+                    # Close spellings the finder offers as "did you mean".
+                    # Forwarded as the Python wrote them.
+                    not_resolved["ecCandidates"] = exc.candidates
+                    not_resolved["ecCandidateNames"] = exc.named_candidates
+                    not_resolved["ecRefusal"] = str(exc)
+                print(json.dumps(not_resolved))
+                return
+
+            ec_number = named.ec
+            resolution_log.append(
+                f"Resolved EC {ec_number} for '{enzyme_name}' via "
+                + ("UniProt name search." if named.source == "uniprot"
+                   else "the enzyme nomenclature: " + named.how + ".")
+            )
+            resolution_log.extend(named.cautions)
+            if not substrate:
+                kegg_substrate = resolve_substrate_from_kegg(ec_number)
+                if kegg_substrate:
+                    substrate = kegg_substrate
+                    resolution_log.append(
+                        f"Resolved substrate '{substrate}' for EC {ec_number} via KEGG."
+                    )
+                else:
+                    resolution_log.append(
+                        f"No KEGG substrate found for EC {ec_number}; "
+                        "BRENDA lookup will be unfiltered by substrate."
+                    )
+
+        elif enzyme_name:
+            # Both arrived. The number is used only when the name does not
+            # contradict it -- see check_ec_against_name for the policy and
+            # the module docstring for why a contradiction is refused rather
+            # than resolved in the number's favour. Silent when they agree:
+            # the common case must stay silent, or the refusal is worthless
+            # (test_one_candidate_is_not_an_ambiguity).
+            agreement = check_ec_against_name(enzyme_name, organism, ec_number)
+            if not agreement.agrees:
+                print(
+                    json.dumps(
+                        {
+                            "ok": True,
+                            "found": False,
+                            "source": "ec_mismatch",
+                            "ecCandidates": agreement.candidates,
+                            "ecCandidateNames": agreement.named,
+                            "ecRefusal": agreement.note,
+                            "literatureCandidates": [],
+                            "logs": [agreement.note],
+                        }
+                    )
+                )
+                return
+            if not agreement.checked:
+                resolution_log.append(agreement.note)
+
+        result = resolve_kinetic_value(
+            enzyme_name, substrate, organism, ec_number,
+            quantity=quantity,
+            allow_cross_species=allow_cross_species,
+            allow_variants=allow_variants,
+            isoform=isoform,
+            inhibition_mode=inhibition_mode,
+            model_substrate=model_substrate,
+        )
+        result.search_log = resolution_log + result.search_log
+
+        if result.found and result.value is not None:
+            # Emit the value under the key matching the requested quantity
+            # so the TypeScript side reads km from "km" and ki from "ki" --
+            # never the other way around.
+            value_key = {"ki": "ki", "kcat": "kcat"}.get(quantity, "km")
+            output = {
+                "ok": True,
+                "found": True,
+                value_key: result.value,
+                "unit": result.unit,
+                "organism": result.organism,
+                # The taxon of the organism the value was MEASURED in, and
+                # of the one the caller ASKED about. Two fields because for
+                # a cross-species result they differ, and that difference is
+                # exactly what makes the substitution machine-detectable in
+                # the exported SBML rather than only readable in a note.
+                "taxonId": taxon_id_for(result.organism),
+                "requestedTaxonId": taxon_id_for(organism),
+                "source": result.source,
+                "crossSpecies": result.cross_species_flag,
+                # STRENDA-mandated assay conditions (ADR 0010). Keys are
+                # omitted-as-null rather than defaulted: the TypeScript
+                # side treats absence as "incomplete", which is the
+                # honest reading when the source never reported them.
+                "assayConditions": {
+                    "ph": result.assay_ph,
+                    "temperatureC": result.assay_temperature_c,
+                    "buffer": result.assay_buffer,
+                    # The buffer string resolved to a comparable chemical
+                    # identity (ADR 0028). The raw string stays alongside it:
+                    # this is an ADDITION to what was reported, never a
+                    # replacement for it, and a reader has to be able to
+                    # disagree with the resolution.
+                    "bufferIdentity": _buffer_identity_dict(result.assay_buffer),
+                    "unreported": result.assay_unreported,
+                },
+                # Which protein this row measured (ADR 0029). Emitted for
+                # FOUND values as well as withheld ones: `unstated` is the
+                # majority case, and a reader needs to know the row simply
+                # did not say rather than assume it was wild-type.
+                "variant": (
+                    result.variant.model_dump() if result.variant else None
+                ),
+                # The chosen row's BRENDA commentary, verbatim: which isoform
+                # it measured and, for a Ki, which inhibition mode and against
+                # which molecule. Without it a reader cannot tell gossypol's
+                # LDH-B Ki from its LDH-A one, or a Ki measured versus NADH
+                # from one versus the modelled substrate.
+                "commentary": getattr(result, "commentary", None),
+                # What that commentary says, decided HERE by the same parser
+                # `caterva bind` and `caterva compose` use, so the TypeScript
+                # side reports it rather than re-deriving it (ADR 0027).
+                "rowScope": _row_scope(getattr(result, "commentary", None)),
+                # A row that is evidence against the model's mechanism for
+                # the Ki returned: BRENDA ref 739793's "noncompetitive
+                # versus pyruvate" row, for a competitive pyruvate model
+                # that correctly carries its "competitive versus NADH" row.
+                # `caterva compose` notes it; without this the API and the
+                # CLI, choosing the same row by the same ranking, did not.
+                # None unless a Ki was asked for with inhibitionMode and
+                # modelSubstrate and such a row exists.
+                "mechanismEvidence": _mechanism_evidence_dict(
+                    getattr(result, "mechanism_evidence", None)),
+                # How the enzyme was PREPARED (ADR 0092): immobilised,
+                # affinity-tagged, covalently modified, native, or unstated.
+                #
+                # Emitted beside `variant` because it is the same question
+                # one category over -- ADR 0029 asks "is this the enzyme's
+                # sequence?", this asks "is this the free enzyme?" -- and
+                # neither is visible to the other's filter.
+                #
+                # Measured before it existed: the human LDH Ki resolved to
+                # 0.00059, a "recombinant His-tagged enzyme" row, with
+                # nothing in the response saying so. ADR 0038 is the
+                # precedent for emitting it HERE: effectors were compared
+                # correctly and stopped at this boundary, and severing the
+                # resolver broke none of the 35 unit tests.
+                "preparation": (
+                    {
+                        **result.preparation.model_dump(),
+                        # The DECISION, made once, here, by the module that
+                        # owns the rule.
+                        #
+                        # `differs_for(quantity)` is the whole judgement:
+                        # was the enzyme altered, and did the curator say
+                        # the alteration left THIS quantity alone. The
+                        # first version emitted only the inputs and let
+                        # queryResolver.ts re-derive it, which is two
+                        # implementations of one rule -- ADR 0027 exactly,
+                        # written while fixing ADR 0027's shape elsewhere.
+                        #
+                        # A client may still read `status` and
+                        # `stated_not_to_affect` to render differently.
+                        # What it must not do is decide again.
+                        "warrantsWarning": result.preparation.differs_for(
+                            quantity
+                        ),
+                    }
+                    if result.preparation else None
+                ),
+                # Cofactors and effectors, with PubChem identity resolved
+                # HERE rather than during parsing -- so parsing a fixture
+                # stays offline and a network outage degrades the identity
+                # rather than failing the whole lookup (ADR 0032).
+                "effectors": _resolved_effectors_dict(result.effectors),
+                # The tie the evidence could not break (ADR 0048). Emitted on
+                # FOUND results: the point is that a value was returned while
+                # equally-evidenced alternatives existed unmentioned.
+                # Which named form the returned value IS, when the pool
+                # mixed forms (ADR 0052). None in every fixture today.
+                "selectedForm": (
+                    result.selected_form.model_dump()
+                    if result.selected_form else None
+                ),
+                "selectionTie": (
+                    result.selection_tie.model_dump()
+                    if result.selection_tie else None
+                ),
+                # EVERY SURVIVING ROW, WITH THE SCORE THAT WEIGHTS IT.
+                #
+                # `selectionTie` says the evidence could not choose and lists
+                # the alternatives. This says how much each one is worth --
+                # Bakker's three axes, graded per candidate rather than only
+                # for the winner, which is what the sampling needs and what
+                # made it unbuildable until the resolver started carrying
+                # them (ADR 0137).
+                #
+                # Emitted whether or not anybody samples: it is a handful of
+                # dicts, and a client that wants to draw a band should not
+                # have to ask for a second resolution to get the weights.
+                #
+                # Empty means nothing was resolved, which is a resolution
+                # failure to report -- never a band with no members.
+                "ensembleCandidates": list(
+                    getattr(result, "ensemble_candidates", []) or []
+                ),
+                # Every relatedness verdict, including the ones that
+                # REJECTED a candidate. A filter that reports only what
+                # survived it cannot be argued with, and the organisms it
+                # dropped are precisely what a reader would want to check.
+                "relatedness": [v.model_dump() for v in result.relatedness],
+                # POOL-LEVEL FINDINGS. Facts about the candidate set, not
+                # about the value that won it.
+                #
+                # These were computed and dropped here for four ADRs. The
+                # resolver attached them to KineticResult, the runner never
+                # emitted them, and only a prose line reached the diagnostic
+                # log -- which is not `provenance.flags`, the list the CLI
+                # and web UI actually render. Exactly ADR 0027's defect: a
+                # thing computed correctly and discarded at a boundary,
+                # invisible because every test on the computation passed.
+                # See ADR 0039.
+                "poolFindings": {
+                    "effectorContrasts": [c.model_dump() for c in result.effector_contrasts],
+                    "formMixtures": [m.model_dump() for m in result.form_mixtures],
+                    "organismDiscrepancies": [
+                        d.model_dump() for d in result.organism_discrepancies
+                    ],
+                    "sourceMixtures": [m.model_dump() for m in result.source_mixtures],
+                    # "nothing found" and "nothing checked" are different
+                    # facts. Set when source tokens were extracted and none
+                    # could be classified -- with NCBI unreachable, a pool
+                    # holding heart and muscle reports no mixture at all.
+                    #
+                    # Omitted from the first draft of this dict, one pass
+                    # after the field was added, and caught by
+                    # check_findings_reach_a_surface.py on its first run.
+                    # The guard written to stop fields being dropped found
+                    # one that had already been dropped.
+                    "sourceCheckUnavailable": (
+                        result.source_check_unavailable.model_dump()
+                        if result.source_check_unavailable
+                        else None
+                    ),
+                },
+                # Bakker's three axes, graded in Python so the CLI and the
+                # API show the same grades by construction rather than by
+                # two implementations happening to agree. Both are asserted
+                # against Tests/reliability_cases.json.
+                "reliability": _reliability_dict(result, organism, physiological),
+                "citation": _citation_to_dict(result.citation),
+                "literatureCandidates": _candidates_to_dict(result.literature_candidates),
+                "logs": result.search_log,
+            }
+
+            # ADR 0019: a resolved kcat plus a caller-supplied enzyme
+            # concentration bridges to a simulable Vmax. enzyme_conc is
+            # NEVER resolved or defaulted here (ADR 0013) -- it only
+            # reaches this branch if queryResolver.ts found it as an
+            # explicit user override on the query.
+            if quantity == "kcat" and enzyme_conc is not None:
+                try:
+                    enzyme_conc_f = float(enzyme_conc)
+                except (TypeError, ValueError):
+                    output["vmaxValidation"] = {
+                        "ok": False,
+                        "flagged": False,
+                        "reason": f"enzyme_conc {enzyme_conc!r} is not a number",
+                    }
+                else:
+                    vmax, ok, flagged, reason = bridge_vmax_from_kcat(
+                        result.value, enzyme_conc_f
+                    )
+                    output["vmaxValidation"] = {
+                        "ok": ok,
+                        "flagged": flagged,
+                        "reason": reason,
+                    }
+                    if ok:
+                        output["vmax"] = vmax
+                        output["logs"] = output["logs"] + [
+                            f"Bridged Vmax={vmax:g} mM/s from kcat={result.value:g} "
+                            f"1/s x enzyme_conc={enzyme_conc_f:g} mM."
+                        ]
+
+            print(json.dumps(output))
         else:
             print(
                 json.dumps(
@@ -139,6 +1206,32 @@ def main() -> None:
                         "ok": True,
                         "found": False,
                         "source": result.source,
+                        # A refusal has to say what it refused. Without
+                        # this the client sees source="cross_species_withheld"
+                        # and cannot tell the user what opting in would
+                        # get them -- the miss becomes unactionable at the
+                        # API boundary even though the resolver knew.
+                        "crossSpeciesOrganismsAvailable": result.cross_species_organisms_available,
+                        # Which variants were found and withheld. A refusal
+                        # that cannot name what it refused leaves the opt-in
+                        # it demands unexercisable.
+                        "variantCandidatesAvailable": result.variant_candidates_available,
+                        # Which isoforms the rows measured, when the one
+                        # asked for is not among them.
+                        "isoformsAvailable": result.isoforms_available,
+                        # What the rows state, when a Ki was asked for by
+                        # the model's mode and every row states another
+                        # (source "mode_withheld"): the mechanisms whose
+                        # constants exist, so the refusal can name them.
+                        "modesAvailable": result.modes_available,
+                        # The same courtesy for the field a student is far
+                        # MORE likely to get wrong. An organism has one
+                        # binomial name; a metabolite has a dozen aliases,
+                        # and BRENDA's label for lactate is `(S)-lactate`,
+                        # so "lactate" matches by substring and "L-lactate"
+                        # returns nothing at all.
+                        "substratesAvailable": result.substrates_available,
+                        "relatedness": [v.model_dump() for v in result.relatedness],
                         "literatureCandidates": _candidates_to_dict(result.literature_candidates),
                         "logs": result.search_log,
                     }

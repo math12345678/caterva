@@ -1,0 +1,156 @@
+/* ============================================================
+   caterva — design tokens (the brand's on-ink expression)
+   Ground is ink, text is paper; signal is an event, not a decoration.
+   Values derive from docs/brand/README.md: ink #2A2D35, paper #FDF8EE,
+   signal #5D7F8D (#9DB8C4 on ink).
+   Amber is reserved exclusively for disclosed uncertainty / review.
+   ============================================================ */
+
+:root {
+  /* --- base ------------------------------------------------ */
+  --void: #1f2127;
+  --graphite: #2a2d35;
+  --deep-slate: #33373f;
+  --structural-slate: #474b55;
+  /* --structural-slate is a SURFACE colour — hairlines, ticks, scrollbar
+     thumbs, disabled borders — and at 1.67:1 on the page ground it cannot
+     carry text. It was nevertheless being used for three real text runs: the
+     region numerals on the atlas plates, the atlas region-jump indices, and
+     the evidence rail's "Select a link to inspect" hint. This is the same
+     family lifted to a legible weight, so those keep reading as the faintest
+     tier of type instead of as decoration that happens to contain words. */
+  --slate-text: #9a9ea7;
+
+  /* --- caterva -------------------------------------------- */
+  --deep-teal: #5d7f8d;
+  /* The same signal, darkened for the pale sheets. --deep-teal is tuned for
+     type on graphite, where it reads 4.6:1; on the archive stock it falls to
+     3.7:1, and inside the seam gradient — where the pilot's eyebrow actually
+     sits, over a wash measured at rgb(193,193,189) — to 2.36:1. Rather than
+     darken the token and dull the teal everywhere it belongs, paper gets its
+     own step. */
+  --deep-teal-ink: #46626e;
+  --signal-teal: #7f9dab;
+  --mineral-teal: #9db8c4;
+  --fog-teal: #d5e1e6;
+
+  /* --- documentation -------------------------------------- */
+  --archive-paper: #fdf8ee;
+  --archive-ink: #2a2d35;
+  /* The secondary tier ON PAPER: field labels, record captions, the small
+     print of the invitation. It had been written inline as rgba(22,32,31,α)
+     with α drifting between 0.48 and 0.62 across six files, and every one of
+     those landed between 2.98:1 and 4.35:1 against the stock — i.e. the whole
+     quiet tier of the archival record was below AA. One token, measured once,
+     at 5.09:1 on #f1f0ea and better on the lighter form plates. */
+  --archive-ink-soft: rgba(22, 32, 31, 0.66);
+  --warm-gray: #bdb8ae;
+
+  /* --- status --------------------------------------------- */
+  /* Status is always word + glyph, never colour alone, but the word still has
+     to be readable. Supported and review were already strong (7.9:1, 9.0:1);
+     blocked and pending were both sitting at 4.47:1 on the page ground and
+     3.60:1 on panel surfaces, so the two states that report trouble were the
+     two hardest to read. Raised to clear AA on both grounds while keeping each
+     hue distinguishable from the others. */
+  --status-supported: #9db8c4;
+  --status-review: #d9ad6a;
+  --status-blocked: #e08a80;
+  --status-pending: #a9acb3;
+
+  /* --- derived surfaces ----------------------------------- */
+  --line-hairline: rgba(184, 222, 213, 0.13);
+  --line-structural: rgba(184, 222, 213, 0.26);
+  --line-grid: rgba(184, 222, 213, 0.055);
+  --text-primary: #f3eee4;
+  --text-secondary: #b4b7be;
+  /* Measured against the surfaces it is actually printed on, not against the
+     void alone. The previous #6c7b79 was 4.47:1 on the page background —
+     under AA by a hair — and this is the quietest text colour in the system,
+     carried by 78 declarations: every micro label, every disclaimer, the run
+     eyebrows, the agent indices. Those are the lines that say what is
+     illustrative and what the system refuses to claim, so they are the last
+     text that should be hard to read.
+
+     Worse, the void is the easy case. Panels and instrument surfaces sit at
+     around rgb(25,36,35), where the old value fell to 3.60:1, and the raised
+     value clears 4.5:1 there too. The few places tertiary is set on a surface
+     lighter still — a teal band, a hover plate — are fixed at those sites
+     rather than by lifting this any further, because pushing it high enough
+     for every backdrop would collapse the distance to --text-secondary and
+     the three-step hierarchy would stop reading as a hierarchy. */
+  --text-tertiary: #a9acb3;
+  --glass: rgba(13, 20, 21, 0.82);
+  --glass-strong: rgba(7, 11, 12, 0.93);
+
+  /* --- type ----------------------------------------------- */
+  /* No webfont is fetched for these. The named faces are kept first on
+     purpose: a visitor who already has Inter Tight or IBM Plex Mono installed
+     locally still gets them, at no network cost and with nothing disclosed to
+     anyone. Everyone else falls through to their own system's UI font.
+
+     index.html used to load both from fonts.googleapis.com. A browser cannot
+     make that request without telling Google who is asking, so every visitor's
+     IP address reached Google before the page rendered -- no click, no
+     consent. An IP address is personal data under GDPR Article 4 (CJEU,
+     Breyer, C-582/14), and LG Muenchen I, 20 Jan 2022 (Az. 3 O 17493/20)
+     awarded damages for precisely this arrangement.
+
+     The old fallbacks were "Helvetica Neue", Arial. Those still work, but they
+     skip the modern system UI faces, so a visitor without the webfont landed
+     on Arial rather than on what their OS actually uses. */
+  --font-sans: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo,
+    Consolas, "Liberation Mono", monospace;
+
+  --step--2: clamp(0.5625rem, 0.55rem + 0.06vw, 0.625rem);
+  --step--1: clamp(0.625rem, 0.6rem + 0.1vw, 0.6875rem);
+  --step-0: clamp(0.8125rem, 0.78rem + 0.15vw, 0.9375rem);
+  --step-1: clamp(1rem, 0.95rem + 0.3vw, 1.1875rem);
+  --step-2: clamp(1.375rem, 1.2rem + 0.9vw, 2rem);
+  --step-3: clamp(1.875rem, 1.4rem + 2.6vw, 3.5rem);
+  --step-4: clamp(2.375rem, 1.5rem + 4.6vw, 5.75rem);
+  --step-5: clamp(2.75rem, 1.4rem + 6.6vw, 7.5rem);
+
+  --track-label: 0.16em;
+  --track-label-tight: 0.1em;
+
+  /* --- space ---------------------------------------------- */
+  --gutter: clamp(1.125rem, 4vw, 4.5rem);
+  --measure: 34rem;
+
+  /* --- motion --------------------------------------------- */
+  --ease-structural: cubic-bezier(0.22, 0.61, 0.24, 1);
+  --ease-instrument: cubic-bezier(0.65, 0.02, 0.2, 1);
+  --ease-glide: cubic-bezier(0.4, 0, 0.15, 1);
+  --dur-fast: 220ms;
+  --dur-base: 460ms;
+  --dur-slow: 900ms;
+  --dur-camera: 1400ms;
+
+  /* --- layers --------------------------------------------- */
+  --z-stage: 1;
+  --z-chrome: 20;
+  --z-hero: 30;
+  --z-inspector: 60;
+  --z-masthead: 70;
+
+  /* How much of the bottom edge the SYSTEM MODE dock is occupying. Written
+     by modes/index.js from the collapsed face's measured height, because the
+     face is sized by its own type and padding and both are fluid. The
+     fallback matters: the dock is built during boot, so anything anchored to
+     the bottom of a section has to be laid out correctly before the first
+     measurement lands. Only consumed where the dock spans the full width —
+     see the phone rules in atlas.css. */
+  --dock-h: 3.4rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
+    --dur-camera: 1ms;
+  }
+}

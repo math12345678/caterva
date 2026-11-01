@@ -1,0 +1,110 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=SDH&organism=human"
+ },
+ "status": 200,
+ "body": {
+  "query": "SDH",
+  "organism": "human",
+  "organism_code": "HUMAN",
+  "organism_label": "human",
+  "release": "02-Sep-2026",
+  "outcome": "ambiguous",
+  "resolved_ec": null,
+  "how": null,
+  "cautions": [],
+  "reason": "'SDH' is an abbreviation or symbol, not an enzyme name, and Caterva does not resolve one by itself; 2 enzymes go by it",
+  "recommended_ec": null,
+  "confirm_only": true,
+  "candidates_total": 3,
+  "candidates": [
+   {
+    "ec": "1.3.5.1",
+    "name": "succinate dehydrogenase",
+    "why": "SDH is a common abbreviation for succinate dehydrogenase and sorbitol (L-iditol) dehydrogenase; it is also used for other enzymes, so the choice is yours",
+    "tier": 2,
+    "reaction": "a quinone + succinate = fumarate + a quinol.",
+    "class_path": "Oxidoreductases > acting on the CH-CH group of donors > with a quinone or related compound as acceptor",
+    "alternative_names": [],
+    "organism": "HUMAN",
+    "organism_proteins": [
+     {
+      "accession": "P31040",
+      "entry_name": "SDHA_HUMAN",
+      "symbol": "SDHA",
+      "gene": "SDHA",
+      "label": "SDHA"
+     },
+     {
+      "accession": "P21912",
+      "entry_name": "SDHB_HUMAN",
+      "symbol": "SDHB",
+      "gene": "SDHB",
+      "label": "SDHB"
+     }
+    ],
+    "organism_protein_count": 2,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "abbreviation",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 1.3.5.1 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "1.1.1.14",
+    "name": "L-iditol 2-dehydrogenase",
+    "why": "SDH is a common abbreviation for succinate dehydrogenase and sorbitol (L-iditol) dehydrogenase; it is also used for other enzymes, so the choice is yours",
+    "tier": 2,
+    "reaction": "L-iditol + NAD(+) = keto-L-sorbose + NADH + H(+).",
+    "class_path": "Oxidoreductases > acting on the CH-OH group of donors > with NAD(+) or NADP(+) as acceptor",
+    "alternative_names": [],
+    "organism": "HUMAN",
+    "organism_proteins": [
+     {
+      "accession": "Q00796",
+      "entry_name": "DHSO_HUMAN",
+      "symbol": "DHSO",
+      "gene": "SORD",
+      "label": "SORD"
+     }
+    ],
+    "organism_protein_count": 1,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "abbreviation",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.1.14 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "1.1.99.32",
+    "name": "L-sorbose 1-dehydrogenase",
+    "why": "another name for this enzyme is written 'SDH', but the abbreviation table lists 'SDH' for other enzymes",
+    "tier": 6,
+    "reaction": "L-sorbopyranose + A = 1-dehydro-L-sorbose + AH2.",
+    "class_path": "Oxidoreductases > acting on the CH-OH group of donors > with other acceptors",
+    "alternative_names": [
+     "SDH"
+    ],
+    "organism": "HUMAN",
+    "organism_proteins": [],
+    "organism_protein_count": 0,
+    "has_organism_protein": false,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": true,
+    "matched_by": "name",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 1.1.99.32 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   }
+  ],
+  "fallback": null
+ }
+}

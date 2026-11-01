@@ -1,0 +1,75 @@
+{
+  "_why": [
+    "ADR 0109's table. The CLI now shows the papers the fallback search found,",
+    "and no longer claims PubMed returned nothing when it did not.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0109-cli-candidate-papers.json"
+  ],
+  "covers": [
+    "0109"
+  ],
+  "test": "npx jest src/cli/__tests__/candidatePapersShown.test.ts src/cli/__tests__/resolveOutput.test.ts src/literature/__tests__/offlineResolverEndToEnd.test.ts --no-cache",
+  "_why_two_files": [
+    "THREE files, and the third was added because the harness demanded it.",
+    "",
+    "The first set ran only the two CLI files and reported C1 and C3 NOT",
+    "CAUGHT. Both mutate `literatureResolver.ts` -- and the CLI tests MOCK",
+    "`resolveKinetic`, so the parsing this change actually fixed never ran.",
+    "The tests proved the command renders papers it is handed and proved",
+    "nothing about whether anything hands them over.",
+    "",
+    "That is ADR 0027 verbatim: a test that pins a component tells you",
+    "nothing about the wiring. The bug lived in the first half of the pipe",
+    "and the tests covered the second.",
+    "",
+    "`offlineResolverEndToEnd.test.ts` drives the real subprocess through a",
+    "stub runner -- the seam that exists for exactly this -- so the boundary",
+    "is exercised rather than mocked past."
+  ],
+  "mutations": [
+    {
+      "id": "C1",
+      "description": "the candidates are dropped at the boundary again (the original defect)",
+      "_note": [
+        "Restores `literatureResolver.ts` to what it did: parse the runner's",
+        "response and build the unresolved result WITHOUT reading",
+        "`literatureCandidates`. The papers exist in the JSON and nobody",
+        "looks."
+      ],
+      "file": "src/literature/literatureResolver.ts",
+      "find": "    const candidates = parseCandidatePapers(parsed['literatureCandidates']);",
+      "replace": "    const candidates = parseCandidatePapers(undefined);"
+    },
+    {
+      "id": "C2",
+      "description": "the false sentence is printed even when papers were found",
+      "_note": [
+        "The defect exactly: 'BRENDA and PubMed were searched and returned",
+        "nothing' shown in the one case where PubMed returned something.",
+        "",
+        "This mutation prints the papers AND the false sentence, which is the",
+        "shape a careless fix would produce -- a screen that contradicts",
+        "itself. If the test only checked that the papers appear, it would",
+        "pass."
+      ],
+      "file": "src/cli/commandResolve.ts",
+      "find": "      if (papers.length === 0) {",
+      "replace": "      if (true) {"
+    },
+    {
+      "id": "C3",
+      "description": "a candidate with no locator is rendered anyway",
+      "_note": [
+        "`parseCandidatePapers` drops entries with no title and entries with",
+        "no pmid, doi or url. A title with no locator is an unverifiable",
+        "claim, and the count printed to the student comes from the filtered",
+        "list so it can never promise more papers than it names.",
+        "",
+        "Dropping the filter makes the count and the list disagree."
+      ],
+      "file": "src/literature/literatureResolver.ts",
+      "find": "    if (pmid === null && doi === null && url === null) continue;",
+      "replace": "    if (false) continue;"
+    }
+  ]
+}

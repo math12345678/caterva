@@ -1,0 +1,53 @@
+{
+  "_why": [
+    "ADR 0085's mutation table, shipped with the record rather than after it.",
+    "",
+    "The defect: `compareJobs` read `job.result?.finalValue || 0`, so two jobs",
+    "that produced nothing compared as 0 against 0 and were reported",
+    "`identical` with `percentDifference: 0`. Two failed runs, presented as",
+    "results that agree perfectly, at POST /api/compare/jobs -- a live route.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0085-compare-jobs.json",
+    "",
+    "Q2 was first written as `if (v1 === undefined && v2 === undefined)`, which makes the file fail to compile. The harness called that INDETERMINATE, correctly -- a suite that did not run has judged nothing. It is now a mutation that compiles, so the verdict is about the tests rather than about the build."
+  ],
+  "covers": [
+    "0085"
+  ],
+  "test": "npx jest src/storage/__tests__/result-comparator.test.ts",
+  "mutations": [
+    {
+      "id": "Q1",
+      "description": "a missing final value coalesces to 0 again",
+      "_note": "The original defect. Restores `|| 0` semantics at the reader, which makes two absences compare as identical.",
+      "file": "src/storage/result-comparator.ts",
+      "find": "  const nested = job?.result?.results?.finalValue;\n  if (typeof nested === 'number') return nested;\n  const flat = job?.result?.finalValue;\n  return typeof flat === 'number' ? flat : null;",
+      "replace": "  return job?.result?.results?.finalValue ?? job?.result?.finalValue ?? 0;"
+    },
+    {
+      "id": "Q2",
+      "description": "the incomparable branch only fires when BOTH are missing",
+      "_note": "Both forms tried -- making the branch unreachable, and narrowing it to `&&` so one missing side slips through -- are INDETERMINATE, because either way `val1` stays `number | null` and the arithmetic below fails to compile. The guard is enforced by the TYPE SYSTEM, not by a test. That is stronger protection than a passing assertion, and the harness is right to refuse to report it as a coverage result: a suite that did not run has judged nothing. Recorded rather than deleted, because the next person to widen those types loses the protection silently and this row is where they will find out.",
+      "file": "src/storage/result-comparator.ts",
+      "find": "  if (v1 === null || v2 === null) {",
+      "replace": "  if (v1 === null && v2 === null) {",
+      "_result": "INDETERMINATE, and that is the finding rather than a gap."
+    },
+    {
+      "id": "Q3",
+      "description": "the refusal stops naming which job is missing",
+      "_note": "A refusal that cannot say what it refused leaves the caller unable to act (ADR 0049). Both ids are named so it is clear when BOTH sides are missing rather than one.",
+      "file": "src/storage/result-comparator.ts",
+      "find": "        `${missing.join(' and ')} produced no final value, so there is nothing to ` +",
+      "replace": "        `A job produced no final value, so there is nothing to ` +"
+    },
+    {
+      "id": "Q4",
+      "description": "a genuine finalValue of zero is treated as absent",
+      "_note": "The opposite error. Full substrate consumption gives a real zero and is the normal end state of a Michaelis-Menten run; treating it as missing throws away the answer.",
+      "file": "src/storage/result-comparator.ts",
+      "find": "  if (typeof nested === 'number') return nested;",
+      "replace": "  if (typeof nested === 'number' && nested !== 0) return nested;"
+    }
+  ]
+}

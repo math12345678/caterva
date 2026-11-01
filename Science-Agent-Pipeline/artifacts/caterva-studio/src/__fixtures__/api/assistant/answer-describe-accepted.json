@@ -1,0 +1,71 @@
+{
+ "request": {
+  "call_id": "78f4e4910a56d530",
+  "payload_sha256": "ecc379d717959f1f2c1ce620d27da22d3a33547292c3365627445bcd1ff73f38",
+  "consent": true
+ },
+ "status": 200,
+ "body": {
+  "call_id": "78f4e4910a56d530",
+  "feature": "describe",
+  "outcome": "accepted",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "local": false,
+  "latency_ms": 0,
+  "content": {
+   "proposal": {
+    "shape": "inhibition",
+    "description": "Michaelis-Menten with a competitive inhibitor",
+    "request": {
+     "description": "Michaelis-Menten with a competitive inhibitor",
+     "substrate": "pyruvate",
+     "inhibitor": "gossypol",
+     "organism": "human"
+    },
+    "reading": "competitive inhibition",
+    "organism_note": "Read --organism 'human' as Homo sapiens.",
+    "stages": null,
+    "variant": "competitive",
+    "suggested": [
+     [
+      "shape",
+      "inhibition"
+     ],
+     [
+      "variant",
+      "competitive"
+     ],
+     [
+      "substrate",
+      "pyruvate"
+     ],
+     [
+      "inhibitor",
+      "gossypol"
+     ],
+     [
+      "organism",
+      "human"
+     ]
+    ],
+    "enzyme_candidates": [],
+    "variants": [
+     "competitive",
+     "uncompetitive",
+     "noncompetitive",
+     "mixed",
+     "substrate",
+     "product"
+    ],
+    "needs_stages": false,
+    "max_stages": 10
+   }
+  },
+  "rejection": null,
+  "error": null,
+  "fallback": {},
+  "grounding": null,
+  "run_id": null
+ }
+}

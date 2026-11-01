@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify a Terrium development environment actually works.
+"""Verify a Caterva development environment actually works.
 
 Not a version-string check: this imports every engine, builds a real model,
 translates it to SBML, integrates it, and compares the answer to a known
@@ -12,6 +12,7 @@ not merely installed.
 from __future__ import annotations
 
 import math
+import pathlib
 import platform
 import sys
 
@@ -37,20 +38,29 @@ def warn(msg: str) -> None:
 
 
 def check_python() -> None:
+    """Gate on the supported window: Python 3.10-3.13.
+
+    This function used to stop at 3.12 and WARN on anything above it, with
+    the reason "python-libsbml and friends publish wheels up to cp312".
+    That reason is the exact false claim `check_python_support_claim.py`
+    was written to kill -- python-libsbml 5.21.1 ships cp314 and antimony
+    2.14.0 is version-agnostic; the real ceiling comes from libroadrunner
+    2.8.0 and numpy 2.2.6 (ADR 0014). The guard survived here because its
+    CLAIM_FILES list covered requirements.txt, README.md and
+    CONTRIBUTING.md but not this file, so `make check` on Python 3.13 --
+    the version the Makefile's resolver prefers first and CI tests --
+    printed a warning telling the contributor their supported interpreter
+    might not work. That file list now includes this one.
+    """
     print("\nPython")
     major, minor = sys.version_info[:2]
     version = f"{major}.{minor}.{sys.version_info[2]}"
-    if major == 3 and 10 <= minor <= 12:
+    if major == 3 and 10 <= minor <= 13:
         ok(f"Python {version} on {platform.machine()}")
-    elif major == 3 and minor > 12:
-        # Real constraint, not a style preference: python-libsbml and friends
-        # publish wheels up to cp312. Past that, pip builds from source and
-        # needs cmake + swig present.
-        warn(f"Python {version}: SBML wheels may not exist yet; "
-             "if install fails, use 3.12")
     else:
-        bad(f"Python {version} is too old",
-            "install Python 3.12 and recreate the venv")
+        bad(f"Python {version} is outside the supported window 3.10-3.13",
+            "install python3.13 (or 3.10-3.12), then: "
+            "rm -rf .venv && make setup")
 
 
 def check_imports() -> None:
@@ -69,6 +79,47 @@ def check_imports() -> None:
         except ImportError as exc:
             bad(f"{label} missing ({exc})",
                 "pip install -r requirements.txt")
+
+
+def check_resolver_deps() -> None:
+    """Dependencies the LITERATURE resolvers need, checked separately.
+
+    `stdpopsim` is pinned in requirements.txt and is where
+    `Tests/popgen_resolver.py` gets its mutation rates -- it is not
+    optional. But it needs libgsl-dev to build, so it is genuinely absent
+    in some environments (ADR 0021 records the review sandbox as one).
+
+    `Tests/test_popgen_resolver.py` therefore calls
+    `pytest.importorskip("stdpopsim")`, which is the right call: 19 hard
+    failures for a missing system library are noise, not signal.
+
+    The danger is what that leaves behind. A clean skip is invisible in a
+    CI summary, so the population-genetics literature path can go entirely
+    untested for months and read as green. This check exists so the
+    environment gap is reported ONCE, clearly, in the place people look --
+    rather than as nineteen tests that quietly stopped running.
+
+    Warned rather than failed: the engine and every other resolver work
+    without it, and `make check` is the gate for "is this stack usable".
+    """
+    print("\nLiterature resolvers")
+    for module, label, consequence in [
+        (
+            "stdpopsim",
+            "stdpopsim (population-genetics mutation rates)",
+            "popgen mutation-rate resolution is UNTESTED and unavailable; "
+            "test_popgen_resolver.py will skip silently",
+        ),
+    ]:
+        try:
+            mod = __import__(module)
+            ok(f"{label} {getattr(mod, '__version__', '?')}")
+        except ImportError:
+            warn(
+                f"{label} missing -- {consequence}. "
+                "Install with: pip install stdpopsim "
+                "(needs libgsl-dev on Debian/Ubuntu)"
+            )
 
 
 def check_test_deps() -> None:
@@ -115,9 +166,40 @@ def check_end_to_end() -> None:
         return
     ok("translated to SBML")
 
+    # The tolerances come from the ENGINE's constants, not from literals
+    # here.
+    #
+    # They were `1e-10` and `1e-12`, hardcoded, and identical to
+    # `DEFAULT_RELATIVE_TOLERANCE` / `DEFAULT_ABSOLUTE_TOLERANCE` in
+    # `caterva/core/data_structures.py`. Two statements of one fact, and the
+    # README leans the project's most load-bearing claim on this check:
+    #
+    #     "If it passes, the numerics are trustworthy."
+    #
+    # Loosen the engine's defaults -- ADR 0005 shows they have been tuned
+    # once already -- and this check would go on certifying the OLD
+    # settings, for a configuration the product no longer runs. The claim
+    # would become false with nothing turning red.
+    #
+    # A failed import is reported, not swallowed. Falling back to literals
+    # would rebuild the defect the import exists to remove, and "could not
+    # read the engine's tolerances" is a different fact from "the numerics
+    # are fine".
+    try:
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+        from caterva.core.data_structures import (
+            DEFAULT_ABSOLUTE_TOLERANCE,
+            DEFAULT_RELATIVE_TOLERANCE,
+        )
+    except Exception as exc:
+        bad(f"could not read the engine's integrator tolerances: {exc}",
+            "this check cannot verify the settings the product uses; "
+            "fix the import before trusting a green run")
+        return
+
     runner = roadrunner.RoadRunner(sbml)
-    runner.integrator.relative_tolerance = 1e-10
-    runner.integrator.absolute_tolerance = 1e-12
+    runner.integrator.relative_tolerance = DEFAULT_RELATIVE_TOLERANCE
+    runner.integrator.absolute_tolerance = DEFAULT_ABSOLUTE_TOLERANCE
     result = runner.simulate(0, t, 2)
     simulated = float(result[-1][1])
     ok("roadrunner integrated the model")
@@ -134,7 +216,9 @@ def check_end_to_end() -> None:
 
     error = abs(simulated - exact) / exact
     if error < 1e-6:
-        ok(f"result matches the exact solution (relative error {error:.2e})")
+        ok(f"result matches the exact solution (relative error {error:.2e}) "
+           f"at the engine's own tolerances "
+           f"({DEFAULT_RELATIVE_TOLERANCE:.0e}/{DEFAULT_ABSOLUTE_TOLERANCE:.0e})")
     else:
         bad(f"numerical result is wrong: got {simulated:.10f}, "
             f"expected {exact:.10f} (relative error {error:.2e})",
@@ -143,11 +227,12 @@ def check_end_to_end() -> None:
 
 def main() -> int:
     print("=" * 66)
-    print("Terrium environment check")
+    print("Caterva environment check")
     print("=" * 66)
 
     check_python()
     check_imports()
+    check_resolver_deps()
     check_test_deps()
     check_end_to_end()
 

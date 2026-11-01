@@ -1,0 +1,65 @@
+{
+  "_why": [
+    "ADR 0142's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "The table this reproduces is about a claim rather than a calculation:",
+    "that a Vmax bridged from a cited kcat and a chosen [E]0 is a THIRD kind",
+    "of number, and that calling it either 'literature' or 'yours' is a lie",
+    "in a specific direction. The first two mutations below are those two",
+    "lies, and they are the reason this ADR needed a table at all.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0142-vmax-derived.json",
+    "",
+    "The test command runs the whole file the ADR cites. Every mutation here",
+    "is closed by a test in it, so a narrower command would be no faster and",
+    "could produce the false NOT CAUGHT that ADR 0026's first set did."
+  ],
+  "test": "cd Tests && python3 -m pytest test_vmax_is_derived_not_demanded.py -q --no-header -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "V1",
+      "description": "a derived Vmax is rendered as `literature`, dropping the chosen half",
+      "_claimed": "2 failed",
+      "_note": "The first of the two lies. It claims BRENDA reports a Vmax for this assay; BRENDA reports a kcat, and the Vmax depends on a number the student picked.",
+      "file": "Tests/lab_report.py",
+      "find": "            f\"| **derived** | {value.relation}: {value.from_cited}, \"\n            f\"and {value.from_chosen} |\"",
+      "replace": "            f\"| literature | {value.from_cited} |\""
+    },
+    {
+      "id": "V2",
+      "description": "the chosen half is dropped from the row, keeping only the citation",
+      "_claimed": "1 failed",
+      "_note": "The subtler lie: the row still says `derived`, but a reader can no longer see that [E]0 was theirs, so the number reads as fully sourced.",
+      "file": "Tests/lab_report.py",
+      "find": "            f\"| **derived** | {value.relation}: {value.from_cited}, \"\n            f\"and {value.from_chosen} |\"",
+      "replace": "            f\"| **derived** | {value.from_cited} |\""
+    },
+    {
+      "id": "V3",
+      "description": "a supplied Vmax is overruled by a derived one",
+      "_claimed": "1 failed",
+      "_note": "ADR 0116's defect in a new place: a flag the student typed is a decision, and replacing it with a computed number they cannot see overrules them silently.",
+      "file": "scripts/report_lab.py",
+      "find": "    if enzyme_conc is not None and \"vmax\" not in inputs:",
+      "replace": "    if enzyme_conc is not None:"
+    },
+    {
+      "id": "V4",
+      "description": "a Vmax is derived with no enzyme concentration to derive it from",
+      "_claimed": "2 failed",
+      "_note": "The overcorrection guard. Deriving whenever Vmax is missing means inventing [E]0, which is the one thing this bridge must never do -- BRENDA does not report it per row (ADR 0013).",
+      "file": "scripts/report_lab.py",
+      "find": "    if enzyme_conc is not None and \"vmax\" not in inputs:",
+      "replace": "    if True:"
+    },
+    {
+      "id": "V5",
+      "description": "the BRENDA page is fetched once per lookup again, not once per run",
+      "_claimed": "1 failed",
+      "_note": "Lisa Jeske asked directly that tools be gentle with BRENDA's servers. km/ki/kcat are separate tables on ONE page, so a two-parameter report fetched it twice and the kcat bridge would have made it three. The test asserts a fetch COUNT: a cache that is built and never consulted passes any check for its presence.",
+      "file": "scripts/report_lab.py",
+      "find": "    page = one_page_per_run(fetch_brenda_html)",
+      "replace": "    page = fetch_brenda_html"
+    }
+  ]
+}

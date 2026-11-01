@@ -1,0 +1,360 @@
+"""A GROMACS setup in which every number says where it came from.
+
+WHY THIS EXISTS
+---------------
+An MD input is a few dozen numbers -- temperature, ionic strength, force
+field, water model, thermostat, cut-offs, time step -- and in most
+simulations nobody can say afterwards why any of them has the value it has.
+Caterva's kinetics already know the conditions an enzyme's constants were
+MEASURED under. A simulation meant to explain those constants should run at
+those conditions, and say so; where it does not, it should say that too.
+
+So each parameter here carries one of three origins:
+
+    measured   taken from the assay behind a cited kinetic constant
+    chosen     a default, labelled as one, overridable on the command line
+    method     a published algorithm or model, with its verified DOI
+
+WHAT IT DOES NOT DO
+-------------------
+It writes inputs and a script; GROMACS runs them. It does not parameterise
+ligands: pdb2gmx has no topology for oxamate or NADH, and inventing one
+would be the MD version of an invented rate constant. Bound small molecules
+are stripped and LISTED, with the tools that can parameterise them. It does
+not set protonation states from a pH either: GROMACS assigns standard
+states, and the assay pH is recorded beside a pointer to PROPKA rather than
+silently assumed to be 7.
+"""
+from __future__ import annotations
+
+import re
+import shlex
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+from caterva.methods import METHODS
+
+ORIGINS = ("measured", "chosen", "method")
+
+#: A PDB entry id: a digit and three ASCII letters or digits. ASCII only: a
+#: Unicode digit or letter is not an id, and would go into a script.
+PDB_ID = re.compile(r"[0-9][A-Za-z0-9]{3}", re.ASCII)
+#: A chain id: one to four ASCII letters or digits (mmCIF allows more than one).
+CHAIN_ID = re.compile(r"[A-Za-z0-9]{1,4}", re.ASCII)
+
+
+def check_pdb_id(value: str) -> str:
+    """`value` when it is a PDB id exactly (no spaces, no newline), else ValueError."""
+    if not isinstance(value, str) or PDB_ID.fullmatch(value) is None:
+        raise ValueError("a PDB id is four characters, a digit then three letters or digits, like 1I10")
+    return value
+
+
+def check_chain_id(value: Optional[str]) -> Optional[str]:
+    """`value` when it is None or a chain id exactly, else ValueError."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or CHAIN_ID.fullmatch(value) is None:
+        raise ValueError("a chain id is one to four letters or digits, like A")
+    return value
+
+
+@dataclass(frozen=True)
+class Parameter:
+    name: str
+    value: str
+    origin: str
+    source: str
+
+    def __post_init__(self) -> None:
+        if self.origin not in ORIGINS:
+            raise ValueError(f"origin must be one of {ORIGINS}, not {self.origin!r}")
+
+
+@dataclass
+class Conditions:
+    """Temperature and pH, and where each came from.
+
+    The sentences are what PROVENANCE.md prints. The measurements beside
+    them are the cited constants those sentences name (a compose
+    `export.Measurement`: value, citation, organism, assay conditions), kept
+    so a reader of the setup -- the studio's page -- gets the citation from
+    the object that carried it rather than by parsing it out of prose.
+    """
+    temperature_k: float = 298.15
+    temperature_source: str = "chosen: 25 C, no measured value supplied"
+    ph: Optional[float] = None
+    ph_source: str = "not stated; GROMACS assigns standard protonation states"
+    measured_temperature: bool = False
+    #: The cited constant whose assay gave the temperature, when measured.
+    temperature_measurement: Optional[Any] = None
+    #: The cited constant whose assay gave the pH, when measured.
+    ph_measurement: Optional[Any] = None
+
+
+@dataclass
+class MdSetup:
+    pdb_id: str
+    chain: Optional[str]
+    conditions: Conditions
+    ns: float = 10.0
+    ionic_strength_m: float = 0.15
+    seed: int = 20260927
+    replicas: int = 3
+    force_field: str = "amber99sb-ildn"
+    water: str = "tip3p"
+    parameters: List[Parameter] = field(default_factory=list)
+
+    def seeds(self) -> List[int]:
+        """One velocity seed per replica: the base seed, then the next integers."""
+        return [self.seed + r for r in range(self.replicas)]
+
+    def __post_init__(self) -> None:
+        check_pdb_id(self.pdb_id)
+        check_chain_id(self.chain)
+        if self.replicas < 1:
+            raise ValueError("replicas must be at least 1")
+        c = self.conditions
+        m = METHODS
+        self.parameters = [
+            Parameter("temperature", f"{c.temperature_k:.2f} K",
+                      "measured" if c.measured_temperature else "chosen", c.temperature_source),
+            Parameter("pH (protonation)", f"{c.ph:g}" if c.ph is not None else "standard states",
+                      "measured" if c.ph is not None else "chosen",
+                      c.ph_source + (f"; assign states at this pH with {m['propka'].cite()}"
+                                     if c.ph is not None else "")),
+            Parameter("ionic strength", f"{self.ionic_strength_m:g} M NaCl, net charge neutralised",
+                      "chosen", "physiological default; override with --ionic-strength"),
+            Parameter("pressure", "1.0 bar", "chosen", "ambient"),
+            Parameter("production length", f"{self.ns:g} ns", "chosen", "override with --ns"),
+            Parameter("replicas", str(self.replicas), "chosen",
+                      ("independent runs from one solvated, minimised system, differing only in their "
+                       "initial velocities; every quantity is reported as a spread across them"
+                       if self.replicas > 1 else
+                       "ONE SAMPLE: a single trajectory has no spread, so nothing it shows can be told "
+                       "apart from chance; use --replicas 3 or more for a result")),
+            Parameter("velocity seed", ", ".join(f"rep{r + 1}: {s}" for r, s in enumerate(self.seeds())),
+                      "chosen",
+                      f"fixed so each run can be reproduced; ion placement uses {self.seed} for all replicas, "
+                      "so they share one starting structure"),
+            Parameter("force field", self.force_field, "method", m["amber99sb-ildn"].cite()),
+            Parameter("water model", self.water, "method", m["tip3p"].cite()),
+            Parameter("thermostat", "V-rescale, tau 0.1 ps", "method", m["v-rescale"].cite()),
+            Parameter("barostat (equilibration)", "C-rescale, tau 2 ps", "method", m["c-rescale"].cite()),
+            Parameter("barostat (production)", "Parrinello-Rahman, tau 2 ps", "method",
+                      m["parrinello-rahman"].cite()),
+            Parameter("electrostatics", "PME, 1.0 nm real-space cut-off", "method",
+                      m["pme"].cite() + " (ions.mdp, which only places ions and simulates "
+                      "nothing, uses a plain cut-off: the system is still charged then)"),
+            Parameter("PME grid", "0.16 nm spacing, 4th-order interpolation", "chosen",
+                      "GROMACS's defaults for PME accuracy"),
+            Parameter("van der Waals", "1.0 nm cut-off, dispersion correction to energy and pressure",
+                      "chosen", "the cut-off the force field was parameterised with"),
+            Parameter("neighbour list", "Verlet buffer, updated every 10 steps", "chosen",
+                      "GROMACS default; the buffer is sized automatically"),
+            Parameter("compressibility", "4.5e-5 1/bar", "chosen", "isothermal compressibility of water near 300 K"),
+            Parameter("minimisation", "steepest descent to max force < 1000 kJ/mol/nm, at most 50000 steps",
+                      "chosen", "standard pre-equilibration target"),
+            Parameter("equilibration", "NVT 100 ps then NPT 100 ps, protein heavy atoms restrained",
+                      "chosen", "restraints released for production"),
+            Parameter("output", "coordinates every 10 ps; energies and log every 2 ps", "chosen",
+                      "enough to analyse, small enough to keep"),
+            Parameter("constraints", "h-bonds, LINCS; 2 fs time step", "method", m["lincs"].cite()),
+            Parameter("engine", "GROMACS", "method", m["gromacs"].cite()),
+            Parameter("structure", f"PDB {self.pdb_id}" + (f", chain {self.chain}" if self.chain else ""),
+                      "measured", f"{m['pdb'].cite()}; entry doi:10.2210/pdb{self.pdb_id.lower()}/pdb"),
+        ]
+
+    # -- the files -----------------------------------------------------
+
+    def _common(self) -> str:
+        return (
+            "cutoff-scheme   = Verlet\n"
+            "nstlist         = 10\n"
+            "pbc             = xyz\n"
+            "coulombtype     = PME\n"
+            "rcoulomb        = 1.0\n"
+            "rvdw            = 1.0\n"
+            "DispCorr        = EnerPres\n"
+        )
+
+    def _dynamics(self, *, nsteps: int, posres: bool, continuation: bool,
+                  barostat: Optional[str], seed: Optional[int] = None) -> str:
+        t = f"{self.conditions.temperature_k:.2f}"
+        text = (
+            ("define          = -DPOSRES\n" if posres else "")
+            + "integrator      = md\n"
+            f"nsteps          = {nsteps}\n"
+            "dt              = 0.002\n"
+            "nstxout-compressed = 5000\n"
+            "nstenergy       = 1000\n"
+            "nstlog          = 1000\n"
+            f"continuation    = {'yes' if continuation else 'no'}\n"
+            "constraint_algorithm = lincs\n"
+            "constraints     = h-bonds\n"
+            "lincs_iter      = 1\n"
+            "lincs_order     = 4\n"
+            + self._common()
+            + "fourierspacing  = 0.16\n"
+            "pme_order       = 4\n"
+            "tcoupl          = V-rescale\n"
+            "tc-grps         = Protein Non-Protein\n"
+            "tau_t           = 0.1 0.1\n"
+            f"ref_t           = {t} {t}\n"
+        )
+        if barostat:
+            text += (
+                f"pcoupl          = {barostat}\n"
+                "pcoupltype      = isotropic\n"
+                "tau_p           = 2.0\n"
+                "ref_p           = 1.0\n"
+                "compressibility = 4.5e-5\n"
+                + ("refcoord_scaling = com\n" if posres else "")
+            )
+        else:
+            text += "pcoupl          = no\n"
+        if continuation:
+            text += "gen_vel         = no\n"
+        else:
+            text += (f"gen_vel         = yes\ngen_temp        = {t}\n"
+                     f"gen_seed        = {self.seed if seed is None else seed}\n")
+        return text
+
+    def files(self) -> Dict[str, str]:
+        header = f"; Caterva MD setup for PDB {self.pdb_id}. Every value: see PROVENANCE.md\n"
+        min_mdp = (header + "integrator      = steep\nemtol           = 1000.0\n"
+                   "emstep          = 0.01\nnsteps          = 50000\n" + self._common())
+        steps = int(round(self.ns * 1_000_000 / 2))  # 2 fs
+        # ions.mdp only builds the .tpr genion reads; nothing is simulated
+        # with it. It uses plain cut-off electrostatics because the system is
+        # still charged at that point, and grompp rightly refuses PME on a
+        # charged system (found running this setup with GROMACS 2021).
+        ions_mdp = (header + "integrator      = steep\nemtol           = 1000.0\n"
+                    "emstep          = 0.01\nnsteps          = 50000\n"
+                    + self._common().replace("coulombtype     = PME", "coulombtype     = cutoff"))
+        out = {
+            "ions.mdp": ions_mdp,
+            "em.mdp": min_mdp,
+        }
+        for r, seed in enumerate(self.seeds(), start=1):
+            out[f"rep{r}/nvt.mdp"] = header + self._dynamics(nsteps=50_000, posres=True, continuation=False,
+                                                             barostat=None, seed=seed)
+        import json
+        out["caterva-setup.json"] = json.dumps(
+            {"pdb": self.pdb_id.upper(), "chain": self.chain, "replicas": self.replicas,
+             "seeds": self.seeds(), "ns": self.ns, "temperature_k": self.conditions.temperature_k}, indent=2) + "\n"
+        return {**out,
+            "npt.mdp": header + self._dynamics(nsteps=50_000, posres=True, continuation=True, barostat="C-rescale"),
+            "md.mdp": header + self._dynamics(nsteps=steps, posres=False, continuation=True,
+                                              barostat="Parrinello-Rahman"),
+            "run.sh": self._script(),
+            "PROVENANCE.md": self.provenance(),
+        }
+
+    def _script(self) -> str:
+        pdb = self.pdb_id.upper()
+        chain = self.chain or ""
+        # Every value that came from a request is quoted for the shell, even
+        # those already checked: a script is read by bash, and what reaches it
+        # is never trusted to be harmless text.
+        q_pdb = shlex.quote(pdb)
+        q_chain = shlex.quote(chain)
+        q_ff = shlex.quote(self.force_field)
+        q_water = shlex.quote(self.water)
+        q_url = shlex.quote(f"https://files.rcsb.org/download/{pdb}.pdb")
+        q_file = shlex.quote(f"{pdb}.pdb")
+        return f"""#!/usr/bin/env bash
+# Caterva MD setup: PDB {pdb}{', chain ' + chain if chain else ''}. Read PROVENANCE.md first.
+# Needs GROMACS (gmx) on PATH, and curl. Stops at the first error.
+set -euo pipefail
+GMX="${{GMX:-gmx}}"
+# One thread-MPI rank with OpenMP threads runs on any machine; GROMACS's own
+# rank choice failed on a 14-core Mac (14 = 2 x 7 cannot be decomposed).
+# On a cluster or GPU node, set MDRUN_FLAGS to what that machine wants.
+MDRUN_FLAGS="${{MDRUN_FLAGS:--ntmpi 1}}"
+cd "$(dirname "$0")"
+
+# The PDB wwPDB copy of the entry.
+[ -f {q_file} ] || curl -fsSL -o {q_file} {q_url}
+
+# Protein only{', chain ' + chain if chain else ''}. pdb2gmx has no topology for small molecules, so
+# they are removed here and listed, not guessed.
+awk -v chain={q_chain} '
+  /^(ATOM|TER)/ && (chain == "" || substr($0,22,1) == chain) {{ print; next }}
+  /^HETATM/ && (chain == "" || substr($0,22,1) == chain) {{ het[substr($0,18,3)]++ }}
+  END {{
+    for (h in het) if (h != "HOH") printf "stripped: %s (%d atoms)\\n", h, het[h] > "/dev/stderr"
+    print "END"
+  }}' {q_file} > protein.pdb
+
+"$GMX" pdb2gmx -f protein.pdb -o processed.gro -p topol.top -ff {q_ff} -water {q_water} -ignh
+"$GMX" editconf -f processed.gro -o boxed.gro -c -d 1.0 -bt dodecahedron
+"$GMX" solvate -cp boxed.gro -cs spc216.gro -o solvated.gro -p topol.top
+"$GMX" grompp -f ions.mdp -c solvated.gro -p topol.top -o ions.tpr -maxwarn 0
+echo SOL | "$GMX" genion -s ions.tpr -o ionized.gro -p topol.top -pname NA -nname CL -neutral -conc {shlex.quote(format(self.ionic_strength_m, "g"))} -seed {int(self.seed)}
+
+"$GMX" grompp -f em.mdp -c ionized.gro -p topol.top -o em.tpr
+"$GMX" mdrun -deffnm em $MDRUN_FLAGS
+
+# {self.replicas} replica{'s' if self.replicas > 1 else ''} from the same minimised system; each differs only in
+# the velocity seed in its own repN/nvt.mdp. Backbone RMSD per replica is
+# written for `caterva md --summarise .`, which reports the spread.
+for r in $(seq 1 {self.replicas}); do
+  d="rep$r"
+  "$GMX" grompp -f "$d/nvt.mdp" -c em.gro -r em.gro -p topol.top -o "$d/nvt.tpr" -po "$d/mdout.mdp"
+  "$GMX" mdrun -deffnm "$d/nvt" $MDRUN_FLAGS
+  "$GMX" grompp -f npt.mdp -c "$d/nvt.gro" -r "$d/nvt.gro" -t "$d/nvt.cpt" -p topol.top -o "$d/npt.tpr" -po "$d/mdout.mdp"
+  "$GMX" mdrun -deffnm "$d/npt" $MDRUN_FLAGS
+  "$GMX" grompp -f md.mdp -c "$d/npt.gro" -t "$d/npt.cpt" -p topol.top -o "$d/md.tpr" -po "$d/mdout.mdp"
+  "$GMX" mdrun -deffnm "$d/md" $MDRUN_FLAGS
+  printf 'Backbone\\nBackbone\\n' | "$GMX" rms -s "$d/md.tpr" -f "$d/md.xtc" -o "$d/rmsd.xvg" -tu ns
+done
+"""
+
+    def provenance(self) -> str:
+        rows = "\n".join(f"| {p.name} | {p.value} | {p.origin} | {p.source} |" for p in self.parameters)
+        c = self.conditions
+        ph_note = (
+            f"The assay pH was {c.ph:g}. GROMACS's pdb2gmx assigns standard protonation "
+            "states, which is only right near neutral pH; before production, check the "
+            "titratable residues at this pH (PROPKA) and set them with pdb2gmx's "
+            "-his/-asp/-glu/-lys options."
+            if c.ph is not None else
+            "No assay pH was supplied, so the standard protonation states pdb2gmx assigns "
+            "are an assumption, not a measurement."
+        )
+        return f"""# Provenance: MD setup for PDB {self.pdb_id}
+
+Every setting in the `*.mdp` files, and the choices `run.sh` makes, is in
+this table with where it came from (a test maps each mdp key to a row): **measured** (from the assay behind a cited kinetic constant, or the
+deposited structure), **chosen** (a labelled default), or **method** (a
+published model or algorithm, cited).
+
+| parameter | value | origin | source |
+|---|---|---|---|
+{rows}
+
+## What this setup does not do
+
+- **Small molecules are stripped.** `run.sh` removes every HETATM record and
+  prints what it removed. A substrate, inhibitor or cofactor needs its own
+  topology (for example from ACPYPE/GAFF or CGenFF) before it can be
+  simulated; none is invented here.
+- **Protonation.** {ph_note}
+- **Replicas.** {self.replicas} run{'s' if self.replicas > 1 else ''}, seeds {", ".join(map(str, self.seeds()))}.
+  {"Report every quantity as a spread across them (`caterva md --summarise`); "
+   "a mean without that spread is one number pretending to be a result."
+   if self.replicas > 1 else
+   "One run is one sample: whatever it shows cannot be told apart from chance."}
+- **Length.** {self.ns:g} ns samples side-chain and loop motion. It does not
+  sample catalysis, and a kcat cannot be read off it.
+
+## Stages
+
+energy minimisation (steepest descent) -> NVT 100 ps (position restraints)
+-> NPT 100 ps (C-rescale, restraints) -> production {self.ns:g} ns
+(Parrinello-Rahman), all at {c.temperature_k:.2f} K.
+"""
+
+
+__all__ = ["Conditions", "MdSetup", "Parameter", "ORIGINS"]

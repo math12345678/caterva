@@ -234,6 +234,18 @@ def test_trypsin_classic_substrates_are_typed_classic(trypsin_html):
         "benzoyl-DL-Arg-p-nitroanilide",
         "Glu-Gly-Arg-4-nitroanilide",
     }
+    # The premise, asserted rather than assumed. Without it this test passes
+    # when the parser produces NO row for any of the three -- which is what
+    # a substrate-parsing regression looks like, and is exactly when the
+    # typing claim below most needs checking. The fixture carries all three
+    # today (4 entries parsed, 3 classic), so the expectation is exact
+    # rather than "at least one".
+    seen = {e.substrate for e in entries} & classic_names
+    assert seen == classic_names, (
+        f"the trypsin fixture no longer yields {sorted(classic_names - seen)}; "
+        "this test would otherwise have checked nothing"
+    )
+
     for e in entries:
         if e.substrate in classic_names:
             assert e.substrate_type == "classic"

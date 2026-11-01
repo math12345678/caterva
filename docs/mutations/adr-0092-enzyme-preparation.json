@@ -1,0 +1,44 @@
+{
+  "_why": [
+    "ADR 0092's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "NOT MY RECORD -- a concurrent agent's. Written for them rather than",
+    "asked for, per the standing policy set when the fifth such ADR arrived:",
+    "asking costs a line in NOT-YET-REPRODUCIBLE.txt every pass and moves",
+    "nothing; writing the set costs one additive file and closes the entry.",
+    "",
+    "It is also the last group in docs/commentary-residue-baseline.txt that",
+    "was still marked OPEN FINDING -- covalent modification, affinity tags",
+    "and immobilisation. Jeske's warning was about pH, temperature, cofactors",
+    "and buffers; this is the same class of fact about the PROTEIN rather",
+    "than the conditions, and ADR 0029's variant filter cannot see it because",
+    "a His-tag is not a sequence change.",
+    "",
+    "Measured before the fix: human LDH resolves a Ki of 0.00059 from a row",
+    "whose commentary reads 'recombinant His-tagged enzyme', and nothing in",
+    "the response said so.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0092-enzyme-preparation.json"
+  ],
+  "covers": ["0092"],
+  "test": "python3 -m pytest Tests/test_enzyme_preparation.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "E1",
+      "description": "`unstated` reported as `native`",
+      "_claimed": "4 failed",
+      "_note": "The inversion this project has found more often than any other. `unstated` is silence; `native` is a curator saying the enzyme was free and unmodified. Collapsing them lets 'we were not told' read as 'it was the plain enzyme' -- the same shape as ADR 0029's `unstated` not being `wild_type`, one category over.",
+      "file": "Tests/enzyme_preparation.py",
+      "find": "    return PreparationVerdict(status=\"unstated\")",
+      "replace": "    return PreparationVerdict(status=\"native\")"
+    },
+    {
+      "id": "E2",
+      "description": "is_as_isolated becomes the negative test",
+      "_note": "Not in the original table; added because the module's own docstring argues for the positive form and an argument in prose is not a check. `status != \"modified\"` returns True for `unstated`, `absent`, `tagged` and `immobilised` alike -- and the whole point is that silence is not a clean bill of health.",
+      "file": "Tests/enzyme_preparation.py",
+      "find": "        return self.status == \"native\"",
+      "replace": "        return self.status != \"modified\""
+    }
+  ]
+}

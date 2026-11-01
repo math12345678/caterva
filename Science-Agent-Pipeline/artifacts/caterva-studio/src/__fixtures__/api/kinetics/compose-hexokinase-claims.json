@@ -1,0 +1,632 @@
+{
+ "captured": {
+  "kind": "compose",
+  "request": {
+   "description": "Michaelis Menten",
+   "subject": "2.7.1.1",
+   "organism": "human",
+   "substrate": "glucose",
+   "no_analysis": true,
+   "no_simulate": true,
+   "no_ranking": true
+  }
+ },
+ "run": {
+  "schema": "caterva.studio.run/1",
+  "id": "20261024-233033-compose-d0183591",
+  "kind": "compose",
+  "title": "Michaelis Menten, EC 2.7.1.1, human, glucose",
+  "status": "done",
+  "created_at": "2026-10-24T23:30:33.123Z",
+  "started_at": "2026-10-24T23:30:33.125Z",
+  "finished_at": "2026-10-24T23:30:46.331Z",
+  "caterva_version": "0.6.0",
+  "cli": [
+   "caterva",
+   "compose",
+   "Michaelis Menten",
+   "--subject",
+   "2.7.1.1",
+   "--organism",
+   "human",
+   "--substrate",
+   "glucose",
+   "--no-analysis",
+   "--no-simulate",
+   "--no-ranking"
+  ],
+  "request": {
+   "description": "Michaelis Menten",
+   "subject": "2.7.1.1",
+   "organism": "human",
+   "substrate": "glucose",
+   "no_analysis": true,
+   "no_simulate": true,
+   "no_ranking": true
+  },
+  "outcome": {
+   "exit_code": 0,
+   "meaning": "produced",
+   "summary": "VERDICT: GROUNDED",
+   "reason": null,
+   "has_result": true
+  },
+  "error": null,
+  "artifacts": [
+   {
+    "name": "report.md",
+    "content_type": "text/markdown; charset=utf-8",
+    "bytes": 7132,
+    "description": "the report caterva compose prints for this request"
+   },
+   {
+    "name": "model.xml",
+    "content_type": "application/xml",
+    "bytes": 8937,
+    "description": "SBML Level 3, every value's origin in its notes (caterva compose --export sbml)"
+   },
+   {
+    "name": "model.ant",
+    "content_type": "text/plain; charset=utf-8",
+    "bytes": 5575,
+    "description": "Antimony source, every value's origin beside it (caterva compose --export antimony)"
+   },
+   {
+    "name": "parameters.csv",
+    "content_type": "text/csv; charset=utf-8",
+    "bytes": 3058,
+    "description": "every number, its origin and its citation (caterva compose --export csv)"
+   },
+   {
+    "name": "methods.md",
+    "content_type": "text/markdown; charset=utf-8",
+    "bytes": 3207,
+    "description": "a methods paragraph grouped by origin (caterva compose --export methods)"
+   },
+   {
+    "name": "claims.zip",
+    "content_type": "application/zip",
+    "bytes": 324711,
+    "description": "the run's claims bundle (manifest.json, claims.jsonl, rows.jsonl, snapshots.jsonl, snapshots/<hex>.gz): unzip it and run `caterva verify DIR` to re-check it offline (caterva compose --claims DIR)"
+   },
+   {
+    "name": "claims.json",
+    "content_type": "application/json",
+    "bytes": 9446,
+    "description": "the bundle's manifest and its claim, row and snapshot records, without the pinned bytes"
+   }
+  ],
+  "progress": {
+   "stage": "exports",
+   "label": "Writing the SBML, Antimony, CSV and methods exports",
+   "fraction": null
+  }
+ },
+ "result_status": 200,
+ "result": {
+  "query": "Michaelis Menten",
+  "recognition": {
+   "rule": "michaelis_menten",
+   "reading": "Michaelis-Menten"
+  },
+  "model": {
+   "species": [
+    {
+     "id": "reaction_S",
+     "initial": {
+      "value": 1.0,
+      "unit": "mM",
+      "provenance": {
+       "kind": "chosen",
+       "by": "default",
+       "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model.",
+       "claim": {
+        "id": "claim:sha256:449e3895c597b8db0e00715cd1866aed8f5913cbb4410efbecd67e34c7d9097b",
+        "kind": "chosen",
+        "rule": {
+         "rule_id": "chosen.starting_amount",
+         "version": 1,
+         "adr": "ADR 0044"
+        },
+        "row": null,
+        "snapshot": null,
+        "reference": null,
+        "certificates": [],
+        "refusal": null
+       }
+      },
+      "id": "reaction_S",
+      "label": "S"
+     }
+    },
+    {
+     "id": "reaction_P",
+     "initial": {
+      "value": 0.0,
+      "unit": "mM",
+      "provenance": {
+       "kind": "chosen",
+       "by": "default",
+       "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model.",
+       "claim": {
+        "id": "claim:sha256:684079f228e29a31b1200e49a802b26fcdcbcd0aa45f18be281f3e1ea5d2d2d2",
+        "kind": "chosen",
+        "rule": {
+         "rule_id": "chosen.starting_amount",
+         "version": 1,
+         "adr": "ADR 0044"
+        },
+        "row": null,
+        "snapshot": null,
+        "reference": null,
+        "certificates": [],
+        "refusal": null
+       }
+      },
+      "id": "reaction_P",
+      "label": "P"
+     }
+    },
+    {
+     "id": "reaction_E",
+     "initial": {
+      "value": 0.001,
+      "unit": "mM",
+      "provenance": {
+       "kind": "chosen",
+       "by": "default",
+       "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model.",
+       "claim": {
+        "id": "claim:sha256:ca36762339a105ba639ea1a21a74a5f08adc6fc40860aba2720c2d276e1d8139",
+        "kind": "chosen",
+        "rule": {
+         "rule_id": "chosen.starting_amount",
+         "version": 1,
+         "adr": "ADR 0044"
+        },
+        "row": null,
+        "snapshot": null,
+        "reference": null,
+        "certificates": [],
+        "refusal": null
+       }
+      },
+      "id": "reaction_E",
+      "label": "E"
+     }
+    }
+   ],
+   "reactions": [
+    {
+     "id": "reaction_catalysis",
+     "rate_law": "reaction_kcat * reaction_E * reaction_S / (reaction_Km + reaction_S)"
+    }
+   ],
+   "parameters": [
+    {
+     "value": 40.1,
+     "unit": "1/s",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "BRENDA ref 739603",
+       "registry": "BRENDA",
+       "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+       "via": "literature",
+       "reference_id": "739603"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": 7.6,
+       "temperature_c": 25.0,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "wild-type, pH 7.6, 25 °C",
+      "scope": [],
+      "chosen_because": null,
+      "spread": {
+       "low": 40.1,
+       "high": 101.0,
+       "unit": "1/s",
+       "carried": 40.1,
+       "n_values": 4,
+       "references": [
+        "702282",
+        "703624",
+        "739603"
+       ],
+       "sentence": "3 sources report 4 values (BRENDA ref 702282, 703624, 739603), spanning 40.1 to 101 1/s (2.52-fold); this model carries 40.1, the resolver's pick, not a verdict; which one is right is a question about the papers. The range is not an uncertainty estimate: it is bounded by which rows are in the database"
+      },
+      "claim": {
+       "id": "claim:sha256:b73bbb32a8bb289625044c2d591bb5b7c150914f49cd958d97f48c789051e0f3",
+       "kind": "cited",
+       "rule": {
+        "rule_id": "select.resolver",
+        "version": 1,
+        "adr": "ADR 0047"
+       },
+       "row": {
+        "locator": "brenda:2.7.1.1:kcat:Homo sapiens:D-glucose:739603:40.1:0",
+        "value_text": "40.1",
+        "unit": "1/s",
+        "substrate": "D-glucose",
+        "organism": "Homo sapiens",
+        "commentary": "wild-type, pH 7.6, 25 °C",
+        "reference": "739603"
+       },
+       "snapshot": {
+        "id": "sha256:3a69b492abcd7253b301d7a002f60d52a971ba9352a3a2559ec5f12f5060ef91",
+        "locator": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+        "retrieved_at": "2026-10-24T23:30:33Z",
+        "licence": "CC BY 4.0",
+        "served_from": "<repository>/Tests/fixtures/recorded/brenda_2.7.1.1.html.gz"
+       },
+       "reference": {
+        "title": "Role of connecting loop I in catalysis and allosteric regulation of human glucokinase",
+        "pmid": "24723372",
+        "journal": "Protein Sci.",
+        "year": "2014",
+        "url": "https://pubmed.ncbi.nlm.nih.gov/24723372/"
+       },
+       "certificates": [
+        {
+         "matched": "739603"
+        },
+        {
+         "matched": "40.1"
+        },
+        {
+         "matched": "wild-type, pH 7.6, 25 °C"
+        },
+        {
+         "matched": "D-glucose"
+        },
+        {
+         "matched": "Homo sapiens"
+        }
+       ],
+       "refusal": null
+      }
+     },
+     "id": "reaction_kcat",
+     "label": "kcat"
+    },
+    {
+     "value": 6.0,
+     "unit": "mM",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "BRENDA ref 641068",
+       "registry": "BRENDA",
+       "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+       "via": "literature",
+       "reference_id": "641068"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": 7.5,
+       "temperature_c": 30.0,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "30°C, pH 7.5, wild-type",
+      "scope": [],
+      "chosen_because": null,
+      "spread": {
+       "low": 6.0,
+       "high": 18.0,
+       "unit": "mM",
+       "carried": 6.0,
+       "n_values": 3,
+       "references": [
+        "641068",
+        "739603"
+       ],
+       "sentence": "2 sources report 3 values (BRENDA ref 641068, 739603), spanning 6 to 18 mM (3-fold); this model carries 6, the resolver's pick, not a verdict; which one is right is a question about the papers. The range is not an uncertainty estimate: it is bounded by which rows are in the database"
+      },
+      "claim": {
+       "id": "claim:sha256:c6290e72b4318f55c09fc952f91f81e43f25fb9f053bd5f7bdc993f0db743cd5",
+       "kind": "cited",
+       "rule": {
+        "rule_id": "select.resolver",
+        "version": 1,
+        "adr": "ADR 0047"
+       },
+       "row": {
+        "locator": "brenda:2.7.1.1:km:Homo sapiens:D-glucose:641068:6:0",
+        "value_text": "6",
+        "unit": "mM",
+        "substrate": "D-glucose",
+        "organism": "Homo sapiens",
+        "commentary": "30°C, pH 7.5, wild-type",
+        "reference": "641068"
+       },
+       "snapshot": {
+        "id": "sha256:3a69b492abcd7253b301d7a002f60d52a971ba9352a3a2559ec5f12f5060ef91",
+        "locator": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+        "retrieved_at": "2026-10-24T23:30:33Z",
+        "licence": "CC BY 4.0",
+        "served_from": "<repository>/Tests/fixtures/recorded/brenda_2.7.1.1.html.gz"
+       },
+       "reference": {
+        "title": "Human beta-cell glucokinase. Dual role of Ser-151 in catalysis and hexose affinity",
+        "pmid": "7730377",
+        "journal": "J. Biol. Chem.",
+        "year": "1995",
+        "url": "https://pubmed.ncbi.nlm.nih.gov/7730377/"
+       },
+       "certificates": [
+        {
+         "matched": "641068"
+        },
+        {
+         "matched": "6"
+        },
+        {
+         "matched": "30°C, pH 7.5, wild-type"
+        },
+        {
+         "matched": "D-glucose"
+        },
+        {
+         "matched": "Homo sapiens"
+        }
+       ],
+       "refusal": null
+      }
+     },
+     "id": "reaction_Km",
+     "label": "Km"
+    }
+   ],
+   "conservation_laws": [
+    "reaction_S + reaction_P",
+    "reaction_E"
+   ],
+   "unconserved": [],
+   "concentration_unit": "mM",
+   "motifs": [
+    {
+     "name": "catalytic_step",
+     "basis": "Michaelis-Menten under the quasi-steady-state assumption (Briggs & Haldane 1925): the enzyme-substrate complex is short-lived relative to the reaction, so its concentration is treated as constant. Valid while [E]0 << [S]; it fails for a tightly-binding enzyme at low substrate, where the free-substrate approximation breaks down.",
+     "copies": 1
+    }
+   ]
+  },
+  "search": {
+   "asked": true,
+   "refused": false,
+   "note": "2 constant(s) resolved from the literature: reaction_Km, reaction_kcat",
+   "subject": "2.7.1.1",
+   "ec": "2.7.1.1",
+   "organism": "Homo sapiens",
+   "substrate": "glucose",
+   "isoform": null,
+   "compounds": {},
+   "unused_compounds": {},
+   "measured": 2,
+   "placeholders": 0
+  },
+  "verdict": {
+   "verdict": "grounded",
+   "licence": "Questions about the system whose constants these are, AT the conditions those constants were measured at. Not questions about other conditions, other organisms, or other enzyme concentrations unless the report says those were checked.",
+   "behaviour": null,
+   "conclusion": null,
+   "concerns": [
+    {
+     "source": "isozymes",
+     "severity": "grounded",
+     "detail": "EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat",
+     "remedy": "pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused",
+     "qualifier": "EC 2.7.1.1 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them"
+    }
+   ],
+   "next_step": "pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused",
+   "consulted": {
+    "units": "all 1 rate law(s) balance",
+    "scale": "all 5 numbers examined are possible",
+    "provenance": "all 2 constant(s) measured, with provenance",
+    "isozymes": "EC 2.7.1.1 is 5 proteins in human, none chosen",
+    "assumptions": "0 violated, 1 undecided",
+    "robustness": "nothing to resample: every constant is measured (the spread between published values is under 'Where the evidence did not settle on one value')"
+   },
+   "unavailable": {
+    "predictions": "no stability report was passed, so there is no predicted steady state to check",
+    "validate": "not run -- pass --validate (or `validation=`) for the cross-module consistency check",
+    "stability": "not run, so this page cannot say what the model does"
+   },
+   "text": "VERDICT: GROUNDED\n\nWhat this supports: Questions about the system whose constants these are, AT the conditions those constants were measured at. Not questions about other conditions, other organisms, or other enzyme concentrations unless the report says those were checked.\n\nQualified: EC 2.7.1.1 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them.\n\n1 concern(s), worst first:\n  - [isozymes] EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nDo this next: pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nChecked: assumptions (0 violated, 1 undecided); isozymes (EC 2.7.1.1 is 5 proteins in human, none chosen); provenance (all 2 constant(s) measured, with provenance); robustness (nothing to resample: every constant is measured (the spread between published values is under 'Where the evidence did not settle on one value')); scale (all 5 numbers examined are possible); units (all 1 rate law(s) balance).\n\n3 check(s) did NOT run: predictions (no stability report was passed, so there is no predicted steady state to check); stability (not run, so this page cannot say what the model does); validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point."
+  },
+  "stability": null,
+  "trajectory": null,
+  "sensitivity": null,
+  "sweeps": [],
+  "sections": [],
+  "notes": [
+   "one enzyme turning one substrate into one product, under the quasi-steady-state assumption",
+   "Read --organism 'human' as Homo sapiens.",
+   "2 constant(s) resolved from the literature: reaction_Km, reaction_kcat"
+  ],
+  "report_markdown": "# michaelis_menten\n\n> Michaelis Menten\n\n## Verdict\n\n```\nVERDICT: GROUNDED\n\nWhat this supports: Questions about the system whose constants these are, AT the conditions those constants were measured at. Not questions about other conditions, other organisms, or other enzyme concentrations unless the report says those were checked.\n\nQualified: EC 2.7.1.1 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them.\n\n1 concern(s), worst first:\n  - [isozymes] EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nDo this next: pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nChecked: assumptions (0 violated, 1 undecided); isozymes (EC 2.7.1.1 is 5 proteins in human, none chosen); provenance (all 2 constant(s) measured, with provenance); robustness (nothing to resample: every constant is measured (the spread between published values is under 'Where the evidence did not settle on one value')); scale (all 5 numbers examined are possible); units (all 1 rate law(s) balance).\n\n3 check(s) did NOT run: predictions (no stability report was passed, so there is no predicted steady state to check); stability (not run, so this page cannot say what the model does); validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point.\n```\n\n## Structure\n\nRecognised as: **michaelis menten** (Michaelis-Menten).\n\n3 species, 1 reactions, 2 parameters.\n\n| reaction | rate law |\n|---|---|\n| `reaction_catalysis` | `reaction_kcat * reaction_E * reaction_S / (reaction_Km + reaction_S)` |\n\n- one enzyme turning one substrate into one product, under the quasi-steady-state assumption.\n- Read --organism 'human' as Homo sapiens.\n- 2 constant(s) resolved from the literature: reaction_Km, reaction_kcat.\n\n## Invariants\n\nThese are **derived**, not asserted: they are the left null space of this model's own stoichiometry matrix, computed exactly over rationals.\n\n- `reaction_S + reaction_P` is constant\n- `reaction_E` is constant\n\n## Dimensions\n\nAll 1 rate laws balance, in dimension and in scale. Checked before compilation: a law with the wrong dimensions integrates perfectly well and is wrong by whatever factor the mistake introduced.\n\n## Where the numbers come from\n\n**2 of 2 constant(s) came from the literature**, searched for `2.7.1.1` in Homo sapiens, substrate glucose. Each constant is looked up under the compound it belongs to.\n\n| quantity | value | origin | source |\n|---|---|---|---|\n| `reaction_Km` | 6.0 mM | literature (Homo sapiens) | BRENDA ref 641068 |\n| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |\n\n### Which isozyme\n\nEC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat. Pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused.\n\n### The conditions these were measured under\n\n- `reaction_Km` — measured at pH 7.5, 30 °C.\n- `reaction_kcat` — measured at pH 7.6, 25 °C.\n\nNo two of the 2 constants above differ by more than the thresholds this project treats as serious (1 pH unit, 10 °C), so they can be read as describing comparable experiments. That is a check on the conditions the sources STATED, not a claim that the assays were otherwise alike.\n\n### Where the evidence did not settle on one value\n\n- `reaction_Km`: 2 sources report 3 values (BRENDA ref 641068, 739603), spanning **6 to 18 mM** (3-fold). The model carries 6 — the resolver's pick, not a verdict; which one is right is a question about the papers.\n- `reaction_kcat`: 3 sources report 4 values (BRENDA ref 702282, 703624, 739603), spanning **40.1 to 101 1/s** (2.52-fold). The model carries 40.1 — the resolver's pick, not a verdict; which one is right is a question about the papers.\n\nThese spreads are carried through to the model rather than averaged away. They are **not an uncertainty estimate**: the range is bounded by which rows happen to be in the database, not by any statement about the true value. A conclusion that changes across one of these ranges rests on a choice the evidence did not make for you.\n\n**Yours to set** (3): `reaction_S`, `reaction_P`, `reaction_E`. Starting amounts and any cooperativity — no paper supplies these, and they are recorded as your choices rather than as measurements.\n\n## Behaviour\n\nNo stability analysis was run.\n\n## Claims\n\nRoot claim: `claim:sha256:68403166b9a501da3d076851b8b0f2a272997b3be2e6064138b47fa79c1d46e7` (computed; model = michaelis_menten(2.7.1.1, glucose, Homo sapiens))\nClaims written: 6 -- 2 cited, 3 chosen, 0 placeholder, 0 refused, 1 computed; 2 row(s) and 3 pinned page(s) in the bundle.\n\n- `reaction_S`: chosen, 1 mM -- `claim:sha256:449e3895c597b8db0e00715cd1866aed8f5913cbb4410efbecd67e34c7d9097b`\n- `reaction_P`: chosen, 0 mM -- `claim:sha256:684079f228e29a31b1200e49a802b26fcdcbcd0aa45f18be281f3e1ea5d2d2d2`\n- `reaction_E`: chosen, 0.001 mM -- `claim:sha256:ca36762339a105ba639ea1a21a74a5f08adc6fc40860aba2720c2d276e1d8139`\n- `reaction_kcat`: cited, 40.1 1/s -- `claim:sha256:b73bbb32a8bb289625044c2d591bb5b7c150914f49cd958d97f48c789051e0f3`\n- `reaction_Km`: cited, 6 mM -- `claim:sha256:c6290e72b4318f55c09fc952f91f81e43f25fb9f053bd5f7bdc993f0db743cd5`\n\nBundle: <data dir>/runs/20261024-233033-compose-d0183591/claims\nRe-check offline: caterva verify <data dir>/runs/20261024-233033-compose-d0183591/claims\n\nA claim is a derivation, not a verdict: `caterva verify` re-checks that each stated reason still holds against the pinned bytes, not whether the paper was right.\n\n---\n\nBuilt by Caterva's compositional model builder. The structure was recognised deterministically from the description — no language model was involved and no API key is required. Conservation laws are exact; steady states and sweeps are numerical, and say so where they appear.\n",
+  "exports": {
+   "sbml": {
+    "available": true,
+    "artifact": "model.xml",
+    "refused": null
+   },
+   "antimony": {
+    "available": true,
+    "artifact": "model.ant",
+    "refused": null
+   },
+   "csv": {
+    "available": true,
+    "artifact": "parameters.csv",
+    "refused": null
+   },
+   "methods": {
+    "available": true,
+    "artifact": "methods.md",
+    "refused": null
+   }
+  },
+  "claims": {
+   "root": "claim:sha256:68403166b9a501da3d076851b8b0f2a272997b3be2e6064138b47fa79c1d46e7",
+   "counts": {
+    "cited": 2,
+    "chosen": 3,
+    "placeholder": 0,
+    "refused": 0,
+    "computed": 1
+   },
+   "rows": 2,
+   "snapshots": 3,
+   "notes": [],
+   "bundle": "claims.zip",
+   "listing": "claims.json",
+   "text": "Root claim: `claim:sha256:68403166b9a501da3d076851b8b0f2a272997b3be2e6064138b47fa79c1d46e7` (computed; model = michaelis_menten(2.7.1.1, glucose, Homo sapiens))\nClaims written: 6 -- 2 cited, 3 chosen, 0 placeholder, 0 refused, 1 computed; 2 row(s) and 3 pinned page(s) in the bundle.\n\n- `reaction_S`: chosen, 1 mM -- `claim:sha256:449e3895c597b8db0e00715cd1866aed8f5913cbb4410efbecd67e34c7d9097b`\n- `reaction_P`: chosen, 0 mM -- `claim:sha256:684079f228e29a31b1200e49a802b26fcdcbcd0aa45f18be281f3e1ea5d2d2d2`\n- `reaction_E`: chosen, 0.001 mM -- `claim:sha256:ca36762339a105ba639ea1a21a74a5f08adc6fc40860aba2720c2d276e1d8139`\n- `reaction_kcat`: cited, 40.1 1/s -- `claim:sha256:b73bbb32a8bb289625044c2d591bb5b7c150914f49cd958d97f48c789051e0f3`\n- `reaction_Km`: cited, 6 mM -- `claim:sha256:c6290e72b4318f55c09fc952f91f81e43f25fb9f053bd5f7bdc993f0db743cd5`\n\nBundle: <data dir>/runs/20261024-233033-compose-d0183591/claims\nRe-check offline: caterva verify <data dir>/runs/20261024-233033-compose-d0183591/claims\n\nA claim is a derivation, not a verdict: `caterva verify` re-checks that each stated reason still holds against the pinned bytes, not whether the paper was right."
+  }
+ },
+ "error": null,
+ "events": [
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261024-233033-compose-d0183591",
+    "seq": 1,
+    "at": "2026-10-24T23:30:33.124Z",
+    "status": "queued"
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261024-233033-compose-d0183591",
+    "seq": 2,
+    "at": "2026-10-24T23:30:33.127Z",
+    "status": "running"
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261024-233033-compose-d0183591",
+    "seq": 3,
+    "at": "2026-10-24T23:30:33.129Z",
+    "stage": "compose",
+    "label": "Composing the model from its description",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261024-233033-compose-d0183591",
+    "seq": 4,
+    "at": "2026-10-24T23:30:33.138Z",
+    "stage": "search",
+    "label": "Searching the literature for 2.7.1.1",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261024-233033-compose-d0183591",
+    "seq": 5,
+    "at": "2026-10-24T23:30:33.141Z",
+    "stage": "search",
+    "label": "Looking up reaction_Km in BRENDA's km table for EC 2.7.1.1",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261024-233033-compose-d0183591",
+    "seq": 6,
+    "at": "2026-10-24T23:30:33.142Z",
+    "stage": "search",
+    "label": "Looking up reaction_kcat in BRENDA's kcat table for EC 2.7.1.1",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261024-233033-compose-d0183591",
+    "seq": 7,
+    "at": "2026-10-24T23:30:41.806Z",
+    "stage": "claims",
+    "label": "Writing the claims bundle to <data dir>/runs/20261024-233033-compose-d0183591/claims",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261024-233033-compose-d0183591",
+    "seq": 8,
+    "at": "2026-10-24T23:30:46.291Z",
+    "stage": "dossier",
+    "label": "Building the dossier: stability, time course, influence ranking, sweeps, verdict",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261024-233033-compose-d0183591",
+    "seq": 9,
+    "at": "2026-10-24T23:30:46.311Z",
+    "stage": "exports",
+    "label": "Writing the SBML, Antimony, CSV and methods exports",
+    "fraction": null
+   }
+  },
+  {
+   "event": "result",
+   "data": {
+    "run_id": "20261024-233033-compose-d0183591",
+    "seq": 10,
+    "at": "2026-10-24T23:30:46.331Z",
+    "outcome": {
+     "exit_code": 0,
+     "meaning": "produced",
+     "summary": "VERDICT: GROUNDED",
+     "reason": null,
+     "has_result": true
+    }
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261024-233033-compose-d0183591",
+    "seq": 11,
+    "at": "2026-10-24T23:30:46.332Z",
+    "status": "done",
+    "outcome": {
+     "exit_code": 0,
+     "meaning": "produced",
+     "summary": "VERDICT: GROUNDED",
+     "reason": null,
+     "has_result": true
+    }
+   }
+  },
+  {
+   "event": "end",
+   "data": {
+    "run_id": "20261024-233033-compose-d0183591",
+    "seq": 12,
+    "at": "2026-10-24T23:30:46.332Z",
+    "status": "done"
+   }
+  }
+ ]
+}

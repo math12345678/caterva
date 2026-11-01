@@ -1,0 +1,35 @@
+{
+ "request": null,
+ "status": 200,
+ "body": {
+  "enabled": true,
+  "provider": "anthropic",
+  "models": {
+   "anthropic": "claude-sonnet-5-5"
+  },
+  "model_lists": {
+   "anthropic": [
+    "claude-sonnet-5-5"
+   ]
+  },
+  "local_url": "http://127.0.0.1:11434/v1/chat/completions",
+  "local_only": false,
+  "features": {
+   "describe": true,
+   "explain": true,
+   "methods": true,
+   "ask": true,
+   "next": true
+  },
+  "max_calls_per_hour": 20,
+  "max_tokens": 1024,
+  "consent": {
+   "explain": "2026-10-04T22:32:50.381Z",
+   "methods": "2026-10-04T22:32:50.501Z",
+   "ask": "2026-10-04T22:32:50.563Z",
+   "next": "2026-10-04T22:32:50.650Z",
+   "describe": "2026-10-04T22:32:51.531Z",
+   "test": "2026-10-04T22:32:52.317Z"
+  }
+ }
+}

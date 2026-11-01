@@ -1,0 +1,118 @@
+{
+ "request": {
+  "method": "GET",
+  "path": "/api/enzymes/find?q=HK1&organism=human"
+ },
+ "status": 200,
+ "body": {
+  "query": "HK1",
+  "organism": "human",
+  "organism_code": "HUMAN",
+  "organism_label": "human",
+  "release": "02-Sep-2026",
+  "outcome": "ambiguous",
+  "resolved_ec": null,
+  "how": null,
+  "cautions": [],
+  "reason": "'HK1' is an abbreviation or symbol, not an enzyme name, and Caterva does not resolve one by itself",
+  "recommended_ec": null,
+  "confirm_only": true,
+  "candidates_total": 2,
+  "candidates": [
+   {
+    "ec": "2.7.1.1",
+    "name": "hexokinase",
+    "why": "HK1 is the human gene symbol of Hexokinase-1 (UniProtKB P19367), which UniProt files under this EC number",
+    "tier": 2,
+    "reaction": "a D-hexose + ATP = a D-hexose 6-phosphate + ADP + H(+).",
+    "class_path": "Transferases > transferring phosphorus-containing groups > phosphotransferases with an alcohol group as acceptor",
+    "alternative_names": [],
+    "organism": "HUMAN",
+    "organism_proteins": [
+     {
+      "accession": "Q2TB90",
+      "entry_name": "HKDC1_HUMAN",
+      "symbol": "HKDC1",
+      "gene": "HKDC1",
+      "label": "HKDC1"
+     },
+     {
+      "accession": "P19367",
+      "entry_name": "HXK1_HUMAN",
+      "symbol": "HXK1",
+      "gene": "HK1",
+      "label": "HK1"
+     },
+     {
+      "accession": "P52789",
+      "entry_name": "HXK2_HUMAN",
+      "symbol": "HXK2",
+      "gene": "HK2",
+      "label": "HK2"
+     },
+     {
+      "accession": "P52790",
+      "entry_name": "HXK3_HUMAN",
+      "symbol": "HXK3",
+      "gene": "HK3",
+      "label": "HK3"
+     },
+     {
+      "accession": "P35557",
+      "entry_name": "HXK4_HUMAN",
+      "symbol": "HXK4",
+      "gene": "GCK",
+      "label": "GCK"
+     }
+    ],
+    "organism_protein_count": 5,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": false,
+    "matched_by": "abbreviation",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 2.7.1.1 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   },
+   {
+    "ec": "2.7.13.3",
+    "name": "histidine kinase",
+    "why": "another name for this enzyme is written 'HK1', but the abbreviation table lists 'HK1' for other enzymes",
+    "tier": 6,
+    "reaction": "ATP + protein L-histidine = ADP + protein N-phospho-L-histidine.",
+    "class_path": "Transferases > transferring phosphorus-containing groups > protein-histidine kinases",
+    "alternative_names": [
+     "HK1"
+    ],
+    "organism": "HUMAN",
+    "organism_proteins": [
+     {
+      "accession": "P15531",
+      "entry_name": "NDKA_HUMAN",
+      "symbol": "NDKA",
+      "gene": "NME1",
+      "label": "NME1"
+     },
+     {
+      "accession": "P22392",
+      "entry_name": "NDKB_HUMAN",
+      "symbol": "NDKB",
+      "gene": "NME2",
+      "label": "NME2"
+     }
+    ],
+    "organism_protein_count": 2,
+    "has_organism_protein": true,
+    "status": "active",
+    "superseded_by": [],
+    "partial_match": true,
+    "matched_by": "name",
+    "compose": "caterva compose \"Michaelis Menten\" --subject 2.7.13.3 --organism human --substrate <substrate>",
+    "recommended": false,
+    "caution": null
+   }
+  ],
+  "fallback": null
+ }
+}

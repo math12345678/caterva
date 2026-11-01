@@ -1,0 +1,36 @@
+{
+  // TypeScript config for the build-tool scripts under scripts/.
+  //
+  // check_typescript_compiles.py reports every .ts/.tsx file that no
+  // tsconfig actually pulls in, and scripts/generate-openapi-clients.ts
+  // was one of them: it is invoked by ts-node, which type-strips rather
+  // than type-checks, so nothing ever compiled it. This config gives it
+  // a project of its own and follows the same remedy the guard prints for
+  // tool configs (a per-tree tsconfig.node.json).
+  //
+  // Settings mirror the repository root tsconfig: the script runs under
+  // ts-node with CommonJS + node resolution and uses Node built-ins.
+  "compilerOptions": {
+    "lib": ["es2022"],
+    "target": "es2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["generate-openapi-clients.ts"]
+}

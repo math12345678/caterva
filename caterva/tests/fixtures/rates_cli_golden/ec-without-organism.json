@@ -1,0 +1,14 @@
+{
+ "argv": [
+  "examples/rates/puromycin.csv",
+  "--sigma-from",
+  "residuals",
+  "--ec",
+  "1.1.1.27",
+  "--substrate",
+  "pyruvate"
+ ],
+ "exit": 2,
+ "stdout": "",
+ "stderr": "usage: caterva rates [-h] [--substrate-column NAME] [--rate-column NAME]\n                     [--sigma-column NAME] [--inhibitor-column NAME]\n                     [--group COLUMN] [--sigma-from {replicates,residuals}]\n                     [--error-model {constant,proportional}]\n                     [--model {auto,michaelis-menten,substrate-inhibition,hill,competitive,uncompetitive,noncompetitive,mixed}]\n                     [--level LEVEL] [--significance SIGNIFICANCE]\n                     [--show-linearizations] [--ec EC] [--organism ORGANISM]\n                     [--substrate NAME] [--inhibitor NAME] [--isoform NAME]\n                     [--json] [--export {csv,curves,methods}]\n                     file\ncaterva rates: error: --ec needs --organism: a Km or a Ki is a property of one organism's enzyme, and borrowing another's would compare different proteins\n"
+}

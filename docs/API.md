@@ -1,172 +1,201 @@
-# `tellurium_engine` API reference
+# Caterva HTTP API
 
-Public interface of `Tellurium/tellurium_engine.py`. This is the module a
-backend/frontend integration would actually call -- everything else in that
-file is implementation detail.
+Every endpoint below is registered by the server. This file is checked by
+`scripts/check_example_endpoints.py`, which resolves each path against the
+Express route table on every build — so a route that is renamed or removed
+fails the build here rather than 404-ing for a reader.
 
-If a signature here ever drifts from the real code, trust the code and file
-an issue against this doc, not the other way around.
+## There are two servers
 
-## The `ok` / `flagged` distinction
+This is the single most important thing to know before reading any other
+document in this repository, and it is what most of them get wrong.
 
-Every domain shares one validation contract, returned as a
-`ParameterValidation`:
+| Server | Started by | Reference |
+|---|---|---|
+| `Science-Agent-Pipeline/artifacts/api-server/` (Express) | its own `npm start` | this page |
+| `src/web/server.ts` (raw `http.createServer`) | `npm run web` | [below](#the-web-server) |
 
-- **`ok=False`** -- the model is physically impossible and cannot be built
-  at all. `simulate_*` raises `ModelBuildError` immediately.
-- **`ok=True, flagged=True`** -- the model builds and simulates fine, but a
-  human should look at the result. `flag_reason` explains why. The
-  resulting `SimulationResult.flagged` property is `True`.
+They share no routes. The Express service has `/api/healthz` and
+`/api/simulate/:jobId`; the web server has `/api/health` and
+`/api/jobs/:jobId`. Point a client at the wrong one and every call 404s,
+which reads as a broken product rather than a wrong base URL.
 
-This mirrors the same distinction `Tests/brenda_client.py` uses for
-literature-derived Km values (see `docs/adr/0003-shared-plausibility-bounds.md`)
--- the two layers agree on what "implausible but real" means, not just
-what's outright impossible.
+`scripts/check_example_endpoints.py` resolves documented endpoints against
+**both** route tables.
 
-## `SimulationResult`
+> **A correction worth keeping.** The first version of that guard parsed only
+> the Express routers, and on that half-a-route-table it reported *242 of 294*
+> endpoint mentions across the documentation as nonexistent. The real figure
+> is **19 of 282**. Almost every "wrong" endpoint was a real route on the
+> other server. Two client examples were rewritten against the wrong service
+> before the error surfaced.
+>
+> A checker with an incomplete source of truth does not fail quietly — it
+> produces confident false accusations, and they are acted on precisely
+> because a guard is trusted. Same shape as a citation guard that parses zero
+> entries and prints OK. The rule it earns: **a guard must be able to say how
+> much of the world it looked at**, and a number it reports should be
+> reproducible by hand before anyone acts on it.
 
-Returned by every `simulate_*` function.
+Base URL: `http://localhost:3000`
 
-```python
-result.colnames        # list[str] - column names, e.g. ["time", "[S]"]
-result.data            # list[list[float]] - one row per time/cycle point
-result.model_name       # str
-result.flagged          # bool - shortcut for result.validation.flagged
-result.column("S")      # list[float] - tolerates roadrunner's "[S]" form
-result.time             # list[float] - shortcut for result.column("time")
-result.final("S")       # float - last value of a column
-len(result)             # number of rows
+## Running a simulation
+
+| Method | Path | What it does |
+|---|---|---|
+| `POST` | `/api/simulate` | Enqueue a simulation. Returns `202` with `{ jobId, status, query }`. |
+| `GET` | `/api/simulate` | List simulation jobs. |
+| `GET` | `/api/simulate/:jobId` | Job state: `pending`, `running`, `completed`, `failed`. |
+| `GET` | `/api/simulate/:jobId/stream` | Server-sent events for a running job. |
+| `POST` | `/api/simulate/:jobId/cancel` | Cancel a pending or running job. |
+| `GET` | `/api/simulate/:jobId/export` | Trajectory as CSV. |
+
+### Parameters go in the query string
+
+```json
+{ "query": "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51" }
 ```
 
-## Enzyme kinetics (Michaelis-Menten)
+There is **no separate `parameters` field**. The resolver reads
+`km=2 vmax=5 s0=10` out of the text.
 
-```python
-simulate_michaelis_menten(
-    km: float, vmax: float, s0: float,
-    start: float = 0.0, end: float = 10.0, points: int = 51,
-) -> SimulationResult
+Anything it cannot find there and cannot resolve from literature is
+reported, never guessed:
+
+```json
+{
+  "error": "MISSING_REQUIRED_INPUT",
+  "message": "Cannot simulate 'sir': s0, i0, r0_recovered, end, points could not be resolved from literature and were not supplied in the query. Add s0=<value> i0=<value> r0_recovered=<value> end=<value> points=<value> to your query and try again."
+}
 ```
 
-Rate law: `dS/dt = -Vmax * S / (Km + S)`.
+This is the product working. `s0`, `i0`, `end` and `points` are
+**experimental conditions** — chosen by whoever runs the experiment, not
+properties of an enzyme — so they are never defaulted and never resolved
+from a paper (ADR 0012/0013).
 
-- `km` -- Michaelis constant, must be positive. Flagged outside
-  `[KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM]` (1e-7 to 1e3 mM).
-- `vmax` -- maximum reaction rate, must be positive.
-- `s0` -- initial substrate concentration, zero allowed (inert but valid).
+## Where the numbers came from
 
-Raises `ModelBuildError` for invalid parameters, `SimulationError` if
-integration fails after a valid model is built.
+| Method | Path | What it does |
+|---|---|---|
+| `GET` | `/api/simulate/:jobId/confidence` | Per-parameter confidence, derived from provenance. |
+| `GET` | `/api/simulate/:jobId/audit` | Publication audit: which parameters can be cited. |
 
-Verified against the exact implicit solution
-`Km*ln(S0/S) + (S0-S) = Vmax*t` in `tests/test_kinetics_correctness.py`.
+`audit` applies the distinction the rest of the system runs on: a
+**measured quantity** (km, ki, kcat, vmax) needs a citation; an
+**experimental condition** (s0, i0, temperature, pH) is reported rather than
+cited, and never blocks publication readiness. A citation is required for
+what someone measured and meaningless for what the experimenter chose.
 
-## Epidemiology (SIR)
+## Enzymes and resolution
 
-```python
-simulate_sir(
-    beta: float, gamma: float, s0: float, i0: float,
-    r0_recovered: float = 0.0,
-    start: float = 0.0, end: float = 100.0, points: int = 101,
-) -> SimulationResult
-```
+| Method | Path | What it does |
+|---|---|---|
+| `GET` | `/api/enzymes` | Enzymes the resolver recognises by name. |
+| `POST` | `/api/resolve` | Resolve a kinetic parameter from the literature layer. |
 
-- `beta` -- transmission rate, must be positive.
-- `gamma` -- recovery rate, must be positive. (Emitted internally as
-  `gamma_rate` in generated antimony source -- see
-  `docs/adr/0004-gamma-reserved-keyword.md`. The Python argument is still
-  `gamma`.)
-- `s0`, `i0`, `r0_recovered` -- initial compartment sizes, zero allowed.
-  Zero `i0` is flagged (valid but inert -- nothing happens).
+## Health, metrics and status
 
-Verified against the SIR conserved quantity
-`S + I - (N/R0)*ln(S) = const` and the final-size equation in
-`tests/test_epidemiology_correctness.py`.
+| Method | Path | What it does |
+|---|---|---|
+| `GET` | `/api/healthz` | Liveness. Returns `{ "status": "ok" }`. |
+| `GET` | `/api/pipeline/status` | Per-subsystem status and queue depth. |
+| `GET` | `/api/pipeline/literature` | Literature backing per domain. |
+| `GET` | `/api/metrics` | Pipeline metrics. |
+| `GET` | `/api/metrics/health` | Health verdict with the denominator behind it. |
+| `POST` | `/api/metrics/reset` | Reset collected metrics. |
+| `GET` | `/api/simulate/metrics/pipeline` | Stage-level metrics with Wilson confidence intervals. |
+| `GET` | `/api/snapshot` | Point-in-time metrics snapshot. |
+| `GET` | `/api/dashboard/overview` | System state: queue, literature backing, STRENDA compliance. |
+| `GET` | `/api/dashboard/health` | Dashboard health verdict. |
 
-## Epidemiology (SEIR)
+## Waitlist
 
-```python
-simulate_seir(
-    beta: float, sigma: float, gamma: float, s0: float,
-    e0: float, i0: float, r0_recovered: float = 0.0,
-    start: float = 0.0, end: float = 100.0, points: int = 101,
-) -> SimulationResult
-```
+| Method | Path | What it does |
+|---|---|---|
+| `POST` | `/api/waitlist` | Join the waitlist. |
+| `GET` | `/api/waitlist/count` | Current waitlist size. |
 
-Same as SIR, plus:
-- `sigma` -- progression rate from exposed to infectious (incubation).
-- `e0` -- initial exposed (incubating, not yet infectious) count.
+## Root
 
-## PCR amplification
+| Method | Path | What it does |
+|---|---|---|
+| `GET` | `/` | Service banner. |
 
-```python
-simulate_pcr(
-    n0: float, efficiency: float, cycles: int,
-    plateau_capacity: Optional[float] = None,
-) -> SimulationResult
-```
+## The web server
 
-**Not** built through antimony/roadrunner -- PCR is a discrete-cycle
-recurrence, not a continuous-time process. See
-`docs/adr/0002-pcr-not-modeled-as-an-ode.md`.
+`src/web/server.ts`, started with `npm run web`. Accepts
+`{query, parameters, enzyme, substrate}` — parameters are a field here, not
+part of the query string. Supplying `enzyme` and `substrate` makes it search
+PubMed for real kinetics before running.
 
-- `n0` -- initial template copy number, must be positive.
-- `efficiency` -- fraction of template copied per cycle, in `[0.0, 1.0]`.
-  `1.0` is perfect doubling. Above `1.0` is a hard rejection (a template
-  can't be copied more than once per cycle). Below `0.5`
-  (`PCR_PLAUSIBLE_LOW_EFFICIENCY`) is flagged, not rejected -- a real but
-  poor reaction.
-- `cycles` -- must be a positive integer, capped at 60 (no real qPCR
-  protocol runs longer).
-- `plateau_capacity` -- if given, growth follows a discrete logistic
-  recurrence approaching but never exceeding this ceiling (reagents/
-  polymerase saturating). If omitted, growth is the exact closed form
-  `N(c) = n0 * (1 + efficiency) ** c`, unbounded.
+| Method | Path | What it does |
+|---|---|---|
+| `POST` | `/api/simulate` | Enqueue a simulation. Returns `{ jobId, status }`. |
+| `GET` | `/api/jobs/:jobId` | Job state and result. |
+| `GET` | `/api/jobs/history` | The 50 most recent jobs. |
+| `GET` | `/api/jobs/query` | Filtered job query (`status=`, `minConfidence=`, `dateFrom=`, …). |
+| `GET` | `/api/stats` | Aggregate statistics. |
+| `POST` | `/api/sweep` | Sweep one parameter across a range. |
+| `GET` | `/api/sweeps/:sweepId` | Sweep results. |
+| `GET` | `/api/analyze/sweep/:sweepId` | Sensitivity analysis of a sweep. Also `/analyze/sweeps/:sweepId`. |
+| `POST` | `/api/batch` | Run many parameter sets. |
+| `GET` | `/api/batches/:batchId` | Batch results. |
+| `POST` | `/api/compare` | Compare models. |
+| `POST` | `/api/compare/jobs` | Compare finished jobs. |
+| `GET` | `/api/health` | Liveness. |
+| `GET` | `/api/export/jobs/csv` | Job history as CSV. See the column note below. |
+| `GET` | `/api/export/stats/csv` | Statistics as CSV. |
+| `GET` | `/api/export/sweep/:sweepId/csv` | Sweep results as CSV. Also `/api/export/sweeps/:sweepId/csv`. |
+| `GET` | `/api/export/batch/:batchId/csv` | Batch results as CSV. Also `/api/export/batches/:batchId/csv`. |
+| `GET` | `/api/export/comparison/:compareId/csv` | Comparison as CSV. Also `/api/export/comparisons/:compareId/csv`. |
 
-Result columns are `["cycle", "copies"]`, not `["time", ...]` -- there's no
-continuous time axis for this domain.
+### `/api/export/jobs/csv` — two columns changed, and one is a breaking change
 
-Verified by exact-equality tests against the closed form (no tolerance
-band, since there's no numerical integration to have error) in
-`tests/test_pcr_correctness.py`.
+**`literatureFound` is gone. `literatureSourcesUsed` replaces it.**
 
-## Lower-level: raw SBML operations
+The old column's value was `job.result.validated ? 'yes' : 'no'`, and
+`validated` does not mean what that name claimed — it means the simulation
+could be performed at all. A run on numbers a user typed in by hand
+validates fine, so it exported as `literatureFound = yes` with no citation
+anywhere behind it.
 
-These are what the `simulate_*` convenience functions call internally.
-Use them directly if you need to build a model from raw antimony/SBML
-rather than going through one of the parameterized domain functions.
+The new column carries `metadata.literatureSourcesUsed`: a count, or the
+string `unknown` when the record does not say. `unknown` is never rendered
+as `0`, because a job nobody checked did not find zero sources.
 
-```python
-build_michaelis_menten_antimony(km, vmax, s0, model_name="michaelis_menten") -> str
-build_sir_antimony(beta, gamma, s0, i0, r0_recovered=0.0, model_name="sir") -> str
-build_seir_antimony(beta, sigma, gamma, s0, e0, i0, r0_recovered=0.0, model_name="seir") -> str
+Any consumer reading `literatureFound` will break. That is intended: the
+column made a false claim about provenance, and preserving it for
+compatibility would preserve the claim.
 
-antimony_to_sbml(antimony_string: str, model_name: str | None = None) -> str
-sbml_to_antimony(sbml_string: str) -> str
-validate_sbml(sbml_string: str) -> list[str]   # returns error strings, empty if valid
+**`finalValue` and `confidence` now contain values.** They read
+`job.result.finalValue` and `job.result.confidence`, which the stored
+pipeline response does not have — the real fields are
+`result.results.finalValue` and `result.validationConfidence`. Both columns
+were blank on every real job for the life of the route. See
+[ADR 0056](adr/0056-a-column-that-claimed-a-source.md).
 
-simulate_sbml(sbml_string, start=0.0, end=10.0, points=51, model_name="model", validation=None) -> SimulationResult
-steady_state(sbml_string: str) -> dict[str, float]
-parameter_scan(sbml_string, parameter, values, start=0.0, end=10.0, points=51, selections=None) -> list[SimulationResult]
-```
+### Singular and plural both work
 
-`antimony_to_sbml` / translation calls are protected by a module-level
-`threading.Lock` internally, because libantimony keeps global module
-state -- concurrent calls without the lock could return one caller's model
-to another. This is transparent to callers; it's mentioned here because
-it's the kind of thing that looks removable to someone optimizing for
-speed and isn't.
+The reads are plural (`/api/sweeps/:id`, `/api/batches/:id`) and the exports
+were singular (`/api/export/sweep/:id/csv`). Anyone who has just fetched a
+sweep reaches for the plural export and gets a 404 with no hint that one
+letter is the problem.
 
-## Validation functions
+That is not hypothetical — it caught the author of
+`docs/api/API_QUICK_REFERENCE.md`, who documented the plural forms
+throughout because they were the reasonable guess. The document was right
+about what the API *should* serve; the API was the inconsistent thing.
 
-Each domain has a matching `validate_*_params` function with the same
-argument names as its `simulate_*` counterpart, returning a
-`ParameterValidation` without building or simulating anything. Useful for
-validating user input before committing to a full simulation (e.g., in a
-web form) without paying the cost of an actual integration.
+Both spellings now route, rather than one being renamed, so any existing
+caller using the singular form keeps working.
 
-```python
-validate_michaelis_menten_params(km, vmax, s0) -> ParameterValidation
-validate_sir_params(beta, gamma, s0, i0, r0_recovered=0.0) -> ParameterValidation
-validate_seir_params(beta, sigma, gamma, s0, e0, i0, r0_recovered=0.0) -> ParameterValidation
-validate_pcr_params(n0, efficiency, cycles) -> ParameterValidation
-```
+## Clients
+
+Working, checked examples — one per server, because they are not
+interchangeable:
+
+- [`examples/python_integration.py`](../examples/python_integration.py) — the web server
+- [`examples/nodejs_integration.js`](../examples/nodejs_integration.js) — the Express service
+
+Both are covered by the same guard as this page.

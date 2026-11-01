@@ -1,0 +1,117 @@
+{
+ "captured": {
+  "kind": "compose",
+  "request": {
+   "description": "glycolysis"
+  }
+ },
+ "run": {
+  "schema": "caterva.studio.run/1",
+  "id": "20261001-093929-compose-ce524f03",
+  "kind": "compose",
+  "title": "glycolysis",
+  "status": "done",
+  "created_at": "2026-10-01T09:39:29.425Z",
+  "started_at": "2026-10-01T09:39:29.428Z",
+  "finished_at": "2026-10-01T09:39:29.430Z",
+  "caterva_version": "0.4.0",
+  "cli": [
+   "caterva",
+   "compose",
+   "glycolysis"
+  ],
+  "request": {
+   "description": "glycolysis"
+  },
+  "outcome": {
+   "exit_code": 3,
+   "meaning": "refused",
+   "summary": "'glycolysis' is a named pathway, not a shape. Building it means its actual enzymes and stoichiometry, which needs a pathway database (KEGG or Reactome) that Caterva does not yet read. Guessing a plausible pathway would be worse than saying so. You can describe the steps you want, or supply SBML.",
+   "reason": "Not built.\n\n'glycolysis' is a named pathway, not a shape. Building it means its actual enzymes and stoichiometry, which needs a pathway database (KEGG or Reactome) that Caterva does not yet read. Guessing a plausible pathway would be worse than saying so. You can describe the steps you want, or supply SBML."
+  },
+  "error": null,
+  "artifacts": [],
+  "progress": {
+   "stage": "compose",
+   "label": "Composing the model from its description",
+   "fraction": null
+  }
+ },
+ "result_status": 404,
+ "result": null,
+ "error": {
+  "error": {
+   "code": "not_found",
+   "message": "the run finished without a result: Not built.\n\n'glycolysis' is a named pathway, not a shape. Building it means its actual enzymes and stoichiometry, which needs a pathway database (KEGG or Reactome) that Caterva does not yet read. Guessing a plausible pathway would be worse than saying so. You can describe the steps you want, or supply SBML."
+  }
+ },
+ "events": [
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-093929-compose-ce524f03",
+    "seq": 1,
+    "at": "2026-10-01T09:39:29.427Z",
+    "status": "queued"
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-093929-compose-ce524f03",
+    "seq": 2,
+    "at": "2026-10-01T09:39:29.428Z",
+    "status": "running"
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261001-093929-compose-ce524f03",
+    "seq": 3,
+    "at": "2026-10-01T09:39:29.430Z",
+    "stage": "compose",
+    "label": "Composing the model from its description",
+    "fraction": null
+   }
+  },
+  {
+   "event": "result",
+   "data": {
+    "run_id": "20261001-093929-compose-ce524f03",
+    "seq": 4,
+    "at": "2026-10-01T09:39:29.430Z",
+    "outcome": {
+     "exit_code": 3,
+     "meaning": "refused",
+     "summary": "'glycolysis' is a named pathway, not a shape. Building it means its actual enzymes and stoichiometry, which needs a pathway database (KEGG or Reactome) that Caterva does not yet read. Guessing a plausible pathway would be worse than saying so. You can describe the steps you want, or supply SBML.",
+     "reason": "Not built.\n\n'glycolysis' is a named pathway, not a shape. Building it means its actual enzymes and stoichiometry, which needs a pathway database (KEGG or Reactome) that Caterva does not yet read. Guessing a plausible pathway would be worse than saying so. You can describe the steps you want, or supply SBML."
+    }
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261001-093929-compose-ce524f03",
+    "seq": 5,
+    "at": "2026-10-01T09:39:29.430Z",
+    "status": "done",
+    "outcome": {
+     "exit_code": 3,
+     "meaning": "refused",
+     "summary": "'glycolysis' is a named pathway, not a shape. Building it means its actual enzymes and stoichiometry, which needs a pathway database (KEGG or Reactome) that Caterva does not yet read. Guessing a plausible pathway would be worse than saying so. You can describe the steps you want, or supply SBML.",
+     "reason": "Not built.\n\n'glycolysis' is a named pathway, not a shape. Building it means its actual enzymes and stoichiometry, which needs a pathway database (KEGG or Reactome) that Caterva does not yet read. Guessing a plausible pathway would be worse than saying so. You can describe the steps you want, or supply SBML."
+    }
+   }
+  },
+  {
+   "event": "end",
+   "data": {
+    "run_id": "20261001-093929-compose-ce524f03",
+    "seq": 6,
+    "at": "2026-10-01T09:39:29.431Z",
+    "status": "done"
+   }
+  }
+ ]
+}

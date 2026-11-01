@@ -1,0 +1,35 @@
+{
+ "request": {
+  "call_id": "a9027dae78259779",
+  "payload_sha256": "68465f6e5143da7c62ed7f653e13ef149dcbacc537e35494a39f0465793579bf",
+  "consent": true
+ },
+ "status": 200,
+ "body": {
+  "call_id": "a9027dae78259779",
+  "feature": "ask",
+  "outcome": "accepted",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "local": false,
+  "latency_ms": 0,
+  "content": {
+   "reply": {
+    "answerable": true,
+    "answer": "kcat is a placeholder: it has no value in the organism requested."
+   },
+   "kind": "ai"
+  },
+  "rejection": null,
+  "error": null,
+  "fallback": {
+   "text": "The assistant is not answering this one. The closest facts in this run's own record:\n- result.model.parameters[0].provenance.note: ILLUSTRATIVE PLACEHOLDER: Caterva's motif library value for competitive_inhibition.kcat. No publication supplies this number and nobody measured it. It is here so the structure can be checked, dimensioned and simulated; the measurement that would replace it is in the kcat table.\n- result.search.note: 2 constant(s) resolved from the literature: reaction_Ki, reaction_Km. 1 still the motif library's placeholder (reaction_kcat): the search ran and returned nothing for them, which is different from their not having been looked for\n- result.notes[2]: 2 constant(s) resolved from the literature: reaction_Ki, reaction_Km. 1 still the motif library's placeholder (reaction_kcat): the search ran and returned nothing for them, which is different from their not having been looked for\n- result.model.reactions[0].rate_law: reaction_kcat * reaction_E * reaction_S / (reaction_Km * (1 + reaction_I / reaction_Ki) + reaction_S)\n- result.model.parameters[0]: 100.0 1/s (placeholder)\n- result.model.parameters[0].provenance.kind: placeholder"
+  },
+  "grounding": {
+   "ok": true,
+   "failures": [],
+   "checked": {}
+  },
+  "run_id": "20261004-222110-compose-6bf8a05d"
+ }
+}

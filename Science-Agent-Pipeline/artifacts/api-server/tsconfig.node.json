@@ -1,0 +1,20 @@
+{
+  // Covers this workspace's build-tool configs, which the application
+  // tsconfig deliberately excludes: they are loaded and type-stripped by
+  // vitest at runtime rather than compiled into the app, so they sat
+  // outside every project's `include` and nothing type-checked them.
+  //
+  // `module: esnext` + `moduleResolution: bundler` because these files are
+  // ESM executed by the tool, not by tsc's emit.
+  "compilerOptions": {
+    "lib": ["es2022"],
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["vitest.config.ts"]
+}

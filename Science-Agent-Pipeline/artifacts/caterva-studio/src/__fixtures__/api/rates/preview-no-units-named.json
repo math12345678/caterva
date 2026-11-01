@@ -1,0 +1,277 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "/api/rates/preview",
+  "body": {
+   "text": "0.02\t76\n0.02\t47\n0.06\t97\n0.06\t107\n0.11\t123\n0.11\t139\n0.22\t159\n0.22\t152\n0.56\t191\n0.56\t201\n1.10\t207\n1.10\t200\n",
+   "mapping": {
+    "delimiter": "tab",
+    "decimal": ".",
+    "header": false,
+    "roles": {
+     "substrate": 0,
+     "rate": 1,
+     "sigma": null,
+     "inhibitor": null,
+     "group": null,
+     "replicate": null,
+     "rates": []
+    },
+    "units": {
+     "substrate": "ppm",
+     "rate": "counts/min/min"
+    },
+    "target": {}
+   }
+  }
+ },
+ "status": 200,
+ "body": {
+  "ok": true,
+  "ready": true,
+  "refusal": null,
+  "bytes": 105,
+  "lines": 12,
+  "filename": null,
+  "shape": "two-column",
+  "format": {
+   "bom": false,
+   "line_ending": "LF",
+   "comment_text": [],
+   "blank_lines": 0,
+   "comment_lines": 0,
+   "delimiter": "tab",
+   "decimal": ".",
+   "header": false
+  },
+  "columns": [
+   {
+    "index": 0,
+    "header": "",
+    "name": "column 1",
+    "unit": null,
+    "role": "substrate",
+    "role_reason": "chosen by you",
+    "numeric": 12,
+    "non_numeric": 0,
+    "blank": 0
+   },
+   {
+    "index": 1,
+    "header": "",
+    "name": "column 2",
+    "unit": null,
+    "role": "rate",
+    "role_reason": "chosen by you",
+    "numeric": 12,
+    "non_numeric": 0,
+    "blank": 0
+   }
+  ],
+  "mapping": {
+   "delimiter": "tab",
+   "decimal": ".",
+   "header": false,
+   "roles": {
+    "substrate": 0,
+    "rate": 1,
+    "sigma": null,
+    "inhibitor": null,
+    "group": null,
+    "replicate": null,
+    "rates": []
+   },
+   "units": {
+    "substrate": "ppm",
+    "rate": "counts/min/min"
+   },
+   "target": {
+    "substrate": "ppm",
+    "rate": "counts/min/min"
+   }
+  },
+  "units": {
+   "substrate": {
+    "given": "ppm",
+    "read_as": "ppm",
+    "kind": "arbitrary",
+    "convertible": false,
+    "problem": null,
+    "target": "ppm",
+    "factor": 1.0
+   },
+   "rate": {
+    "given": "counts/min/min",
+    "read_as": "counts/min/min",
+    "kind": "arbitrary",
+    "convertible": false,
+    "problem": null,
+    "target": "counts/min/min",
+    "factor": 1.0
+   }
+  },
+  "decisions": [
+   "Fields are split at tabs, as you chose.",
+   "Decimals are read with a point, as you chose.",
+   "The first row is data (no header), as you chose.",
+   "Two columns: the first is the substrate concentration and the second the rate.",
+   "Column 1 ('column 1') is the substrate: chosen by you.",
+   "Column 2 ('column 2') is the rate: chosen by you."
+  ],
+  "problems": [],
+  "problems_total": 0,
+  "preview": {
+   "headers": [
+    "column 1",
+    "column 2"
+   ],
+   "rows": [
+    {
+     "line": 1,
+     "cells": [
+      "0.02",
+      "76"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 2,
+     "cells": [
+      "0.02",
+      "47"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 3,
+     "cells": [
+      "0.06",
+      "97"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 4,
+     "cells": [
+      "0.06",
+      "107"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 5,
+     "cells": [
+      "0.11",
+      "123"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 6,
+     "cells": [
+      "0.11",
+      "139"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 7,
+     "cells": [
+      "0.22",
+      "159"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 8,
+     "cells": [
+      "0.22",
+      "152"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 9,
+     "cells": [
+      "0.56",
+      "191"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 10,
+     "cells": [
+      "0.56",
+      "201"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 11,
+     "cells": [
+      "1.10",
+      "207"
+     ],
+     "used": true,
+     "flags": {}
+    },
+    {
+     "line": 12,
+     "cells": [
+      "1.10",
+      "200"
+     ],
+     "used": true,
+     "flags": {}
+    }
+   ],
+   "shown": 12,
+   "total": 12
+  },
+  "summary": {
+   "rows_used": 12,
+   "conditions": 6,
+   "replicate_rows": 6,
+   "inhibitor": false,
+   "groups": [],
+   "substrate_unit": "ppm",
+   "rate_unit": "counts/min/min",
+   "substrate_convertible": false,
+   "rate_convertible": false,
+   "rate_kind": "arbitrary",
+   "highest_substrate": 1.1,
+   "lowest_substrate": 0.02,
+   "rows_read": 12,
+   "rows_skipped": 0,
+   "wide_measurements_skipped": 0
+  },
+  "canonical": "# Read by Caterva Studio from pasted text; the table below is what was fitted.\n# Fields are split at tabs, as you chose.\n# Decimals are read with a point, as you chose.\n# The first row is data (no header), as you chose.\n# Two columns: the first is the substrate concentration and the second the rate.\n# Column 1 ('column 1') is the substrate: chosen by you.\n# Column 2 ('column 2') is the rate: chosen by you.\nsubstrate (ppm),rate (counts/min/min)\n0.02,76\n0.02,47\n0.06,97\n0.06,107\n0.11,123\n0.11,139\n0.22,159\n0.22,152\n0.56,191\n0.56,201\n1.10,207\n1.10,200\n",
+  "sigma_options": {
+   "column": false,
+   "replicate_sets": 6,
+   "replicate_dof": 6,
+   "replicates": true,
+   "residuals": true
+  },
+  "group_column": null,
+  "column_names": {
+   "substrate": "substrate",
+   "rate": "rate"
+  },
+  "units_needed": false,
+  "limits": {
+   "bytes": 524288,
+   "rows": 2000
+  }
+ }
+}

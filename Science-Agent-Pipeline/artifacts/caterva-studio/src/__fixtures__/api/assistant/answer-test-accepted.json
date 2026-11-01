@@ -1,0 +1,25 @@
+{
+ "request": {
+  "call_id": "dfd41209def67aa7",
+  "payload_sha256": "58b056cee03cc6178ae8e7f7f0bd4d0ef6666a612e3253d8465dd200d1ce8af0",
+  "consent": true
+ },
+ "status": 200,
+ "body": {
+  "call_id": "dfd41209def67aa7",
+  "feature": "test",
+  "outcome": "accepted",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "local": false,
+  "latency_ms": 0,
+  "content": {
+   "reply": "ready"
+  },
+  "rejection": null,
+  "error": null,
+  "fallback": {},
+  "grounding": null,
+  "run_id": null
+ }
+}

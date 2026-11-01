@@ -1,0 +1,111 @@
+{
+  "_why": [
+    "ADR 0110's guard and ADR 0112's table -- the guard that notices when a finding",
+    "end and not the other, mutation-tested against the two defects it claims",
+    "to prevent.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0112-both-front-ends.json"
+  ],
+  "covers": [
+    "0110",
+    "0112"
+  ],
+  "verdict": "exit_code",
+  "test": "python3 scripts/check_both_front_ends_read_it.py --selftest && python3 scripts/check_both_front_ends_read_it.py",
+  "_why_exit_code": [
+    "The 'suite' is a guard script, so the verdict is its exit status -- the",
+    "mode ADR 0045 added. It is more careful than reading `$?`: a mutation",
+    "that makes the script CRASH also exits non-zero, and calling that",
+    "'caught' would certify a check that no longer runs."
+  ],
+  "mutations": [
+    {
+      "id": "B1",
+      "description": "a NEW one-sided finding no longer fails the build",
+      "_note": [
+        "The guard's whole contract. It does not claim the 24 listed keys",
+        "were reviewed -- it claims the debt cannot grow silently. If a new",
+        "one-sided key passes, the guard is a counter and not a check.",
+        "",
+        "Mutating the baseline lookup to accept everything is what a",
+        "well-meaning 'suppress the noise' change looks like."
+      ],
+      "file": "scripts/check_both_front_ends_read_it.py",
+      "find": "    unreviewed = {k: v for k, v in one_sided.items() if k not in baseline}",
+      "replace": "    unreviewed = {}"
+    },
+    {
+      "id": "B2",
+      "description": "the baseline can be added to but never emptied",
+      "_note": [
+        "A key that STOPS being one-sided must be removed, or the count at",
+        "the top stops meaning anything. Same shrinking-baseline rule as",
+        "ADR 0072's mutation tables and ADR 0090's unwired exports.",
+        "",
+        "This is not hypothetical: `selected` was written into the baseline",
+        "on the first run and the guard rejected it, because `selected` is",
+        "also an ordinary local variable name on both sides. The rule caught",
+        "a real error in this file's own first draft."
+      ],
+      "file": "scripts/check_both_front_ends_read_it.py",
+      "find": "    stale = sorted(k for k in baseline if k not in one_sided)",
+      "replace": "    stale = []"
+    },
+    {
+      "id": "B3",
+      "description": "an empty side reads as 'nothing is one-sided'",
+      "_note": [
+        "If one glob stops matching -- a directory renamed, a refactor -- the",
+        "guard would find every key absent from that side and report all 79",
+        "as one-sided, or, with the baseline swallowing them, report OK on a",
+        "comparison it never made.",
+        "",
+        "The standing trap: a guard that examined nothing must not print OK.",
+        "Same shape as the citation guard that parsed zero entries."
+      ],
+      "file": "scripts/check_both_front_ends_read_it.py",
+      "find": "    if not api_src or not cli_src:",
+      "replace": "    if False:"
+    }
+  ],
+  "_all_three_not_caught_and_why": [
+    "0 caught, 3 not caught -- and the guard is not wrong, the SET is.",
+    "",
+    "Every mutation deletes a failure path, and the guard is currently GREEN:",
+    "24 one-sided keys are all listed in the baseline, so `unreviewed` is",
+    "empty, `stale` is empty, and both sides are non-empty. Removing a check",
+    "that is not firing changes no output, so no verdict can be had.",
+    "",
+    "This is the same structure as ADR 0100's G2 and ADR 0104's T3: a",
+    "mutation that is a no-op against the current input cannot be caught, and",
+    "recording it as caught would be a verdict the harness never established.",
+    "",
+    "The fix is not a better mutation. It is a --selftest that builds a",
+    "temporary tree WITH the failure present -- a new one-sided key, a stale",
+    "baseline entry, an empty side -- the way check_exports_reach_a_caller.py",
+    "and check_mutation_tables_reproducible.py do. Then these three mutations",
+    "become expressible, because there is something for them to stop",
+    "catching.",
+    "",
+    "Until that exists the guard is deliberately NOT wired into verify_build.",
+    "A guard whose refusals have never been observed to fire is what this",
+    "project refuses to put in a harness everyone runs. Kept here rather than",
+    "deleted so the next pass inherits the analysis instead of repeating it."
+  ],
+  "_why_the_selftest_is_in_the_test_command": [
+    "The first run of this set was 0 caught, 3 not caught, and the guard was",
+    "not what was wrong. Every mutation deletes a failure path, and against",
+    "the REAL tree the guard is green -- nothing unreviewed, nothing stale,",
+    "both sides non-empty -- so removing a check that is not firing changes",
+    "no output and no verdict can be had.",
+    "",
+    "Same shape as ADR 0100's G2 and ADR 0104's T3. The fix was never a",
+    "better mutation; it was an input where the refusals fire. `--selftest`",
+    "builds that input, and the mutations became expressible the moment it",
+    "existed.",
+    "",
+    "Both are run: the self-test provides the failing input, and the real",
+    "invocation catches a mutation that breaks the guard against the actual",
+    "tree without breaking the temporary one."
+  ]
+}

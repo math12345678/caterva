@@ -1,0 +1,19 @@
+{
+ "kind": "fep.status",
+ "request": {
+  "directory": "/tmp/caterva-fixtures/lyso-md"
+ },
+ "cli": [
+  "caterva",
+  "fep",
+  "--summarise",
+  "/tmp/caterva-fixtures/lyso-md"
+ ],
+ "outcome": {
+  "exit_code": 3,
+  "meaning": "refused",
+  "summary": "caterva fep: /tmp/caterva-fixtures/lyso-md has no caterva-fep.json; it was not written by caterva fep",
+  "reason": "caterva fep: /tmp/caterva-fixtures/lyso-md has no caterva-fep.json; it was not written by caterva fep"
+ },
+ "result": null
+}

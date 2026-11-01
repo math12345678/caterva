@@ -1,0 +1,220 @@
+/*
+ * The enzyme finder: a type-ahead whose candidates open below the field, in
+ * the flow of the form, and a compact summary once one is chosen.
+ *
+ * Tokens only (src/index.css); both themes follow. EC numbers are DM Mono,
+ * the accepted name carries the weight, and the reason a candidate matched
+ * is one plain line beneath it. Rows are set apart by hairlines, not boxes.
+ * The highlighted row (the combobox's active descendant) has a full ring,
+ * not a stripe, so it reads in either theme at 3:1 or better. The
+ * finder's recommendation is a chip and a sentence; it never changes which
+ * row is highlighted.
+ */
+
+.enz {
+  min-width: 0;
+}
+
+.enz-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  min-width: 0;
+}
+.enz-ec {
+  font-size: var(--text-sm);
+  color: var(--signal-deep);
+  white-space: nowrap;
+}
+.enz-name {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.enz-why {
+  font-size: var(--text-xs);
+  color: var(--fg-soft);
+  line-height: 1.45;
+}
+.enz-reaction {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.enz-organism {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-soft);
+  overflow-wrap: anywhere;
+}
+.enz-organism[data-none="true"] {
+  font-family: inherit;
+  color: var(--caution);
+}
+.enz-note {
+  font-size: var(--text-xs);
+  color: var(--fg-soft);
+  line-height: 1.45;
+}
+
+/* ------------------------------------------------------------- the list */
+
+.enz-panel {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.125rem;
+  padding: 0.5rem 0 0.25rem;
+  border-top: 1px solid var(--rule);
+}
+.enz-panel[hidden],
+.enz-list[hidden] {
+  display: none;
+}
+.enz-status {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--fg);
+  line-height: 1.45;
+}
+.enz-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 24rem;
+  overflow-y: auto;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-control);
+  background: var(--field);
+}
+.enz-option {
+  display: grid;
+  gap: 0.1875rem;
+  padding: 0.5rem 0.625rem;
+  cursor: pointer;
+  border-top: 1px solid var(--rule);
+}
+.enz-option:first-child {
+  border-top: 0;
+}
+.enz-option[data-active="true"] {
+  background: var(--signal-wash);
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.enz-option[data-disabled="true"] {
+  cursor: not-allowed;
+}
+.enz-option[data-disabled="true"] .enz-name,
+.enz-option[data-disabled="true"] .enz-ec {
+  color: var(--muted);
+}
+.enz-foot {
+  display: grid;
+  gap: 0.25rem;
+}
+.enz-foot p {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--fg-soft);
+  line-height: 1.45;
+}
+.enz-foot .enz-caution {
+  color: var(--caution);
+}
+.enz-foot .enz-release {
+  color: var(--muted);
+}
+
+/* --------------------------------------------------- the chosen summary */
+
+.enz-chip {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--rule-control);
+  border-radius: var(--radius-control);
+  background: var(--field);
+}
+.enz-chip[data-state="unlisted"] {
+  border-color: color-mix(in oklch, var(--caution) 55%, var(--rule-control));
+}
+.enz-chip-body {
+  display: grid;
+  gap: 0.1875rem;
+  min-width: 0;
+}
+.enz-chip .btn {
+  flex: none;
+}
+
+@media (forced-colors: active) {
+  .enz-option[data-active="true"] {
+    outline-color: Highlight;
+  }
+}
+
+/* --------------------------------------------------- the isoform chooser */
+
+.enz-iso {
+  display: grid;
+  gap: 0.375rem;
+}
+.enz-iso-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.enz-iso-button[aria-pressed="true"] {
+  background: var(--signal-wash);
+  border-color: var(--signal-deep);
+  color: var(--signal-deep);
+}
+
+/* ------------------------------------------------ a name that was refused */
+
+.enz-refusal {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.enz-refusal-list {
+  display: grid;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-control);
+  background: var(--field);
+}
+.enz-refusal-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.625rem;
+  border-top: 1px solid var(--rule);
+}
+.enz-refusal-row:first-child {
+  border-top: 0;
+}
+.enz-refusal-row .btn {
+  flex: none;
+}
+.enz-refusal-body {
+  display: grid;
+  gap: 0.1875rem;
+  min-width: 0;
+}

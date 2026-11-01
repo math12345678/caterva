@@ -1,0 +1,51 @@
+{
+  "_why": [
+    "ADR 0144's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "ADR 0144 is the one that fixed check_mutation_tables_reproducible.py so",
+    "it could see a table indented inside a bullet. It then published its own",
+    "mutation table -- and was immediately flagged by the rule it had just",
+    "restored to working order. That is the guard behaving correctly on its",
+    "own author, and it is the reason this file exists.",
+    "",
+    "The mutations restore the two invented citations from the README: the",
+    "original `ref 12345`, which appeared in no fixture at all, and a",
+    "plausible-looking `ref 999999`. The subtler defect ADR 0144 also found --",
+    "`ref 649716`, a real ACETYLCHOLINESTERASE reference printed under a",
+    "lactate dehydrogenase example -- is deliberately NOT here, because the",
+    "guard does not catch it and the ADR says so. A set file that implied",
+    "otherwise would overstate the evidence.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0144-documented-citations.json"
+  ],
+  "test": "cd Tests && python3 -m pytest test_documented_citations_guard.py --no-header -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "C1",
+      "description": "the guard stops checking whether a cited id exists",
+      "_claimed": "caught by both invented-citation tests",
+      "_note": "The whole check, removed. Everything still prints -- the counts, the OK line -- so a reader watching the output would see a guard that looks like it ran.",
+      "file": "scripts/check_documented_citations_are_real.py",
+      "find": "            if ref not in known:",
+      "replace": "            if False:"
+    },
+    {
+      "id": "C2",
+      "description": "an empty fixture corpus passes vacuously instead of failing",
+      "_claimed": "caught by the tree-is-clean test",
+      "_note": "With no reference ids loaded, every citation is trivially 'unknown' or trivially fine depending on which way the check leans. Failing loudly and naming the fixtures as the cause is the only honest option; passing would make the guard strongest exactly when it knows least.",
+      "file": "scripts/check_documented_citations_are_real.py",
+      "find": "    if not known:\n        # An empty corpus would make every citation \"unknown\" and the check",
+      "replace": "    if False:\n        # An empty corpus would make every citation \"unknown\" and the check"
+    },
+    {
+      "id": "C3",
+      "description": "a missing surface is skipped rather than reported",
+      "_claimed": "caught by the surface-list test",
+      "_note": "The failure mode check_non_affiliation_notice.py names explicitly: the easiest way to defeat a checklist is to delete the thing being checked, and a guard that shrugs at a missing file rewards exactly that.",
+      "file": "scripts/check_documented_citations_are_real.py",
+      "find": "        if not path.exists():\n            problems.append(",
+      "replace": "        if False:\n            problems.append("
+    }
+  ]
+}

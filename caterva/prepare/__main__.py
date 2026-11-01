@@ -1,0 +1,340 @@
+"""`caterva prepare`: what is wrong with a PDB entry before you simulate it.
+
+    caterva prepare 1I10
+    caterva prepare 1I10 --json audit.json --out audit.md
+    caterva prepare ./my_model.cif
+
+Reads the entry's own mmCIF records and reports, ranked by how much each
+matters and how close it sits to the enzyme's catalytic residues:
+residues that differ from UniProt (whatever the depositors called them),
+chain breaks, truncated side chains, alternate conformations, non-standard
+residues, the biological assembly against the deposited chains, and model
+quality. It fixes nothing; it says what a setup would silently get wrong.
+
+Exit codes follow the rest of Caterva: 0 at least one chain has no blocking
+defect, 4 every chain has one, 2 a malformed question, 3 refused and said
+why (no such entry, no network), 1 a crash.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Callable, List, Optional, Sequence, Tuple
+
+from caterva.methods import METHODS
+from caterva.prepare.audit import ACTIVE_SITE_RADIUS, Audit, TitratableSite, audit
+
+if TYPE_CHECKING:
+    from caterva.prepare.protonation import Titration
+
+RCSB_CIF = "https://files.rcsb.org/download/{id}.cif"
+UNIPROT_FASTA = "https://rest.uniprot.org/uniprotkb/{acc}.fasta"
+
+EXIT_BLOCKS = 4
+
+
+class PrepareError(Exception):
+    """The audit could not be run, as distinct from finding defects."""
+
+
+def _cache_dir() -> Path:
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.environ.get("HOME") or "~", ".cache")
+    return Path(os.path.expanduser(base)) / "caterva" / "prepare"
+
+
+def live_fetch(timeout: float = 60.0) -> Callable[[str], str]:
+    import requests
+
+    from caterva import netuse
+
+    def get(url: str) -> str:
+        try:
+            r = requests.get(url, timeout=timeout)
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            netuse.failed(url, exc)
+            raise
+        netuse.answered(url)
+        if r.status_code == 404:
+            raise PrepareError(f"not found: {url}")
+        r.raise_for_status()
+        return r.text
+    return get
+
+
+def cached(fetch: Callable[[str], str], cache: Optional[Path]) -> Callable[[str], str]:
+    """Deposited entries and UniProt sequences are stable; fetch each once."""
+    if cache is None:
+        return fetch
+
+    def get(url: str) -> str:
+        name = re.sub(r"[^A-Za-z0-9._-]", "_", url.split("://", 1)[-1])
+        path = cache / name
+        if path.exists():
+            return path.read_text(encoding="utf-8")
+        text = fetch(url)
+        # The cache saves a download next time; it is not worth failing the
+        # answer over. An unwritable cache (a sandbox, a read-only home)
+        # crashed `caterva analyze` before it measured anything.
+        try:
+            cache.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        except OSError:
+            pass
+        return text
+    return get
+
+
+def sequence_fetcher(fetch: Callable[[str], str]) -> Callable[[str], str]:
+    def sequence_of(acc: str) -> str:
+        text = fetch(UNIPROT_FASTA.format(acc=acc))
+        return "".join(l.strip() for l in text.splitlines() if l and not l.startswith(">"))
+    return sequence_of
+
+
+def run_audit(entry: str, fetch: Callable[[str], str]) -> Audit:
+    path = Path(entry)
+    if path.suffix.lower() in (".cif", ".mmcif") and path.exists():
+        text = path.read_text(encoding="utf-8")
+    elif re.fullmatch(r"[0-9][A-Za-z0-9]{3}", entry):
+        text = fetch(RCSB_CIF.format(id=entry.upper()))
+    else:
+        raise PrepareError(f"{entry!r} is neither a PDB id (like 1I10) nor an existing .cif file")
+    return audit(text, sequence_fetcher(fetch))
+
+
+def _dist(d: Optional[float]) -> str:
+    return "?" if d is None else f"{d:.1f}"
+
+
+def protonation_sites(a: Audit) -> List[TitratableSite]:
+    """The titratable residues the protonation section judges: those of the
+    first chain of the enzyme (the chain a setup starts from)."""
+    return [t for t in a.titratable if t.chain == (a.chains[0] if a.chains else t.chain)]
+
+
+@dataclass
+class ChargeState:
+    """One active-site residue's charge at the assay pH, as the table states it."""
+
+    site: TitratableSite
+    #: "Glu35 (catalytic)", as the table names it.
+    name: str
+    #: None when the residue type is not in the survey (arginine).
+    titration: Optional["Titration"]
+    #: The "at pH" column: the titration's own description, or "not assessed".
+    at_ph: str
+    #: The "state" column, without the emphasis the table puts on it.
+    state: str
+    emphasised: bool = False
+
+    @property
+    def contradicted(self) -> bool:
+        return self.titration is not None and self.titration.default_contradicted
+
+    @property
+    def uncertain(self) -> bool:
+        return self.titration is not None and not self.contradicted and self.titration.settled is None
+
+
+def charge_states(a: Audit, ph: float) -> List[ChargeState]:
+    """Each active-site residue of the first chain judged at `ph`: the rows
+    of the protonation table, for the report and for the studio alike."""
+    from caterva.prepare.protonation import assess
+    out: List[ChargeState] = []
+    for t in protonation_sites(a):
+        ti = assess(t.resname, ph)
+        name = f"{t.resname.title()}{t.auth_seq_id}" + (" (catalytic)" if t.catalytic else "")
+        if ti is None:
+            out.append(ChargeState(t, name, None, "not assessed",
+                                   f"{t.resname.title()} is not in the survey; taken as charged below pH 12"))
+            continue
+        state = {True: "settled, protonated", False: "settled, deprotonated", None: "uncertain"}[ti.settled]
+        emphasised = ti.settled is None
+        if ti.default_contradicted:
+            state, emphasised = "pdb2gmx default contradicts it", True
+        out.append(ChargeState(t, name, ti, ti.describe(), state, emphasised))
+    return out
+
+
+def protonation_section(a: Audit, ph: Optional[float]) -> List[str]:
+    """Titratable residues at the active site, judged at the assay pH."""
+    from caterva.prepare.protonation import SETTLED, SOURCE
+    sites = protonation_sites(a)
+    L = ["## Protonation at the active site", ""]
+    if not sites:
+        return L + ["No titratable residue within the active-site radius of chain "
+                    f"{a.chains[0] if a.chains else '?'} (or no catalytic residues were placed).", ""]
+    if ph is None:
+        names = ", ".join(f"{t.resname.title()}{t.auth_seq_id}" for t in sites)
+        return L + [f"{len(sites)} titratable residue(s) within {ACTIVE_SITE_RADIUS:g} Å of a catalytic atom "
+                    f"in chain {sites[0].chain}: {names}. Pass --ph with the assay pH to judge which of "
+                    "their charge states are uncertain there.", ""]
+    L += [f"Each titratable residue within {ACTIVE_SITE_RADIUS:g} Å of a catalytic atom in chain "
+          f"{sites[0].chain}, judged at pH {ph:g} from how far folded proteins move that group's pKa "
+          f"({SOURCE}). This is not a pKa prediction: it says where typical behaviour does not settle "
+          "the charge, so a structure-based estimate (PROPKA) or constant-pH simulation is needed "
+          "before trusting the state GROMACS assigns.", "",
+          "| residue | Å to active site | at pH | state |", "|---|---|---|---|"]
+    states = charge_states(a, ph)
+    for c in states:
+        state = f"**{c.state}**" if c.emphasised else c.state
+        L.append(f"| {c.name} | {c.site.distance:.1f} | {c.at_ph} | {state} |")
+    wrong = [c.name for c in states if c.contradicted]
+    uncertain = [c.name for c in states if c.uncertain]
+    L.append("")
+    if wrong:
+        L.append(f"- Set these by hand before simulating (pdb2gmx -asp/-glu/-lys/-his): {', '.join(wrong)}.")
+    if uncertain:
+        L.append(f"- Charge state not settled by typical behaviour at pH {ph:g}: {', '.join(uncertain)}. "
+                 "Start with any catalytic one: its pKa is the one the mechanism may depend on.")
+    if not wrong and not uncertain:
+        L.append(f"- Every assessed residue's state is settled at pH {ph:g} and pdb2gmx's default agrees.")
+    L += [f"- Settled means the protonated fraction is below {SETTLED:.0%} or above {1 - SETTLED:.0%} for "
+          "any pKa within one standard deviation of the survey mean (Henderson-Hasselbalch); a chosen rule.",
+          ""]
+    return L
+
+
+def clean_chains(a: Audit) -> List[str]:
+    """Chains a faithful setup can start from: no blocking defect, and the
+    catalytic residues intact. Exit 0 needs at least one; the report names them."""
+    return [s.chain for s in a.chain_summary if s.blocks == 0 and s.catalytic_intact]
+
+
+def report(a: Audit, ph: Optional[float] = None) -> List[str]:
+    q = []
+    if a.resolution is not None:
+        q.append(f"{a.resolution} Å")
+    if a.r_free is not None:
+        q.append(f"R-free {a.r_free:.3f}")
+    L = [f"# Preparation audit: {a.pdb_id}", "", f"*{a.title}*", "",
+         f"{a.method.lower()}{', ' + ', '.join(q) if q else ''}. "
+         f"Chains of the enzyme: {', '.join(a.chains)}.", ""]
+
+    if a.reference:
+        r = a.reference
+        L += ["## Catalytic residues", "",
+              f"From M-CSA entry {r.mcsa_id} ({r.enzyme}, reference {r.uniprot}), chosen by "
+              f"{r.how}; {r.identity:.0%} identical to chain {a.chains[0]}. Positions are carried "
+              "onto each chain by global alignment.", ""]
+        if r.rejected:
+            L.append("Other M-CSA mechanisms for this EC number, not used: " + "; ".join(
+                f"{mid} {name} ({ident:.0%})" for mid, name, ident in r.rejected) + ".")
+            L.append("")
+        first = [c for c in a.catalytic if c.chain == a.chains[0]]
+        L += ["| residue | reference | role | conserved |", "|---|---|---|---|"]
+        for c in first:
+            ok = "yes" if c.found == c.expected else f"**no** ({c.found or 'absent'})"
+            L.append(f"| {(c.found or c.expected).title()}{c.auth_seq_id} | {c.reference} | {c.roles} | {ok} |")
+        L.append("")
+
+    L += ["## Which chain to start from", "",
+          f"| chain | blocking defects | findings within {ACTIVE_SITE_RADIUS:g} Å of the active site | "
+          "catalytic residues intact |", "|---|---|---|---|"]
+    for s in a.chain_summary:
+        L.append(f"| {s.chain} | {s.blocks} | {s.near_site} | {'yes' if s.catalytic_intact else '**no**'} |")
+    clean = clean_chains(a)
+    L += ["", ("Chains with no blocking defect: " + ", ".join(clean) + "."
+               if clean else "**Every chain has at least one blocking defect.**"), ""]
+
+    titles = {"blocks": "Blocks a faithful setup", "decide": "Choices to make and record",
+              "note": "Worth knowing"}
+    for sev in ("blocks", "decide", "note"):
+        fs = a.by_severity(sev)
+        if not fs:
+            continue
+        L += [f"## {titles[sev]} ({len(fs)})", "",
+              "| chain | where | Å to active site | finding | from |", "|---|---|---|---|---|"]
+        fs = sorted(fs, key=lambda f: (f.distance if f.distance is not None else 1e9, f.chain or ""))
+        for f in fs:
+            L.append(f"| {f.chain or '-'} | {', '.join(f.residues) or '-'} | {_dist(f.distance)} | "
+                     f"{f.what} | `{f.source}` |")
+        L.append("")
+
+    L += protonation_section(a, ph)
+    L += ["## Not checked", ""] + [f"- {n}" for n in a.not_checked] + [""]
+    L += ["## Sources", ""]
+    for key in ("pdb", "mcsa", "needleman-wunsch", "blosum62"):
+        m = METHODS[key]
+        L.append(f"- {m.what}: {m.cite()}")
+    L += ["", f"Distances are to the nearest atom of a catalytic residue in the same chain; "
+          f"{ACTIVE_SITE_RADIUS:g} Å is a chosen cutoff, not a physical boundary. Unmodelled "
+          "stretches are placed by their observed flanking residues."]
+    return L
+
+
+def build_parser(prog: str = "caterva prepare") -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog=prog,
+        description=(
+            "Audit a PDB entry as the starting point of a simulation: sequence "
+            "differences from UniProt, chain breaks, truncated side chains, alternate "
+            "conformations, non-standard residues, the biological assembly, and model "
+            "quality -- each placed relative to the enzyme's catalytic residues (M-CSA)."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            f"  {prog} 1I10\n"
+            f"  {prog} 1L63 --out 1l63-audit.md --json 1l63-audit.json\n"
+            f"  {prog} ./model.cif\n"
+            "\nExit codes: 0 a clean chain exists, 4 every chain has a blocking defect, "
+            "2 malformed question, 3 refused and said why, 1 a crash."
+        ),
+    )
+    p.add_argument("entry", help="a PDB id (1I10) or a local mmCIF file")
+    p.add_argument("--out", metavar="FILE", help="write the report here as well as printing it")
+    p.add_argument("--json", metavar="FILE", help="write the findings as JSON")
+    p.add_argument("--no-cache", action="store_true", help="fetch everything fresh")
+    p.add_argument("--ph", type=float, metavar="PH",
+                   help="the assay pH: judge which active-site residues have an uncertain charge there")
+    return p
+
+
+def audit_or_refuse(entry: str, fetch: Callable[[str], str]) -> Tuple[Optional[Audit], Optional[str]]:
+    """(audit, None), or (None, the refusal `main` prints to stderr, exit 3).
+
+    A network failure is a refusal, not a crash; any other exception is a
+    crash and propagates."""
+    try:
+        return run_audit(entry, fetch), None
+    except PrepareError as e:
+        return None, f"caterva prepare: {e}"
+    except Exception as e:
+        if type(e).__module__.startswith("requests"):
+            return None, f"caterva prepare: could not reach the PDB or UniProt ({e})"
+        raise
+
+
+def fetcher(no_cache: bool = False) -> Callable[[str], str]:
+    """The fetch `main` uses: RCSB and UniProt, cached unless told not to."""
+    return cached(live_fetch(), None if no_cache else _cache_dir())
+
+
+def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva prepare",
+         fetch: Optional[Callable[[str], str]] = None) -> int:
+    args = build_parser(prog).parse_args(argv)
+    a, refusal = audit_or_refuse(args.entry, fetch or fetcher(args.no_cache))
+    if a is None:
+        print(refusal, file=sys.stderr)
+        return 3
+    text = "\n".join(report(a, args.ph)) + "\n"
+    print(text, end="")
+    if args.out:
+        Path(args.out).write_text(text, encoding="utf-8")
+    if args.json:
+        Path(args.json).write_text(json.dumps(asdict(a), indent=2, default=str), encoding="utf-8")
+    return 0 if clean_chains(a) else EXIT_BLOCKS
+
+
+def console_main() -> int:
+    return main()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
