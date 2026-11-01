@@ -662,9 +662,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # gromacs depends on gromacs-data of the SAME version. On 2026-11-01
+      # the runner's mirror offered gromacs 2025.2-1 and apt refused the
+      # pair ("Reached two conflicting assignments"), though main passed on
+      # 2026-10-28 with nothing in this job changed. So name both, at the
+      # candidate version of gromacs, and print apt's view if that fails.
       - name: Install GROMACS
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq gromacs
+          sudo apt-get update -qq && v=$(apt-cache policy gromacs | awk '/Candidate:/ {print $2}')
+          echo "gromacs candidate: $v"
+          if ! sudo apt-get install -y -qq "gromacs=$v" "gromacs-data=$v"; then
+            apt-cache policy gromacs gromacs-data
+            exit 1
+          fi
           gmx --version | head -3
       - name: Set up Caterva
         run: make setup

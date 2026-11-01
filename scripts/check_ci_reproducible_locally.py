@@ -72,10 +72,18 @@ _MIN_RECIPES = 6
 #
 # Keyed by a distinctive substring of the command.
 CI_ONLY: dict[str, str] = {
-    "sudo apt-get update -qq && sudo apt-get install -y -qq gromacs": (
+    # The install is several lines since 2026-11-01 (gromacs and gromacs-data
+    # pinned to one version, apt's view printed on failure); one reason
+    # covers each of them.
+    **dict.fromkeys(
+        (
+            "apt-cache policy gromacs",
+            'echo "gromacs candidate: $v"',
+            '"gromacs=$v" "gromacs-data=$v"',
+        ),
         "installs GROMACS on the runner. Locally GROMACS is whatever the "
         "developer has (the md-smoke target takes GMX=/path/to/gmx); a Makefile "
-        "recipe cannot sudo-install a system package."
+        "recipe cannot sudo-install a system package.",
     ),
     "gmx --version | head -3": (
         "prints which GROMACS the runner got, for the log. `make md-smoke` "
