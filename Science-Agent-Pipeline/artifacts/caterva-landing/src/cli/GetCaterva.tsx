@@ -24,11 +24,15 @@ import { RELEASE_TAG } from "@/lib/domains";
 // (`readFor`); a test fails when RELEASE_TAG moves on and they have not
 // been re-read. `commands` is the COMMANDS table in `git show
 // v0.6.0:caterva/app.py`, in its order; platforms are the bundles attached
-// to the GitHub release.
+// to the GitHub release. Re-read 2026-11-01 for v0.7.0: caterva/app.py is
+// unchanged from v0.6.0 (git diff v0.6.0 -- caterva/app.py is empty), the
+// release workflow attaches the same three platforms. The date is the day
+// the plain v0.7.0 release was published; re-check it against `gh release
+// view v0.7.0 --json publishedAt` if this file changes before it is.
 const RELEASE = {
   tag: RELEASE_TAG,
-  readFor: "v0.6.0",
-  date: "2026-10-28",
+  readFor: "v0.7.0",
+  date: "2026-11-01",
   url: `https://github.com/math12345678/caterva/releases/tag/${RELEASE_TAG}`,
   platforms: ["macOS (Apple silicon)", "Linux x86_64", "Windows x86_64"],
   commands: [
@@ -51,7 +55,7 @@ const RELEASE = {
 
 // Commands registered in caterva/app.py on this branch that RELEASE does
 // not register. Computed 2026-11-01 by comparing the COMMANDS table here
-// with `git show v0.6.0:caterva/app.py`: the two are identical, so the
+// with `git show v0.6.0:caterva/app.py` (v0.7.0's is the same file): the two are identical, so the
 // main branch adds no command today, only changes to the ones above.
 const MAIN_ONLY: string[] = [];
 

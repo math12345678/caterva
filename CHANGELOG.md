@@ -14,20 +14,24 @@ done: there was no release to version.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-01
+
 Caterva V7: every number on a public surface is measured, derived from the
 tree, or removed (ADR 0180).
 
 ### Changed
 - The landing app reads its guard count, suite sizes and data sources from a generated `repoFacts.json`; `scripts/check_landing_test_counts.py` fails when that file, a row's `collected:` or its pass count is stale, and `--write` regenerates it. The landing CLI's `status` calls `/api/healthz` and `/api/metrics/health` and prints what came back.
-- `caterva-site`'s shell offers the five live domains only, runs Michaelis-Menten and Gillespie computations in the browser with the showcase constants, and answers an archived domain with its archive date and v0.4.0. Its tests run in CI and in the new `make test-site`.
+- `caterva-site`'s shell offers the five live domains only, runs Michaelis-Menten with the showcase's hexokinase constants and Gillespie with the domain catalogue's example rates in the browser, and answers an archived domain with its archive date and v0.4.0. Its tests run in CI and in the new `make test-site`.
 - The dashboard shows the literature score on a 0-1 scale, labelled a heuristic and not a probability, and computes the average tile from the runs shown.
 - `scripts/verify_citations_live.py` and `scripts/verify_values_live.py` end every check matched, mismatched or unreachable (exit 0, 2, 1); DOIs are checked through the CrossRef API; BRENDA ref 740253 is no longer checked as a PubMed id.
-- scipy is pinned to 1.16.0 on Python 3.11-3.13, because 1.15.3 does not import `scipy.sparse.linalg` on macOS 27.0.1; Python 3.10 keeps 1.15.3.
+- scipy is pinned to 1.16.0 on Python 3.11-3.13, because 1.15.3's cp313 wheel does not import `scipy.sparse.linalg` on macOS 27.0.1; Python 3.10 keeps 1.15.3. certifi is 2026.10.19.
+- `docker-compose.yml` mounts `./data` for the job store (`CATERVA_JOBS_FILE`) instead of bind-mounting `./caterva-jobs.jsonl`; move that file into `./data` to keep a deployment's history.
+- `scripts/check_documented_counts.py` reads "N guards" as well as "N guard scripts", and skips a quoted count; it found three stale guard counts in `docs/readmes/`.
 - Monitoring files moved to `deploy/monitoring/`, their ports bound to 127.0.0.1, and Grafana's admin password is read from `GRAFANA_ADMIN_PASSWORD` with no default; `scripts/check_port_binding.py` reads that compose file too.
-- The landing page offers v0.6.0. `repoFacts.json` carries `releaseTag`, read from `caterva/__init__.py`, and the download box, roadmap, 404 page and domain statuses all use it; `check_landing_test_counts.py` fails when it is stale. Before this, the page offered v0.4.0, and the 404 page said v0.7.0. The changelog modal gains 0.6.0 and dates 0.3.3 to September 22.
+- The landing page offers the release named by `__version__` (v0.7.0 in this release). `repoFacts.json` carries `releaseTag`, read from `caterva/__init__.py`, and the download box, roadmap, 404 page and domain statuses all use it; `check_landing_test_counts.py` fails when it is stale. Before this, the page offered v0.4.0, and the 404 page said v0.7.0. The changelog modal gains 0.6.0 and dates 0.3.3 to September 22.
 - `scripts/check_license_consistency.py` also reads the published OpenAPI spec and `pyproject.toml`, and fails when a file it is told to read is missing. The root `openapi.yaml` declares Apache-2.0 and links to github.com/math12345678/caterva.
 - CHANGELOG and CITATION.cff say that 0.5.0 and 0.5.1 were released only as candidates.
-- Docs that pointed readers at the 18 Terrium-sim repositories say those repositories are private and were pushed once, on 2026-08-12; development is at github.com/math12345678/caterva.
+- Docs that pointed readers at the 18 Terrium-sim repositories say those repositories are private; 17 were pushed on 2026-08-12 under the old name (the 18th is GitHub's demo repository) and none since; development is at github.com/math12345678/caterva.
 
 ### Removed
 - The API server's epidemiology bridge (`applyBetaGammaFromR0Resolution`, `resolveEpidemiologyParameters`, `diseases.ts`) and the `wright_fisher` resolvable field, which no live domain reached.

@@ -8,9 +8,9 @@
 // main branch and waits for the next release.
 //
 // Corrected 2026-11-01: this said v0.4.0, whose caterva/app.py registers
-// only compose and sim, and marked the other four capabilities "main". The
-// latest release is v0.6.0 (published 2026-10-28), and `git show
-// v0.6.0:caterva/app.py` registers prepare, md, analyze, bind, complex and
+// only compose and sim, and marked the other four capabilities "main".
+// v0.6.0 (published 2026-10-28) was then the latest release, and `git show
+// v0.6.0:caterva/app.py` (v0.7.0's is the same file) registers prepare, md, analyze, bind, complex and
 // fep as well, so every capability below is in it.
 import repoFacts from "./generated/repoFacts.json";
 

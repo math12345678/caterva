@@ -218,9 +218,14 @@ def documented_guard_counts(text: str) -> List[Tuple[int, int]]:
     vaguer wording rather than truer wording.
     """
     claims: List[Tuple[int, int]] = []
-    pattern = re.compile(r"(~)?\s*(\d+)\s+guard scripts?\b", re.IGNORECASE)
+    # "<N> guards" as well as "<N> guard scripts" since 2026-11-01: the
+    # narrower pattern let "22 guards run on every build" and "The 21
+    # guards" stand in docs/readmes/ beside 79. A quoted count is a quote.
+    pattern = re.compile(r"(~)?\s*(\d+)\s+guard(?: scripts?|s)\b", re.IGNORECASE)
     for lineno, line in enumerate(text.splitlines(), start=1):
         for match in pattern.finditer(line):
+            if is_quoted(line, match.start(2), match.end(2)):
+                continue
             approximate = match.group(1) is not None
             value = int(match.group(2))
             claims.append((lineno, -value if approximate else value))
@@ -554,7 +559,7 @@ def rewrite(text: str, actual: dict, guards: int, adrs: int) -> Tuple[str, List[
             text = apply(text, re.compile(pattern), actual[key], label)
 
     text = apply(
-        text, re.compile(r"(~)?\s*(\d+) guard scripts?\b", re.IGNORECASE),
+        text, re.compile(r"(~)?\s*(\d+) guard(?: scripts?|s)\b", re.IGNORECASE),
         guards, "guard scripts",
     )
     text = apply(
@@ -651,7 +656,11 @@ def selftest() -> int:
     That is precisely how this guard's original scope went unnoticed.
     """
     guard_cases = [
-        ("22 guards run on every build", []),          # "guards" != "guard scripts"
+        # Read as a claim since 2026-11-01 (it was a deliberate non-match,
+        # and "22 guards run on every build" stood in docs/readmes/main.md).
+        ("22 guards run on every build", [22]),
+        ('it stated *"22 guards"*', []),               # a quote, not a claim
+        ("3 guardrails", []),
         ("all 14 guard scripts", [14]),
         ("~20 guard scripts", [-20]),
         ("35 guard scripts pass", [35]),

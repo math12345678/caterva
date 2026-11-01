@@ -26,6 +26,12 @@ interface Release {
 // Every line below names something CHANGELOG.md records.
 const RELEASES: Release[] = [
   {
+    date: "November 1, 2026",
+    tag: "fix",
+    title: "v0.7.0: every public number measured, derived or removed",
+    desc: "Every count and version on the README, the site and this page is now measured from the tree, derived from it, or removed, and a guard fails when one goes stale. On Python 3.11 and later scipy is 1.16.0, because 1.15.3 does not import scipy.sparse.linalg on macOS 27, which stopped steady-state analysis and influence ranking. The archived epidemiology and population-genetics resolvers left the live code.",
+  },
+  {
     date: "October 25, 2026",
     tag: "feature",
     title: "v0.6.0: claims over pinned evidence",

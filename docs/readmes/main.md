@@ -10,7 +10,7 @@ git clone --recursive https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # 8,735 tests (7,059 engine + 1,676 literature)
+make test      # 8,739 tests (7,059 engine + 1,680 literature)
 ```
 
 `make check` is not a version-string check. It builds a real
@@ -59,11 +59,11 @@ can drift out of sync.
 
 | repository | what |
 |---|---|
-| [`caterva`](https://github.com/math12345678/caterva) | the simulation engine — 15 domains, 7,059 tests |
-| [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 1,676 tests |
+| [`caterva`](https://github.com/math12345678/caterva) | the simulation engine — 5 domains, 7,059 tests |
+| [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 1,680 tests |
 | [`backend-main`](https://github.com/Terrium-sim/backend-main) | TypeScript library, CLI, web server |
 | [`frontend-main`](https://github.com/Terrium-sim/frontend-main) | the dashboard UI |
-| [`wiring-main`](https://github.com/Terrium-sim/wiring-main) | the 22 guards, CI, build config |
+| [`wiring-main`](https://github.com/Terrium-sim/wiring-main) | the 79 guards, CI, build config |
 | [`science-agent-pipeline-replit`](https://github.com/Terrium-sim/science-agent-pipeline-replit) | the Express API service |
 | [`documents`](https://github.com/Terrium-sim/documents) | constitution, 178 ADRs, API reference |
 | [`business`](https://github.com/Terrium-sim/business) | strategy, and the build-stage record |
@@ -75,7 +75,7 @@ Full reasoning: [`docs/REPO_MAP.md`](docs/REPO_MAP.md).
 
 ## How it keeps itself honest
 
-22 guards run on every build. They exist because the alternative was tried
+79 guards run on every build. They exist because the alternative was tried
 and failed — most were written *after* something claimed to be verified and
 was not.
 

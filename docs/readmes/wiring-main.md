@@ -7,7 +7,7 @@ The guards, CI and build configuration. 27 files.
 Not backend, not frontend: the machinery that decides whether a change is
 allowed to land.
 
-## The 21 guards
+## The 79 guards
 
 ```bash
 python scripts/verify_build.py --quick

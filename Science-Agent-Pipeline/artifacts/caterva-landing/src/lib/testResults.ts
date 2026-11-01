@@ -273,7 +273,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "95 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "96 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -356,10 +356,14 @@ export const TEST_SUITES: TestSuite[] = [
         // passed, 0 skipped, 0 failed, 725 s. The skip left with the
         // archived popgen suite; the epidemiology tests left too, and the
         // licence-guard and retired-resolver tests arrived: 1676.
-        passed: 1676,
+        //
+        // Measured 2026-11-01 for 0.7.0, the same way: 1680 tests, 1680
+        // passed, 0 skipped, 0 failed, 1767 s (the machine was loaded).
+        // test_documented_guard_counts.py arrived with 4 tests: 1680.
+        passed: 1680,
         skipped: 0,
         failed: 0,
-        collected: 1676,
+        collected: 1680,
       },
     ],
   },

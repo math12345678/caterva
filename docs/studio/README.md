@@ -251,7 +251,7 @@ python3 scripts/build_studio_app.py --frozen dist/frozen/caterva --out /tmp/upd/
 cp /tmp/upd/new/Caterva-*-macos-arm64.zip /tmp/upd/serve/
 sig="$($S/bin/sign_update --account caterva-test -p /tmp/upd/serve/Caterva-*-macos-arm64.zip)"
 python3 scripts/make_appcast.py --zip /tmp/upd/serve/Caterva-*-macos-arm64.zip --signature "$sig" \
-    --tag v$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' caterva/__init__.py) --notes docs/releases/v0.5.1.md \
+    --tag v$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' caterva/__init__.py) --notes docs/releases/v$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' caterva/__init__.py).md \
     --download-prefix http://127.0.0.1:8000/ --out /tmp/upd/serve/appcast.xml
 (cd /tmp/upd/serve && python3 -m http.server 8000 --bind 127.0.0.1)    # leave running
 ```
