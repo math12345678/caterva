@@ -37,15 +37,36 @@ minutes, so it is not in the default path -- Stage 4's amendment says a
 guard is not delivered until something runs it unasked, and a guard nobody
 can afford to run is not run unasked.
 
+THE REPOSITORY FACTS THE PAGE SHOWS
+-----------------------------------
+`src/lib/generated/repoFacts.json` holds the counts the page shows that are
+facts about the repository rather than measurements of a run: the number
+of guard scripts (`scripts/check_*.py`), the engine and literature test
+counts README.md states (and check_documented_counts.py holds to pytest's
+collection), and the data sources docs/data-sources.json attributes. They
+were hand-typed in domains.ts and testResults.ts, and on 2026-10-31 the
+page said 76 guards against 79 on disk, and 6,696 / 1,589 engine and
+literature tests against the README's 7,057 / 1,622.
+
+The default run regenerates that file's content in memory and fails when
+the checked-in copy differs; `--write` writes it. It also fails when the
+engine or literature row of testResults.ts states a `collected:` figure
+other than the suite size in repoFacts.json: a pass count measured
+against a suite that has since grown or shrunk is a measurement of
+something else, so adding a test now fails the build until somebody
+re-measures.
+
 Usage:
     python scripts/check_landing_test_counts.py
     python scripts/check_landing_test_counts.py --full
+    python scripts/check_landing_test_counts.py --write
     python scripts/check_landing_test_counts.py --selftest
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -62,6 +83,14 @@ TEST_RESULTS = (
     / "lib"
     / "testResults.ts"
 )
+
+LANDING = REPO_ROOT / "Science-Agent-Pipeline" / "artifacts" / "caterva-landing"
+REPO_FACTS = LANDING / "src" / "lib" / "generated" / "repoFacts.json"
+DATA_SOURCES = REPO_ROOT / "docs" / "data-sources.json"
+
+#: testResults.ts rows whose suite size README.md states, keyed by
+#: workingDirectory, naming the key in repoFacts.json's "tests".
+COLLECTED_SUITES: Dict[str, str] = {"caterva/": "engine", "Tests/": "literature"}
 
 # How to count test files, and how to run the suite, for each declared
 # workingDirectory. Keyed by the exact string in testResults.ts so a
@@ -113,6 +142,7 @@ class Claim:
         passed: int,
         skipped: int,
         failed: int,
+        collected: Optional[int] = None,
     ) -> None:
         self.name = name
         self.working_directory = working_directory
@@ -120,6 +150,9 @@ class Claim:
         self.passed = passed
         self.skipped = skipped
         self.failed = failed
+        # The suite size the pass count was measured against, where the
+        # row states one (the engine and literature rows must).
+        self.collected = collected
 
 
 def parse_claims(text: str) -> List[Claim]:
@@ -144,7 +177,11 @@ def parse_claims(text: str) -> List[Claim]:
         passed = sum(int(x) for x in re.findall(r"passed:\s*(\d+)", files_body))
         skipped = sum(int(x) for x in re.findall(r"skipped:\s*(\d+)", files_body))
         failed = sum(int(x) for x in re.findall(r"failed:\s*(\d+)", files_body))
-        claims.append(Claim(name, wd, files_claimed, passed, skipped, failed))
+        c = re.search(r"collected:\s*(\d+)", files_body)
+        collected = int(c.group(1)) if c else None
+        claims.append(
+            Claim(name, wd, files_claimed, passed, skipped, failed, collected)
+        )
     return claims
 
 
@@ -185,6 +222,122 @@ def _last_int(text: str, pattern: str) -> Optional[int]:
     return int(hits[-1]) if hits else None
 
 
+def expected_facts() -> Tuple[Optional[dict], List[str]]:
+    """What repoFacts.json should say, derived from the tree now.
+
+    Returns (facts, problems). A count that cannot be read is a problem,
+    never a guess: facts is None then, and nothing is written.
+    """
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    try:
+        from check_documented_counts import documented_numbers
+    finally:
+        sys.path.pop(0)
+
+    problems: List[str] = []
+    readme = REPO_ROOT / "README.md"
+    documented = (
+        documented_numbers(readme.read_text(encoding="utf-8"))
+        if readme.is_file()
+        else {}
+    )
+    tests = {}
+    for key in ("engine", "literature"):
+        if key not in documented:
+            problems.append(f"README.md states no {key} test count to derive from")
+        else:
+            tests[key] = documented[key]
+
+    sources: List[str] = []
+    try:
+        data = json.loads(DATA_SOURCES.read_text(encoding="utf-8"))
+        sources = [s["tokens"][0] for s in data["sources"]]
+    except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
+        problems.append(f"could not read the source list in {DATA_SOURCES}: {exc}")
+    if not sources and not problems:
+        problems.append(f"{DATA_SOURCES} lists no sources")
+
+    if problems:
+        return None, problems
+    return (
+        {
+            "_readme": [
+                "Generated by `python3 scripts/check_landing_test_counts.py "
+                "--write`; do not edit by hand.",
+                "guardScripts: files matching scripts/check_*.py.",
+                "tests: the engine and literature test counts README.md "
+                "states, which scripts/check_documented_counts.py holds to "
+                "pytest's collection.",
+                "dataSources: the first token of each source "
+                "docs/data-sources.json attributes. KEGG is not one: it is "
+                "off unless CATERVA_ENABLE_KEGG is set.",
+            ],
+            "guardScripts": len(list((REPO_ROOT / "scripts").glob("check_*.py"))),
+            "tests": tests,
+            "dataSources": sources,
+        },
+        [],
+    )
+
+
+def facts_failures(current: Optional[dict], expected: dict) -> List[str]:
+    """Each field of the checked-in facts that differs from the tree."""
+    if current is None:
+        return [f"{REPO_FACTS.relative_to(REPO_ROOT)} is missing or not JSON"]
+    return [
+        f"repoFacts.json {key} is {current.get(key)!r}, the tree says "
+        f"{expected[key]!r}. Run this script with --write."
+        for key in ("guardScripts", "tests", "dataSources")
+        if current.get(key) != expected[key]
+    ]
+
+
+def collected_failures(claims: List[Claim], facts: dict) -> List[str]:
+    """Rows measured against a suite size other than the current one."""
+    failures = []
+    by_wd = {c.working_directory: c for c in claims}
+    for wd, key in COLLECTED_SUITES.items():
+        claim = by_wd.get(wd)
+        size = facts.get("tests", {}).get(key)
+        if claim is None:
+            failures.append(f"testResults.ts has no {wd} row to hold to {key}")
+        elif claim.collected is None:
+            failures.append(
+                f"{claim.name}: states no 'collected:' figure, so nothing says "
+                "which suite its pass count was measured against"
+            )
+        elif claim.collected != size:
+            failures.append(
+                f"{claim.name}: measured against {claim.collected} collected "
+                f"tests; the suite is {size} now. Re-run it and paste the "
+                "real numbers."
+            )
+        elif claim.passed + claim.failed > claim.collected:
+            failures.append(
+                f"{claim.name}: claims more passing and failing tests "
+                f"({claim.passed + claim.failed}) than were collected "
+                f"({claim.collected})"
+            )
+    return failures
+
+
+def read_facts() -> Optional[dict]:
+    try:
+        return json.loads(REPO_FACTS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def write_facts() -> List[str]:
+    """Write repoFacts.json from the tree. Returns problems, if any."""
+    facts, problems = expected_facts()
+    if facts is None:
+        return problems
+    REPO_FACTS.parent.mkdir(parents=True, exist_ok=True)
+    REPO_FACTS.write_text(json.dumps(facts, indent=2) + "\n", encoding="utf-8")
+    return []
+
+
 def check(full: bool) -> List[str]:
     if not TEST_RESULTS.is_file():
         return [f"{TEST_RESULTS} is missing"]
@@ -196,6 +349,12 @@ def check(full: bool) -> List[str]:
         # A parser that silently matched nothing would make this guard
         # pass forever, which is the failure mode it exists to prevent.
         return ["could not parse any suite out of testResults.ts"]
+
+    facts, problems = expected_facts()
+    failures.extend(problems)
+    if facts is not None:
+        failures.extend(facts_failures(read_facts(), facts))
+        failures.extend(collected_failures(claims, facts))
 
     known = set(SUITES)
     for claim in claims:
@@ -270,11 +429,51 @@ def selftest() -> int:
         finally:
             TEST_RESULTS.write_text(original, encoding="utf-8")
 
+    # The repository facts. Checked through the pure functions, on copies,
+    # so the selftest never rewrites a file another process may be reading.
+    facts, fact_problems = expected_facts()
+    if facts is None:
+        problems.extend(f"could not derive repoFacts: {p}" for p in fact_problems)
+    else:
+        if facts_failures(json.loads(json.dumps(facts)), facts):
+            problems.append("facts derived from the tree were reported as stale")
+        for key, wrong in (
+            ("guardScripts", facts["guardScripts"] - 3),
+            ("tests", {**facts["tests"], "engine": facts["tests"]["engine"] - 361}),
+            ("dataSources", facts["dataSources"] + ["kegg"]),
+        ):
+            if not facts_failures({**facts, key: wrong}, facts):
+                problems.append(f"a stale repoFacts {key} was NOT caught")
+        if facts_failures(None, facts) == []:
+            problems.append("a missing repoFacts.json was NOT caught")
+
+        rows = [c for c in claims if c.working_directory in COLLECTED_SUITES]
+        if len(rows) != len(COLLECTED_SUITES):
+            problems.append("could not find the engine and literature rows")
+        else:
+            row = rows[0]
+            key = COLLECTED_SUITES[row.working_directory]
+            size = facts["tests"][key]
+            for collected, what in ((size + 1, "a suite that has since grown"),
+                                    (None, "a row with no 'collected:'")):
+                stale = Claim(row.name, row.working_directory, row.files_claimed,
+                              min(row.passed, size), row.skipped, 0, collected)
+                if not collected_failures([stale] + rows[1:], facts):
+                    problems.append(f"{what} was NOT caught")
+            inflated = Claim(row.name, row.working_directory, row.files_claimed,
+                             size + 1, 0, 0, size)
+            if not collected_failures([inflated] + rows[1:], facts):
+                problems.append("more passes than collected tests was NOT caught")
+
     if problems:
         for p in problems:
             print(f"SELFTEST FAIL: {p}", file=sys.stderr)
         return 1
-    print("selftest: OK -- the guard parses four suites and catches a wrong count")
+    print(
+        "selftest: OK -- the guard parses four suites and catches a wrong "
+        "count, a stale repoFacts.json and a row measured against another "
+        "suite size"
+    )
     return 0
 
 
@@ -286,10 +485,23 @@ def main() -> int:
         help="also run every suite and compare pass counts exactly (~40 min)",
     )
     parser.add_argument("--selftest", action="store_true")
+    parser.add_argument(
+        "--write",
+        action="store_true",
+        help="regenerate src/lib/generated/repoFacts.json from the tree",
+    )
     args = parser.parse_args()
 
     if args.selftest:
         return selftest()
+
+    if args.write:
+        problems = write_facts()
+        if problems:
+            for p in problems:
+                print(f"NOT WRITTEN: {p}", file=sys.stderr)
+            return 1
+        print(f"wrote {REPO_FACTS.relative_to(REPO_ROOT)}")
 
     failures = check(full=args.full)
     if failures:
@@ -299,6 +511,8 @@ def main() -> int:
         print(
             "\nRe-run the affected suite and paste the real numbers into\n"
             "  Science-Agent-Pipeline/artifacts/caterva-landing/src/lib/testResults.ts\n"
+            "and regenerate the repository facts with\n"
+            "  python3 scripts/check_landing_test_counts.py --write\n"
             "This figure is displayed in the hero, the metrics bar and the\n"
             "trust section, on a page whose claim is that every number is\n"
             "verifiable.",
@@ -307,6 +521,7 @@ def main() -> int:
         return 1
 
     scope = "file counts and pass counts" if args.full else "file counts"
+    scope += ", repoFacts.json, measured suite sizes"
     print(f"landing test counts: OK ({scope})")
     return 0
 

@@ -156,5 +156,7 @@ working tree.
 - **`mule`.** You said you would add the MuleRun page; it is created with a
   placeholder README.
 - **`demo-repository`.** Left untouched — it is GitHub's demo repo.
-- **`worktrees`.** Genuinely empty: `Caterva.worktrees/` tracks no files. It
-  gets a README so an empty repo is not mistaken for a failed push.
+- **`worktrees`.** Genuinely empty: `Caterva.worktrees/` tracks no files
+  (its helper, `scripts/worktree.sh`, moved out of it on 2026-10-31 and
+  ships with `wiring-main`). It gets a README so an empty repo is not
+  mistaken for a failed push.

@@ -5,17 +5,15 @@ import {
   coherenceFromProvenance,
   type CoherenceReport,
 } from "./assayCoherence";
-import { resolveKineticValue, resolveEpidemiologyParameters, type RelatednessVerdict } from "./scienceAgent";
+import { resolveKineticValue, type RelatednessVerdict } from "./scienceAgent";
 import { buildCitationLocators, type CitationLocator } from "./citeVerify";
 import { matchEnzyme } from "./enzymes";
 import { matchOrganism } from "./organisms";
-import { matchDisease } from "./diseases";
 import { extractStatedQuantities } from "./statedQuantities";
 import {
   RESOLVABLE_FIELDS,
   KI_MODE_OF_DOMAIN,
   DOMAINS_WITH_LITERATURE_RESOLUTION,
-  EPIDEMIOLOGY_BRIDGE_DOMAINS,
   RequiredParametersMissingError,
   UnrecognizedQueryError,
   resolveGaps,
@@ -1314,299 +1312,6 @@ async function applyVmaxFromKcatResolution(
   return { parameters, parameterProvenance, flags };
 }
 
-/**
- * ADR 0017 / ADR 0020: resolve a named disease's (R0, infectious period)
- * from the hand-verified registry and bridge it to the SIR engine's own
- * (beta, gamma) — the epidemiology counterpart of applyVmaxFromKcatResolution.
- *
- * Unlike the kcat bridge, this needs no caller-supplied half: R0 and
- * infectious period are both intrinsic disease properties, both resolved
- * from literature (ADR 0017's Context section explains why kcat's [E]0
- * situation does NOT apply here). The gate is simpler as a result: fires
- * whenever the domain is "sir", a disease name is recognized in the query
- * text, and neither `beta` nor `gamma` was already supplied by the caller
- * or the LLM. If either is already present, the bridge is skipped entirely
- * rather than mixing one literature-derived rate with one arbitrary
- * caller-chosen rate — beta and gamma come from the same internally
- * consistent source or neither does.
- *
- * Scoped to "sir" only, not "seir": ADR 0017's verification (the SIR peak
- * condition S(t_peak) = N/R0) was checked against the two-compartment SIR
- * model specifically; SEIR's extra exposed compartment changes what
- * "infectious period" as a generation-time proxy would even mean, and that
- * has not been checked.
- */
-async function applyBetaGammaFromR0Resolution(
-  query: string,
-  overrides: Record<string, number | number[]>,
-  domain: string,
-  parameters: Record<string, number | number[]>,
-  parameterProvenance: Record<string, ParameterProvenance>,
-  flags: string[],
-): Promise<{
-  parameters: Record<string, number | number[]>;
-  parameterProvenance: Record<string, ParameterProvenance>;
-  flags: string[];
-}> {
-  // The domain list lives in provenance.ts beside RESOLVABLE_FIELDS, so
-  // that DOMAINS_WITH_LITERATURE_RESOLUTION can be derived from it rather
-  // than restating which domains have a resolver. A hardcoded
-  // `domain !== "sir"` here would be a second copy of that fact, and the
-  // two would drift the way the enzyme and domain-keyword lists did.
-  if (!EPIDEMIOLOGY_BRIDGE_DOMAINS.has(domain)) {
-    return { parameters, parameterProvenance, flags };
-  }
-  if ("beta" in overrides || "gamma" in overrides) {
-    return { parameters, parameterProvenance, flags };
-  }
-  const disease = matchDisease(query);
-  if (!disease) {
-    // Not "literature has nothing for this disease" -- this system only
-    // recognizes disease NAMES it has a verified, methodology-compatible
-    // (R0, infectious period) source for in the first place (see
-    // diseases.ts and ADR 0017), so a name outside that short list never
-    // even reaches the literature lookup below. Previously silent: a
-    // query naming a real disease (measles, influenza, ...) that
-    // correctly reaches the sir domain would refuse on missing beta/gamma
-    // via the generic "could not be resolved from literature" sentence --
-    // false by omission for a real, well-studied disease that simply
-    // isn't registered here yet, not one the literature has nothing on.
-    // Set directly on beta/gamma (not just a flag, which never reaches
-    // the RequiredParametersMissingError response the client actually
-    // sees) so missingKeyDetails can promote it into the error message.
-    // Names the registry's ACTUAL contents and, for measles, the specific
-    // paper behind the refusal.
-    //
-    // This said "currently COVID-19 only, per ADR 0017" until ADR 0169
-    // registered the two influenza entries — a refusal that misdescribes
-    // what the system can do is its own small inaccuracy, in the message
-    // a user reads when they are already blocked.
-    //
-    // The measles clause matters more than it looks. Measles is the
-    // disease most people try after COVID, and its refusal is NOT "we
-    // haven't got to it": Vink et al. (2014) supplies a measles serial
-    // interval (11.7 d), so half the pair exists. It is unregistered
-    // because Guerra et al. (2017), the standard R0 systematic review,
-    // concludes estimates "vary more than the often cited range of 12-18"
-    // and endorses no single value. Citing that is the product's own
-    // promise applied to its own gaps.
-    const measlesAsked = /\bmeasles\b/i.test(query);
-    const note =
-      "No disease name in this query matches Caterva's literature-backed " +
-      "R0 registry (currently COVID-19, seasonal influenza, and influenza " +
-      "A(H1N1)pdm09 -- see ADR 0017 and ADR 0169). This is a gap in what " +
-      "this system has verified so far, not a statement that the " +
-      "literature is silent. " +
-      (measlesAsked
-        ? "Measles specifically is not registered because Guerra et al. " +
-          "(2017), Lancet Infect Dis 17(12):e420-e428, " +
-          "doi:10.1016/S1473-3099(17)30307-9 -- the standard R0 systematic " +
-          "review -- found that R0 estimates vary far more than the often " +
-          "cited 12-18 range and endorses no single value, so no honest " +
-          "default exists. Supply beta and gamma for YOUR setting. "
-        : "") +
-      "Supply beta/gamma directly if you have a source for this disease.";
-    for (const key of ["beta", "gamma"] as const) {
-      if (!(key in overrides)) {
-        parameterProvenance = {
-          ...parameterProvenance,
-          [key]: {
-            ...parameterProvenance[key],
-            origin: parameterProvenance[key]?.origin ?? "default",
-            unresolvedReason: "disease_not_registered",
-            note,
-          },
-        };
-      }
-    }
-    return { parameters, parameterProvenance, flags };
-  }
-
-  const agentResult = await resolveEpidemiologyParameters(disease.diseaseName);
-  if (!agentResult.found) {
-    flags.push(
-      `Could not resolve real (R0, infectious period) literature values for ` +
-        `'${disease.diseaseName}'; beta/gamma were not bridged from literature.`,
-    );
-    return { parameters, parameterProvenance, flags };
-  }
-
-  if (
-    !agentResult.betaGammaValidation?.ok ||
-    agentResult.beta === undefined ||
-    agentResult.gamma === undefined
-  ) {
-    flags.push(
-      `Resolved R0=${agentResult.r0} for '${agentResult.disease}' but could not ` +
-        `bridge it to beta/gamma: ${agentResult.betaGammaValidation?.reason ?? "invalid inputs"}.`,
-    );
-    return { parameters, parameterProvenance, flags };
-  }
-
-  const located = locatableCitation(agentResult.citation);
-  if (located === undefined) {
-    flags.push(
-      `Resolved R0 for '${agentResult.disease}' but its citation carries no ` +
-        `locator; beta/gamma were not bridged from literature.`,
-    );
-    return { parameters, parameterProvenance, flags };
-  }
-  const citation = located.display;
-
-  const bridgeNote =
-    `beta and gamma derived from R0=${agentResult.r0} and infectious_period=` +
-    `${agentResult.infectiousPeriodDays} days for '${agentResult.disease}' ` +
-    `(gamma = 1/infectious_period, beta = R0 * gamma).` +
-    (agentResult.betaGammaValidation.flagged
-      ? ` ${agentResult.betaGammaValidation.reason ?? ""}`
-      : "");
-
-  // beta/gamma are not STRENDA-governed (a disease has no assay pH), which
-  // buildResolvedKineticProvenance now handles itself via parameterKey —
-  // see ADR 0021.
-  //
-  // citationStatus was unconditionally "verified" here, on the reasoning
-  // that the registry had no flagged tier to select between (ADR 0017,
-  // when COVID-19 was the only entry and both its numbers came from one
-  // paper). ADR 0169 adds that tier: an entry whose R0 and serial
-  // interval come from two different systematic reviews is a CROSS-STUDY
-  // COMPOSITE, and is flagged for the same reason a cross-species BRENDA
-  // Km is — usable and cited, but visibly weaker than a single-source
-  // value. Letting a composite inherit "verified" would erase the only
-  // signal that two methodologies were combined.
-  const composite = agentResult.crossStudyComposite === true;
-  const secondary = locatableCitation(agentResult.secondaryCitation);
-
-  // BOTH papers go in the citation string. A composite that displayed only
-  // the R0 paper would read as single-source at exactly the layer built
-  // for checking.
-  //
-  // The LOCATORS stay primary-only, deliberately. validateParameterProvenance
-  // requires every locator to be findable in the citation string, and
-  // buildCitationLocators emits a PubMed locator whose value is a PMID
-  // while the citation carries a doi.org URL — so the secondary's locators
-  // are not string-matchable here and adding them fails that check. That
-  // check is right and is not being weakened to fit this feature: the
-  // second paper reaches the reader through the citation text and the
-  // note, and the machine-followable set stays honest about what it can
-  // actually verify.
-  const displayCitation =
-    composite && secondary
-      ? `${citation} + serial interval from ${secondary.display}`
-      : citation;
-
-  const fullNote = composite
-    ? `${bridgeNote} ${agentResult.compositeNote ?? ""}`.trim()
-    : bridgeNote;
-
-  parameters = { ...parameters, beta: agentResult.beta, gamma: agentResult.gamma };
-  const provenanceEntry = buildResolvedKineticProvenance({
-    parameterKey: "beta",
-    source: agentResult.source ?? "PubMed",
-    citation: displayCitation,
-    citationStatus: composite ? "flagged" : "verified",
-    citationLocators: buildCitationLocators(agentResult.citation),
-    note: fullNote,
-  });
-  parameterProvenance = {
-    ...parameterProvenance,
-    beta: provenanceEntry,
-    gamma: provenanceEntry,
-  };
-  flags.push(
-    `Bridged beta=${agentResult.beta}, gamma=${agentResult.gamma} from ` +
-      `literature R0 and infectious period for '${agentResult.disease}'.`,
-  );
-
-  return { parameters, parameterProvenance, flags };
-}
-
-/**
- * Apply population genetics parameter resolution from literature.
- * Currently supports mutation_rate for Wright-Fisher domains.
- */
-async function applyPopgenResolution(
-  entities: EntityExtraction | undefined,
-  overrides: Record<string, number | number[]>,
-  domain: string,
-  parameters: Record<string, number | number[]>,
-  parameterProvenance: Record<string, ParameterProvenance>,
-  flags: string[],
-): Promise<{
-  parameters: Record<string, number | number[]>;
-  parameterProvenance: Record<string, ParameterProvenance>;
-  flags: string[];
-}> {
-  const resolvable = RESOLVABLE_FIELDS[domain] ?? [];
-  const popgenKeys = resolvable.filter((k) => !(k in overrides));
-  if (popgenKeys.length === 0) {
-    return { parameters, parameterProvenance, flags };
-  }
-
-  // Accumulate updates to avoid repeated object spreading
-  const parameterUpdates: Record<string, number | number[]> = {};
-  const provenanceUpdates: Record<string, ParameterProvenance> = {};
-
-  // For now, only mutation_rate is supported
-  if (popgenKeys.includes("mutation_rate") && entities?.organism) {
-    const agentResult = await resolveKineticValue({
-      ...entities,
-      parameterType: "mutation_rate",
-    });
-
-    if (agentResult.found && agentResult.km !== undefined) {
-      const value = agentResult.km;
-      const located = locatableCitation(agentResult.citation);
-
-      if (located !== undefined) {
-        const citation = located.display;
-        parameterUpdates["mutation_rate"] = value;
-        // mutation_rate is a per-generation per-base-pair substitution
-        // rate, not an enzyme kinetic constant: STRENDA does not govern it
-        // and it has no assay pH or temperature. buildResolvedKineticProvenance
-        // now enforces that itself via the mandatory parameterKey.
-        //
-        // Before that fix, this call unconditionally stamped a strendaStatus
-        // here, which validateParameterProvenance rejects as a hard
-        // violation and provenanceViolations THROWS on -- so every
-        // successfully-resolved mutation_rate crashed resolveQuery() with
-        // "Internal error: invalid parameter provenance". Never caught by
-        // CI because stdpopsim is absent from the test sandbox, so the
-        // popgen resolver always returned found=false and this branch never
-        // executed. See ADR 0021.
-        provenanceUpdates["mutation_rate"] = buildResolvedKineticProvenance({
-          parameterKey: "mutation_rate",
-          source: agentResult.source ?? "unknown",
-          citation,
-          organism: agentResult.organism,
-          citationStatus: "verified",
-          citationLocators: buildCitationLocators(agentResult.citation),
-        });
-        flags.push(
-          `Resolved mutation_rate=${value} from ${agentResult.source ?? "literature"}.`,
-        );
-      } else {
-        provenanceUpdates["mutation_rate"] = {
-          origin: "default",
-          note: "Found a mutation_rate value but its citation carries no locator; using default.",
-        };
-      }
-    } else {
-      provenanceUpdates["mutation_rate"] = {
-        origin: "default",
-        note: "Could not resolve a real mutation_rate value from literature; using default.",
-      };
-    }
-  }
-
-  // Apply accumulated changes
-  return {
-    parameters: { ...parameters, ...parameterUpdates },
-    parameterProvenance: { ...parameterProvenance, ...provenanceUpdates },
-    flags,
-  };
-}
-
 export interface ResolvedSimulation {
   runId: string;
   domain: SimulationDomain;
@@ -2806,22 +2511,6 @@ export async function resolveQuery(
       flags = vmaxResult.flags;
     }
 
-    // ADR 0017 / ADR 0020: bridge a literature R0/infectious-period pair
-    // to beta/gamma for a recognized disease name in the query text.
-    {
-      const epiResult = await applyBetaGammaFromR0Resolution(
-        query,
-        effectiveOverrides,
-        llmResult.domain,
-        parameters,
-        parameterProvenance,
-        flags,
-      );
-      parameters = epiResult.parameters;
-      parameterProvenance = epiResult.parameterProvenance;
-      flags = epiResult.flags;
-    }
-
 
     if (
       Object.keys(effectiveOverrides).length === 0 &&
@@ -2972,9 +2661,8 @@ export async function resolveQuery(
         modelCitations: domainCitation ? [domainCitation] : [],
         // Appended HERE rather than pushed at the point of discard: `flags`
         // is REASSIGNED further down this function (flags = result.flags,
-        // = vmaxResult.flags, = epiResult.flags, = popgenResult.flags), so
-        // anything pushed earlier is silently dropped on four of the paths
-        // through it.
+        // = vmaxResult.flags), so anything pushed earlier is silently
+        // dropped on two of the paths through it.
         flags:
           discardedLlmCitations > 0
             ? [
@@ -3128,22 +2816,6 @@ export async function resolveQuery(
     parameters = vmaxResult.parameters;
     parameterProvenance = vmaxResult.parameterProvenance;
     flags = vmaxResult.flags;
-  }
-
-  // ADR 0017 / ADR 0020: bridge a literature R0/infectious-period pair to
-  // beta/gamma for a recognized disease name in the query text.
-  {
-    const epiResult = await applyBetaGammaFromR0Resolution(
-      query,
-      effectiveOverrides,
-      best.domain,
-      parameters,
-      parameterProvenance,
-      flags,
-    );
-    parameters = epiResult.parameters;
-    parameterProvenance = epiResult.parameterProvenance;
-    flags = epiResult.flags;
   }
 
 

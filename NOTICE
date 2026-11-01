@@ -389,7 +389,9 @@ depend on the `tellurium` package -- a prohibition made executable by
 Constitution Rule 7 and scripts/check_forbidden_packages.py.
 
 Caterva is a consumer of libRoadRunner and Antimony, in the ordinary way
-those libraries are meant to be consumed. The project was called Terrium until 2026-09-27, too close to Tellurium's name; it has been Caterva since.md and docs/RENAME_PLAN.md.
+those libraries are meant to be consumed. The project was called Terrium
+until 2026-09-27, a name too close to Tellurium's; it has been Caterva
+since. The rename is addressed in README.md and docs/RENAME_PLAN.md.
 
 Other software
 --------------

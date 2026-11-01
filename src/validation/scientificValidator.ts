@@ -229,7 +229,14 @@ export class ParameterValidator {
   }
 
   /**
-   * Calculate confidence score (0-1)
+   * A heuristic score in [0, 1] -- NOT a calibrated probability.
+   *
+   * It starts from `param.confidence`, which scientificPipeline.ts seeds
+   * from literature-source count alone (0.95 / 0.92 / 0), and adjusts by
+   * fixed steps for warnings and for well-cited references. None of these
+   * constants was fitted to whether runs turned out right, so the result
+   * ranks; it does not estimate. Anything that prints it says so
+   * (scientificCLI.ts `literatureScoreLines`; ADR 0125).
    */
   private static calculateConfidence(
     param: ParameterMetadata,
@@ -271,7 +278,7 @@ function crossRefUserAgent(): string {
   const contact = process.env['CATERVA_CONTACT_EMAIL'];
   return contact
     ? `Caterva/1.0 (mailto:${contact})`
-    : 'Caterva/1.0 (https://github.com/caterva)';
+    : 'Caterva/1.0 (https://github.com/math12345678/caterva)';
 }
 
 /** Registry lookups must not hang a validation pass. */
@@ -1216,7 +1223,7 @@ export class ScientificValidationPipeline {
     return {
       passed: true,
       confidence: Math.max(0, minConfidence),
-      summary: `✓ Validation complete (confidence: ${(minConfidence * 100).toFixed(1)}%)`,
+      summary: `✓ Validation complete (heuristic score: ${Math.max(0, minConfidence).toFixed(2)}, uncalibrated)`,
       errors: []
     };
   }

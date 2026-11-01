@@ -111,7 +111,11 @@ STUDIO_PACKAGE = ROOT / "Science-Agent-Pipeline" / "artifacts" / "caterva-studio
 #: (LSMinimumSystemVersion), the DMG README and the docs. 14.0, because the
 #: pinned wheels inside the app are built for it: NumPy 2.2.6 and SciPy 1.15.3
 #: are macosx_14_0_arm64 and libRoadRunner 2.8.0 macosx_14_0_universal2
-#: (`vtool -show-build` on their extension modules reports minos 14.0).
+#: (`vtool -show-build` on their extension modules reports minos 14.0). Since
+#: 2026-10-31 SciPy is 1.15.3 only below Python 3.11 and 1.16.0 from 3.11
+#: (requirements.txt); the app is built on 3.12 (studio-dmg.yml), so it carries
+#: 1.16.0, whose cp312 arm64 wheel on PyPI is also macosx_14_0_arm64 (its minos
+#: not yet read with vtool).
 MIN_MACOS = "14.0"
 
 #: The deployment target the Swift shell itself is compiled for. Lower than

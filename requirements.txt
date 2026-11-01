@@ -19,8 +19,9 @@
 # on the 2.8.0 line and numpy on 2.2.x -- the first lines that publish cp313
 # wheels while still covering the cp310 floor. numpy must stay on 2.2.x:
 # libroadrunner 2.8.0 pins numpy~=2.2, and numpy 2.2.x is the last line that
-# also satisfies scipy 1.15.3's numpy<2.5 cap with a single pin for every
-# supported interpreter. See docs/adr/0014-python-version-support.md.
+# also satisfies both scipy pins' numpy caps (1.15.3 <2.5, 1.16.0 <2.6) with a
+# single pin for every supported interpreter. See
+# docs/adr/0014-python-version-support.md.
 
 # --- Simulation engines (Tier 2 ODE domains) -------------------------------
 # NOTE: do NOT `pip install tellurium`. The umbrella package pulls in
@@ -50,7 +51,18 @@ python-libsedml==2.0.33
 
 # --- Numerics --------------------------------------------------------------
 numpy==2.2.6
-scipy==1.15.3
+# scipy is split by interpreter. 1.15.3's cp313 arm64 wheel does not load on
+# macOS 27.0.1: `import scipy.sparse.linalg` -- and with it
+# scipy.optimize -- fails in dlopen with "section '__DATA/__thread_bss' has a
+# zero-fill section type, but offset field is not zero", so steady-state
+# analysis and influence ranking stopped working. 1.15.2 fails the same way;
+# 1.16.0 is the first release after 1.15.3 that imports there (checked
+# 2026-10-31, each of 1.16.0-1.18.0 tried). 1.16.0 requires Python >=3.11, so
+# 3.10 keeps 1.15.3
+# -- the last line with cp310 wheels; whether its cp310 wheel shows the same
+# macOS 27 failure is unchecked (no 3.10 interpreter was available).
+scipy==1.15.3; python_version < "3.11"
+scipy==1.16.0; python_version >= "3.11"
 
 # --- Literature layer (BRENDA / KEGG / PubMed scraping) --------------------
 requests==2.34.2

@@ -139,7 +139,12 @@ describe("POST /api/simulate", () => {
     const getRes = await request(server).get(`/api/simulate/${jobId}`);
     expect(getRes.status).toBe(200);
     expect(getRes.body.jobId).toBe(jobId);
-    expect(["pending", "running", "failed", "completed"]).toContain(
+    // Every JobStatus (lib/queue.ts): at 800 ms a job may still be resolving
+    // or validating, and which one depends on the machine, not the code.
+    const statuses: queue.JobStatus[] = [
+      "pending", "resolving", "validating", "running", "completed", "failed", "cancelled",
+    ];
+    expect(statuses).toContain(
       getRes.body.status,
     );
   });

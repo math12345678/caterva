@@ -35,8 +35,11 @@ export class JobDatabase {
   constructor(dbPath: string = './caterva-jobs.jsonl') {
     this.dbPath = dbPath;
 
-    // Create file if doesn't exist
+    // Create file if doesn't exist. The file is not tracked (.gitignore), so
+    // on a fresh clone or a fresh ./data volume this is where it first appears;
+    // its directory may not exist yet either.
     if (!fs.existsSync(dbPath)) {
+      fs.mkdirSync(path.dirname(dbPath), { recursive: true });
       fs.writeFileSync(dbPath, '', 'utf-8');
       logger.info({ path: dbPath }, 'Created job database');
     }
@@ -230,9 +233,17 @@ export class JobDatabase {
 // Default instance
 let defaultDb: JobDatabase | null = null;
 
+/**
+ * CATERVA_JOBS_FILE moves the store into a directory. docker-compose.yml needs
+ * that: bind-mounting `./caterva-jobs.jsonl` as a single file makes Docker
+ * create a DIRECTORY at that path whenever the host file is absent -- which,
+ * since the file is untracked, is every fresh clone -- and every save then
+ * fails with EISDIR, logged and swallowed. Mounting ./data and pointing here
+ * avoids that.
+ */
 export function getDefaultDatabase(): JobDatabase {
   if (!defaultDb) {
-    defaultDb = new JobDatabase('./caterva-jobs.jsonl');
+    defaultDb = new JobDatabase(process.env.CATERVA_JOBS_FILE || './caterva-jobs.jsonl');
   }
   return defaultDb;
 }

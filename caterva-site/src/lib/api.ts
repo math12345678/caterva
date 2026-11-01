@@ -10,9 +10,9 @@
  * commands) but is not an acceptable basis for a `run` command that claims
  * to simulate something. This file is what actually calls the science-agent
  * pipeline (Science-Agent-Pipeline/artifacts/api-server) that does real
- * literature resolution, so `run kinetics <enzyme>` and
- * `run epidemiology <query>` report only what that pipeline actually found,
- * with its citations and its flags, not a fabricated demo.
+ * literature resolution, so `run mm <enzyme>` reports only what that
+ * pipeline actually found, with its citations and its flags, not a
+ * fabricated demo.
  */
 
 export interface ParameterProvenanceEntry {
@@ -56,7 +56,8 @@ export interface SimulationJob {
  * Configure via `.env.local`: VITE_CATERVA_API_URL=http://localhost:3000
  */
 export const API_BASE_URL: string =
-  (import.meta.env.VITE_CATERVA_API_URL as string | undefined) || "";
+  // `?.`: under `node --test` (tests/) there is no Vite, so no env object.
+  (import.meta.env?.VITE_CATERVA_API_URL as string | undefined) || "";
 
 export class ApiUnavailableError extends Error {}
 

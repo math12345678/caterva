@@ -95,9 +95,11 @@ describe("example cards do not overstate what the pipeline returns", () => {
  * a smaller, more modest invented number would have been the identical
  * defect wearing a humbler face.
  *
- * The Caterva side keeps a figure because that one was measured
- * end-to-end (2.0-28.3 s across three queries on 2026-09-05), and the
- * file records the runs.
+ * The Caterva side kept "under 30 s (measured)" from three runs on
+ * 2026-09-05 (2.0-28.3 s). Two were SIR/influenza queries, domains archived
+ * on 2026-09-27, and one enzyme run is not a bound, so on 2026-10-31 the
+ * figure was withdrawn. The runs stay recorded in the file's comments, so
+ * whoever restores a figure starts from what was measured.
  */
 describe("the workflow comparison does not invent durations", () => {
   const source = readFileSync(
@@ -125,12 +127,13 @@ describe("the workflow comparison does not invent durations", () => {
     expect(rendered).toMatch(/Cross-reference papers/i);
   });
 
-  it("keeps the Caterva figure, which is measured, and labels it so", () => {
-    expect(rendered).toMatch(/under 30 s/i);
-    expect(rendered).toMatch(/measured/i);
+  it("claims no Caterva duration either, since none is measured on live domains", () => {
+    expect(rendered).not.toMatch(/under 30 s/i);
+    expect(rendered).not.toMatch(/\d+(\.\d+)?\s*(s|sec|seconds)\b/i);
+    expect(rendered).toMatch(/not yet measured/i);
   });
 
-  it("records the measurements behind that figure in the file", () => {
+  it("keeps the withdrawn measurements on record in the file", () => {
     // A number is only as good as its recorded basis. If someone changes
     // the claim they have to change the evidence next to it.
     //

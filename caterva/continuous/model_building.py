@@ -1,7 +1,8 @@
 """Antimony model construction and SBML translation (continuous domains).
 
-Antimony/libterium are intentionally isolated to this module: discrete
-domains never import them (ADR 0001, ADR 0002, ADR 0006).
+Antimony and libSBML, which this module imports, are intentionally kept
+out of the discrete domains: caterva/discrete/ never imports them (ADR 0001,
+ADR 0002, ADR 0006).
 """
 
 from __future__ import annotations

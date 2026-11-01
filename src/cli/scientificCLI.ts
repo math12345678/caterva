@@ -319,6 +319,39 @@ function readQuantities(params?: Record<string, string>): {
   };
 }
 
+/**
+ * The literature score, said as what it is.
+ *
+ * `validationConfidence` is `ScientificValidationPipeline.validate`'s
+ * minimum over `ParameterValidator.calculateConfidence` -- a per-parameter
+ * seed of 0.95 / 0.92 / 0 by literature-source count (scientificPipeline.ts),
+ * minus 0.05 per medium and 0.02 per low warning, plus 0.05 when more than
+ * two references average over 500 citations -- less 0.1 per violated model
+ * assumption, capped by the output's data-quality score. None of those
+ * constants was fitted to outcomes, so the result is an uncalibrated
+ * heuristic. Printed as `92.0%` beside the word "confidence" it reads as a
+ * probability that the run is right, which nothing has measured.
+ *
+ * So: no literature claim is "not applicable" (ADR 0125), and a claim gets
+ * the score on a 0-1 scale with the label saying it is a heuristic.
+ */
+function literatureScoreLines(response: {
+  validationConfidence: number;
+  metadata: { literatureSourcesUsed: number };
+}): string[] {
+  if (response.metadata.literatureSourcesUsed === 0) {
+    return [
+      'Literature agreement: not applicable — this run made no',
+      '                      literature claim to check.',
+    ];
+  }
+  return [
+    `Literature agreement: ${response.validationConfidence.toFixed(2)} ` +
+      '(heuristic score from source count and',
+    '                      validator checks; uncalibrated, not a probability)',
+  ];
+}
+
 async function commandValidate(query: string, params?: Record<string, string>) {
   header('SCIENTIFIC VALIDATION');
 
@@ -377,7 +410,12 @@ async function commandValidate(query: string, params?: Record<string, string>) {
     }
 
     success('VALIDATION PASSED');
-    console.log(`\nConfidence: ${(response.validationConfidence * 100).toFixed(1)}%`);
+    // Was `Confidence: ${validationConfidence * 100}%` -- ADR 0125's
+    // defect on the command that ADR did not reach. `validate` loads no
+    // literature (above), so the number could only be 0.0% here, printed
+    // under a word that reads as a probability. See literatureScoreLines.
+    console.log('');
+    literatureScoreLines(response).forEach(line => console.log(line));
     console.log(`Literature sources: ${response.metadata.literatureSourcesUsed}`);
     console.log(`Execution time: ${response.metadata.executionTimeMs}ms`);
 
@@ -608,8 +646,7 @@ async function commandSimulate(
     // one.
     console.log('\n' + colors.dim + 'Quality:' + colors.reset);
     if (response.metadata.literatureSourcesUsed === 0) {
-      console.log('  Literature agreement: not applicable — this run made no');
-      console.log('                        literature claim to check.');
+      literatureScoreLines(response).forEach(line => console.log(`  ${line}`));
       console.log('  What was checked:     units and dimensions, plausibility');
       console.log('                        bounds, and the model assumptions');
       console.log('                        listed above. All passed.');
@@ -619,8 +656,11 @@ async function commandSimulate(
         '    --organism "<organism>" --s0 10mM --enzyme-conc 0.001mM' +
         colors.reset);
     } else {
-      console.log(`  Literature agreement: ${(response.validationConfidence * 100).toFixed(1)}%`);
-      console.log(`  Overall confidence: ${(response.metadata.confidenceScore * 100).toFixed(1)}%`);
+      // No `Overall confidence` line. It printed `metadata.confidenceScore`,
+      // which scientificPipeline.ts sets to the same `resultValidation
+      // .confidence` as the line above: one number under two names, the
+      // second implying an aggregate ADR 0125 declined to invent.
+      literatureScoreLines(response).forEach(line => console.log(`  ${line}`));
       console.log(`  Literature sources: ${response.metadata.literatureSourcesUsed}`);
     }
     console.log(`  Execution time: ${response.metadata.executionTimeMs}ms`);

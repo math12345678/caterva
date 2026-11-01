@@ -6,6 +6,8 @@
 // v0.4.0 download has it (caterva/app.py at the tag lists compose and sim);
 // "main" means it is built and tested on the main branch and waits for the
 // next release.
+import repoFacts from "./generated/repoFacts.json";
+
 export type CapabilityStatus = "released" | "main";
 
 export const RELEASE_TAG = "v0.4.0";
@@ -54,7 +56,19 @@ export const CAPABILITY_COUNT = DOMAINS.length;
 export const RELEASED_COUNT = DOMAINS.filter((d) => d.status === "released").length;
 
 /**
- * scripts/check_*.py in the repository, as counted by
- * scripts/check_documented_counts.py ("guards"). Update with it.
+ * scripts/check_*.py in the repository ("guards"), read from the generated
+ * repoFacts.json rather than typed here: the literal this replaced said 76
+ * while scripts/ held 79. scripts/check_landing_test_counts.py fails when
+ * the file disagrees with the tree, and `--write` regenerates it.
  */
-export const GUARD_COUNT = 76;
+export const GUARD_COUNT: number = repoFacts.guardScripts;
+
+/**
+ * The external data sources docs/data-sources.json attributes (BRENDA,
+ * NCBI Taxonomy, ExPASy ENZYME), from the same generated file. KEGG is
+ * not among them: it is off unless an operator sets CATERVA_ENABLE_KEGG.
+ */
+export const DATA_SOURCES: readonly string[] = repoFacts.dataSources;
+
+/** The literature suite's size as README.md states it, from the same file. */
+export const LITERATURE_TEST_COUNT: number = repoFacts.tests.literature;

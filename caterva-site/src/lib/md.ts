@@ -1,13 +1,14 @@
 /**
- * Lennard-Jones molecular dynamics, velocity Verlet, in the browser.
+ * The page background: particles under a Lennard-Jones-shaped pair force,
+ * stepped with velocity Verlet.
  *
- * This drives the ambient background of the site. It is not a particle
- * effect dressed up in physics vocabulary — it is the same model Caterva's
- * molecular-dynamics domain implements in Python, integrated with the same
- * scheme, conserving the same quantities. The background of the page is one
- * of the product's own simulation domains, running.
- *
- * Reduced units throughout (epsilon = sigma = m = 1), matching the engine.
+ * This is decoration. The core is softened, the force is clamped, the
+ * velocities are damped every step and the walls reflect, so it conserves
+ * nothing and simulates no system; it is not molecular dynamics and the
+ * site does not call it that. Caterva's molecular dynamics is `caterva md`,
+ * which sets up GROMACS runs of enzymes. The toy Lennard-Jones domain this
+ * background was once described as running was archived on 2026-09-27
+ * (archive/legacy_domains/README.md); v0.4.0 is the last release with it.
  */
 
 export interface MDState {
@@ -154,89 +155,4 @@ export function step(s: MDState, dt: number): void {
       vel[y] = -Math.abs(vel[y]);
     }
   }
-}
-
-// ---------------------------------------------------------------------------
-// Cluster geometry — the values the terminal reports, recomputed live.
-// ---------------------------------------------------------------------------
-
-export const R_MIN = Math.pow(2, 1 / 6); // 1.122462048309373
-
-function ljPotential(p: number[][]): number {
-  let e = 0;
-  for (let i = 0; i < p.length; i++) {
-    for (let j = i + 1; j < p.length; j++) {
-      const dx = p[i][0] - p[j][0];
-      const dy = p[i][1] - p[j][1];
-      const dz = p[i][2] - p[j][2];
-      const r = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      const s6 = Math.pow(1 / r, 6);
-      e += 4 * (s6 * s6 - s6);
-    }
-  }
-  return e;
-}
-
-const PHI = (1 + Math.sqrt(5)) / 2;
-
-const ICOSA: number[][] = [
-  [0, 1, PHI], [0, 1, -PHI], [0, -1, PHI], [0, -1, -PHI],
-  [1, PHI, 0], [1, -PHI, 0], [-1, PHI, 0], [-1, -PHI, 0],
-  [PHI, 0, 1], [PHI, 0, -1], [-PHI, 0, 1], [-PHI, 0, -1],
-];
-
-/**
- * Golden-section search for the LJ13 icosahedron scale.
- *
- * One-dimensional, deterministic, hand-written — the same constraint the
- * engine works under (numpy only, no optimiser). Converges to
- * 0.5687560445, giving E = -44.326801, which is the published global minimum
- * from Hoare & Pal (1971).
- */
-export function lj13(): { scale: number; energy: number; shell: number; centre: number } {
-  const invPhi = PHI - 1;
-  let lo = 0.4;
-  let hi = 0.8;
-  const build = (sc: number) => [[0, 0, 0], ...ICOSA.map((v) => v.map((c) => c * sc))];
-  const f = (sc: number) => ljPotential(build(sc));
-
-  let m1 = hi - invPhi * (hi - lo);
-  let m2 = lo + invPhi * (hi - lo);
-  let e1 = f(m1);
-  let e2 = f(m2);
-
-  for (let k = 0; k < 200 && hi - lo > 1e-12; k++) {
-    if (e1 < e2) {
-      hi = m2; m2 = m1; e2 = e1; m1 = hi - invPhi * (hi - lo); e1 = f(m1);
-    } else {
-      lo = m1; m1 = m2; e1 = e2; m2 = lo + invPhi * (hi - lo); e2 = f(m2);
-    }
-  }
-
-  const scale = (lo + hi) / 2;
-  const pts = build(scale);
-  const centre = Math.hypot(pts[1][0], pts[1][1], pts[1][2]);
-  let shell = Infinity;
-  for (let i = 1; i < 13; i++) {
-    for (let j = i + 1; j < 13; j++) {
-      const d = Math.hypot(
-        pts[i][0] - pts[j][0], pts[i][1] - pts[j][1], pts[i][2] - pts[j][2],
-      );
-      if (d < shell) shell = d;
-    }
-  }
-  return { scale, energy: ljPotential(pts), shell, centre };
-}
-
-/** Small clusters whose minima are exact by construction AND published. */
-export function exactCluster(n: 2 | 3 | 4): number {
-  const r = R_MIN;
-  if (n === 2) return ljPotential([[0, 0, 0], [r, 0, 0]]);
-  if (n === 3) {
-    return ljPotential([[0, 0, 0], [r, 0, 0], [r / 2, (r * Math.sqrt(3)) / 2, 0]]);
-  }
-  const s = r / (2 * Math.sqrt(2));
-  return ljPotential([
-    [s, s, s], [s, -s, -s], [-s, s, -s], [-s, -s, s],
-  ]);
 }

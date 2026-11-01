@@ -160,11 +160,19 @@ describe("interpreter discovery does not judge by filename", () => {
    * never occurred, and removing the fallback under test changed nothing.
    * The test passed either way, which makes it worse than no test: it was
    * reported as coverage of a line it could not reach.
+   *
+   * It is a wrapper that execs the real path, not a symlink (2026-10-31). A
+   * symlink to a virtualenv's interpreter, placed outside the venv, starts
+   * the BASE interpreter -- Python looks for pyvenv.cfg beside the path it
+   * was invoked by -- so Caterva's dependencies vanish and the resolver
+   * rightly refuses it. That failed on every machine whose supported Python
+   * is a venv, for a reason that had nothing to do with the fallback.
    */
   function pathWithOnlyBarePython3(source: string): string | undefined {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "caterva-py-"));
     try {
-      fs.symlinkSync(source, path.join(dir, "python3"));
+      const wrapper = path.join(dir, "python3");
+      fs.writeFileSync(wrapper, `#!/bin/sh\nexec ${JSON.stringify(source)} "$@"\n`, { mode: 0o755 });
     } catch {
       return undefined;
     }

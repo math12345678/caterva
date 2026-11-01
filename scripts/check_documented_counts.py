@@ -1036,6 +1036,23 @@ def main() -> int:
                 path.write_text(after, encoding="utf-8")
                 changed.extend(f"{relative} {e}" for e in edits)
 
+        # The landing page's copy of these counts (guard scripts, and the
+        # engine and literature counts the README now states) lives in a
+        # generated repoFacts.json that check_landing_test_counts.py holds
+        # to the tree. Regenerated here too, from the README just written,
+        # so one --write does not leave the page a count behind.
+        sys.path.insert(0, str(REPO_ROOT / "scripts"))
+        try:
+            import check_landing_test_counts as landing
+        finally:
+            sys.path.pop(0)
+        before_facts = landing.read_facts()
+        problems = landing.write_facts()
+        if problems:
+            print("NOTE: landing repoFacts.json not written: " + "; ".join(problems))
+        elif landing.read_facts() != before_facts:
+            changed.append(f"{landing.REPO_FACTS.relative_to(REPO_ROOT)} regenerated")
+
         if changed:
             print(f"WROTE {len(changed)} count(s):")
             for line in changed:

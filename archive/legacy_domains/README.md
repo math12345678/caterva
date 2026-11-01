@@ -38,6 +38,11 @@ The literature layer's epidemiology and population-genetics resolvers
 science agent, the parameteriser and several guards, so it is a separate
 change.
 
+The API server's epidemiology bridge (`applyBetaGammaFromR0Resolution`,
+`resolveEpidemiologyParameters`, `diseases.ts`) and the
+`wright_fisher: ["mutation_rate"]` entry in `RESOLVABLE_FIELDS` were removed
+on 2026-10-31 (ADR 0180).
+
 The API's database enum and OpenAPI spec still list the archived domain
 names, because stored rows may carry them. A request for one is refused
 with a message naming this archive and v0.4.0.

@@ -984,3 +984,33 @@ describe('simulate --resolve: the reproducible identifier reproduces', () => {
     expect(identifiers(stdout).inputs).not.toBe(base.inputs);
   });
 });
+
+describe('the literature score is not printed as a probability', () => {
+  // `validationConfidence` is an uncalibrated heuristic seeded from source
+  // count (scientificValidator.ts calculateConfidence). `validate` printed
+  // it as `Confidence: 0.0%` -- ADR 0125's defect on the command that ADR
+  // did not reach -- and `simulate` printed the same number a second time as
+  // `Overall confidence`.
+  const ANSI_CODES = /\x1b\[[0-9;]*m/g;
+
+  it('validate on typed values says not applicable, never a confidence percentage', () => {
+    const { stdout, code } = runCli(
+      ['validate', 'michaelis menten', '--km', '5.2', '--vmax', '12.8', '--s0', '10'],
+    );
+    const plain = stdout.replace(ANSI_CODES, '');
+    expect(code).toBe(0);
+    expect(plain).toContain('VALIDATION PASSED');
+    expect(plain).toMatch(/Literature agreement: not applicable/);
+    expect(plain).not.toMatch(/confidence: [0-9.]+%/i);
+  });
+
+  it('simulate on typed values prints no confidence percentage either', () => {
+    const { stdout, code } = runCli(
+      ['simulate', 'michaelis menten', '--km', '5.2', '--vmax', '12.8', '--s0', '10'],
+    );
+    const plain = stdout.replace(ANSI_CODES, '');
+    expect(code).toBe(0);
+    expect(plain).toMatch(/Literature agreement: not applicable/);
+    expect(plain).not.toMatch(/confidence: [0-9.]+%/i);
+  });
+});

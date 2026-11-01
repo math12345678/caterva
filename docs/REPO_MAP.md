@@ -34,7 +34,7 @@ back with the split rather than ahead of it.
 
 | repo | contents | source in the monorepo | history |
 |---|---|---|---|
-| `main` | umbrella: README, LICENSE, CITATION.cff, CONTRIBUTING, SECURITY, CHANGELOG, Docker/compose, submodules | root files (14 current docs) | new |
+| `main` | umbrella: README, LICENSE, CITATION.cff, CONTRIBUTING, SECURITY, CHANGELOG, Docker/compose, the monitoring stack, submodules | root files (14 current docs), `deploy/monitoring/` | new |
 | `backend-main` | TypeScript library, CLI, engine bridge, web server, storage, validation, literature layer | `src/`, `examples/` | preserved |
 | `frontend-main` | the dashboard UI served by the web server | `src/web/dashboard.html` | preserved |
 | `wiring-main` | the guards, CI workflow, Makefile, build/lint/type config | `scripts/`, `.github/`, `Makefile`, `pyproject.toml`, `tsconfig.json`, `requirements*.txt` | preserved |
@@ -49,7 +49,7 @@ back with the split rather than ahead of it.
 | `worktrees` | git worktree scratch space | `Caterva.worktrees/` | new — see below |
 | `science-agent-pipeline-replit` | the Express API server and science-agent pipeline | `Science-Agent-Pipeline/` | preserved |
 | `archive` | 58 superseded status/session/completion reports | root `*.md` | new |
-| `miscellaneous` | uncategorised docs, images, the pitch deck, throwaway scripts | root loose files | new |
+| `miscellaneous` | the logo and the architecture diagram (the script also names `caterva_pitch_deck.pptx` and a root `FINAL_STATUS.txt`; neither is tracked, so a split skips them) | `Logo.png`, `docs/brand/caterva_ai_architecture.png` | new |
 | `mule` | MuleRun landing page | *(you add)* | new |
 | `demo-repository` | GitHub demo repo | *(unchanged)* | — |
 
@@ -94,8 +94,12 @@ replayed on top. Everything else splits directly, since no other path moved.
 ### `worktrees` starts empty
 
 `Caterva.worktrees/` contains no tracked files — it is scratch space for
-`git worktree add`. The repository is created with a README explaining what
-it is for, so that an empty repo is not mistaken for a failed push.
+`git worktree add`, and `.gitignore` ignores it. That was not quite true
+until 2026-10-31: the helper that creates the worktrees,
+`scripts/worktree.sh`, used to live inside the directory as its one tracked
+file. It now lives in `scripts/` and ships with `wiring-main`. The
+repository is created with a README explaining what it is for, so that an
+empty repo is not mistaken for a failed push.
 
 ### `archive` is large on purpose
 

@@ -63,6 +63,12 @@ WHAT IT CHECKS
 3. Every key the runner emits has a receiving field on `ScienceAgentResult`.
    Catches ADR 0027's and ADR 0038's shape: sent, and nothing catches it.
 
+4. Every `RUNNER_ONLY` key is still emitted by the runner. Check 3 only
+   looks at keys this file names, so a stale entry is not harmless: it
+   reads as a key that crosses and is checked, when nothing crosses at all.
+   Six epidemiology entries would have stayed when the runner's branch was
+   removed, had this check not been added in the same change.
+
 WHAT IT DOES NOT CHECK
 ----------------------
 It compares NAMES, not types or semantics. A field that crosses under the
@@ -76,6 +82,7 @@ covered by `allowVariantsReachesResolver.test.ts`, which posts real bodies.
 
 Usage:
     python3 scripts/check_runner_boundary.py
+    python3 scripts/check_runner_boundary.py --selftest
 """
 from __future__ import annotations
 
@@ -202,12 +209,11 @@ RUNNER_ONLY: dict[str, str] = {
     "kcat": "the quantity-specific value key; see `value` above",
     "vmax": "bridged in the runner from kcat + caller enzyme_conc (ADR 0019)",
     "vmaxValidation": "the bridge's own validation result (ADR 0019)",
-    "disease": "epidemiology path, resolved outside KineticResult (ADR 0017)",
-    "r0": "epidemiology path (ADR 0017)",
-    "infectiousPeriodDays": "epidemiology path (ADR 0017)",
-    "beta": "epidemiology bridge (ADR 0020)",
-    "gamma": "epidemiology bridge (ADR 0020)",
-    "betaGammaValidation": "epidemiology bridge (ADR 0020)",
+    # disease, r0, infectiousPeriodDays, beta, gamma and betaGammaValidation
+    # sat here until 2026-10-31, when the runner's epidemiology branch was
+    # removed (it now answers `parameterType: "disease_parameters"` with
+    # source "domain_archived"). Epidemiology itself was archived on
+    # 2026-09-27 (d990a73); the runner kept emitting these until then.
     "reliability": "graded in the runner from the result, not carried on it",
     "rowScope": "isoform and inhibition mode parsed in the runner from `commentary` (caterva.bind.core)",
 }
@@ -236,9 +242,16 @@ def runner_emitted_keys() -> set[str]:
     branch, because a key emitted on ANY path needs a receiver. A false
     positive here costs a `RUNNER_ONLY` entry with a reason, which is cheap;
     a false negative is the defect this guard exists for.
+
+    Both forms count: a dict literal's `"key": value` and an assignment's
+    `output["key"] = value`. Only the first was read until check 4 was
+    added, which then reported `vmax` and `vmaxValidation` as no longer
+    emitted -- they are, at the runner's `output["vmax"] = vmax`.
     """
     text = RUNNER.read_text()
-    return set(re.findall(r'"([A-Za-z][A-Za-z0-9_]*)":\s', text))
+    return set(re.findall(r'"([A-Za-z][A-Za-z0-9_]*)":\s', text)) | set(
+        re.findall(r'\["([A-Za-z][A-Za-z0-9_]*)"\]\s*=[^=]', text)
+    )
 
 
 def science_agent_result_fields() -> set[str]:
@@ -251,18 +264,12 @@ def science_agent_result_fields() -> set[str]:
     return set(_TS_FIELD_RE.findall(block)) | set(_TS_NESTED_RE.findall(block))
 
 
-def main() -> int:
+def boundary_findings(
+    fields: set[str], emitted: set[str], received: set[str]
+) -> list[str]:
+    """Every boundary problem, given the three sides. Pure, so the selftest
+    can hand it sets that are broken in exactly one way."""
     problems: list[str] = []
-
-    try:
-        fields = kinetic_result_fields()
-    except Exception as exc:  # noqa: BLE001
-        print(f"Could not import KineticResult: {exc}")
-        print("This is an environment failure, not a boundary result.")
-        return 1
-
-    emitted = runner_emitted_keys()
-    received = science_agent_result_fields()
 
     # 1. Every KineticResult field must have a decision recorded.
     undeclared = sorted(fields - set(EMITTED_AS))
@@ -313,6 +320,30 @@ def main() -> int:
             f"and thrown away by the receiver."
         )
 
+    # 4. Every RUNNER_ONLY key must still be emitted.
+    for key in sorted(set(RUNNER_ONLY) - emitted):
+        problems.append(
+            f"RUNNER_ONLY names `{key}`, which the runner no longer emits. "
+            f"Delete the entry: check 3 reads RUNNER_ONLY as the list of "
+            f"keys that cross, so a stale one claims a boundary that is not "
+            f"there."
+        )
+
+    return problems
+
+
+def main() -> int:
+    try:
+        fields = kinetic_result_fields()
+    except Exception as exc:  # noqa: BLE001
+        print(f"Could not import KineticResult: {exc}")
+        print("This is an environment failure, not a boundary result.")
+        return 1
+
+    problems = boundary_findings(
+        fields, runner_emitted_keys(), science_agent_result_fields()
+    )
+
     if problems:
         print("Process-boundary findings:\n")
         for p in problems:
@@ -329,10 +360,61 @@ def main() -> int:
         f"OK: {len(fields)} KineticResult field(s) all have a recorded "
         f"boundary decision ({internal} deliberately internal); every mapped "
         f"field is emitted by the runner; every emitted key has a receiver "
-        f"on ScienceAgentResult."
+        f"on ScienceAgentResult; every RUNNER_ONLY key is still emitted."
     )
     return 0
 
 
+def _selftest() -> int:
+    """Prove each check fires, on sets built here from the tables above.
+
+    The clean case is the tables' own picture of a sound boundary; each
+    other case breaks it in one place and asserts on the message, so a check
+    that fires for the wrong reason fails too. Imports nothing: it needs
+    neither KineticResult nor the runner.
+    """
+    fields = set(EMITTED_AS)
+    wire = {w for w in EMITTED_AS.values() if w and not w.startswith("*")}
+    emitted = wire | set(RUNNER_ONLY) | set(NO_RECEIVER_NEEDED)
+    received = wire | set(RUNNER_ONLY)
+    mapped = next(n for n, w in EMITTED_AS.items() if w and not w.startswith("*"))
+    runner_only = next(iter(RUNNER_ONLY))
+
+    cases = [
+        ("a sound boundary", fields, emitted, received, None),
+        ("a field with no decision", fields | {"new_field"}, emitted, received,
+         "`KineticResult.new_field` has no entry in EMITTED_AS"),
+        ("a mapping for a deleted field", fields - {mapped}, emitted, received,
+         f"EMITTED_AS names `{mapped}`, which is not a field"),
+        ("a mapped key never emitted (ADR 0039)", fields,
+         emitted - {EMITTED_AS[mapped]}, received,
+         f"`KineticResult.{mapped}` is mapped to wire key"),
+        ("an emitted key with no receiver (ADR 0027)", fields, emitted,
+         received - {runner_only},
+         f"The runner emits `{runner_only}` and `ScienceAgentResult` declares no"),
+        ("a RUNNER_ONLY key no longer emitted", fields,
+         emitted - {runner_only}, received,
+         f"RUNNER_ONLY names `{runner_only}`, which the runner no longer emits"),
+    ]
+    failures: list[str] = []
+    for label, f, e, r, expected in cases:
+        found = boundary_findings(f, e, r)
+        if expected is None:
+            if found:
+                failures.append(f"{label}: expected no finding, got {found}")
+        elif not any(expected in p for p in found):
+            failures.append(f"{label}: no finding contains {expected!r}; got {found}")
+
+    if failures:
+        print("SELFTEST FAILED:")
+        for line in failures:
+            print(f"  - {line}")
+        return 1
+    print(f"SELFTEST OK: {len(cases)} case(s), each check fires on its own defect.")
+    return 0
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv[1:]:
+        sys.exit(_selftest())
     sys.exit(main())

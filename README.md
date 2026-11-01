@@ -124,7 +124,7 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 8,679 tests (7,057 engine + 1,622 literature)
+make test      # runs all 8,725 tests (7,059 engine + 1,666 literature)
 ```
 
 ### Or download the release
@@ -148,6 +148,13 @@ pip install caterva-<version>-py3-none-any.whl   # the wheel, from the same page
 caterva-compose "a toggle switch between two repressors"
 ```
 
+The wheel needs Python 3.10–3.13; on a newer `python3`, pip refuses it, so
+make the virtual environment with a 3.10–3.13 interpreter. Install the
+release wheel rather than `pip install` of a checkout: the literature layer
+is filled in at release time, so a checkout installed with pip has no
+literature search and every cited constant stays a placeholder. In a
+checkout, use `make setup`.
+
 The folders are not code-signed; macOS quarantines the folder and Windows
 SmartScreen asks once, and `README.txt` inside each folder gives the exact
 step for its platform (on Windows, run `.\caterva.exe` from a terminal in
@@ -157,7 +164,7 @@ the folder).
 the Mac app as well as from a checkout (from v0.5.0 the literature search
 ships in every artifact; it reads BRENDA, NCBI, UniProt and PubChem live and
 needs a network connection).
-`compose --subject 1.1.1.27 --organism "Homo sapiens" --substrate pyruvate`
+`compose "Michaelis Menten" --subject 1.1.1.27 --organism "Homo sapiens" --substrate pyruvate`
 builds the mechanism with those constants already in it, each row naming its
 reference and any constant the search could not find still marked a
 placeholder (ADR 0178). `make cite EC=1.1.1.27 SUBSTRATE=pyruvate
@@ -595,17 +602,17 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Caterva/
 ├── caterva/                  simulation engine (ODE + discrete/stochastic)
 │   ├── caterva_engine.py     public entry point (88 names)
-│   └── tests/                7,057 tests
+│   └── tests/                7,059 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1622 tests
+│   └── ...                   1666 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    177 decision records (and counting)
+│   └── adr/                    178 decision records (and counting)
 ├── scripts/                    79 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
@@ -686,10 +693,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 8,679 tests
+make test        # run all 8,725 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (7,057 tests)
-make test-lit    # literature layer only (1622 tests)
+make test-sim    # simulation engine only (7,059 tests)
+make test-lit    # literature layer only (1666 tests)
 python3 scripts/verify_build.py --quick  # all 79 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

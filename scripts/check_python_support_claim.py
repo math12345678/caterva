@@ -31,19 +31,30 @@ That part needs no network and cannot flake.
 `--online` additionally confirms each pinned dependency really does publish
 wheels covering the claimed window. Run it when changing a pin.
 
+Pins are read from `requirements.txt`, environment markers included. Until
+2026-10-31 this file kept its own copy of them, and when scipy was split by
+interpreter (1.15.3 below 3.11, 1.16.0 from 3.11; ADR 0014) the copy still
+said 1.15.3 for every version, so `--online` checked a wheel set the 3.11-3.13
+installs no longer use. A pin with a `python_version` marker is checked
+against the part of the window its marker selects, and offline the guard
+requires every listed dependency to have exactly one pin for each supported
+version.
+
 Usage:
     python scripts/check_python_support_claim.py            # offline
     python scripts/check_python_support_claim.py --online   # + PyPI
+    python scripts/check_python_support_claim.py --selftest # prove it can fail
 """
 
 from __future__ import annotations
 
 import json
+import operator
 import re
 import sys
 import urllib.request
 from pathlib import Path
-from typing import List, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -69,14 +80,25 @@ CLAIM_FILES = [
     REPO_ROOT / "scripts" / "check_env.py",
 ]
 
-# Runtime dependencies whose wheel coverage defines the window.
-PINNED = {
-    "libroadrunner": "2.8.0",
-    "numpy": "2.2.6",
-    "python-libsbml": "5.21.1",
-    "antimony": "2.14.0",
-    "scipy": "1.15.3",
+# Runtime dependencies whose wheel coverage defines the window. Their versions
+# come from REQUIREMENTS, not from here: a second copy is how the scipy split
+# went unchecked.
+WINDOW_DEPENDENCIES = ("antimony", "libroadrunner", "numpy", "python-libsbml", "scipy")
+
+REQUIREMENTS = REPO_ROOT / "requirements.txt"
+
+# `name==version` with an optional `; python_version <op> "3.N"` marker.
+PIN_PATTERN = re.compile(
+    r"""^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;#]+)\s*"""
+    r"""(?:;\s*python_version\s*(<=|>=|==|!=|<|>)\s*["']3\.(\d+)["'])?\s*(?:#.*)?$"""
+)
+MARKER_OPS = {
+    "<": operator.lt, "<=": operator.le, ">": operator.gt,
+    ">=": operator.ge, "==": operator.eq, "!=": operator.ne,
 }
+
+# (version, supported minors the pin applies to), per dependency.
+Pins = Dict[str, List[Tuple[str, Tuple[int, ...]]]]
 
 
 def _claimed_window(text: str) -> Tuple[int, int] | None:
@@ -84,6 +106,48 @@ def _claimed_window(text: str) -> Tuple[int, int] | None:
     if match is None:
         return None
     return int(match.group(1)), int(match.group(2))
+
+
+def read_pins(text: str) -> Tuple[Pins, List[str]]:
+    """The WINDOW_DEPENDENCIES pins in a requirements file, by marker.
+
+    A line naming one of them that this cannot read is an error, not a skip:
+    a marker it does not understand would otherwise drop out of the check.
+    """
+    pins: Pins = {}
+    errors: List[str] = []
+    minors = [minor for _, minor in SUPPORTED]
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        name = re.split(r"[\s=<>!~;\[]", line, maxsplit=1)[0].lower()
+        if name not in WINDOW_DEPENDENCIES:
+            continue
+        match = PIN_PATTERN.match(line)
+        if match is None:
+            errors.append(f"requirements.txt: cannot read the pin {line!r}")
+            continue
+        _, version, op, bound = match.groups()
+        applies = tuple(
+            m for m in minors if op is None or MARKER_OPS[op](m, int(bound))
+        )
+        pins.setdefault(name, []).append((version, applies))
+    return pins, errors
+
+
+def check_pins_cover_window(pins: Pins) -> List[str]:
+    """Each window dependency has exactly one pin for each supported version."""
+    errors: List[str] = []
+    for package in WINDOW_DEPENDENCIES:
+        for _, minor in SUPPORTED:
+            chosen = [v for v, applies in pins.get(package, []) if minor in applies]
+            if len(chosen) != 1:
+                errors.append(
+                    f"requirements.txt pins {package} {len(chosen)} times for "
+                    f"Python 3.{minor} ({chosen}); expected exactly once"
+                )
+    return errors
 
 
 def check_internal_consistency() -> List[str]:
@@ -115,6 +179,13 @@ def check_internal_consistency() -> List[str]:
                 f"Makefile is_supported() accepts 3.{sorted(gate)}, "
                 f"docs claim 3.{sorted(expected_gate)}"
             )
+
+    if not REQUIREMENTS.exists():
+        errors.append("requirements.txt not found")
+    else:
+        pins, pin_errors = read_pins(REQUIREMENTS.read_text(encoding="utf-8"))
+        errors.extend(pin_errors)
+        errors.extend(check_pins_cover_window(pins))
     return errors
 
 
@@ -143,11 +214,16 @@ def _wheel_pythons(package: str, version: str) -> Set[str] | None:
 
 
 def check_against_pypi() -> List[str]:
-    """Each pin must cover the whole claimed window."""
+    """Each pin must cover the part of the window its marker selects."""
     errors: List[str] = []
-    needed = {f"cp3{minor}" for _, minor in SUPPORTED}
+    pins, _ = read_pins(REQUIREMENTS.read_text(encoding="utf-8"))
 
-    for package, version in sorted(PINNED.items()):
+    for package, version, applies in sorted(
+        (p, v, a) for p, entries in pins.items() for v, a in entries
+    ):
+        if not applies:
+            continue
+        needed = {f"cp3{minor}" for minor in applies}
         tags = _wheel_pythons(package, version)
         if tags is None:
             continue
@@ -162,11 +238,52 @@ def check_against_pypi() -> List[str]:
                 f"(publishes {covered}) -- the claimed window is unsupportable"
             )
         else:
-            print(f"  {package:<16} {version:<9} {covered}")
+            print(f"  {package:<16} {version:<9} {covered} (needs {sorted(needed)})")
     return errors
 
 
+def _selftest() -> int:
+    """Prove the pin reading and the coverage check can fail."""
+    split = (
+        'numpy==2.2.6\n'
+        'scipy==1.15.3; python_version < "3.11"\n'
+        'scipy==1.16.0; python_version >= "3.11"\n'
+        'antimony==2.14.0\nlibroadrunner==2.8.0\npython-libsbml==5.21.1\n'
+    )
+    failures: List[str] = []
+
+    pins, errors = read_pins(split)
+    if errors or check_pins_cover_window(pins):
+        failures.append("a correct marker split was rejected")
+    if pins.get("scipy") != [("1.15.3", (10,)), ("1.16.0", (11, 12, 13))]:
+        failures.append(f"the scipy split was read as {pins.get('scipy')}")
+
+    cases = [
+        ("a pin missing for 3.10", split.replace('scipy==1.15.3; python_version < "3.11"\n', "")),
+        ("two pins for 3.11", split.replace('>= "3.11"', '>= "3.10"')),
+        ("an unreadable marker", split.replace('python_version >= "3.11"', 'sys_platform == "darwin"')),
+        # An extra pin, so dropping it leaves no hole for the coverage check:
+        # only the unreadable-pin error can catch this one.
+        ("an unreadable extra pin", split + 'scipy==1.17.0; sys_platform == "win32"\n'),
+        ("a dependency not pinned at all", split.replace("numpy==2.2.6\n", "")),
+    ]
+    for label, text in cases:
+        pins, errors = read_pins(text)
+        if not (errors or check_pins_cover_window(pins)):
+            failures.append(f"{label} was accepted")
+
+    if failures:
+        print("SELFTEST FAIL:")
+        for failure in failures:
+            print(f"  - {failure}")
+        return 1
+    print(f"SELFTEST OK: a correct split passes and all {len(cases)} broken ones are caught.")
+    return 0
+
+
 def main() -> int:
+    if "--selftest" in sys.argv:
+        return _selftest()
     online = "--online" in sys.argv
     errors: List[str] = []
 
@@ -192,7 +309,10 @@ def main() -> int:
         return 1
 
     window = f"3.{SUPPORTED[0][1]}-3.{SUPPORTED[-1][1]}"
-    print(f"OK: every file claims Python {window}, and the Makefile gate agrees.")
+    print(
+        f"OK: every file claims Python {window}, the Makefile gate agrees, and "
+        "requirements.txt pins each window dependency once per version."
+    )
     return 0
 
 

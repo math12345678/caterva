@@ -9,6 +9,8 @@
 > - "Metrics guide (700+ lines)" — real `METRICS_GUIDE.md` is 522 lines (as originally delivered), not 700+ (same finding as in `METRICS_DELIVERY_SUMMARY.md`).
 > - The "Performance Overhead" section ("< 5ms per request", "< 100ms" scrape, "< 500ms" render, "< 0.1% overhead") and "Storage & Retention" section ("~2GB per year", "~200MB per month") give specific numbers with no benchmark, profiling code, or measurement anywhere in this repo to back them (checked via grep across `src/`) — they read as measured but are not.
 
+> **Moved (2026-10-31):** the six monitoring files now live in `deploy/monitoring/`, not the repository root, and the stack starts with `docker-compose -f deploy/monitoring/docker-compose-monitoring.yml up -d`. The line counts in the banner above describe the files on 2026-08-12; the compose file has since gained comments, the missing `prometheus-rules.yml` mount, and `CATERVA_JOBS_FILE`, so `wc -l` on it no longer gives 76.
+
 **Date:** 2026-08-12 (Afternoon)  
 **Session Focus:** Production monitoring with Prometheus + Grafana  
 **Status:** ✅ Complete (0 build errors, 0 warnings)
@@ -135,12 +137,12 @@ Complete reference covering:
 | File | Type | Size | Purpose |
 |------|------|------|---------|
 | `src/web/metrics-exporter.ts` | NEW | 250+ LOC | Prometheus formatter |
-| `grafana-dashboard.json` | NEW | 500+ LOC | Dashboard definition |
-| `prometheus.yml` | NEW | 20+ lines | Prometheus config |
-| `prometheus-rules.yml` | NEW | 100+ lines | Alert rules |
-| `docker-compose-monitoring.yml` | NEW | 100+ lines | Full stack |
-| `grafana-datasources.yml` | NEW | 10+ lines | DS provisioning |
-| `grafana-dashboards.yml` | NEW | 10+ lines | Dashboard provisioning |
+| `deploy/monitoring/grafana-dashboard.json` | NEW | 500+ LOC | Dashboard definition |
+| `deploy/monitoring/prometheus.yml` | NEW | 20+ lines | Prometheus config |
+| `deploy/monitoring/prometheus-rules.yml` | NEW | 100+ lines | Alert rules |
+| `deploy/monitoring/docker-compose-monitoring.yml` | NEW | 100+ lines | Full stack |
+| `deploy/monitoring/grafana-datasources.yml` | NEW | 10+ lines | DS provisioning |
+| `deploy/monitoring/grafana-dashboards.yml` | NEW | 10+ lines | Dashboard provisioning |
 | `MONITORING_SETUP.md` | NEW | 500+ lines | Complete guide |
 | `src/web/server.ts` | MODIFIED | +10 LOC | Added /metrics endpoint |
 
@@ -163,7 +165,9 @@ Complete reference covering:
 ### 1. Start Complete Stack (30 seconds)
 
 ```bash
-docker-compose -f docker-compose-monitoring.yml up -d
+# Required, no default (it was "admin" until 2026-10-31):
+export GRAFANA_ADMIN_PASSWORD='<a password of your own>'
+docker-compose -f deploy/monitoring/docker-compose-monitoring.yml up -d
 ```
 
 ### 2. Access Services
@@ -171,6 +175,11 @@ docker-compose -f docker-compose-monitoring.yml up -d
 - **Caterva API:** http://localhost:3000
 - **Prometheus:** http://localhost:9090
 - **Grafana:** http://localhost:3001
+
+All three are published on 127.0.0.1 only, so these URLs work on the Docker
+host itself. From another machine, tunnel them:
+`ssh -N -L 3000:127.0.0.1:3000 -L 9090:127.0.0.1:9090 -L 3001:127.0.0.1:3001 you@docker-host`.
+See MONITORING_SETUP.md, "Reaching the stack from another machine".
 
 ### 3. View Metrics
 
@@ -183,7 +192,7 @@ curl http://localhost:9090/api/v1/query?query=caterva_success_rate
 
 # Grafana dashboard
 open http://localhost:3001
-# Login: admin / admin
+# Login: admin / the GRAFANA_ADMIN_PASSWORD you set
 ```
 
 ### 4. Run Some Simulations
@@ -392,8 +401,8 @@ Daily backups recommended
 
 | Task | Command |
 |------|---------|
-| Start all | `docker-compose -f docker-compose-monitoring.yml up -d` |
-| Stop all | `docker-compose -f docker-compose-monitoring.yml down` |
+| Start all | `docker-compose -f deploy/monitoring/docker-compose-monitoring.yml up -d` |
+| Stop all | `docker-compose -f deploy/monitoring/docker-compose-monitoring.yml down` |
 | View Grafana | `open http://localhost:3001` |
 | View Prometheus | `open http://localhost:9090` |
 | Check metrics | `curl http://localhost:3000/metrics` |

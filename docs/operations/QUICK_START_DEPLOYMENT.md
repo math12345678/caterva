@@ -368,9 +368,12 @@ docker run -d --name caterva3 -p 3002:3000 caterva:latest
 
 ### Job Data
 
-Jobs are saved to `caterva-jobs.jsonl`. This file:
+Jobs are saved to `caterva-jobs.jsonl` (or to `CATERVA_JOBS_FILE`, if set).
+This file:
 - Persists across restarts
-- Grows ~1KB per job
+- Is created on first use, and is not tracked by git
+- Under `docker-compose.yml`, is `./data/caterva-jobs.jsonl` on the host
+- Grows with each job's trajectory length (every line holds the full result)
 - Should be backed up regularly
 
 ```bash

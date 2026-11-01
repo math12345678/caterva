@@ -51,7 +51,7 @@ export interface OrganismEntry {
 }
 
 /**
- * Deliberately short and explicit, like enzymes.ts and diseases.ts.
+ * Deliberately short and explicit, like enzymes.ts.
  *
  * Every pattern is anchored on a word boundary. "coli" is not matched
  * bare -- it would hit "colitis" and any word ending in it -- and the

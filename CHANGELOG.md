@@ -12,6 +12,26 @@ onward and [Keep a Changelog](https://keepachangelog.com/) in shape.
 Entries before 0.1.0 are grouped by date, because that is how the work was
 done: there was no release to version.
 
+## [Unreleased]
+
+Caterva V7: every number on a public surface is measured, derived from the
+tree, or removed (ADR 0180).
+
+### Changed
+- The landing app reads its guard count, suite sizes and data sources from a generated `repoFacts.json`; `scripts/check_landing_test_counts.py` fails when that file, a row's `collected:` or its pass count is stale, and `--write` regenerates it. The landing CLI's `status` calls `/api/healthz` and `/api/metrics/health` and prints what came back.
+- `caterva-site`'s shell offers the five live domains only, runs Michaelis-Menten and Gillespie computations in the browser with the showcase constants, and answers an archived domain with its archive date and v0.4.0. Its tests run in CI and in the new `make test-site`.
+- The dashboard shows the literature score on a 0-1 scale, labelled a heuristic and not a probability, and computes the average tile from the runs shown.
+- `scripts/verify_citations_live.py` and `scripts/verify_values_live.py` end every check matched, mismatched or unreachable (exit 0, 2, 1); DOIs are checked through the CrossRef API; BRENDA ref 740253 is no longer checked as a PubMed id.
+- scipy is pinned to 1.16.0 on Python 3.11-3.13, because 1.15.3 does not import `scipy.sparse.linalg` on macOS 27.0.1; Python 3.10 keeps 1.15.3.
+- Monitoring files moved to `deploy/monitoring/`, their ports bound to 127.0.0.1, and Grafana's admin password is read from `GRAFANA_ADMIN_PASSWORD` with no default; `scripts/check_port_binding.py` reads that compose file too.
+
+### Removed
+- The API server's epidemiology bridge (`applyBetaGammaFromR0Resolution`, `resolveEpidemiologyParameters`, `diseases.ts`) and the `wright_fisher` resolvable field, which no live domain reached.
+- Root probe scripts, a screenshot and the committed `caterva-jobs.jsonl`.
+
+### Fixed
+- README: the `compose --subject` example names its mechanism, and the install section says the wheel needs Python 3.10-3.13 and that a checkout is installed with `make setup`.
+
 ## [0.6.0] - 2026-10-25
 
 Claims over pinned evidence: `caterva compose --claims DIR`, `caterva why`

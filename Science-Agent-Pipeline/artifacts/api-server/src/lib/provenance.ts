@@ -275,10 +275,11 @@ export const RESOLVABLE_FIELDS: Record<string, string[]> = {
   // assay conditions -- so a cross-species Ki never borrows a verified Km's
   // provenance (see applyKineticResolution in queryResolver.ts).
   mm_competitive_inhibition: ["km", "ki"],
-  // Population genetics: mutation_rate resolved from published literature
-  // (Rahbari et al., Nature Genetics, 2015 for human; other organisms
-  // in Tests/popgen_resolver.py with primary citations).
-  wright_fisher: ["mutation_rate"],
+  // wright_fisher: ["mutation_rate"] sat here until 2026-10-31. Population
+  // genetics was archived on 2026-09-27 (archive/legacy_domains/README.md;
+  // v0.4.0 is the last release that runs it), no live domain is named
+  // wright_fisher, and the runner answers parameterType "mutation_rate"
+  // with source "domain_archived".
 };
 
 /** The mechanisms a model can be of, and so the modes a Ki can be asked for
@@ -312,22 +313,6 @@ export const KI_MODE_OF_DOMAIN: Readonly<Record<string, InhibitionMode>> = {
 };
 
 /**
- * Domains whose (beta, gamma) resolve from a literature (R0, infectious
- * period) pair — ADR 0017 / ADR 0020.
- *
- * Deliberately NOT in RESOLVABLE_FIELDS: that map means "one BRENDA-style
- * table maps to one engine parameter", which is false here (an arithmetic
- * bridge feeds two parameters from one registry entry). It lives here
- * anyway, rather than as a bare `domain !== "sir"` inside the bridge, so
- * that the set below can be DERIVED from it. The bridge imports this;
- * there is one list, not two.
- */
-export const EPIDEMIOLOGY_BRIDGE_DOMAINS: ReadonlySet<string> = new Set<string>([
-  // Empty since epidemiology was archived on 2026-09-27; kept so the bridge
-  // still has one list to consult if the domain ever returns.
-]);
-
-/**
  * Every domain where ANY parameter has a literature lookup behind it.
  *
  * This exists because the refusal message was making a claim that is
@@ -350,7 +335,7 @@ export const EPIDEMIOLOGY_BRIDGE_DOMAINS: ReadonlySet<string> = new Set<string>(
  * stale.
  */
 export const DOMAINS_WITH_LITERATURE_RESOLUTION: ReadonlySet<string> =
-  new Set([...Object.keys(RESOLVABLE_FIELDS), ...EPIDEMIOLOGY_BRIDGE_DOMAINS]);
+  new Set(Object.keys(RESOLVABLE_FIELDS));
 
 /**
  * Assay conditions under which a kinetic constant was measured.
@@ -620,19 +605,6 @@ export interface ParameterProvenance {
      * omission. The literature was not silent — nobody read it out.
      */
     | "literature_candidates"
-    /**
-     * The run stopped at the DISEASE NAME (epidemiology's counterpart to
-     * `ec_not_resolved`), before the (R0, infectious period) registry was
-     * consulted at all -- either no disease name was recognized in the
-     * query, or the one that was is not among the short list this system
-     * has a verified, methodology-compatible source for (see diseases.ts
-     * and ADR 0017; today that list is COVID-19 only). The generic
-     * sentence would say beta/gamma "could not be resolved from
-     * literature", which reads as "we checked and the literature had
-     * nothing" -- false for a real, well-studied disease like measles or
-     * influenza that simply isn't registered here yet.
-     */
-    | "disease_not_registered"
     /**
      * Vmax is missing ONLY because the enzyme concentration is (ADR 0013 /
      * ADR 0019).
@@ -1466,7 +1438,9 @@ export function classifyGap(
   // all: it is unregistered because Guerra et al. (2017), Lancet Infect Dis
   // 17(12):e420-e428, found R0 estimates vary far more than the cited 12-18
   // range and endorse no single value -- so no honest default exists. See
-  // `applyBetaGammaFromR0Resolution`, which argues this at length.
+  // ADR 0017 and ADR 0169. (The R0 bridge, applyBetaGammaFromR0Resolution,
+  // was removed on 2026-10-31: epidemiology was archived on 2026-09-27 and
+  // v0.4.0 is the last release that runs it. The rule below still holds.)
   //
   // A domain-shaped test cannot see that. A quantity is a free choice
   // because of what the QUANTITY is, not because of which table happens to

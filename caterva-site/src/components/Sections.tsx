@@ -58,8 +58,8 @@ export function Ledger() {
         <Title>{LEDGER.length} claims, and where each one comes from.</Title>
         <p className="mt-2 max-w-[66ch] font-sans text-[14px] leading-relaxed text-dim">
           The rightmost column is the product. It is the difference between
-          “our simulation says” and “this reproduces a result published in
-          1962 that we did not produce.”
+          “our simulation says” and “this reproduces a result published
+          elsewhere that we did not produce.”
         </p>
       </Reveal>
 

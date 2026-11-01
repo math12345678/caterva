@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: enzyme-index enzyme-symbols cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow test-ts test-studio studio-page studio guards pr demo publish-check evidence cli clean release-artifacts release-app
+.PHONY: enzyme-index enzyme-symbols cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow test-ts test-site test-studio studio-page studio guards pr demo publish-check evidence cli clean release-artifacts release-app
 
 help:
 	@echo "Caterva"
@@ -34,6 +34,7 @@ help:
 	@echo "  make test-lit   literature layer only (Tests/)"
 	@echo "  make test-ts    the root TypeScript package (src/, the scientific CLI):"
 	@echo "                  type-check and jest suite; needs Node (runs npm ci once)"
+	@echo "  make test-site  caterva-site's browser shell tests; needs Node 22.18+ (runs npm ci once)"
 	@echo "  make test-studio  Caterva Studio: the page's type-check, tests and build,"
 	@echo "                  then the studio server tests against it; needs Node and pnpm"
 	@echo "  make studio-page  build Caterva Studio's page into caterva/studio/static/"
@@ -249,6 +250,19 @@ test-ts: check-python
 	npm run type-check
 	npm test -- --ci --json --outputFile=root-jest-results.json
 	@"$(PY)" scripts/check_typescript_suites_discovered.py --jest-results root-jest-results.json
+
+# caterva-site's shell tests, as the end of the root TypeScript job in
+# .github/workflows/tests.yml runs them. Not part of `test` or `pr`, for the
+# reason test-ts is not: it needs Node. The tests read the v0.4.0 tag, so a
+# shallow clone without tags fails them.
+test-site:
+	@if ! command -v npm >/dev/null 2>&1; then \
+		echo "No npm on PATH, so caterva-site cannot be installed or tested."; \
+		echo "Install Node (CI uses Node 22) and run this again."; \
+		exit 2; \
+	fi
+	@[ -d caterva-site/node_modules ] || { echo ">> installing caterva-site: npm ci (exactly its package-lock.json)"; cd caterva-site && npm ci; }
+	cd caterva-site && npm test
 
 # Caterva Studio, as the `studio` job in .github/workflows/tests.yml runs it:
 # the page (Science-Agent-Pipeline/artifacts/caterva-studio) type-checked,

@@ -5,8 +5,10 @@ backed by literature. That claim was, until this guard existed,
 unfalsifiable — and therefore worth nothing. Three things were true at the
 same time:
 
-  * `RESOLVABLE_FIELDS` resolves exactly five parameters live (km, ki,
+  * `RESOLVABLE_FIELDS` resolved exactly five parameters live (km, ki,
     kcat/vmax, mutation_rate, beta/gamma-from-R0). Real, cited, verified.
+    (2026-10-31: mutation_rate and the beta/gamma-from-R0 bridge went with
+    the archived domains; RESOLVABLE_FIELDS now lists km and ki.)
   * `DOMAIN_DEFAULTS` in queryResolver.ts contains 64 hardcoded numbers
     across 14 domains — km=2, vmax=5, beta=0.3, gamma=0.1 — none of which
     is checked against any source. (The first count taken by hand said

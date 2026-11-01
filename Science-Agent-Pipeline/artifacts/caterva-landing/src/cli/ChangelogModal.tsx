@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { LITERATURE_TEST_COUNT } from "@/lib/domains";
 
 interface Release {
   date: string;
@@ -75,7 +76,9 @@ const RELEASES: Release[] = [
     date: "July 21-22, 2026",
     tag: "feature",
     title: "Literature-scraping layer",
-    desc: "Initial BRENDA/KEGG/PubMed parsing layer -- 124 tests -- so simulation parameters can be resolved to a real citation instead of a hardcoded default.",
+    // 124 is the count CHANGELOG.md records for that date, kept as history;
+    // today's figure comes from repoFacts.json so it cannot go stale here.
+    desc: `Initial BRENDA/KEGG/PubMed parsing layer, with 124 tests at the time (the literature suite has ${LITERATURE_TEST_COUNT.toLocaleString("en-US")} now), so simulation parameters can be resolved to a real citation instead of a hardcoded default. KEGG has since been switched off by default, pending a licence.`,
   },
 ];
 

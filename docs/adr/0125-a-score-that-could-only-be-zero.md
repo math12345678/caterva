@@ -138,3 +138,37 @@ was — one literal reused across three outcomes — and the file says so.
 
 - ADR 0024 — three axes reported separately, with `noAggregateReason`
 - ADR 0044 — the dashboard's pre-filled `5.2`, and the green tick it bought
+
+## A correction (2026-10-31): eight tests, eight mutations, and no percentage
+
+**The Verification section above is out of date, and is left as written.**
+It says 6 tests and three mutations. The file now holds 8 tests, and the
+mutation table is a set file anyone can replay:
+`docs/mutations/adr-0125-a-score-that-could-only-be-zero.json`.
+
+**Two of the mutations were not caught until a seventh test was added.**
+C5 (the zero-literature condition inverted, `!== 0`) and C6 (a missing
+count read as sourced, `?? 1`) both left the six tests green, because those
+tests check that `'n/a'` and `literatureSourcesUsed` each occur somewhere,
+which an inverted or mis-defaulted condition still satisfies. The seventh
+test, *"n/a is chosen by the zero-literature condition, not merely
+present"*, pins the whole ternary.
+
+**The dashboard still printed the score as a percentage.** The Consequences
+above list `92.0%` as the sourced display. The CLI has since stopped doing
+that (`literatureScoreLines` in `src/cli/scientificCLI.ts`): the score's
+constants were never fitted to outcomes, so `92.0%` beside the word
+"confidence" reads as a probability that the run is right, which nothing has
+measured. The dashboard now matches it: a sourced run shows
+`validationConfidence.toFixed(2)` on a 0-1 scale, under a column headed
+*Literature agreement (heuristic, not a probability)* where it said
+*Confidence*, and the unpopulated "Avg Confidence" tile is relabelled "Avg
+Literature Agreement" (no test pins that tile). The test that the `%` travels with the number became a test that there
+is no `%`, and an eighth test pins the header wording.
+
+Replayed with `python3 scripts/mutate.py --set
+docs/mutations/adr-0125-a-score-that-could-only-be-zero.json` against
+`confidenceIsNotAZero.test.ts` and `dashboardParameterGate.test.ts`
+(baseline green, 43 tests): **8 caught, 0 not caught, 0 indeterminate.**
+C2 and C7 were re-derived against the 0-1 line; C8 (the header back to
+*Confidence*) is new.
