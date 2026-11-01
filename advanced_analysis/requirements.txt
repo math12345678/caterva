@@ -59,4 +59,4 @@ jupyter_contrib_nbextensions>=0.7.0
 black>=22.0
 flake8>=5.0
 pytest>=7.0
-mypy>=0.970
+mypy>=2.3.1
