@@ -48,7 +48,7 @@ PyYAML==6.0.3
 # MIT -- read from the LICENSE the wheel ships
 # (ruff-0.11.11.dist-info/licenses/LICENSE): "MIT License, Copyright (c)
 # 2022 Charles Marsh".
-ruff==0.11.11
+ruff==0.16.8
 
 # Type stubs for PyYAML, so `mypy` can check the two guards that parse the
 # workflow instead of reporting "Library stubs not installed for yaml".
