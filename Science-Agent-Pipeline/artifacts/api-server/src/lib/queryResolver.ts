@@ -5,17 +5,15 @@ import {
   coherenceFromProvenance,
   type CoherenceReport,
 } from "./assayCoherence";
-import { resolveKineticValue, resolveEpidemiologyParameters, type RelatednessVerdict } from "./scienceAgent";
+import { resolveKineticValue, type RelatednessVerdict } from "./scienceAgent";
 import { buildCitationLocators, type CitationLocator } from "./citeVerify";
 import { matchEnzyme } from "./enzymes";
 import { matchOrganism } from "./organisms";
-import { matchDisease } from "./diseases";
 import { extractStatedQuantities } from "./statedQuantities";
 import {
   RESOLVABLE_FIELDS,
   KI_MODE_OF_DOMAIN,
   DOMAINS_WITH_LITERATURE_RESOLUTION,
-  EPIDEMIOLOGY_BRIDGE_DOMAINS,
   RequiredParametersMissingError,
   UnrecognizedQueryError,
   resolveGaps,
@@ -856,7 +854,7 @@ function buildUnresolvedKineticProvenance(
  */
 async function applyKineticResolution(
   entities: EntityExtraction | undefined,
-  overrides: Record<string, number | number[]>,
+  overrides: Record<string, number>,
   domain: string,
   allowCrossSpecies: boolean,
   allowVariants: boolean,
@@ -1133,7 +1131,7 @@ async function applyKineticResolution(
  */
 async function applyVmaxFromKcatResolution(
   entities: EntityExtraction | undefined,
-  overrides: Record<string, number | number[]>,
+  overrides: Record<string, number>,
   domain: string,
   parameters: Record<string, number | number[]>,
   parameterProvenance: Record<string, ParameterProvenance>,
@@ -1314,299 +1312,6 @@ async function applyVmaxFromKcatResolution(
   return { parameters, parameterProvenance, flags };
 }
 
-/**
- * ADR 0017 / ADR 0020: resolve a named disease's (R0, infectious period)
- * from the hand-verified registry and bridge it to the SIR engine's own
- * (beta, gamma) — the epidemiology counterpart of applyVmaxFromKcatResolution.
- *
- * Unlike the kcat bridge, this needs no caller-supplied half: R0 and
- * infectious period are both intrinsic disease properties, both resolved
- * from literature (ADR 0017's Context section explains why kcat's [E]0
- * situation does NOT apply here). The gate is simpler as a result: fires
- * whenever the domain is "sir", a disease name is recognized in the query
- * text, and neither `beta` nor `gamma` was already supplied by the caller
- * or the LLM. If either is already present, the bridge is skipped entirely
- * rather than mixing one literature-derived rate with one arbitrary
- * caller-chosen rate — beta and gamma come from the same internally
- * consistent source or neither does.
- *
- * Scoped to "sir" only, not "seir": ADR 0017's verification (the SIR peak
- * condition S(t_peak) = N/R0) was checked against the two-compartment SIR
- * model specifically; SEIR's extra exposed compartment changes what
- * "infectious period" as a generation-time proxy would even mean, and that
- * has not been checked.
- */
-async function applyBetaGammaFromR0Resolution(
-  query: string,
-  overrides: Record<string, number | number[]>,
-  domain: string,
-  parameters: Record<string, number | number[]>,
-  parameterProvenance: Record<string, ParameterProvenance>,
-  flags: string[],
-): Promise<{
-  parameters: Record<string, number | number[]>;
-  parameterProvenance: Record<string, ParameterProvenance>;
-  flags: string[];
-}> {
-  // The domain list lives in provenance.ts beside RESOLVABLE_FIELDS, so
-  // that DOMAINS_WITH_LITERATURE_RESOLUTION can be derived from it rather
-  // than restating which domains have a resolver. A hardcoded
-  // `domain !== "sir"` here would be a second copy of that fact, and the
-  // two would drift the way the enzyme and domain-keyword lists did.
-  if (!EPIDEMIOLOGY_BRIDGE_DOMAINS.has(domain)) {
-    return { parameters, parameterProvenance, flags };
-  }
-  if ("beta" in overrides || "gamma" in overrides) {
-    return { parameters, parameterProvenance, flags };
-  }
-  const disease = matchDisease(query);
-  if (!disease) {
-    // Not "literature has nothing for this disease" -- this system only
-    // recognizes disease NAMES it has a verified, methodology-compatible
-    // (R0, infectious period) source for in the first place (see
-    // diseases.ts and ADR 0017), so a name outside that short list never
-    // even reaches the literature lookup below. Previously silent: a
-    // query naming a real disease (measles, influenza, ...) that
-    // correctly reaches the sir domain would refuse on missing beta/gamma
-    // via the generic "could not be resolved from literature" sentence --
-    // false by omission for a real, well-studied disease that simply
-    // isn't registered here yet, not one the literature has nothing on.
-    // Set directly on beta/gamma (not just a flag, which never reaches
-    // the RequiredParametersMissingError response the client actually
-    // sees) so missingKeyDetails can promote it into the error message.
-    // Names the registry's ACTUAL contents and, for measles, the specific
-    // paper behind the refusal.
-    //
-    // This said "currently COVID-19 only, per ADR 0017" until ADR 0169
-    // registered the two influenza entries — a refusal that misdescribes
-    // what the system can do is its own small inaccuracy, in the message
-    // a user reads when they are already blocked.
-    //
-    // The measles clause matters more than it looks. Measles is the
-    // disease most people try after COVID, and its refusal is NOT "we
-    // haven't got to it": Vink et al. (2014) supplies a measles serial
-    // interval (11.7 d), so half the pair exists. It is unregistered
-    // because Guerra et al. (2017), the standard R0 systematic review,
-    // concludes estimates "vary more than the often cited range of 12-18"
-    // and endorses no single value. Citing that is the product's own
-    // promise applied to its own gaps.
-    const measlesAsked = /\bmeasles\b/i.test(query);
-    const note =
-      "No disease name in this query matches Caterva's literature-backed " +
-      "R0 registry (currently COVID-19, seasonal influenza, and influenza " +
-      "A(H1N1)pdm09 -- see ADR 0017 and ADR 0169). This is a gap in what " +
-      "this system has verified so far, not a statement that the " +
-      "literature is silent. " +
-      (measlesAsked
-        ? "Measles specifically is not registered because Guerra et al. " +
-          "(2017), Lancet Infect Dis 17(12):e420-e428, " +
-          "doi:10.1016/S1473-3099(17)30307-9 -- the standard R0 systematic " +
-          "review -- found that R0 estimates vary far more than the often " +
-          "cited 12-18 range and endorses no single value, so no honest " +
-          "default exists. Supply beta and gamma for YOUR setting. "
-        : "") +
-      "Supply beta/gamma directly if you have a source for this disease.";
-    for (const key of ["beta", "gamma"] as const) {
-      if (!(key in overrides)) {
-        parameterProvenance = {
-          ...parameterProvenance,
-          [key]: {
-            ...parameterProvenance[key],
-            origin: parameterProvenance[key]?.origin ?? "default",
-            unresolvedReason: "disease_not_registered",
-            note,
-          },
-        };
-      }
-    }
-    return { parameters, parameterProvenance, flags };
-  }
-
-  const agentResult = await resolveEpidemiologyParameters(disease.diseaseName);
-  if (!agentResult.found) {
-    flags.push(
-      `Could not resolve real (R0, infectious period) literature values for ` +
-        `'${disease.diseaseName}'; beta/gamma were not bridged from literature.`,
-    );
-    return { parameters, parameterProvenance, flags };
-  }
-
-  if (
-    !agentResult.betaGammaValidation?.ok ||
-    agentResult.beta === undefined ||
-    agentResult.gamma === undefined
-  ) {
-    flags.push(
-      `Resolved R0=${agentResult.r0} for '${agentResult.disease}' but could not ` +
-        `bridge it to beta/gamma: ${agentResult.betaGammaValidation?.reason ?? "invalid inputs"}.`,
-    );
-    return { parameters, parameterProvenance, flags };
-  }
-
-  const located = locatableCitation(agentResult.citation);
-  if (located === undefined) {
-    flags.push(
-      `Resolved R0 for '${agentResult.disease}' but its citation carries no ` +
-        `locator; beta/gamma were not bridged from literature.`,
-    );
-    return { parameters, parameterProvenance, flags };
-  }
-  const citation = located.display;
-
-  const bridgeNote =
-    `beta and gamma derived from R0=${agentResult.r0} and infectious_period=` +
-    `${agentResult.infectiousPeriodDays} days for '${agentResult.disease}' ` +
-    `(gamma = 1/infectious_period, beta = R0 * gamma).` +
-    (agentResult.betaGammaValidation.flagged
-      ? ` ${agentResult.betaGammaValidation.reason ?? ""}`
-      : "");
-
-  // beta/gamma are not STRENDA-governed (a disease has no assay pH), which
-  // buildResolvedKineticProvenance now handles itself via parameterKey —
-  // see ADR 0021.
-  //
-  // citationStatus was unconditionally "verified" here, on the reasoning
-  // that the registry had no flagged tier to select between (ADR 0017,
-  // when COVID-19 was the only entry and both its numbers came from one
-  // paper). ADR 0169 adds that tier: an entry whose R0 and serial
-  // interval come from two different systematic reviews is a CROSS-STUDY
-  // COMPOSITE, and is flagged for the same reason a cross-species BRENDA
-  // Km is — usable and cited, but visibly weaker than a single-source
-  // value. Letting a composite inherit "verified" would erase the only
-  // signal that two methodologies were combined.
-  const composite = agentResult.crossStudyComposite === true;
-  const secondary = locatableCitation(agentResult.secondaryCitation);
-
-  // BOTH papers go in the citation string. A composite that displayed only
-  // the R0 paper would read as single-source at exactly the layer built
-  // for checking.
-  //
-  // The LOCATORS stay primary-only, deliberately. validateParameterProvenance
-  // requires every locator to be findable in the citation string, and
-  // buildCitationLocators emits a PubMed locator whose value is a PMID
-  // while the citation carries a doi.org URL — so the secondary's locators
-  // are not string-matchable here and adding them fails that check. That
-  // check is right and is not being weakened to fit this feature: the
-  // second paper reaches the reader through the citation text and the
-  // note, and the machine-followable set stays honest about what it can
-  // actually verify.
-  const displayCitation =
-    composite && secondary
-      ? `${citation} + serial interval from ${secondary.display}`
-      : citation;
-
-  const fullNote = composite
-    ? `${bridgeNote} ${agentResult.compositeNote ?? ""}`.trim()
-    : bridgeNote;
-
-  parameters = { ...parameters, beta: agentResult.beta, gamma: agentResult.gamma };
-  const provenanceEntry = buildResolvedKineticProvenance({
-    parameterKey: "beta",
-    source: agentResult.source ?? "PubMed",
-    citation: displayCitation,
-    citationStatus: composite ? "flagged" : "verified",
-    citationLocators: buildCitationLocators(agentResult.citation),
-    note: fullNote,
-  });
-  parameterProvenance = {
-    ...parameterProvenance,
-    beta: provenanceEntry,
-    gamma: provenanceEntry,
-  };
-  flags.push(
-    `Bridged beta=${agentResult.beta}, gamma=${agentResult.gamma} from ` +
-      `literature R0 and infectious period for '${agentResult.disease}'.`,
-  );
-
-  return { parameters, parameterProvenance, flags };
-}
-
-/**
- * Apply population genetics parameter resolution from literature.
- * Currently supports mutation_rate for Wright-Fisher domains.
- */
-async function applyPopgenResolution(
-  entities: EntityExtraction | undefined,
-  overrides: Record<string, number | number[]>,
-  domain: string,
-  parameters: Record<string, number | number[]>,
-  parameterProvenance: Record<string, ParameterProvenance>,
-  flags: string[],
-): Promise<{
-  parameters: Record<string, number | number[]>;
-  parameterProvenance: Record<string, ParameterProvenance>;
-  flags: string[];
-}> {
-  const resolvable = RESOLVABLE_FIELDS[domain] ?? [];
-  const popgenKeys = resolvable.filter((k) => !(k in overrides));
-  if (popgenKeys.length === 0) {
-    return { parameters, parameterProvenance, flags };
-  }
-
-  // Accumulate updates to avoid repeated object spreading
-  const parameterUpdates: Record<string, number | number[]> = {};
-  const provenanceUpdates: Record<string, ParameterProvenance> = {};
-
-  // For now, only mutation_rate is supported
-  if (popgenKeys.includes("mutation_rate") && entities?.organism) {
-    const agentResult = await resolveKineticValue({
-      ...entities,
-      parameterType: "mutation_rate",
-    });
-
-    if (agentResult.found && agentResult.km !== undefined) {
-      const value = agentResult.km;
-      const located = locatableCitation(agentResult.citation);
-
-      if (located !== undefined) {
-        const citation = located.display;
-        parameterUpdates["mutation_rate"] = value;
-        // mutation_rate is a per-generation per-base-pair substitution
-        // rate, not an enzyme kinetic constant: STRENDA does not govern it
-        // and it has no assay pH or temperature. buildResolvedKineticProvenance
-        // now enforces that itself via the mandatory parameterKey.
-        //
-        // Before that fix, this call unconditionally stamped a strendaStatus
-        // here, which validateParameterProvenance rejects as a hard
-        // violation and provenanceViolations THROWS on -- so every
-        // successfully-resolved mutation_rate crashed resolveQuery() with
-        // "Internal error: invalid parameter provenance". Never caught by
-        // CI because stdpopsim is absent from the test sandbox, so the
-        // popgen resolver always returned found=false and this branch never
-        // executed. See ADR 0021.
-        provenanceUpdates["mutation_rate"] = buildResolvedKineticProvenance({
-          parameterKey: "mutation_rate",
-          source: agentResult.source ?? "unknown",
-          citation,
-          organism: agentResult.organism,
-          citationStatus: "verified",
-          citationLocators: buildCitationLocators(agentResult.citation),
-        });
-        flags.push(
-          `Resolved mutation_rate=${value} from ${agentResult.source ?? "literature"}.`,
-        );
-      } else {
-        provenanceUpdates["mutation_rate"] = {
-          origin: "default",
-          note: "Found a mutation_rate value but its citation carries no locator; using default.",
-        };
-      }
-    } else {
-      provenanceUpdates["mutation_rate"] = {
-        origin: "default",
-        note: "Could not resolve a real mutation_rate value from literature; using default.",
-      };
-    }
-  }
-
-  // Apply accumulated changes
-  return {
-    parameters: { ...parameters, ...parameterUpdates },
-    parameterProvenance: { ...parameterProvenance, ...provenanceUpdates },
-    flags,
-  };
-}
-
 export interface ResolvedSimulation {
   runId: string;
   domain: SimulationDomain;
@@ -1754,10 +1459,11 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     //
     // ADR 0008: `modelCitations` describes the MODEL, never a parameter
     // value. Every other domain in this table cites the paper that defines
-    // its model -- Kermack & McKendrick for SIR, Gillespie for the SSA,
-    // Lotka for Lotka-Volterra, Elowitz & Leibler for the repressilator.
-    // These two cited a database, so the two domains most central to this
-    // project were the only ones whose model was uncited.
+    // its model -- Gillespie for the SSA (and, before the 2026-09-27
+    // archive, Kermack & McKendrick for SIR, Lotka for Lotka-Volterra,
+    // Elowitz & Leibler for the repressilator). These two cited a
+    // database, so the two domains most central to this project were the
+    // only ones whose model was uncited.
     //
     // And these `parameters` are hardcoded defaults (km 2, vmax 5) used
     // when nothing resolved. On that path BRENDA supplied nothing, so
@@ -1821,20 +1527,38 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   },
 ];
 
+/**
+ * The keys a user may set as `key=value` overrides: exactly the parameters
+ * caterva_runner.py's live run functions read (`params.get(...)` in
+ * run_mm, run_mm_competitive_inhibition and the three Gillespie runners).
+ *
+ * Until 2026-11-01 this list also carried 27 keys (beta, gamma, sigma,
+ * r0, population_size, starting_frequencies, mutation_rate, n_particles,
+ * temperature, ...) of the domains archived on 2026-09-27, after v0.4.0
+ * (the last release that runs them). No live domain reads any of them,
+ * and because extraction runs before domain classification, they did
+ * harm: "two locus ... starting_frequencies=0.5,0,0,0.4" was answered
+ * with an array-validation error telling the user to fix their haplotype
+ * frequencies, instead of the archive refusal.
+ *
+ * An archived key in `key=value` form is now an ordinary unrecognised
+ * token -- it is not an override and never reaches the engine, and a
+ * question naming its domain is refused with the archive date and the
+ * release that still runs it (archivedDomainResidue.test.ts).
+ */
 const PARAMETER_NAMES =
-  "km|ki|vmax|kcat|enzyme_conc|s0|beta|gamma|sigma|e0|i0|r0|r0_recovered|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|starting_frequencies|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k|n_replicates|seed|alpha|delta|p0|v0";
+  "km|ki|vmax|kcat|enzyme_conc|s0|i0|end|points|a0|b0|k|n_replicates|seed";
 
 /**
  * Matches a parameter token: the key name, an optional `=` or `:`
- * delimiter, and the value portion (which may be a scalar or a
- * comma-separated array).
+ * delimiter, and the value portion.
  */
 const PARAMETER_TOKEN_PATTERN = new RegExp(
   `^(${PARAMETER_NAMES})\\s*[=:]\\s*(.+)$`,
   "i",
 );
 
-/** Scalar: km=5, vmax 10, beta = 0.4
+/** Scalar: km=5, vmax 10, s0 = 0.4
  *
  * ANCHORED (`^...$`), and that is load-bearing. Unanchored, this matched a
  * parameter name appearing ANYWHERE inside a whitespace-delimited token,
@@ -1879,7 +1603,18 @@ const BARE_PARAMETER_NAME_PATTERN = new RegExp(`^(${PARAMETER_NAMES})$`, "i");
 const BARE_NUMBER_PATTERN = /^[0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?$/i;
 
 /**
- * Validation errors for malformed array overrides.
+ * Raised when a `key=value` override carries a comma-separated list or a
+ * bracket where one number belongs ("km=1,2", "s0=[10]").
+ *
+ * No live parameter is array-valued. The one that was,
+ * `starting_frequencies` (two-locus Wright-Fisher), went with its domain
+ * when it was archived on 2026-09-27, after v0.4.0 (the last release that
+ * runs it), and the array parser and its length/sum validators went with
+ * it on 2026-11-01. The rejection stays: reading "km=1,2" as km=1 would
+ * run the engine on half of what the user typed and report it as their
+ * choice, so a list is refused loudly.
+ * The class keeps its old name so a caller that already catches it by
+ * name keeps working.
  */
 export class ArrayOverrideValidationError extends Error {
   constructor(
@@ -1892,124 +1627,19 @@ export class ArrayOverrideValidationError extends Error {
 }
 
 /**
- * Parse a single comma-separated value string into a number array.
- * Returns undefined if the string contains no commas (meaning it should
- * be treated as a scalar, not an array).
- *
- * For array parameters, validation happens in `validateArrayOverride()`
- * after parsing — this function only extracts the raw numbers.
- */
-function parseArrayValue(raw: string): number[] | undefined {
-  const trimmed = raw.replace(/^\[|\]$/g, "").trim();
-  if (!trimmed.includes(",")) return undefined;
-  const parts = trimmed.split(",").map((s) => s.trim());
-  if (parts.length === 0 || parts.some((s) => s === "")) return undefined;
-  const nums = parts.map((s) => Number.parseFloat(s));
-  if (!nums.every((n) => Number.isFinite(n))) return undefined;
-  return nums;
-}
-
-/**
- * Known array-valued parameters and their validation constraints.
- *
- * Each entry specifies:
- *  - `length`: exact number of elements required
- *  - `sumTo`: if set, the elements must sum to this value within tolerance
- *  - `tolerance`: float tolerance for the sum check (default 1e-6)
- *
- * Mutation-test note (Rule 6): the sum tolerance is guarded by the array
- * override suite. Mutating `1e-6` -> `1e6` is caught by 4 tests across
- * arrayOverride.test.ts, provenance.test.ts, and queryOverrides.test.ts
- * ("rejects ... that sum to 0.9" / "do not sum to 1" / "rejects array that
- * doesn't sum to 1" / "rejects sum!=1"); the mutation was run and reverted.
- */
-const ARRAY_VALIDATORS: Record<
-  string,
-  { length: number; sumTo?: number; tolerance?: number }
-> = {
-  starting_frequencies: { length: 4, sumTo: 1, tolerance: 1e-6 },
-};
-
-/**
- * Validate an array override against its declared constraints.
- * Throws `ArrayOverrideValidationError` with a clear, actionable message
- * if validation fails.
- */
-function validateArrayOverride(key: string, arr: number[]): void {
-  const spec = ARRAY_VALIDATORS[key];
-  if (!spec) {
-    throw new ArrayOverrideValidationError(
-      key,
-      `'${key}' is not an array-valued parameter. ` +
-        `Remove the commas or use a valid array parameter.`,
-    );
-  }
-
-  if (arr.length !== spec.length) {
-    throw new ArrayOverrideValidationError(
-      key,
-      `${key} must have exactly ${spec.length} values (${arr.length} provided). ` +
-        `Example: ${key}=${Array(spec.length).fill("0.25").join(",")}`,
-    );
-  }
-
-  if (spec.sumTo !== undefined) {
-    const sum = arr.reduce((a, b) => a + b, 0);
-    const tolerance = spec.tolerance ?? 1e-6;
-    if (Math.abs(sum - spec.sumTo) > tolerance) {
-      throw new ArrayOverrideValidationError(
-        key,
-        `${key} values must sum to ${spec.sumTo} (got ${sum.toPrecision(6)}). ` +
-          `Haplotype frequencies must sum to 1.0.`,
-      );
-    }
-  }
-}
-
-/**
  * Extract numeric overrides from the query string.
  *
- * Supports both scalar and array-valued parameters:
- *   - Scalar: "km=5", "vmax 10", "beta = 0.4"
- *   - Array:  "starting_frequencies=0.5,0,0,0.5"
- *            "starting_frequencies=[0.5,0,0,0.5]"
+ *   - "km=5", "km:5", "km5", "km 5"  ->  { km: 5 }
  *
- * Array syntax requires `=` or `:` so it cannot be confused with a scalar
- * followed by unrelated text.
+ * Only the keys in PARAMETER_NAMES are recognised. Every value is a single
+ * number; a list ("km=1,2") throws ArrayOverrideValidationError rather
+ * than being truncated to its first element.
  */
 export function extractParameterOverrides(
   query: string,
-): Record<string, number | number[]> {
-  const overrides: Record<string, number | number[]> = {};
+): Record<string, number> {
+  const overrides: Record<string, number> = {};
 
-  // --- Array overrides: scan the RAW query first -------------------------
-  //
-  // Tokenization splits on whitespace, which breaks `key=a, b, c, d` apart
-  // into `key=a,` `b,` `c,` `d`. Scanning the raw query with a dedicated
-  // pattern captures the full comma-separated group regardless of spaces.
-  const arrayKeys = new Set<string>();
-  for (const [key, spec] of Object.entries(ARRAY_VALIDATORS)) {
-    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const arrayRe = new RegExp(
-      `${escapedKey}\\s*[=:]\\s*\\[?([0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?(?:\\s*,\\s*[0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?)+)\\]?`,
-      "i",
-    );
-    const m = arrayRe.exec(query);
-    if (m) {
-      const arr = parseArrayValue(m[1]!);
-      if (arr !== undefined) {
-        validateArrayOverride(key, arr);
-        overrides[key] = arr;
-        arrayKeys.add(key);
-      }
-    }
-  }
-
-  // --- Scalar / token-based extraction ----------------------------------
-  //
-  // Keys already captured as arrays are skipped so a partial token
-  // (e.g. `starting_frequencies=0.5,` from a space-split list) cannot
-  // overwrite the validated array with a scalar.
   const tokens = query.split(/\s+/);
   for (let tokenIdx = 0; tokenIdx < tokens.length; tokenIdx++) {
     const token = tokens[tokenIdx]!;
@@ -2017,43 +1647,20 @@ export function extractParameterOverrides(
     const kvMatch = PARAMETER_TOKEN_PATTERN.exec(token);
     if (kvMatch) {
       const key = kvMatch[1]!.toLowerCase();
-      if (arrayKeys.has(key)) continue;
-
       const rawValue = kvMatch[2]!;
 
-      // If the value contains commas or brackets, it MUST be an array.
-      // Do not fall back to scalar — a malformed array is rejected.
       if (rawValue.includes(",") || /\[/.test(rawValue)) {
-        const arr = parseArrayValue(rawValue);
-        if (arr !== undefined) {
-          validateArrayOverride(key, arr);
-          overrides[key] = arr;
-        } else {
-          throw new ArrayOverrideValidationError(
-            key,
-            `'${key}' value '${rawValue}' is not a valid comma-separated number list. ` +
-              `Example: ${key}=0.5,0,0,0.5`,
-          );
-        }
-        continue;
-      }
-
-      // Scalar parse — but only if this key is not an array parameter.
-      // An array parameter supplied without commas (e.g. starting_frequencies=0.5)
-      // is malformed and must be rejected, not silently accepted as a scalar.
-      if (ARRAY_VALIDATORS[key] === undefined) {
-        const value = Number.parseFloat(rawValue);
-        if (Number.isFinite(value)) {
-          overrides[key] = value;
-          continue;
-        }
-      } else {
-        // Array parameter supplied as scalar — reject with actionable message.
         throw new ArrayOverrideValidationError(
           key,
-          `'${key}' requires a comma-separated list (e.g. ${key}=0.5,0,0,0.5), ` +
-            `not a single number.`,
+          `'${key}' takes a single number, not the list '${rawValue}'. ` +
+            `Example: ${key}=5`,
         );
+      }
+
+      const value = Number.parseFloat(rawValue);
+      if (Number.isFinite(value)) {
+        overrides[key] = value;
+        continue;
       }
     }
 
@@ -2062,7 +1669,6 @@ export function extractParameterOverrides(
     const scalarMatch = PARAMETER_PATTERN.exec(token);
     if (scalarMatch) {
       const key = scalarMatch[1]!.toLowerCase();
-      if (arrayKeys.has(key)) continue;
       const value = Number.parseFloat(scalarMatch[2]!);
       if (Number.isFinite(value)) {
         overrides[key] = value;
@@ -2076,25 +1682,17 @@ export function extractParameterOverrides(
     // cannot see the next token. Consuming the pair here is what makes it
     // real. Only a BARE name (no `=`/`:`/digits already on it -- ruled out
     // by every branch above reaching here) followed by a BARE number
-    // qualifies, so "km=5 10" or "beta: x" cannot accidentally pair with
+    // qualifies, so "km=5 10" or "km: x" cannot accidentally pair with
     // an unrelated neighboring number.
     if (BARE_PARAMETER_NAME_PATTERN.test(token) && tokenIdx + 1 < tokens.length) {
       const key = token.toLowerCase();
       const nextToken = tokens[tokenIdx + 1]!;
-      if (!arrayKeys.has(key) && BARE_NUMBER_PATTERN.test(nextToken)) {
-        if (ARRAY_VALIDATORS[key] === undefined) {
-          const value = Number.parseFloat(nextToken);
-          if (Number.isFinite(value)) {
-            overrides[key] = value;
-            tokenIdx++; // consume the value token so it is not re-scanned
-          }
+      if (BARE_NUMBER_PATTERN.test(nextToken)) {
+        const value = Number.parseFloat(nextToken);
+        if (Number.isFinite(value)) {
+          overrides[key] = value;
+          tokenIdx++; // consume the value token so it is not re-scanned
         }
-        // An array parameter named bare ("starting_frequencies 0.5") is
-        // left unmatched here rather than rejected: unlike `key=0.5`,
-        // typing the name and a lone number with a space is at least as
-        // likely to be prose ("starting_frequencies 0.5 each" is not
-        // natural) as an attempted override, so silence is safer than an
-        // error a plain sentence could trigger by coincidence.
       }
     }
   }
@@ -2361,7 +1959,7 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
  */
 function buildParameterProvenance(
   parameters: Record<string, number | number[]>,
-  overrides: Record<string, number | number[]>,
+  overrides: Record<string, number>,
   llmSupplied: Record<string, number | number[]>,
   domain: string,
 ): Record<string, ParameterProvenance> {
@@ -2416,6 +2014,11 @@ function buildParameterProvenance(
  * number they had already given, in the same sentence. Reading it is not
  * inventing it; the difference between "a town of 10000 people" and
  * "s0=10000" is grammar, not provenance, and both are origin "user".
+ * (Note, 2026-11-01: that covid example is an epidemiology question, a
+ * domain archived on 2026-09-27, after v0.4.0, the last release that
+ * runs it; statedQuantities.ts now reads only stated concentrations
+ * (s0, enzyme_conc) and durations (end) for the two Michaelis-Menten
+ * domains, and the same rule applies to them.)
  *
  * An explicit key=value ALWAYS wins over prose. Someone who writes
  * "s0=500" after describing a town of 10000 is correcting themselves, and
@@ -2432,9 +2035,9 @@ function buildParameterProvenance(
 function readStatedQuantities(
   query: string,
   domain: SimulationDomain,
-  overrides: Record<string, number | number[]>,
+  overrides: Record<string, number>,
 ): {
-  effectiveOverrides: Record<string, number | number[]>;
+  effectiveOverrides: Record<string, number>;
   statedPhrases: Record<string, string>;
 } {
   const statedPhrases: Record<string, string> = {};
@@ -2485,7 +2088,7 @@ function provenanceViolations(
  * Generate flags about parameter extraction from query overrides.
  * Consolidated pattern used in both LLM and fallback resolution paths.
  */
-function buildParameterExtractionFlags(overrides: Record<string, number | number[]>): string[] {
+function buildParameterExtractionFlags(overrides: Record<string, number>): string[] {
   const extractionFlags: string[] = [];
   if (Object.keys(overrides).length === 0) {
     extractionFlags.push("No parameters were extracted from the query; using defaults.");
@@ -2806,22 +2409,6 @@ export async function resolveQuery(
       flags = vmaxResult.flags;
     }
 
-    // ADR 0017 / ADR 0020: bridge a literature R0/infectious-period pair
-    // to beta/gamma for a recognized disease name in the query text.
-    {
-      const epiResult = await applyBetaGammaFromR0Resolution(
-        query,
-        effectiveOverrides,
-        llmResult.domain,
-        parameters,
-        parameterProvenance,
-        flags,
-      );
-      parameters = epiResult.parameters;
-      parameterProvenance = epiResult.parameterProvenance;
-      flags = epiResult.flags;
-    }
-
 
     if (
       Object.keys(effectiveOverrides).length === 0 &&
@@ -2972,9 +2559,8 @@ export async function resolveQuery(
         modelCitations: domainCitation ? [domainCitation] : [],
         // Appended HERE rather than pushed at the point of discard: `flags`
         // is REASSIGNED further down this function (flags = result.flags,
-        // = vmaxResult.flags, = epiResult.flags, = popgenResult.flags), so
-        // anything pushed earlier is silently dropped on four of the paths
-        // through it.
+        // = vmaxResult.flags), so anything pushed earlier is silently
+        // dropped on two of the paths through it.
         flags:
           discardedLlmCitations > 0
             ? [
@@ -3128,22 +2714,6 @@ export async function resolveQuery(
     parameters = vmaxResult.parameters;
     parameterProvenance = vmaxResult.parameterProvenance;
     flags = vmaxResult.flags;
-  }
-
-  // ADR 0017 / ADR 0020: bridge a literature R0/infectious-period pair to
-  // beta/gamma for a recognized disease name in the query text.
-  {
-    const epiResult = await applyBetaGammaFromR0Resolution(
-      query,
-      effectiveOverrides,
-      best.domain,
-      parameters,
-      parameterProvenance,
-      flags,
-    );
-    parameters = epiResult.parameters;
-    parameterProvenance = epiResult.parameterProvenance;
-    flags = epiResult.flags;
   }
 
 

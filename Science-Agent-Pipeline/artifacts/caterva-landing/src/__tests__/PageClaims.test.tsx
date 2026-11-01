@@ -30,6 +30,11 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+// Imported statically: loading GetCaterva pulls in TerminalWindow, Reveal
+// and framer-motion, which on a cold, loaded machine ran past vitest's 5s
+// test timeout when it was a dynamic import inside the test body.
+import { DOMAINS, RELEASE_TAG } from "@/lib/domains";
+import { MAIN_ONLY, RELEASE } from "@/cli/GetCaterva";
 
 const gallery = readFileSync(
   path.join(__dirname, "..", "cli", "ExampleGallery.tsx"),
@@ -95,9 +100,11 @@ describe("example cards do not overstate what the pipeline returns", () => {
  * a smaller, more modest invented number would have been the identical
  * defect wearing a humbler face.
  *
- * The Caterva side keeps a figure because that one was measured
- * end-to-end (2.0-28.3 s across three queries on 2026-09-05), and the
- * file records the runs.
+ * The Caterva side kept "under 30 s (measured)" from three runs on
+ * 2026-09-05 (2.0-28.3 s). Two were SIR/influenza queries, domains archived
+ * on 2026-09-27, and one enzyme run is not a bound, so on 2026-10-31 the
+ * figure was withdrawn. The runs stay recorded in the file's comments, so
+ * whoever restores a figure starts from what was measured.
  */
 describe("the workflow comparison does not invent durations", () => {
   const source = readFileSync(
@@ -125,12 +132,13 @@ describe("the workflow comparison does not invent durations", () => {
     expect(rendered).toMatch(/Cross-reference papers/i);
   });
 
-  it("keeps the Caterva figure, which is measured, and labels it so", () => {
-    expect(rendered).toMatch(/under 30 s/i);
-    expect(rendered).toMatch(/measured/i);
+  it("claims no Caterva duration either, since none is measured on live domains", () => {
+    expect(rendered).not.toMatch(/under 30 s/i);
+    expect(rendered).not.toMatch(/\d+(\.\d+)?\s*(s|sec|seconds)\b/i);
+    expect(rendered).toMatch(/not yet measured/i);
   });
 
-  it("records the measurements behind that figure in the file", () => {
+  it("keeps the withdrawn measurements on record in the file", () => {
     // A number is only as good as its recorded basis. If someone changes
     // the claim they have to change the evidence next to it.
     //
@@ -247,5 +255,80 @@ describe("the inhibition demo cites what ref 739793 measured", () => {
     expect(dash).toContain("const KI = 0.00252;");
     expect(dash).toContain("VMAX / (1 + inhibitor / KI)");
     expect(galleryNow).toContain("INHIBITOR_KI = 0.00252");
+  });
+});
+
+/**
+ * The release the page offers is the package's version, not a typed one.
+ *
+ * On 2026-11-01 the page offered v0.4.0 as the download, labelled released
+ * work "In v0.4.0", showed "v0.7.0" on its 404 page and called the
+ * structure and MD tools main-only, four days after v0.6.0 (which carries
+ * them) was published on 2026-10-28. RELEASE_TAG now comes from
+ * repoFacts.json, which scripts/check_landing_test_counts.py derives from
+ * caterva/__init__.py. These tests hold the rest of the page to that one
+ * value.
+ */
+describe("the release the page names is RELEASE_TAG", () => {
+  const src = (...p: string[]) =>
+    readFileSync(path.join(__dirname, "..", ...p), "utf-8");
+
+  it("takes RELEASE_TAG from the generated repoFacts.json", () => {
+    const facts = JSON.parse(src("lib", "generated", "repoFacts.json"));
+    expect(RELEASE_TAG).toBe(facts.releaseTag);
+    expect(RELEASE_TAG).toMatch(/^v\d+\.\d+\.\d+$/);
+  });
+
+  it("re-reads the download's date and commands when the release moves on", () => {
+    // The date, platforms and command list cannot be derived from the
+    // tree, so GetCaterva records the tag they were read against. A new
+    // version fails here until somebody reads the new tag's app.py.
+    expect(RELEASE.readFor).toBe(RELEASE_TAG);
+    expect(RELEASE.tag).toBe(RELEASE_TAG);
+    expect(RELEASE.url.endsWith(`/releases/tag/${RELEASE_TAG}`)).toBe(true);
+    // A command cannot be both in the release and main-only.
+    expect(MAIN_ONLY.filter((c) => RELEASE.commands.includes(c))).toEqual([]);
+  });
+
+  it("types no version as current outside lib/domains.ts", () => {
+    // History (ChangelogModal, and "the v0.4.0 release still runs them",
+    // which is true of that tag) may name old versions; nothing else may
+    // type a version string where RELEASE_TAG belongs.
+    const files: [string[], RegExp][] = [
+      [["cli", "GetCaterva.tsx"], /tag:\s*"v\d/],
+      [["cli", "RoadmapSection.tsx"], /label:\s*"In v\d/],
+      [["pages", "not-found.tsx"], /CATERVA v\d|Download v\d/],
+      [["lib", "domains.ts"], /RELEASE_TAG\s*(?::\s*string\s*)?=\s*"v/],
+      // The FAQ and the updates box named the main branch, not a release,
+      // as the home of the MD tools until 2026-11-01; they now say
+      // RELEASE_TAG, and a typed tag in its place fails here.
+      [["cli", "FAQSection.tsx"], /In v\d|on the main branch, `prepare`/],
+      [["cli", "CliApp.tsx"], /v\d+\.\d+\.\d+ carries|next release will carry/],
+    ];
+    for (const [p, typed] of files) {
+      expect(src(...p), p.join("/")).not.toMatch(typed);
+    }
+  });
+
+  it("marks released exactly the capabilities the release registers", () => {
+    // Read against `git show v0.6.0:caterva/app.py`, which registers
+    // compose, sim, prepare, md, analyze, bind, complex and fep among its
+    // fourteen commands. When RELEASE_TAG moves on, the test above fails
+    // first and this list is re-read with it.
+    // Every command a description names counts, so "caterva bind,
+    // complex, fep" needs all three in the release, not only `bind`.
+    const commandsOf = (desc: string) =>
+      [...desc.matchAll(/caterva (\w+(?:, \w+)*)/g)].flatMap((m) =>
+        m[1]!.split(", "),
+      );
+    for (const d of DOMAINS) {
+      const named = commandsOf(d.desc);
+      // A description that names no command would pass vacuously.
+      expect(named.length, `${d.id} names no caterva command`).toBeGreaterThan(0);
+      const inRelease = named.every((c) => RELEASE.commands.includes(c));
+      expect(d.status, `${d.id} (${named.join(", ")})`).toBe(
+        inRelease ? "released" : "main",
+      );
+    }
   });
 });

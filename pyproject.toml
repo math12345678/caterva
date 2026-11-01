@@ -25,7 +25,9 @@ dependencies = [
     "antimony==2.14.0",
     "python-libsbml==5.21.1",
     "numpy==2.2.6",
-    "scipy==1.15.3",
+    # Split by interpreter; the reason is beside the pin in requirements.txt.
+    "scipy==1.15.3; python_version < '3.11'",
+    "scipy==1.16.0; python_version >= '3.11'",
     "requests==2.34.2",
     "certifi==2026.10.19",
     "beautifulsoup4==4.15.0",

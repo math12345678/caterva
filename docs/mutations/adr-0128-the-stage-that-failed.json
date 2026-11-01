@@ -1,0 +1,81 @@
+{
+  "_why": [
+    "ADR 0128's mutation table, re-derived as a set file.",
+    "",
+    "ec_not_resolved and ec_ambiguous both stop at the enzyme name, before BRENDA is asked.",
+    "They used to render as 'could not resolve a real KM from BRENDA/KEGG/PubMed'.",
+    "ADR 0128 recorded three mutations; the 'revert both branches' one is split into S1/S2 because",
+    "the set format mutates one site at a time.",
+    "",
+    "S6 is the ADR's own 'folding the two identity failures into one message': the ec_ambiguous branch",
+    "also takes ec_not_resolved, so a misspelt name is told it matched several enzymes. The",
+    "`|| ec_not_resolved` goes on the branch placed FIRST; on the later one it is the no-op ADR 0128",
+    "already describes.",
+    "",
+    "S3 is NOT the ADR's mutation. The earlier port read 'one message' as one `unresolvedReason` and",
+    "wrote that fold instead; it leaves both NOTES intact, and every test asserted on the note, so it",
+    "came back NOT CAUGHT. The ADR never graded the field a program branches on; the gap is new, not a",
+    "refuted claim. Closed by 'keeps ec_ambiguous and ec_not_resolved as two reasons, not one' in",
+    "theStageThatFailed.test.ts. S5 is the same fold through the forwarded-refusal branch, which",
+    "passes `reason` through and so has no literal for S3's find string to hit; it was NOT CAUGHT too.",
+    "Both verdicts re-measured 2026-10-31 by excluding only that test with vitest -t; every remaining test passed.",
+    "",
+    "S4 is the vacuous-test case: the message's own worked example contains 1.1.1.27/1.1.1.28, so a",
+    "test using those passes on prose. The test uses 3.2.1.1/3.2.1.2. Its find string carries the",
+    "fallback line because `? ecCandidates.join(\", \")` alone also occurs in the ec_mismatch branch;",
+    "the fallback text names which branch is meant.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0128-the-stage-that-failed.json"
+  ],
+  "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run --no-cache src/__tests__/theStageThatFailed.test.ts",
+  "mutations": [
+    {
+      "id": "S1",
+      "description": "the ec_ambiguous branch is reverted to the generic message",
+      "_claimed": "caught",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "if (reason === \"ec_ambiguous\") {",
+      "replace": "if (false) {"
+    },
+    {
+      "id": "S2",
+      "description": "the ec_not_resolved branch is reverted to the generic message",
+      "_claimed": "caught",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "if (reason === \"ec_not_resolved\") {",
+      "replace": "if (false) {"
+    },
+    {
+      "id": "S3",
+      "description": "the two identity failures are folded into one reason",
+      "_claimed": "caught after the distinct-reasons test was added",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "unresolvedReason: \"ec_ambiguous\",",
+      "replace": "unresolvedReason: \"ec_not_resolved\","
+    },
+    {
+      "id": "S4",
+      "description": "the candidate EC numbers are dropped from the ec_ambiguous sentence",
+      "_claimed": "caught after the test was repaired",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "? ecCandidates.join(\", \")\n      : \"more than one EC number\";",
+      "replace": "? \"an unnamed enzyme\"\n      : \"more than one EC number\";"
+    },
+    {
+      "id": "S5",
+      "description": "the forwarded-refusal branch folds both identity failures into one reason",
+      "_claimed": "caught after the distinct-reasons test was added",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "      unresolvedReason: reason,\n      note:\n        `The enzyme name you gave does not identify one enzyme",
+      "replace": "      unresolvedReason: \"ec_ambiguous\",\n      note:\n        `The enzyme name you gave does not identify one enzyme"
+    },
+    {
+      "id": "S6",
+      "description": "the two identity failures are folded into one message: ec_not_resolved takes the ec_ambiguous branch",
+      "_claimed": "caught",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "if (reason === \"ec_ambiguous\") {",
+      "replace": "if (reason === \"ec_ambiguous\" || reason === \"ec_not_resolved\") {"
+    }
+  ]
+}

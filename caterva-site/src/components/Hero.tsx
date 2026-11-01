@@ -16,8 +16,15 @@ import { LEDGER } from '../lib/pipeline';
 // numbers stale again.
 const CLAIM_COUNT = LEDGER.length;
 const DOMAIN_COUNT = new Set(LEDGER.map((row) => row.domain)).size;
+// LEDGER holds live domains only; the archived domains' claims moved to
+// ARCHIVED_LEDGER on 2026-09-27's archiving, so these counters no longer
+// advertise PCR, popgen and the rest. The domain counter is labelled "in the
+// ledger" because it counts ledger domains, which is fewer than README.md:53's
+// five live simulation domains (competitive inhibition and the SSA ensemble
+// have no ledger row of their own).
 
-const WORDS = ['exact mathematics.', 'a closed form.', 'a 1971 paper.', 'a second model.'];
+// 'a 1971 paper.' was Hoare & Pal's LJ13 minimum, an archived domain's claim.
+const WORDS = ['exact mathematics.', 'a closed form.', 'a second model.'];
 
 export default function Hero() {
   const reduced = useReducedMotion();
@@ -109,7 +116,7 @@ export default function Hero() {
           <span className="text-ink">{claims}</span> verified claims
         </span>
         <span>
-          <span className="text-ink">{domains}</span> simulation domains
+          <span className="text-ink">{domains}</span> live domains in the ledger
         </span>
         <span>
           <span className="text-ink">2</span> independent implementers

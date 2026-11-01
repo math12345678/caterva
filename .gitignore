@@ -154,3 +154,17 @@ md-smoke
 # (scripts/vendor_literature.py, run by scripts/build_release.py): a build
 # product, regenerated from Tests/ every time, never committed.
 caterva/_literature/
+
+# The job store `src/storage/job-database.ts` appends to. It is created at
+# runtime on first use, and it is a run's output, not source: the committed
+# copy held five jobs from one machine, which `GET /api/jobs/history` then
+# served to every fresh clone as if that server had run them. Untracked on
+# 2026-10-31. docker-compose.yml keeps it under ./data/ (CATERVA_JOBS_FILE),
+# and mounts ./logs/ beside it; both are the container's output.
+/caterva-jobs.jsonl
+/data/
+/logs/
+
+# Where scripts/worktree.sh checks out one worktree per agent. Each is a
+# full working tree; tracking any of it would nest checkouts in the index.
+/Caterva.worktrees/

@@ -30,7 +30,9 @@ in increasing order of importance:
   * different quantities resolve through different machinery today
     (BRENDA for kinetics, a registry for epidemiology, stdpopsim for
     population genetics), and hard-coding one would quietly make the others
-    second-class;
+    second-class (2026-11-01: the epidemiology and population-genetics
+    resolvers are now in archive/legacy_domains/; the reason stands for
+    whatever resolves next);
   * it makes the ORDER of operations testable, which is where the
     interesting failure lives -- a version that judged compatibility before
     all resolutions had returned would report a coherent model on partial

@@ -34,3 +34,11 @@ caterva_pitch_deck.pptx
 Logo.png
 Screenshot*.png
 Business/
+
+# Run output and agent checkouts, untracked since 2026-10-31 (.gitignore).
+# .devcontainer/Dockerfile does `COPY . .`, which would otherwise copy a
+# local job history and every agent worktree into the image.
+caterva-jobs.jsonl
+data/
+logs/
+Caterva.worktrees/

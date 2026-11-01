@@ -77,8 +77,10 @@ curl http://localhost:3000/api/metrics/batches-by-query
 
 1. Start Prometheus and Grafana:
    ```bash
-   docker-compose -f docker-compose-monitoring.yml up
+   GRAFANA_ADMIN_PASSWORD='<a password of your own>' \
+     docker-compose -f deploy/monitoring/docker-compose-monitoring.yml up
    ```
+   The password has no default and the stack will not start without it.
 
 2. Prometheus scrapes `/metrics` every 15 seconds
 
@@ -90,7 +92,9 @@ curl http://localhost:3000/api/metrics/batches-by-query
    - `caterva_batch_avg_success_rate` — average batch success rate
    - `caterva_batch_avg_execution_time_ms` — average batch time
 
-4. View in Grafana: http://localhost:3001
+4. View in Grafana: http://localhost:3001 (user `admin`, the password above).
+   Every port in this stack is bound to 127.0.0.1; from another machine use
+   `ssh -N -L 3001:127.0.0.1:3001 you@docker-host` (see MONITORING_SETUP.md).
 
 ## Key Data Points Per Sweep/Batch
 

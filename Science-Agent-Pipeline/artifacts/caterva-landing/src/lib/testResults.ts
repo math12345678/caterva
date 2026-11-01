@@ -128,6 +128,14 @@ export interface SuiteFile {
   passed: number;
   skipped: number;
   failed: number;
+  /**
+   * How many tests the measured run collected. Stated for the engine and
+   * literature rows, whose suite size README.md states and
+   * src/lib/generated/repoFacts.json records: check_landing_test_counts.py
+   * fails when the two differ, so a pass count cannot outlive the suite it
+   * was measured on.
+   */
+  collected?: number;
 }
 
 export interface TestSuite {
@@ -230,9 +238,32 @@ export const TEST_SUITES: TestSuite[] = [
         // not counted): 6696 passed, 1 skipped, 0 failed, of the 6707 tests
         // collected. The earlier running tally above is superseded by this
         // one measurement.
-        passed: 6696,
+        //
+        // Superseded 2026-10-31 by CI: run 40724292047 of the tests
+        // workflow, job "test (3.12)", on commit 2c8cae3 (2026-10-28),
+        // `pytest` in caterva/ as CI collects it: "collected 7057 items",
+        // "7055 passed, 2 skipped". The two skips are recorded by
+        // check_no_silent_skips in the same job: the Swift type-check (no
+        // Swift toolchain on Linux; studio-dmg compiles the same sources)
+        // and the codegen selftest (needs npx; the api-server job runs it).
+        //
+        // Superseded 2026-10-31 (V7, ADR 0180) by a local run of caterva/
+        // alone on the merged tree, nothing else in flight, read out of a
+        // junit-xml report: 7059 tests, 7057 passed, 1 skipped, 1 failed.
+        // The failure is test_studio_socket.py::
+        // test_a_request_dripped_in_slowly_is_cut_off_by_its_total_deadline,
+        // and the junit report says why: ConnectionResetError on recv. The
+        // server cut the connection at 1.4 s, as it should, but with a
+        // dripped byte still unread, so the kernel sent RST, not FIN, and
+        // the test only recognised FIN. The test now treats a reset as the
+        // cut-off it is; test_studio_socket.py then passed in full (10 of
+        // 10) three runs out of three. So 7057 + 1: 7058. The skip is the
+        // Swift type-check, which needs Sparkle unpacked into dist/sparkle
+        // (scripts/fetch_sparkle.py); the studio-dmg job compiles it.
+        passed: 7058,
         skipped: 1,
         failed: 0,
+        collected: 7059,
       },
     ],
   },
@@ -242,7 +273,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "92 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "96 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -290,9 +321,49 @@ export const TEST_SUITES: TestSuite[] = [
         // current. The 21 test_popgen_resolver.py tests ran there and skip in
         // CI, which does not install stdpopsim, so the figure CI collects is
         // 1610 less 21: 1589.
-        passed: 1589,
+        //
+        // Superseded 2026-10-31 by CI: run 40724292047, job "test (3.12)",
+        // commit 2c8cae3, `pytest` in Tests/: "collected 1622 items / 1
+        // skipped", "1621 passed, 2 skipped". The module-level skip is
+        // test_popgen_resolver.py (stdpopsim is not installed in CI, which
+        // is why it is not among the 1622); the other is the
+        // dependency-licence test, which reads installed JavaScript
+        // packages the Python job does not install. Both are recorded by
+        // check_no_silent_skips in that job.
+        //
+        // Superseded 2026-10-31 (V7, ADR 0180) by a local run of Tests/
+        // alone on the merged tree, read out of a junit-xml report: 1666
+        // passed, 1 skipped, 0 failed, 1245 s. The skip is
+        // test_popgen_resolver.py's module-level skip (stdpopsim absent);
+        // the dependency-licence test ran, with JavaScript packages present.
+        // CI's 3.10 job then failed one test there: CORE's "+0000" reset
+        // timestamp, which fromisoformat accepts only from 3.11. The parser
+        // now falls back to strptime, and one test forces that path on any
+        // interpreter (2026-11-01; the file passed in full, 12 of 12): 1667.
+        //
+        // (Note 2026-11-01: test_popgen_resolver.py, the skip named above,
+        // is no longer in Tests/. Its resolver's last caller, the API
+        // server's science_agent_runner.py, was removed on 2026-10-31 (ADR
+        // 0180), and the suite, popgen_resolver.py and
+        // requirements-popgen.txt moved to archive/legacy_domains/ on
+        // 2026-11-01, where pytest does not collect them; v0.6.0 is the
+        // last release that ships them. test_epidemiology_resolver.py,
+        // whose tests were among the 1667 passed, and epidemiology_resolver.py
+        // moved with them.)
+        //
+        // Measured 2026-11-01 after that move, `pytest Tests` alone on the
+        // merged tree, read out of a junit-xml report: 1676 tests, 1676
+        // passed, 0 skipped, 0 failed, 725 s. The skip left with the
+        // archived popgen suite; the epidemiology tests left too, and the
+        // licence-guard and retired-resolver tests arrived: 1676.
+        //
+        // Measured 2026-11-01 for 0.7.0, the same way: 1680 tests, 1680
+        // passed, 0 skipped, 0 failed, 1767 s (the machine was loaded).
+        // test_documented_guard_counts.py arrived with 4 tests: 1680.
+        passed: 1680,
         skipped: 0,
         failed: 0,
+        collected: 1680,
       },
     ],
   },
@@ -346,7 +417,25 @@ export const TEST_SUITES: TestSuite[] = [
         // total in the passed column turns any failure into an invisible
         // one, which is the specific dishonesty this panel exists to
         // avoid.
-        passed: 828,
+        //
+        // Superseded 2026-10-31 (V7, ADR 0180): `vitest run` alone, with
+        // CATERVA_PYTHON and the venv first on PATH, from a JSON report:
+        // 82 files, 856 tests, 854 passed, 2 failed, both test defects. The
+        // routes test listed four of the seven JobStatus values and a job
+        // was caught "resolving"; python.test.ts symlinked a venv's
+        // interpreter out of its venv, which starts the base interpreter
+        // without Caterva's packages. Both fixed; the two files then passed
+        // in full (63 of 63): 856.
+        //
+        // Measured 2026-11-01, the same way: 81 files, 861 tests, 861
+        // passed. Against 856: arrayOverride.test.ts (two-locus
+        // Wright-Fisher only) deleted, -6; popgenProvenance.test.ts became
+        // strendaGoverned.test.ts, -2; provenance.test.ts lost its two
+        // starting_frequencies tests, -2; queryOverrides.test.ts dropped its
+        // array cases and gained list-refusal and archived-name cases, +6;
+        // scenarioDefaults +6; statedQuantities +2;
+        // literatureEndpointClaims +1. 856 + 5: 861.
+        passed: 861,
         skipped: 0,
         failed: 0,
       },
@@ -367,7 +456,13 @@ export const TEST_SUITES: TestSuite[] = [
         // a render of the hero demo, plus the reduced-motion lockup test and four that pin the
         // motion frame by frame). Plus 1 PageClaims test pinning the export
         // samples to the generated file of a real run (2026-09-29): 45.
-        passed: 45,
+        // Plus two tests of the shell's `status` command (it now asks the
+        // API server) and one holding GUARD_COUNT to scripts/ on disk:
+        // `vitest run` on 2026-10-31, 6 files, 48 passed. Plus four
+        // PageClaims tests holding the release tag, the download's commands
+        // and each domain's status to the package version: `vitest run` on
+        // 2026-11-01, from a JSON report, 6 files, 52 passed.
+        passed: 52,
         skipped: 0,
         failed: 0,
       },
@@ -397,14 +492,26 @@ export const TEST_SUITES: TestSuite[] = [
   },
 ];
 
+// The four skips in the engine and literature rows, as CI run 40724292047
+// recorded them (check_no_silent_skips, which fails on any skip it has not
+// been told about).
+//
+// Corrected 2026-11-01: the last sentence said test_popgen_resolver.py
+// "needs" stdpopsim from the optional requirements-popgen.txt, in the
+// present tense. That suite, its resolver and requirements-popgen.txt
+// moved to archive/legacy_domains/ on 2026-11-01 and are no longer
+// collected, so the sentence now says so in the past tense. The first
+// sentence also changed: it ties the four skips to CI run 40724292047
+// instead of to "CI's Python jobs" in general.
 export const SKIP_EXPLANATION =
-  "test_popgen_resolver.py skips one test when stdpopsim isn't installed. " +
-  "stdpopsim is GPL-3.0-or-later; Caterva is Apache-2.0, so it was moved " +
-  "out of requirements.txt into an optional requirements-popgen.txt on " +
-  "2026-08-15 rather than mixing licenses into the default install. The " +
-  "population-genetics code itself wraps that import in try/except and " +
-  "degrades to the non-stdpopsim path -- this is a documented licensing " +
-  "boundary, not an untested code path.";
+  "The one skip is the Swift type-check in the engine suite, which " +
+  "needs Sparkle unpacked into dist/sparkle (scripts/fetch_sparkle.py); " +
+  "the studio-dmg workflow compiles the same sources. It is a missing " +
+  "tool, not a failure. Earlier counts also skipped " +
+  "test_popgen_resolver.py, which needed stdpopsim (GPL-3.0-or-later, " +
+  "moved out of the Apache-2.0 default install on 2026-08-16); that " +
+  "suite moved to archive/legacy_domains/ on 2026-11-01 and is no " +
+  "longer collected.";
 
 export function totals() {
   let passed = 0;

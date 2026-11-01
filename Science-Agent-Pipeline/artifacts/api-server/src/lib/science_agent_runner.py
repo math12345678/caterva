@@ -100,12 +100,10 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
 import enzyme_lookup
-import epidemiology_resolver
 import fallback_logic
 import reliability
 from fallback_logic import KineticResult
 import httpx
-import popgen_resolver
 
 
 def resolve_ec_number(enzyme_name: str, organism: str) -> str | None:
@@ -564,8 +562,8 @@ def _reliability_dict(result, requested_organism: str, physiological=None) -> di
 def _ensure_caterva_path() -> str:
     """Ensure caterva/ directory is in sys.path for validation imports.
 
-    Returns the Caterva directory path. This is shared by vmax and beta_gamma bridges
-    to avoid duplicating the import setup logic.
+    Returns the Caterva directory path. Kept as its own function so the
+    vmax bridge's import setup is written once.
     """
     import pathlib
     import sys
@@ -590,8 +588,8 @@ def bridge_vmax_from_kcat(kcat: float, enzyme_conc: float) -> tuple[float, bool,
     ``core.data_structures``) WITHOUT executing caterva/__init__.py's
     full antimony-dependent import chain, which the public
     ``caterva_engine`` entry point requires just to expose one
-    pure-arithmetic function. This keeps every non-kcat lookup (km, ki,
-    mutation_rate) free of an antimony dependency it never needed.
+    pure-arithmetic function. This keeps every non-kcat lookup (km, ki)
+    free of an antimony dependency it never needed.
 
     Returns (vmax, ok, flagged, flag_reason_or_error). ``ok=False`` means
     the inputs were rejected (non-finite/non-positive); the caller must
@@ -606,53 +604,16 @@ def bridge_vmax_from_kcat(kcat: float, enzyme_conc: float) -> tuple[float, bool,
     return vmax, True, result.flagged, result.flag_reason
 
 
-def bridge_beta_gamma_from_r0(
-    r0: float, infectious_period_days: float
-) -> tuple[float, float, bool, bool, str | None]:
-    """Compute (beta, gamma) = R0/infectious-period bridge via the SAME
-    implementation the SIR engine itself uses
-    (caterva.core.validation.beta_gamma_from_r0), imported the same
-    lightweight way bridge_vmax_from_kcat() reaches vmax_from_kcat -- as
-    ``core.validation`` with caterva/ (not the Caterva package root) on
-    sys.path, never executing caterva/__init__.py's antimony-dependent
-    chain. See ADR 0017 for the resolver, ADR 0020 for this bridge.
-
-    Returns (beta, gamma, ok, flagged, flag_reason_or_error).
-    """
-    _ensure_caterva_path()
-    from core import validation as caterva_validation  # noqa: PLC0415
-
-    beta, gamma, result = caterva_validation.beta_gamma_from_r0(
-        r0, infectious_period_days
-    )
-    if not result.ok:
-        return 0.0, 0.0, False, False, "; ".join(result.errors)
-    return beta, gamma, True, result.flagged, result.flag_reason
-
-
-def resolve_popgen_parameter(param_type: str, organism: str) -> dict | None:
-    """Resolve a population genetics parameter from literature.
-    
-    Args:
-        param_type: Parameter type (e.g., 'mutation_rate')
-        organism: Organism name
-        
-    Returns:
-        Dict with value, unit, citation info, or None if not found.
-    """
-    if param_type == 'mutation_rate':
-        result = popgen_resolver.resolve_mutation_rate(organism)
-        if not result.found:
-            return None
-        return {
-            'value': result.value,
-            'unit': result.unit,
-            'source': result.source,
-            'citation': result.citation,
-            'organism': result.organism,
-            'doi': result.doi,
-        }
-    return None
+#: Parameter types that belonged to domains archived on 2026-09-27
+#: (archive/legacy_domains/README.md): population genetics asked for
+#: `mutation_rate`, epidemiology for `disease_parameters`. Their resolvers
+#: are no longer on this path. A request for one is answered found=false
+#: with a source that says why, rather than falling through to the enzyme
+#: path and being refused for a missing enzyme name it was never about.
+RETIRED_PARAMETER_TYPES: dict[str, str] = {
+    "mutation_rate": "population genetics",
+    "disease_parameters": "SIR / SEIR epidemiology",
+}
 
 
 def _citation_to_dict(citation) -> Dict[str, Any] | None:
@@ -743,131 +704,23 @@ def main() -> None:
         physiological = _parse_physiological(payload)
         resolution_log: list[str] = []
 
-        # Handle population genetics parameter resolution
-        if parameter_type == "mutation_rate":
-            popgen_result = resolve_popgen_parameter("mutation_rate", organism)
-            if popgen_result is None:
-                print(
-                    json.dumps(
-                        {
-                            "ok": True,
-                            "found": False,
-                            "source": "popgen_not_found",
-                            "literatureCandidates": [],
-                            "logs": [
-                                f"No literature value found for mutation_rate in '{organism}'"
-                            ],
-                        }
-                    )
-                )
-                return
+        if parameter_type in RETIRED_PARAMETER_TYPES:
+            domain = RETIRED_PARAMETER_TYPES[parameter_type]
             print(
                 json.dumps(
                     {
                         "ok": True,
-                        "found": True,
-                        "km": popgen_result["value"],  # Reuse km field for the value
-                        "ki": None,
-                        "unit": popgen_result["unit"],
-                        "organism": popgen_result["organism"],
-                        "source": "popgen_literature",
-                        "crossSpecies": False,
-                        "assayConditions": {},
-                        "citation": {
-                            "source": popgen_result["source"],
-                            "referenceId": popgen_result["doi"],
-                            "url": f"https://doi.org/{popgen_result['doi']}" if popgen_result['doi'] else None,
-                            "title": popgen_result["citation"],
-                        },
+                        "found": False,
+                        "source": "domain_archived",
                         "literatureCandidates": [],
-                        "logs": [*resolution_log, f"Resolved mutation_rate from literature: {popgen_result['citation']}"],
+                        "logs": [
+                            f"parameterType '{parameter_type}' belongs to {domain}, "
+                            "archived on 2026-09-27 (archive/legacy_domains/). "
+                            "Release v0.4.0 still resolves it."
+                        ],
                     }
                 )
             )
-            return
-
-        # Handle epidemiology parameter resolution (ADR 0017 / ADR 0020):
-        # a disease name resolves to a hand-curated (R0, infectious period)
-        # golden tuple, then bridges to the SIR engine's own (beta, gamma)
-        # via the exact same beta_gamma_from_r0() the engine uses. Only
-        # diseases in the registry resolve; everything else is an honest
-        # found=False, never a fabricated R0.
-        if parameter_type == "disease_parameters":
-            disease = payload.get("disease", "")
-            epi_result = epidemiology_resolver.resolve_disease_parameters(disease)
-            if not epi_result.found:
-                print(
-                    json.dumps(
-                        {
-                            "ok": True,
-                            "found": False,
-                            "source": "epidemiology_not_found",
-                            "literatureCandidates": [],
-                            "logs": epi_result.search_log,
-                        }
-                    )
-                )
-                return
-
-            beta, gamma, bg_ok, bg_flagged, bg_reason = bridge_beta_gamma_from_r0(
-                epi_result.r0, epi_result.infectious_period_days
-            )
-            output = {
-                "ok": True,
-                "found": True,
-                "disease": epi_result.disease,
-                "r0": epi_result.r0,
-                "infectiousPeriodDays": epi_result.infectious_period_days,
-                "organism": None,
-                "source": epi_result.source,
-                "crossSpecies": False,
-                "assayConditions": {},
-                "citation": {
-                    "source": epi_result.source,
-                    "referenceId": epi_result.pmid,
-                    "url": f"https://doi.org/{epi_result.doi}" if epi_result.doi else None,
-                    "title": epi_result.citation,
-                },
-                # ADR 0169: a cross-study composite carries BOTH sources
-                # and must surface flagged, never verified. The secondary
-                # citation is the serial-interval half; omitting it would
-                # present a two-paper number as if one paper supported it.
-                "crossStudyComposite": epi_result.cross_study_composite,
-                "compositeNote": epi_result.composite_note,
-                "secondaryCitation": (
-                    {
-                        "source": epi_result.source,
-                        "referenceId": epi_result.secondary_pmid,
-                        "url": (
-                            f"https://doi.org/{epi_result.secondary_doi}"
-                            if epi_result.secondary_doi
-                            else None
-                        ),
-                        "title": epi_result.secondary_citation,
-                    }
-                    if epi_result.secondary_pmid
-                    else None
-                ),
-                "betaGammaValidation": {
-                    "ok": bg_ok,
-                    "flagged": bg_flagged,
-                    "reason": bg_reason,
-                },
-                "literatureCandidates": [],
-                "logs": epi_result.search_log,
-            }
-            if bg_ok:
-                output["beta"] = beta
-                # "gamma" here, NOT "gamma_rate" -- gamma_rate is only the
-                # Antimony-emitted model-string name (ADR 0004); the
-                # Python/TS API surface takes "gamma".
-                output["gamma"] = gamma
-                output["logs"] = output["logs"] + [
-                    f"Bridged beta={beta:g}, gamma={gamma:g} from R0="
-                    f"{epi_result.r0:g} and infectious_period="
-                    f"{epi_result.infectious_period_days:g} days."
-                ]
-            print(json.dumps(output))
             return
 
         if not ec_number:

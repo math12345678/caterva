@@ -10,13 +10,18 @@
 # A worktree per agent gives each one its own working directory and branch
 # against one shared object store: no duplicated clone, no cross-talk.
 #
-#   ./worktree.sh new  <name>     create ../Caterva.worktrees/<name> on branch agent/<name>
-#   ./worktree.sh list            show every worktree and what it is doing
-#   ./worktree.sh done <name>     remove it, refusing if work would be lost
-#   ./worktree.sh clean           prune worktrees whose directory is gone
+#   scripts/worktree.sh new  <name>   create Caterva.worktrees/<name> on branch agent/<name>
+#   scripts/worktree.sh list          show every worktree and what it is doing
+#   scripts/worktree.sh done <name>   remove it, refusing if work would be lost
+#   scripts/worktree.sh clean         prune worktrees whose directory is gone
 #
 set -euo pipefail
 
+# This script used to live INSIDE Caterva.worktrees/, which made that
+# directory a tracked one holding exactly one file -- while the docs said it
+# tracked none. It moved to scripts/ on 2026-10-31; the worktrees it makes
+# still go in Caterva.worktrees/ at the repository root, which .gitignore
+# now ignores.
 ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 TREES="$ROOT/Caterva.worktrees"
 cd "$ROOT"
@@ -27,7 +32,7 @@ case "${1:-}" in
 
 new)
   name="${2:-}"
-  [ -z "$name" ] && { echo "need a name: ./worktree.sh new <name>" >&2; exit 1; }
+  [ -z "$name" ] && { echo "need a name: scripts/worktree.sh new <name>" >&2; exit 1; }
   dest="$TREES/$name"
   branch="agent/$name"
 
@@ -50,7 +55,7 @@ new)
 
   When finished:
 
-      ./worktree.sh done $name
+      $ROOT/scripts/worktree.sh done $name
 EOF
   ;;
 
@@ -79,7 +84,7 @@ list)
 
 done)
   name="${2:-}"
-  [ -z "$name" ] && { echo "need a name: ./worktree.sh done <name>" >&2; exit 1; }
+  [ -z "$name" ] && { echo "need a name: scripts/worktree.sh done <name>" >&2; exit 1; }
   dest="$TREES/$name"
   [ -d "$dest" ] || { echo "$dest does not exist" >&2; exit 1; }
 

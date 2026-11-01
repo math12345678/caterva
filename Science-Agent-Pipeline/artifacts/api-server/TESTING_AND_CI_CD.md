@@ -23,7 +23,10 @@ split is naming convention:
 
 - **E2E-named tests (28 cases, 2 files):** `literature-backed-e2e.test.ts` (24 cases) and
   `popgenResolutionE2E.test.ts` (4 cases) — these exercise the full query → engine → result
-  pipeline.
+  pipeline. (Note, 2026-11-01: `popgenResolutionE2E.test.ts` was removed when population
+  genetics and the other non-enzyme domains were archived on 2026-09-27, after v0.4.0, the
+  last release that runs them and still carries the file; the counts in this section are the
+  2026-08-09 snapshot.)
 - **Everything else (376 cases, 26 files):** parameter/schema validation, provenance,
   caching, rate limiting, query resolution, LLM provider contracts, etc. — fast, in-process,
   mostly mocked where they touch external services (LLM API, Python bridge).
@@ -127,26 +130,31 @@ pnpm test
 
 ### 2. E2E-Named Tests
 
-**Location:** `src/__tests__/*e2e*.test.ts` (matches `literature-backed-e2e.test.ts` and
-`popgenResolutionE2E.test.ts`). The doc previously called these "Integration Tests"; there is
-no separate integration-test tier or tooling in this repo — these are simply the two files
-whose names contain "e2e".
+**Location:** `src/__tests__/*e2e*.test.ts`, which now matches one file,
+`literature-backed-e2e.test.ts`. It also matched `popgenResolutionE2E.test.ts` until that file
+was removed with the 2026-09-27 archive (it is still in v0.4.0, the last release that runs
+the archived domains). The doc previously called these "Integration Tests"; there is no
+separate integration-test tier or tooling in this repo — this is simply the one file whose
+name contains "e2e".
 
 **Examples:**
 - End-to-end query → engine → result (literature-backed-e2e.test.ts)
-- Domain resolution with literature (popgenResolutionE2E.test.ts)
 - Provenance tracking through full pipeline
+
+Not E2E-named, but the closest coverage of domain resolution with literature since the
+population-genetics example above was removed: `queryOverrides.test.ts` and
+`kiProvenance.test.ts`.
 
 **Pattern:**
 ```typescript
 describe("QueryResolver E2E", () => {
-  it("resolves complete SIR simulation", async () => {
-    const query = "SIR beta=0.5 gamma=0.1 S0=900";
+  it("resolves a complete Michaelis-Menten simulation", async () => {
+    const query = "simulate michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51";
     const resolved = await resolveQuery(query);
     
-    expect(resolved.domain).toBe("sir");
-    expect(resolved.parameters).toHaveProperty("beta", 0.5);
-    expect(resolved.parameterProvenance.beta.origin).toBe("user");
+    expect(resolved.domain).toBe("mm");
+    expect(resolved.parameters).toHaveProperty("km", 0.5);
+    expect(resolved.parameterProvenance.km.origin).toBe("user");
   });
 });
 ```
@@ -483,7 +491,7 @@ brew install wrk
 cat > scenario.lua << 'EOF'
 request = function()
   return wrk.format("POST", "/api/simulate",
-    nil, '{"query":"SIR beta=0.5 gamma=0.1 S0=900"}')
+    nil, '{"query":"simulate michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51"}')
 end
 EOF
 
@@ -525,10 +533,10 @@ proposal for reducing duplication if the test suite grows, but describes no code
 ```typescript
 // PROPOSED — src/__tests__/fixtures/queries.ts does not exist
 export const testQueries = {
-  sir_basic: {
-    query: "SIR beta=0.5 gamma=0.1 S0=900",
-    expectedDomain: "sir",
-    expectedParams: { beta: 0.5, gamma: 0.1, s0: 900 }
+  mm_basic: {
+    query: "simulate michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51",
+    expectedDomain: "mm",
+    expectedParams: { km: 0.5, vmax: 2, s0: 10 }
   },
   // ...
 };

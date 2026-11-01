@@ -362,46 +362,15 @@ def check_packages(interpreter):
             _record(name, "PASS", "{}  {}".format(value, role))
 
 
-def check_stdpopsim(interpreter):
-    """stdpopsim is pinned but is the one dependency that genuinely may not install.
-
-    It is not optional in principle -- Tests/popgen_resolver.py gets its
-    mutation rates from it -- but msprime, its C-extension dependency,
-    publishes wheels only for manylinux x86_64, macOS and win_amd64. On
-    Linux aarch64 there is no wheel for any msprime version, so pip builds
-    the sdist and needs GSL. That is the whole of the "needs libgsl-dev"
-    story, and stating the architecture is the difference between a fix and
-    a shrug: on x86_64 a missing stdpopsim means `pip install stdpopsim`,
-    on arm64 it means installing system packages first.
-    """
-    print("\nPopulation-genetics resolver (stdpopsim)")
-    target = interpreter or Path(sys.executable)
-    code, out = _run([
-        str(target), "-c",
-        "import stdpopsim;print(getattr(stdpopsim,'__version__','?'))",
-    ], timeout=120)
-
-    if code == 0:
-        _record("stdpopsim", "PASS", out.splitlines()[-1] if out else "installed")
-        return
-
-    arm_linux = platform.system() == "Linux" and platform.machine() in (
-        "aarch64", "arm64")
-    if arm_linux:
-        fix = ("apt install build-essential libgsl-dev, then "
-               "pip install stdpopsim -- msprime has no linux/aarch64 wheel, "
-               "so it is built from source here")
-    else:
-        fix = "pip install stdpopsim"
-    _record("stdpopsim", "WARN",
-            "not importable -- 19 tests in Tests/test_popgen_resolver.py "
-            "will skip", fix)
-
-    # Only worth reporting where the source build is what actually happens.
-    if arm_linux:
-        gsl = shutil.which("gsl-config")
-        _record("libgsl", "PASS" if gsl else "WARN",
-                gsl or "gsl-config not on PATH (needed to build msprime here)")
+# `check_stdpopsim()` stood here until 2026-11-01. It reported whether
+# stdpopsim imported and, on linux/arm64, whether GSL was there to build
+# msprime, because `Tests/popgen_resolver.py` took its mutation rates from
+# it. That day the resolver, its tests and requirements-popgen.txt moved to
+# archive/legacy_domains/, following the Wright-Fisher domain they served
+# (archived on 2026-09-27, after v0.4.0, the last release that runs it).
+# `make setup` has not installed stdpopsim since ADR 0061 (2026-08-16), so
+# a WARN naming it -- and an apt-get line for its C dependency -- sent
+# people after a package nothing in the live tree imports.
 
 
 # --------------------------------------------------------------------------
@@ -465,7 +434,6 @@ def main():
     interpreter = check_venv()
     check_hidden_pth()
     check_packages(interpreter)
-    check_stdpopsim(interpreter)
     check_node()
 
     passes = sum(1 for _, status, _ in checked if status == "PASS")

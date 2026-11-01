@@ -124,16 +124,20 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 8,679 tests (7,057 engine + 1,622 literature)
+make test      # runs all 8,739 tests (7,059 engine + 1,680 literature)
 ```
 
 ### Or download the release
 
 The repository and its [Releases page](https://github.com/math12345678/caterva/releases)
-are public. Every tagged version is published there by CI, after it has
+are public. Every version tagged from v0.3.0 on is published there by CI
+(v0.2.0 and the first three v0.3.0 candidates have no release there, and
+v0.1.0's release page predates that CI and carries no files), after it has
 rebuilt, reinstalled and run what it attaches: a one-folder app per platform
-that runs without Python, a Python wheel, the source, and, from v0.5.0, a
-disk image for Macs (below). Every file is listed with its SHA-256 in
+that runs without Python, a Python wheel, the source, and a disk image for
+Macs (below). The disk image first shipped in the v0.5.0 release candidates;
+v0.6.0 is the first final release with it, because 0.5.0 and 0.5.1 were
+released only as candidates. Every file is listed with its SHA-256 in
 `SHA256SUMS` on the release page. The release notes for each version are in
 [`docs/releases/`](docs/releases/).
 
@@ -148,16 +152,24 @@ pip install caterva-<version>-py3-none-any.whl   # the wheel, from the same page
 caterva-compose "a toggle switch between two repressors"
 ```
 
+The wheel needs Python 3.10–3.13; on a newer `python3`, pip refuses it, so
+make the virtual environment with a 3.10–3.13 interpreter. Install the
+release wheel rather than `pip install` of a checkout: the literature layer
+is filled in at release time, so a checkout installed with pip has no
+literature search and every cited constant stays a placeholder. In a
+checkout, use `make setup`.
+
 The folders are not code-signed; macOS quarantines the folder and Windows
 SmartScreen asks once, and `README.txt` inside each folder gives the exact
 step for its platform (on Windows, run `.\caterva.exe` from a terminal in
 the folder).
 
 **Real constants with real citations** work from the wheel, the folder and
-the Mac app as well as from a checkout (from v0.5.0 the literature search
-ships in every artifact; it reads BRENDA, NCBI, UniProt and PubChem live and
+the Mac app as well as from a checkout (the literature search ships in
+every artifact, first in the v0.5.0 release candidates and first in a final
+release in v0.6.0; it reads BRENDA, NCBI, UniProt and PubChem live and
 needs a network connection).
-`compose --subject 1.1.1.27 --organism "Homo sapiens" --substrate pyruvate`
+`compose "Michaelis Menten" --subject 1.1.1.27 --organism "Homo sapiens" --substrate pyruvate`
 builds the mechanism with those constants already in it, each row naming its
 reference and any constant the search could not find still marked a
 placeholder (ADR 0178). `make cite EC=1.1.1.27 SUBSTRATE=pyruvate
@@ -184,8 +196,9 @@ feature sends (`docs/PRIVACY.md`).
   to open it, then System Settings, Privacy & Security, Open Anyway; if macOS
   keeps refusing, run `xattr -dr com.apple.quarantine
   /Applications/Caterva.app` in Terminal. The disk image's README says the
-  same. There is no Intel build. **From 0.5.1 the app updates itself**
-  (Caterva menu, Check for Updates; Settings, Updates): the first copy that
+  same. There is no Intel build. **The app updates itself** (Caterva menu,
+  Check for Updates; Settings, Updates), first in the v0.5.1 release
+  candidates and first in a final release in v0.6.0: the first copy that
   has the updater must be installed by hand from the disk image, and after
   that new versions arrive inside the app, checked against a key built into
   it. That is not an Apple signature; the app is still unsigned, and the Open
@@ -251,38 +264,18 @@ resolves.
 
 **If anything above fails, run `make doctor`.** It reports every interpreter
 it found and their versions, whether `.venv` exists and runs, which of the
-seven required packages import and at what version against the pin, whether
-`stdpopsim` is available, and whether Node is present for the TypeScript
-guards — then lists what to do about each. It prints what it checked, not
-just a verdict.
+seven required packages import and at what version against the pin, and
+whether Node is present for the TypeScript guards — then lists what to do
+about each. It prints what it checked, not just a verdict.
 
-### The population-genetics resolver is opt-in
-
-`stdpopsim` is **not** installed by `make setup`. It is GPL-3.0-or-later and
-Caterva is Apache-2.0, so a default install would put copyleft code into the
-environment of a project that declares a permissive licence — compatible in
-one direction only, and not something a reader should have to derive by
-comparing two licence files.
-
-```bash
-pip install -r requirements-popgen.txt     # adds GPL-3.0-or-later code
-```
-
-Nothing is violated either way: Caterva never bundles stdpopsim, and running
-two separately-installed packages together is use rather than distribution.
-Splitting it just means you can see what you have. See
-[ADR 0061](docs/adr/0061-gpl-out-of-the-default-install.md) and NOTICE.
-
-Without it, `test_popgen_resolver.py` skips its 19 tests and the resolver
-returns `found=false` with a log saying stdpopsim is not installed — never a
-substituted value. `make check` reports the skip as a warning so the gap is
-visible; a silent skip would let the population-genetics literature path go
-untested and still read as green.
-
-The one platform where it reliably will not install is Linux on arm64:
-`msprime`, stdpopsim's C-extension dependency, publishes wheels for
-manylinux x86_64, macOS and Windows only, so pip builds it from source there
-and needs `libgsl-dev` plus a compiler.
+The opt-in population-genetics resolver, the epidemiology resolver and
+`requirements-popgen.txt` (stdpopsim, GPL-3.0-or-later) moved to
+[`archive/legacy_domains/`](archive/legacy_domains/README.md) on 2026-11-01.
+The Wright-Fisher and epidemiology domains they once served were archived
+on 2026-09-27, after v0.4.0 (the last release that runs them). The API
+server's science agent kept calling both resolvers until 2026-10-31
+([ADR 0180](docs/adr/0180-v7-every-public-number-measured-derived-or-removed.md)),
+so v0.6.0 is the last release that ships them.
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
 model, translates it to SBML, integrates it, and compares the result to the
@@ -595,17 +588,17 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Caterva/
 ├── caterva/                  simulation engine (ODE + discrete/stochastic)
 │   ├── caterva_engine.py     public entry point (88 names)
-│   └── tests/                7,057 tests
+│   └── tests/                7,059 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1622 tests
+│   └── ...                   1680 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    177 decision records (and counting)
+│   └── adr/                    178 decision records (and counting)
 ├── scripts/                    79 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
@@ -686,10 +679,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 8,679 tests
+make test        # run all 8,739 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (7,057 tests)
-make test-lit    # literature layer only (1622 tests)
+make test-sim    # simulation engine only (7,059 tests)
+make test-lit    # literature layer only (1680 tests)
 python3 scripts/verify_build.py --quick  # all 79 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

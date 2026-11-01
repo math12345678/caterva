@@ -67,6 +67,21 @@ describe('the results table distinguishes its three outcomes', () => {
     expect(html).toContain("'n/a'");
   });
 
+  test('n/a is chosen by the zero-literature condition, not merely present', () => {
+    // The two `toContain`s above pass on any file holding both strings, so
+    // they cannot see the branch turned round (`!== 0` puts the score back
+    // on exactly the unsourced runs, and `n/a` on the sourced ones) or a
+    // missing count read as sourced (`?? 1` gives the hand-typed path a
+    // score of nothing again). Measured: both mutations left
+    // this file green until this assertion pinned the whole ternary. The
+    // ADR's claim is "no literature -> n/a, literature -> the score"; this
+    // is that sentence, as the code has to spell it.
+    const html = dashboardSource();
+    expect(html).toMatch(
+      /confidence: \(result\.metadata\?\.literatureSourcesUsed \?\? 0\) === 0\s*\?\s*'n\/a'\s*:\s*result\.validationConfidence\.toFixed\(2\),/,
+    );
+  });
+
   test('failed and errored runs no longer borrow the same zero', () => {
     const html = dashboardSource();
     expect(html).not.toContain("confidence: '0'");
@@ -78,11 +93,70 @@ describe('the results table distinguishes its three outcomes', () => {
     expect(dashes.length).toBe(2);
   });
 
-  test('the percentage sign travels with the number, not the cell', () => {
-    // Otherwise "n/a" would render as "n/a%" the moment the cell puts it
-    // back — the failure this test exists to keep out.
+  test('a sourced score is not shown as a percentage', () => {
+    // The score's constants were never fitted to outcomes, so "92.0%"
+    // beside the word "confidence" reads as a probability nothing has
+    // measured. The CLI prints it 0-1 with that said (scientificCLI.ts
+    // literatureScoreLines); the dashboard must not say otherwise.
     const html = dashboardSource();
-    expect(html).toContain(".toFixed(1) + '%'");
+    expect(html).not.toContain('validationConfidence * 100');
+    expect(html).not.toMatch(/<td>\$\{result\.confidence\}%/);
+  });
+
+  test('the column says the score is a heuristic, not a probability', () => {
+    // Wording is the fix here: a bare "Confidence" header puts the
+    // probability reading back on an unchanged number.
+    const html = dashboardSource();
+    expect(html).not.toContain('<th>Confidence</th>');
+    expect(html).toMatch(/<th[^>]*>Literature agreement \(heuristic, not a probability\)<\/th>/);
+  });
+});
+
+describe('the Avg Literature Agreement tile', () => {
+  // It showed '--' and nothing wrote to it. Now addResult() averages the
+  // scores the table shows for sourced runs. Run here, not just matched:
+  // the function is lifted out of the page and handed a stub document.
+  function tile(cells: string[]): string {
+    const html = dashboardSource();
+    const decl = html.match(/const sourcedScores = \[\];/);
+    const fn = html.match(/function addResult\(result\) \{[\s\S]*?\n {8}\}\n/);
+    expect(decl).not.toBeNull();
+    expect(fn).not.toBeNull();
+    const els: Record<string, { textContent: string }> = {};
+    const table = {
+      innerHTML: '',
+      firstChild: null,
+      querySelector: () => null,
+      querySelectorAll: () => ({ length: 0 }),
+      insertBefore: () => undefined,
+    };
+    const document = {
+      createElement: () => ({ innerHTML: '' }),
+      getElementById: (id: string) =>
+        id === 'resultsTable' ? table : (els[id] ??= { textContent: '' }),
+    };
+    const addResult = new Function('document', `${decl![0]}\n${fn![0]}\nreturn addResult;`)(document);
+    for (const confidence of cells) addResult({ confidence });
+    return els.avgConfidence.textContent;
+  }
+
+  test('it is the mean over sourced runs, and n/a and failures are not zeros', () => {
+    // 0.92 and 0.95 are the two values validationConfidence takes on a
+    // sourced run (scientificPipeline.ts, pinned below); 0.92, 0.92, 0.95
+    // average 0.93. The n/a and the dash averaged in as 0 would give 0.56.
+    expect(tile(['0.92', 'n/a', '0.92', '—', '0.95'])).toBe('0.93');
+  });
+
+  test('with no sourced run it says n/a, not 0.00', () => {
+    expect(tile(['n/a', '—'])).toBe('n/a');
+  });
+
+  test('the label says heuristic and the tooltip says not a probability', () => {
+    const html = dashboardSource();
+    expect(html).toMatch(
+      /<span class="metric-label" title="[^"]*backed by literature only[^"]*not a probability[^"]*">Avg Literature Agreement \(heuristic\)<\/span>/,
+    );
+    expect(html).toContain('<span class="metric-value" id="avgConfidence">n/a</span>');
   });
 });
 

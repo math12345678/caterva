@@ -15,7 +15,8 @@ is worth something, but it is not verification: if the value was wrong when
 it was first typed in, the assertion is wrong in exactly the same way and
 passes forever. Every other numeric claim in this project is checked
 against a primary source (BRENDA pages, stdpopsim, a closed form); these
-two are not.
+two are not. (2026-11-01: stdpopsim is no longer one of those sources; the
+resolver that read it is in archive/legacy_domains/.)
 
 BioModels is the primary source available for both. It is EMBL-EBI's
 curated repository of published models, and each curated entry is

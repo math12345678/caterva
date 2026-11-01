@@ -70,42 +70,13 @@ export interface ScienceAgentResult {
     flagged: boolean;
     reason?: string;
   };
-  /** ADR 0017 / ADR 0020: a resolved disease's canonical name, basic
-   * reproduction number, and infectious period (from
-   * Tests/epidemiology_resolver.py's hand-verified registry), plus the
-   * bridged (beta, gamma) the SIR engine takes directly, computed by the
-   * same caterva.core.validation.beta_gamma_from_r0() the engine uses.
-   * Only present when parameterType="disease_parameters" was requested. */
-  disease?: string;
-  r0?: number;
-  infectiousPeriodDays?: number;
-  /**
-   * ADR 0169: true when R0 and the serial interval come from two
-   * different systematic reviews rather than one paper.
-   *
-   * A composite MUST reach provenance as citationStatus "flagged", never
-   * "verified" — the same tier a cross-species BRENDA Km gets. Inheriting
-   * COVID-19's verified status would erase the only signal telling a
-   * reader that two methodologies were combined.
-   */
-  crossStudyComposite?: boolean;
-  /** What exactly was combined, in the entry's own words. */
-  compositeNote?: string;
-  /**
-   * The serial-interval half's citation, when it differs from the R0
-   * half's. Both must reach the user: surfacing only the first would
-   * present a two-paper number as if one paper supported it — the same
-   * shape as the popgen defect where a genome-assembly DOI stood in for a
-   * mutation rate.
-   */
-  secondaryCitation?: Citation;
-  beta?: number;
-  gamma?: number;
-  betaGammaValidation?: {
-    ok: boolean;
-    flagged: boolean;
-    reason?: string;
-  };
+  // disease, r0, infectiousPeriodDays, crossStudyComposite, compositeNote,
+  // secondaryCitation, beta, gamma and betaGammaValidation (ADR 0017 / ADR
+  // 0020 / ADR 0169) were removed on 2026-10-31. Epidemiology was archived
+  // on 2026-09-27 (archive/legacy_domains/README.md; v0.4.0 is the last
+  // release that runs it), and the runner answers "disease_parameters"
+  // with found=false and source "domain_archived" (science_agent_runner.py,
+  // RETIRED_PARAMETER_TYPES), so nothing set or read them.
   unit?: string;
   organism?: string;
   source?: string;
@@ -474,7 +445,11 @@ export interface EntityExtraction {
    * the one enzyme finder and answers `source: "ec_mismatch"` when the name
    * identifies a different enzyme. */
   ecNumber?: string;
-  /** For population genetics: parameter type to resolve (e.g., 'mutation_rate') */
+  /** A non-kinetic parameter type. Only population genetics
+   * ('mutation_rate') and epidemiology ('disease_parameters') ever used
+   * one; both were archived on 2026-09-27 (v0.4.0 is the last release that
+   * runs them) and the runner answers either with source
+   * "domain_archived". Nothing in this server sets it now. */
   parameterType?: string;
   /** Which kinetic constant to resolve: "km" (BRENDA KM Values table) or
    * "ki" (BRENDA Ki Values table). Each call resolves exactly one quantity
@@ -601,10 +576,10 @@ export function runnerError(stdout: string): string | null {
 
 /**
  * Spawn the Python science-agent runner with an arbitrary JSON payload and
- * parse its stdout. Shared by resolveKineticValue() (enzyme kinetics) and
- * resolveEpidemiologyParameters() (ADR 0017 / ADR 0020) so there is exactly
- * one place that owns the spawn/PYTHONPATH/stdout-parsing contract, rather
- * than two copies that could drift.
+ * parse its stdout. Kept separate from resolveKineticValue() (enzyme
+ * kinetics), its only caller since resolveEpidemiologyParameters() was
+ * removed on 2026-10-31, so there is exactly one place that owns the
+ * spawn/PYTHONPATH/stdout-parsing contract.
  *
  * This function uses BRENDA/KEGG/PubMed lookups in Tests/fallback_logic.py.
  * If an EC number isn't known, the Python side resolves one from the enzyme
@@ -692,21 +667,6 @@ function notFoundResult(reason: string): ScienceAgentResult {
     literatureCandidates: [],
     logs: [reason],
   };
-}
-
-/**
- * Resolve a disease's (R0, infectious period) golden tuple and bridge it to
- * the SIR engine's own (beta, gamma) — see Tests/epidemiology_resolver.py
- * and caterva.core.validation.beta_gamma_from_r0. Returns found=false for
- * any disease outside the hand-verified registry; never fabricates a value.
- */
-export async function resolveEpidemiologyParameters(
-  disease: string,
-): Promise<ScienceAgentResult> {
-  if (!disease) {
-    return notFoundResult("No disease name provided; skipping real parameter lookup.");
-  }
-  return spawnScienceAgent({ parameterType: "disease_parameters", disease });
 }
 
 export async function resolveKineticValue(

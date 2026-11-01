@@ -582,9 +582,12 @@ while IFS= read -r f; do ARCHIVE_DOCS+=("$f"); done < <(
 )
 build_fileset archive docs/readmes/archive.md "${ARCHIVE_DOCS[@]}"
 
+# The three probe scripts this list also named (lr_probe.js, e2e-test.js,
+# test-real-data.js) were deleted on 2026-10-31: one asked to be, one called
+# queries the validator now rejects, one called no Caterva code at all.
 build_fileset miscellaneous docs/readmes/miscellaneous.md \
-  Logo.png caterva_ai_architecture.png caterva_pitch_deck.pptx \
-  FINAL_STATUS.txt lr_probe.js test-real-data.js e2e-test.js
+  Logo.png docs/brand/caterva_ai_architecture.png caterva_pitch_deck.pptx \
+  FINAL_STATUS.txt
 
 # The dashboard the web server serves. Split from server.ts, which stays in
 # backend-main -- see docs/REPO_MAP.md for why, and for the guard that keeps
@@ -601,9 +604,13 @@ while IFS= read -r f; do KEEP_DOCS+=("$f"); done < <(
 )
 build_fileset main docs/readmes/main.md "${KEEP_DOCS[@]}" \
   LICENSE CITATION.cff Dockerfile docker-compose.yml .dockerignore \
-  .editorconfig .gitignore docs/REPO_MAP.md docs/ARCHIVE_TRIAGE.md
+  .editorconfig .gitignore docs/REPO_MAP.md docs/ARCHIVE_TRIAGE.md \
+  deploy/monitoring
 
-build_fileset worktrees docs/readmes/worktrees.md Caterva.worktrees/worktree.sh
+# README only. The helper that fills Caterva.worktrees/ is scripts/worktree.sh,
+# which wiring-main already carries with the rest of scripts/; listing it here
+# too would publish one file from two repositories that can drift apart.
+build_fileset worktrees docs/readmes/worktrees.md
 build_fileset mule docs/readmes/mule.md
 
 # ---------------------------------------------------------------------------

@@ -13,6 +13,10 @@ import StatsBar from "@/cli/StatsBar";
 import DashboardPreview from "@/cli/DashboardPreview";
 import BrandMotion, { pose } from "@/components/brand/BrandMotion";
 import BackendHealth from "@/components/ui/backend-health";
+import { StatusOutput } from "@/cli/InteractiveShell";
+import { GUARD_COUNT } from "@/lib/domains";
+import { readdirSync } from "node:fs";
+import path from "node:path";
 
 const mockTrajectory = [
   { t: 0, S: 10, P: 0 },
@@ -71,7 +75,7 @@ describe("StatsBar", () => {
     expect(screen.getByText(/tests passing/i)).toBeInTheDocument();
     // "capabilities built" since 2026-09-29: "live" was attached to MD
     // tools no release carried. lib/domains.ts now says where each one is
-    // (in v0.4.0, or on main), and the count is derived from it, never a
+    // (in RELEASE_TAG, or on main), and the count is derived from it, never a
     // second hardcoded copy.
     expect(screen.getByText(/capabilities built/i)).toBeInTheDocument();
   });
@@ -95,7 +99,7 @@ describe("StatsBar", () => {
       await Promise.resolve();
     });
     expect(screen.queryByText(/researchers waiting/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/pipeline uptime/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/API uptime since last restart/i)).not.toBeInTheDocument();
   });
 
   it("shows the real waitlist count and uptime once the API responds, including a genuine zero", async () => {
@@ -113,11 +117,13 @@ describe("StatsBar", () => {
       }
       return Promise.reject(new Error(`unexpected fetch: ${href}`));
     });
-    render(<StatsBar />);
+    const { container } = render(<StatsBar />);
     expect(
       await screen.findByText(/researchers waiting/i),
     ).toBeInTheDocument();
-    expect(await screen.findByText(/pipeline uptime/i)).toBeInTheDocument();
+    expect(await screen.findByText(/API uptime since last restart/i)).toBeInTheDocument();
+    // The count is the number returned, with no "+" making 0 read as "0+".
+    expect(container.textContent).not.toMatch(/\d\+/);
   });
 });
 
@@ -217,5 +223,52 @@ describe("BrandMotion pose", () => {
     const a = pose(0), b = pose(10.999);
     a.radii.forEach((r, i) => expect(b.radii[i]!).toBeCloseTo(r, 0));
     expect(b.lockup).toBe(a.lockup);
+  });
+});
+
+describe("the shell's status command", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shows what the health endpoints answer, not a constant", async () => {
+    // It printed "pipeline: operational / llm-resolver: connected /
+    // brenda-kegg: indexed / pubmed: rate-limited" whatever was running.
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const href = String(url);
+      if (href.endsWith("/api/healthz")) {
+        return Promise.resolve(new Response('{"status":"ok"}', { status: 200 }));
+      }
+      if (href.endsWith("/api/metrics/health")) {
+        return Promise.resolve(
+          new Response('{"status":"no_data","sampleCount":0}', { status: 200 }),
+        );
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${href}`));
+    });
+    const { container } = render(<StatusOutput />);
+    expect(await screen.findByText(/HTTP 200 \{"status":"ok"\}/)).toBeInTheDocument();
+    expect(await screen.findByText(/"status":"no_data"/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(container.textContent).not.toMatch(/operational|connected|indexed|rate-limited/);
+  });
+
+  it("says unreachable, with the reason, when the server does not answer", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Failed to fetch"));
+    render(<StatusOutput />);
+    const lines = await screen.findAllByText(/unreachable \(Failed to fetch\)/);
+    expect(lines).toHaveLength(2);
+  });
+});
+
+describe("repository facts the page shows", () => {
+  it("counts the guard scripts that are on disk", () => {
+    // GUARD_COUNT was a hand-typed 76 while scripts/ held 79. It now comes
+    // from the generated repoFacts.json; this reads the directory itself.
+    const scripts = path.join(__dirname, "..", "..", "..", "..", "..", "scripts");
+    const onDisk = readdirSync(scripts).filter(
+      (f) => f.startsWith("check_") && f.endsWith(".py"),
+    ).length;
+    expect(GUARD_COUNT).toBe(onDisk);
   });
 });

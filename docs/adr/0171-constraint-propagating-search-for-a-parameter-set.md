@@ -191,3 +191,7 @@ consumes it. `run_parameterize` substitutes, merges with the caller's own
 sources (under them, not over: someone modelling their own preparation keeps
 their own Km), compiles with provenance and integrates. Anything nobody
 sourced is refused by name.
+
+## Note (2026-10-31)
+
+The call chain in the Context section names `applyBetaGammaFromR0Resolution()`. That function was removed on 2026-10-31 (ADR 0180), because epidemiology was archived on 2026-09-27 and nothing live reached it.

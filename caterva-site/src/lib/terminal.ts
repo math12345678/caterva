@@ -1,32 +1,41 @@
 /**
  * The site's command line.
  *
- * Every command that reports a number computes it, here, now. `verify md`
- * runs a golden-section search and reports what it found. `run popgen`
- * simulates two thousand populations. Nothing below prints a stored answer,
+ * Every command that reports a number computes it, here, now. `run mm`
+ * evaluates the Michaelis-Menten rate law on two cited BRENDA constants.
+ * `verify gillespie_ssa` runs fifty exact stochastic simulations and holds
+ * their mean to the closed form. Nothing below prints a stored answer,
  * because a page arguing that claims must be checked should not itself be
  * a set of unchecked claims.
+ *
+ * Only Caterva's five live domains run (README.md, "five simulation
+ * domains"; src/cli/domainCatalogue.ts). The domains archived on 2026-09-27
+ * answer that they are archived and name the release that still runs them.
  */
 
-import { CONFIG, prepare, type PreparedData } from './drift';
-import { lj13, exactCluster, R_MIN } from './md';
-import { LEDGER, PIPELINE } from './pipeline';
+import { LEDGER, PIPELINE } from './pipeline.ts';
 import {
   simulateMichaelisMenten,
   simulateMMCompetitiveInhibition,
-  simulateSIR,
   DEFAULT_MM,
   DEFAULT_MM_COMPETITIVE,
-  DEFAULT_SIR,
   MM_TOLERANCE,
-  SIR_TOLERANCE,
-} from './simulate';
+} from './simulate.ts';
+import {
+  checkAssociationMean,
+  checkDecayMean,
+  odeAssociation,
+  ssaAssociation,
+  ssaDecay,
+  type EnsembleCheck,
+} from './ssa.ts';
 import {
   resolveAndSimulate,
   ApiUnavailableError,
   API_BASE_URL,
   type ParameterProvenanceEntry,
-} from './api';
+} from './api.ts';
+
 
 export type LineKind =
   | 'out'
@@ -50,13 +59,6 @@ const warn = (text: string): Line => ({ kind: 'warn', text });
 const err = (text: string): Line => ({ kind: 'err', text });
 const head = (text: string): Line => ({ kind: 'head', text });
 const rule = (): Line => ({ kind: 'rule', text: '' });
-
-/** Lazily computed once, then reused — 2000 replicates is real work. */
-let driftCache: PreparedData | null = null;
-function drift(): PreparedData {
-  if (!driftCache) driftCache = prepare();
-  return driftCache;
-}
 
 export interface Command {
   name: string;
@@ -145,7 +147,7 @@ async function runLiteratureBacked(query: string, domainLabel: string): Promise<
     return [
       err(`  no science-agent API configured (VITE_CATERVA_API_URL is unset)`),
       d(`  cannot claim a literature-backed ${domainLabel} result without one --`),
-      d(`  see 'verify ${domainLabel === 'kinetics' ? 'kinetics' : 'epidemiology'}'`),
+      d(`  see 'verify mm'`),
       d(`  for a pure math check of the integrator instead.`),
     ];
   }
@@ -180,18 +182,140 @@ async function runLiteratureBacked(query: string, domainLabel: string): Promise<
   }
 }
 
-// [name, description, type, literature_backed]
-// literature_backed: true = parameters can be resolved from real databases
-//                    false = all parameters are user-specified by design
+// [id, description, type, literature]: the five live domains, with the ids
+// and order of src/cli/domainCatalogue.ts. literature says what (if
+// anything) THIS SHELL resolves from real databases: 'run mm <enzyme>' asks
+// the API, whose RESOLVABLE_FIELDS for mm is Km alone (provenance.ts), and
+// 'run mm_competitive_inhibition' never asks it. tests/terminal.test.mjs
+// holds the column to both.
 export const DOMAINS: Array<[string, string, string, string]> = [
-  ['kinetics', 'Michaelis-Menten enzyme kinetics', 'continuous', 'km from BRENDA'],
-  ['mm_competitive_inhibition', 'Competitive inhibition kinetics', 'continuous', 'km from BRENDA'],
-  ['epidemiology', 'SIR / SEIR compartment models', 'continuous', 'user-specified (outbreak-fit)'],
-  ['pcr', 'PCR amplification', 'discrete', 'user-specified (assay-specific)'],
-  ['monte_carlo', 'Monte Carlo pi estimation', 'stochastic', 'no parameters needed'],
-  ['popgen', 'Wright-Fisher neutral drift', 'stochastic', 'mutation_rate from literature'],
-  ['md', 'Lennard-Jones molecular dynamics', 'discrete-time', 'user-specified (sim choice)'],
+  ['mm', 'Michaelis-Menten enzyme kinetics', 'continuous', 'Km from BRENDA'],
+  ['mm_competitive_inhibition', 'Competitive inhibition kinetics', 'continuous', 'none: textbook constants'],
+  ['gillespie_ssa', 'Exact stochastic decay, A -> B', 'stochastic', 'user-specified'],
+  ['gillespie_ssa_bimolecular', 'Exact stochastic association, A + B -> C', 'stochastic', 'user-specified'],
+  ['gillespie_ssa_replicates', 'Many SSA runs, to see the spread', 'stochastic', 'user-specified'],
 ];
+
+/** Names a visitor may type for each live domain. */
+export const ALIASES: Record<string, string> = {
+  mm: 'mm',
+  kinetics: 'mm',
+  michaelis_menten: 'mm',
+  mm_competitive_inhibition: 'mm_competitive_inhibition',
+  competitive: 'mm_competitive_inhibition',
+  inhibition: 'mm_competitive_inhibition',
+  gillespie_ssa: 'gillespie_ssa',
+  ssa: 'gillespie_ssa',
+  decay: 'gillespie_ssa',
+  gillespie_ssa_bimolecular: 'gillespie_ssa_bimolecular',
+  bimolecular: 'gillespie_ssa_bimolecular',
+  association: 'gillespie_ssa_bimolecular',
+  gillespie_ssa_replicates: 'gillespie_ssa_replicates',
+  replicates: 'gillespie_ssa_replicates',
+};
+
+/**
+ * The domains archived on 2026-09-27, by every name the shell used to accept
+ * for them. archive/legacy_domains/README.md lists each with v0.4.0 as the
+ * last release that runs it; `git tag` holds v0.4.0.
+ */
+export const ARCHIVED_ON = '2026-09-27';
+export const LAST_RELEASE = 'v0.4.0';
+export const ARCHIVED: Array<[string[], string]> = [
+  [['epidemiology', 'sir', 'seir'], 'SIR / SEIR epidemiology'],
+  [['pcr'], 'PCR amplification'],
+  [['monte_carlo'], 'Monte Carlo pi estimation'],
+  [['popgen', 'wright_fisher', 'population_genetics'], 'Wright-Fisher population genetics'],
+  [['md', 'molecular_dynamics', 'lj13', 'lennard_jones'], 'Lennard-Jones cluster molecular dynamics'],
+];
+
+function archivedAnswer(t: string): Line[] | null {
+  const hit = ARCHIVED.find(([names]) => names.includes(t));
+  if (!hit) return null;
+  const [names, title] = hit;
+  const lines = [
+    warn(`  '${t}' (${title}) was archived on ${ARCHIVED_ON}.`),
+    d('  Caterva no longer runs it, and neither does this shell.'),
+    d(`  ${LAST_RELEASE} is the last release that does:  git checkout ${LAST_RELEASE}`),
+    d('  see archive/legacy_domains/README.md in the repository.'),
+  ];
+  if (names.includes('md')) {
+    lines.push(
+      o(),
+      d("  molecular dynamics continues as 'caterva md', which sets up GROMACS"),
+      d('  runs of enzymes. it does not run in a browser. the moving lattice'),
+      d('  behind this page is decoration, not a simulation.'),
+    );
+  }
+  lines.push(o(), d("  live domains: try 'domains'"));
+  return lines;
+}
+
+/**
+ * Human hexokinase on D-glucose, the two cited rows of
+ * caterva/evidence/showcase.py (KM_ROW, KCAT_ROW), read from the recorded
+ * BRENDA page for EC 2.7.1.1 fetched 2026-09-28 (CC BY 4.0). Copied, not
+ * fetched: this browser does not query BRENDA. tests/terminal.test.mjs fails
+ * if showcase.py stops holding these values.
+ */
+export const HEXOKINASE = {
+  ec: '2.7.1.1',
+  organism: 'Homo sapiens',
+  substrate: 'D-glucose',
+  km: { value: 6.0, unit: 'mM', ref: '641068', conditions: '30°C, pH 7.5, wild-type' },
+  kcat: { value: 40.1, unit: '1/s', ref: '739603', conditions: 'wild-type, pH 7.6, 25 °C' },
+  /** Chosen, as in the showcase; nobody measured it. */
+  s: 1,
+};
+
+/** Turnover per enzyme molecule, v/[E] = kcat·S/(Km + S), in 1/s. */
+export function turnover(s: number, km = HEXOKINASE.km.value, kcat = HEXOKINASE.kcat.value): number {
+  return (kcat * s) / (km + s);
+}
+
+function runHexokinase(): Line[] {
+  const { km, kcat, s } = HEXOKINASE;
+  const lines: Line[] = [
+    head('MICHAELIS-MENTEN · HUMAN HEXOKINASE ON D-GLUCOSE'),
+    rule(),
+    ok(`  Km     ${km.value} ${km.unit}     BRENDA EC ${HEXOKINASE.ec}, ref ${km.ref} (${km.conditions})`),
+    ok(`  kcat   ${kcat.value} ${kcat.unit}  BRENDA EC ${HEXOKINASE.ec}, ref ${kcat.ref} (${kcat.conditions})`),
+    warn(`  S      ${s} mM      chosen, not measured`),
+    o(),
+    o(`  v/[E] = kcat·S / (Km + S) = ${turnover(s).toFixed(6)} 1/s at S = ${s} mM`),
+    o(),
+    o('  S (mM)    v/[E] (1/s)   v/Vmax'),
+  ];
+  for (const x of [km.value / 4, km.value / 2, km.value, 2 * km.value, 10 * km.value]) {
+    const v = turnover(x);
+    lines.push(o(`  ${x.toFixed(2).padEnd(10)}${v.toFixed(6).padEnd(14)}${(v / kcat.value).toFixed(6)}`));
+  }
+  lines.push(
+    o(),
+    d('  at S = Km the rate is exactly half of kcat, as the rate law requires.'),
+    warn('  the two rows were measured at different temperatures and pH;'),
+    warn('  BRENDA reports them as separate experiments.'),
+    d('  Vmax = kcat·[E] needs an enzyme concentration, which nobody reported,'),
+    d('  so this prints the rate per enzyme molecule.'),
+    o(),
+    d("  constants from caterva/evidence/showcase.py. for a live resolution of"),
+    d("  another enzyme: 'run mm <enzyme>' (needs the literature API)."),
+  );
+  return lines;
+}
+
+function ensembleLines(label: string, c: EnsembleCheck): Line[] {
+  const diff = Math.abs(c.mean - c.expected);
+  return [
+    o(`  ${label}`),
+    o(`    expected  ${c.expected.toFixed(4)}`),
+    o(`    measured  ${c.mean.toFixed(4)}   mean of ${c.runs} seeds`),
+    o(`    |diff|    ${diff.toFixed(4)}   tolerance ${c.tolerance.toFixed(4)}`),
+    (c.pass ? ok : err)(`    ${c.pass ? 'PASS' : 'FAIL'}${c.conserved ? '      conservation held after every event' : '      CONSERVATION BROKEN'}`),
+  ];
+}
+
+const SAMPLE_TIMES = [0, 10, 20, 30, 40, 50];
 
 export const COMMANDS: Command[] = [
   {
@@ -214,19 +338,26 @@ export const COMMANDS: Command[] = [
     run: () => [
       head('DOMAINS'),
       rule(),
-      o('  DOMAIN           DESCRIPTION                              TYPE        LITERATURE'),
-      o('  ---------------  ---------------------------------------  ----------  -------------------'),
+      o('  DOMAIN                     DESCRIPTION                               TYPE        LITERATURE'),
+      o('  -------------------------  ----------------------------------------  ----------  ------------------------'),
       ...DOMAINS.map(([n, desc, kind, lit]) =>
-        o(`  ${n.padEnd(16)}${(desc as string).padEnd(38)}${kind.padEnd(11)}${lit}`),
+        o(`  ${n.padEnd(27)}${desc.padEnd(42)}${kind.padEnd(12)}${lit}`),
       ),
       o(),
-      d('  run <domain>     to simulate'),
+      d('  run <domain>     to simulate, in this browser'),
       d('  verify <domain>  to check against exact mathematics'),
       o(),
-      d('  LITERATURE column: what (if anything) is resolved from real databases.'),
-      d('  If marked "user-specified", ALL parameters for that domain must be typed'),
-      d('  manually — this is by design, not a gap (the parameters are assay-specific'),
-      d('  or fit-to-data, with no single "true" value in any database).'),
+      d('  "user-specified": every parameter is typed by you, by design -- rate'),
+      d('  constants and counts for a teaching system have no single "true"'),
+      d('  value in any database.'),
+      o(),
+      d("  'run mm <enzyme>' resolves Km and nothing else; 'run mm' alone shows"),
+      d("  hexokinase's two cited constants, Km and kcat. the competitive-"),
+      d("  inhibition demo runs a textbook set: the API resolves Km and Ki for"),
+      d('  that domain, and this shell does not call it.'),
+      o(),
+      d(`  archived ${ARCHIVED_ON}, runnable only in ${LAST_RELEASE}:`),
+      d(`  ${ARCHIVED.map(([names]) => names[0]).join(', ')}`),
     ],
   },
 
@@ -236,62 +367,18 @@ export const COMMANDS: Command[] = [
     help: 'run a simulation and report the result',
     run: (args) => {
       const t = (args[0] || '').toLowerCase();
-      if (!t) return [err('usage: run <domain>    (try: run popgen)')];
+      if (!t) return [err('usage: run <domain>    (try: run mm)')];
+      const archived = archivedAnswer(t);
+      if (archived) return archived;
 
-      if (t === 'popgen' || t === 'wright_fisher') {
-        const t0 = performance.now();
-        const p = drift();
-        const ms = Math.round(performance.now() - t0);
-        return [
-          head('WRIGHT-FISHER NEUTRAL DRIFT'),
-          rule(),
-          d(`  N = ${CONFIG.populationSize}   2N = ${CONFIG.correctAlleleCopies} allele copies`),
-          d(`  ${CONFIG.replicates} replicate populations, ${CONFIG.generations} generations, seed ${CONFIG.seed}`),
-          o(),
-          o(`  H(0)   measured ${p.correct.meanHeterozygosity[0].toFixed(6)}   theory ${p.theory[0].toFixed(6)}`),
-          o(`  H(50)  measured ${p.correct.meanHeterozygosity[50].toFixed(6)}   theory ${p.theory[50].toFixed(6)}`),
-          o(`  H(200) measured ${p.correct.meanHeterozygosity[200].toFixed(6)}   theory ${p.theory[200].toFixed(6)}`),
-          o(),
-          ok(`  max deviation ${p.deviationCorrect.toFixed(6)} < tolerance ${CONFIG.tolerance}`),
-          d(`  ${ms === 0 ? 'cached' : ms + 'ms'} · closed form H(t) = H0 (1 - 1/2N)^t`),
-        ];
-      }
-
-      if (t === 'md' || t === 'molecular_dynamics') {
-        const t0 = performance.now();
-        const r = lj13();
-        const ms = Math.round(performance.now() - t0);
-        return [
-          head('LENNARD-JONES CLUSTER — LJ13'),
-          rule(),
-          d('  golden-section scale search, bracket [0.40, 0.80], 200 iterations'),
-          o(),
-          o(`  optimal scale   ${r.scale.toFixed(15)}`),
-          o(`  energy          ${r.energy.toFixed(12)} eps`),
-          o(`  published       -44.326801 eps`),
-          ok(`  agreement       ${Math.abs(r.energy + 44.326801).toExponential(3)}  (published value is 6 d.p.)`),
-          o(),
-          d(`  centre-to-shell ${r.centre.toFixed(9)}  compressed below r_min`),
-          d(`  shell-to-shell  ${r.shell.toFixed(9)}  stretched above r_min`),
-          d(`  r_min           ${R_MIN.toFixed(9)}`),
-          d(`  ${ms}ms · Hoare & Pal, Adv. Phys. 20, 161 (1971)`),
-        ];
-      }
-
-      if (t === 'kinetics' || t === 'michaelis_menten' || t === 'mm') {
+      const id = ALIASES[t];
+      if (id === 'mm') {
         const enzyme = args.slice(1).join(' ');
-        if (!enzyme) {
-          return [
-            err('  usage: run kinetics <enzyme>    (try: run kinetics lactate dehydrogenase)'),
-            d('  a bare "run kinetics" has no literature source to resolve --'),
-            d("  this command reports what BRENDA/KEGG/PubMed actually found for"),
-            d('  a named enzyme, not a demo number.'),
-          ];
-        }
+        if (!enzyme) return runHexokinase();
         return runLiteratureBacked(`simulate ${enzyme} kinetics`, 'kinetics');
       }
 
-      if (t === 'mm_competitive_inhibition' || t === 'competitive' || t === 'inhibition') {
+      if (id === 'mm_competitive_inhibition') {
         const t0 = performance.now();
         const p = DEFAULT_MM_COMPETITIVE;
         const r = simulateMMCompetitiveInhibition(p);
@@ -318,19 +405,73 @@ export const COMMANDS: Command[] = [
         return lines;
       }
 
-      if (t === 'epidemiology' || t === 'sir' || t === 'seir') {
-        const rest = args.slice(1).join(' ');
-        const query = rest ? `simulate ${rest}` : 'simulate sir outbreak';
-        return runLiteratureBacked(query, 'epidemiology');
+      if (id === 'gillespie_ssa' || id === 'gillespie_ssa_bimolecular') {
+        const seedArg = args[1] ?? '1';
+        const seed = Number(seedArg);
+        if (!/^\d+$/.test(seedArg) || !Number.isSafeInteger(seed)) {
+          return [err(`  usage: run ${t} [seed]    (seed: a non-negative integer)`)];
+        }
+        const bi = id === 'gillespie_ssa_bimolecular';
+        // The domain catalogue's own example parameters.
+        const a0 = 100;
+        const k = bi ? 0.01 : 0.1;
+        const t0 = performance.now();
+        const r = bi
+          ? ssaAssociation(a0, a0, k, 50, seed, SAMPLE_TIMES)
+          : ssaDecay(a0, k, 50, seed, SAMPLE_TIMES);
+        const ms = Math.round(performance.now() - t0);
+        const lines: Line[] = [
+          head(bi ? 'GILLESPIE SSA · A + B -> C' : 'GILLESPIE SSA · A -> B'),
+          rule(),
+          d(bi
+            ? `  a0 = b0 = ${a0}   k = ${k}   propensity k·a·b   seed ${seed}`
+            : `  a0 = ${a0}   k = ${k}   propensity k·a   seed ${seed}`),
+          o(),
+          o(bi ? '  t      A this run   ODE a0/(1 + k·a0·t)' : '  t      A this run   mean a0·e^(-kt)'),
+        ];
+        SAMPLE_TIMES.forEach((ti, i) => {
+          const ref = bi ? odeAssociation(ti, a0, a0, k) : a0 * Math.exp(-k * ti);
+          lines.push(o(`  ${String(ti).padEnd(7)}${String(r.a[i]).padEnd(13)}${ref.toFixed(4)}`));
+        });
+        lines.push(
+          o(),
+          (r.conserved ? ok : err)(`  ${r.events} events · ${bi ? 'a + c = a0, b + c = b0' : 'a + b = a0'} ${r.conserved ? 'after every one' : 'BROKEN'}`),
+          d(`  ${ms}ms · exact direct method · one path, so it wanders off the`),
+          d(`  ${bi ? 'ODE' : 'mean'}: at counts this small the noise is the point.`),
+          d(`  try 'run ${t} ${seed + 1}' for another path, 'verify ${t}' for the ensemble.`),
+        );
+        return lines;
       }
 
-      if (DOMAINS.some(([n]) => n === t)) {
-        return [
-          warn(`  '${t}' runs in the Python engine, not in this browser.`),
-          d('  domains compiled to the web: popgen, md (pure math demos)'),
-          d('  domains resolved via the literature API: kinetics, epidemiology'),
+      if (id === 'gillespie_ssa_replicates') {
+        const a0 = 100;
+        const k = 0.1;
+        const runs = 50;
+        const t0 = performance.now();
+        const paths = Array.from({ length: runs }, (_, seed) => ssaDecay(a0, k, 50, seed, SAMPLE_TIMES).a);
+        const ms = Math.round(performance.now() - t0);
+        const lines: Line[] = [
+          head('GILLESPIE SSA · REPLICATES'),
+          rule(),
+          d(`  A -> B, a0 = ${a0}, k = ${k}, seeds 0..${runs - 1}`),
+          d('  A(t) is exactly Binomial(a0, p), p = e^(-kt): mean a0·p, sd sqrt(a0·p·(1-p))'),
+          o(),
+          o('  t      mean      theory    sd        theory'),
         ];
+        SAMPLE_TIMES.forEach((ti, i) => {
+          const xs = paths.map((a) => a[i]);
+          const mean = xs.reduce((s, x) => s + x, 0) / runs;
+          const sd = Math.sqrt(xs.reduce((s, x) => s + (x - mean) ** 2, 0) / (runs - 1));
+          const p = Math.exp(-k * ti);
+          lines.push(o(
+            `  ${String(ti).padEnd(7)}${mean.toFixed(3).padEnd(10)}${(a0 * p).toFixed(3).padEnd(10)}` +
+              `${sd.toFixed(3).padEnd(10)}${Math.sqrt(a0 * p * (1 - p)).toFixed(3)}`,
+          ));
+        });
+        lines.push(o(), d(`  ${ms}ms · sd is the sample sd over ${runs} runs, so it scatters too.`));
+        return lines;
       }
+
       return [err(`unknown domain '${t}' — try: domains`)];
     },
   },
@@ -341,38 +482,10 @@ export const COMMANDS: Command[] = [
     help: 'check a domain against exact mathematics',
     run: (args) => {
       const t = (args[0] || '').toLowerCase();
-      if (t === 'md' || t === 'molecular_dynamics') {
-        const e2 = exactCluster(2);
-        const e3 = exactCluster(3);
-        const e4 = exactCluster(4);
-        const r = lj13();
-        const row = (n: string, got: number, pub: number, tol: string) => {
-          const diff = Math.abs(got - pub);
-          const pass = diff < (tol === '1e-12' ? 1e-12 : 1e-6);
-          return {
-            kind: pass ? ('ok' as LineKind) : ('err' as LineKind),
-            text: `  LJ${n.padEnd(3)} ${got.toFixed(12).padStart(18)}  ${pub
-              .toFixed(6)
-              .padStart(12)}   ${diff.toExponential(2).padStart(9)}   ${pass ? 'PASS' : 'FAIL'}`,
-          };
-        };
-        return [
-          head('VERIFY · MOLECULAR DYNAMICS'),
-          rule(),
-          d('       computed            published        |diff|    '),
-          row('2', e2, -1, '1e-12'),
-          row('3', e3, -3, '1e-12'),
-          row('4', e4, -6, '1e-12'),
-          row('13', r.energy, -44.326801, '1e-6'),
-          o(),
-          d('  LJ2/3/4 are exact by two independent routes: derivable by hand'),
-          d('  (a regular tetrahedron places all six pairs at r_min simultaneously)'),
-          d('  and independently listed in the Cambridge Cluster Database.'),
-          d('  LJ5 is the first size where frustration makes this impossible:'),
-          d('  -9.103852, not -10.'),
-        ];
-      }
-      if (t === 'kinetics' || t === 'michaelis_menten' || t === 'mm') {
+      const archived = archivedAnswer(t);
+      if (archived) return archived;
+      const id = ALIASES[t];
+      if (id === 'mm') {
         const r = simulateMichaelisMenten(DEFAULT_MM);
         const passes = r.finalResidual < MM_TOLERANCE;
         return [
@@ -387,10 +500,10 @@ export const COMMANDS: Command[] = [
           d('  checked against the closed form the ODE has no free parameters left to fit.'),
           d(`  NOTE: Km=${DEFAULT_MM.km}, Vmax=${DEFAULT_MM.vmax} here are illustrative constants,`),
           d('  not a literature-resolved enzyme -- this checks the solver only.'),
-          d("  for a real enzyme's resolved parameters, try 'run kinetics <enzyme>'."),
+          d("  for cited constants, try 'run mm'."),
         ];
       }
-      if (t === 'competitive' || t === 'mm_competitive_inhibition' || t === 'inhibition') {
+      if (id === 'mm_competitive_inhibition') {
         const p = DEFAULT_MM_COMPETITIVE;
         const r = simulateMMCompetitiveInhibition(p);
         const passes = r.finalResidual < MM_TOLERANCE;
@@ -407,74 +520,72 @@ export const COMMANDS: Command[] = [
           d('  same apparent-Km closed form caterva/tests/test_mm_competitive_inhibition.py'),
           d('  checks against the Python engine; reduces exactly to plain MM at I=0.'),
           d(`  NOTE: these are illustrative constants, not a literature-resolved enzyme --`),
-          d('  this checks the solver only, same caveat as verify kinetics.'),
+          d('  this checks the solver only, same caveat as verify mm.'),
         ];
       }
-      if (t === 'epidemiology' || t === 'sir' || t === 'seir') {
-        const r = simulateSIR(DEFAULT_SIR);
-        const passes = r.conservationError < SIR_TOLERANCE;
+      if (id === 'gillespie_ssa' || id === 'gillespie_ssa_replicates') {
         return [
-          head('VERIFY · EPIDEMIOLOGY'),
+          head('VERIFY · GILLESPIE SSA'),
           rule(),
-          o(`  target      S + I + R = N at every t     population conservation`),
-          o(`  measured    |S+I+R-N| ${r.conservationError.toExponential(3)}`),
-          o(`  tolerance   ${SIR_TOLERANCE}`),
-          (passes ? ok : err)(`  ${passes ? 'PASS' : 'FAIL'}        margin ${(SIR_TOLERANCE / r.conservationError).toFixed(1)}x`),
+          d('  A(t) for A -> B is exactly Binomial(a0, e^(-kt)); the mean of N runs'),
+          d('  must land within 3 standard errors, 3·sqrt(a0·p·(1-p)/N), of a0·e^(-kt).'),
           o(),
-          d('  same invariant caterva/tests/test_properties.py checks with Hypothesis'),
-          d('  across the whole input space; spot-checked here at the final point.'),
-          d(`  NOTE: beta=${DEFAULT_SIR.beta}, gamma=${DEFAULT_SIR.gamma} here are illustrative,`),
-          d('  not resolved from an outbreak literature source -- this checks the'),
-          d("  solver only. try 'run epidemiology <disease/outbreak>' for a resolved run."),
+          ...ensembleLines('a0 4000, k 0.5, t 10', checkDecayMean()),
+          o(),
+          d('  parameters and rule of caterva/tests/test_gillespie_ssa_correctness.py'),
+          d('  ::test_mean_a_tracks_exp_decay, re-run here on this browser\'s seeds.'),
+          ...(id === 'gillespie_ssa_replicates'
+            ? [d('  the replicates domain runs this system once per seed; this is its ensemble.')]
+            : []),
+          o(),
+          warn('  try:  mutate gillespie_ssa     to break it deliberately'),
         ];
       }
-      if (t === 'popgen' || t === 'wright_fisher') {
-        const p = drift();
+      if (id === 'gillespie_ssa_bimolecular') {
         return [
-          head('VERIFY · POPULATION GENETICS'),
+          head('VERIFY · GILLESPIE SSA · A + B -> C'),
           rule(),
-          o(`  target      H(t) = H0 (1 - 1/2N)^t     exact closed form`),
-          o(`  measured    max deviation ${p.deviationCorrect.toFixed(6)}`),
-          o(`  tolerance   ${CONFIG.tolerance}`),
-          ok(`  PASS        margin ${(CONFIG.tolerance / p.deviationCorrect).toFixed(1)}x`),
+          d('  the stochastic mean tracks the ODE as counts grow; the mean of 40'),
+          d('  runs must land within 3% of the closed-form A(t).'),
           o(),
-          d('  second target: P(fixation) = p0 — Kimura (1962)'),
+          ...ensembleLines('a0 = b0 = 3000, k 2e-4, t 10', checkAssociationMean(3000, 3000, 2e-4)),
           o(),
-          warn('  try:  mutate popgen     to break it deliberately'),
+          ...ensembleLines('a0 4000, b0 3000, k 1e-4, t 10', checkAssociationMean(4000, 3000, 1e-4)),
+          o(),
+          d('  parameters and rule of caterva/tests/'),
+          d('  test_gillespie_ssa_bimolecular_correctness.py::TestOdeReference.'),
         ];
       }
-      return [err('usage: verify <md|popgen|kinetics|competitive|epidemiology>')];
+      return [err('usage: verify <mm|mm_competitive_inhibition|gillespie_ssa|gillespie_ssa_bimolecular|gillespie_ssa_replicates>')];
     },
   },
 
   {
     name: 'mutate',
     args: '<domain>',
-    help: 'inject a real bug and watch the test catch it',
+    help: 'inject a bug and watch the check catch it',
     run: (args) => {
       const t = (args[0] || '').toLowerCase();
-      if (t !== 'popgen' && t !== 'wright_fisher') {
-        return [err('usage: mutate popgen')];
+      const archived = archivedAnswer(t);
+      if (archived) return archived;
+      if (ALIASES[t] !== 'gillespie_ssa') {
+        return [err('usage: mutate gillespie_ssa')];
       }
-      const p = drift();
-      const fails = p.deviationBugged > CONFIG.tolerance;
+      const c = checkDecayMean(4000, 0.5, 10, 50, { precedenceBug: true });
       return [
-        head('MUTATION · 2N -> N'),
+        head('MUTATION · A MISSING PAIR OF PARENTHESES'),
         rule(),
-        d('  the diploid off-by-factor-of-two. a real bug, pre-specified in'),
-        d('  the domain spec before the code was written.'),
+        d('  the waiting time to the next event is Exp(k·a). written without'),
+        d('  parentheses, it divides by k and then multiplies by a:'),
         o(),
-        err('  -   return rng.binomial(2 * n_pop, p)'),
-        ok('  +   return rng.binomial(n_pop, p)'),
+        err('  -   tau = -ln(u) / (k * a)'),
+        ok('  +   tau = -ln(u) / k * a'),
         o(),
-        o(`  max deviation   ${p.deviationBugged.toFixed(6)}`),
-        o(`  tolerance       ${CONFIG.tolerance}`),
-        fails
-          ? err(`  FAIL            exceeds tolerance by ${(p.deviationBugged / CONFIG.tolerance).toFixed(1)}x`)
-          : ok('  PASS'),
+        ...ensembleLines('a0 4000, k 0.5, t 10', c),
         o(),
-        d('  decay now follows (1 - 1/N)^t instead of (1 - 1/2N)^t.'),
-        d('  caught by test_heterozygosity_decay_matches_exact_rate.'),
+        d('  the bug makes every wait a²-times too long, so decay stalls.'),
+        d('  this is the in-browser check, re-run on the mutated sampler; the'),
+        d('  Python suite holds the engine to the same rule.'),
       ];
     },
   },
@@ -559,17 +670,15 @@ export const COMMANDS: Command[] = [
     run: () => [
       head('REFERENCES'),
       rule(),
-      o('  Hoare, M. R. & Pal, P. (1971)'),
-      d('    Adv. Phys. 20, 161 — LJ13 and LJ55 icosahedral global minima'),
+      o('  Michaelis, L. & Menten, M. L. (1913)'),
+      d('    Biochem. Z. 49, 333 — the rate law v = Vmax·S / (Km + S)'),
       o(),
-      o('  Swope, Andersen, Berens & Wilson (1982)'),
-      d('    J. Chem. Phys. 76, 637 — velocity Verlet, in the appendix'),
+      o('  Gillespie, D. T. (1977)'),
+      d('    J. Phys. Chem. 81, 2340 — the exact stochastic simulation algorithm'),
       o(),
-      o('  Kimura, M. (1962)'),
-      d('    fixation probability of a neutral allele equals its frequency'),
-      o(),
-      o('  Cambridge Cluster Database'),
-      d('    Wales, Doye et al. — tabulated LJ global minima, N <= 150'),
+      o(`  BRENDA, EC ${HEXOKINASE.ec}, references ${HEXOKINASE.km.ref} and ${HEXOKINASE.kcat.ref} (CC BY 4.0)`),
+      d(`    brenda-enzymes.org/literature.php?e=${HEXOKINASE.ec}&r=${HEXOKINASE.km.ref} — Km`),
+      d(`    brenda-enzymes.org/literature.php?e=${HEXOKINASE.ec}&r=${HEXOKINASE.kcat.ref} — kcat`),
     ],
   },
 
@@ -579,12 +688,12 @@ export const COMMANDS: Command[] = [
     run: () => [
       head('CATERVA'),
       rule(),
-      o('  A scientific simulation engine for teaching labs.'),
+      o('  Enzyme kinetics and molecular dynamics for research groups and teaching labs.'),
       o(),
-      d('  A student asks a question in plain language. Caterva resolves the'),
-      d('  real parameters from published literature, runs the simulation, and'),
-      d('  shows its work. Every number traces to a citation that has been'),
-      d('  independently reproduced.'),
+      d('  Ask a question in plain language. Caterva resolves the real'),
+      d('  parameters from the literature, runs the simulation, and shows its'),
+      d('  work: every number traceable to a citation that has been'),
+      d('  independently checked.'),
       o(),
       d('  Built by two AI implementers working from identical specs, with'),
       d('  every claim reproduced by a third before it is accepted.'),

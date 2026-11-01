@@ -731,30 +731,33 @@
       <p class="footer__tag">Caterva runs the science.</p>
     </div>
     <div class="footer__cols">
-      <!-- This list said "Domains at launch" and named six, one of them as
-           "Molecular dynamics setup". Fifteen are built, and molecular
-           dynamics is a full velocity-Verlet integrator verified against
-           published global-minimum energies — not setup. A site for a tool
-           whose selling point is that it does not overstate should not be
-           understating its own engine either. Counts are the ones in the
-           repository README, which the test suite pins. -->
+      <!-- This list said "Domains at launch" and named six; then "15 built"
+           and named eight, five of them (SIR/SEIR, Wright-Fisher, Lennard-
+           Jones MD, PCR, Monte Carlo) and the ODE oscillators since archived
+           on 2026-09-27 (archive/legacy_domains/README.md). What is live is
+           what README.md:53 states, "five simulation domains and two
+           structure tools": the five are the teaching domains of
+           src/cli/domainCatalogue.ts (mm, mm_competitive_inhibition and the
+           three Gillespie SSA variants); the two tools are caterva structure
+           and caterva prepare. GROMACS setup (caterva md) is listed apart,
+           because the simulation itself runs in the user's GROMACS. -->
       <div>
-        <p class="label label--micro">Simulation domains / 15 built</p>
+        <p class="label label--micro">Simulation domains / 5 live</p>
         <ul class="footer__list mono">
-          <li>Michaelis–Menten (+ inhibition)</li>
-          <li>SIR / SEIR modeling</li>
-          <li>Lotka–Volterra, cell cycle, repressilator</li>
-          <li>Gillespie SSA (3 variants)</li>
-          <li>Wright–Fisher population genetics</li>
-          <li>Molecular dynamics (Lennard-Jones)</li>
-          <li>PCR amplification</li>
-          <li>Monte Carlo simulation</li>
+          <li>Michaelis–Menten</li>
+          <li>Competitive inhibition</li>
+          <li>Gillespie SSA (decay, association, replicates)</li>
+          <li>+ 2 structure tools: structure, prepare</li>
+          <li>+ GROMACS setup: caterva md</li>
         </ul>
       </div>
       <div>
         <p class="label label--micro">Status</p>
+        <!-- Test count: README.md:127, "8,679 tests (7,057 engine + 1,622
+             literature)". check_documented_counts.py pins the README to the
+             repository; this copy is static, so change it with the README. -->
         <ul class="footer__list mono">
-          <li>8,296 tests / engine + literature</li>
+          <li>8,679 tests / engine + literature</li>
           <li>Verified against closed-form solutions</li>
           <li>Pre-validation</li>
           <li>Seeking course-pilot partners</li>

@@ -16,6 +16,12 @@
  * them, so demanding one refuses the query permanently. A tool that cannot
  * answer "michaelis menten for hexokinase" is not strict, it is broken.
  *
+ * (Note, 2026-11-01: Lotka-Volterra, the repressilator and Monte Carlo
+ * were archived on 2026-09-27, after v0.4.0, the last release that runs
+ * them. Their keys -- n_samples, cycles, generations and the rest -- were
+ * pruned from SCENARIO_DEFAULTABLE_KEYS on 2026-11-01, and the cases below
+ * now use the keys a live domain reads.)
+ *
  * `provenance.ts` already contained the right distinction and enforced the
  * wrong one: ADR 0044 is quoted there saying "a pre-filled experimental
  * condition is a UI convenience ...; a pre-filled measurement is a
@@ -91,7 +97,7 @@ describe("the guarantee that survives it", () => {
     origin: ParameterProvenance["origin"],
   ): Record<string, ParameterProvenance> => ({ [key]: { origin } });
 
-  it.each(["km", "vmax", "kcat", "ki", "beta", "gamma", "mutation_rate"])(
+  it.each(["km", "vmax", "kcat", "ki", "k"])(
     "still blocks a defaulted %s -- these are the product",
     (key) => {
       expect(unverifiedOriginKeys(provenance(key, "default"))).toEqual([key]);
@@ -109,14 +115,30 @@ describe("the guarantee that survives it", () => {
     expect(SCENARIO_DEFAULTABLE_KEYS.has("enzyme_conc")).toBe(false);
   });
 
-  it.each(["end", "points", "s0", "i0", "n_samples", "cycles", "generations"])(
+  it.each(["start", "end", "points", "s0", "i0", "a0", "b0", "n_replicates", "seed"])(
     "allows a documented default for %s",
     (key) => {
       expect(unverifiedOriginKeys(provenance(key, "default"))).toEqual([]);
     },
   );
 
-  it.each(["end", "s0", "n_samples"])(
+  it.each([
+    "n_samples",
+    "cycles",
+    "generations",
+    "population_size",
+    "temperature",
+    "starting_frequencies",
+  ])("no longer defaults %s, a key only an archived domain read", (key) => {
+    // These were scenario keys of the domains archived on 2026-09-27
+    // (after v0.4.0, the last release that runs them). No live domain
+    // reads one, so a default for it could only come from an archived
+    // table; it falls back to the unclassified rule and stays blocked.
+    expect(SCENARIO_DEFAULTABLE_KEYS.has(key)).toBe(false);
+    expect(unverifiedOriginKeys(provenance(key, "default"))).toEqual([key]);
+  });
+
+  it.each(["end", "s0", "n_replicates"])(
     "still blocks an LLM-invented %s, even though its default is allowed",
     (key) => {
       // A default is a documented value in this repository, auditable and

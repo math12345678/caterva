@@ -159,3 +159,7 @@ disease.
   4.80 days of viral shedding is not a serial interval, and using it
   would redefine gamma mid-registry.
 - **ADR 0017** — the rule this ADR extends, and the deferral it resolves.
+
+## Note (2026-10-31)
+
+The `disease_not_registered` refusal described here no longer exists: the reason, `resolveEpidemiologyParameters` and `diseases.ts` were removed from the API server on 2026-10-31 with the rest of the archived epidemiology residue (ADR 0180). A request for an archived domain is refused with a message naming the archive and v0.4.0.

@@ -12,6 +12,35 @@ onward and [Keep a Changelog](https://keepachangelog.com/) in shape.
 Entries before 0.1.0 are grouped by date, because that is how the work was
 done: there was no release to version.
 
+## [Unreleased]
+
+## [0.7.0] - 2026-11-01
+
+Caterva V7: every number on a public surface is measured, derived from the
+tree, or removed (ADR 0180).
+
+### Changed
+- The landing app reads its guard count, suite sizes and data sources from a generated `repoFacts.json`; `scripts/check_landing_test_counts.py` fails when that file, a row's `collected:` or its pass count is stale, and `--write` regenerates it. The landing CLI's `status` calls `/api/healthz` and `/api/metrics/health` and prints what came back.
+- `caterva-site`'s shell offers the five live domains only, runs Michaelis-Menten with the showcase's hexokinase constants and Gillespie with the domain catalogue's example rates in the browser, and answers an archived domain with its archive date and v0.4.0. Its tests run in CI and in the new `make test-site`.
+- The dashboard shows the literature score on a 0-1 scale, labelled a heuristic and not a probability, and computes the average tile from the runs shown.
+- `scripts/verify_citations_live.py` and `scripts/verify_values_live.py` end every check matched, mismatched or unreachable (exit 0, 2, 1); DOIs are checked through the CrossRef API; BRENDA ref 740253 is no longer checked as a PubMed id.
+- scipy is pinned to 1.16.0 on Python 3.11-3.13, because 1.15.3's cp313 wheel does not import `scipy.sparse.linalg` on macOS 27.0.1; Python 3.10 keeps 1.15.3. certifi is 2026.10.19.
+- `docker-compose.yml` mounts `./data` for the job store (`CATERVA_JOBS_FILE`) instead of bind-mounting `./caterva-jobs.jsonl`; move that file into `./data` to keep a deployment's history.
+- `scripts/check_documented_counts.py` reads "N guards" as well as "N guard scripts", and skips a quoted count; it found three stale guard counts in `docs/readmes/`.
+- Monitoring files moved to `deploy/monitoring/`, their ports bound to 127.0.0.1, and Grafana's admin password is read from `GRAFANA_ADMIN_PASSWORD` with no default; `scripts/check_port_binding.py` reads that compose file too.
+- The landing page offers the release named by `__version__` (v0.7.0 in this release). `repoFacts.json` carries `releaseTag`, read from `caterva/__init__.py`, and the download box, roadmap, 404 page and domain statuses all use it; `check_landing_test_counts.py` fails when it is stale. Before this, the page offered v0.4.0, and the 404 page said v0.7.0. The changelog modal gains 0.6.0 and dates 0.3.3 to September 22.
+- `scripts/check_license_consistency.py` also reads the published OpenAPI spec and `pyproject.toml`, and fails when a file it is told to read is missing. The root `openapi.yaml` declares Apache-2.0 and links to github.com/math12345678/caterva.
+- CHANGELOG and CITATION.cff say that 0.5.0 and 0.5.1 were released only as candidates.
+- Docs that pointed readers at the 18 Terrium-sim repositories say those repositories are private; 17 were pushed on 2026-08-12 under the old name (the 18th is GitHub's demo repository) and none since; development is at github.com/math12345678/caterva.
+
+### Removed
+- The API server's epidemiology bridge (`applyBetaGammaFromR0Resolution`, `resolveEpidemiologyParameters`, `diseases.ts`) and the `wright_fisher` resolvable field, which no live domain reached.
+- Root probe scripts, a screenshot and the committed `caterva-jobs.jsonl`.
+- `Tests/epidemiology_resolver.py`, `Tests/popgen_resolver.py`, their tests and `requirements-popgen.txt` moved to `archive/legacy_domains/`, and the doctor, env check and guards no longer check for, install or advise installing stdpopsim. The query parser accepts only live parameter names, and has no array path.
+
+### Fixed
+- README: the `compose --subject` example names its mechanism, and the install section says the wheel needs Python 3.10-3.13 and that a checkout is installed with `make setup`.
+
 ## [0.6.0] - 2026-10-25
 
 Claims over pinned evidence: `caterva compose --claims DIR`, `caterva why`
@@ -48,6 +77,10 @@ notes did not describe them, and they are listed here.
 
 ## [0.5.1] - 2026-10-04
 
+**Released only as candidates** (`v0.5.1-rc.1`, `v0.5.1-rc.2`, both
+GitHub pre-releases). No final `v0.5.1` tag was cut; the next final release
+is 0.6.0, which carries everything below. Note added 2026-11-01.
+
 Caterva.app updates itself. A release candidate, `v0.5.1-rc.1`, comes first,
 as for 0.5.0.
 
@@ -61,6 +94,10 @@ as for 0.5.0.
 - Version 0.5.1. The Studio's desktop bridge has four new messages (`updateStatus`, `checkForUpdates`, `setUpdateOptions`, `reportActiveRuns`; `docs/studio/CONTRACT.md`, section 16).
 
 ## [0.5.0] - 2026-10-03
+
+**Released only as candidates** (`v0.5.0-rc.1`, `v0.5.0-rc.2`, both
+GitHub pre-releases). No final `v0.5.0` tag was cut; the next final release
+is 0.6.0, which carries everything below. Note added 2026-11-01.
 
 Caterva Studio, the enzyme finder, and a Mac app, on top of the tools listed
 below them.

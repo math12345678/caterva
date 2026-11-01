@@ -96,6 +96,29 @@ describe("a failure at the enzyme-identity step says so", () => {
     expect(note).not.toContain("()");
   });
 
+  it("keeps ec_ambiguous and ec_not_resolved as two reasons, not one", () => {
+    // The notes differ, but a caller that branches on the machine-readable
+    // field never reads the note. Folding the two into one
+    // `unresolvedReason` left every test above green: the first mutation
+    // run of ADR 0128's set reported it NOT CAUGHT. "The name matched
+    // several enzymes" and "the name matched none" are different fixes --
+    // pick one, versus check the spelling -- so the field a program reads
+    // has to keep them apart as surely as the sentence does.
+    expect(build("km", "ec_ambiguous").unresolvedReason).toBe("ec_ambiguous");
+    expect(build("km", "ec_not_resolved").unresolvedReason).toBe("ec_not_resolved");
+
+    // And the branch that forwards the Python finder's refusal, which
+    // passes `reason` through rather than naming it. Hard-coding either
+    // value there is the same fold, reached by a different path.
+    const refusal = "'amylase' names 2 enzymes.";
+    const forwarded = (reason: "ec_ambiguous" | "ec_not_resolved") =>
+      build("km", reason, undefined, undefined, undefined, undefined, undefined, refusal);
+    expect(forwarded("ec_ambiguous").note).toContain(refusal);
+    expect(forwarded("ec_ambiguous").unresolvedReason).toBe("ec_ambiguous");
+    expect(forwarded("ec_not_resolved").note).toContain(refusal);
+    expect(forwarded("ec_not_resolved").unresolvedReason).toBe("ec_not_resolved");
+  });
+
   it("keeps the three stages apart", () => {
     // enzyme identity / substrate name / organism coverage send a reader
     // to three different fixes. A message covering two of them sends them

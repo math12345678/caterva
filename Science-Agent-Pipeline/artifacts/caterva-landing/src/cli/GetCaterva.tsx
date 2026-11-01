@@ -1,5 +1,6 @@
 import TerminalWindow from "./TerminalWindow";
 import Reveal from "./Reveal";
+import { RELEASE_TAG } from "@/lib/domains";
 
 // How to get Caterva, which replaces a pricing table.
 //
@@ -9,20 +10,56 @@ import Reveal from "./Reveal";
 // that runs on the machine that asks, and nothing is metered, so there is
 // nothing to price.
 //
-// The facts below were read on 2026-09-29: the latest release is v0.4.0
-// (2026-09-27) and its bundles carry `caterva compose` and `caterva sim`
-// (caterva/app.py at v0.4.0). The structure and molecular dynamics tools
-// were added after it and are on the main branch only. When a release
-// carries them, this section changes with it.
+// The facts below were first read on 2026-09-29, against v0.4.0 (compose
+// and sim). Corrected 2026-11-01: they still named v0.4.0 after v0.6.0 was
+// published on GitHub on 2026-10-28 (its CHANGELOG heading is dated
+// 2026-10-25, the day the release candidate was cut), so the page offered
+// a download one release old (0.5.0 and 0.5.1 were only release
+// candidates) and called the structure and molecular dynamics tools
+// main-only when v0.6.0 carries them.
+//
+// The tag comes from RELEASE_TAG (repoFacts.json, derived from
+// caterva/__init__.py). The date, platforms and commands cannot be derived
+// from the tree, so they are recorded with the tag they were read against
+// (`readFor`); a test fails when RELEASE_TAG moves on and they have not
+// been re-read. `commands` is the COMMANDS table in `git show
+// v0.6.0:caterva/app.py`, in its order; platforms are the bundles attached
+// to the GitHub release. Re-read 2026-11-01 for v0.7.0: caterva/app.py is
+// unchanged from v0.6.0 (git diff v0.6.0 -- caterva/app.py is empty), the
+// release workflow attaches the same three platforms. The date is the day
+// the plain v0.7.0 release was published; re-check it against `gh release
+// view v0.7.0 --json publishedAt` if this file changes before it is.
 const RELEASE = {
-  tag: "v0.4.0",
-  date: "2026-09-27",
-  url: "https://github.com/math12345678/caterva/releases/tag/v0.4.0",
+  tag: RELEASE_TAG,
+  readFor: "v0.7.0",
+  date: "2026-11-01",
+  url: `https://github.com/math12345678/caterva/releases/tag/${RELEASE_TAG}`,
   platforms: ["macOS (Apple silicon)", "Linux x86_64", "Windows x86_64"],
-  commands: ["compose", "sim"],
+  commands: [
+    "compose",
+    "rates",
+    "enzyme",
+    "structure",
+    "md",
+    "analyze",
+    "bind",
+    "complex",
+    "fep",
+    "prepare",
+    "sim",
+    "studio",
+    "why",
+    "verify",
+  ],
 };
 
-const MAIN_ONLY = ["structure", "md", "prepare", "analyze", "bind", "complex", "fep"];
+// Commands registered in caterva/app.py on this branch that RELEASE does
+// not register. Computed 2026-11-01 by comparing the COMMANDS table here
+// with `git show v0.6.0:caterva/app.py` (v0.7.0's is the same file): the two are identical, so the
+// main branch adds no command today, only changes to the ones above.
+const MAIN_ONLY: string[] = [];
+
+export { RELEASE, MAIN_ONLY };
 
 const REPO = "https://github.com/math12345678/caterva";
 
@@ -51,7 +88,7 @@ export default function GetCaterva() {
               library inside, for {RELEASE.platforms.join(", ")}. Carries{" "}
               {RELEASE.commands.map((c, i) => (
                 <span key={c}>
-                  {i > 0 && " and "}
+                  {i > 0 && (i === RELEASE.commands.length - 1 ? " and " : ", ")}
                   <code className="font-mono text-fg/88">caterva {c}</code>
                 </span>
               ))}
@@ -76,15 +113,24 @@ export default function GetCaterva() {
               Build from the main branch
             </p>
             <p className="text-[11px] text-fg/70 leading-relaxed mb-3">
-              Adds the structure and molecular dynamics tools no release
-              carries yet:{" "}
-              {MAIN_ONLY.map((c, i) => (
-                <span key={c}>
-                  {i > 0 && ", "}
-                  <code className="font-mono text-fg/88">{c}</code>
-                </span>
-              ))}
-              . Python 3.10 to 3.13; GROMACS installed separately for{" "}
+              {MAIN_ONLY.length > 0 ? (
+                <>
+                  Adds commands no release carries yet:{" "}
+                  {MAIN_ONLY.map((c, i) => (
+                    <span key={c}>
+                      {i > 0 && ", "}
+                      <code className="font-mono text-fg/88">{c}</code>
+                    </span>
+                  ))}
+                  .
+                </>
+              ) : (
+                <>
+                  The same commands as {RELEASE.tag}, with whatever has been
+                  merged since.
+                </>
+              )}{" "}
+              Python 3.10 to 3.13; GROMACS installed separately for{" "}
               <code className="font-mono text-fg/88">md</code> and{" "}
               <code className="font-mono text-fg/88">fep</code>.
             </p>

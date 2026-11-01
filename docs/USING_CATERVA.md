@@ -2102,7 +2102,7 @@ crash.
 ## Where to go next
 
 - `caterva compose --help` — every option, with examples.
-- [`docs/releases/v0.6.0.md`](releases/v0.6.0.md) — what the current release
+- [`docs/releases/v0.7.0.md`](releases/v0.7.0.md) — what the current release
   contains and, more importantly, what it does not.
 - [`README.md`](../README.md) — the project's own account of why it exists.
 - [`docs/adr/`](adr/README.md) — why each design decision was made, including

@@ -49,11 +49,13 @@ That split is a real limitation and is written down rather than implied: a
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 CATALOGUE = REPO_ROOT / "src" / "cli" / "domainCatalogue.ts"
@@ -99,22 +101,31 @@ def main() -> int:
         print("FAIL: no python executable to run examples with.", file=sys.stderr)
         return 1
 
+    # The examples run in a scratch directory, not the checkout: the
+    # replicates entry ends `--out runs.csv`, and run from REPO_ROOT it left
+    # an untracked runs.csv at the repo root on every pass. PYTHONPATH is
+    # what still lets `-m caterva.cli` import the checkout's package.
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        p for p in (str(REPO_ROOT), env.get("PYTHONPATH", "")) if p)
     failures: list[tuple[str, str]] = []
-    for example in runnable:
-        # Everything after a `#` is a note to the reader, not part of the
-        # command. Split before tokenising or argparse receives "#" as a
-        # positional and the example fails for a reason that is not real.
-        command = example.split("#", 1)[0].strip()
-        args = command[len(PY_PREFIX):].split()
-        proc = subprocess.run(
-            [sys.executable, "-m", "caterva.cli", *args],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        if proc.returncode != 0:
-            failures.append((command, (proc.stderr or proc.stdout).strip().splitlines()[-1]))
+    with tempfile.TemporaryDirectory(prefix="domain-examples-") as scratch:
+        for example in runnable:
+            # Everything after a `#` is a note to the reader, not part of the
+            # command. Split before tokenising or argparse receives "#" as a
+            # positional and the example fails for a reason that is not real.
+            command = example.split("#", 1)[0].strip()
+            args = command[len(PY_PREFIX):].split()
+            proc = subprocess.run(
+                [sys.executable, "-m", "caterva.cli", *args],
+                cwd=scratch,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            if proc.returncode != 0:
+                failures.append((command, (proc.stderr or proc.stdout).strip().splitlines()[-1]))
 
     print(f"Examples in the catalogue:      {len(found)}")
     print(f"  runnable here (engine CLI):   {len(runnable)}")

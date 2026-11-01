@@ -3,11 +3,10 @@
 These verify that network-lookup failures in the KEGG substrate resolver
 degrade gracefully (return None) rather than crashing the whole resolution,
 and that genuine programming errors are NOT swallowed by the same handler.
-The mutation_rate (population-genetics) path is covered end-to-end so a
-wrong dict-field access like the ``popgen_result['doi']`` KeyError -- caught
-by the runner's broad except and degraded to a cryptic ``{'ok': false}``
-error -- cannot silently land again (ADR 0008: literature provenance must
-surface or fail loudly, never silently).
+The parameter types of the domains archived on 2026-09-27 (population
+genetics' ``mutation_rate``, epidemiology's ``disease_parameters``) are
+pinned to an explicit found=false refusal, so neither falls through to the
+enzyme path nor reaches a resolver that is no longer on the live path.
 """
 
 import io
@@ -66,15 +65,16 @@ class TestResolveSubstrateFromKegg:
                 resolve_substrate_from_kegg("1.1.1.1")
 
 
-class TestPopgenMutationRateResolution:
-    """The mutation_rate path of the runner's main() end-to-end.
+class TestRetiredParameterTypes:
+    """The parameter types of archived domains are refused by name.
 
-    Regression: main() read ``popgen_result['doi']`` from a dict that had no
-    ``doi`` key. On the first successful stdpopsim hit the KeyError was caught
-    by the broad except and returned as ``{"ok": false, "error": "'doi'"}`` --
-    every Wright-Fisher literature mutation_rate call failed with a cryptic
-    error instead of a value. These tests drive main() with a mocked resolver
-    so they stay offline and pin the success and not-found shapes.
+    Until 2026-10-31 the runner imported ``popgen_resolver`` and
+    ``epidemiology_resolver`` and answered ``mutation_rate`` and
+    ``disease_parameters`` -- for domains archived on 2026-09-27
+    (archive/legacy_domains/README.md). Those branches are gone; what is
+    pinned now is that a request for either says why it is not answered,
+    instead of reaching the enzyme path and being refused for a missing
+    enzyme name.
     """
 
     @staticmethod
@@ -87,53 +87,30 @@ class TestPopgenMutationRateResolution:
             sys.stdin = old_stdin
         return json.loads(capsys.readouterr().out)
 
-    def test_success_path_returns_value_and_doi_locator(self, capsys, monkeypatch):
-        """A found mutation rate must come back with the value and a citation
-        carrying a resolvable DOI -- not crash on a missing dict field."""
-        from popgen_resolver import PopgenResult
+    def test_runner_does_not_import_the_retired_resolvers(self):
+        assert not hasattr(science_agent_runner, "popgen_resolver")
+        assert not hasattr(science_agent_runner, "epidemiology_resolver")
 
-        fake = PopgenResult(
-            found=True,
-            value=1.29e-8,
-            organism="Homo sapiens",
-            source="stdpopsim",
-            citation="International Human Genome Sequencing Consortium (2001)",
-            doi="10.1038/35057062",
-        )
-        monkeypatch.setattr(
-            science_agent_runner.popgen_resolver,
-            "resolve_mutation_rate",
-            lambda organism: fake,
-        )
-
-        out = self._run_with_capsys(
-            capsys, {"parameterType": "mutation_rate", "organism": "Homo sapiens"}
-        )
-
-        assert out["ok"] is True
-        assert out["found"] is True
-        assert out["km"] == pytest.approx(1.29e-8)
-        assert out["citation"]["referenceId"] == "10.1038/35057062"
-        assert out["citation"]["url"] == "https://doi.org/10.1038/35057062"
-
-    def test_not_found_path_returns_honest_found_false(self, capsys, monkeypatch):
-        """An organism stdpopsim has nothing for degrades to found:false --
-        never a fabricated value, never a crash."""
-        from popgen_resolver import PopgenResult
-
-        monkeypatch.setattr(
-            science_agent_runner.popgen_resolver,
-            "resolve_mutation_rate",
-            lambda organism: PopgenResult(found=False, search_log=["not in catalog"]),
-        )
-
-        out = self._run_with_capsys(
-            capsys, {"parameterType": "mutation_rate", "organism": "Unknownus"}
-        )
+    @pytest.mark.parametrize(
+        ("payload", "domain"),
+        [
+            ({"parameterType": "mutation_rate", "organism": "Homo sapiens"},
+             "population genetics"),
+            ({"parameterType": "disease_parameters", "disease": "measles"},
+             "epidemiology"),
+        ],
+    )
+    def test_retired_parameter_type_is_refused_by_name(self, capsys, payload, domain):
+        out = self._run_with_capsys(capsys, payload)
 
         assert out["ok"] is True
         assert out["found"] is False
-        assert out["source"] == "popgen_not_found"
+        assert out["source"] == "domain_archived"
+        assert "km" not in out and "r0" not in out
+        log = " ".join(out["logs"])
+        assert payload["parameterType"] in log
+        assert domain in log
+        assert "v0.4.0" in log
 
 
 # ---------------------------------------------------------------------------

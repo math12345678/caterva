@@ -1,4 +1,4 @@
-import { CAPABILITY_COUNT, GUARD_COUNT } from "@/lib/domains";
+import { CAPABILITY_COUNT, DATA_SOURCES, GUARD_COUNT } from "@/lib/domains";
 import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import AnimatedCounter from "@/components/ui/animated-counter";
@@ -16,6 +16,12 @@ interface MetricItem {
 // the count as a second hardcoded literal -- two copies of the same fact
 // is exactly how the count this replaced (304) went stale in the first
 // place while testResults.ts had already moved on.
+//
+// "sources" was a literal 3 labelled "literature sources", left from when
+// the page named BRENDA, KEGG and PubMed -- and KEGG is off by default. It
+// now counts the sources docs/data-sources.json attributes, through the
+// generated repoFacts.json, and says that is what it counts. "guards" is
+// scripts/check_*.py from the same file.
 const METRICS: MetricItem[] = [
   {
     key: "tests",
@@ -33,9 +39,9 @@ const METRICS: MetricItem[] = [
   },
   {
     key: "sources",
-    target: 3,
+    target: DATA_SOURCES.length,
     suffix: "",
-    label: "literature sources",
+    label: "attributed data sources",
     color: "#946522",
   },
   {

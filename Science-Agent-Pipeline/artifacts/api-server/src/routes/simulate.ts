@@ -1183,10 +1183,14 @@ function buildAuditReport(
   for (const [name, value] of Object.entries(parameters)) {
     const prov = provenance[name];
     if (!prov) continue;
-    // Array-valued parameters (e.g. starting_frequencies for two-locus
-    // Wright-Fisher) have no single scalar to run through the
+    // Array-valued parameters have no single scalar to run through the
     // literature/STRENDA numeric checks below, which are built around one
-    // kinetic-style value. Audited by presence/origin only.
+    // kinetic-style value. Audited by presence/origin only. (Note,
+    // 2026-11-01: the example this cited, two-locus Wright-Fisher's
+    // starting_frequencies, was archived on 2026-09-27, after v0.4.0, the
+    // last release that runs it, and a query override can no longer be a
+    // list. The branch stays for any non-scalar value that reaches this
+    // audit by another path.)
     if (typeof value !== "number") {
       parameterAudits.push({
         name,

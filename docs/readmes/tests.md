@@ -2,7 +2,7 @@
 
 Part of [**Caterva**](https://github.com/math12345678/caterva) — scientific computing for teaching labs.
 
-The literature layer and its 91 files — 1,622 tests.
+The literature layer and its 96 files — 1,680 tests.
 
 This is what makes Caterva more than a solver: the resolvers that fetch real
 measured kinetic parameters from BRENDA and PubMed, the citation verifier, and the
@@ -18,8 +18,6 @@ python -m pytest . -q
 |---|---|
 | `brenda_client.py` | BRENDA KM/Ki/kcat tables, with the reference id that re-finds each value |
 | `enzyme_lookup.py` | UniProt accession and taxon resolution |
-| `epidemiology_resolver.py` | R0 and serial interval per disease, from a matched-methodology source |
-| `popgen_resolver.py` | mutation rates via stdpopsim |
 | `fallback_logic.py` | exact match → cross-species → not found, never a guess |
 
 ## The rule that shapes all of it
@@ -28,11 +26,19 @@ A value that cannot be sourced is **not** replaced with a plausible one. The
 resolver returns "not found", the caller degrades honestly, and the run
 stops rather than inventing a number.
 
-`test_epidemiology_resolver.py::TestNoLatentPeriodIsOffered` is the clearest
-example: SEIR's σ needs a *latent* period, the literature overwhelmingly
-publishes *incubation* periods, and the test exists to stop anyone quietly
-substituting one for the other. The two differ in a direction that would
-make epidemics look slower than they are.
+`test_fallback_logic.py::test_literature_search_never_fabricates_a_numeric_value`
+is the clearest example. The first version of the literature tier returned
+the same Km, organism and PubMed id whatever it was asked; the test feeds
+the resolver a substrate no BRENDA row covers and a PubMed hit that merely
+mentions Km, and requires `found` to be false and the value empty. A paper
+that might hold the number is a lead for a person to read, not a number.
+
+(Until 2026-11-01 this paragraph cited
+`test_epidemiology_resolver.py::TestNoLatentPeriodIsOffered`. That test
+moved to `archive/legacy_domains/` with the epidemiology resolver and the
+SIR and SEIR domains it served, which were archived on 2026-09-27, after
+v0.4.0 (the last release that runs them); the
+population-genetics resolver went with it.)
 
 ## Licence, and one thing worth knowing
 

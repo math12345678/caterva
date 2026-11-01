@@ -24,6 +24,7 @@ from __future__ import annotations
 import os
 import signal
 import shlex
+import shutil
 import subprocess
 import sys
 import time
@@ -380,7 +381,9 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # The compliance position today rests on a fact nobody was watching:
     # nothing in CI publishes anything, so the LGPL (python-libsbml) and GPL
     # (stdpopsim, opt-in) terms impose nothing. A legal position that depends
-    # on an unwatched fact is a coincidence, not a position.
+    # on an unwatched fact is a coincidence, not a position. (2026-11-01: no
+    # live manifest installs stdpopsim any more; its opt-in file is in
+    # archive/legacy_domains/.)
     guards.append(run_guard(
         "Release Artifact Guard (self-check)",
         f"{PYTHON} {SCRIPTS_DIR / 'check_release_artifacts.py'} --selftest"
@@ -537,6 +540,14 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # Adding a field to KineticResult now FAILS until someone records
     # whether it crosses. That is the point -- four fields defaulted to
     # "does not cross" silently and none of their tests noticed.
+    #
+    # The self-check runs first: it plants each of its defects and requires
+    # each check to fire, so a parse that stopped finding the boundary
+    # cannot report a clean one.
+    guards.append(run_guard(
+        "Runner Boundary Guard (self-check)",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_runner_boundary.py'} --selftest"
+    ))
     guards.append(run_guard(
         "Runner Boundary Guard",
         f"{PYTHON} {SCRIPTS_DIR / 'check_runner_boundary.py'}"
@@ -601,6 +612,8 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     #   reserved", CITATION.cff said LicenseRef-Caterva-Proprietary,
     #   package.json said MIT) and nothing read more than one of them at
     #   once. A project about provenance must agree about its own terms.
+    #   (Since 2026-11-01 it also reads every tracked OpenAPI spec and
+    #   pyproject.toml: the root openapi.yaml said MIT while it printed OK.)
     guards.append(run_guard(
         "License Consistency Guard",
         f"{PYTHON} {SCRIPTS_DIR / 'check_license_consistency.py'}"
@@ -680,6 +693,35 @@ def run_typescript_guards() -> List[Tuple[str, bool, str]]:
             timeout=240,
         ),
     ]
+
+
+def run_site_tests() -> List[Tuple[str, bool | None, str]]:
+    """caterva-site's shell tests (`npm test`, tests/terminal.test.mjs).
+
+    They pin the browser shell to the live domain catalogue, the archived
+    names to the v0.4.0 tag, the hexokinase constants to showcase.py and the
+    SSA checks' tolerance -- and until 2026-10-31 nothing ran them. About
+    three seconds, so not behind --quick.
+
+    Node and caterva-site's own node_modules are separate from every other
+    tree here, and a checkout without them cannot run these tests. That is
+    reported as SKIPPED with the reason, never as a pass: a suite that did
+    not start said nothing. CI's root-typescript job installs both and runs
+    the same command.
+    """
+    name = "caterva-site Shell Tests"
+    site = REPO_ROOT / "caterva-site"
+    if shutil.which("node") is None:
+        reason = "node is not on PATH, so caterva-site's tests could not run"
+    elif not (site / "node_modules").is_dir():
+        reason = (
+            "caterva-site/node_modules is absent, so its tests could not run; "
+            "`npm ci` in caterva-site installs it"
+        )
+    else:
+        return [run_guard(name, "npm test", cwd=site, timeout=120)]
+    print(f"  Running {name}... ⏭️  skipped", flush=True)
+    return [(name, None, reason)]
 
 
 def run_hygiene_guard() -> List[Tuple[str, bool, str]]:
@@ -1135,6 +1177,15 @@ def run_live_citation_guard() -> List[Tuple[str, bool, str]]:
             f"{PYTHON} {SCRIPTS_DIR / 'check_ec_numbers_current.py'} --live",
             timeout=180,
         ),
+        # Keyed cross-checks: PMIDs on-topic, BRENDA ids never cited as
+        # PMIDs, DOIs looked up in CORE. Its rate-limit waiting is bounded
+        # by CORE_WAIT_BUDGET_S in that script; keep this timeout above it
+        # so the budget, not this kill, is what ends a throttled run.
+        run_guard(
+            "Live Value Verification",
+            f"{PYTHON} {SCRIPTS_DIR / 'verify_values_live.py'}",
+            timeout=300,
+        ),
     ]
 
 
@@ -1152,16 +1203,31 @@ def run_rng_guard() -> List[Tuple[str, bool, str]]:
     return guards
 
 
+#: Checks that could not run, by name, for the summary: a skip printed only
+#: in its own group would still end under "ALL CHECKS PASSED".
+SKIPPED: List[str] = []
+
+
 def print_results(
     title: str,
-    results: List[Tuple[str, bool, str]]
+    results: List[Tuple[str, bool | None, str]]
 ) -> int:
-    """Print results and return number of failures."""
+    """Print results and return number of failures.
+
+    A success of None is a check that could not run: printed as SKIP with
+    its reason, counted as neither a pass nor a failure, and named again in
+    the summary.
+    """
     print(f"\n{title}:")
     print("-" * 50)
-    
+
     failures = 0
     for name, success, message in results:
+        if success is None:
+            SKIPPED.append(name)
+            print(f"  ⏭️  SKIP: {name}")
+            print(f"    Reason: {message}")
+            continue
         status = "✅ PASS" if success else "❌ FAIL"
         print(f"  {status}: {name}")
         if not success and message:
@@ -1226,6 +1292,8 @@ def main() -> int:
     if not args.no_typescript:
         ts_guards = run_typescript_guards()
         total_failures += print_results("TypeScript Guards", ts_guards)
+        site_tests = run_site_tests()
+        total_failures += print_results("caterva-site Tests", site_tests)
 
     # EVERYTHING BELOW IS OUTSIDE THAT `if`, AND USED NOT TO BE.
     #
@@ -1303,6 +1371,13 @@ def main() -> int:
     print("SUMMARY")
     print("=" * 60)
     
+    if total_failures == 0 and SKIPPED:
+        print(
+            f"✅ NO FAILURES in {duration:.1f}s, but {len(SKIPPED)} "
+            f"CHECK(S) DID NOT RUN: {', '.join(SKIPPED)}"
+        )
+        print("\n⚠️  Not all checks ran; see each SKIP's reason above.")
+        return 0
     if total_failures == 0:
         print(f"✅ ALL CHECKS PASSED in {duration:.1f}s")
         print("\n🎉 The codebase is in a deployable state!")

@@ -37,14 +37,16 @@ work wrong if you don't know them. Read this before touching anything.
    so that it forbade this project's own name and permitted the package it
    exists to block.
 
-2. THE PROJECT IS NOW 18 REPOSITORIES
+2. THE PROJECT IS ONE REPOSITORY
 
-   Development happens at github.com/Terrium-sim, not in one repo. `main`
-   is an umbrella of submodules; the code lives in `caterva`, `tests`,
-   `backend-main`, `frontend-main`, `wiring-main`,
-   `science-agent-pipeline-replit`, `documents`, `business` and others.
+   It is github.com/math12345678/caterva, and that is where development
+   happens. The 18 split repositories (`tests`, `backend-main`,
+   `frontend-main`, `wiring-main`, ...) under github.com/Terrium-sim were
+   pushed once, on 2026-08-12, under the old name, and not since; all are
+   private, so an outside reader gets a 404 for every one of them. Do not
+   link to them from anything a reader sees.
 
-   Full map: docs/REPO_MAP.md
+   The plan, and what would go where: docs/REPO_MAP.md
 
    HOW TO COMMIT: keep working in the monorepo and commit there as normal.
    Do NOT try to commit directly into the split repositories. They are

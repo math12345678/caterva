@@ -302,7 +302,7 @@ curl http://localhost:3000/api/metrics/batches/batch_1692201600456_x9y8z
 
 ### Prometheus Scraping
 
-Prometheus automatically scrapes Caterva's `/metrics` endpoint every 15 seconds. Add to `prometheus.yml`:
+Prometheus automatically scrapes Caterva's `/metrics` endpoint every 15 seconds. Add to `deploy/monitoring/prometheus.yml`:
 
 ```yaml
 global:

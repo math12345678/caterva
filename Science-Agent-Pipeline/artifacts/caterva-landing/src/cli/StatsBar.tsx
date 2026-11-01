@@ -44,11 +44,16 @@ export default function StatsBar() {
     label: string;
   };
   const liveStats: StatItem[] = [];
+  // No "+" on the count: it read "0+" for an empty list and implied more
+  // than the server said for any other. The number shown is the number
+  // returned. Uptime is process.uptime() of the API server (GET
+  // /api/metrics), which resets on every restart, so it is labelled as that
+  // and not as the pipeline's availability.
   if (waitlistCount !== null) {
     liveStats.push({
       key: "waiting",
       target: waitlistCount,
-      suffix: "+",
+      suffix: "",
       label: "researchers waiting",
     });
   }
@@ -57,7 +62,7 @@ export default function StatsBar() {
       key: "uptime",
       target: uptimeHours,
       suffix: "h",
-      label: "pipeline uptime",
+      label: "API uptime since last restart",
     });
   }
 

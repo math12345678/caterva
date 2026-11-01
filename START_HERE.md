@@ -210,10 +210,14 @@ In the PR, say what you verified and how. "Should work" is not a result.
 
 Branch naming: `yourname/what-it-does`, e.g. `priya/fix-csv-zero-export`.
 
-Work in **`main`**. Do not commit directly into `caterva`, `tests`,
-`backend-main` and the rest — those are regenerated from here by
-`scripts/split_repos.sh`, and a commit made straight into one gets
-overwritten on the next split.
+Work in **this repository**,
+[math12345678/caterva](https://github.com/math12345678/caterva). All
+development happens here. A split into separate repositories is planned
+([`docs/REPO_MAP.md`](docs/REPO_MAP.md)); the private Terrium-sim copies
+were pushed once, on 2026-08-12, under the old name, and not since. If the
+split happens, those copies are regenerated from here by
+`scripts/split_repos.sh`, so never commit into one directly: the next split
+overwrites it.
 
 ## Things that are genuinely fine
 
@@ -234,7 +238,7 @@ overwritten on the next split.
 | what reviewers outside the project said, and what changed | [`docs/EXPERT_FEEDBACK.md`](docs/EXPERT_FEEDBACK.md) |
 | setup detail, Python version policy, PR rules | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 | the HTTP API | [`docs/API.md`](docs/API.md) |
-| what lives in which of the 18 repositories | [`docs/REPO_MAP.md`](docs/REPO_MAP.md) |
+| which repository each file would go to if the planned split happens (today there is one) | [`docs/REPO_MAP.md`](docs/REPO_MAP.md) |
 | if you are an AI agent | [`docs/AGENT_BRIEF.md`](docs/AGENT_BRIEF.md) |
 
 The build-stage records (kept privately since 2026-09-27) are the honest one. Every stage records what broke
