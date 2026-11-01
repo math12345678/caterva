@@ -122,22 +122,23 @@ Comprehensive literature backing database for all domains.
 ```json
 {
   "timestamp": "ISO-8601",
-  "totalDomainsCovered": 13,
+  "message": "Every simulation domain here carries at least one primary reference. ...",
+  "totalDomainsCovered": 4,
   "domains": [
-    {
-      "domain": "mm",
-      "citation": "Lehninger et al. (2008) - Lehninger Principles of Biochemistry..."
-    }
+    { "domain": "mm", "citation": "..." },
+    { "domain": "mm_competitive_inhibition", "citation": "..." },
+    { "domain": "gillespie_ssa", "citation": "..." },
+    { "domain": "gillespie_ssa_bimolecular", "citation": "..." }
   ],
   "literature": {
-    "queuing": "Little (1961) - Queue theory L = λW",
-    "confidence": "Wilson (1927) - Binomial proportion confidence intervals",
-    "metrics": "Harter (1974) - Percentile analysis",
-    "enzyme": "Tipton et al. (2014) - STRENDA reporting standards",
-    "epidemiology": "Kermack & McKendrick (1927) - Mathematical epidemiology"
+    "queuing": "Little (1961) L = λW -- ...",
+    "confidence": "Wilson (1927) -- ...",
+    "enzyme": "Tipton et al. (2014) -- STRENDA reporting standards, applied: ..."
   }
 }
 ```
+
+(Note, 2026-11-01: `literature` also carried an `epidemiology` entry, Kermack & McKendrick (1927), until this date. Epidemiology was archived on 2026-09-27, after v0.4.0 (the last release that runs it), and none of the four domains this route serves uses that model, so the entry was removed.)
 
 ### Data Export
 
@@ -190,25 +191,18 @@ Validates all 7 STRENDA requirements:
 
 ---
 
-## Domain Coverage (13 Domains)
+## Domain Coverage (4 Domains)
 
-All backed by peer-reviewed literature:
+The domains `GET /api/pipeline/literature` reports (`src/routes/pipeline.ts`):
 
 | Domain | Primary Reference | Year | DOI/Citation |
 |--------|------------------|------|------------|
 | mm | Lehninger et al. | 2008 | Lehninger Principles of Biochemistry |
 | mm_competitive_inhibition | Copeland | 2013 | "Enzymes: Practical Introduction" |
-| sir | Kermack & McKendrick | 1927 | 10.1098/rspa.1927.0118 |
-| seir | Anderson & May | 1991 | Infectious Diseases of Humans |
-| wright_fisher | Rahbari et al. | 2016 | Nature Genetics |
 | gillespie_ssa | Gillespie | 1976 | "General method for stochastic reactions" |
-| pcr | Mullis et al. | 1986 | Cold Spring Harbor Symposia |
-| molecular_dynamics | Lennard-Jones, Verlet | 1924, 1967 | Classical methods |
 | gillespie_ssa_bimolecular | Gillespie | 1976 | Same |
-| two_locus_wright_fisher | Wright & Fisher | 1930s | Population genetics |
-| lotka_volterra | Lotka & Volterra | 1925, 1926 | "Elements of Physical Biology" |
-| cell_cycle_oscillator | Tyson | 1991 | Molecular biology |
-| repressilator | Elowitz & Leibler | 2000 | Nature 403, 335-338 |
+
+This table listed 13 domains until 2026-11-01. sir, seir, wright_fisher, two_locus_wright_fisher, pcr, molecular_dynamics, lotka_volterra, cell_cycle_oscillator and repressilator were archived on 2026-09-27, after v0.4.0 (the last release that runs them), and this build refuses them.
 
 ---
 
@@ -284,7 +278,7 @@ See `docs/adr/` for complete architecture decision records:
 - ADR 0016: Serialization-Boundary Provenance Guards
 - ADR 0018: Ki Inhibition Constant Resolution
 - ADR 0019: kcat Resolution (Exposed, not yet wired to Vmax)
-- ADR 0020: Epidemiology Parameters Wired to Resolvable Fields
+- ADR 0020: Epidemiology Parameters Wired to Resolvable Fields (historical: epidemiology was archived on 2026-09-27, after v0.4.0)
 
 ---
 

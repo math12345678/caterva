@@ -61,9 +61,25 @@ Three are enough to start:
 
 ### 3. CI on pull requests — already done
 
-Every split repository now carries a workflow. `main` runs the 22 guards.
-A contributor gets a red or green within minutes of pushing, which teaches
-the standard faster than review comments do.
+CI runs on every pull request to
+[math12345678/caterva](https://github.com/math12345678/caterva)
+(`.github/workflows/tests.yml`), which is the only repository development
+happens in. A contributor gets a red or green within minutes of pushing,
+which teaches the standard faster than review comments do. If the planned
+split happens, each split repository gets its workflow from
+`scripts/split_repos.sh`.
+
+*Corrected 2026-11-01.* This section used to say "Every split repository
+now carries a workflow. `main` runs the 22 guards." The 18 Terrium-sim
+repositories are private. 17 of them are copies pushed once, on
+2026-08-12, under the old name, and not pushed since (the 18th,
+`demo-repository`, is GitHub's demo). Only six of the 17 (`backend-main`,
+`tests`, `terium`, `landing`, `terrium-site`,
+`science-agent-pipeline-replit`) carry a workflow. The other 11 (`main`,
+`frontend-main`, `wiring-main`, `advanced-analysis`, `archive`,
+`benchmark-results`, `business`, `documents`, `miscellaneous`, `mule`,
+`worktrees`) carry none. So `main` ran no guards, and there is no
+`caterva` repository there.
 
 ### 4. A discussion channel — 15 minutes
 

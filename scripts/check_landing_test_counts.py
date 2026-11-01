@@ -48,6 +48,13 @@ were hand-typed in domains.ts and testResults.ts, and on 2026-10-31 the
 page said 76 guards against 79 on disk, and 6,696 / 1,589 engine and
 literature tests against the README's 7,057 / 1,622.
 
+It also holds the release tag the page names (`releaseTag`), "v" plus
+`__version__` in caterva/__init__.py, the one place the version lives. On
+2026-11-01 the page still offered v0.4.0 as the download, its 404 page
+showed "v0.7.0", and the roadmap labelled released work "In v0.4.0", four
+days after v0.6.0 was published on 2026-10-28: the tag was typed in
+domains.ts and GetCaterva.tsx and nothing compared it to the package.
+
 The default run regenerates that file's content in memory and fails when
 the checked-in copy differs; `--write` writes it. It also fails when the
 engine or literature row of testResults.ts states a `collected:` figure
@@ -87,6 +94,10 @@ TEST_RESULTS = (
 LANDING = REPO_ROOT / "Science-Agent-Pipeline" / "artifacts" / "caterva-landing"
 REPO_FACTS = LANDING / "src" / "lib" / "generated" / "repoFacts.json"
 DATA_SOURCES = REPO_ROOT / "docs" / "data-sources.json"
+VERSION_FILE = REPO_ROOT / "caterva" / "__init__.py"
+
+#: The keys of repoFacts.json that are derived from the tree and compared.
+FACT_KEYS = ("guardScripts", "tests", "dataSources", "releaseTag")
 
 #: testResults.ts rows whose suite size README.md states, keyed by
 #: workingDirectory, naming the key in repoFacts.json's "tests".
@@ -257,6 +268,21 @@ def expected_facts() -> Tuple[Optional[dict], List[str]]:
     if not sources and not problems:
         problems.append(f"{DATA_SOURCES} lists no sources")
 
+    # Read as text, not imported: importing caterva loads the engine and
+    # its native libraries, which a fact about a string does not need.
+    version = None
+    try:
+        m = re.search(
+            r'^__version__\s*=\s*"([^"]+)"',
+            VERSION_FILE.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+        version = m.group(1) if m else None
+    except OSError:
+        pass
+    if version is None:
+        problems.append(f"could not read __version__ from {VERSION_FILE}")
+
     if problems:
         return None, problems
     return (
@@ -271,10 +297,13 @@ def expected_facts() -> Tuple[Optional[dict], List[str]]:
                 "dataSources: the first token of each source "
                 "docs/data-sources.json attributes. KEGG is not one: it is "
                 "off unless CATERVA_ENABLE_KEGG is set.",
+                "releaseTag: \"v\" + __version__ in caterva/__init__.py, the "
+                "release the page offers and labels capabilities with.",
             ],
             "guardScripts": len(list((REPO_ROOT / "scripts").glob("check_*.py"))),
             "tests": tests,
             "dataSources": sources,
+            "releaseTag": f"v{version}",
         },
         [],
     )
@@ -287,7 +316,7 @@ def facts_failures(current: Optional[dict], expected: dict) -> List[str]:
     return [
         f"repoFacts.json {key} is {current.get(key)!r}, the tree says "
         f"{expected[key]!r}. Run this script with --write."
-        for key in ("guardScripts", "tests", "dataSources")
+        for key in FACT_KEYS
         if current.get(key) != expected[key]
     ]
 
@@ -402,6 +431,15 @@ def check(full: bool) -> List[str]:
     return failures
 
 
+def _package_version() -> Optional[str]:
+    """__version__ as caterva/__init__.py states it, read independently of
+    expected_facts so the selftest does not check the parser against itself."""
+    for line in VERSION_FILE.read_text(encoding="utf-8").splitlines():
+        if line.startswith("__version__"):
+            return line.split("=", 1)[1].strip().strip("\"'")
+    return None
+
+
 def selftest() -> int:
     """Prove the guard can fail. A check that cannot fail is worse than none."""
     text = TEST_RESULTS.read_text(encoding="utf-8")
@@ -441,9 +479,18 @@ def selftest() -> int:
             ("guardScripts", facts["guardScripts"] - 3),
             ("tests", {**facts["tests"], "engine": facts["tests"]["engine"] - 361}),
             ("dataSources", facts["dataSources"] + ["kegg"]),
+            # The tag the page carried from v0.4.0's release on 2026-09-27
+            # until 2026-11-01, the last four days of it after v0.6.0 was
+            # published.
+            ("releaseTag", "v0.4.0"),
         ):
             if not facts_failures({**facts, key: wrong}, facts):
                 problems.append(f"a stale repoFacts {key} was NOT caught")
+        if facts.get("releaseTag") != f"v{_package_version()}":
+            problems.append(
+                f"releaseTag {facts.get('releaseTag')!r} is not derived from "
+                f"__version__ {_package_version()!r}"
+            )
         if facts_failures(None, facts) == []:
             problems.append("a missing repoFacts.json was NOT caught")
 
@@ -471,8 +518,8 @@ def selftest() -> int:
         return 1
     print(
         "selftest: OK -- the guard parses four suites and catches a wrong "
-        "count, a stale repoFacts.json and a row measured against another "
-        "suite size"
+        "count, a stale repoFacts.json (release tag included) and a row "
+        "measured against another suite size"
     )
     return 0
 

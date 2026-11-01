@@ -306,18 +306,13 @@ def documented_adr_counts(text: str) -> List[Tuple[int, int]]:
 _OUTCOME_WORDS = ("failed", "passed", "broke", "were", "did", "ran", "collected")
 
 
-#: Text before a `<N> tests` that means it is NOT a suite size.
-#:
-#: `test_popgen_resolver.py skips its 19 tests` is a true statement about
-#: one file. Checking it against the suite totals would fail forever, and a
-#: guard that fires on a correct sentence gets suppressed (ADR 0028) --
-#: which is very likely why README was excluded from the test-count check
-#: wholesale rather than having this three-line exception.
-#:
-#: Deliberately narrow. Anything not listed here IS checked: an exclusion
-#: list that grows to cover every awkward case is how a check stops
-#: checking.
-_NOT_A_SUITE_SIZE = re.compile(r"\bskips its\s*$")
+# `_NOT_A_SUITE_SIZE` stood here until 2026-11-01: a one-pattern
+# exception so README's "test_popgen_resolver.py skips its 19 tests", a
+# true sentence about one file, was not checked against the suite totals
+# (ADR 0154). That sentence left README when the resolver moved to
+# archive/legacy_domains/, and no checked document said "skips its" after
+# it, so the exception excused nothing and was removed. If a per-file
+# count needs exempting again, add it back with the sentence it exists for.
 
 
 def documented_test_counts(text: str) -> List[Tuple[int, int]]:
@@ -334,8 +329,6 @@ def documented_test_counts(text: str) -> List[Tuple[int, int]]:
     for lineno, line in enumerate(text.splitlines(), start=1):
         for match in pattern.finditer(line):
             if is_quoted(line, match.start(), match.end()):
-                continue
-            if _NOT_A_SUITE_SIZE.search(line[: match.start()]):
                 continue
             claims.append((lineno, int(match.group(1).replace(",", ""))))
     return claims
@@ -837,6 +830,9 @@ def main() -> int:
     # because `test_popgen_resolver.py` needs `stdpopsim`, which lives in
     # the optional `requirements-popgen.txt` that `make setup` does not
     # install -- and an Anaconda base happened to satisfy it.
+    # (2026-11-01: that file is now in archive/legacy_domains/tests/, out
+    # of the literature suite, so that half of the spread is gone. The
+    # engine half, and the reason to print the interpreter, remain.)
     #
     # So `--write` run from the wrong interpreter produces numbers that are
     # honestly measured and still wrong for this project, and the next

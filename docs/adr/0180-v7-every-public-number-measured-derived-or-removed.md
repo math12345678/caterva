@@ -94,3 +94,30 @@ What this changed:
   accepts archived parameter names, because four test files depend on it;
   `Tests/epidemiology_resolver.py` and `Tests/popgen_resolver.py` are still
   in the tree (see `archive/legacy_domains/README.md`).
+
+## Update, 2026-11-01
+
+The two "Not done" items above are done:
+
+- `extractParameterOverrides` in `queryResolver.ts` accepts only scalar
+  overrides for live parameter names. The archived names, the array path
+  (two-locus Wright-Fisher `starting_frequencies`) and
+  `arrayOverride.test.ts` are gone. `popgenProvenance.test.ts` is now
+  `strendaGoverned.test.ts`; it keeps its two `km` cases, and its
+  non-governed case now uses the live Gillespie key `k`.
+- `Tests/epidemiology_resolver.py`, `Tests/popgen_resolver.py`, their tests
+  and `requirements-popgen.txt` moved to `archive/legacy_domains/`.
+  `Tests/test_retired_resolvers_stay_retired.py` fails when a guard or
+  set-up check names a path that moved, a set-up check still probes for
+  stdpopsim, or live code imports one of them. v0.6.0 is the last release
+  that ships them; v0.4.0 is the last that runs the domains they served.
+
+`repoFacts.json` also carries `releaseTag`, read from
+`caterva/__init__.py`. The landing page's download, roadmap, 404 page and
+domain statuses read it, so they can no longer offer v0.4.0 after a later
+release. `check_license_consistency.py` now also reads the published OpenAPI
+spec and `pyproject.toml`.
+
+The Python 3.10 line under Consequences was true when written. CI's 3.10 job
+then ran and found one 3.10-only failure: `datetime.fromisoformat` rejects
+CORE's `+0000` offset. `verify_values_live.py` now falls back to `strptime`.

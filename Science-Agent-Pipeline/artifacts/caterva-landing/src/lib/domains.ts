@@ -1,16 +1,29 @@
 // What Caterva runs today (enzyme focus since 2026-09-27; the other
-// domains are in archive/legacy_domains/ and v0.4.0 still runs them).
+// domains are in archive/legacy_domains/, and the v0.4.0 tag, cut before
+// they were moved, still runs them).
 //
 // `status` says WHERE a capability is, because "live" said nothing true: no
 // release carried the MD tools it was attached to. "released" means the
-// v0.4.0 download has it (caterva/app.py at the tag lists compose and sim);
-// "main" means it is built and tested on the main branch and waits for the
-// next release.
+// RELEASE_TAG download has it; "main" means it is built and tested on the
+// main branch and waits for the next release.
+//
+// Corrected 2026-11-01: this said v0.4.0, whose caterva/app.py registers
+// only compose and sim, and marked the other four capabilities "main". The
+// latest release is v0.6.0 (published 2026-10-28), and `git show
+// v0.6.0:caterva/app.py` registers prepare, md, analyze, bind, complex and
+// fep as well, so every capability below is in it.
 import repoFacts from "./generated/repoFacts.json";
 
 export type CapabilityStatus = "released" | "main";
 
-export const RELEASE_TAG = "v0.4.0";
+/**
+ * The release the page offers, "v" + __version__ in caterva/__init__.py,
+ * read from the generated repoFacts.json rather than typed here: the
+ * literal this replaced still said v0.4.0 after v0.6.0 was published.
+ * scripts/check_landing_test_counts.py fails when the file disagrees with
+ * the package, and `--write` regenerates it.
+ */
+export const RELEASE_TAG: string = repoFacts.releaseTag;
 
 export const STATUS_LABEL: Record<CapabilityStatus, string> = {
   released: RELEASE_TAG,
@@ -30,22 +43,22 @@ export const DOMAINS: { id: string; status: CapabilityStatus; desc: string }[] =
   },
   {
     id: "structure-audit",
-    status: "main",
+    status: "released",
     desc: "caterva prepare: PDB defects and uncertain protonation states ranked by distance to the M-CSA catalytic residues",
   },
   {
     id: "md-setup",
-    status: "main",
+    status: "released",
     desc: "caterva md: a GROMACS setup at the assay conditions of a cited constant, three replicas by default",
   },
   {
     id: "trajectory-analysis",
-    status: "main",
+    status: "released",
     desc: "caterva analyze: catalytic distances and angles, hydrogen bonds, side-chain rotamers, active-site water and flexibility, each checked against GROMACS and reported only when the replicas agree",
   },
   {
     id: "binding-free-energy",
-    status: "main",
+    status: "released",
     desc: "caterva bind, complex, fep: an absolute binding free energy judged against a cited Ki; not yet shown to reproduce one",
   },
 ];

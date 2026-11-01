@@ -3,15 +3,26 @@
 **This describes a plan, not the current layout.** Caterva is *to be*
 published as 18 repositories under
 [github.com/Terrium-sim](https://github.com/Terrium-sim); today it is one
-repository, and `docs/PUBLISHING.md` holds the procedure that has not been
-run. This file records what would go where and, where the answer was not
-obvious, why.
+repository,
+[math12345678/caterva](https://github.com/math12345678/caterva), and all
+development happens there. `docs/PUBLISHING.md` holds the procedure. It was
+run once, on 2026-08-12, under the old name: 17 of the 18 Terrium-sim
+repositories exist from that push (the 18th, `demo-repository`, is
+GitHub's demo), all 18 are private (anyone else gets a 404), and none has
+been pushed since. There is no `caterva` or `caterva-site`
+repository there yet. This file records what would go where and, where the
+answer was not obvious, why.
 
 That distinction is the reason for this paragraph. The line above read
 "Caterva **is** published as 18 repositories", in the present tense, in a
 document `DOCUMENTATION_INDEX.md` offers as "find my way around the tree" —
 so a newcomer looking for `backend-main` would go hunting for a repository
 that does not exist and conclude they had lost it.
+
+(Corrected 2026-11-01: `backend-main` does exist, as one of the private
+Terrium-sim repositories from the 2026-08-12 push. A newcomer still cannot
+see it, since it is private and not kept up to date, so the point stands:
+look in math12345678/caterva.)
 
 After the split, `main` becomes an **umbrella**: top-level README, compose
 and container files, CI, and git submodules pointing at the others. No

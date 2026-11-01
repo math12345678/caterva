@@ -12,12 +12,25 @@ interface Release {
 // Pulled from this repo's own CHANGELOG.md. Entries before 2026-08-29 carry
 // real dates from git history and no version number, because there was no
 // release to version then; CHANGELOG.md follows Semantic Versioning from
-// 0.1.0 (2026-08-29) onward and the three tagged versions are listed as
-// such. This used to be a fabricated version-numbered history (v0.4.0
-// "Private Alpha Launch" with a "pilot cohort" and 3 nonexistent database
-// backends) -- removed entirely rather than corrected, since none of it
-// happened. Every line below names something CHANGELOG.md records.
+// 0.1.0 (2026-08-29) onward and each final release is listed as such, dated
+// as CHANGELOG.md dates it (v0.6.0's heading says 2026-10-25; GitHub
+// published it on 2026-10-28). 0.5.0 and 0.5.1 were only ever tagged as
+// release candidates (v0.5.0-rc.1 to v0.5.1-rc.2), with no final release,
+// so they are not listed. Corrected 2026-11-01: this comment said "three
+// tagged versions" over a list of seven, v0.6.0 was missing, and v0.3.3
+// was dated September 24 against CHANGELOG.md's 2026-09-22.
+//
+// This used to be a fabricated version-numbered history (v0.4.0 "Private
+// Alpha Launch" with a "pilot cohort" and 3 nonexistent database backends)
+// -- removed entirely rather than corrected, since none of it happened.
+// Every line below names something CHANGELOG.md records.
 const RELEASES: Release[] = [
+  {
+    date: "October 25, 2026",
+    tag: "feature",
+    title: "v0.6.0: claims over pinned evidence",
+    desc: "caterva compose --claims keeps every BRENDA page it read, as the bytes it read, and turns each constant into a claim tied to its place on that page. caterva why walks a number back to those bytes; caterva verify re-checks a bundle offline with code that shares nothing with what wrote it. In Caterva Studio: each number's derivation, a re-check of a run, the Rates screen for your own measurements, and an assistant that is off by default.",
+  },
   {
     date: "September 27, 2026",
     tag: "feature",
@@ -31,7 +44,7 @@ const RELEASES: Release[] = [
     desc: "All 36 shapes build from the one-line description --shapes prints (21 did not). A fully sourced model is graded GROUNDED. --organism human works, a misspelt substrate lists what BRENDA holds, and an unknown EC number says so.",
   },
   {
-    date: "September 24, 2026",
+    date: "September 22, 2026",
     tag: "feature",
     title: "v0.3.3: a model whose constants are sourced",
     desc: "compose searches BRENDA and every constant names its reference. The report also says what the evidence did not settle (two papers 13-fold apart on one Km), the pH and temperature each value was measured under, and why a missing constant is missing: most often it exists in another organism.",

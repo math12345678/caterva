@@ -90,8 +90,10 @@ bare interpreter and imports nothing outside the standard library, so it
 still works when the venv is the broken thing -- which check_env.py, by
 construction, cannot do. It prints every interpreter it found, the venv's
 state and which Python built it, each required package's installed version
-next to its pin, whether stdpopsim is available and why not, and whether
-Node is present for the TypeScript guards.
+next to its pin, and whether Node is present for the TypeScript guards.
+(Until 2026-11-01 it also reported whether stdpopsim was available; that
+check went when the population-genetics resolver moved to
+`archive/legacy_domains/`.)
 
 ## Windows
 

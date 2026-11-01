@@ -79,9 +79,11 @@ without naming what broke are not trusted here.
 
 ## Environment gaps are not free
 
-`stdpopsim` cannot install in some sandboxes, so 9 popgen tests fail there.
-For as long as that was "the known gap", it was also an unmonitored region
-— and it hid a real crash for its entire existence (ADR 0021). If an
+`stdpopsim` could not install in some sandboxes, so 9 popgen tests failed
+there. For as long as that was "the known gap", it was also an unmonitored
+region — and it hid a real crash for its entire existence (ADR 0021). (Since
+2026-11-01 those tests are in `archive/legacy_domains/` and nothing live
+needs stdpopsim; the lesson is why this section stays.) If an
 environment gap disables a code path, add a mocked substitute that keeps
 the path covered.
 

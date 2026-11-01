@@ -157,6 +157,8 @@ def scrub(text: str, keys: dict[str, str]) -> str:
 
 # DOIs cited for resolved values (popgen_resolver.py via stdpopsim; ADR 0017
 # epidemiology registry). Kermack & McKendrick 1927 is the SIR model citation.
+# Both resolvers moved to archive/legacy_domains/ on 2026-11-01; the notes
+# below are kept because they record what this list once got wrong.
 DOIS = [
     # "10.1038/ng.3141" was listed here as "Rahbari et al. 2015 (human
     # mutation rate)" and removed 2026-08-09. It is a THIRD distinct
@@ -211,8 +213,12 @@ DOI_SOURCE_FILES = [
     ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/routes/pipeline.ts",
     ROOT / "caterva/core/data_structures.py",
     ROOT / "caterva/continuous/model_building.py",
-    ROOT / "Tests/epidemiology_resolver.py",
-    ROOT / "Tests/popgen_resolver.py",
+    # `Tests/epidemiology_resolver.py` and `Tests/popgen_resolver.py` were
+    # listed here until 2026-11-01, when they moved to
+    # archive/legacy_domains/ with the SIR, SEIR and Wright-Fisher domains
+    # they served. Nothing live serves their citations any more, and the
+    # FileNotFoundError in discovered_dois() would have stopped this whole
+    # check had the entries been left pointing at the old paths.
     # Added 2026-09-05. This list held only .ts and .py sources, so the one
     # document in the repository whose entire purpose is to enumerate
     # Caterva's citations was the one file the citation checker never read.

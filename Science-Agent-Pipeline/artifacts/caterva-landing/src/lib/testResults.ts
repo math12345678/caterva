@@ -340,10 +340,26 @@ export const TEST_SUITES: TestSuite[] = [
         // timestamp, which fromisoformat accepts only from 3.11. The parser
         // now falls back to strptime, and one test forces that path on any
         // interpreter (2026-11-01; the file passed in full, 12 of 12): 1667.
-        passed: 1667,
-        skipped: 1,
+        //
+        // (Note 2026-11-01: test_popgen_resolver.py, the skip named above,
+        // is no longer in Tests/. Its resolver's last caller, the API
+        // server's science_agent_runner.py, was removed on 2026-10-31 (ADR
+        // 0180), and the suite, popgen_resolver.py and
+        // requirements-popgen.txt moved to archive/legacy_domains/ on
+        // 2026-11-01, where pytest does not collect them; v0.6.0 is the
+        // last release that ships them. test_epidemiology_resolver.py,
+        // whose tests were among the 1667 passed, and epidemiology_resolver.py
+        // moved with them.)
+        //
+        // Measured 2026-11-01 after that move, `pytest Tests` alone on the
+        // merged tree, read out of a junit-xml report: 1676 tests, 1676
+        // passed, 0 skipped, 0 failed, 725 s. The skip left with the
+        // archived popgen suite; the epidemiology tests left too, and the
+        // licence-guard and retired-resolver tests arrived: 1676.
+        passed: 1676,
+        skipped: 0,
         failed: 0,
-        collected: 1667,
+        collected: 1676,
       },
     ],
   },
@@ -353,7 +369,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "82 test files -- query resolution, parameter provenance, " +
+          "81 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
@@ -406,7 +422,16 @@ export const TEST_SUITES: TestSuite[] = [
         // interpreter out of its venv, which starts the base interpreter
         // without Caterva's packages. Both fixed; the two files then passed
         // in full (63 of 63): 856.
-        passed: 856,
+        //
+        // Measured 2026-11-01, the same way: 81 files, 861 tests, 861
+        // passed. Against 856: arrayOverride.test.ts (two-locus
+        // Wright-Fisher only) deleted, -6; popgenProvenance.test.ts became
+        // strendaGoverned.test.ts, -2; provenance.test.ts lost its two
+        // starting_frequencies tests, -2; queryOverrides.test.ts dropped its
+        // array cases and gained list-refusal and archived-name cases, +6;
+        // scenarioDefaults +6; statedQuantities +2;
+        // literatureEndpointClaims +1. 856 + 5: 861.
+        passed: 861,
         skipped: 0,
         failed: 0,
       },
@@ -429,8 +454,11 @@ export const TEST_SUITES: TestSuite[] = [
         // samples to the generated file of a real run (2026-09-29): 45.
         // Plus two tests of the shell's `status` command (it now asks the
         // API server) and one holding GUARD_COUNT to scripts/ on disk:
-        // `vitest run` on 2026-10-31, 6 files, 48 passed.
-        passed: 48,
+        // `vitest run` on 2026-10-31, 6 files, 48 passed. Plus four
+        // PageClaims tests holding the release tag, the download's commands
+        // and each domain's status to the package version: `vitest run` on
+        // 2026-11-01, from a JSON report, 6 files, 52 passed.
+        passed: 52,
         skipped: 0,
         failed: 0,
       },
@@ -463,14 +491,23 @@ export const TEST_SUITES: TestSuite[] = [
 // The four skips in the engine and literature rows, as CI run 40724292047
 // recorded them (check_no_silent_skips, which fails on any skip it has not
 // been told about).
+//
+// Corrected 2026-11-01: the last sentence said test_popgen_resolver.py
+// "needs" stdpopsim from the optional requirements-popgen.txt, in the
+// present tense. That suite, its resolver and requirements-popgen.txt
+// moved to archive/legacy_domains/ on 2026-11-01 and are no longer
+// collected, so the sentence now says so in the past tense. The first
+// sentence also changed: it ties the four skips to CI run 40724292047
+// instead of to "CI's Python jobs" in general.
 export const SKIP_EXPLANATION =
-  "Four tests skip in CI's Python jobs, each for a missing tool rather " +
-  "than a failure. The Swift type-check needs a Swift toolchain (the " +
-  "studio-dmg workflow compiles the same sources); the codegen selftest " +
-  "needs npx (the api-server job runs it); the dependency-licence test " +
-  "reads installed JavaScript packages; and test_popgen_resolver.py needs " +
-  "stdpopsim, which is GPL-3.0-or-later and so lives in the optional " +
-  "requirements-popgen.txt rather than the Apache-2.0 default install.";
+  "The one skip is the Swift type-check in the engine suite, which " +
+  "needs Sparkle unpacked into dist/sparkle (scripts/fetch_sparkle.py); " +
+  "the studio-dmg workflow compiles the same sources. It is a missing " +
+  "tool, not a failure. Earlier counts also skipped " +
+  "test_popgen_resolver.py, which needed stdpopsim (GPL-3.0-or-later, " +
+  "moved out of the Apache-2.0 default install on 2026-08-16); that " +
+  "suite moved to archive/legacy_domains/ on 2026-11-01 and is no " +
+  "longer collected.";
 
 export function totals() {
   let passed = 0;

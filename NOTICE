@@ -58,7 +58,8 @@ differed from the pin, that is noted.
   pydantic         MIT
   pytest           MIT                           dev only
   hypothesis       MPL-2.0                       dev only
-  stdpopsim        GPL-3.0-or-later              NOT in the default install
+  stdpopsim        GPL-3.0-or-later              named by no live manifest since
+                                                 2026-11-01; see the note below
 
 All of these are compatible with redistributing Caterva's own code under
 Apache-2.0. Three need saying out loud.
@@ -281,9 +282,12 @@ WHAT IS ACTUALLY DISTRIBUTED, AS OF v0.3.0 (2026-09-21)
   3. THE SOURCE ARCHIVES GitHub attaches to every release are copies of the
   tagged tree: Caterva's own files only, no dependency.
 
-  stdpopsim (GPL-3.0-or-later) is in none of the three. It stays opt-in
-  through `requirements-popgen.txt` (ADR 0058); the wheel does not name it
-  and `scripts/build_app.py` does not collect it.
+  stdpopsim (GPL-3.0-or-later) is in none of the three. The wheel does not
+  name it and `scripts/build_app.py` does not collect it. Since 2026-11-01
+  no live manifest names it either: `requirements-popgen.txt`, the opt-in
+  file that installed it (ADR 0061), moved to `archive/legacy_domains/`.
+  (Corrected 2026-11-01: this paragraph cited that file as ADR 0058, an
+  unrelated record; the stdpopsim decision is ADR 0061.)
 
   No container image is published. The image analysis above still stands
   as the task to do before one is.
@@ -299,7 +303,8 @@ stdpopsim — GPL-3.0-or-later, and why it is not installed by default
 --------------------------------------------------------------------
 
 stdpopsim (PopSim Consortium) is GPL-3.0-or-later. It was pinned in
-`requirements.txt` until 2026-08-15, which meant `make setup` placed GPLv3
+`requirements.txt` until 2026-08-16 (ADR 0061 is dated 2026-08-15; the
+commit that removed it, b1bc8f4, is 2026-08-16), which meant `make setup` placed GPLv3
 code into the default environment of a project whose LICENSE says
 Apache-2.0.
 
@@ -319,6 +324,14 @@ try/except ImportError and returns `found=False` with a search log saying
 so. The manifest was the only thing claiming it was required.
 
 See docs/adr/0061-gpl-out-of-the-default-install.md.
+
+2026-11-01: the population-genetics resolver, its tests and
+`requirements-popgen.txt` moved to `archive/legacy_domains/`, following the
+Wright-Fisher domain they served (archived on 2026-09-27, after v0.4.0,
+the last release that runs it; v0.6.0 is the last release that ships the
+resolver). Nothing in the live tree imports stdpopsim or offers to install
+it now, so there is nothing left for a user to opt in to; the separation
+above is kept because it records why the archived file existed.
 
 
 Per-library attribution
@@ -401,10 +414,11 @@ numpy and scipy (BSD-3-Clause), requests (Apache-2.0), httpx and lxml
 (MPL-2.0). The JavaScript workspace depends on 494 packages, all under
 MIT, ISC, BSD, Apache-2.0 or equivalent permissive terms.
 
-stdpopsim (GPL-3.0) is OPTIONAL and is not redistributed with Caterva. It is
-imported at runtime only when a user has installed it themselves; the
-population-genetics tests skip when it is absent. No stdpopsim code ships
-with Caterva, so no GPL obligation attaches to Caterva's own distribution.
+stdpopsim (GPL-3.0) is not redistributed with Caterva. Until 2026-11-01 it
+was an optional import of the population-genetics resolver, which a user
+installed themselves; that resolver is now in `archive/legacy_domains/`
+and nothing live imports stdpopsim. No stdpopsim code ships with Caterva,
+so no GPL obligation attaches to Caterva's own distribution.
 
 Every direct dependency and the grant it rests on is recorded in
 scripts/check_dependency_licenses.py, which fails the build when a

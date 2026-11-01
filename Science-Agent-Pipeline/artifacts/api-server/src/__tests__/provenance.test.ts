@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { resolveQuery, ArrayOverrideValidationError } from "../lib/queryResolver";
+import { resolveQuery } from "../lib/queryResolver";
 import type { ParameterProvenance } from "../lib/provenance";
 import {
   isLocatableCitation,
@@ -884,56 +884,19 @@ describe("regression — competitive inhibition query with no vmax is hard-block
 });
 
 // =========================================================================
-// Array-valued query-string overrides (starting_frequencies)
-// Verification targets from the task spec.
+// Query-string scalar overrides
+//
+// This block held array-valued override tests for starting_frequencies
+// (two-locus Wright-Fisher) until 2026-11-01. That domain was archived on
+// 2026-09-27, after v0.4.0 (the last release that runs it), and its keys
+// and the array parser were removed from extractParameterOverrides;
+// queryOverrides.test.ts now asserts that an archived key is not an
+// override and that the archived question gets the archive refusal. The
+// mm regression below is what remains here.
 // =========================================================================
 
-describe("array-valued query-string overrides", () => {
-  // Verification target 1: Valid starting_frequencies + all other required overrides -> success
-  // Verification target 2: starting_frequencies sums to 0.9 -> rejected
-  it("rejects starting_frequencies that do not sum to 1", async () => {
-    await expect(
-      resolveQuery(
-        "two locus linkage disequilibrium population_size=100 generations=20 " +
-          "starting_frequencies=0.5,0,0,0.4 recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
-      ),
-    ).rejects.toThrow(ArrayOverrideValidationError);
-    try {
-      await resolveQuery(
-        "two locus linkage disequilibrium population_size=100 generations=20 " +
-          "starting_frequencies=0.5,0,0,0.4 recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
-      );
-      expect.unreachable();
-    } catch (err) {
-      expect(err).toBeInstanceOf(ArrayOverrideValidationError);
-      expect((err as ArrayOverrideValidationError).key).toBe("starting_frequencies");
-      expect((err as ArrayOverrideValidationError).message).toMatch(/sum to 1/);
-    }
-  });
-
-  // Verification target 3: starting_frequencies with only 3 values -> rejected
-  it("rejects starting_frequencies with wrong element count", async () => {
-    await expect(
-      resolveQuery(
-        "two locus linkage disequilibrium population_size=100 generations=20 " +
-          "starting_frequencies=0.5,0,0 recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
-      ),
-    ).rejects.toThrow(ArrayOverrideValidationError);
-    try {
-      await resolveQuery(
-        "two locus linkage disequilibrium population_size=100 generations=20 " +
-          "starting_frequencies=0.5,0,0 recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
-      );
-      expect.unreachable();
-    } catch (err) {
-      expect(err).toBeInstanceOf(ArrayOverrideValidationError);
-      expect((err as ArrayOverrideValidationError).key).toBe("starting_frequencies");
-      expect((err as ArrayOverrideValidationError).message).toMatch(/exactly 4/);
-    }
-  });
-
-  // Verification target 4: No starting_frequencies override -> RequiredParametersMissingError
-  // Verification target 5: existing mm scalar override still works (regression)
+describe("query-string scalar overrides", () => {
+  // An existing mm scalar override still works (regression).
   it("existing mm scalar override (km=0.5) is not regressed", async () => {
     const resolved = await resolveQuery("simulate enzyme kinetics km=0.5 vmax=5 s0=10 end=10 points=51");
     expect(resolved.domain).toBe("mm");

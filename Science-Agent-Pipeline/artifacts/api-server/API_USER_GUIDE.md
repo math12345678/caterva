@@ -14,10 +14,12 @@ Caterva is a science agent that runs simulations based on your natural language 
 
 **Example:**
 ```
-Input Query: "SIR model with beta=0.5 and gamma=0.1, starting with S0=900"
-Processing: Recognizes SIR (epidemiology), extracts parameters
+Input Query: "michaelis menten kinetics for lactate dehydrogenase vmax=5 s0=10 end=10 points=51"
+Processing: Recognizes Michaelis-Menten (enzyme kinetics), resolves Km from BRENDA, reads your other values
 Output: Simulation output with time series data
 ```
+
+> **Archived domains (note, 2026-11-01).** Epidemiology (SIR, SEIR), population genetics (Wright-Fisher, two-locus Wright-Fisher), PCR, Monte Carlo, the ODE oscillators (Lotka-Volterra, repressilator, cell-cycle oscillator) and Lennard-Jones molecular dynamics were archived on 2026-09-27, after v0.4.0. This build refuses a question about them, naming the archive date and v0.4.0, the last release that runs them. Earlier versions of this guide used SIR as the running example.
 
 ### Quick Start (5 Minutes)
 
@@ -27,14 +29,15 @@ Output: Simulation output with time series data
 curl -X POST http://localhost:5000/api/simulate \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "SIR epidemic model beta=0.5 gamma=0.1 S0=900"
+    "query": "simulate michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51"
   }'
 ```
 
-**Response:**
+**Response** (`202 Accepted`):
 ```json
 {
   "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "query": "simulate michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51",
   "status": "pending",
   "progress": 0,
   "createdAt": "2026-08-09T12:34:56Z",
@@ -65,29 +68,30 @@ When status is `completed`:
 curl http://localhost:5000/api/simulate/a1b2c3d4-e5f6-7890-abcd-ef1234567890
 ```
 
-**Full response includes:**
+**Full response includes** (abbreviated; the trajectory has `points` rows):
 ```json
 {
   "jobId": "...",
   "status": "completed",
   "result": {
-    "domain": "sir",
+    "runId": "...",
+    "domain": "mm",
     "parameters": {
-      "beta": 0.5,
-      "gamma": 0.1,
-      "s0": 900,
-      "i0": 10,
-      "r0_recovered": 0,
-      "end": 100,
-      "points": 101
+      "km": 0.5,
+      "vmax": 2,
+      "s0": 10,
+      "end": 10,
+      "points": 51
     },
     "trajectory": [
-      { "time": 0, "S": 900, "I": 10, "R": 0 },
-      { "time": 0.1, "S": 898.5, "I": 12.3, "R": 0.2 },
+      { "time": 0, "[S]": 10, "[P]": 0 },
+      { "time": 0.2, "[S]": 9.6194, "[P]": 0.3806 },
       ...
+      { "time": 10, "[S]": 2.06e-8, "[P]": 10 }
     ],
     "parameterProvenance": { ... },
-    "provenance": { ... }
+    "provenance": { ... },
+    "completedAt": "..."
   }
 }
 ```
@@ -100,22 +104,21 @@ curl http://localhost:5000/api/simulate/a1b2c3d4-e5f6-7890-abcd-ef1234567890
 
 The `trajectory` field contains your simulation output: a time-series of state variables.
 
-**For SIR model:**
+**For Michaelis-Menten** (concentrations in mM, time in seconds):
 ```json
 {
   "time": 0,
-  "S": 900,        // Susceptible
-  "I": 1,          // Infected
-  "R": 0           // Recovered
+  "[S]": 10,       // Substrate
+  "[P]": 0         // Product
 }
 ```
 
-**For Lotka-Volterra:**
+**For Gillespie SSA decay** (molecule counts):
 ```json
 {
   "time": 0,
-  "P": 100,        // Prey population
-  "V": 10          // Predator population
+  "a": 200,        // Reactant A
+  "b": 0           // Product B
 }
 ```
 
@@ -139,23 +142,21 @@ The `parameters` field shows the exact values used for the simulation.
 
 ```json
 "parameterProvenance": {
-  "beta": {
+  "km": {
     "origin": "resolved",
-    "source": "BRENDA enzyme database",
-    "citation": "Kermack & McKendrick (1927) Royal Society 115:700-721",
+    "source": "brenda_exact",
+    "citation": "BRENDA (ref 740253) — https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
     "organism": "Homo sapiens",
-    "citationStatus": "verified",
-    "note": "Exact organism match"
+    "citationStatus": "flagged",
+    "citationLocators": [
+      { "kind": "brenda_ec", "value": "1.1.1.27", "deepLink": "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27" },
+      { "kind": "brenda_ref", "value": "740253" }
+    ],
+    "strendaStatus": "incomplete",
+    "note": "Assay pH and temperature not reported by the source; STRENDA requires them for kinetic data, so this value is flagged rather than verified."
   },
-  "gamma": {
-    "origin": "user",
-    "note": "Supplied in query: gamma=0.1"
-  },
-  "s0": {
-    "origin": "default",
-    "source": "Caterva standard parameters",
-    "note": "SIR default: 900 susceptible population"
-  }
+  "vmax": { "origin": "user" },
+  "s0": { "origin": "user" }
 }
 ```
 
@@ -172,12 +173,15 @@ The `parameters` field shows the exact values used for the simulation.
 
 ```json
 "provenance": {
-  "reasoning": "Query mentions 'SIR' and epidemic, resolved to SIR model",
+  "reasoning": "Keywords related to enzyme kinetics were found; defaulting to a Michaelis-Menten simulation.",
   "modelCitations": [
-    "Kermack, McKendrick (1927) Royal Society 115:700-721"
+    "Michaelis L., Menten M.L. (1913) Die Kinetik der Invertinwirkung. Biochemische Zeitschrift 49, 333-369. ...",
+    "Lehninger, A. L., Nelson, D. L., & Cox, M. M. (2008). Lehninger Principles of Biochemistry (5th ed.)"
   ],
   "flags": [
-    "gamma cross-species fallback: resolved from Ebola, applied to general SIR"
+    "assumed: organism = Homo sapiens. The query names no organism, so the KM lookup used Homo sapiens, chosen for you; ...",
+    "Resolved KM=10.73 mM from brenda_exact.",
+    "Applied parameter overrides found in the query string."
   ]
 }
 ```
@@ -196,22 +200,7 @@ The `parameters` field shows the exact values used for the simulation.
 
 ### Examples by Domain
 
-#### SIR (Epidemiology)
-
-```
-"SIR model with beta=0.5 gamma=0.1"
-"simulate an epidemic with R0=2.5"
-"measles transmission beta=0.9 gamma=0.3"
-```
-
-**Parameters:**
-- `beta` - Transmission rate
-- `gamma` - Recovery rate
-- `s0` - Initial susceptible
-- `i0` - Initial infected (default 10)
-- `r0_recovered` - Initial recovered (default 0)
-- `end` - Simulation end time (default 100)
-- `points` - Number of time points (default 101)
+> SIR, SEIR, Lotka-Volterra, Wright-Fisher and the other archived domains were removed from this section on 2026-11-01; they were archived on 2026-09-27, after v0.4.0 (the last release that runs them), and a query for one is refused.
 
 #### Michaelis-Menten (Enzyme Kinetics)
 
@@ -228,39 +217,15 @@ The `parameters` field shows the exact values used for the simulation.
 - `end` - Time range
 - `points` - Number of time points
 
-#### Lotka-Volterra (Predator-Prey)
+#### Competitive Inhibition
 
 ```
-"predator-prey dynamics with p0=100 v0=10"
-"lotka-volterra alpha=0.5 beta=0.02 gamma=0.02 delta=0.5"
-"population dynamics for rabbits and wolves"
+"competitive inhibition of hexokinase km=2 ki=1 vmax=5 s0=10 i0=1 end=10 points=51"
 ```
 
-**Parameters:**
-- `alpha` - Prey growth rate (default 1.1)
-- `beta` - Predation rate (default 0.4)
-- `gamma` - Predation efficiency (default 0.1)
-- `delta` - Predator death rate (default 0.4)
-- `p0` - Initial prey (default 10)
-- `v0` - Initial predator (default 5)
-- `end` - Simulation end time (default 20)
-
-#### Population Genetics (Wright-Fisher)
-
-```
-"Wright-Fisher selection model population_size=1000 starting_frequency=0.5"
-"genetic drift with 500 individuals and 0.1 mutation rate"
-```
-
-**Parameters:**
-- `population_size` - Effective population (required)
-- `starting_frequency` - Allele frequency [0,1] (required)
-- `generations` - Number of generations (required)
-- `replicate_runs` - Number of replicates (required)
-- `mutation_rate` - Mutation rate (optional)
-- `selection_coefficient` - Selection strength (optional)
-- `dominance` - Dominance parameter (optional)
-- `seed` - Random seed (optional; for reproducibility)
+**Parameters:** as Michaelis-Menten, plus
+- `ki` - Inhibition constant
+- `i0` - Inhibitor concentration
 
 #### Gillespie Stochastic Simulation
 
@@ -279,10 +244,10 @@ The `parameters` field shows the exact values used for the simulation.
 
 **Allowed delimiters:** `=` or `:`
 ```
-beta=0.5      ✅
-beta: 0.5     ✅
-beta 0.5      ✅
-gamma: 0.1    ✅
+km=0.5        ✅
+km: 0.5       ✅
+km 0.5        ✅
+vmax: 2       ✅
 ```
 
 **Numbers:**
@@ -293,66 +258,63 @@ gamma: 0.1    ✅
 0.0           ✅ Zero
 ```
 
-**Arrays** (for multi-locus genetics):
-```
-"starting_frequencies=[0.5,0,0,0.5]"
-```
+**One number per parameter.** No live parameter takes a list, so `km=1,2` is refused rather than read as `km=1`. (The array syntax this guide used to show, `starting_frequencies=[...]`, belonged to two-locus Wright-Fisher, archived on 2026-09-27, after v0.4.0, the last release that runs it.)
+
+**Recognised names:** `km`, `ki`, `vmax`, `kcat`, `enzyme_conc`, `s0`, `i0`, `end`, `points`, `a0`, `b0`, `k`, `n_replicates`, `seed`. Any other `name=value` (for example `beta=0.5`) is not an override and is ignored.
 
 **Case-insensitive:**
 ```
-"SIR"         ✅
-"sir"         ✅
-"Sir"         ✅
-BETA=0.5      ✅ (parameter name)
+"Michaelis Menten"   ✅
+"michaelis menten"   ✅
+KM=0.5               ✅ (parameter name)
 ```
 
 ---
 
 ## Common Workflows
 
-### Workflow 1: Quick Epidemic Projection
+### Workflow 1: Quick Progress Curve
 
-**Goal:** Estimate how an epidemic spreads with current parameters
+**Goal:** See how fast an enzyme consumes its substrate
 
 ```bash
 curl -X POST http://localhost:5000/api/simulate \
-  -d '{"query":"SIR epidemic R0=2.5"}'
+  -d '{"query":"michaelis menten kinetics for lactate dehydrogenase vmax=5 s0=10 end=10 points=51"}'
 
-# System estimates beta and gamma from R0
-# Returns projection to disease elimination
+# System resolves Km from the literature and cites it
+# Returns substrate and product over time
 ```
 
-**Then:** Extract `trajectory` and plot S, I, R over time
+**Then:** Extract `trajectory` and plot `[S]` and `[P]` over time
 
 ### Workflow 2: Parameter Sensitivity Analysis
 
 **Goal:** How does result change with different parameters?
 
 ```bash
-# Run 1: Low transmission
+# Run 1: Tight binding
 curl -X POST http://localhost:5000/api/simulate \
-  -d '{"query":"SIR beta=0.1 gamma=0.1"}'
+  -d '{"query":"michaelis menten km=0.1 vmax=2 s0=10 end=10 points=51"}'
 
-# Run 2: High transmission  
+# Run 2: Weak binding
 curl -X POST http://localhost:5000/api/simulate \
-  -d '{"query":"SIR beta=0.9 gamma=0.1"}'
+  -d '{"query":"michaelis menten km=10 vmax=2 s0=10 end=10 points=51"}'
 
 # Compare trajectories
 ```
 
-**Analysis:** Peak infection timing/magnitude changes with beta
+**Analysis:** With `s0` well above Km the rate is near Vmax; with `s0` below Km it is roughly proportional to `[S]`
 
 ### Workflow 3: Reproduce Published Results
 
 **Goal:** Verify a paper's simulation matches published figures
 
 ```bash
-# Find paper's exact parameters
-# e.g., "Kermack & McKendrick 1927"
+# Find paper's exact parameters (Km, Vmax, [S]0, assay length)
 
 # Query with exact values
 curl -X POST http://localhost:5000/api/simulate \
-  -d '{"query":"SIR beta=0.5 gamma=0.33 S0=1000 I0=1"}'
+  -d '{"query":"michaelis menten km=0.5 vmax=2 s0=10 end=10 points=1001"}'
 
 # Compare result trajectory to paper's figures
 # Should match if parameters and solver are same
@@ -380,9 +342,9 @@ curl -X POST http://localhost:5000/api/simulate \
 
 ```bash
 # Script to run multiple queries
-for beta in 0.1 0.3 0.5 0.7 0.9; do
+for km in 0.1 0.3 0.5 0.7 0.9; do
   curl -X POST http://localhost:5000/api/simulate \
-    -d "{\"query\":\"SIR beta=$beta gamma=0.1\"}"
+    -d "{\"query\":\"michaelis menten km=$km vmax=2 s0=10 end=10 points=51\"}"
 done
 
 # Collect jobIds, then poll for results
@@ -392,59 +354,38 @@ done
 
 ## Interpreting Common Results
 
-### SIR Epidemic Curve
+### Michaelis-Menten Progress Curve
 
 **What you see:**
 ```
-S (susceptible):    Decreasing curve
-I (infected):       Peak then decline
-R (recovered):      Increasing curve (S + I + R = constant)
+[S] (substrate):    Decreasing curve
+[P] (product):      Increasing curve ([S] + [P] = [S]0)
 ```
 
 **What it means:**
-- Peak I indicates epidemic maximum (healthcare load)
-- R0 affects curve steepness
-- Lower gamma = slower recovery = broader peak
+- The initial slope is close to Vmax when `s0` is well above Km
+- The curve flattens as substrate runs out
+- A larger Km means a slower approach at the same Vmax
 
 **How to use it:**
-- Estimate when peak hits (healthcare planning)
-- Calculate total infected (R at end)
-- Predict disease elimination time
+- Estimate how long an assay takes to consume its substrate
+- Compare against a measured progress curve
 
-### Lotka-Volterra Predator-Prey
+### Gillespie Stochastic Decay
 
 **What you see:**
 ```
-Prey (P):       Oscillates with lag
-Predator (V):   Oscillates with lag
+a (reactant):   Step-wise decrease
+b (product):    Step-wise increase
 ```
 
 **What it means:**
-- Predator population lags prey population
-- Classic cycle: prey ↑ → predators ↑ → prey ↓ → predators ↓
-- Amplitude indicates population stability
+- Stochastic process; different seeds give different trajectories
+- Fewer molecules → larger relative fluctuations
 
 **How to use it:**
-- Understand predator-prey cycles in ecosystems
-- Estimate population doubling time
-- Detect if population crashes (extinction risk)
-
-### Wright-Fisher Genetic Drift
-
-**What you see:**
-```
-Allele frequency:   Random walk toward 0 or 1
-```
-
-**What it means:**
-- Stochastic process; different runs give different outcomes
-- Eventually fixes to one allele (frequency = 0 or 1)
-- Smaller population → faster fixation
-
-**How to use it:**
-- Calculate fixation probability
-- Estimate time to fixation
-- Understand neutral evolution
+- See when copy numbers are small enough that noise matters
+- Fix `seed` to reproduce a run exactly
 
 ---
 
@@ -460,7 +401,7 @@ Allele frequency:   Random walk toward 0 or 1
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `MISSING_REQUIRED_INPUT` | Missing required parameter | Add parameter: `beta=0.5` |
+| `MISSING_REQUIRED_INPUT` | Missing required parameter | Add parameter: `vmax=5` |
 | `TOO_MANY_REQUESTS` | More than 10 `POST /api/simulate` requests in 60 seconds | Wait up to 60 seconds and retry |
 | `PIPELINE_ERROR` | Unexpected failure | Contact support with jobId |
 
@@ -480,7 +421,7 @@ Allele frequency:   Random walk toward 0 or 1
 
 1. **Specify all parameters explicitly:**
    ```
-   "SIR beta=0.5 gamma=0.1 S0=900 I0=1 end=100 points=1001"
+   "michaelis menten km=0.5 vmax=2 s0=10 end=10 points=1001"
    ```
 
 2. **Use the stochastic seed:**
@@ -504,7 +445,7 @@ Allele frequency:   Random walk toward 0 or 1
 1. **Different parameters** - Check `parameterProvenance`, might differ from paper
 2. **Different solver** - Caterva uses specific ODE solvers
 3. **Different precision** - Numerical resolution (`points` parameter)
-4. **Stochastic variation** - For Gillespie/Wright-Fisher, different seed = different result
+4. **Stochastic variation** - For Gillespie SSA, different seed = different result
 
 **How to debug:**
 ```bash
@@ -520,7 +461,6 @@ curl http://localhost:5000/api/simulate/{jobId} | jq '.result.parameters'
 **Typical times:**
 - Deterministic ODE: 50–200ms
 - Stochastic (Gillespie): 100ms–2s (depends on steps)
-- Population genetics: 500ms–5s (depends on generations)
 - LLM classification: 500ms–2s
 - **Total:** 1–7 seconds typical
 
@@ -564,7 +504,7 @@ jq '.result.provenance.flags' result.json
 ```
 
 **Disclose assumptions in your paper:**
-> "We used Kermack-McKendrick SIR parameters from [cite]. For gamma, we used a cross-species estimate from measles."
+> "Km for lactate dehydrogenase was taken from BRENDA (ref 740253); the source did not report assay pH or temperature, so Caterva flagged it rather than verified it."
 
 ### 2. Validate Against Known Results
 
@@ -584,8 +524,8 @@ jq '.result.provenance.flags' result.json
 **For any important parameter:**
 ```bash
 # Vary ±50% and observe impact
-# E.g., if beta=0.5:
-#   Run with beta=0.25 and beta=0.75
+# E.g., if km=0.5:
+#   Run with km=0.25 and km=0.75
 # Is result robust to parameter uncertainty?
 ```
 
@@ -642,23 +582,6 @@ curl http://localhost:5000/api/simulate
 
 ## Example Queries by Discipline
 
-### Epidemiology
-
-```
-"Model COVID-19 transmission with R0=3"
-"SIR for measles vaccination scenario"
-"SEIR epidemic with 10% immunity"
-"flu dynamics with seasonal forcing"
-```
-
-### Ecology
-
-```
-"Predator-prey dynamics for wolf-elk system"
-"Population growth with carrying capacity"
-"Lotka-Volterra with p0=100 v0=5"
-```
-
 ### Biochemistry
 
 ```
@@ -667,21 +590,14 @@ curl http://localhost:5000/api/simulate
 "Lactate dehydrogenase kinetics"
 ```
 
-### Population Genetics
+### Stochastic Kinetics
 
 ```
-"Wright-Fisher drift in 100-person population"
-"Fixation time for beneficial allele"
-"Neutral evolution 1000 generations"
+"Gillespie SSA a0=100 k=0.1 end=50 seed=42"
+"bimolecular association a0=100 b0=100 k=0.005 end=10"
 ```
 
-### Physics/Chemistry
-
-```
-"Molecular dynamics 100 particles"
-"PCR amplification 40 cycles"
-"Monte Carlo simulation 10000 samples"
-```
+> Epidemiology, ecology, population-genetics and physics examples were removed on 2026-11-01: those domains were archived on 2026-09-27, after v0.4.0 (the last release that runs them).
 
 ---
 
@@ -701,4 +617,4 @@ curl http://localhost:5000/api/simulate
 
 **Version:** 1.0  
 **Last Updated:** August 9, 2026  
-**All domains:** 16 (15 core scientific domains + 1 SBML escape hatch)
+**Live domains (as of 2026-11-01):** `mm`, `mm_competitive_inhibition`, `gillespie_ssa`, `gillespie_ssa_bimolecular`, `gillespie_ssa_replicates`, and the `sbml` escape hatch. The "16 domains" this line used to state predates the 2026-09-27 archive (made after v0.4.0, the last release that runs the archived domains).

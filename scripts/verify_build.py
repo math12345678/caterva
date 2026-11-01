@@ -381,7 +381,9 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # The compliance position today rests on a fact nobody was watching:
     # nothing in CI publishes anything, so the LGPL (python-libsbml) and GPL
     # (stdpopsim, opt-in) terms impose nothing. A legal position that depends
-    # on an unwatched fact is a coincidence, not a position.
+    # on an unwatched fact is a coincidence, not a position. (2026-11-01: no
+    # live manifest installs stdpopsim any more; its opt-in file is in
+    # archive/legacy_domains/.)
     guards.append(run_guard(
         "Release Artifact Guard (self-check)",
         f"{PYTHON} {SCRIPTS_DIR / 'check_release_artifacts.py'} --selftest"
@@ -610,6 +612,8 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     #   reserved", CITATION.cff said LicenseRef-Caterva-Proprietary,
     #   package.json said MIT) and nothing read more than one of them at
     #   once. A project about provenance must agree about its own terms.
+    #   (Since 2026-11-01 it also reads every tracked OpenAPI spec and
+    #   pyproject.toml: the root openapi.yaml said MIT while it printed OK.)
     guards.append(run_guard(
         "License Consistency Guard",
         f"{PYTHON} {SCRIPTS_DIR / 'check_license_consistency.py'}"

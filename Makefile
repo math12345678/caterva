@@ -78,10 +78,8 @@ setup: check-python
 		echo "    make doctor"; \
 		echo ""; \
 		echo "which names the interpreter it found, what is already"; \
-		echo "installed, and the two causes that account for nearly every"; \
-		echo "failure here: a Python outside 3.10-3.13, and stdpopsim on"; \
-		echo "linux/arm64, where msprime has no wheel and needs libgsl-dev"; \
-		echo "plus a C compiler to build from source."; \
+		echo "installed, and the cause that accounts for most failures"; \
+		echo "here: a Python outside 3.10-3.13."; \
 		exit 1; }
 	@echo ""
 	@echo ">> done. Verify with: make check"

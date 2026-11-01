@@ -4,6 +4,8 @@
 **Status:** August 2026  
 **Languages:** Python, JavaScript/Node.js, R, cURL
 
+> **Note, 2026-11-01.** These recipes used SIR epidemic queries until this date. Epidemiology, population genetics, Lotka-Volterra and the other non-enzyme domains were archived on 2026-09-27, after v0.4.0 (the last release that runs them), and are refused by this build, so the examples now use Michaelis-Menten, whose trajectory columns are `time`, `[S]` and `[P]`. The same day the example Python client class was renamed from `TerrriumClient`, a misspelling left over from the project's old name, to `CatervaClient`; the module it is imported from was already `caterva_client`.
+
 ---
 
 ## Quick Integration Patterns
@@ -43,7 +45,7 @@ def simulate_blocking(query, timeout=60):
     raise TimeoutError(f"Simulation took longer than {timeout}s")
 
 # Usage
-result = simulate_blocking("SIR beta=0.5 gamma=0.1")
+result = simulate_blocking("michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51")
 print(f"Domain: {result['domain']}")
 print(f"Parameters: {result['parameters']}")
 ```
@@ -80,14 +82,14 @@ async function simulateBlocking(query, timeout = 60000) {
 }
 
 // Usage
-const result = await simulateBlocking("SIR beta=0.5 gamma=0.1");
+const result = await simulateBlocking("michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51");
 console.log(`Domain: ${result.domain}`);
 ```
 
 **cURL:**
 ```bash
 #!/bin/bash
-QUERY="SIR beta=0.5 gamma=0.1"
+QUERY="michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51"
 TIMEOUT=60
 POLL_INTERVAL=0.5
 
@@ -126,7 +128,7 @@ Submit and get back immediately; caller polls for results.
 
 **Python:**
 ```python
-class TerrriumClient:
+class CatervaClient:
     def __init__(self, base_url='http://localhost:5000'):
         self.base_url = base_url
     
@@ -158,10 +160,10 @@ class TerrriumClient:
             time.sleep(poll_interval)
 
 # Usage
-client = TerrriumClient()
+client = CatervaClient()
 
 # Submit job
-job_id = client.submit_simulation("SIR beta=0.5 gamma=0.1")
+job_id = client.submit_simulation("michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51")
 print(f"Submitted: {job_id}")
 
 # Check status later
@@ -269,17 +271,16 @@ def analyze_trajectory(result):
     print("\nStatistics:")
     print(df.describe())
     
-    # Find peak (useful for SIR)
-    if 'I' in df.columns:
-        peak_idx = df['I'].idxmax()
-        peak_time = df.loc[peak_idx, 'time']
-        peak_value = df.loc[peak_idx, 'I']
-        print(f"\nPeak infections: {peak_value:.1f} at time {peak_time:.2f}")
+    # Time to consume half the substrate (useful for Michaelis-Menten)
+    if '[S]' in df.columns:
+        half = df['[S]'].iloc[0] / 2
+        t_half = df.loc[df['[S]'] <= half, 'time'].min()
+        print(f"\nHalf the substrate consumed by time {t_half:.2f}")
     
     return df
 
 # Usage
-result = simulate_blocking("SIR beta=0.5 gamma=0.1")
+result = simulate_blocking("michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51")
 df = analyze_trajectory(result['result'])
 ```
 
@@ -313,7 +314,7 @@ analyze_trajectory <- function(result) {
 # Usage
 response <- httr::POST(
   "http://localhost:5000/api/simulate",
-  body = list(query = "SIR beta=0.5 gamma=0.1"),
+  body = list(query = "michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51"),
   encode = "json"
 )
 
@@ -337,32 +338,31 @@ df <- analyze_trajectory(result$result)
 ```python
 import matplotlib.pyplot as plt
 
-def plot_sir(result):
-    """Plot SIR trajectory."""
+def plot_progress_curve(result):
+    """Plot a Michaelis-Menten progress curve."""
     df = pd.DataFrame(result['trajectory'])
     
     plt.figure(figsize=(10, 6))
-    plt.plot(df['time'], df['S'], label='Susceptible', linewidth=2)
-    plt.plot(df['time'], df['I'], label='Infected', linewidth=2)
-    plt.plot(df['time'], df['R'], label='Recovered', linewidth=2)
+    plt.plot(df['time'], df['[S]'], label='Substrate', linewidth=2)
+    plt.plot(df['time'], df['[P]'], label='Product', linewidth=2)
     
-    plt.xlabel('Time (days)')
-    plt.ylabel('Population')
-    plt.title('SIR Epidemic Model')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Concentration (mM)')
+    plt.title('Michaelis-Menten Progress Curve')
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig('sir_trajectory.png', dpi=150)
+    plt.savefig('mm_trajectory.png', dpi=150)
     plt.show()
 
 # Usage
-result = simulate_blocking("SIR beta=0.5 gamma=0.1 end=100 points=1001")
-plot_sir(result)
+result = simulate_blocking("michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51")
+plot_progress_curve(result)
 ```
 
 **JavaScript with Chart.js:**
 ```javascript
-async function visualizeSIR(jobId) {
+async function visualizeProgressCurve(jobId) {
   const result = await pollForCompletion(jobId);
   
   const ctx = document.getElementById('chart').getContext('2d');
@@ -372,20 +372,14 @@ async function visualizeSIR(jobId) {
       labels: result.trajectory.map(p => p.time),
       datasets: [
         {
-          label: 'Susceptible',
-          data: result.trajectory.map(p => p.S),
+          label: 'Substrate',
+          data: result.trajectory.map(p => p['[S]']),
           borderColor: 'blue',
           tension: 0.1
         },
         {
-          label: 'Infected',
-          data: result.trajectory.map(p => p.I),
-          borderColor: 'red',
-          tension: 0.1
-        },
-        {
-          label: 'Recovered',
-          data: result.trajectory.map(p => p.R),
+          label: 'Product',
+          data: result.trajectory.map(p => p['[P]']),
           borderColor: 'green',
           tension: 0.1
         }
@@ -394,7 +388,7 @@ async function visualizeSIR(jobId) {
     options: {
       responsive: true,
       plugins: {
-        title: { display: true, text: 'SIR Epidemic Model' }
+        title: { display: true, text: 'Michaelis-Menten Progress Curve' }
       }
     }
   });
@@ -430,7 +424,7 @@ def extract_reliable_parameters(result):
     return reliable
 
 # Usage
-result = simulate_blocking("SIR beta=0.5 gamma=0.1")
+result = simulate_blocking("michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51")
 reliable_params = extract_reliable_parameters(result)
 ```
 
@@ -485,7 +479,7 @@ import itertools
 
 def sweep_parameters(base_query, param_ranges):
     """Run simulation for all parameter combinations."""
-    client = TerrriumClient()
+    client = CatervaClient()
     
     results = {}
     
@@ -513,18 +507,18 @@ def sweep_parameters(base_query, param_ranges):
 
 # Usage
 results = sweep_parameters(
-    "SIR S0=900 I0=1 gamma=0.1 end=100 points=1001",
+    "michaelis menten vmax=2 s0=10 points=51",
     {
-        'beta': [0.1, 0.3, 0.5, 0.7, 0.9],
-        'end': [50, 100, 200]
+        'km': [0.1, 0.3, 0.5, 0.7, 0.9],
+        'end': [5, 10, 20]
     }
 )
 
 # Analyze results
 for params, result in results.items():
     df = pd.DataFrame(result['trajectory'])
-    peak_infections = df['I'].max()
-    print(f"Params {params}: Peak infections = {peak_infections:.1f}")
+    product_at_end = df['[P]'].iloc[-1]
+    print(f"Params {params}: [P] at end = {product_at_end:.3f} mM")
 ```
 
 ### Batch with Progress Tracking
@@ -535,7 +529,7 @@ def batch_simulate_with_progress(queries, max_workers=5):
     """Run multiple simulations in parallel with progress bar."""
     from tqdm import tqdm
     
-    client = TerrriumClient()
+    client = CatervaClient()
     
     # Submit all jobs
     job_ids = []
@@ -553,10 +547,10 @@ def batch_simulate_with_progress(queries, max_workers=5):
 
 # Usage
 queries = [
-    "SIR beta=0.5 gamma=0.1",
-    "sir beta=0.3 gamma=0.2",
-    "epidemiology with R0=2.5",
-    "Lotka-Volterra p0=100 v0=10"
+    "michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51",
+    "competitive inhibition km=2 ki=1 vmax=5 s0=10 i0=1 end=10 points=51",
+    "gillespie stochastic decay a0=200 k=0.5 end=5 seed=9",
+    "bimolecular association a0=100 b0=100 k=0.005 end=10"
 ]
 
 results = batch_simulate_with_progress(queries)
@@ -588,8 +582,8 @@ def robust_simulate(query, fallback_query=None):
 # Usage
 try:
     result = robust_simulate(
-        "SIR beta=0.5 gamma=0.1",
-        fallback_query="SIR epidemic"
+        "michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51",
+        fallback_query="michaelis menten kinetics for lactate dehydrogenase vmax=5 s0=10 end=10 points=51"
     )
 except Exception:
     print("Simulation unavailable")
@@ -624,7 +618,7 @@ def simulate_with_retry(query):
     return simulate_blocking(query, timeout=30)
 
 # Usage
-result = simulate_with_retry("SIR beta=0.5 gamma=0.1")
+result = simulate_with_retry("michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51")
 ```
 
 ---
@@ -639,7 +633,7 @@ from flask import Flask, request, jsonify
 import threading
 
 app = Flask(__name__)
-client = TerrriumClient()
+client = CatervaClient()
 
 @app.route('/simulate', methods=['POST'])
 def submit_simulation():
@@ -730,8 +724,8 @@ def test_submit_simulation(mock_post):
         'status': 'pending'
     }
     
-    client = TerrriumClient()
-    job_id = client.submit_simulation("SIR beta=0.5")
+    client = CatervaClient()
+    job_id = client.submit_simulation("michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51")
     
     assert job_id == 'test-123'
     mock_post.assert_called_once()
@@ -741,10 +735,10 @@ def test_get_status(mock_get):
     """Test status polling."""
     mock_get.return_value.json.return_value = {
         'status': 'completed',
-        'result': {'domain': 'sir', 'parameters': {}}
+        'result': {'domain': 'mm', 'parameters': {}}
     }
     
-    client = TerrriumClient()
+    client = CatervaClient()
     status = client.get_status('test-123')
     
     assert status['status'] == 'completed'
@@ -829,48 +823,47 @@ rate_info = check_rate_limit(response)
 # research_app.py
 import pandas as pd
 import matplotlib.pyplot as plt
-from caterva_client import TerrriumClient
+from caterva_client import CatervaClient
 
-def run_epidemiology_study():
+def run_km_study():
     """Complete research workflow."""
-    client = TerrriumClient()
+    client = CatervaClient()
     
     # Parameter sweep
     results = {}
-    for beta in [0.3, 0.5, 0.7]:
+    for km in [0.3, 0.5, 0.7]:
         job_id = client.submit_simulation(
-            f"SIR beta={beta} gamma=0.1 S0=900 end=100 points=1001"
+            f"michaelis menten km={km} vmax=2 s0=10 end=10 points=1001"
         )
         result = client.wait_for_completion(job_id)
-        results[beta] = result
+        results[km] = result
     
     # Analyze
-    for beta, result in results.items():
+    for km, result in results.items():
         df = pd.DataFrame(result['trajectory'])
-        peak = df['I'].max()
-        peak_time = df[df['I'] == peak]['time'].values[0]
+        half = df['[S]'].iloc[0] / 2
+        t_half = df.loc[df['[S]'] <= half, 'time'].min()
         
-        print(f"Beta={beta}: Peak infections={peak:.0f} at t={peak_time:.2f}")
+        print(f"Km={km}: half the substrate consumed by t={t_half:.2f} s")
     
     # Visualize
     fig, axes = plt.subplots(1, len(results), figsize=(15, 4))
-    for idx, (beta, result) in enumerate(results.items()):
+    for idx, (km, result) in enumerate(results.items()):
         df = pd.DataFrame(result['trajectory'])
         ax = axes[idx]
-        ax.plot(df['time'], df['S'], label='S')
-        ax.plot(df['time'], df['I'], label='I')
-        ax.plot(df['time'], df['R'], label='R')
-        ax.set_title(f'β={beta}')
-        ax.set_xlabel('Time')
-        ax.set_ylabel('Population')
+        ax.plot(df['time'], df['[S]'], label='[S]')
+        ax.plot(df['time'], df['[P]'], label='[P]')
+        ax.set_title(f'Km={km} mM')
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Concentration (mM)')
         ax.legend()
     
     plt.tight_layout()
-    plt.savefig('epidemic_analysis.png', dpi=150)
-    print("Saved: epidemic_analysis.png")
+    plt.savefig('km_analysis.png', dpi=150)
+    print("Saved: km_analysis.png")
 
 if __name__ == '__main__':
-    run_epidemiology_study()
+    run_km_study()
 ```
 
 ---

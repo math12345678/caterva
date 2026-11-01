@@ -5,7 +5,9 @@
  * "Add end=<value>" is useless for a repressilator, whose time is
  * dimensionless and whose sensible window is a few hundred units: a
  * reader cannot tell whether to type 5 or 5000, so the message meant to
- * unblock them does not. "Add end=200" does.
+ * unblock them does not. "Add end=200" does. (Note, 2026-11-01: the
+ * repressilator was archived on 2026-09-27, after v0.4.0, the last
+ * release that runs it; the cases below use live keys.)
  *
  * The dangerous version of that feature suggests `km=2`. The domain
  * tables carry illustrative Km and Vmax values that the hard rule exists
@@ -37,7 +39,7 @@ describe("refusal hints", () => {
   it("NEVER shows a number for a measured constant", () => {
     // The whole point. km/vmax/ki/kcat are measurements; the values in
     // the domain table are teaching defaults the hard rule blocks.
-    for (const key of ["km", "vmax", "ki", "kcat", "mutation_rate", "beta", "gamma"]) {
+    for (const key of ["km", "vmax", "ki", "kcat", "k"]) {
       const m = message([key], { [key]: 2 });
       expect(m, key).toContain(`${key}=<value>`);
       expect(m, key).not.toContain(`${key}=2`);
@@ -68,15 +70,22 @@ describe("refusal hints", () => {
   });
 
   it("does not offer an array as an example", () => {
-    // starting_frequencies is a vector; "key=1,2,3" is not valid syntax
-    // for the override parser, so a hint in that shape would be wrong.
+    // "key=1,2,3" is not valid syntax for the override parser (a list is
+    // refused with ArrayOverrideValidationError), so a hint in that shape
+    // would be wrong. No live parameter is array-valued, but the examples
+    // map can still carry one from LLM-supplied parameters, so the guard
+    // is tested on a key that otherwise WOULD get a number: `end`.
+    // (Until 2026-11-01 this case used two-locus Wright-Fisher's
+    // starting_frequencies, archived on 2026-09-27, after v0.4.0, the last
+    // release that runs it.)
     const m = new RequiredParametersMissingError(
-      "two_locus_wright_fisher",
-      ["starting_frequencies"],
+      "mm",
+      ["end"],
       {},
       {},
-      { starting_frequencies: [0.1, 0.2] },
+      { end: [10, 20] },
     ).message;
-    expect(m).toContain("starting_frequencies=<value>");
+    expect(m).toContain("end=<value>");
+    expect(m).not.toContain("end=10");
   });
 });

@@ -6,7 +6,9 @@
 
 ## Overview
 
-The Caterva Science-Agent Pipeline backend is a TypeScript/Express API that bridges natural language queries to scientific simulations. Users describe what they want to simulate ("show me predator-prey dynamics"), and the system resolves the domain, parameters, and runs the computation.
+The Caterva Science-Agent Pipeline backend is a TypeScript/Express API that bridges natural language queries to scientific simulations. Users describe what they want to simulate ("michaelis menten kinetics for lactate dehydrogenase"), and the system resolves the domain, parameters, and runs the computation.
+
+> **Note, 2026-11-01.** Epidemiology (SIR, SEIR), population genetics (Wright-Fisher), PCR, Monte Carlo, the ODE oscillators and Lennard-Jones molecular dynamics were archived on 2026-09-27, after v0.4.0 (`ARCHIVED_DOMAINS` in `src/lib/caterva_runner.py`). This guide's examples and domain table were updated to the live domains; a query for an archived one is refused with the archive date and v0.4.0, the last release that runs it.
 
 The architecture emphasizes:
 - **Scientific integrity** through parameter provenance tracking
@@ -82,7 +84,7 @@ User Query
 #### Path B: Keyword Fallback (Always Available)
 1. Extract domain keywords from query
 2. Match against domain keyword list
-3. Extract parameter tokens (km=5, beta=0.3, etc.)
+3. Extract parameter tokens (km=5, vmax=2, etc.; only the keys the live runner reads)
 4. Use defaults for any missing parameters
 5. Tag those parameters `origin: "default"`
 
@@ -210,16 +212,20 @@ try {
 
 **The DISPATCH Contract (ADR 0007):**
 
-Python has a `DISPATCH` dict mapping domains to handler functions:
+Python has a `DISPATCH` dict mapping each domain to the engine function that runs it:
 
 ```python
-DISPATCH = {
-    "mm": run_mm,
-    "sir": run_sir,
-    "cell_cycle_oscillator": run_cell_cycle_oscillator,
-    # ... 16 total
+DISPATCH: Dict[str, str] = {
+    "mm": "simulate_michaelis_menten",
+    "mm_competitive_inhibition": "simulate_mm_competitive_inhibition",
+    "gillespie_ssa": "simulate_gillespie_ssa",
+    "gillespie_ssa_bimolecular": "simulate_gillespie_ssa_bimolecular",
+    "gillespie_ssa_replicates": "simulate_gillespie_ssa_replicates",
+    "sbml": "simulate_sbml",
 }
 ```
+
+Composed domains (`compose`, `parameterize`, `network`) are declared separately in `COMPOSED_DOMAINS`, because none maps to a single engine function.
 
 TypeScript mirrors this in:
 - `SimulationDomain` type union
@@ -227,19 +233,16 @@ TypeScript mirrors this in:
 
 If you add a domain: update both or tests fail.
 
-**The 16 Domains:**
+**The live domains** (`SimulationDomain` in `src/lib/catervaRunner.ts`):
 
 | Type | Domain | LLM Exposed? |
 |------|--------|--------------|
 | **Kinetics** | mm, mm_competitive_inhibition | ✓ |
-| **Epidemiology** | sir, seir | ✓ |
-| **Genetics** | wright_fisher, two_locus_wright_fisher | ✓ |
 | **Stochastic** | gillespie_ssa, gillespie_ssa_bimolecular | ✓ |
-| **Dynamics** | molecular_dynamics, lotka_volterra | ✓ |
-| **ODE Oscillators** | cell_cycle_oscillator, repressilator | ✓ |
-| **Other** | pcr | ✓ |
-| **Engine-Internal** | monte_carlo_pi, gillespie_ssa_replicates | ✗ |
+| **Engine-Internal** | gillespie_ssa_replicates | ✗ |
 | **Escape Hatch** | sbml | ✓ (raw XML) |
+
+The table listed 16 domains until 2026-11-01. The other ten (sir, seir, wright_fisher, two_locus_wright_fisher, molecular_dynamics, lotka_volterra, cell_cycle_oscillator, repressilator, pcr, monte_carlo_pi) were archived on 2026-09-27, after v0.4.0 (the last release that runs them).
 
 ### 6. Caching & Persistence
 
@@ -292,7 +295,7 @@ If you add a domain: update both or tests fail.
 ```json
 {
   "error": "MISSING_REQUIRED_INPUT",
-  "message": "Cannot simulate 'sir': beta, gamma could not be resolved from literature and were not supplied in the query. Add beta=<value> gamma=<value> to your query and try again."
+  "message": "Cannot simulate 'mm': vmax is unresolved. vmax: Vmax is not a property of the enzyme on its own — it is kcat × [E]0, so it depends on how much enzyme is in YOUR assay. ..."
 }
 ```
 

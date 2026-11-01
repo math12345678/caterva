@@ -36,8 +36,11 @@ vi.mock("../lib/llmResolver", async (importOriginal) => {
   return { ...original, resolveQueryWithLLM: vi.fn() };
 });
 
-// beta/gamma supplied so the epidemiology bridge short-circuits: no
-// network, and what is under test is the citation handling.
+// km, vmax and s0 supplied so no network call is made, and what is under
+// test is the citation handling. (The comment here described an SIR query
+// with beta/gamma until 2026-11-01; the query had already moved to
+// Michaelis-Menten when epidemiology was archived on 2026-09-27, after
+// v0.4.0, the last release that runs it.)
 const QUERY =
   "michaelis menten kinetics with km=0.5 vmax=2 s0=10";
 

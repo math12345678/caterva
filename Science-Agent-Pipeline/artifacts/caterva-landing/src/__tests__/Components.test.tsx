@@ -75,7 +75,7 @@ describe("StatsBar", () => {
     expect(screen.getByText(/tests passing/i)).toBeInTheDocument();
     // "capabilities built" since 2026-09-29: "live" was attached to MD
     // tools no release carried. lib/domains.ts now says where each one is
-    // (in v0.4.0, or on main), and the count is derived from it, never a
+    // (in RELEASE_TAG, or on main), and the count is derived from it, never a
     // second hardcoded copy.
     expect(screen.getByText(/capabilities built/i)).toBeInTheDocument();
   });

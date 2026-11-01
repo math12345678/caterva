@@ -22,9 +22,10 @@ info:
   version: 1.0.0
   contact:
     name: Caterva Team
-    url: https://github.com/Terrium-sim
+    url: https://github.com/math12345678/caterva
   license:
-    name: MIT
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
 
 servers:
   - url: http://localhost:3000

@@ -65,6 +65,18 @@ describe("GET /api/pipeline/literature does not overclaim", () => {
     }
   });
 
+  it("credits no model that none of its domains runs", async () => {
+    // `literature.epidemiology` (Kermack & McKendrick 1927) was served
+    // here until 2026-11-01, beside four domains none of which is
+    // epidemiological: epidemiology was archived on 2026-09-27, after
+    // v0.4.0, the last release that runs it. A real paper printed beside
+    // results it did not produce is the defect the test above exists for.
+    const res = await request(app).get("/api/pipeline/literature");
+    expect(res.status).toBe(200);
+    expect(res.body.literature).not.toHaveProperty("epidemiology");
+    expect(JSON.stringify(res.body)).not.toMatch(/Kermack|McKendrick/);
+  });
+
   it("and the stronger claim it dropped is still false", async () => {
     // The premise of the correction, pinned. If every reference ever DID
     // acquire a DOI, the old sentence would become true and this test

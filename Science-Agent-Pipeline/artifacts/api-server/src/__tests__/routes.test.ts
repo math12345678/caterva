@@ -29,6 +29,13 @@ let server: Server;
  * missing is a broken environment -- which is a thing to report, not a thing
  * to swallow. Compare the stdpopsim skip (Part 21): an explicit skip with a
  * stated reason is legible in a CI summary; a green test is not.
+ *
+ * (Note, 2026-11-01: that skip, the `pytest.importorskip("stdpopsim")`
+ * in Tests/test_popgen_resolver.py, moved with popgen_resolver.py to
+ * archive/legacy_domains/ on 2026-11-01; v0.6.0 is the last release that
+ * ships them. stdpopsim itself was pinned in requirements.txt only from
+ * 2026-08-04 to 2026-08-16, when ADR 0061 took it out of the default
+ * install. The principle stands.)
  */
 async function awaitJob(
   jobId: string,
@@ -162,6 +169,11 @@ describe("POST /api/simulate", () => {
         // "failed"` and passed -- so the assertions below, including the two
         // that check beta and gamma survive the round trip, had never once
         // executed. Making the helper throw surfaced it on the first run.
+        //
+        // (Note, 2026-11-01: that was an SIR query. Epidemiology was
+        // archived on 2026-09-27, after v0.4.0, the last release that runs
+        // it, so the query is Michaelis-Menten and states its own s0, end
+        // and points; r0_recovered, beta and gamma no longer apply.)
         query: "simulate michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51",
       });
 

@@ -36,7 +36,10 @@ What it demands is that every number be **declared**, in
 
   RESOLVED       - not a constant at all; fetched live from a primary
                    source per query, with a citation attached to the value
-                   (BRENDA, stdpopsim, the ADR 0017 registry).
+                   (BRENDA; stdpopsim and the ADR 0017 registry too until
+                   2026-09-27, when the SIR, SEIR and Wright-Fisher entries
+                   left this inventory with their domains, after v0.4.0 --
+                   every RESOLVED entry has been BRENDA since).
   VERIFIED       - a constant whose value was checked against a named
                    primary source, with the check itself automated.
   UNVERIFIED     - a teaching default chosen for pedagogy, not derived from

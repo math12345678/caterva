@@ -40,7 +40,8 @@ antimony==2.14.0
 python-libsbml==5.21.1
 # SED-ML, for the COMBINE archive export. BSD (Frank Bergmann, Heidelberg),
 # so it sits under Apache-2.0 without the separation stdpopsim needed --
-# see requirements-popgen.txt for the GPL case and docs/LICENSING.md.
+# see docs/LICENSING.md for the GPL case (and, since 2026-11-01,
+# archive/legacy_domains/requirements-popgen.txt for the file it was).
 #
 # A hard dependency rather than optional: the archive is built THROUGH
 # libSEDML rather than string-formatted, so the document is correct by
@@ -74,7 +75,8 @@ pydantic==2.13.4
 
 # --- Population genetics -----------------------------------------------
 #
-# stdpopsim MOVED to requirements-popgen.txt on 2026-08-15. It is NOT
+# stdpopsim MOVED to requirements-popgen.txt on 2026-08-16 (ADR 0061 is
+# dated 2026-08-15; the commit, b1bc8f4, is 2026-08-16). It is NOT
 # installed by default, and that is a licence decision rather than a
 # packaging preference.
 #
@@ -86,16 +88,18 @@ pydantic==2.13.4
 # declares Apache-2.0 — a tension a reader would have had to discover by
 # reading two licence files and inferring the interaction.
 #
-# The code has always treated it as optional. `Tests/popgen_resolver.py`
-# wraps `import stdpopsim` in try/except ImportError and returns
-# `found=False` with a search log saying so; the 19 popgen tests skip
-# cleanly and `make check` already reports the absence as a warning. So the
+# The code had always treated it as optional. `Tests/popgen_resolver.py`
+# wrapped `import stdpopsim` in try/except ImportError and returned
+# `found=False` with a search log saying so; the 19 popgen tests skipped
+# cleanly and `make check` reported the absence as a warning. So the
 # manifest was the only place claiming it was required, and it was the only
 # place that was wrong.
 #
-# To use the population-genetics resolver:
-#
-#     pip install -r requirements-popgen.txt
+# 2026-11-01: the resolver, its tests and requirements-popgen.txt moved to
+# archive/legacy_domains/ (v0.6.0 is the last release that ships them), so
+# no live manifest installs stdpopsim and nothing live imports it. This
+# section used to end "To use the population-genetics resolver: pip
+# install -r requirements-popgen.txt"; check out v0.6.0 for that instead.
 #
 # See NOTICE, "Third-party software", and
 # docs/adr/0061-gpl-out-of-the-default-install.md.

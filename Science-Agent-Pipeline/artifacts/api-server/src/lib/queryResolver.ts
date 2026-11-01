@@ -854,7 +854,7 @@ function buildUnresolvedKineticProvenance(
  */
 async function applyKineticResolution(
   entities: EntityExtraction | undefined,
-  overrides: Record<string, number | number[]>,
+  overrides: Record<string, number>,
   domain: string,
   allowCrossSpecies: boolean,
   allowVariants: boolean,
@@ -1131,7 +1131,7 @@ async function applyKineticResolution(
  */
 async function applyVmaxFromKcatResolution(
   entities: EntityExtraction | undefined,
-  overrides: Record<string, number | number[]>,
+  overrides: Record<string, number>,
   domain: string,
   parameters: Record<string, number | number[]>,
   parameterProvenance: Record<string, ParameterProvenance>,
@@ -1459,10 +1459,11 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     //
     // ADR 0008: `modelCitations` describes the MODEL, never a parameter
     // value. Every other domain in this table cites the paper that defines
-    // its model -- Kermack & McKendrick for SIR, Gillespie for the SSA,
-    // Lotka for Lotka-Volterra, Elowitz & Leibler for the repressilator.
-    // These two cited a database, so the two domains most central to this
-    // project were the only ones whose model was uncited.
+    // its model -- Gillespie for the SSA (and, before the 2026-09-27
+    // archive, Kermack & McKendrick for SIR, Lotka for Lotka-Volterra,
+    // Elowitz & Leibler for the repressilator). These two cited a
+    // database, so the two domains most central to this project were the
+    // only ones whose model was uncited.
     //
     // And these `parameters` are hardcoded defaults (km 2, vmax 5) used
     // when nothing resolved. On that path BRENDA supplied nothing, so
@@ -1526,20 +1527,38 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   },
 ];
 
+/**
+ * The keys a user may set as `key=value` overrides: exactly the parameters
+ * caterva_runner.py's live run functions read (`params.get(...)` in
+ * run_mm, run_mm_competitive_inhibition and the three Gillespie runners).
+ *
+ * Until 2026-11-01 this list also carried 27 keys (beta, gamma, sigma,
+ * r0, population_size, starting_frequencies, mutation_rate, n_particles,
+ * temperature, ...) of the domains archived on 2026-09-27, after v0.4.0
+ * (the last release that runs them). No live domain reads any of them,
+ * and because extraction runs before domain classification, they did
+ * harm: "two locus ... starting_frequencies=0.5,0,0,0.4" was answered
+ * with an array-validation error telling the user to fix their haplotype
+ * frequencies, instead of the archive refusal.
+ *
+ * An archived key in `key=value` form is now an ordinary unrecognised
+ * token -- it is not an override and never reaches the engine, and a
+ * question naming its domain is refused with the archive date and the
+ * release that still runs it (archivedDomainResidue.test.ts).
+ */
 const PARAMETER_NAMES =
-  "km|ki|vmax|kcat|enzyme_conc|s0|beta|gamma|sigma|e0|i0|r0|r0_recovered|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|starting_frequencies|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k|n_replicates|seed|alpha|delta|p0|v0";
+  "km|ki|vmax|kcat|enzyme_conc|s0|i0|end|points|a0|b0|k|n_replicates|seed";
 
 /**
  * Matches a parameter token: the key name, an optional `=` or `:`
- * delimiter, and the value portion (which may be a scalar or a
- * comma-separated array).
+ * delimiter, and the value portion.
  */
 const PARAMETER_TOKEN_PATTERN = new RegExp(
   `^(${PARAMETER_NAMES})\\s*[=:]\\s*(.+)$`,
   "i",
 );
 
-/** Scalar: km=5, vmax 10, beta = 0.4
+/** Scalar: km=5, vmax 10, s0 = 0.4
  *
  * ANCHORED (`^...$`), and that is load-bearing. Unanchored, this matched a
  * parameter name appearing ANYWHERE inside a whitespace-delimited token,
@@ -1584,7 +1603,18 @@ const BARE_PARAMETER_NAME_PATTERN = new RegExp(`^(${PARAMETER_NAMES})$`, "i");
 const BARE_NUMBER_PATTERN = /^[0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?$/i;
 
 /**
- * Validation errors for malformed array overrides.
+ * Raised when a `key=value` override carries a comma-separated list or a
+ * bracket where one number belongs ("km=1,2", "s0=[10]").
+ *
+ * No live parameter is array-valued. The one that was,
+ * `starting_frequencies` (two-locus Wright-Fisher), went with its domain
+ * when it was archived on 2026-09-27, after v0.4.0 (the last release that
+ * runs it), and the array parser and its length/sum validators went with
+ * it on 2026-11-01. The rejection stays: reading "km=1,2" as km=1 would
+ * run the engine on half of what the user typed and report it as their
+ * choice, so a list is refused loudly.
+ * The class keeps its old name so a caller that already catches it by
+ * name keeps working.
  */
 export class ArrayOverrideValidationError extends Error {
   constructor(
@@ -1597,124 +1627,19 @@ export class ArrayOverrideValidationError extends Error {
 }
 
 /**
- * Parse a single comma-separated value string into a number array.
- * Returns undefined if the string contains no commas (meaning it should
- * be treated as a scalar, not an array).
- *
- * For array parameters, validation happens in `validateArrayOverride()`
- * after parsing — this function only extracts the raw numbers.
- */
-function parseArrayValue(raw: string): number[] | undefined {
-  const trimmed = raw.replace(/^\[|\]$/g, "").trim();
-  if (!trimmed.includes(",")) return undefined;
-  const parts = trimmed.split(",").map((s) => s.trim());
-  if (parts.length === 0 || parts.some((s) => s === "")) return undefined;
-  const nums = parts.map((s) => Number.parseFloat(s));
-  if (!nums.every((n) => Number.isFinite(n))) return undefined;
-  return nums;
-}
-
-/**
- * Known array-valued parameters and their validation constraints.
- *
- * Each entry specifies:
- *  - `length`: exact number of elements required
- *  - `sumTo`: if set, the elements must sum to this value within tolerance
- *  - `tolerance`: float tolerance for the sum check (default 1e-6)
- *
- * Mutation-test note (Rule 6): the sum tolerance is guarded by the array
- * override suite. Mutating `1e-6` -> `1e6` is caught by 4 tests across
- * arrayOverride.test.ts, provenance.test.ts, and queryOverrides.test.ts
- * ("rejects ... that sum to 0.9" / "do not sum to 1" / "rejects array that
- * doesn't sum to 1" / "rejects sum!=1"); the mutation was run and reverted.
- */
-const ARRAY_VALIDATORS: Record<
-  string,
-  { length: number; sumTo?: number; tolerance?: number }
-> = {
-  starting_frequencies: { length: 4, sumTo: 1, tolerance: 1e-6 },
-};
-
-/**
- * Validate an array override against its declared constraints.
- * Throws `ArrayOverrideValidationError` with a clear, actionable message
- * if validation fails.
- */
-function validateArrayOverride(key: string, arr: number[]): void {
-  const spec = ARRAY_VALIDATORS[key];
-  if (!spec) {
-    throw new ArrayOverrideValidationError(
-      key,
-      `'${key}' is not an array-valued parameter. ` +
-        `Remove the commas or use a valid array parameter.`,
-    );
-  }
-
-  if (arr.length !== spec.length) {
-    throw new ArrayOverrideValidationError(
-      key,
-      `${key} must have exactly ${spec.length} values (${arr.length} provided). ` +
-        `Example: ${key}=${Array(spec.length).fill("0.25").join(",")}`,
-    );
-  }
-
-  if (spec.sumTo !== undefined) {
-    const sum = arr.reduce((a, b) => a + b, 0);
-    const tolerance = spec.tolerance ?? 1e-6;
-    if (Math.abs(sum - spec.sumTo) > tolerance) {
-      throw new ArrayOverrideValidationError(
-        key,
-        `${key} values must sum to ${spec.sumTo} (got ${sum.toPrecision(6)}). ` +
-          `Haplotype frequencies must sum to 1.0.`,
-      );
-    }
-  }
-}
-
-/**
  * Extract numeric overrides from the query string.
  *
- * Supports both scalar and array-valued parameters:
- *   - Scalar: "km=5", "vmax 10", "beta = 0.4"
- *   - Array:  "starting_frequencies=0.5,0,0,0.5"
- *            "starting_frequencies=[0.5,0,0,0.5]"
+ *   - "km=5", "km:5", "km5", "km 5"  ->  { km: 5 }
  *
- * Array syntax requires `=` or `:` so it cannot be confused with a scalar
- * followed by unrelated text.
+ * Only the keys in PARAMETER_NAMES are recognised. Every value is a single
+ * number; a list ("km=1,2") throws ArrayOverrideValidationError rather
+ * than being truncated to its first element.
  */
 export function extractParameterOverrides(
   query: string,
-): Record<string, number | number[]> {
-  const overrides: Record<string, number | number[]> = {};
+): Record<string, number> {
+  const overrides: Record<string, number> = {};
 
-  // --- Array overrides: scan the RAW query first -------------------------
-  //
-  // Tokenization splits on whitespace, which breaks `key=a, b, c, d` apart
-  // into `key=a,` `b,` `c,` `d`. Scanning the raw query with a dedicated
-  // pattern captures the full comma-separated group regardless of spaces.
-  const arrayKeys = new Set<string>();
-  for (const [key, spec] of Object.entries(ARRAY_VALIDATORS)) {
-    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const arrayRe = new RegExp(
-      `${escapedKey}\\s*[=:]\\s*\\[?([0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?(?:\\s*,\\s*[0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?)+)\\]?`,
-      "i",
-    );
-    const m = arrayRe.exec(query);
-    if (m) {
-      const arr = parseArrayValue(m[1]!);
-      if (arr !== undefined) {
-        validateArrayOverride(key, arr);
-        overrides[key] = arr;
-        arrayKeys.add(key);
-      }
-    }
-  }
-
-  // --- Scalar / token-based extraction ----------------------------------
-  //
-  // Keys already captured as arrays are skipped so a partial token
-  // (e.g. `starting_frequencies=0.5,` from a space-split list) cannot
-  // overwrite the validated array with a scalar.
   const tokens = query.split(/\s+/);
   for (let tokenIdx = 0; tokenIdx < tokens.length; tokenIdx++) {
     const token = tokens[tokenIdx]!;
@@ -1722,43 +1647,20 @@ export function extractParameterOverrides(
     const kvMatch = PARAMETER_TOKEN_PATTERN.exec(token);
     if (kvMatch) {
       const key = kvMatch[1]!.toLowerCase();
-      if (arrayKeys.has(key)) continue;
-
       const rawValue = kvMatch[2]!;
 
-      // If the value contains commas or brackets, it MUST be an array.
-      // Do not fall back to scalar — a malformed array is rejected.
       if (rawValue.includes(",") || /\[/.test(rawValue)) {
-        const arr = parseArrayValue(rawValue);
-        if (arr !== undefined) {
-          validateArrayOverride(key, arr);
-          overrides[key] = arr;
-        } else {
-          throw new ArrayOverrideValidationError(
-            key,
-            `'${key}' value '${rawValue}' is not a valid comma-separated number list. ` +
-              `Example: ${key}=0.5,0,0,0.5`,
-          );
-        }
-        continue;
-      }
-
-      // Scalar parse — but only if this key is not an array parameter.
-      // An array parameter supplied without commas (e.g. starting_frequencies=0.5)
-      // is malformed and must be rejected, not silently accepted as a scalar.
-      if (ARRAY_VALIDATORS[key] === undefined) {
-        const value = Number.parseFloat(rawValue);
-        if (Number.isFinite(value)) {
-          overrides[key] = value;
-          continue;
-        }
-      } else {
-        // Array parameter supplied as scalar — reject with actionable message.
         throw new ArrayOverrideValidationError(
           key,
-          `'${key}' requires a comma-separated list (e.g. ${key}=0.5,0,0,0.5), ` +
-            `not a single number.`,
+          `'${key}' takes a single number, not the list '${rawValue}'. ` +
+            `Example: ${key}=5`,
         );
+      }
+
+      const value = Number.parseFloat(rawValue);
+      if (Number.isFinite(value)) {
+        overrides[key] = value;
+        continue;
       }
     }
 
@@ -1767,7 +1669,6 @@ export function extractParameterOverrides(
     const scalarMatch = PARAMETER_PATTERN.exec(token);
     if (scalarMatch) {
       const key = scalarMatch[1]!.toLowerCase();
-      if (arrayKeys.has(key)) continue;
       const value = Number.parseFloat(scalarMatch[2]!);
       if (Number.isFinite(value)) {
         overrides[key] = value;
@@ -1781,25 +1682,17 @@ export function extractParameterOverrides(
     // cannot see the next token. Consuming the pair here is what makes it
     // real. Only a BARE name (no `=`/`:`/digits already on it -- ruled out
     // by every branch above reaching here) followed by a BARE number
-    // qualifies, so "km=5 10" or "beta: x" cannot accidentally pair with
+    // qualifies, so "km=5 10" or "km: x" cannot accidentally pair with
     // an unrelated neighboring number.
     if (BARE_PARAMETER_NAME_PATTERN.test(token) && tokenIdx + 1 < tokens.length) {
       const key = token.toLowerCase();
       const nextToken = tokens[tokenIdx + 1]!;
-      if (!arrayKeys.has(key) && BARE_NUMBER_PATTERN.test(nextToken)) {
-        if (ARRAY_VALIDATORS[key] === undefined) {
-          const value = Number.parseFloat(nextToken);
-          if (Number.isFinite(value)) {
-            overrides[key] = value;
-            tokenIdx++; // consume the value token so it is not re-scanned
-          }
+      if (BARE_NUMBER_PATTERN.test(nextToken)) {
+        const value = Number.parseFloat(nextToken);
+        if (Number.isFinite(value)) {
+          overrides[key] = value;
+          tokenIdx++; // consume the value token so it is not re-scanned
         }
-        // An array parameter named bare ("starting_frequencies 0.5") is
-        // left unmatched here rather than rejected: unlike `key=0.5`,
-        // typing the name and a lone number with a space is at least as
-        // likely to be prose ("starting_frequencies 0.5 each" is not
-        // natural) as an attempted override, so silence is safer than an
-        // error a plain sentence could trigger by coincidence.
       }
     }
   }
@@ -2066,7 +1959,7 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
  */
 function buildParameterProvenance(
   parameters: Record<string, number | number[]>,
-  overrides: Record<string, number | number[]>,
+  overrides: Record<string, number>,
   llmSupplied: Record<string, number | number[]>,
   domain: string,
 ): Record<string, ParameterProvenance> {
@@ -2121,6 +2014,11 @@ function buildParameterProvenance(
  * number they had already given, in the same sentence. Reading it is not
  * inventing it; the difference between "a town of 10000 people" and
  * "s0=10000" is grammar, not provenance, and both are origin "user".
+ * (Note, 2026-11-01: that covid example is an epidemiology question, a
+ * domain archived on 2026-09-27, after v0.4.0, the last release that
+ * runs it; statedQuantities.ts now reads only stated concentrations
+ * (s0, enzyme_conc) and durations (end) for the two Michaelis-Menten
+ * domains, and the same rule applies to them.)
  *
  * An explicit key=value ALWAYS wins over prose. Someone who writes
  * "s0=500" after describing a town of 10000 is correcting themselves, and
@@ -2137,9 +2035,9 @@ function buildParameterProvenance(
 function readStatedQuantities(
   query: string,
   domain: SimulationDomain,
-  overrides: Record<string, number | number[]>,
+  overrides: Record<string, number>,
 ): {
-  effectiveOverrides: Record<string, number | number[]>;
+  effectiveOverrides: Record<string, number>;
   statedPhrases: Record<string, string>;
 } {
   const statedPhrases: Record<string, string> = {};
@@ -2190,7 +2088,7 @@ function provenanceViolations(
  * Generate flags about parameter extraction from query overrides.
  * Consolidated pattern used in both LLM and fallback resolution paths.
  */
-function buildParameterExtractionFlags(overrides: Record<string, number | number[]>): string[] {
+function buildParameterExtractionFlags(overrides: Record<string, number>): string[] {
   const extractionFlags: string[] = [];
   if (Object.keys(overrides).length === 0) {
     extractionFlags.push("No parameters were extracted from the query; using defaults.");

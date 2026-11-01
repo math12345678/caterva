@@ -6,7 +6,7 @@ import {
   resolveQuery,
 } from "../lib/queryResolver";
 import { resolveKineticValue } from "../lib/scienceAgent";
-import { RequiredParametersMissingError } from "../lib/provenance";
+import { UnrecognizedQueryError } from "../lib/provenance";
 
 vi.mock("../lib/scienceAgent", async (importOriginal) => {
   const original =
@@ -68,7 +68,7 @@ describe("extractParameterOverrides", () => {
     });
 
     it("handles decimal values", () => {
-      expect(extractParameterOverrides("beta=0.3")).toEqual({ beta: 0.3 });
+      expect(extractParameterOverrides("s0=0.3")).toEqual({ s0: 0.3 });
     });
 
     it("handles scientific notation", () => {
@@ -90,136 +90,104 @@ describe("extractParameterOverrides", () => {
     });
   });
 
-  describe("array overrides (new behavior)", () => {
-    it("extracts a comma-separated array from key=value", () => {
-      expect(
-        extractParameterOverrides("starting_frequencies=0.5,0,0,0.5"),
-      ).toEqual({ starting_frequencies: [0.5, 0, 0, 0.5] });
-    });
-
-    it("extracts a bracket-enclosed array from key=value", () => {
-      expect(
-        extractParameterOverrides("starting_frequencies=[0.5,0,0,0.5]"),
-      ).toEqual({ starting_frequencies: [0.5, 0, 0, 0.5] });
-    });
-
-    it("extracts array with key:value syntax (no space)", () => {
-      expect(
-        extractParameterOverrides("starting_frequencies:0.5,0,0,0.5"),
-      ).toEqual({ starting_frequencies: [0.5, 0, 0, 0.5] });
-    });
-
-    it("handles scientific notation elements", () => {
-      expect(
-        extractParameterOverrides("starting_frequencies=1e-1,2e-1,3e-1,4e-1"),
-      ).toEqual({ starting_frequencies: [0.1, 0.2, 0.3, 0.4] });
-    });
-
-    it("accepts spaces after commas", () => {
-      expect(
-        extractParameterOverrides("starting_frequencies=0.5, 0, 0, 0.5"),
-      ).toEqual({ starting_frequencies: [0.5, 0, 0, 0.5] });
-    });
-
-    it("accepts a bracket-enclosed array with spaces", () => {
-      expect(
-        extractParameterOverrides("starting_frequencies=[0.5, 0, 0, 0.5]"),
-      ).toEqual({ starting_frequencies: [0.5, 0, 0, 0.5] });
-    });
-
-    it("rejects array with wrong length", () => {
-      expect(() =>
-        extractParameterOverrides("starting_frequencies=0.5,0,0"),
-      ).toThrow(ArrayOverrideValidationError);
-    });
-
-    it("rejects array that doesn't sum to 1", () => {
-      expect(() =>
-        extractParameterOverrides("starting_frequencies=0.5,0,0,0.4"),
-      ).toThrow(ArrayOverrideValidationError);
-    });
-
-    it("rejects array with non-numeric elements", () => {
-      expect(() =>
-        extractParameterOverrides("starting_frequencies=0.5,abc,0,0.5"),
-      ).toThrow(ArrayOverrideValidationError);
+  describe("a list where one number belongs", () => {
+    // No live parameter is array-valued. starting_frequencies was, for
+    // two-locus Wright-Fisher, and went with that domain into the
+    // 2026-09-27 archive (after v0.4.0, the last release that runs it).
+    // A list is still refused loudly rather than truncated to its first
+    // element: "km=1,2" read as km=1 would run on half of what the user
+    // typed and call it their choice.
+    it.each(["km=1,2", "s0=[10]", "vmax=5, 6"])("rejects %j", (q) => {
+      expect(() => extractParameterOverrides(q)).toThrow(
+        ArrayOverrideValidationError,
+      );
+      expect(() => extractParameterOverrides(q)).toThrow(/single number/);
     });
   });
 
-  describe("mixed scalar and array overrides", () => {
-    it("extracts both from the same query", () => {
-      expect(
-        extractParameterOverrides(
-          "starting_frequencies=0.8,0,0,0.2 recombination_rate=0.05 population_size=200",
-        ),
-      ).toEqual({
-        starting_frequencies: [0.8, 0, 0, 0.2],
-        recombination_rate: 0.05,
-        population_size: 200,
-      });
+  describe("archived-domain parameter names are not overrides", () => {
+    // Until 2026-11-01 PARAMETER_NAMES also held the keys of the domains
+    // archived on 2026-09-27, after v0.4.0 (the last release that runs
+    // them). They are now ordinary unrecognised tokens: extracted as
+    // nothing, so they cannot reach the engine, and a malformed value for
+    // one (a list that does not sum to 1, a scalar where a vector was
+    // expected) no longer raises a validation error that reads as though
+    // the domain still ran.
+    it.each([
+      "beta=0.3",
+      "gamma:0.1",
+      "sigma 0.2",
+      "r0_recovered=0",
+      "population_size=200",
+      "generations=30",
+      "mutation_rate=1.29e-8",
+      "recombination_rate=0.05",
+      "starting_frequency=0.5",
+      "starting_frequencies=0.5,0,0,0.4",
+      "starting_frequencies=[0.5,0,0,0.5]",
+      "n_particles=64 temperature=1.0 timestep=0.005",
+      "cycles=30 efficiency=0.9",
+    ])("%j yields no override", (q) => {
+      expect(extractParameterOverrides(q)).toEqual({});
     });
 
-    it("does not confuse scalar for part of array", () => {
-      expect(extractParameterOverrides("starting_frequency=0.5")).toEqual({
-        starting_frequency: 0.5,
-      });
+    it("keeps the live keys beside an archived one", () => {
+      expect(
+        extractParameterOverrides("km=2 beta=0.3 vmax=5 population_size=100"),
+      ).toEqual({ km: 2, vmax: 5 });
     });
   });
 
   describe("edge cases", () => {
     it("case-insensitive parameter names", () => {
-      expect(
-        extractParameterOverrides("Starting_Frequencies=0.5,0,0,0.5"),
-      ).toEqual({ starting_frequencies: [0.5, 0, 0, 0.5] });
+      expect(extractParameterOverrides("KM=0.5 Vmax=5")).toEqual({
+        km: 0.5,
+        vmax: 5,
+      });
     });
   });
 });
 
-// ─── Integration tests: resolveQuery with two_locus_wright_fisher ─────────
+// ─── Integration: an archived parameter in an archived-domain question ───
+//
+// extractParameterOverrides runs before domain classification. While
+// starting_frequencies was still a recognised array key, this exact query
+// was answered with ArrayOverrideValidationError ("values must sum to 1")
+// -- a request to fix the haplotype frequencies of a domain that no longer
+// runs. It now reaches classification and gets the archive refusal.
 
-// All overrides required for two_locus_wright_fisher (no literature-resolvable
-// fields exist for this domain, so every parameter must be user-supplied).
-const TWO_LOCUS_OVERRIDES =
-  "population_size=200 generations=30 recombination_rate=0.1 starting_frequencies=0.5,0,0,0.5 mutation_rate=0.001 replicate_runs=100";
-
-describe("resolveQuery — two_locus_wright_fisher array overrides", () => {
-  // Test 1: Full success — all required overrides supplied
-  // Test 2: Sum ≠ 1 → rejected
-  it("test 2: rejects sum≠1 with clear error", async () => {
-    await expect(
-      resolveQuery(
-        `linkage disequilibrium two locus population_size=200 generations=30 recombination_rate=0.1 starting_frequencies=0.5,0,0,0.4 mutation_rate=0.001 replicate_runs=100`,
-      ),
-    ).rejects.toThrow(ArrayOverrideValidationError);
-    await expect(
-      resolveQuery(
-        `linkage disequilibrium two locus population_size=200 generations=30 recombination_rate=0.1 starting_frequencies=0.5,0,0,0.4 mutation_rate=0.001 replicate_runs=100`,
-      ),
-    ).rejects.toThrow(/must sum to 1/);
+describe("resolveQuery — archived domain with archived key=value parameters", () => {
+  it("refuses with the archive date and v0.4.0, not a parameter error", async () => {
+    const err = await resolveQuery(
+      "linkage disequilibrium two locus wright fisher population_size=200 " +
+        "generations=30 recombination_rate=0.1 starting_frequencies=0.5,0,0,0.4 " +
+        "mutation_rate=0.001 replicate_runs=100",
+    ).catch((e: unknown) => e);
+    expect(err).not.toBeInstanceOf(ArrayOverrideValidationError);
+    expect(err).toBeInstanceOf(UnrecognizedQueryError);
+    const message = String((err as Error).message);
+    expect(message).toContain("archived on 2026-09-27");
+    expect(message).toContain("v0.4.0");
   });
 
-  // Test 3: Only 3 values → rejected
-  it("test 3: rejects wrong length with clear error", async () => {
-    await expect(
-      resolveQuery(
-        `linkage disequilibrium two locus population_size=200 generations=30 recombination_rate=0.1 starting_frequencies=0.5,0,0 mutation_rate=0.001 replicate_runs=100`,
-      ),
-    ).rejects.toThrow(ArrayOverrideValidationError);
-    await expect(
-      resolveQuery(
-        `linkage disequilibrium two locus population_size=200 generations=30 recombination_rate=0.1 starting_frequencies=0.5,0,0 mutation_rate=0.001 replicate_runs=100`,
-      ),
-    ).rejects.toThrow(/exactly 4 values/);
+  it("an archived key on a live-domain query is ignored, not run", async () => {
+    // beta is not a parameter of Michaelis-Menten and is no longer an
+    // override at all: the run carries exactly the mm parameters.
+    const resolved = await resolveQuery(
+      "simulate enzyme kinetics km=0.5 vmax=5 s0=10 end=10 points=51 beta=0.3",
+    );
+    expect(resolved.domain).toBe("mm");
+    expect(resolved.parameters).not.toHaveProperty("beta");
+    expect(resolved.parameterProvenance).not.toHaveProperty("beta");
+    expect(resolved.parameters["km"]).toBe(0.5);
   });
-
-  // Test 4: Absent starting_frequencies → RequiredParametersMissingError
 });
 
 // ─── Regression: existing mm golden query ──────────────────────────────────
 //
 // An existing mm query must not regress. This also proves that scalar
 // override behaviour and RESOLVABLE_FIELDS / provenance validation are
-// untouched by the array-override changes.
+// untouched by the removal of the archived keys and the array parser.
 //
 // Bare "simulate lactate dehydrogenase" resolves km from BRENDA (via the
 // mocked science agent) but vmax/s0/end/points are not literature-resolvable
