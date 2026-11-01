@@ -336,10 +336,14 @@ export const TEST_SUITES: TestSuite[] = [
         // passed, 1 skipped, 0 failed, 1245 s. The skip is
         // test_popgen_resolver.py's module-level skip (stdpopsim absent);
         // the dependency-licence test ran, with JavaScript packages present.
-        passed: 1666,
+        // CI's 3.10 job then failed one test there: CORE's "+0000" reset
+        // timestamp, which fromisoformat accepts only from 3.11. The parser
+        // now falls back to strptime, and one test forces that path on any
+        // interpreter (2026-11-01; the file passed in full, 12 of 12): 1667.
+        passed: 1667,
         skipped: 1,
         failed: 0,
-        collected: 1666,
+        collected: 1667,
       },
     ],
   },

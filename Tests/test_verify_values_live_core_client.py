@@ -176,3 +176,21 @@ def test_a_paced_wait_beyond_the_budget_raises_without_sending_the_request():
         c.search("second")
     assert s.slept == []
     assert s.calls == 1
+
+
+def test_core_iso_reset_parses_where_fromisoformat_refuses_the_offset(monkeypatch):
+    # Python 3.10's fromisoformat rejects "+0000" and "Z". CI caught that on
+    # 3.10 only; this forces the same refusal on any interpreter, so the
+    # fallback is exercised wherever the suite runs.
+    class Py310Datetime(datetime.datetime):
+        @classmethod
+        def fromisoformat(cls, value):
+            if value.endswith(("Z", "+0000")):
+                raise ValueError(f"Invalid isoformat string: {value!r}")
+            return super().fromisoformat(value)
+
+    monkeypatch.setattr(live.datetime, "datetime", Py310Datetime)
+    now = datetime.datetime(2026, 10, 31, 12, 0, 0, tzinfo=datetime.timezone.utc)
+    assert live._seconds_until("2026-10-31T12:00:10+0000", now.timestamp()) == 10.0
+    assert live._seconds_until("2026-10-31T12:00:10.500Z", now.timestamp()) == 10.5
+    assert live._seconds_until("not a time", now.timestamp()) is None

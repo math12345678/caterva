@@ -98,6 +98,24 @@ def pubmed_summaries(ids: list[str], key: str) -> dict[str, dict]:
     return r.json()["result"]
 
 
+def _parse_iso(value: str) -> datetime.datetime | None:
+    """An ISO timestamp, including CORE's "+0000" offset, on Python 3.10 too.
+
+    fromisoformat accepts "+0000" and "Z" only from 3.11 on; strptime's %z
+    has accepted both since 3.7, and the wheel supports 3.10.
+    """
+    try:
+        return datetime.datetime.fromisoformat(value)
+    except ValueError:
+        pass
+    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S.%f%z"):
+        try:
+            return datetime.datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return None
+
+
 def _seconds_until(value: str | None, now: float) -> float | None:
     """A reset hint as seconds from now: delta-seconds, HTTP-date or ISO."""
     if not value:
@@ -111,10 +129,8 @@ def _seconds_until(value: str | None, now: float) -> float | None:
     try:
         when = email.utils.parsedate_to_datetime(value)
     except (TypeError, ValueError):
-        try:
-            # CORE writes "+0000"; fromisoformat accepts that from 3.11 on.
-            when = datetime.datetime.fromisoformat(value)
-        except ValueError:
+        when = _parse_iso(value)
+        if when is None:
             return None
     if when.tzinfo is None:
         when = when.replace(tzinfo=datetime.timezone.utc)
