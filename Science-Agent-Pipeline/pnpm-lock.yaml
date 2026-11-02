@@ -524,8 +524,8 @@ importers:
         specifier: 'catalog:'
         version: 0.545.0(react@19.1.0)
       markdown-it:
-        specifier: ^14.1.0
-        version: 14.3.2
+        specifier: ^14.3.3
+        version: 14.3.3
       react:
         specifier: 'catalog:'
         version: 19.1.0
@@ -3394,6 +3394,10 @@ packages:
 
   markdown-it@14.3.2:
     resolution: {integrity: sha512-sHHjZ5fJKlgrG4qns2YwVcdNep35h5fERrfkD2YNsb9UFk0UIHarbiTaHKVMlPuWAoiilyK8Fv/jAm11slsY7Q==}
+    hasBin: true
+
+  markdown-it@14.3.3:
+    resolution: {integrity: sha512-L//tDAkjTjJCU6pBUSBTgs3Kg4InVaZuUZog/b6V12UKhcDQ7S78877ibbCanRExwPuYP1CZD7Gd2dxSy1GXRg==}
     hasBin: true
 
   math-intrinsics@1.1.0:
@@ -6830,6 +6834,15 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   markdown-it@14.3.2:
+    dependencies:
+      argparse: 2.0.1
+      entities: 4.5.0
+      linkify-it: 5.0.2
+      mdurl: 2.1.0
+      punycode.js: 2.3.1
+      uc.micro: 2.1.0
+
+  markdown-it@14.3.3:
     dependencies:
       argparse: 2.0.1
       entities: 4.5.0
