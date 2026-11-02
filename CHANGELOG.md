@@ -25,6 +25,7 @@ tree, or removed (ADR 0180).
 - The dashboard shows the literature score on a 0-1 scale, labelled a heuristic and not a probability, and computes the average tile from the runs shown.
 - `scripts/verify_citations_live.py` and `scripts/verify_values_live.py` end every check matched, mismatched or unreachable (exit 0, 2, 1); DOIs are checked through the CrossRef API; BRENDA ref 740253 is no longer checked as a PubMed id.
 - scipy is pinned to 1.16.0 on Python 3.11-3.13, because 1.15.3's cp313 wheel does not import `scipy.sparse.linalg` on macOS 27.0.1; Python 3.10 keeps 1.15.3. certifi is 2026.10.19.
+- The API server logs with pino 10.3.1 and pino-http 11.0.0, the pino-http release built on pino 10; pino-http 10 still required pino 9, and the two type definitions did not typecheck together.
 - `docker-compose.yml` mounts `./data` for the job store (`CATERVA_JOBS_FILE`) instead of bind-mounting `./caterva-jobs.jsonl`; move that file into `./data` to keep a deployment's history.
 - `scripts/check_documented_counts.py` reads "N guards" as well as "N guard scripts", and skips a quoted count; it found three stale guard counts in `docs/readmes/`.
 - Monitoring files moved to `deploy/monitoring/`, their ports bound to 127.0.0.1, and Grafana's admin password is read from `GRAFANA_ADMIN_PASSWORD` with no default; `scripts/check_port_binding.py` reads that compose file too.
