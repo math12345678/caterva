@@ -633,7 +633,9 @@ def _provenance_concerns(
     else:
         detail = (
             f"all {unmeasured} rate constant(s) are the motif library's "
-            f"illustrative values, because no enzyme was named"
+            f"illustrative values, because "
+            + (model.no_subject_reason() if callable(getattr(model, "no_subject_reason", None))
+               else "no enzyme was named")
         )
         note = f"{unmeasured} constant(s) unmeasured"
 
@@ -644,6 +646,12 @@ def _provenance_concerns(
         f"run the literature search for {subject!r}, or supply the "
         f"constants the provenance table lists"
         if subject else
+        # The description named an enzyme and it was not applied, for the
+        # reason the detail gives: "name the enzyme" would send the reader
+        # to do what they had done.
+        "supply the constants the provenance table lists, each from a "
+        "measurement of the enzyme that runs that step"
+        if getattr(model, "unapplied_subject", None) else
         "name the enzyme, or supply the constants the provenance table lists"
         if _database_could_supply(model) else
         # A gene circuit's synthesis rates and repression thresholds are in

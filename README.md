@@ -172,7 +172,11 @@ needs a network connection).
 `compose "Michaelis Menten" --subject 1.1.1.27 --organism "Homo sapiens" --substrate pyruvate`
 builds the mechanism with those constants already in it, each row naming its
 reference and any constant the search could not find still marked a
-placeholder (ADR 0178). `make cite EC=1.1.1.27 SUBSTRATE=pyruvate
+placeholder (ADR 0178). The sentence alone does the same:
+`compose "Michaelis-Menten kinetics of human hexokinase on glucose"` reads
+EC 2.7.1.1, Homo sapiens and D-glucose from it, says how it read each word,
+and refuses a name that is several enzymes with each one named (ADR 0181).
+`make cite EC=1.1.1.27 SUBSTRATE=pyruvate
 ORGANISM="Homo sapiens"`, in a checkout, prints the constant alone, with the
 papers that disagree and the conditions it was measured under.
 

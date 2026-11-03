@@ -24,6 +24,15 @@ from dataclasses import dataclass, field
 from typing import Any, List, Optional, Sequence, Tuple
 
 
+def _no_subject_reason(model: Any) -> str:
+    """`ComposedModel.no_subject_reason`, for any model this is handed.
+
+    "No enzyme was named" was printed under a description that named one
+    and could not have it applied (ADR 0181); the model says which."""
+    reason = getattr(model, "no_subject_reason", None)
+    return reason() if callable(reason) else "no enzyme was named"
+
+
 @dataclass(frozen=True)
 class ModelDossier:
     """Everything known about one composed model."""
@@ -148,8 +157,9 @@ class ModelDossier:
         lines = ["", "## Where the numbers come from", ""]
 
         if self.model.structure_only:
+            why = _no_subject_reason(self.model)
             lines.append(
-                "**Nothing was searched for.** No enzyme was named, so there "
+                f"**Nothing was searched for.** {why[:1].upper()}{why[1:]}, so there "
                 "is nothing whose measured constants could be looked up. "
                 "These are the measurements that would complete the model:"
             )
@@ -788,7 +798,7 @@ class ModelDossier:
             "because this mechanism has no enzyme step, so its constants are "
             "not kept in an enzyme database"
             if not subject and not _database_could_supply(self.model)
-            else "because no enzyme was named" if not subject
+            else f"because {_no_subject_reason(self.model)}" if not subject
             else f"because no search has been run for {subject!r}"
             if count == total and not getattr(self.model, "searched", False)
             else f"because the search for {subject!r} did not find them"

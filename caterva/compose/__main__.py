@@ -951,6 +951,269 @@ def _validate_section(
 
 
 # ---------------------------------------------------------------------------
+# What the description itself names (ADR 0181)
+# ---------------------------------------------------------------------------
+
+#: The shapes a description's enzyme is applied to: ONE enzyme, whatever it
+#: is inhibited by or however many substrates it takes. A cascade, a
+#: competition, a pathway or a futile cycle has an enzyme per step, and one
+#: named enzyme's constants on every step is ADR 0076's adjacent-paper
+#: miscitation: "three step cascade of hexokinase" would carry hexokinase's
+#: Km on two steps hexokinase does not run.
+SINGLE_ENZYME_RULES = frozenset({
+    "michaelis_menten", "competitive_inhibition", "noncompetitive_inhibition",
+    "uncompetitive_inhibition", "mixed_inhibition", "substrate_inhibition",
+    "product_inhibition", "cooperative_catalysis", "reversible_catalysis",
+    "ordered_bi_bi", "ping_pong_bi_bi", "mwc_allostery",
+})
+
+#: The shape built when a description names an enzyme and no mechanism.
+NAMED_ENZYME_SHAPE = "Michaelis Menten"
+
+#: Word stems that describe a mechanism. A description the grammar did not
+#: recognise that names an enzyme AND one of these ("hexokinase
+#: oscillator") is refused, not read as one enzyme on one substrate: the
+#: person asked for a mechanism this grammar does not build, and building
+#: Michaelis-Menten instead would answer a question they did not ask.
+_MECHANISM_STEMS = (
+    "oscillat", "switch", "toggle", "feedback", "feed-forward", "feedforward", "loop", "cascade",
+    "cycle", "pathway", "bistab", "gene", "promoter", "repress", "transcri", "translat",
+    "transport", "pump", "channel", "receptor", "binding", "complex", "inhibit", "allosteric",
+    "cooperativ", "hill", "network", "circuit", "signal", "phosphorylation", "dephosph", "competition",
+    "competing", "branch", "reversible", "two-substrate", "bi-bi", "ping-pong",
+)
+
+
+@dataclass
+class DescriptionReading:
+    """What `read_description` made of `args.description`.
+
+    `description` is what to compose: the description as typed, or
+    NAMED_ENZYME_SHAPE when it named an enzyme and no mechanism. `notes`
+    are sentences for the report, each inference stated. `name_refusal`
+    is the policy's `NameNotResolved` when the enzyme the description names
+    is several enzymes, and `refusal_note` the search note that says so.
+    `unapplied` says why a named enzyme was not made the subject.
+    """
+
+    description: str
+    notes: List[str] = field(default_factory=list)
+    name_refusal: Optional[Any] = None
+    refusal_note: Optional[str] = None
+    unapplied: Optional[str] = None
+    enzyme_text: Optional[str] = None
+
+
+def _rerun_command(description: str) -> str:
+    """`caterva compose "<description>" --subject {ec}`, quoted for a shell and
+    with its braces doubled, because the refusal fills `{ec}` with format()."""
+    import shlex
+
+    quoted = (f'"{description}"' if not re.search(r'["$`\\!]', description)
+              else shlex.quote(description))
+    return f"caterva compose {quoted} --subject {{ec}}".replace("{", "{{").replace("}", "}}") \
+        .replace("{{ec}}", "{ec}")
+
+
+def _flag_subject_ec(args: Any) -> Optional[str]:
+    """The EC number `--subject` names, offline, or None when it does not
+    name exactly one (the search then refuses it, as it always has)."""
+    try:
+        from caterva.enzymes.policy import resolve_enzyme_name
+
+        return resolve_enzyme_name(args.subject, args.organism, allow_unlisted_ec=True).ec
+    except Exception:  # noqa: BLE001 - read_subject refuses it, with the candidates named
+        return None
+
+
+def _shape_from(description: str, reading: Any) -> Tuple[str, str, Optional[str]]:
+    """(what to compose, the rule it builds, a note) for `description`.
+
+    Raises the grammar's UnrecognisedShape unless the description named an
+    enzyme and nothing a mechanism is made of, in which case the shape is
+    one enzyme turning one substrate into product and the note says so.
+    """
+    from caterva.compose.grammar import UnrecognisedShape, _named_pathway_in, recognise
+
+    try:
+        return description, recognise(description).rule, None
+    except UnrecognisedShape as exc:
+        # A named pathway ("glycolysis") and a missing motif library are
+        # refusals with their own remedy; only "no shape matches" is a
+        # description that may just have named an enzyme and stopped.
+        if (type(exc) is not UnrecognisedShape or not reading.names_enzyme
+                or _named_pathway_in(description.lower()) is not None):
+            raise
+        enzyme = reading.enzyme_text
+        mechanism = [w for w in reading.remainder.lower().split()
+                     if any(w.startswith(stem) for stem in _MECHANISM_STEMS)]
+        if mechanism:
+            ec = reading.ec or "<its EC number>"
+            raise UnrecognisedShape(
+                description,
+                exc.reason + f" Your description names the enzyme {enzyme!r}, and also "
+                + ", ".join(repr(w) for w in mechanism) + ", which is not a mechanism this grammar "
+                "builds, so it was not read as one enzyme turning one substrate into product. "
+                f"To model it that way, run: caterva compose \"{NAMED_ENZYME_SHAPE}\" --subject {ec}",
+                suggestions=exc.suggestions) from None
+        return NAMED_ENZYME_SHAPE, "michaelis_menten", (
+            f"Your description named an enzyme ({enzyme!r}) and no mechanism this grammar "
+            "recognises, so its shape was read as Michaelis-Menten: one enzyme turning one "
+            "substrate into one product. To build another mechanism, describe it, e.g. "
+            "'Michaelis-Menten with a competitive inhibitor'.")
+
+
+def _why_not_applied(rule: str, model_tables: Sequence[Optional[str]], reading: Any) -> str:
+    named = f"the enzyme your description names ({reading.enzyme_text!r}"
+    named += f", EC {reading.ec})" if reading.ec else ")"
+    kcats = sum(1 for t in model_tables if t == "kcat")
+    if not any(t in ("kcat", "km") for t in model_tables):
+        return (f"{named} was not applied: this mechanism ({rule.replace('_', ' ')}) has no enzyme step, "
+                "so no constant of it is an enzyme's")
+    if kcats > 1:
+        return (f"{named} was not applied: this mechanism ({rule.replace('_', ' ')}) has {kcats} catalytic "
+                "steps, and one enzyme's measured constants on every step would ground steps the "
+                "description did not attach to it (ADR 0076)")
+    return (f"{named} was not applied: this mechanism ({rule.replace('_', ' ')}) is not one of the "
+            "single-enzyme shapes a description's enzyme is applied to (ADR 0181). Pass --subject to "
+            "apply it deliberately")
+
+
+def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = True) -> DescriptionReading:
+    """Fill what no flag set from what the description names, and say so.
+
+    THE ONE PLACE a description is read for its subject: `compose_report`
+    (so the terminal and Caterva Studio), `_export` and `--antimony` all call
+    this, so the three cannot read one sentence three ways. Flags always win:
+    the description only fills `args.subject`, `args.organism`,
+    `args.substrate` and `args.inhibitor` where no flag set them, and every
+    value it fills is a note in the report.
+
+    * An enzyme (caterva.enzymes.sentence: exact names and EC numbers only)
+      becomes the subject only in a single-enzyme shape (SINGLE_ENZYME_RULES);
+      in any other the report says it was not applied and why. A
+      description that named an enzyme and no mechanism is built as
+      Michaelis-Menten, and the note says that is how it was read.
+    * A name that is several enzymes is refused, the candidates named and
+      the exact command that accepts one given (`name_refusal`).
+    * A substrate only when BRENDA lists it for that enzyme
+      (`brenda_km_substrates`, `match_substrate`); otherwise the existing
+      refusal, which lists BRENDA's substrates, runs. `look_up_substrate`
+      False (the --antimony path, which searches nothing) skips the fetch.
+    * `--organism`, `--substrate` or `--inhibitor` given while no subject
+      was named or read are said to have gone unused, on `err` and in a
+      note, instead of being dropped without a word.
+    """
+    from caterva.enzymes.sentence import read_sentence
+
+    err = sys.stderr if err is None else err
+    typed = args.description
+    reading = read_sentence(typed, organism=getattr(args, "organism", None))
+    description, rule, shape_note = _shape_from(typed, reading)
+    out = DescriptionReading(description=description)
+    if shape_note:
+        out.notes.append(shape_note)
+    tables: Sequence[Optional[str]] = ()
+    if reading.names_enzyme and rule not in SINGLE_ENZYME_RULES:
+        from caterva.compose.pipeline import compose
+
+        tables = [q.table for q in compose(description).resolvable]
+
+    if getattr(args, "subject", None):
+        if reading.ec and args.subject.strip() not in (reading.ec, reading.enzyme_text):
+            out.notes.append(
+                f"Your description names {reading.enzyme_text!r} (EC {reading.ec}); --subject "
+                f"{args.subject} was used, because a flag wins over the description.")
+    elif reading.names_enzyme and rule not in SINGLE_ENZYME_RULES:
+        out.unapplied = _why_not_applied(rule, tables, reading)
+        out.notes.append(out.unapplied[:1].upper() + out.unapplied[1:] + ".")
+    elif reading.ec:
+        args.subject = reading.ec
+        out.notes.append(reading.enzyme_note())
+    elif reading.ambiguity is not None:
+        from caterva.enzymes.policy import AMBIGUOUS, _refuse
+
+        out.enzyme_text = reading.enzyme_text
+        out.name_refusal = _refuse(reading.ambiguity, _rerun_command(typed), AMBIGUOUS)
+        out.refusal_note = (f"No search was run: your description names {reading.enzyme_text!r}, "
+                            f"which is not one enzyme. {out.name_refusal}")
+    elif reading.near is not None:
+        note = reading.near_note()
+        out.unapplied = note[:1].lower() + note[1:].rstrip(".")
+        out.notes.append(note)
+    elif reading.other_enzymes:
+        out.unapplied = ("the enzymes your description names ("
+                         + ", ".join(f"{t!r}, EC {ec}" for t, ec, _ in reading.other_enzymes)
+                         + ") are several, and none was applied: a model grounded in one of them would "
+                         "carry constants for a protein the description did not single out")
+        out.notes.append(out.unapplied[:1].upper() + out.unapplied[1:] + ".")
+
+    if args.subject:
+        if reading.organism and not args.organism:
+            args.organism = reading.organism
+            out.notes.append(reading.organism_note())
+        elif reading.organism and args.organism != reading.organism:
+            out.notes.append(
+                f"Your description names {reading.organism_text!r} ({reading.organism}); --organism "
+                f"{args.organism} was used, because a flag wins over the description.")
+        if len(reading.organisms_named) > 1 and not args.organism:
+            out.notes.append("Your description names " + " and ".join(
+                f"{t!r} ({b})" for t, b in reading.organisms_named)
+                + "; no organism was read from it, because choosing one would be a guess.")
+        if reading.inhibitor_text and not getattr(args, "inhibitor", None):
+            args.inhibitor = reading.inhibitor_text
+            out.notes.append(f"Read {reading.inhibitor_text!r} in your description as the inhibitor.")
+        if look_up_substrate and not args.substrate and reading.substrate_candidates:
+            _substrate_from(args, reading, out)
+    else:
+        unused = [f"--{flag} {getattr(args, flag)}" for flag in ("organism", "substrate", "inhibitor")
+                  if getattr(args, flag, None)]
+        if unused and out.name_refusal is None:
+            why = out.unapplied or "no enzyme was named, by --subject or in the description"
+            text = (f"{' and '.join(unused)} {'was' if len(unused) == 1 else 'were'} given, but "
+                    f"{why}, so nothing was searched for and {'it was' if len(unused) == 1 else 'they were'} "
+                    "not used. Name the enzyme with --subject to search for it.")
+            out.notes.append(text)
+            print(f"Not used: {text}", file=err)
+    return out
+
+
+def _substrate_from(args: Any, reading: Any, out: DescriptionReading) -> None:
+    """Accept a word of the description as `args.substrate`, only against
+    what BRENDA lists for the subject's EC number."""
+    from caterva.enzymes.sentence import match_substrate
+
+    ec = reading.ec if reading.ec and args.subject == reading.ec else _flag_subject_ec(args)
+    if ec is None:
+        return
+    listed = brenda_km_substrates(ec, args.organism)
+    shown = ", ".join(repr(c) for c in reading.substrate_candidates[:4])
+    where = f" for {args.organism}" if args.organism else ""
+    if listed is None:
+        out.notes.append(
+            f"BRENDA's substrate list for EC {ec} could not be read, so no word of your description "
+            f"({shown}) was taken as the substrate.")
+        return
+    match = match_substrate(reading.substrate_candidates, list(listed))
+    if match.name is not None:
+        args.substrate = match.name
+        how = (" with its stereo or anomer prefix set aside, the only substrate BRENDA lists under "
+               "that name" if match.prefix_set_aside else "")
+        out.notes.append(
+            f"Read {match.typed!r} in your description as the substrate {match.name}, which BRENDA "
+            f"lists for EC {ec}{where}{how}.")
+    elif match.rivals:
+        out.notes.append(
+            "Your description's words match more than one substrate BRENDA lists for EC "
+            f"{ec}{where} (" + "; ".join(f"{t!r} as {n}" for t, n in match.rivals)
+            + "), so none was chosen.")
+    else:
+        out.notes.append(
+            f"No word of your description ({shown}) is a substrate BRENDA lists for EC {ec}{where}, "
+            "so none was taken as the substrate.")
+
+
+# ---------------------------------------------------------------------------
 # Export
 # ---------------------------------------------------------------------------
 
@@ -1073,6 +1336,31 @@ def search_the_literature(
 SUBSTRATES_NAMED = 8
 
 
+def brenda_km_substrates(ec: str, organism: Optional[str]) -> Optional[Dict[str, int]]:
+    """substrate -> Km row count on BRENDA's page for `ec`, for `organism`
+    when one is given; None when the page could not be read.
+
+    One reading, shared by the missing-substrate refusal (which names the
+    substrates) and the plain-language reader (which accepts a word of the
+    description as the substrate only when it is one of these), so the
+    sentence can never be read as a substrate the refusal would not list.
+    """
+    try:
+        from caterva.checkout import literature_module
+        from caterva.compose.organisms import normalise_organism
+        client = literature_module("brenda_client")
+        name, _ = normalise_organism(organism) if organism else (None, None)
+        html = client.fetch_brenda_html(ec)
+        rows = client.parse_brenda_km_html(
+            html, ec, [], name, require_substrate_match=False)
+    except Exception:  # noqa: BLE001 - each caller says what not having it means
+        return None
+    counts: Dict[str, int] = {}
+    for row in rows:
+        counts[row.substrate] = counts.get(row.substrate, 0) + 1
+    return counts
+
+
 def _substrates_brenda_lists(ec: str, organism: Optional[str]) -> str:
     """Name the substrates BRENDA holds Km rows for, so the refusal can be acted on.
 
@@ -1091,19 +1379,10 @@ def _substrates_brenda_lists(ec: str, organism: Optional[str]) -> str:
     readable sentence; the total is stated beside them, so a reader can tell
     when the list is not all of it.
     """
-    try:
-        from caterva.checkout import literature_module
-        from caterva.compose.organisms import normalise_organism
-        client = literature_module("brenda_client")
-        name, _ = normalise_organism(organism) if organism else (None, None)
-        html = client.fetch_brenda_html(ec)
-        rows = client.parse_brenda_km_html(
-            html, ec, [], name, require_substrate_match=False)
-    except Exception:  # noqa: BLE001 - the refusal above is the answer
-        return ""
-    counts: Dict[str, int] = {}
-    for row in rows:
-        counts[row.substrate] = counts.get(row.substrate, 0) + 1
+    from caterva.compose.organisms import normalise_organism
+
+    name, _ = normalise_organism(organism) if organism else (None, None)
+    counts = brenda_km_substrates(ec, organism)
     if not counts:
         return ""
     top = sorted(counts, key=lambda k: (-counts[k], k))[:SUBSTRATES_NAMED]
@@ -1388,10 +1667,23 @@ def _export(description: str, subject: Optional[str], fmt: str,
 
     claims = None
     try:
+        read = None
+        if args is not None:
+            # The same reading `compose_report` makes, so an export of a
+            # sentence carries the values its report carries (ADR 0181).
+            read = read_description(args)
+            description, subject = read.description, args.subject
         model = compose(description, subject=subject,
                         organism=getattr(args, "organism", None),
                         substrate=getattr(args, "substrate", None),
                         compounds=compounds_from(args) if args is not None else None)
+        if read is not None and read.unapplied:
+            model = replace(model, unapplied_subject=read.unapplied)
+        if read is not None and read.name_refusal is not None:
+            # An export has no report to carry the refusal, so it goes to
+            # stderr, and the artefact carries placeholders, labelled so.
+            model = replace(model, subject=read.enzyme_text, search_refused=read.refusal_note)
+            print(read.refusal_note, file=sys.stderr)
         # Opened only once there is a model, as in `compose_report`: a
         # description that builds nothing writes no store (`_claims_run`).
         claims = _claims_run(args)
@@ -1607,7 +1899,10 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
         print(
             "\nIt recognises a SHAPE, never a SUBJECT. 'three step "
             "phosphorylation cascade' builds; 'glycolysis' does not, and "
-            "says why."
+            "says why. An enzyme named exactly in a one-enzyme mechanism "
+            "('Michaelis-Menten kinetics of human hexokinase on glucose') "
+            "is searched for, and the report says how each word was read "
+            "(ADR 0181)."
         )
         return 0
 
@@ -1631,7 +1926,11 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
             from caterva.compose.pipeline import compose
             from caterva.core.network import compile_to_antimony
 
-            model = compose(args.description, subject=args.subject)
+            # Read like every other path, so a description that named an
+            # enzyme and no mechanism compiles to the shape its report
+            # shows; nothing is searched, so no substrate is looked up.
+            read = read_description(args, look_up_substrate=False)
+            model = compose(read.description, subject=args.subject)
             print(compile_to_antimony(model.network))
             return 0
 
@@ -1730,9 +2029,15 @@ def _compose_report(
     # verdict can read them, and printed by their sections afterwards
     # without being computed a second time.
     at("compose", "Composing the model from its description")
-    model = compose(args.description, subject=args.subject,
+    # What the description names fills what no flag set, before anything is
+    # composed or searched, so the search, the report and the studio's
+    # result all read the same subject (ADR 0181).
+    read = read_description(args, err=err)
+    model = compose(read.description, subject=args.subject,
                     organism=args.organism, substrate=args.substrate,
                     compounds=compounds_from(args))
+    if read.unapplied:
+        model = replace(model, unapplied_subject=read.unapplied)
     claims = _claims_run(args)
     if claims is not None:
         closing.enter_context(claims)
@@ -1757,6 +2062,14 @@ def _compose_report(
         name_refusal = found.name_refusal
         if search_refused and not model.searched and model.search_refused is None:
             model = replace(model, search_refused=search_note)
+    elif read.name_refusal is not None:
+        # The description named an enzyme that is several. Refused exactly
+        # as `--subject "lactate dehydrogenase"` is, with the candidates
+        # named and the whole command that accepts one, never skipped: a
+        # report saying "no enzyme was named" here would be false, and one
+        # that picked would cite the wrong protein.
+        search_note, search_refused, name_refusal = read.refusal_note, True, read.name_refusal
+        model = replace(model, subject=read.enzyme_text, search_refused=search_note)
     claim_set = None
     if claims is not None:
         # Built now, from the same ProvenancedModel every export is written
@@ -1792,6 +2105,8 @@ def _compose_report(
     # pages has put its last word in the middle.
     if organism_note and args.subject:
         model.recognition.composition.note(organism_note)
+    for line in read.notes:
+        model.recognition.composition.note(line)
     if search_note:
         model.recognition.composition.note(search_note)
     print(report.markdown(footer=False), file=out)
@@ -1977,6 +2292,7 @@ __all__ = [
     "check_request", "compose_report", "export_texts", "main",
     "precompute_for_verdict", "provenanced_for_export", "run_analyses",
     "search_the_literature", "search_literature", "read_subject", "LiteratureSearch",
+    "read_description", "DescriptionReading", "brenda_km_substrates",
 ]
 
 
