@@ -132,6 +132,11 @@ export default function RecentRuns({
 }: RecentRunsProps) {
   const [runs, setRuns] = useState<SimulationJob[]>(loadCachedRuns);
   const [error, setError] = useState<string | null>(null);
+  // True while the list on screen came from this browser's localStorage
+  // copy rather than from the API. See the catch in fetchRuns.
+  const [fromCache, setFromCache] = useState<boolean>(
+    () => loadCachedRuns().length > 0,
+  );
   const [expanded, setExpanded] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -238,11 +243,19 @@ export default function RecentRuns({
           setRuns(data);
           saveCachedRuns(data);
           setError(null);
+          setFromCache(false);
         }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to fetch runs");
+          // Whatever stays on screen is no longer the API's answer: either
+          // the last list this browser saved, or the last one fetched
+          // before the API went away. It used to stay up unmarked, so a
+          // run list from yesterday's session read as the server's current
+          // state, statuses and all, with only an error string above it to
+          // hint that nothing below had been refreshed.
           setRuns((prev) => (prev.length > 0 ? prev : loadCachedRuns()));
+          setFromCache(true);
         }
       } finally {
         if (!cancelled) {
@@ -335,6 +348,17 @@ export default function RecentRuns({
       {error && (
         <div className="text-red-400/70 text-[12px] mb-4 border border-red-500/10 rounded-lg bg-red-500/[0.03] p-3">
           {error}
+        </div>
+      )}
+
+      {fromCache && runs.length > 0 && (
+        <div
+          data-testid="runs-cached-label"
+          className="text-yellow-500/80 text-[11px] mb-3 border border-yellow-500/15 rounded-lg bg-yellow-500/[0.04] px-3 py-2"
+        >
+          {error
+            ? "cached, API unreachable — these runs are this browser's saved copy, not the server's current list"
+            : "cached — showing this browser's saved copy until the API answers"}
         </div>
       )}
 

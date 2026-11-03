@@ -180,17 +180,30 @@ describe("presets and samples do not contradict the resolver", () => {
   const read = (f: string) =>
     readFileSync(path.join(__dirname, "..", "cli", f), "utf-8");
 
-  it("enzyme presets carry the Km the resolver returns", () => {
+  it("enzyme presets carry only a Km the live resolver still returns", () => {
+    // Re-measured 2026-11-02 against live BRENDA: hexokinase/glucose is
+    // still 6 mM (ref 641068); LDH/pyruvate now resolves 0.03 mM (not the
+    // preset's 10.73) and AChE/acetylcholine 0.0714 mM (not 0.09). The two
+    // stale presets were removed rather than re-pasted, so no hard-coded
+    // value can drift from the resolver again unnoticed.
     const src = read("KineticsPlayground.tsx");
-    expect(src).toMatch(/label: "LDH", km: 10\.73/);
-    expect(src).toMatch(/label: "Hexokinase", km: 6/);
-    // The wrong ones must not come back.
-    expect(src).not.toMatch(/label: "LDH", km: 0\.5/);
-    expect(src).not.toMatch(/label: "Hexokinase", km: 0\.1\b/);
-    // Each named enzyme cites where its Km came from.
-    for (const ref of ["740253", "641068", "649716"]) {
-      expect(src, `missing BRENDA ref ${ref}`).toContain(ref);
-    }
+    const presets = src.slice(
+      src.indexOf("const PRESETS"),
+      src.indexOf("export default function"),
+    );
+    expect(presets).toMatch(/label: "Hexokinase",\s*km: 6,/);
+    expect(presets).toContain("641068");
+    expect(presets).not.toMatch(/label: "LDH"/);
+    expect(presets).not.toMatch(/label: "AChE"/);
+    expect(presets).not.toMatch(/label: "Hexokinase",\s*km: 0\.1\b/);
+  });
+
+  it("labels a preset's Vmax and s0 as illustrative, on the page", () => {
+    // Vmax needs [E]0 (ADR 0013) and s0 is the experiment's choice; a
+    // number next to an enzyme's name with no label reads as that enzyme's.
+    const src = read("KineticsPlayground.tsx");
+    expect(src).toMatch(/are illustrative experimental choices, not\s+literature values/);
+    expect(src).toContain('data-testid="preset-provenance"');
   });
 
   it("drops enzyme names with no resolved value rather than inventing one", () => {

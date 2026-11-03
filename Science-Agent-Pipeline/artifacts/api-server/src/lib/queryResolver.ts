@@ -8,7 +8,7 @@ import {
 import { resolveKineticValue, type RelatednessVerdict } from "./scienceAgent";
 import { buildCitationLocators, type CitationLocator } from "./citeVerify";
 import { matchEnzyme } from "./enzymes";
-import { matchOrganism } from "./organisms";
+import { matchOrganism, stripOrganisms } from "./organisms";
 import { extractStatedQuantities } from "./statedQuantities";
 import {
   RESOLVABLE_FIELDS,
@@ -1217,21 +1217,71 @@ async function applyVmaxFromKcatResolution(
     };
   };
 
+  // A kcat that EXISTS but was withheld is not "the literature holds no
+  // kcat", and must not be reported as one.
+  //
+  // Measured 2026-11-02: "lactate dehydrogenase with pyruvate in humans
+  // with 50 nM enzyme" refused with "BRENDA, KEGG and PubMed hold no kcat
+  // for this enzyme" while the runner had answered `cross_species_withheld`
+  // -- BRENDA holds LDH kcat rows, just none measured in Homo sapiens. The
+  // Km path (buildUnresolvedKineticProvenance) has named the organisms it
+  // withheld since ADR 0024; this bridge collapsed every miss into one
+  // sentence, telling a student the science was empty when it was this
+  // system's species policy that said no. The bridge never forwards
+  // allowCrossSpecies, so the sentence offers no flag that would not work.
+  const withheldKcat = (): string | undefined => {
+    const asked = entities.organism ? ` measured in ${entities.organism}` : "";
+    if (agentResult.source === "cross_species_withheld") {
+      const others = agentResult.crossSpeciesOrganismsAvailable ?? [];
+      return (
+        `BRENDA holds a kcat for this enzyme` +
+        (others.length > 0 ? ` from ${others.join(", ")}` : " from another organism") +
+        `, but none${asked}. Kinetic constants are species-specific, so ` +
+        "Vmax was not bridged from another species' kcat."
+      );
+    }
+    if (agentResult.source === "variant_withheld") {
+      const variants = agentResult.variantCandidatesAvailable ?? [];
+      return (
+        "Every kcat BRENDA holds for this enzyme" +
+        (variants.length > 0 ? ` (${variants.join(", ")})` : "") +
+        " was measured on a sequence variant, not on the enzyme as found, " +
+        "so Vmax was not bridged from it."
+      );
+    }
+    if (agentResult.source === "isoform_withheld") {
+      const isoforms = agentResult.isoformsAvailable ?? [];
+      return (
+        "BRENDA's kcat rows for this enzyme measure " +
+        (isoforms.length > 0 ? isoforms.join(", ") : "other isoforms") +
+        ", not the isoform asked for, so Vmax was not bridged from them."
+      );
+    }
+    return undefined;
+  };
+
   if (!agentResult.found || agentResult.kcat === undefined) {
+    const withheld = withheldKcat();
     flags.push(
-      "Could not resolve a real kcat value from BRENDA/KEGG/PubMed; " +
-        "Vmax was not bridged from literature.",
+      withheld
+        ? `kcat withheld: ${withheld}`
+        : "Could not resolve a real kcat value from BRENDA/KEGG/PubMed; " +
+            "Vmax was not bridged from literature.",
     );
+    const nextStep =
+      "Supply kcat=<value> (in 1/s) and Vmax is computed from it, or " +
+      "supply vmax=<value> you measured yourself. Either way, attach the " +
+      "paper with --cite so the source is recorded rather than lost.";
     return {
       parameters,
       parameterProvenance: explainVmax(
         "not_found",
-        "Vmax = kcat × [E]0, and your enzyme concentration was read, but " +
-          "BRENDA, KEGG and PubMed hold no kcat for this enzyme — so there " +
-          "is nothing to multiply it by. Supply kcat=<value> (in 1/s) and " +
-          "Vmax is computed from it, or supply vmax=<value> directly. " +
-          "Either way, attach the paper with --cite so the source is " +
-          "recorded rather than lost.",
+        withheld
+          ? "Vmax = kcat × [E]0, and your enzyme concentration was read. " +
+              `${withheld} ${nextStep}`
+          : "Vmax = kcat × [E]0, and your enzyme concentration was read, but " +
+              "BRENDA, KEGG and PubMed hold no kcat for this enzyme — so there " +
+              `is nothing to multiply it by. ${nextStep}`,
       ),
       flags,
     };
@@ -1737,16 +1787,85 @@ function domainKeywordWords(): Set<string> {
  * real EC number or comes back honestly empty. A wrong guess costs one
  * failed lookup; it never fabricates a parameter value.
  */
+/**
+ * Words ending in "-ase" that name no enzyme. Kept short: a miss here costs
+ * one failed UniProt lookup, which the refusal then reports honestly.
+ */
+const NOT_ENZYME_ASE_WORDS = new Set([
+  "base", "case", "phase", "please", "increase", "decrease", "release",
+  "database", "disease", "phrase", "ease", "lease", "erase", "purchase",
+  "chase", "vase", "showcase",
+]);
+
+/** Routing keywords that are also words of enzyme names (domainKeywordWords). */
+const ENZYME_NAME_PARTS = new Set(["pyruvate", "lactate", "alcohol", "ldh"]);
+
+/** Concentration and amount words: grammar around a number, never a name. */
+const QUANTITY_WORDS = new Set([
+  "enzyme", "nm", "um", "µm", "μm", "mm", "m", "pm", "mol", "nmol", "umol",
+  "mmol", "s", "sec", "seconds", "min", "minutes", "at", "concentration",
+]);
+
 function guessEnzymeNameFromQuery(query: string): string | undefined {
   const domainWords = domainKeywordWords();
-  const words = query
-    .split(/\s+/)
-    .filter((token) => !PARAMETER_TOKEN_PATTERN.test(token) && !PARAMETER_PATTERN.test(token))
-    .join(" ")
+  // Each token is classified, not deleted, so the gaps stay where they
+  // were: a connector or an organism between two words means those words
+  // are NOT one name, and the window below must not join across it.
+  const tokens = stripOrganisms(
+    query
+      .split(/\s+/)
+      .filter((token) => !PARAMETER_TOKEN_PATTERN.test(token) && !PARAMETER_PATTERN.test(token))
+      .join(" "),
+  )
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/[^a-z0-9µμ\s-]/g, " ")
     .split(/\s+/)
-    .filter((w) => w && !QUERY_CONNECTOR_WORDS.has(w) && !domainWords.has(w));
+    .filter((w) => w.length > 0);
+  const isGrammar = (w: string) =>
+    QUERY_CONNECTOR_WORDS.has(w) ||
+    QUANTITY_WORDS.has(w) ||
+    /^[0-9.]+(?:e[+-]?[0-9]+)?$/.test(w);
+  // The old filter dropped every domain-routing keyword, and mm's list
+  // holds words enzyme names are made of ("kinase", "dehydrogenase",
+  // "pyruvate", "alcohol"): "pyruvate kinase" left nothing to guess. For
+  // the window, a routing word breaks a name only when it could not be
+  // part of one ("michaelis", "substrate", "competitive").
+  const breaksName = (w: string) =>
+    isGrammar(w) ||
+    (domainWords.has(w) && !/ase$/.test(w) && !ENZYME_NAME_PARTS.has(w));
+  const keep = tokens.map((w) => !breaksName(w));
+  // The organism was matched in stripOrganisms above, so its words are
+  // already gone and act as a break.
+  //
+  // THE LONGEST "-ase" WINDOW. The whole leftover phrase used to be the
+  // name: "glucokinase glucose rat" was sent to UniProt as an enzyme
+  // called "glucokinase glucose rat", matched nothing, and the refusal
+  // said the NAME was the problem -- for a query that named a real enzyme
+  // in its first word. An enzyme's name ends in its "-ase" word and may
+  // carry the words before it ("pyruvate carboxylase", "glucose oxidase");
+  // the substrate and the species come after it or across a connector.
+  // So the guess is the longest unbroken run of kept words that ENDS at an
+  // "-ase" word. Nothing is invented: every word in it is the person's,
+  // and a wrong guess is still only one failed lookup, reported as such.
+  let best: string[] | undefined;
+  for (let i = 0; i < tokens.length; i++) {
+    const w = tokens[i]!;
+    // "kinase", "atpase", "dehydrogenase", "hexokinase-2"; not "base".
+    const isAseWord =
+      /[a-z]{3}ase(?:-[0-9a-z]{1,3})?$/.test(w) && !NOT_ENZYME_ASE_WORDS.has(w);
+    if (!keep[i] || !isAseWord) continue;
+    let start = i;
+    while (start > 0 && keep[start - 1]) start--;
+    const window = tokens.slice(start, i + 1);
+    if (!best || window.length > best.length) best = window;
+  }
+  if (best) return best.join(" ");
+
+  // No "-ase" word: the old behaviour, minus the organism and quantity
+  // words, because some enzymes are not named that way ("lysozyme",
+  // "trypsin", "pepsin") and dropping the guess would end the lookup
+  // before UniProt could answer.
+  const words = tokens.filter((w) => !isGrammar(w) && !domainWords.has(w));
   if (words.length === 0) return undefined;
   return words.join(" ");
 }
@@ -2505,6 +2624,10 @@ export async function resolveQuery(
         // km/vmax in this same table can never reach the message and be
         // pasted back as a user value.
         Object.fromEntries(missing.map((k) => [k, parameters[k]!])),
+        // Every key's provenance, missing ones included: a resolved Km's
+        // citation and a missing Vmax's `unresolvedReason` are both things
+        // the form that answers this refusal has to show (routes/enzymes.ts).
+        parameterProvenance,
       );
     }
 
@@ -2789,6 +2912,7 @@ export async function resolveQuery(
       resolvedOnly,
       // Same as the LLM branch above, same filtering.
       Object.fromEntries(missing.map((k) => [k, parameters[k]!])),
+      parameterProvenance,
     );
   }
 

@@ -35,6 +35,21 @@ export class RequiredParametersMissingError extends Error {
    * missing.
    */
   readonly resolvedSoFar: Record<string, number | number[]>;
+  /**
+   * Where each value in `resolvedSoFar` came from, and why each missing
+   * key is missing (`unresolvedReason`), keyed like `parameterProvenance`
+   * on a successful result.
+   *
+   * Without it the refusal shipped bare numbers. The landing page seeded
+   * its form from them and, on "run", re-sent EVERY one as `key=value` in
+   * the query text, which the resolver reads as the person typing it:
+   * "hexokinase glucose human" came back with BRENDA's Km 6 mM (ref
+   * 641068), and the run that followed reported km origin "user" with no
+   * citation -- the literature value relabelled as the student's own
+   * choice, and the default s0/end/points with it. A caller cannot keep
+   * a provenance it was never given.
+   */
+  readonly parameterProvenance: Record<string, ParameterProvenance>;
 
   /**
    * `details` exists because the summary sentence is not always true.
@@ -64,6 +79,7 @@ export class RequiredParametersMissingError extends Error {
      * degrades to the previous `key=<value>` form.
      */
     examples: Record<string, number | number[]> = {},
+    parameterProvenance: Record<string, ParameterProvenance> = {},
   ) {
     const explained = missing.filter((k) => details[k]);
     const unexplained = missing.filter((k) => !details[k]);
@@ -133,6 +149,7 @@ export class RequiredParametersMissingError extends Error {
     this.missing = missing;
     this.details = details;
     this.resolvedSoFar = resolvedSoFar;
+    this.parameterProvenance = parameterProvenance;
   }
 }
 

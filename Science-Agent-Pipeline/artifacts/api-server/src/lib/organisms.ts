@@ -56,6 +56,18 @@ export interface OrganismEntry {
  * Every pattern is anchored on a word boundary. "coli" is not matched
  * bare -- it would hit "colitis" and any word ending in it -- and the
  * common-name aliases are only those a lab would actually type.
+ *
+ * PLURALS ARE TYPED. `\bhuman\b` did not match "in humans", the way most
+ * people phrase it, because the boundary falls after the "s". Measured
+ * 2026-11-02: "hexokinase with glucose in humans" was treated as naming
+ * no organism, so the Km arrived with "assumed: organism = Homo sapiens
+ * ... chosen for you" -- telling the student a choice they had written
+ * out had been made for them. "mice" and "rats" failed the same way. The
+ * common names below are the ones BRENDA's own organism column is full
+ * of for the classic purified enzymes (rabbit muscle, bovine heart,
+ * porcine pancreas, chicken liver), each mapped to the binomial BRENDA
+ * indexes by; a name not listed here still falls back to the documented
+ * default rather than a guess.
  */
 export const ORGANISMS: OrganismEntry[] = [
   {
@@ -63,19 +75,19 @@ export const ORGANISMS: OrganismEntry[] = [
     organism: "Escherichia coli",
   },
   {
-    pattern: /\bS\.?\s?cerevisiae\b|\bSaccharomyces cerevisiae\b|\b(?:budding\s+)?yeast\b|\bbaker'?s yeast\b/i,
+    pattern: /\bS\.?\s?cerevisiae\b|\bSaccharomyces cerevisiae\b|\b(?:budding\s+)?yeasts?\b|\bbaker'?s yeast\b/i,
     organism: "Saccharomyces cerevisiae",
   },
   {
-    pattern: /\bHomo sapiens\b|\bhuman\b/i,
+    pattern: /\bHomo sapiens\b|\bhumans?\b/i,
     organism: "Homo sapiens",
   },
   {
-    pattern: /\bMus musculus\b|\bmouse\b|\bmurine\b/i,
+    pattern: /\bMus musculus\b|\bmouse\b|\bmice\b|\bmurine\b/i,
     organism: "Mus musculus",
   },
   {
-    pattern: /\bRattus norvegicus\b|\brat\b/i,
+    pattern: /\bRattus norvegicus\b|\brats?\b/i,
     organism: "Rattus norvegicus",
   },
   {
@@ -83,7 +95,7 @@ export const ORGANISMS: OrganismEntry[] = [
     organism: "Bacillus subtilis",
   },
   {
-    pattern: /\bD\.?\s?melanogaster\b|\bDrosophila\b|\bfruit fly\b/i,
+    pattern: /\bD\.?\s?melanogaster\b|\bDrosophila\b|\bfruit fl(?:y|ies)\b/i,
     organism: "Drosophila melanogaster",
   },
   {
@@ -95,8 +107,24 @@ export const ORGANISMS: OrganismEntry[] = [
     organism: "Arabidopsis thaliana",
   },
   {
-    pattern: /\bDanio rerio\b|\bzebrafish\b/i,
+    pattern: /\bDanio rerio\b|\bzebrafish(?:es)?\b/i,
     organism: "Danio rerio",
+  },
+  {
+    pattern: /\bBos taurus\b|\bbovine\b|\bcows?\b|\bcattle\b/i,
+    organism: "Bos taurus",
+  },
+  {
+    pattern: /\bSus scrofa\b|\bporcine\b|\bpigs?\b|\bswine\b/i,
+    organism: "Sus scrofa",
+  },
+  {
+    pattern: /\bOryctolagus cuniculus\b|\brabbits?\b/i,
+    organism: "Oryctolagus cuniculus",
+  },
+  {
+    pattern: /\bGallus gallus\b|\bchickens?\b/i,
+    organism: "Gallus gallus",
   },
   {
     pattern: /\bP\.?\s?aeruginosa\b|\bPseudomonas aeruginosa\b/i,
@@ -119,4 +147,22 @@ export function matchOrganism(query: string): string | undefined {
     if (entry.pattern.test(query)) return entry.organism;
   }
   return undefined;
+}
+
+/**
+ * The query with every organism phrase it names blanked out.
+ *
+ * For the enzyme-name guess, which used to hand the whole leftover phrase
+ * to UniProt: "glucokinase glucose rat" was looked up as an enzyme called
+ * "glucokinase glucose rat", matched nothing, and the refusal blamed the
+ * NAME. The organism is still read by `matchOrganism` from the original
+ * text; this only stops it being read twice, once as a species and once
+ * as part of an enzyme's name.
+ */
+export function stripOrganisms(query: string): string {
+  let out = query;
+  for (const entry of ORGANISMS) {
+    out = out.replace(new RegExp(entry.pattern.source, "gi"), " ");
+  }
+  return out;
 }
