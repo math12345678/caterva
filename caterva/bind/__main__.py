@@ -45,11 +45,6 @@ from caterva.bind.core import (
 
 EXIT_OK, EXIT_CRASH, EXIT_USAGE, EXIT_REFUSED, EXIT_DISAGREES = 0, 1, 2, 3, 4
 
-COMMON = {"human": "Homo sapiens", "mouse": "Mus musculus", "rat": "Rattus norvegicus",
-          "rabbit": "Oryctolagus cuniculus", "yeast": "Saccharomyces cerevisiae",
-          "e. coli": "Escherichia coli", "ecoli": "Escherichia coli"}
-
-
 def _rows(html: str, ec: str, organism: str, inhibitor: Optional[str]) -> List[Measurement]:
     from caterva.checkout import literature_module
     brenda = literature_module("brenda_client")
@@ -81,8 +76,27 @@ _compound_names = compound_names
 
 
 def organism_of(text: str) -> str:
-    """The organism --organism names: a common name read as its species."""
-    return COMMON.get(text.strip().lower(), text.strip())
+    """The organism --organism names: a common name read as its species.
+
+    Read by the shared normaliser (`caterva.compose.organisms`), so "homo
+    sapiens", "humans" and "cow" mean here what they mean to compose and
+    structure; this module's own short table knew seven names, and a
+    lower-case binomial went to BRENDA in a case no row carries."""
+    from caterva.compose.organisms import normalise_organism
+
+    organism, _ = normalise_organism(text)
+    return organism if organism is not None else (text or "").strip()
+
+
+def resolve_ec(text: str, organism: Optional[str]):
+    """`--ec` read by the one enzyme-name policy (`caterva.enzymes.ec_option`):
+    a name becomes its EC number with a sentence saying so, and a name that
+    is not exactly one enzyme is refused naming the candidates, before any
+    page is fetched. Sending the name itself to BRENDA printed "No Ki rows
+    for EC hexokinase", an absence that was never searched for."""
+    from caterva.enzymes.ec_option import read_ec_option
+
+    return read_ec_option(text, organism, flag="--ec")
 
 
 def read_page(ec: str, html: Optional[Path] = None) -> str:
@@ -291,7 +305,8 @@ def no_rows_for(inhibitor: str, ec: str, organism: str, names: List[str]) -> str
 def build_parser(prog: str = "caterva bind") -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog=prog, description=__doc__.split("\n\n")[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--ec", required=True, help="EC number, e.g. 1.1.1.27")
+    p.add_argument("--ec", required=True,
+                   help="EC number, e.g. 1.1.1.27, or an enzyme name (read as its EC number, and said so)")
     p.add_argument("--organism", default="Homo sapiens", help="species (common names accepted)")
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--inhibitor", help="the compound, exactly as BRENDA names it (see --list)")
@@ -328,6 +343,15 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva bind") -> in
         except ValueError as e:
             print(f"caterva bind: {e}", file=sys.stderr)
             return EXIT_USAGE
+
+    subject = resolve_ec(a.ec, organism)
+    if subject.ec is None:
+        print(f"caterva bind: {subject.refusal}", file=sys.stderr)
+        return EXIT_REFUSED
+    if subject.note:
+        # With --json, stdout is the payload alone; the sentence still reaches the reader.
+        print(subject.note, file=sys.stderr if a.json else sys.stdout)
+    a.ec = subject.ec
 
     try:
         html = read_page(a.ec, a.html)

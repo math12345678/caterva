@@ -36,9 +36,20 @@ KJ_PER_KCAL = 4.184
 
 
 def _target(a) -> Optional[Target]:
-    from caterva.bind.__main__ import COMMON, _rows, _compound_names
+    from caterva.bind.__main__ import _compound_names, _rows, organism_of, resolve_ec
     from caterva.bind.core import target
-    organism = COMMON.get(a.organism.strip().lower(), a.organism.strip())
+    organism = organism_of(a.organism)
+    # The same reading `caterva bind --ec` gives, so the target a run is
+    # held to is the one `caterva bind` lists: a name resolved to its EC
+    # number (and said so), or refused with the candidates before BRENDA is
+    # read, instead of "no Ki for gossypol with EC lactate dehydrogenase".
+    subject = resolve_ec(a.ec, organism)
+    if subject.ec is None:
+        print(f"caterva fep: {subject.refusal}", file=sys.stderr)
+        return None
+    if subject.note:
+        print(subject.note)
+    a.ec = subject.ec
     if a.html:
         html = a.html.read_text(encoding="utf-8")
     else:

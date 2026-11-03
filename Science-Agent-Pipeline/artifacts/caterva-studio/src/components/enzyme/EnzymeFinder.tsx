@@ -57,6 +57,12 @@ export interface EnzymeFinderProps {
   organism?: string;
   /** Text to start the search with when nothing is chosen (a link that carried a name). */
   seed?: string;
+  /**
+   * Told the text in the input whenever it changes ("" once a row is chosen, on Change and on Escape). For a
+   * screen whose engine resolves a name itself (Compose): a name typed and never clicked was otherwise lost, and
+   * the run went ahead with placeholders as though no enzyme had been named.
+   */
+  onQueryChange?: (text: string) => void;
   label?: ReactNode;
   optional?: boolean;
   hint?: ReactNode;
@@ -263,6 +269,7 @@ export function EnzymeFinder({
   onChange,
   organism = "",
   seed = "",
+  onQueryChange,
   label = "Enzyme",
   optional = false,
   hint,
@@ -284,6 +291,12 @@ export function EnzymeFinder({
   const [focusAfter, setFocusAfter] = useState<"change" | "input" | null>(null);
 
   const typed = query.trim();
+  // A ref, so a screen passing a new arrow each render does not re-fire this for text that did not change.
+  const queryListener = useRef(onQueryChange);
+  queryListener.current = onQueryChange;
+  useEffect(() => {
+    queryListener.current?.(query);
+  }, [query]);
   const settled = useDebounced(typed, 200);
   const settledOrganism = useDebounced(organism.trim(), 300);
   const waiting = typed !== settled;

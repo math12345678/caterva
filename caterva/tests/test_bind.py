@@ -194,3 +194,66 @@ def test_the_benchmark_rule(monkeypatch):
     assert rows["X"]["benchmark"] and rows["X"]["why_not"] == []
     assert not rows["Y"]["benchmark"]
     assert set(rows["Y"]["why_not"]) == {"mode not stated", "temperature not stated"}
+
+
+# --- --ec read by the one enzyme-name policy ----------------------------------
+# `--ec hexokinase` went to BRENDA as the number and printed "No Ki rows for
+# EC hexokinase in Homo sapiens.": an absence nobody had searched for.
+
+HK_PAGE = ROOT / "Tests" / "fixtures" / "brenda_hexokinase_fixture.html"
+
+
+def test_an_enzyme_name_is_read_as_its_ec_number_and_said_so(capsys, monkeypatch):
+    import caterva.bind.__main__ as cli
+
+    asked = []
+    real = cli.read_page
+    monkeypatch.setattr(cli, "read_page", lambda ec, html=None: asked.append(ec) or real(ec, html))
+    code = main(["--ec", "hexokinase", "--organism", "human", "--html", str(HK_PAGE), "--list"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert asked == ["2.7.1.1"]
+    assert out.splitlines()[0] == "Read 'hexokinase' as EC 2.7.1.1 (hexokinase): accepted name matches exactly."
+    assert "Compounds with a recorded Ki for EC 2.7.1.1 in Homo sapiens:" in out
+    assert "EC hexokinase" not in out
+    # The number itself lists the same compounds, with no sentence in front.
+    assert main(["--ec", "2.7.1.1", "--organism", "human", "--html", str(HK_PAGE), "--list"]) == 0
+    by_number = capsys.readouterr().out
+    assert out.split("\n", 1)[1] == by_number
+
+
+def test_a_name_that_is_several_enzymes_is_refused_naming_them_and_nothing_is_read(capsys, monkeypatch):
+    import caterva.bind.__main__ as cli
+
+    monkeypatch.setattr(cli, "read_page", lambda *a, **k: pytest.fail("BRENDA read for an unresolved name"))
+    code = main(["--ec", "lactate dehydrogenase", "--organism", "human", "--list"])
+    out = capsys.readouterr()
+    assert code == 3
+    assert out.out == ""
+    assert "EC 1.1.1.27 L-lactate dehydrogenase" in out.err and "EC 1.1.1.28 D-lactate dehydrogenase" in out.err
+    assert "re-run with --ec 1.1.1.27" in out.err
+    assert "No Ki rows" not in out.err
+
+
+def test_an_ec_class_is_refused_not_searched(capsys, monkeypatch):
+    import caterva.bind.__main__ as cli
+
+    monkeypatch.setattr(cli, "read_page", lambda *a, **k: pytest.fail("BRENDA read for an EC class"))
+    assert main(["--ec", "2.7.1", "--organism", "human", "--list"]) == 3
+    assert "'2.7.1' is a class of enzymes, not one enzyme" in capsys.readouterr().err
+
+
+def test_with_json_the_reading_goes_to_stderr_and_stdout_stays_json(capsys):
+    code = main(["--ec", "L-lactate dehydrogenase", "--organism", "human", "--html", str(KI_PAGE),
+                 "--inhibitor", QUINOLINE, "--json"])
+    out = capsys.readouterr()
+    assert code == 0
+    assert json.loads(out.out)["compound"] == QUINOLINE
+    assert "Read 'L-lactate dehydrogenase' as EC 1.1.1.27" in out.err
+
+
+@pytest.mark.parametrize("typed", ["human", "homo sapiens", "Homo sapiens", "humans"])
+def test_organism_is_read_by_the_shared_normaliser(typed):
+    from caterva.bind.__main__ import organism_of
+
+    assert organism_of(typed) == "Homo sapiens"

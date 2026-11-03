@@ -265,3 +265,19 @@ def test_the_solvent_build_can_be_rerun(tmp_path):
     run(tmp_path)
     script = (tmp_path / "out" / "run.sh").read_text()
     assert script.index("cp topol.base.top topol.top") < script.index("solvate")
+
+
+def test_an_enzyme_name_is_read_as_bind_reads_it(tmp_path, capsys):
+    # The target a run is held to is the one `caterva bind --ec` builds,
+    # so a name is read by the same policy: resolved and said so ...
+    assert run(tmp_path, "--ec", "L-lactate dehydrogenase") == 0
+    out = capsys.readouterr().out
+    assert out.startswith("Read 'L-lactate dehydrogenase' as EC 1.1.1.27")
+
+
+def test_a_name_that_is_several_enzymes_is_refused_before_brenda(tmp_path, capsys):
+    # ... or refused with the candidates, never sent to BRENDA as a number.
+    assert run(tmp_path, "--ec", "lactate dehydrogenase") == 3
+    err = capsys.readouterr().err
+    assert "EC 1.1.1.27 L-lactate dehydrogenase" in err and "re-run with --ec 1.1.1.27" in err
+    assert "no Ki for" not in err
