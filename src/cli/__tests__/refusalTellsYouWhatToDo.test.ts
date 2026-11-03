@@ -185,6 +185,32 @@ describe('a refusal explains the next step', () => {
     expect(clean).toMatch(/--allow-cross-species/);
   });
 
+  it('leaves a labelled placeholder where a measured value goes, never a number or a citation', () => {
+    // This block used to print `--vmax 1.2mM/s` and
+    // `--cite vmax="Smith 2019, PMID 12345"` as "example values" -- for a
+    // quantity the literature had just failed to yield. Copied "in full",
+    // that ran on a Vmax nobody measured, cited to a PMID about something
+    // else, and the provenance recorded it as the reader's cited value.
+    const { stdout } = runCli([...SYSTEM, '--enzyme-conc', '0.01mM', '--s0', '10mM']);
+    const clean = stdout.replace(ANSI, '');
+    const next = clean.split('What to do next')[1] ?? '';
+    expect(next).toContain('--vmax "<your measured Vmax, e.g. in mM/s>"');
+    expect(next).toContain('--cite vmax="<author year, PMID>"');
+    expect(next).not.toMatch(/--vmax \d/);
+    expect(next).not.toMatch(/PMID \d/);
+    // The heading names the slot as something to replace.
+    expect(next).toContain('replace <your measured Vmax, e.g. in mM/s>');
+  });
+
+  it('refuses the placeholder if it is copied unedited, rather than running on it', () => {
+    const { stdout, code } = runCli([
+      ...SYSTEM, '--enzyme-conc', '0.01mM', '--s0', '10mM',
+      '--vmax', '<your measured Vmax, e.g. in mM/s>',
+    ]);
+    expect(code).not.toBe(0);
+    expect(stdout.replace(ANSI, '')).not.toMatch(/Simulation complete|final value/i);
+  });
+
   it('says nothing extra under --json', () => {
     // The guidance is prose for a person. Under --json stdout carries one
     // document (ADR 0077), and this must not have reopened that.

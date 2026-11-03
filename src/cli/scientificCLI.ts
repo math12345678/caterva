@@ -12,11 +12,9 @@ import { parseReportQuantities } from './reportQuantities';
 import { collectRepeated, parseUserCitations } from './userCitations';
 import { convertConcentration, vmaxInSubstrateUnitsPerSecond } from '../units';
 import { exportModel, type ExportProvenance } from './exportArtifacts';
-import {
-  parseSystemFromQuery,
-  formatResolveCommand,
-} from './suggestResolveCommand';
+import { formatResolveCommand } from './suggestResolveCommand';
 import { confirmSystem, terminalIO } from './confirmSystem';
+import { canonicalOrganism, readSystemFromQuery } from './readSystem';
 import { commandDomains } from './commandDomains';
 import { commandEnsemble } from './commandEnsemble';
 
@@ -541,7 +539,11 @@ async function commandSimulate(
       // command is printed, and the student names the system explicitly by
       // running it. The guess never becomes provenance without a human in
       // between, which is the whole of the constraint.
-      const system = parseSystemFromQuery(query);
+      // readSystemFromQuery, not parseSystemFromQuery: the same reader the
+      // --resolve path confirms with, so the command printed here names the
+      // organism BRENDA is searched under ("humans" -> "Homo sapiens") and
+      // reads the preposition-less orderings too.
+      const system = readSystemFromQuery(query);
       if (system !== null) {
         console.log(
           '\n' + colors.dim +
@@ -582,19 +584,30 @@ async function commandSimulate(
         // sentence when it can be parsed. This is the branch where it could
         // not, and the honest thing there is a slot they must fill: a
         // placeholder is never the wrong enzyme.
+        //
+        // The closing sentence used to say "Caterva does not read them out of
+        // your question" -- false since --resolve learned to (the `if` branch
+        // above, and confirmSystem). What is true HERE is narrower: this
+        // question did not match a phrasing the parser reads, so nothing was
+        // read. And the first line offered `--km 5.2 --vmax 12.8` as values
+        // to supply: plausible numbers for constants nobody measured, which
+        // is the default this tool refuses to invent itself. A measured
+        // value is named as one to bring with its source instead.
         console.log(
           '\n' + colors.dim +
           'No trajectory was produced, so there are no results to show.\n' +
-          'Either supply the values in the query — e.g. --km 5.2 --vmax 12.8\n' +
-          '--s0 10 — or name a system and let Caterva resolve them:\n' +
+          'Either supply the values yourself — --km and --vmax measured for\n' +
+          'your enzyme, with --cite for their source, and --s0 for your\n' +
+          'experiment — or name a system and let Caterva resolve them:\n' +
           colors.reset + '\n' +
           '  scientific simulate "michaelis menten" --resolve \\\n' +
           '    --enzyme "<enzyme>" --substrate "<substrate>" \\\n' +
           '    --organism "<organism>" --s0 10mM --enzyme-conc 0.001mM\n' +
           '\n' + colors.dim +
-          'Replace the three names with your system. Caterva does not read\n' +
-          'them out of your question, because a citation attached to a system\n' +
-          'you did not name is worse than no citation at all.\n' +
+          'Replace the three names with your system. Caterva could not find\n' +
+          'an enzyme, substrate and organism in this question; asked as\n' +
+          '"<enzyme> on <substrate> in <organism>", --resolve reads them out\n' +
+          'and asks you to confirm before anything is cited.\n' +
           colors.reset
         );
       }
@@ -1182,7 +1195,7 @@ ${colors.bright}Commands:${colors.reset}
       --ec NUMBER          EC number, if you know it (else resolved via UniProt)
       --quantity km|ki|kcat  which constant to resolve (default: km)
       --cite NAME="SOURCE"  Attach a source to a value YOU supplied, e.g.
-                           --cite km="Smith 2019, PMID 12345". Repeatable.
+                           --cite km="<author year, PMID>". Repeatable.
                            Caterva does not check that the source reports the
                            value — it records that the claim is yours, which is
                            still far better than the number arriving from
@@ -1487,7 +1500,7 @@ async function main() {
           // gets the old refusal plus the exact command. A default-confirm
           // would be the silent inference this forbids, with a prompt in the
           // code that nobody ever sees.
-          const parsed = parseSystemFromQuery(query);
+          const parsed = readSystemFromQuery(query);
           const decision = parsed
             ? await confirmSystem(parsed, terminalIO(), {
                 assumeYes: booleans.has('yes'),
@@ -1522,6 +1535,18 @@ async function main() {
             }
             process.exit(1);
           }
+        }
+
+        // An --organism typed as a common name ("human") is searched as the
+        // binomial BRENDA files it under, by the shared normaliser; the
+        // parsed path above already did this. Said out loud, because the
+        // command printed later names the binomial, not what was typed.
+        if (flags['organism'] && organism === flags['organism']) {
+          const canonical = canonicalOrganism(organism);
+          if (canonical.typed !== undefined && !booleans.has('json')) {
+            info(`--organism "${canonical.typed}" is searched as ${canonical.organism}.`);
+          }
+          organism = canonical.organism;
         }
 
         const overrides: Record<string, string> = {};

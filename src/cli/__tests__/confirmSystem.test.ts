@@ -145,6 +145,15 @@ describe('what the student is shown before deciding', () => {
     expect(text).toMatch(/organism\s+Homo sapiens/);
   });
 
+  it('shows the organism searched AND what was typed, when they differ', () => {
+    // "humans" is searched as Homo sapiens (readSystem.ts). Agreeing to the
+    // binomial without seeing it came from your word would be agreeing to a
+    // substitution nobody showed you.
+    const text = describeParsedSystem({ ...SYSTEM, organismTyped: 'humans' });
+    expect(text).toMatch(/organism\s+Homo sapiens\s+\(you wrote "humans"\)/);
+    expect(describeParsedSystem(SYSTEM)).not.toContain('you wrote');
+  });
+
   /**
    * A student who does not know what a wrong organism costs cannot judge the
    * question being put to them. The consequence is named, not implied.

@@ -107,6 +107,33 @@ def organism_code(text: Optional[str]) -> Optional[str]:
     return _NAME_TO_CODE.get(_norm(text))
 
 
+def organism_binomial(text: Optional[str]) -> Optional[str]:
+    """The binomial BRENDA files `text` under, or None to leave it as typed.
+
+    "human", "humans", "H. sapiens" and "HUMAN" are all `Homo sapiens`, and
+    BRENDA is indexed by binomial only: the literature path took "humans"
+    verbatim, matched no BRENDA organism, and refused hexokinase/glucose as
+    "held only for other organisms (... Homo sapiens ...)" -- the organism
+    asked for, listed as somebody else's (found 2026-11-02).
+
+    None for a name this table does not hold (no guess), and None for a
+    name that is MORE specific than the binomial: "E. coli K-12" and
+    "Saccharomyces cerevisiae S288C" share a UniProt code with the plain
+    species, and rewriting them to it would widen a strain the reader named
+    into the species they did not.
+    """
+    code = organism_code(text)
+    if code is None:
+        return None
+    binomial = ORGANISMS[code][0]
+    typed = _norm(text or "")
+    genus, _, species = binomial.partition(" ")
+    for prefix in (_norm(binomial), _norm(f"{genus[0]}. {species}")):
+        if typed.startswith(prefix + " "):
+            return None
+    return binomial
+
+
 def organism_label(code: str) -> str:
     """Short name for messages: `human`, `E. coli`; the code itself if unknown."""
     entry = ORGANISMS.get(code)

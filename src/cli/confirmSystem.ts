@@ -63,7 +63,10 @@ export function describeParsedSystem(system: ParsedSystem): string {
     '',
     `    enzyme      ${system.enzyme}`,
     `    substrate   ${system.substrate}`,
-    `    organism    ${system.organism}`,
+    // The binomial is what BRENDA is searched under; what was typed is
+    // shown beside it so "humans" is visibly the organism being agreed to.
+    `    organism    ${system.organism}` +
+      (system.organismTyped !== undefined ? `   (you wrote "${system.organismTyped}")` : ''),
     '',
     // Named consequences, not a generic "is this ok?". A student who does
     // not know what a wrong organism costs cannot judge the question.
