@@ -373,7 +373,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "81 test files -- query resolution, parameter provenance, " +
+          "82 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
@@ -435,7 +435,14 @@ export const TEST_SUITES: TestSuite[] = [
         // array cases and gained list-refusal and archived-name cases, +6;
         // scenarioDefaults +6; statedQuantities +2;
         // literatureEndpointClaims +1. 856 + 5: 861.
-        passed: 861,
+        //
+        // Measured 2026-11-02, the same way (vitest JSON report, venv first
+        // on PATH): 82 files, 874 tests, 874 passed. Against 861:
+        // webPathProvenance.test.ts, new, +13 (the 422's provenance, the
+        // resolved Km surviving the run, withheld-kcat wording, organism
+        // plurals, the enzyme-name window); routes.test.ts gained
+        // assertions, not tests. 861 + 13: 874.
+        passed: 874,
         skipped: 0,
         failed: 0,
       },
@@ -447,9 +454,10 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "6 test files -- component rendering, nav/section integrity, " +
-          "page-claim accuracy, disabled-source claims, and the merged " +
-          "MuleRun chapters' content",
+          "7 test files -- component rendering, nav/section integrity, " +
+          "page-claim accuracy, disabled-source claims, the merged " +
+          "MuleRun chapters' content, and the resolve-to-run provenance " +
+          "round trip",
         // Measured 2026-09-28, `vitest run`: 6 files, 44 passed (33, plus
         // three MergedChapters tests from the MuleRun merge and two that pin
         // the inhibitor attribution to BRENDA ref 739793's pyruvate row, plus
@@ -461,8 +469,13 @@ export const TEST_SUITES: TestSuite[] = [
         // `vitest run` on 2026-10-31, 6 files, 48 passed. Plus four
         // PageClaims tests holding the release tag, the download's commands
         // and each domain's status to the package version: `vitest run` on
-        // 2026-11-01, from a JSON report, 6 files, 52 passed.
-        passed: 52,
+        // 2026-11-01, from a JSON report, 6 files, 52 passed. Plus
+        // ProvenanceRoundTrip.test.tsx (11: what the agent simulator sends
+        // and shows across a 422, Recent Runs' cached label, the playground
+        // preset's labels) and one more PageClaims test (the stale LDH and
+        // AChE presets replaced by two tests): `vitest run` on 2026-11-02,
+        // from a JSON report, 7 files, 64 passed.
+        passed: 64,
         skipped: 0,
         failed: 0,
       },

@@ -72,6 +72,21 @@ router.post(
           // what succeeded instead of making the user retype it just to
           // supply the one thing that was actually missing.
           resolvedParameters: err.resolvedSoFar,
+          // WHY each missing key is missing, per key, and WHERE each
+          // resolved value came from. The landing page used to show only
+          // its own paraphrase ("vmax is yours to choose") -- the opposite
+          // of what `details.vmax` says (Vmax = kcat x [E]0: state the
+          // enzyme concentration and it is derived and cited) -- because
+          // `message` was the one explanation it could read, and it did
+          // not read that either. `parameterProvenance` lets the form keep
+          // a resolved Km's citation instead of re-sending the number as
+          // if the person had typed it.
+          details: err.details,
+          parameterProvenance: err.parameterProvenance,
+          // "assumed: organism = Homo sapiens ..." and the like: the
+          // choices made for the person, which a 422 dropped although the
+          // resolved Km beside them was made under one (provenance.ts).
+          flags: err.flags,
         });
         return;
       }
