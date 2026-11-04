@@ -83,6 +83,10 @@ router.post(
           // if the person had typed it.
           details: err.details,
           parameterProvenance: err.parameterProvenance,
+          // "assumed: organism = Homo sapiens ..." and the like: the
+          // choices made for the person, which a 422 dropped although the
+          // resolved Km beside them was made under one (provenance.ts).
+          flags: err.flags,
         });
         return;
       }

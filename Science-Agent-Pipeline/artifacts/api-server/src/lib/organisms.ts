@@ -51,6 +51,38 @@ export interface OrganismEntry {
 }
 
 /**
+ * The first word of a longer animal name that ends in one of these
+ * common names, and is a different animal.
+ *
+ * `\bpigs?\b` matched inside "guinea pig". Measured 2026-11-03 on the
+ * live API: "hexokinase with glucose in guinea pigs" came back km 0.015,
+ * source brenda_exact, organism Sus scrofa, cited "BRENDA (ref 640240)"
+ * -- a pig hexokinase II row under the guinea pig's query, badged as an
+ * exact match. "naked mole rats" was read as Rattus norvegicus (ref
+ * 640259) the same way, and "sea cow" and "pig-tailed macaque" likewise.
+ * Before these aliases existed each of those queries fell to the labelled
+ * "assumed: organism" default, which is honest; a wrong species with a
+ * real citation is not. So a common name counts only when it stands on
+ * its own: no listed modifier before it, and no hyphen on either side
+ * ("mole-rat", "pig-tailed", "mouse-ear cress", which is Arabidopsis). A
+ * longer name this list misses still matches the wrong species: the list
+ * is the compound animal names a lab is likely to type, not a closed set.
+ */
+const COMPOUND_NAME_HEADS = [
+  "guinea", "sea", "mole", "kangaroo", "cotton", "wood", "bush", "musk",
+  "water", "sand", "pack", "desert", "deer", "field", "spiny", "harvest",
+  "pocket", "grasshopper", "jumping", "pygmy", "giant", "bandicoot",
+  "cane", "rice", "prairie",
+].join("|");
+
+function commonName(word: string): string {
+  return (
+    `(?<!\\b(?:${COMPOUND_NAME_HEADS})[\\s-]+)(?<![-\\w])` +
+    `(?:${word})(?![-\\w])`
+  );
+}
+
+/**
  * Deliberately short and explicit, like enzymes.ts.
  *
  * Every pattern is anchored on a word boundary. "coli" is not matched
@@ -83,11 +115,11 @@ export const ORGANISMS: OrganismEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /\bMus musculus\b|\bmouse\b|\bmice\b|\bmurine\b/i,
+    pattern: new RegExp(`\\bMus musculus\\b|${commonName("mouse|mice")}|\\bmurine\\b`, "i"),
     organism: "Mus musculus",
   },
   {
-    pattern: /\bRattus norvegicus\b|\brats?\b/i,
+    pattern: new RegExp(`\\bRattus norvegicus\\b|${commonName("rats?")}`, "i"),
     organism: "Rattus norvegicus",
   },
   {
@@ -111,11 +143,11 @@ export const ORGANISMS: OrganismEntry[] = [
     organism: "Danio rerio",
   },
   {
-    pattern: /\bBos taurus\b|\bbovine\b|\bcows?\b|\bcattle\b/i,
+    pattern: new RegExp(`\\bBos taurus\\b|\\bbovine\\b|${commonName("cows?")}|\\bcattle\\b`, "i"),
     organism: "Bos taurus",
   },
   {
-    pattern: /\bSus scrofa\b|\bporcine\b|\bpigs?\b|\bswine\b/i,
+    pattern: new RegExp(`\\bSus scrofa\\b|\\bporcine\\b|${commonName("pigs?")}|\\bswine\\b`, "i"),
     organism: "Sus scrofa",
   },
   {
@@ -123,7 +155,7 @@ export const ORGANISMS: OrganismEntry[] = [
     organism: "Oryctolagus cuniculus",
   },
   {
-    pattern: /\bGallus gallus\b|\bchickens?\b/i,
+    pattern: new RegExp(`\\bGallus gallus\\b|${commonName("chickens?")}`, "i"),
     organism: "Gallus gallus",
   },
   {
@@ -137,16 +169,76 @@ export const ORGANISMS: OrganismEntry[] = [
 ];
 
 /**
- * The organism named in a query, or undefined when none is.
+ * Assay reagents that carry an animal's name and are not the enzyme's
+ * source.
+ *
+ * Measured 2026-11-03 on the live API: "pseudomonas aeruginosa hexokinase
+ * with glucose with bovine serum albumin" came back km 0.047, brenda_exact,
+ * organism Bos taurus, BRENDA ref 662842 -- a cow's hexokinase Km under a
+ * Pseudomonas query, because "bovine" (added to ORGANISMS on 2026-11-02)
+ * sits ahead of Pseudomonas in the list and the first match won. BSA,
+ * ovalbumin and gelatin are in half the assay buffers ever written down;
+ * the species they name is the reagent's, never the enzyme's. "human serum
+ * albumin" had the same defect before any of the new aliases existed.
+ *
+ * Bare "serum" and "plasma" are NOT here: "lactate dehydrogenase in rat
+ * serum" is the rat's own LDH, and setting the rat aside would ground it
+ * in the Homo sapiens default instead.
+ */
+const REAGENT =
+  "(?:serum\\s+albumin|albumin|ovalbumin|egg\\s+albumin|" +
+  "gamma[\\s-]?globulin|globulins?|IgG|immunoglobulins?|gelatin|BSA|HSA)";
+
+function withoutReagents(query: string): string {
+  let out = query;
+  for (const entry of ORGANISMS) {
+    const org = `(?:${entry.pattern.source})`;
+    // "bovine serum albumin", "chicken ovalbumin"; and "BSA from cows",
+    // "albumin of the rat".
+    out = out
+      .replace(new RegExp(`(?:fetal\\s+)?${org}\\s+${REAGENT}\\b`, "gi"), " ")
+      .replace(
+        new RegExp(`\\b${REAGENT}\\s+(?:from|of)\\s+(?:the\\s+|a\\s+)?(?:fetal\\s+)?${org}`, "gi"),
+        " ",
+      );
+  }
+  return out;
+}
+
+/**
+ * Every distinct organism a query names, reagents set aside, in list
+ * order.
+ *
+ * More than one is a conflict the caller must refuse, not resolve. The
+ * matcher used to return the first entry in ORGANISMS' order, so which
+ * species a two-species query was grounded in depended on how this file
+ * happened to be sorted: "mycobacterium tuberculosis kinase, chicken
+ * liver extract" went to Gallus gallus because chicken was listed first.
+ * Nothing in the text says which one the enzyme came from, and a guess
+ * here attaches a real citation to it.
+ */
+export function matchOrganisms(query: string): string[] {
+  const text = withoutReagents(query);
+  const found: string[] = [];
+  for (const entry of ORGANISMS) {
+    if (entry.pattern.test(text) && !found.includes(entry.organism)) {
+      found.push(entry.organism);
+    }
+  }
+  return found;
+}
+
+/**
+ * The organism named in a query, or undefined when none is -- or when
+ * several are (see matchOrganisms; a caller that must tell those two
+ * apart calls it directly, as extractEntitiesFromQuery does).
  *
  * `undefined` is a real answer, not a failure: the caller keeps its
  * existing default rather than being handed a guess.
  */
 export function matchOrganism(query: string): string | undefined {
-  for (const entry of ORGANISMS) {
-    if (entry.pattern.test(query)) return entry.organism;
-  }
-  return undefined;
+  const found = matchOrganisms(query);
+  return found.length === 1 ? found[0] : undefined;
 }
 
 /**
@@ -160,7 +252,7 @@ export function matchOrganism(query: string): string | undefined {
  * as part of an enzyme's name.
  */
 export function stripOrganisms(query: string): string {
-  let out = query;
+  let out = withoutReagents(query);
   for (const entry of ORGANISMS) {
     out = out.replace(new RegExp(entry.pattern.source, "gi"), " ");
   }

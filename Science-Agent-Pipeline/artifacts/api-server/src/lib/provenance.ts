@@ -50,6 +50,18 @@ export class RequiredParametersMissingError extends Error {
    * a provenance it was never given.
    */
   readonly parameterProvenance: Record<string, ParameterProvenance>;
+  /**
+   * The resolver's flags up to the refusal, the same strings a successful
+   * result carries in `provenance.flags`.
+   *
+   * Without them an assumption made on the person's behalf vanished on the
+   * one path that stops to ask them something. Measured 2026-11-03:
+   * "hexokinase with glucose in humna" (a misspelt organism) came back 422
+   * with BRENDA's Homo sapiens Km (ref 641068) in `parameterProvenance` and
+   * no "assumed: organism = Homo sapiens" anywhere in the body, so the
+   * form showed a human value as if the query had asked for one.
+   */
+  readonly flags: string[];
 
   /**
    * `details` exists because the summary sentence is not always true.
@@ -80,6 +92,7 @@ export class RequiredParametersMissingError extends Error {
      */
     examples: Record<string, number | number[]> = {},
     parameterProvenance: Record<string, ParameterProvenance> = {},
+    flags: string[] = [],
   ) {
     const explained = missing.filter((k) => details[k]);
     const unexplained = missing.filter((k) => !details[k]);
@@ -150,6 +163,7 @@ export class RequiredParametersMissingError extends Error {
     this.details = details;
     this.resolvedSoFar = resolvedSoFar;
     this.parameterProvenance = parameterProvenance;
+    this.flags = flags;
   }
 }
 
@@ -604,6 +618,20 @@ export interface ParameterProvenance {
      *                 would have cited a protein the name does not denote.
      */
     | "ec_mismatch"
+    /**
+     * The query names more than one organism (reagents such as "bovine
+     * serum albumin" set aside), so which one the enzyme came from is not
+     * in the text. Same stage as the three above: nothing was looked up,
+     * because a lookup in either species attaches a real citation to a
+     * guess.
+     */
+    | "organism_ambiguous"
+    /**
+     * A guessed enzyme (one not in enzymes.ts) with no substrate named. A
+     * lookup without one takes whichever substrate's row the runner
+     * reaches first, and its result does not say which substrate that was.
+     */
+    | "substrate_not_named"
     /**
      * Nothing was found anywhere. The plain case, and the only one the
      * generic sentence actually describes — named explicitly so the union

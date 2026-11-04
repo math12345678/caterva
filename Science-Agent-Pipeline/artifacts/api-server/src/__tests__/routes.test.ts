@@ -470,6 +470,9 @@ describe("POST /api/resolve", () => {
     expect(res.body.parameterProvenance.km.origin).toBe("user");
     expect(res.body.parameterProvenance.vmax.origin).toBe("default");
     expect(res.body.parameterProvenance.vmax.unresolvedReason).toBeTruthy();
+    // The resolver's flags travel too: an "assumed: organism" made for the
+    // person was dropped on this path (webPathProvenance.test.ts).
+    expect(Array.isArray(res.body.flags)).toBe(true);
   });
 
   it("resolves an MM query", async () => {

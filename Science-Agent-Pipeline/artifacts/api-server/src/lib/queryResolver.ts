@@ -8,7 +8,7 @@ import {
 import { resolveKineticValue, type RelatednessVerdict } from "./scienceAgent";
 import { buildCitationLocators, type CitationLocator } from "./citeVerify";
 import { matchEnzyme } from "./enzymes";
-import { matchOrganism, stripOrganisms } from "./organisms";
+import { matchOrganism, matchOrganisms, stripOrganisms } from "./organisms";
 import { extractStatedQuantities } from "./statedQuantities";
 import {
   RESOLVABLE_FIELDS,
@@ -877,6 +877,22 @@ async function applyKineticResolution(
     return { parameters, parameterProvenance, flags };
   }
 
+  // The query does not name one enzyme in one organism: say so on each
+  // key, and ask nothing. Before the organism and the enzyme it was the
+  // list order of ORGANISMS, or the longest -ase window, that chose.
+  if (entities.extractionRefusal) {
+    const { reason, note } = entities.extractionRefusal;
+    const refused: Record<string, ParameterProvenance> = {};
+    for (const key of kineticKeys) {
+      refused[key] = { origin: "default", unresolvedReason: reason, note };
+    }
+    return {
+      parameters,
+      parameterProvenance: { ...parameterProvenance, ...refused },
+      flags,
+    };
+  }
+
   if (entities.organismAssumed) {
     flags.push(assumedOrganismFlag(entities.organism, kineticKeys));
   }
@@ -1148,6 +1164,20 @@ async function applyVmaxFromKcatResolution(
     return { parameters, parameterProvenance, flags };
   }
   if (!entities?.ecNumber && !entities?.enzymeName) {
+    return { parameters, parameterProvenance, flags };
+  }
+  // Same refusal as the Km's (applyKineticResolution), for the same query:
+  // a kcat looked up for one of two named enzymes or organisms is the
+  // same guess with a second citation on it.
+  if (entities.extractionRefusal) {
+    const existing = parameterProvenance["vmax"];
+    if (existing) {
+      const { reason, note } = entities.extractionRefusal;
+      parameterProvenance = {
+        ...parameterProvenance,
+        vmax: { ...existing, origin: "default", unresolvedReason: reason, note },
+      };
+    }
     return { parameters, parameterProvenance, flags };
   }
   const enzymeConcOverride = overrides["enzyme_conc"];
@@ -1806,7 +1836,43 @@ const QUANTITY_WORDS = new Set([
   "mmol", "s", "sec", "seconds", "min", "minutes", "at", "concentration",
 ]);
 
-function guessEnzymeNameFromQuery(query: string): string | undefined {
+/**
+ * Words that follow an enzyme's name without naming what it acts on.
+ * Skipped when reading the substrate, so "carboxylase activity with
+ * bicarbonate" reads "bicarbonate", not "activity", and "a MAP kinase
+ * cascade" names no substrate at all (it was sent as substrate "cascade",
+ * matched no BRENDA row, and the lookup ran
+ * past gapClassification.test.ts's 60 s limit).
+ */
+const NOT_SUBSTRATE_WORDS = new Set([
+  "activity", "activities", "assay", "assays", "coupled", "buffer",
+  "extract", "purified", "recombinant", "native", "wild-type", "mutant",
+  "variant", "isoform", "subunit", "complex", "family", "gene", "protein",
+  "cascade", "pathway", "signaling", "signalling", "domain",
+  "ph", "temperature", "mg", "ml", "from", "by", "at",
+]);
+
+/** What the guess path read: the enzyme, and the substrate if one was named. */
+interface EnzymeGuess {
+  name: string;
+  /**
+   * The words after the name, across its connector ("... carboxylase WITH
+   * bicarbonate"). Undefined when the query names none -- not "", which the
+   * runner reads as "fill it in from KEGG".
+   */
+  substrate?: string;
+  /**
+   * Every distinct enzyme the query names, when it names more than one
+   * ("pyruvate carboxylase and malate dehydrogenase coupled assay").
+   */
+  enzymesNamed?: string[];
+}
+
+const isAseWord = (w: string) =>
+  // "kinase", "atpase", "dehydrogenase", "hexokinase-2"; not "base".
+  /[a-z]{3}ase(?:-[0-9a-z]{1,3})?$/.test(w) && !NOT_ENZYME_ASE_WORDS.has(w);
+
+function guessEnzymeNameFromQuery(query: string): EnzymeGuess | undefined {
   const domainWords = domainKeywordWords();
   // Each token is classified, not deleted, so the gaps stay where they
   // were: a connector or an organism between two words means those words
@@ -1847,19 +1913,59 @@ function guessEnzymeNameFromQuery(query: string): string | undefined {
   // So the guess is the longest unbroken run of kept words that ENDS at an
   // "-ase" word. Nothing is invented: every word in it is the person's,
   // and a wrong guess is still only one failed lookup, reported as such.
-  let best: string[] | undefined;
+  //
+  // Windows that share a start are ONE name read at two lengths ("pyruvate
+  // dehydrogenase phosphatase" ends at two -ase words); windows with
+  // different starts are different enzymes.
+  const windows = new Map<number, { end: number; words: string[] }>();
   for (let i = 0; i < tokens.length; i++) {
-    const w = tokens[i]!;
-    // "kinase", "atpase", "dehydrogenase", "hexokinase-2"; not "base".
-    const isAseWord =
-      /[a-z]{3}ase(?:-[0-9a-z]{1,3})?$/.test(w) && !NOT_ENZYME_ASE_WORDS.has(w);
-    if (!keep[i] || !isAseWord) continue;
+    if (!keep[i] || !isAseWord(tokens[i]!)) continue;
     let start = i;
     while (start > 0 && keep[start - 1]) start--;
-    const window = tokens.slice(start, i + 1);
-    if (!best || window.length > best.length) best = window;
+    windows.set(start, { end: i, words: tokens.slice(start, i + 1) });
   }
-  if (best) return best.join(" ");
+  if (windows.size > 0) {
+    const found = [...windows.values()];
+    let best = found[0]!;
+    for (const w of found) if (w.words.length > best.words.length) best = w;
+    // TWO ENZYMES ARE NOT ONE GUESS. Measured 2026-11-03: "pyruvate
+    // carboxylase and malate dehydrogenase coupled assay with pyruvate in
+    // humans" simulated pyruvate carboxylase alone (km 0.08, EC 6.4.1.1,
+    // ref 649744) and the response never mentioned malate dehydrogenase.
+    // A coupled assay's readout belongs to the pair, and which half the
+    // person meant to model is not in the text. "kinase" after "pyruvate
+    // kinase" is the same enzyme said twice, not a second one.
+    const names = [...new Set(found.map((w) => w.words.join(" ")))];
+    const distinct = names.filter(
+      (n) => !names.some((other) => other !== n && other.endsWith(` ${n}`)),
+    );
+    // THE SUBSTRATE IS THE PERSON'S, OR NONE. The guess used to send
+    // substrate "", which the runner fills from KEGG's first substrate for
+    // the EC number. Measured 2026-11-03: "pyruvate carboxylase with
+    // bicarbonate in humans" returned km 0.08 mM, brenda_exact, BRENDA ref
+    // 649744 -- which BRENDA's own page lists as the Km for PYRUVATE -- and
+    // nothing in the response said so. The words after the name and its
+    // connector are what the person said it acts on; sent as the
+    // substrate, BRENDA's row filter applies, and a substrate it has no
+    // row for is refused with the labels it does have.
+    let j = best.end + 1;
+    const skippable = (w: string) => breaksName(w) || NOT_SUBSTRATE_WORDS.has(w);
+    while (j < tokens.length && skippable(tokens[j]!)) j++;
+    const substrateWords: string[] = [];
+    while (
+      j < tokens.length &&
+      !skippable(tokens[j]!) &&
+      !isAseWord(tokens[j]!)
+    ) {
+      substrateWords.push(tokens[j]!);
+      j++;
+    }
+    return {
+      name: best.words.join(" "),
+      ...(substrateWords.length > 0 ? { substrate: substrateWords.join(" ") } : {}),
+      ...(distinct.length > 1 ? { enzymesNamed: distinct } : {}),
+    };
+  }
 
   // No "-ase" word: the old behaviour, minus the organism and quantity
   // words, because some enzymes are not named that way ("lysozyme",
@@ -1867,7 +1973,7 @@ function guessEnzymeNameFromQuery(query: string): string | undefined {
   // before UniProt could answer.
   const words = tokens.filter((w) => !isGrammar(w) && !domainWords.has(w));
   if (words.length === 0) return undefined;
-  return words.join(" ");
+  return { name: words.join(" ") };
 }
 
 /**
@@ -2033,7 +2139,9 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
   // `undefined` from matchOrganism is a real answer -- no organism was
   // named -- so the existing default stands rather than being replaced by
   // a guess.
-  const namedOrganism = matchOrganism(query);
+  const organismsNamed = matchOrganisms(query);
+  const namedOrganism = organismsNamed.length === 1 ? organismsNamed[0] : undefined;
+  const organismRefusal = organismConflict(organismsNamed);
 
   const matched = matchEnzyme(query);
   if (matched) {
@@ -2049,19 +2157,78 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
       inhibitor: extractInhibitor(query),
       isoform: extractIsoform(query),
       organism: namedOrganism ?? matched.organism,
-      organismAssumed: namedOrganism === undefined,
+      organismAssumed: organismsNamed.length === 0,
       ecNumber: matched.ecNumber,
+      ...(organismRefusal ? { extractionRefusal: organismRefusal } : {}),
     };
   }
 
   const guess = guessEnzymeNameFromQuery(query);
   if (!guess) return undefined;
+  const enzymeRefusal = guess.enzymesNamed
+    ? {
+        reason: "ec_ambiguous" as const,
+        note:
+          `The query names more than one enzyme (${guess.enzymesNamed.join(", ")}), ` +
+          "and a Michaelis-Menten model is the kinetics of one. Nothing was " +
+          "looked up -- BRENDA, KEGG and PubMed were never asked -- because " +
+          "simulating either alone would attach a real citation to a choice " +
+          "the query does not make. Name the one enzyme to model.",
+      }
+    : undefined;
+  // NO SUBSTRATE NAMED IS A QUESTION, NOT A BLANK TO FILL. The runner
+  // reads substrate "" as "any": it takes KEGG's first substrate for the EC
+  // number, or, when KEGG lists none, BRENDA's rows unfiltered. Measured
+  // 2026-11-03 on the live runner: "pyruvate carboxylase in humans" logged
+  // "No KEGG substrate found for EC 6.4.1.1; BRENDA lookup will be
+  // unfiltered by substrate" and returned km 0.08 (ref 649744), the
+  // PYRUVATE row, while the result carries no field saying which
+  // substrate a row was measured on -- so nothing downstream could say so
+  // either. The table path (enzymes.ts) has a documented substrate per
+  // enzyme; a guessed enzyme has none, and a Km is the constant of one.
+  const substrateRefusal = !guess.substrate
+    ? {
+        reason: "substrate_not_named" as const,
+        note:
+          `The query names no substrate for ${guess.name}, and a kinetic ` +
+          "constant is measured on one enzyme acting on one substrate: BRENDA " +
+          "lists a different Km for each. Nothing was looked up, because a lookup " +
+          "without one returns whichever substrate's row comes first. Name " +
+          `it ("${guess.name} with <substrate>").`,
+      }
+    : undefined;
+  const refusal = enzymeRefusal ?? organismRefusal ?? substrateRefusal;
   return {
-    enzymeName: guess,
-    substrate: "",
+    enzymeName: guess.name,
+    substrate: guess.substrate ?? "",
     organism: namedOrganism ?? "Homo sapiens",
-    organismAssumed: namedOrganism === undefined,
+    organismAssumed: organismsNamed.length === 0,
     ecNumber: undefined,
+    ...(refusal ? { extractionRefusal: refusal } : {}),
+  };
+}
+
+/**
+ * The refusal for a query naming several organisms, or undefined.
+ *
+ * Measured 2026-11-03: "P. aeruginosa hexokinase with glucose in a buffer
+ * with 0.1 mg/ml BSA from cows" was grounded in Bos taurus, because the
+ * matcher took the first organism in ORGANISMS' order. Reagents are now set
+ * aside before matching (organisms.ts); what is left naming two species is
+ * a query whose text does not say which one the enzyme came from.
+ */
+function organismConflict(
+  organismsNamed: string[],
+): EntityExtraction["extractionRefusal"] {
+  if (organismsNamed.length < 2) return undefined;
+  return {
+    reason: "organism_ambiguous",
+    note:
+      `The query names more than one organism (${organismsNamed.join(", ")}), ` +
+      "and a kinetic constant is measured on the enzyme from one of them. " +
+      "Nothing was looked up -- BRENDA, KEGG and PubMed were never asked -- " +
+      "because grounding it in either would cite a species the query may " +
+      "not mean. Name only the organism the enzyme comes from.",
   };
 }
 
@@ -2467,6 +2634,12 @@ export async function resolveQuery(
     // the model's reading of it; when neither names one, the API's
     // documented default applies and applyKineticResolution reports it as
     // an assumption in `flags`.
+    //
+    // Several organisms in the text is a refusal here too: the model's
+    // reading of which one was meant is the same first-match guess the
+    // keyword path no longer makes, with less to check it against.
+    const organismsInText = matchOrganisms(query);
+    const organismRefusal = organismConflict(organismsInText);
     const organismNamed =
       matchOrganism(query) ?? (llmResult.entities?.organism || undefined);
     const llmEntities: EntityExtraction | undefined = llmResult.entities
@@ -2474,6 +2647,7 @@ export async function resolveQuery(
           ...llmResult.entities,
           organism: organismNamed ?? "Homo sapiens",
           organismAssumed: organismNamed === undefined,
+          ...(organismRefusal ? { extractionRefusal: organismRefusal } : {}),
         }
       : undefined;
     // A proposal the model made and the resolver did not use. Said, not
@@ -2628,6 +2802,9 @@ export async function resolveQuery(
         // citation and a missing Vmax's `unresolvedReason` are both things
         // the form that answers this refusal has to show (routes/enzymes.ts).
         parameterProvenance,
+        // And the assumptions made for the person ("assumed: organism"),
+        // which a refusal is the likeliest place for them to act on.
+        flags,
       );
     }
 
@@ -2913,6 +3090,7 @@ export async function resolveQuery(
       // Same as the LLM branch above, same filtering.
       Object.fromEntries(missing.map((k) => [k, parameters[k]!])),
       parameterProvenance,
+      flags,
     );
   }
 

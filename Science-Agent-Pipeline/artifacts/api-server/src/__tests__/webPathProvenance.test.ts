@@ -23,7 +23,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { resolveQuery } from "../lib/queryResolver";
 import { RequiredParametersMissingError } from "../lib/provenance";
-import { matchOrganism, stripOrganisms } from "../lib/organisms";
+import { matchOrganism, matchOrganisms, stripOrganisms } from "../lib/organisms";
 import { resolveQueryWithLLM } from "../lib/llmResolver";
 
 // Undefined (no LLM configured) unless a test says otherwise, so every other
@@ -36,12 +36,14 @@ vi.mock("../lib/llmResolver", async (importOriginal) => {
 type Entities = {
   quantity?: string;
   enzymeName?: string;
+  substrate?: string;
   ecNumber?: string;
   organism?: string;
 };
 
 const seen: Entities[] = [];
 let kcatAnswer: Record<string, unknown> = {};
+let kmAnswer: Record<string, unknown> = {};
 
 const HEXOKINASE_KM = {
   found: true,
@@ -84,7 +86,7 @@ vi.mock("../lib/scienceAgent", async (importOriginal) => {
     resolveKineticValue: vi.fn(async (entities: Entities) => {
       seen.push({ ...entities });
       if (entities.quantity === "kcat") return kcatAnswer;
-      return HEXOKINASE_KM;
+      return kmAnswer;
     }),
   };
 });
@@ -92,6 +94,7 @@ vi.mock("../lib/scienceAgent", async (importOriginal) => {
 beforeEach(() => {
   seen.length = 0;
   kcatAnswer = HEXOKINASE_KCAT;
+  kmAnswer = HEXOKINASE_KM;
 });
 
 async function refusalOf(query: string): Promise<RequiredParametersMissingError> {
@@ -257,5 +260,147 @@ describe("the enzyme-name guess is the enzyme, not the whole phrase", () => {
   it("does not read a concentration phrase as part of the name", async () => {
     await attempt("glucose oxidase with 50 nM enzyme");
     expect(sentNames()).toEqual(["glucose oxidase"]);
+  });
+});
+
+describe("a common name inside a longer animal's name is not that animal", () => {
+  // Measured 2026-11-03 on the live API: "guinea pigs" grounded in Sus
+  // scrofa (ref 640240), "naked mole rats" in Rattus norvegicus (ref
+  // 640259). Unmatched, each falls to the labelled "assumed" default.
+  it("does not read guinea pig, mole rat, sea cow or pig-tailed macaque", () => {
+    expect(matchOrganism("hexokinase in guinea pigs")).toBeUndefined();
+    expect(matchOrganism("hexokinase with glucose in a guinea pig")).toBeUndefined();
+    expect(matchOrganism("hexokinase in naked mole rats")).toBeUndefined();
+    expect(matchOrganism("hexokinase in the naked mole-rat")).toBeUndefined();
+    expect(matchOrganism("hexokinase from the sea cow")).toBeUndefined();
+    expect(matchOrganism("hexokinase in a pig-tailed macaque")).toBeUndefined();
+    expect(matchOrganism("hexokinase in deer mice")).toBeUndefined();
+  });
+
+  it("still reads the animal itself", () => {
+    expect(matchOrganism("hexokinase in pigs")).toBe("Sus scrofa");
+    expect(matchOrganism("rat liver glucokinase")).toBe("Rattus norvegicus");
+    expect(matchOrganism("hexokinase in cows")).toBe("Bos taurus");
+    expect(matchOrganism("in mice")).toBe("Mus musculus");
+  });
+});
+
+describe("a reagent's species is not the enzyme's", () => {
+  // Measured 2026-11-03: a Pseudomonas hexokinase query "with bovine serum
+  // albumin" came back with a Bos taurus Km (ref 662842), brenda_exact.
+  it("sets aside serum albumin, BSA and ovalbumin", () => {
+    expect(
+      matchOrganism("pseudomonas aeruginosa hexokinase with glucose with bovine serum albumin"),
+    ).toBe("Pseudomonas aeruginosa");
+    expect(
+      matchOrganism(
+        "P. aeruginosa hexokinase with glucose in a buffer with 0.1 mg/ml BSA from cows",
+      ),
+    ).toBe("Pseudomonas aeruginosa");
+    expect(matchOrganism("mycobacterium tuberculosis kinase, chicken ovalbumin")).toBe(
+      "Mycobacterium tuberculosis",
+    );
+    expect(matchOrganism("E. coli hexokinase with human serum albumin")).toBe(
+      "Escherichia coli",
+    );
+  });
+
+  it("keeps an animal's own serum as the animal", () => {
+    expect(matchOrganism("lactate dehydrogenase in rat serum")).toBe("Rattus norvegicus");
+  });
+
+  it("refuses, and looks nothing up, when two organisms remain", async () => {
+    expect(matchOrganisms("rat hexokinase expressed in E. coli")).toEqual([
+      "Escherichia coli",
+      "Rattus norvegicus",
+    ]);
+    const err = await refusalOf("rat hexokinase with glucose expressed in E. coli");
+    expect(seen).toEqual([]);
+    const km = err.parameterProvenance["km"]!;
+    expect(km.origin).toBe("default");
+    expect(km.unresolvedReason).toBe("organism_ambiguous");
+    expect(err.details["km"]).toContain("Escherichia coli, Rattus norvegicus");
+    expect(err.resolvedSoFar).not.toHaveProperty("km");
+  });
+});
+
+describe("the guess path sends the substrate the person named", () => {
+  const kmLookups = () => seen.filter((e) => e.quantity !== "kcat");
+
+  it("a bicarbonate query does not come back with the pyruvate Km", async () => {
+    // Measured 2026-11-03: km 0.08 (ref 649744), which BRENDA lists for
+    // PYRUVATE, under a query naming bicarbonate. With the substrate sent,
+    // the runner's row filter applies and answers with what it does hold.
+    kmAnswer = {
+      found: false,
+      source: "not_found",
+      substratesAvailable: ["ATP", "HCO3-", "pyruvate"],
+      literatureCandidates: [],
+      logs: [],
+    };
+    const err = await refusalOf("pyruvate carboxylase with bicarbonate in humans");
+    expect(kmLookups().map((e) => [e.enzymeName, e.substrate])).toEqual([
+      ["pyruvate carboxylase", "bicarbonate"],
+    ]);
+    expect(err.resolvedSoFar).not.toHaveProperty("km");
+    expect(err.parameterProvenance["km"]!.origin).toBe("default");
+    expect(err.details["km"]).toContain("HCO3-");
+  });
+
+  it("reads the substrate past words that are not one", async () => {
+    await attempt("pyruvate carboxylase activity with ATP in humans");
+    expect(kmLookups()[0]!.substrate).toBe("atp");
+    seen.length = 0;
+    await attempt("glucokinase glucose rat");
+    expect(kmLookups()[0]!.substrate).toBe("glucose");
+  });
+
+  it("refuses, and looks nothing up, when no substrate is named", async () => {
+    // Measured 2026-11-03 on the live runner: "pyruvate carboxylase in
+    // humans" went out with substrate "", the runner logged "BRENDA lookup
+    // will be unfiltered by substrate", and the Km of whichever substrate
+    // came first (pyruvate, ref 649744) came back with nothing naming it.
+    const err = await refusalOf("pyruvate carboxylase in humans");
+    expect(seen).toEqual([]);
+    const km = err.parameterProvenance["km"]!;
+    expect(km.origin).toBe("default");
+    expect(km.unresolvedReason).toBe("substrate_not_named");
+    expect(err.resolvedSoFar).not.toHaveProperty("km");
+    expect(err.details["km"]).toContain('"pyruvate carboxylase with <substrate>"');
+  });
+
+  it("a table enzyme keeps its documented substrate default", async () => {
+    // enzymes.ts names a substrate for each enzyme it lists, so the refusal
+    // above is for guessed names only.
+    await attempt("hexokinase in humans");
+    expect(kmLookups().map((e) => e.substrate)).toEqual(["glucose"]);
+  });
+});
+
+describe("a query naming two enzymes is not modelled as one", () => {
+  it("refuses a coupled assay instead of simulating its first enzyme", async () => {
+    // Measured 2026-11-03: pyruvate carboxylase alone (ref 649744), and
+    // malate dehydrogenase mentioned nowhere in the response.
+    const err = await refusalOf(
+      "pyruvate carboxylase and malate dehydrogenase coupled assay with pyruvate in humans",
+    );
+    expect(seen).toEqual([]);
+    expect(err.parameterProvenance["km"]!.unresolvedReason).toBe("ec_ambiguous");
+    expect(err.details["km"]).toContain("pyruvate carboxylase, malate dehydrogenase");
+  });
+
+  it("does not count one enzyme named twice as two", async () => {
+    await attempt("pyruvate dehydrogenase phosphatase with pyruvate in humans");
+    expect(seen.map((e) => e.enzymeName)).toContain("pyruvate dehydrogenase phosphatase");
+  });
+});
+
+describe("the refusal says what it assumed", () => {
+  it("a misspelt organism's default is flagged on the 422 path", async () => {
+    // Measured 2026-11-03: "in humna" came back 422 with a Homo sapiens Km
+    // (ref 641068) and no "assumed: organism" anywhere in the body.
+    const err = await refusalOf("hexokinase with glucose in humna");
+    expect(err.parameterProvenance["km"]!.organism).toBe("Homo sapiens");
+    expect(err.flags.join(" ")).toMatch(/assumed: organism = Homo sapiens/);
   });
 });
