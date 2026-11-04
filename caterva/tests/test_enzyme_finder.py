@@ -392,3 +392,53 @@ def test_a_unique_name_inside_a_longer_one_is_not_resolved_either():
         result = resolve(name, "human")
         assert isinstance(result, Ambiguous), name
         assert result.suggestions_only or len(result.candidates) > 1, name
+
+
+# --- a word for a kind of enzyme is not one enzyme -------------------------
+# `caterva bind --ec protein --organism pig` read 'protein' as EC 1.8.1.4
+# (dihydrolipoyl dehydrogenase, through its other name 'L-protein') and
+# printed seven cited Ki rows for it; 'enzyme' became EC 2.4.1.25 through
+# 'D-enzyme', 'peptidase' the viral L-peptidase, and 'protein kinase'
+# histidine kinase. Found 2026-11-03 by review of the --ec name reading.
+
+
+@pytest.mark.parametrize("word, misread", [
+    ("protein", "1.8.1.4"), ("enzyme", "2.4.1.25"), ("peptidase", "3.4.22.46"),
+    ("glutamyltransferase", "2.3.2.1"), ("tautomerase", "4.1.1.84"),
+])
+def test_a_bare_word_that_needs_a_stereo_label_set_aside_is_a_choice(word, misread):
+    for organism in (None, "Homo sapiens", "Sus scrofa"):
+        result = resolve(word, organism)
+        assert isinstance(result, Ambiguous), (word, organism, result)
+        assert result.candidates[0].ec == misread and len(result.candidates) > 1
+        assert result.recommended is None and result.class_word
+        text = refusal_text(result, "--ec {ec}")
+        assert "only once the label in" in text
+        # The example re-run is never the misreading the rule refuses.
+        assert f"--ec {misread}" not in text and text.endswith("--ec <its EC number>")
+
+
+@pytest.mark.parametrize("words, misread", [
+    ("protein kinase", "2.7.13.3"), ("threonine aldolase", "2.1.2.1"), ("sulfatase", "3.1.6.1"),
+])
+def test_another_name_that_is_the_family_word_of_other_accepted_names_is_a_choice(words, misread):
+    result = resolve(words, "Homo sapiens")
+    assert isinstance(result, Ambiguous), result
+    assert result.candidates[0].ec == misread and result.class_word
+    assert "it names a kind of enzyme, not one" in result.reason
+
+
+@pytest.mark.parametrize("name, ec", [
+    # A one-word name no other enzyme uses still resolves through a label ...
+    ("fuculokinase", "2.7.1.51"), ("iduronidase", "3.2.1.76"),
+    # ... the name typed with its letter is that enzyme ...
+    ("L protein", "1.8.1.4"),
+    # ... and an other-name inside its own accepted name, or used by at most
+    # one other accepted name, is still the enzyme it names.
+    ("lipase", "3.1.1.3"), ("pepsin", "3.4.23.1"), ("sorbitol dehydrogenase", "1.1.1.14"),
+    ("L-lactate dehydrogenase", "1.1.1.27"),
+])
+def test_names_that_are_one_enzyme_still_resolve(name, ec):
+    result = resolve(name, "Homo sapiens")
+    assert isinstance(result, Resolved), (name, result)
+    assert result.ec == ec

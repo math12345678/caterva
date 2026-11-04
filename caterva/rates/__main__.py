@@ -124,8 +124,9 @@ def build_parser(prog: str = "caterva rates") -> argparse.ArgumentParser:
                               "nonlinear fit, for teaching; they are never the reported estimate")
     lit = p.add_argument_group("literature (reads BRENDA live: needs a network connection)")
     lit.add_argument("--ec", metavar="EC",
-                     help="the enzyme's EC number, e.g. 1.1.1.27, to compare the fitted Km and Ki "
-                          "with the values BRENDA cites")
+                     help="the enzyme's EC number, e.g. 1.1.1.27, or its name (read as its EC "
+                          "number, and said so), to compare the fitted Km and Ki with the values "
+                          "BRENDA cites")
     lit.add_argument("--organism",
                      help="the organism, e.g. 'Homo sapiens' or human; required with --ec, "
                           "because kinetic constants are species-specific")

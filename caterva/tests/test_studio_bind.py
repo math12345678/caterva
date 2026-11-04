@@ -177,3 +177,36 @@ def test_the_parser_refuses_what_the_command_refuses():
     with pytest.raises(contract.Malformed) as caught:
         adapter.argv({**BASE, "mode": "inhibitor", "inhibitor": "x", "computed": {"value": 1.0, "unit": "ev"}})
     assert "invalid choice: 'ev'" in str(caught.value)
+
+
+def test_an_enzyme_name_in_the_ec_field_is_read_as_the_command_reads_it(tmp_path):
+    # The studio sent the name to BRENDA as the number and refused with
+    # "No Ki rows for EC L-lactate dehydrogenase"; it is read by the same
+    # policy as `caterva bind --ec`, and said so in a stage.
+    progress = Recorder()
+    by_name = studio({"ec": "L-lactate dehydrogenase", "organism": "human", "mode": "list"}, tmp_path, progress)
+    by_number = studio({**BASE, "mode": "list"}, tmp_path)
+    assert by_name.exit_code == by_number.exit_code == 0
+    assert by_name.result == by_number.result
+    assert progress.stages()[0] == "subject"
+
+
+def test_a_name_that_is_several_enzymes_is_refused_with_the_candidates(tmp_path):
+    outcome = studio({"ec": "lactate dehydrogenase", "organism": "human", "mode": "list"}, tmp_path)
+    assert outcome.exit_code == 3 and outcome.result is None
+    assert "EC 1.1.1.27 L-lactate dehydrogenase" in outcome.refusal
+    assert "No Ki rows" not in outcome.refusal
+
+
+def test_a_word_for_a_kind_of_enzyme_is_refused_not_read_as_one(tmp_path):
+    # 'protein' was read as EC 1.8.1.4 through its other name 'L-protein'.
+    outcome = studio({"ec": "protein", "organism": "pig", "mode": "list"}, tmp_path)
+    assert outcome.exit_code == 3 and outcome.result is None
+    assert "only once the label in 'L-protein' is set aside" in outcome.refusal
+
+
+def test_an_organism_the_page_never_names_is_not_reported_as_no_ki_rows(tmp_path):
+    outcome = studio({**BASE, "organism": "humn", "mode": "list"}, tmp_path)
+    assert outcome.exit_code == 3
+    assert "names no organism 'Humn' anywhere" in outcome.refusal
+    assert "No Ki rows" not in outcome.refusal

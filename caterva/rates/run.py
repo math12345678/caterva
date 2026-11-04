@@ -93,11 +93,24 @@ def execute(data: Dataset, *, sigma_from: Optional[str] = None, error_model: Opt
     if literature is not None and literature.ec:
         from caterva.compose.organisms import normalise_organism
 
+        from caterva.enzymes.ec_option import read_ec_option
+
         organism, read_as = normalise_organism(literature.organism)
         if read_as:
             analysis.notes.append(read_as)
+        # `--ec` read by the one enzyme-name policy, as `caterva bind --ec`
+        # reads it. The text went to BRENDA as given, so `--ec hexokinase`
+        # compared the fit with "no cited value" -- a search for a name no
+        # BRENDA page is filed under. A name that is not exactly one enzyme
+        # is refused here, naming the candidates, and nothing is searched.
+        subject = read_ec_option(literature.ec, organism, flag="--ec")
+        if subject.ec is None:
+            analysis.literature = []
+            analysis.literature_refused = subject.refusal
+            return Execution(analysis, True, [subject.refusal])
+        analysis.notes.extend(subject.notes)
         try:
-            compare_literature(analysis, ec=literature.ec.strip(), organism=organism,
+            compare_literature(analysis, ec=subject.ec, organism=organism,
                                substrate=literature.substrate, inhibitor=literature.inhibitor,
                                isoform=literature.isoform, resolver=resolver)
         except LiteratureUnavailable as exc:
