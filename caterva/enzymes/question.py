@@ -40,7 +40,7 @@ import json
 import sys
 from typing import Dict, List, Optional, Sequence
 
-from .finder import TIER_ALTERNATIVE_TOLERANT, find
+from .finder import TIER_ACCEPTED_TOLERANT, TIER_ALL_WORDS, TIER_ALTERNATIVE_TOLERANT, find
 from .index import organism_binomial, organism_code
 
 #: Leading words that are never part of the system: the command's own
@@ -68,7 +68,18 @@ def canonical_organism(typed: str) -> Dict[str, str]:
 
 def _is_enzyme_name(words: Sequence[str], organism: Optional[str]) -> bool:
     text = " ".join(words)
-    return any(c.tier <= TIER_ALTERNATIVE_TOLERANT for c in find(text, organism, None))
+    found = find(text, organism, None)
+    named = [c for c in found if c.tier <= TIER_ALTERNATIVE_TOLERANT]
+    if len(words) == 1 and named and all(c.tier >= TIER_ACCEPTED_TOLERANT for c in named):
+        # A bare word met only once a label was set aside, while other
+        # enzymes carry it as written, is a class word: "enzyme" equals
+        # "D-enzyme" (EC 2.4.1.25) and "protein" "L-protein" (EC 1.8.1.4).
+        # The finder refuses these in `resolve` (its rule e); the reader asks
+        # the same question of `find`, so the word is not taken as a name.
+        hit = {c.ec for c in named}
+        if any(c.ec not in hit and c.via == "name" and c.tier <= TIER_ALL_WORDS for c in found):
+            return False
+    return bool(named)
 
 
 def _holds_enzyme_name(words: Sequence[str], organism: Optional[str]) -> bool:

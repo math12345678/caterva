@@ -61,9 +61,9 @@ def test_canonical_organism_names_what_was_typed():
 # "enzyme" equals "D-enzyme" (EC 2.4.1.25) once the D- is set aside, so it
 # reached the stereo-tolerant tier and was read as an enzyme name; the
 # runner then cited BRENDA ref 737180 (27.5 mM, 4-alpha-glucanotransferase)
-# for `simulate "enzyme maltotriose arabidopsis"`. The fix is in finder.py,
-# the one place every command resolves a name, so both the reader and the
-# resolver are pinned here.
+# for `simulate "enzyme maltotriose arabidopsis"`. The resolver refuses it
+# in finder.py (rule e) and the reader in question.py asks the same of
+# `find`, so both are pinned here.
 
 @pytest.mark.parametrize("query", [
     "enzyme glucose human",
@@ -76,10 +76,11 @@ def test_a_class_word_is_not_read_as_an_enzyme(query):
 
 @pytest.mark.parametrize("word", ["enzyme", "protein", "peptidase", "dioxygenase"])
 def test_a_class_word_does_not_resolve_to_the_enzyme_whose_labelled_name_it_is(word):
-    from caterva.enzymes.finder import TIER_ALTERNATIVE_TOLERANT, Resolved, find, resolve
+    from caterva.enzymes.finder import Resolved, resolve
+    from caterva.enzymes.question import _is_enzyme_name
 
     assert not isinstance(resolve(word, "human"), Resolved)
-    assert all(c.tier > TIER_ALTERNATIVE_TOLERANT for c in find(word, "human"))
+    assert not _is_enzyme_name([word], "human")
 
 
 def test_a_one_word_name_only_its_own_enzyme_uses_still_resolves_tolerantly():

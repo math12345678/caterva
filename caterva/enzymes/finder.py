@@ -695,34 +695,6 @@ def _search(query: str, code: Optional[str], index: EnzymeIndex) -> List[Candida
                      f"every word of your query is in another name for this enzyme: '{name.text}'", name.text,
                      partial=True)
 
-    # A ONE-WORD query that matched only once a label was set aside, while
-    # the same word is a word of OTHER enzymes' names, is a class word, not a
-    # name. "enzyme" equals "D-enzyme" (EC 2.4.1.25, 4-alpha-
-    # glucanotransferase) with the D- removed, so "enzyme" reached tier 4 and
-    # resolved, and `simulate "enzyme maltotriose arabidopsis" --resolve`
-    # cited a real Km (27.5 mM, BRENDA ref 737180) for an enzyme nobody
-    # named, under a confirmation that showed only "enzyme enzyme" (found
-    # 2026-11-03). "protein" (L-protein, EC 1.8.1.4) and "peptidase"
-    # (L-peptidase, EC 3.4.22.46) resolved the same way, in every command
-    # that resolves a name. The D- there is part of a name, not a stereo
-    # label, and a tolerant match cannot tell the two apart; what it can see
-    # is that the word left over is also a word of other enzymes' names. Such
-    # a hit becomes a fragment: listed, never resolved. A one-word key only
-    # its own enzymes use ("L-fuculokinase" read as "fuculokinase") is
-    # untouched, and so is every multi-word query: "lactate dehydrogenase"
-    # still reaches L- and D-lactate dehydrogenase and is refused as two.
-    if len(q_loose.split()) == 1:
-        tolerant = [ec for ec, held in best.items()
-                    if held.tier in (TIER_ACCEPTED_TOLERANT, TIER_ALTERNATIVE_TOLERANT)]
-        others = [ec for ec, held in best.items() if TIER_ACCEPTED_PHRASE <= held.tier <= TIER_ALL_WORDS]
-        if tolerant and others:
-            for ec in tolerant:
-                held = best[ec]
-                held.tier = TIER_ALTERNATIVE_PHRASE
-                held.partial = True
-                held.why = (f"{held.why}; but {text!r} is also a word of {len(others)} other enzymes' "
-                            "names, so here it is a class word, not this enzyme's name")
-
     # The curated table of gene symbols and lab abbreviations (symbols.py).
     # Its readings are candidates and never resolve on their own, with one
     # exception made in `resolve`: an abbreviation that is also an exact

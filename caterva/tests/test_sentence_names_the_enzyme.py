@@ -107,11 +107,9 @@ def test_a_name_that_is_several_enzymes_is_an_ambiguity_not_a_skip():
 ])
 def test_a_class_word_is_never_an_enzyme_and_never_an_ambiguity(text):
     # "protein kinase" is an exact alternative name of histidine kinase
-    # (EC 2.7.13.3) and "MAP kinase" of EC 2.7.11.24: both resolve in the
-    # finder, and neither is an enzyme a sentence means.
-    from caterva.enzymes.finder import Resolved, resolve
-
-    assert isinstance(resolve("protein kinase"), Resolved), "the guard is needed only while this resolves"
+    # (EC 2.7.13.3) and "MAP kinase" of EC 2.7.11.24. The finder now refuses
+    # the first as a family word (its rule f); the class-word guard keeps
+    # both out of a sentence whatever the finder does with them.
     reading = read_sentence(text)
     assert reading.ec is None and reading.ambiguity is None and not reading.names_enzyme, reading
 
