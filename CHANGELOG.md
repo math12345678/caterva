@@ -14,6 +14,14 @@ done: there was no release to version.
 
 ## [Unreleased]
 
+Plain-language questions reach measured, cited values (ADR 0181).
+
+### Fixed
+- `caterva compose` reads the enzyme, organism and substrate from the sentence when the shape has one enzyme step: "hexokinase glucose human" builds Michaelis-Menten with Km 6.0 mM (BRENDA ref 641068) and kcat 40.1 1/s (BRENDA ref 739603) for Homo sapiens. Only an exact accepted name, a unique other name or an EC number is read; a name shared by two enzymes ("lactate dehydrogenase") is refused with the candidates and the exact re-run; flags win over the sentence; every reading is a note in the report. A word taken out of a longer compound name ("glucose" in "glucose 6-phosphate") is not the substrate, and a misspelt organism is said not read.
+- The web page no longer re-sends resolved values as the student's own, so BRENDA's Km keeps its citation through `/api/simulate`, and it shows each value's citation and why a run stopped. A 422 carries the per-parameter provenance, details and flags. Organism words read plurals and common names without matching inside "guinea pig", "naked mole rat" or a reagent such as bovine serum albumin; two organisms, two enzymes or a guessed enzyme with no substrate are refused instead of picking one.
+- The TypeScript CLI refuses when a flag contradicts the question, shows the EC its citation will be about, and prints labelled placeholders instead of example numbers (`--km 10.7mM`, `PMID 12345`) in its suggestions. Its tests no longer write runs to `~/.caterva`.
+- `caterva bind`, `fep` and `rates` read an enzyme name passed as `--ec` instead of searching BRENDA for it as a number, and Studio Compose sends a typed name. A word for a kind of enzyme ("protein", "enzyme", "peptidase", "protein kinase") is refused rather than read as the one enzyme a synonym happens to match, and an organism BRENDA's page does not name is reported as that, with a suggestion, not as "No Ki rows".
+
 ## [0.7.0] - 2026-11-01
 
 Caterva V7: every number on a public surface is measured, derived from the

@@ -151,7 +151,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "182 test files -- kinetics & Michaelis-Menten correctness, " +
+          "184 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -260,10 +260,17 @@ export const TEST_SUITES: TestSuite[] = [
         // 10) three runs out of three. So 7057 + 1: 7058. The skip is the
         // Swift type-check, which needs Sparkle unpacked into dist/sparkle
         // (scripts/fetch_sparkle.py); the studio-dmg job compiles it.
-        passed: 7058,
+        //
+        // Measured 2026-11-04 (ADR 0181) on the merged tree of the four
+        // plain-language branches, caterva/ in eight shards, read out of
+        // junit-xml reports: 7210 tests, 7208 passed, 2 skipped, 0 failed.
+        // One skip was the codegen selftest, run before node was on PATH;
+        // with it there, test_guard_selftests.py passed in full. The other
+        // is the Swift type-check (Sparkle not unpacked): 7209.
+        passed: 7209,
         skipped: 1,
         failed: 0,
-        collected: 7059,
+        collected: 7210,
       },
     ],
   },
@@ -360,10 +367,16 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-11-01 for 0.7.0, the same way: 1680 tests, 1680
         // passed, 0 skipped, 0 failed, 1767 s (the machine was loaded).
         // test_documented_guard_counts.py arrived with 4 tests: 1680.
-        passed: 1680,
+        //
+        // Measured 2026-11-04 on the ADR 0181 merged tree, Tests/ in six
+        // shards, junit-xml: 1692 tests, 1691 passed, 1 failed -- the README
+        // ADR count (178, now 179), which check_documented_counts.py --write
+        // then fixed; test_documented_counts.py passed in full after it.
+        // 1691 + 1: 1692.
+        passed: 1692,
         skipped: 0,
         failed: 0,
-        collected: 1680,
+        collected: 1692,
       },
     ],
   },
@@ -442,7 +455,13 @@ export const TEST_SUITES: TestSuite[] = [
         // resolved Km surviving the run, withheld-kcat wording, organism
         // plurals, the enzyme-name window); routes.test.ts gained
         // assertions, not tests. 861 + 13: 874.
-        passed: 874,
+        //
+        // Measured 2026-11-04 on the ADR 0181 merged tree, vitest
+        // --maxWorkers=2, venv on PATH: 82 files, 886 tests, 886 passed.
+        // The 12 more are webPathProvenance.test.ts's review cases (guinea
+        // pig, a reagent's organism, a guessed enzyme with no substrate, two
+        // enzymes): 886.
+        passed: 886,
         skipped: 0,
         failed: 0,
       },
@@ -487,7 +506,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "72 test files -- the `scientific` CLI end to end and its " +
+          "76 test files -- the `scientific` CLI end to end and its " +
           "refusals, the literature resolver, the Python engine bridge, " +
           "inhibition models, exports, request validation, result storage " +
           "and reproducibility checks",
@@ -497,7 +516,12 @@ export const TEST_SUITES: TestSuite[] = [
         // files on disk (72 of 72). These tests had never run in CI before
         // that day; four of them had been written for the wrong runner and
         // could not load, and were converted without changing an assertion.
-        passed: 944,
+        //
+        // Measured 2026-11-04 on the ADR 0181 merged tree: jest --runInBand,
+        // 76 suites, 981 tests, all passing, none skipped; ~/.caterva's
+        // history and records were unchanged by the run (the new
+        // testsDoNotWriteHome guard is one of the four new files): 981.
+        passed: 981,
         skipped: 0,
         failed: 0,
       },
