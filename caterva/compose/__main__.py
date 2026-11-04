@@ -1160,6 +1160,8 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
             out.notes.append("Your description names " + " and ".join(
                 f"{t!r} ({b})" for t, b in reading.organisms_named)
                 + "; no organism was read from it, because choosing one would be a guess.")
+        if reading.unread_organism is not None and not args.organism:
+            out.notes.append(reading.unread_organism_note())
         if reading.inhibitor_text and not getattr(args, "inhibitor", None):
             args.inhibitor = reading.inhibitor_text
             out.notes.append(f"Read {reading.inhibitor_text!r} in your description as the inhibitor.")

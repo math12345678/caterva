@@ -33,15 +33,20 @@ WHAT IT READS, AND WHAT IT NEVER GUESSES
 * The ORGANISM through `index.organism_code`, the one normaliser every caller
   shares, so "human", "humans", "human's", "H. sapiens", "E. coli" and
   "yeast" are read the same way here as `--organism` reads them; and a
-  binomial written after "in" or "from" ("in Thermus thermophilus").
+  binomial written after "in" or "from" ("in Thermus thermophilus"). A near
+  spelling where an organism goes ("humna hexokinase") is never read as one,
+  and is said (`unread_organism`).
 * The SUBSTRATE only as CANDIDATES (`substrate_candidates`). Whether one is
   the substrate is decided by `match_substrate` against the substrates BRENDA
   lists for the resolved enzyme, never here: "glucose" is a substrate of
   hexokinase because BRENDA has Km rows for D-glucose, not because it looks
   like a sugar.
-* The INHIBITOR from "inhibited by X", "inhibitor X" and "by X" in a
-  sentence about inhibition, as typed; the Ki search then looks it up as it
-  looks up `--inhibitor`.
+* The INHIBITOR from "inhibited by X", "inhibitor X" and "<enzyme> by X"
+  in a sentence about inhibition, as typed; never from a "by" after any
+  other word ("measured by fluorescence"). The Ki search then looks it up
+  as it looks up `--inhibitor`.
+* The SUBSTRATE candidates are whole runs of words, never one word of a
+  longer compound name ("glucose" out of "glucose 6-phosphate").
 
 Everything inferred is said, in `notes()`, so the report shows what was read
 and a reader can see a wrong reading instead of trusting it. Offline and
@@ -143,6 +148,10 @@ class SentenceReading:
     near: Optional[Tuple[str, str, str, str]] = None
     #: Organisms the description names when it names more than one.
     organisms_named: Tuple[Tuple[str, str], ...] = ()
+    #: (typed, organism name it is close to) for a word placed where an
+    #: organism goes that is a near spelling of one ("humna"), when no
+    #: organism was read. Never read as that organism: said.
+    unread_organism: Optional[Tuple[str, str]] = None
     #: The description with the enzyme, organism and inhibitor spans removed.
     remainder: str = ""
 
@@ -174,6 +183,12 @@ class SentenceReading:
             return f"Read the organism {self.organism} from your description."
         return f"Read {self.organism_text!r} in your description as {self.organism}."
 
+    def unread_organism_note(self) -> str:
+        typed, close = self.unread_organism
+        return (f"{typed!r} in your description was not read as an organism: it is close to {close!r}, "
+                f"but a near spelling is never taken as one, so no organism was read from your "
+                f"description (pass --organism if you mean one).")
+
     def notes(self) -> List[str]:
         """The sentences a report prints: what was read, as what."""
         out = [n for n in (self.enzyme_note(), self.organism_note()) if n]
@@ -183,6 +198,8 @@ class SentenceReading:
             out.append("Your description names " + " and ".join(
                 f"{typed!r} ({binomial})" for typed, binomial in self.organisms_named)
                 + "; no organism was read from it, because choosing one would be a guess.")
+        if self.unread_organism is not None:
+            out.append(self.unread_organism_note())
         if self.near is not None and self.ec is None:
             out.append(self.near_note())
         if self.other_enzymes:
@@ -292,6 +309,43 @@ def _read_organism(tokens: List[_Token]) -> List[Tuple[int, int, str, str]]:
             found.append((i, i + 2, f"{genus} {epithet}", f"{genus} {epithet}"))
             taken[i] = taken[i + 1] = True
     return sorted(found)
+
+
+def _organism_words() -> List[str]:
+    """Every one-word name the organism table reads, lower case."""
+    out = set()
+    for binomial, common, aliases in ORGANISMS.values():
+        for name in (binomial, common, *aliases):
+            if " " not in name and "." not in name and len(name) >= 3:
+                out.add(name.lower())
+    return sorted(out)
+
+
+def _misspelt_organism(tokens: List[_Token]) -> Optional[Tuple[str, str]]:
+    """(typed, close name) for an unread word where an organism goes -- just
+    before a word read as the enzyme, or after "in"/"from" -- that is a near
+    spelling of a one-word organism name.
+
+    "Michaelis-Menten kinetics of humna hexokinase on glucose" read no
+    organism and said nothing about 'humna': the search then ranked without
+    one and the report never showed that a word meant as the organism had
+    gone unread. It is still never READ as human: a near spelling is a
+    guess, and the organism decides whose constants are cited. It is said.
+    """
+    import difflib
+
+    names = _organism_words()
+    for i, token in enumerate(tokens):
+        if token.used or token.low in STOPWORDS or token.low in FILLER or len(token.low) < 3:
+            continue
+        before_enzyme = i + 1 < len(tokens) and tokens[i + 1].used
+        after_in = i > 0 and tokens[i - 1].low in ("in", "from")
+        if not (before_enzyme or after_in):
+            continue
+        close = difflib.get_close_matches(token.low, names, n=1, cutoff=0.8)
+        if close:
+            return token.raw, close[0]
+    return None
 
 
 def _is_class_window(words: Sequence[_Token]) -> bool:
@@ -407,7 +461,14 @@ def _read_inhibitor(tokens: List[_Token]) -> Optional[Tuple[int, int]]:
         start = None
         if word in ("inhibitor", "inhibitors") and i + 1 < len(tokens) and not _joins(tokens[i + 1]):
             start = i + 1
-        elif word == "by" and about_inhibition and any(w.startswith("inhibit") for w in lows[:i]):
+        elif (word == "by" and about_inhibition and i > 0
+              and (lows[i - 1].startswith("inhibit") or tokens[i - 1].used)):
+            # Only "inhibited by X", "inhibition by X" or "<enzyme or
+            # organism> by X". Any "by" after an inhibition word read
+            # "competitive inhibition of hexokinase on glucose measured by
+            # fluorescence" as inhibited by fluorescence, and the report said
+            # so; the Ki stayed a placeholder only because BRENDA has no
+            # "fluorescence" row.
             start = i + 1
         if start is None:
             continue
@@ -493,6 +554,7 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
             name = result.candidate.name if result.candidate else ""
             others.append((typed, ec, name))
 
+    unread_organism = _misspelt_organism(tokens) if not organisms and (hits or ambiguity) else None
     inhibitor_span = _read_inhibitor(tokens)
     inhibitor_text = None
     if inhibitor_span is not None:
@@ -505,16 +567,27 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
     def add(span: Optional[Tuple[int, int]]) -> None:
         if span is None:
             return
-        words = tokens[span[0]:span[1]]
-        kept = [w for w in words if w.low not in FILLER]
-        if not kept:
-            return
-        phrase = text[kept[0].start:kept[-1].end]
-        if phrase not in candidates:
-            candidates.append(phrase)
-        for w in kept:
-            if w.raw not in candidates:
-                candidates.append(w.raw)
+        # A candidate is a whole run of non-filler words, never one word
+        # taken out of a longer run. Each kept word used to be tried on its
+        # own after the phrase, so "glucose 6-phosphate", "2 deoxy glucose"
+        # and "glucose analogues" matched nothing whole and then 'glucose'
+        # matched D-glucose: the report carried D-glucose's Km 6.0 mM (ref
+        # 641068) as the answer for a different compound, and "fructose
+        # 1,6-bisphosphate" and "N-acetyl glucosamine" got D-fructose's and
+        # D-glucosamine's. A filler word ("kinetics", "rate") does separate
+        # runs, because it describes the request, not the compound: "glucose
+        # kinetics" is "glucose". A run that matches nothing whole takes no
+        # substrate, and the refusal that lists BRENDA's substrates runs.
+        run: List[_Token] = []
+        for w in list(tokens[span[0]:span[1]]) + [None]:
+            if w is not None and w.low not in FILLER:
+                run.append(w)
+                continue
+            if run:
+                phrase = text[run[0].start:run[-1].end]
+                if phrase not in candidates:
+                    candidates.append(phrase)
+            run = []
 
     for i, token in enumerate(tokens):
         if token.low in ("with", "on", "for", "of", "and", "using") and not token.used:
@@ -540,7 +613,7 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
             substrate_text=candidates[0] if candidates else None,
             substrate_candidates=tuple(candidates), inhibitor_text=inhibitor_text,
             organisms_named=tuple((t, b) for _, _, t, b in organisms) if len(distinct) > 1 else (),
-            remainder=remainder)
+            unread_organism=unread_organism, remainder=remainder)
     return SentenceReading(near=near if ambiguity is None and not others else None,
         text=text, enzyme_text=ambiguity_text if ambiguity is not None else None,
         organism=read_organism[1] if read_organism else None,
@@ -549,7 +622,7 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
         substrate_candidates=tuple(candidates), inhibitor_text=inhibitor_text,
         ambiguity=ambiguity, other_enzymes=tuple(others) if ambiguity is None else (),
         organisms_named=tuple((t, b) for _, _, t, b in organisms) if len(distinct) > 1 else (),
-        remainder=remainder)
+        unread_organism=unread_organism, remainder=remainder)
 
 
 # ---------------------------------------------------------------------------

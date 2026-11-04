@@ -416,3 +416,74 @@ def test_an_unreadable_substrate_list_takes_nothing_and_says_so(monkeypatch):
     read = cli.read_description(args, err=io.StringIO())
     assert args.substrate is None
     assert any("could not be read, so no word of your description" in n for n in read.notes)
+
+
+# ---------------------------------------------------------------------------
+# Review of 2026-11-03: a word out of a compound's name, a "by" that is not
+# an inhibitor, an organism misspelt
+# ---------------------------------------------------------------------------
+
+#: Every one of these grounded the model in another substrate's BRENDA row,
+#: citation and all, because one word of the compound's name matched it:
+#: D-glucose's Km 6.0 mM (ref 641068) for glucose 6-phosphate, 2-deoxy
+#: glucose and "glucose analogues"; D-fructose's 11.4 mM (ref 640237) for
+#: fructose 1,6-bisphosphate; D-glucosamine's 0.5 mM (ref 640230) for
+#: N-acetyl glucosamine.
+COMPOUND_NAMES = [
+    "glucose 6-phosphate", "2 deoxy glucose", "glucose analogues", "fructose 1,6-bisphosphate",
+    "N-acetyl glucosamine",
+]
+
+
+@pytest.mark.parametrize("compound", COMPOUND_NAMES)
+def test_a_word_out_of_a_longer_compound_name_is_not_a_candidate(compound):
+    reading = read_sentence(f"Michaelis-Menten kinetics of human hexokinase on {compound}")
+    assert reading.substrate_candidates == (compound,)
+    assert match_substrate(reading.substrate_candidates, HUMAN_HK).name is None
+
+
+@pytest.mark.parametrize("compound", COMPOUND_NAMES)
+def test_a_compound_brenda_does_not_list_is_refused_not_grounded_in_its_neighbour(compound):
+    with hexokinase_offline():
+        code, out, err = _main([f"Michaelis-Menten kinetics of human hexokinase on {compound}", *FLAGS])
+    assert code == 3, err
+    assert "in your description as the substrate" not in out
+    assert f"No word of your description ({compound!r}) is a substrate BRENDA lists for EC 2.7.1.1" in out
+    assert "Re-run with --substrate NAME" in out
+    assert "| literature (Homo sapiens) |" not in out
+
+
+def test_a_filler_word_still_separates_the_compound_from_the_request():
+    assert read_sentence("hexokinase on glucose kinetics").substrate_candidates == ("glucose",)
+
+
+def test_by_after_a_word_that_is_not_the_inhibition_or_the_enzyme_is_not_an_inhibitor():
+    reading = read_sentence("competitive inhibition of human hexokinase on glucose measured by fluorescence")
+    assert reading.ec == "2.7.1.1" and reading.inhibitor_text is None
+    assert not any("inhibitor" in n for n in reading.notes())
+
+
+def test_inhibited_by_still_reads_the_inhibitor():
+    assert read_sentence("hexokinase inhibited by mannoheptulose").inhibitor_text == "mannoheptulose"
+
+
+def test_a_misspelt_organism_is_said_not_read():
+    reading = read_sentence("Michaelis-Menten kinetics of humna hexokinase on glucose")
+    assert reading.organism is None
+    assert reading.unread_organism == ("humna", "human")
+    assert any("'humna' in your description was not read as an organism" in n for n in reading.notes())
+
+
+def test_a_misspelt_organism_reaches_the_report(monkeypatch):
+    import caterva.compose.__main__ as cli
+
+    monkeypatch.setattr(cli, "brenda_km_substrates", lambda ec, org: {"D-glucose": 25})
+    args = _args(description="Michaelis-Menten kinetics of humna hexokinase on glucose")
+    read = cli.read_description(args, err=io.StringIO())
+    assert args.organism is None
+    assert any("'humna' in your description was not read as an organism" in n for n in read.notes)
+
+
+def test_a_word_that_only_sits_before_the_enzyme_is_not_called_an_organism():
+    assert read_sentence("Michaelis-Menten kinetics of muscle hexokinase on glucose").unread_organism is None
+    assert read_sentence("Michaelis-Menten kinetics of human hexokinase on glucose").unread_organism is None
