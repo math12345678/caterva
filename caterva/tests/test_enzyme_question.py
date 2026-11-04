@@ -54,3 +54,56 @@ def test_canonical_organism_names_what_was_typed():
     assert canonical_organism("humans") == {"organism": "Homo sapiens", "typed": "humans"}
     assert canonical_organism("Thermus aquaticus") == {
         "organism": "Thermus aquaticus", "typed": "Thermus aquaticus"}
+
+
+# --- found 2026-11-03 by review -------------------------------------------
+#
+# "enzyme" equals "D-enzyme" (EC 2.4.1.25) once the D- is set aside, so it
+# reached the stereo-tolerant tier and was read as an enzyme name; the
+# runner then cited BRENDA ref 737180 (27.5 mM, 4-alpha-glucanotransferase)
+# for `simulate "enzyme maltotriose arabidopsis"`. The fix is in finder.py,
+# the one place every command resolves a name, so both the reader and the
+# resolver are pinned here.
+
+@pytest.mark.parametrize("query", [
+    "enzyme glucose human",
+    "michaelis menten enzyme kinetics glucose human",
+    "enzyme maltotriose arabidopsis",
+])
+def test_a_class_word_is_not_read_as_an_enzyme(query):
+    assert read_system(query) is None
+
+
+@pytest.mark.parametrize("word", ["enzyme", "protein", "peptidase", "dioxygenase"])
+def test_a_class_word_does_not_resolve_to_the_enzyme_whose_labelled_name_it_is(word):
+    from caterva.enzymes.finder import TIER_ALTERNATIVE_TOLERANT, Resolved, find, resolve
+
+    assert not isinstance(resolve(word, "human"), Resolved)
+    assert all(c.tier > TIER_ALTERNATIVE_TOLERANT for c in find(word, "human"))
+
+
+def test_a_one_word_name_only_its_own_enzyme_uses_still_resolves_tolerantly():
+    # The rule is "a word of OTHER enzymes' names", not "one word": the
+    # stereo-tolerant tier keeps doing its job where nothing else competes.
+    from caterva.enzymes.finder import Resolved, resolve
+
+    result = resolve("fuculokinase", "human")
+    assert isinstance(result, Resolved) and result.ec == "2.7.1.51"
+
+
+@pytest.mark.parametrize("query", [
+    "hexokinase glucose phosphoglucose isomerase human",
+    "hexokinase glucose then pyruvate kinase human",
+    "hexokinase glucose and fructose human",
+])
+def test_a_cascade_or_mixture_is_refused_not_read_with_a_junk_substrate(query):
+    assert read_system(query) is None
+
+
+def test_the_identity_shown_at_confirmation_is_the_resolver_s():
+    from caterva.enzymes.question import enzyme_identity
+
+    assert enzyme_identity("hexokinase", "Homo sapiens") == {"ec": "2.7.1.1", "name": "hexokinase"}
+    # Two enzymes by that name: nothing decided offline, so nothing shown as one.
+    assert enzyme_identity("lactate dehydrogenase", "Homo sapiens") is None
+    assert enzyme_identity("enzyme", "Arabidopsis thaliana") is None

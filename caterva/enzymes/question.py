@@ -20,7 +20,11 @@ tables already hold exactly:
     name -- accepted or alternative name, exact or with stereo labels set
     aside (tiers 1-4 of finder.py), never a phrase inside a longer name or
     a typo;
-  * the SUBSTRATE is what is left, which must be non-empty.
+  * the SUBSTRATE is what is left, which must be non-empty, and must not
+    itself hold an enzyme name or a word that joins two steps ("then",
+    "and"): "hexokinase glucose phosphoglucose isomerase human" is a
+    cascade, and reading "glucose phosphoglucose isomerase" as one
+    substrate would have been a wrong reading shown for confirmation.
 
 When more than one split satisfies that, or none does, the answer is None.
 Nothing here resolves or cites anything: the CLI still prints what it read
@@ -47,6 +51,10 @@ _PREAMBLE = {"simulate", "simulation", "run", "the", "a", "an", "model", "kineti
 #: Words that join the parts. "in" only ever introduces the organism.
 _JOINERS = ("on", "with")
 
+#: Words that join two steps or two substrates. A substrate holding one is
+#: a cascade or a mixture, which is two systems, not one to confirm.
+_STEP_WORDS = {"then", "and", "+", "->", "plus", "followed"}
+
 #: The longest organism name in index.ORGANISMS is four words
 #: ("escherichia coli k 12" normalises to five tokens, but is typed as four).
 _MAX_ORGANISM_WORDS = 5
@@ -61,6 +69,12 @@ def canonical_organism(typed: str) -> Dict[str, str]:
 def _is_enzyme_name(words: Sequence[str], organism: Optional[str]) -> bool:
     text = " ".join(words)
     return any(c.tier <= TIER_ALTERNATIVE_TOLERANT for c in find(text, organism, None))
+
+
+def _holds_enzyme_name(words: Sequence[str], organism: Optional[str]) -> bool:
+    """Any run of `words` the nomenclature reads as an enzyme name (see _is_enzyme_name)."""
+    return any(_is_enzyme_name(words[i:j], organism)
+               for i in range(len(words)) for j in range(i + 1, len(words) + 1))
 
 
 def _split_organism(words: List[str]) -> List[tuple]:
@@ -104,6 +118,13 @@ def read_system(query: str) -> Optional[Dict[str, str]]:
                 continue
             if not _is_enzyme_name(enzyme, typed):
                 continue
+            # A second step in the substrate part ("glucose then pyruvate
+            # kinase", "glucose phosphoglucose isomerase") makes the whole
+            # question two systems. Refused here rather than read as one
+            # enzyme with a junk substrate, which is what it used to be read
+            # as (found 2026-11-03).
+            if any(w.lower() in _STEP_WORDS for w in substrate) or _holds_enzyme_name(substrate, typed):
+                return None
             reading = {"enzyme": " ".join(enzyme), "substrate": " ".join(substrate),
                        **canonical_organism(typed)}
             readings[(reading["enzyme"], reading["substrate"], reading["organism"])] = reading
@@ -112,13 +133,39 @@ def read_system(query: str) -> Optional[Dict[str, str]]:
     return next(iter(readings.values())) if len(readings) == 1 else None
 
 
+def enzyme_identity(enzyme: str, organism: Optional[str]) -> Optional[Dict[str, str]]:
+    """{"ec", "name"} when the nomenclature resolves `enzyme` to ONE enzyme, else None.
+
+    The confirmation used to show only the words: "enzyme enzyme / substrate
+    maltotriose", while the citation that followed was for EC 2.4.1.25,
+    4-alpha-glucanotransferase. A person agreeing to a system has to see the
+    enzyme the citation will be about, and this is the same decision the
+    runner makes first (policy.resolve_enzyme_name asks finder.resolve and
+    uses its EC unchanged when it resolves). None is "not decided offline":
+    the runner may still find it through UniProt, or refuse, and says which.
+    """
+    from .finder import Resolved, resolve
+
+    try:
+        result = resolve(enzyme, organism)
+    except Exception:  # an unreadable index is "not decided", never a guess
+        return None
+    if isinstance(result, Resolved) and result.candidate is not None:
+        return {"ec": result.ec, "name": result.candidate.name}
+    return None
+
+
 def main() -> None:
-    """stdin {"query"} -> {"system": ...|null}; {"organism"} -> canonical_organism."""
+    """stdin {"query"} -> {"system", "identity"}; {"organism"[, "enzyme"]} -> canonical_organism (+ "identity")."""
     payload = json.loads(sys.stdin.read() or "{}")
     if isinstance(payload.get("organism"), str):
-        out: object = canonical_organism(payload["organism"])
+        out: Dict[str, object] = dict(canonical_organism(payload["organism"]))
+        if isinstance(payload.get("enzyme"), str):
+            out["identity"] = enzyme_identity(payload["enzyme"], str(out["organism"]))
     else:
-        out = {"system": read_system(str(payload.get("query") or ""))}
+        system = read_system(str(payload.get("query") or ""))
+        out = {"system": system,
+               "identity": enzyme_identity(system["enzyme"], system["organism"]) if system else None}
     sys.stdout.write(json.dumps(out))
 
 

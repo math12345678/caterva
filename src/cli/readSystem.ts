@@ -60,9 +60,26 @@ export function canonicalOrganism(typed: string): { organism: string; typed?: st
   return organism === typed ? { organism } : { organism, typed };
 }
 
+function identityOf(out: Record<string, unknown> | null): { ec?: string; ecName?: string } {
+  const identity = out?.['identity'] as Record<string, unknown> | null | undefined;
+  if (!identity || typeof identity['ec'] !== 'string') return {};
+  return {
+    ec: identity['ec'] as string,
+    ...(typeof identity['name'] === 'string' ? { ecName: identity['name'] as string } : {}),
+  };
+}
+
 function withCanonicalOrganism(system: ParsedSystem): ParsedSystem {
-  const { organism, typed } = canonicalOrganism(system.organism);
-  return typed === undefined ? system : { ...system, organism, organismTyped: typed };
+  // One Python call for both: the binomial, and the EC the enzyme name
+  // resolves to under it, which the confirmation shows.
+  const out = ask({ organism: system.organism, enzyme: system.enzyme });
+  const organism = typeof out?.['organism'] === 'string' ? (out['organism'] as string) : system.organism;
+  return {
+    ...system,
+    organism,
+    ...(organism !== system.organism ? { organismTyped: system.organism } : {}),
+    ...identityOf(out),
+  };
 }
 
 /**
@@ -88,5 +105,57 @@ export function readSystemFromQuery(query: string): ParsedSystem | null {
     substrate: system['substrate'] as string,
     organism: system['organism'] as string,
     ...(typed !== undefined && typed !== system['organism'] ? { organismTyped: typed } : {}),
+    ...identityOf(out),
   };
+}
+
+/** Flags typed alongside a question that names a system. */
+export interface GivenFlags {
+  enzyme?: string;
+  substrate?: string;
+  organism?: string;
+  ec?: string;
+}
+
+const same = (a: string, b: string): boolean =>
+  a.trim().replace(/\s+/g, ' ').toLowerCase() === b.trim().replace(/\s+/g, ' ').toLowerCase();
+
+/**
+ * Every flag the sentence's reading contradicts, as "--organism human, but
+ * the question says mouse (Mus musculus)". Empty when they agree.
+ *
+ * WHY THIS IS A REFUSAL AND NOT A PRECEDENCE RULE
+ * -----------------------------------------------
+ * `simulate "hexokinase glucose mouse" --organism human --resolve --yes`
+ * replaced all three names with the sentence's, dropped `--organism human`
+ * without a word, and cited BRENDA refs 758915 and 674800 -- mouse
+ * measurements -- for a run whose command line said human (found
+ * 2026-11-03). Either choice made silently is a citation for a system one
+ * of the two inputs did not name, so neither is made: the run stops and
+ * names both. `organismOfFlag` is the flag's canonical binomial, so
+ * `--organism human` agrees with a sentence that says "humans".
+ */
+export function flagsContradicting(
+  parsed: ParsedSystem,
+  given: GivenFlags,
+  organismOfFlag: (typed: string) => string,
+): string[] {
+  const out: string[] = [];
+  if (given.enzyme !== undefined && !same(given.enzyme, parsed.enzyme)) {
+    out.push(`--enzyme "${given.enzyme}", but the question says "${parsed.enzyme}"`);
+  }
+  if (given.substrate !== undefined && !same(given.substrate, parsed.substrate)) {
+    out.push(`--substrate "${given.substrate}", but the question says "${parsed.substrate}"`);
+  }
+  if (given.organism !== undefined && !same(organismOfFlag(given.organism), parsed.organism)) {
+    const said = parsed.organismTyped !== undefined
+      ? `"${parsed.organismTyped}" (${parsed.organism})`
+      : `"${parsed.organism}"`;
+    out.push(`--organism "${given.organism}", but the question says ${said}`);
+  }
+  if (given.ec !== undefined && parsed.ec !== undefined && !same(given.ec, parsed.ec)) {
+    out.push(`--ec ${given.ec}, but "${parsed.enzyme}" in the question is EC ${parsed.ec}` +
+      (parsed.ecName ? ` (${parsed.ecName})` : ''));
+  }
+  return out;
 }

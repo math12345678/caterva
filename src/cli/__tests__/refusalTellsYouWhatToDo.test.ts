@@ -219,3 +219,54 @@ describe('a refusal explains the next step', () => {
     expect(stdout).not.toContain('What to do next');
   });
 });
+
+/**
+ * The same placeholder rule, for the Km slot.
+ *
+ * Found 2026-11-03 by review: replacing the km suggestion with the old fake
+ * `--km 10.7mM` left this file green, because every case above stubs a
+ * resolved Km and only Vmax ever reached "What to do next". These run
+ * against a runner that resolves nothing, so km is a literature blocker.
+ */
+describe('when the Km itself is not found', () => {
+  let nothingStub: string;
+
+  beforeAll(() => {
+    nothingStub = path.join(tmpDir, 'nothing.py');
+    fs.writeFileSync(
+      nothingStub,
+      'import json, sys\nsys.stdin.read()\nsys.stdout.write(json.dumps({"ok": True, "found": False, "logs": []}))\n',
+      'utf-8',
+    );
+  });
+
+  function runNothing(extra: string[]): { stdout: string; code: number } {
+    const saved = stub;
+    stub = nothingStub;
+    try {
+      return runCli([...SYSTEM, '--enzyme-conc', '0.01mM', '--s0', '10mM', ...extra]);
+    } finally {
+      stub = saved;
+    }
+  }
+
+  it('leaves a labelled Km placeholder, never a number', () => {
+    const { stdout, code } = runNothing([]);
+    expect(code).toBe(2);
+    const next = stdout.replace(ANSI, '').split('What to do next')[1] ?? '';
+    expect(next).toContain('--km "<your measured Km, e.g. in mM>"');
+    expect(next).not.toMatch(/--km \d/);
+    expect(next).not.toMatch(/PMID \d/);
+  });
+
+  it('refuses the Km placeholder if it is copied unedited, rather than running on it', () => {
+    const { stdout, code } = runNothing([
+      // A real --vmax, so the only thing that can stop this run is the
+      // unedited Km slot: with both placeholders a Vmax refusal would hide a
+      // Km placeholder that ran.
+      '--km', '<your measured Km, e.g. in mM>', '--vmax', '1.2mM/s',
+    ]);
+    expect(code).not.toBe(0);
+    expect(stdout.replace(ANSI, '')).not.toMatch(/Simulation complete|final value/i);
+  });
+});

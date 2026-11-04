@@ -161,4 +161,12 @@ describe('what the student is shown before deciding', () => {
   it('says what getting it wrong would cost', () => {
     expect(describeParsedSystem(SYSTEM)).toMatch(/worse than\s*\n?no citation at all/);
   });
+
+  it('names the EC the citation will be about, or says none was decided', () => {
+    // "enzyme enzyme" was agreed to while the Km that followed was cited for
+    // EC 2.4.1.25. The words alone cannot show a person which protein that is.
+    const named = describeParsedSystem({ ...SYSTEM, enzyme: 'hexokinase', ec: '2.7.1.1', ecName: 'hexokinase' });
+    expect(named).toMatch(/EC\s+2\.7\.1\.1 \(hexokinase\)/);
+    expect(describeParsedSystem(SYSTEM)).toMatch(/EC\s+not one enzyme by that name offline/);
+  });
 });

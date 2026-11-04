@@ -14,7 +14,7 @@ import { convertConcentration, vmaxInSubstrateUnitsPerSecond } from '../units';
 import { exportModel, type ExportProvenance } from './exportArtifacts';
 import { formatResolveCommand } from './suggestResolveCommand';
 import { confirmSystem, terminalIO } from './confirmSystem';
-import { canonicalOrganism, readSystemFromQuery } from './readSystem';
+import { canonicalOrganism, flagsContradicting, readSystemFromQuery } from './readSystem';
 import { commandDomains } from './commandDomains';
 import { commandEnsemble } from './commandEnsemble';
 
@@ -1501,6 +1501,26 @@ async function main() {
           // would be the silent inference this forbids, with a prompt in the
           // code that nobody ever sees.
           const parsed = readSystemFromQuery(query);
+          // A flag the sentence contradicts is refused BEFORE anything is
+          // confirmed: the reading below used to overwrite all three names,
+          // so `"hexokinase glucose mouse" --organism human` cited mouse
+          // BRENDA refs with --organism human silently dropped. See
+          // flagsContradicting for why neither input simply wins.
+          const contradicted = parsed
+            ? flagsContradicting(
+                parsed,
+                { enzyme, substrate, organism, ec },
+                (typed) => canonicalOrganism(typed).organism,
+              )
+            : [];
+          if (contradicted.length > 0) {
+            error(
+              'Your flags and your question name different systems, so nothing was resolved:\n' +
+              contradicted.map((line) => `  ${line}`).join('\n') + '\n' +
+              'Drop the flag, or reword the question, so that both name the system you mean.'
+            );
+            process.exit(1);
+          }
           const decision = parsed
             ? await confirmSystem(parsed, terminalIO(), {
                 assumeYes: booleans.has('yes'),

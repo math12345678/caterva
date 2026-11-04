@@ -22,6 +22,9 @@ import { canonicalOrganism, readSystemFromQuery } from '../readSystem';
 
 jest.setTimeout(120_000);
 
+/** The one enzyme the name resolves to, shown at confirmation (flagsAgreeWithTheQuestion.test.ts). */
+const HEXOKINASE_EC = { ec: '2.7.1.1', ecName: 'hexokinase' };
+
 beforeAll(() => {
   execFileSync(
     resolvePythonExecutable(REPO_ROOT),
@@ -37,6 +40,7 @@ describe('the organism is searched as the binomial BRENDA files it under', () =>
       substrate: 'glucose',
       organism: 'Homo sapiens',
       organismTyped: 'humans',
+      ...HEXOKINASE_EC,
     });
   });
 
@@ -45,6 +49,7 @@ describe('the organism is searched as the binomial BRENDA files it under', () =>
       enzyme: 'hexokinase',
       substrate: 'glucose',
       organism: 'Homo sapiens',
+      ...HEXOKINASE_EC,
     });
   });
 
@@ -66,6 +71,7 @@ describe('orderings without the full preposition pattern', () => {
       substrate: 'glucose',
       organism: 'Homo sapiens',
       organismTyped: typed,
+      ...HEXOKINASE_EC,
     });
   });
 

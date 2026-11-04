@@ -58,6 +58,15 @@ export interface ParsedSystem {
    * the reader agrees to the organism that will actually be searched.
    */
   organismTyped?: string;
+  /**
+   * The ONE enzyme the nomenclature resolves `enzyme` to, when it does
+   * (readSystem.ts, caterva.enzymes.question.enzyme_identity). Shown at
+   * confirmation: "enzyme enzyme" was agreed to while the Km that followed
+   * was cited for EC 2.4.1.25, 4-alpha-glucanotransferase, and nothing on
+   * the screen said so. Absent means "not decided offline", never "none".
+   */
+  ec?: string;
+  ecName?: string;
 }
 
 /** Words that are never an enzyme, substrate or organism. */
