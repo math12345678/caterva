@@ -62,8 +62,17 @@ export function describeParsedSystem(system: ParsedSystem): string {
     'Your question names a system. Caterva read it as:',
     '',
     `    enzyme      ${system.enzyme}`,
+    // The EC is the identity the citation will be about. Without it a
+    // person can agree to a word ("enzyme") that the resolver turns into one
+    // specific protein they never saw named.
+    system.ec !== undefined
+      ? `    EC          ${system.ec}` + (system.ecName ? ` (${system.ecName})` : '')
+      : '    EC          not one enzyme by that name offline; the run says which, or refuses',
     `    substrate   ${system.substrate}`,
-    `    organism    ${system.organism}`,
+    // The binomial is what BRENDA is searched under; what was typed is
+    // shown beside it so "humans" is visibly the organism being agreed to.
+    `    organism    ${system.organism}` +
+      (system.organismTyped !== undefined ? `   (you wrote "${system.organismTyped}")` : ''),
     '',
     // Named consequences, not a generic "is this ok?". A student who does
     // not know what a wrong organism costs cannot judge the question.

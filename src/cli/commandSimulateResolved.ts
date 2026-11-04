@@ -329,6 +329,31 @@ function rowScopeOf(result: ResolvedKinetic): string[] | undefined {
  * Telling a student "vmax is unresolved" without saying which kind of
  * problem it is leaves them stuck in the same place either way.
  */
+/**
+ * What the "What to do next" block prints where a MEASURED value has to go.
+ *
+ * It used to print `--km 10.7mM`, `--vmax 1.2mM/s` and
+ * `--cite km="Smith 2019, PMID 12345"` -- plausible numbers and a plausible
+ * citation, under a heading that called them "example values", in a block
+ * whose whole point is that the literature did not yield this constant. A
+ * reader who copied the command "in full" ran a simulation on a Km nobody
+ * measured, cited to a PMID that is not a paper about this enzyme, and the
+ * provenance then showed it as `user`-supplied and cited: the exact
+ * plausible-default this tool refuses to produce itself.
+ *
+ * So the slot is a labelled placeholder: angle brackets that the heading
+ * names as "replace ... with your own", and that parseQuantity refuses if
+ * copied unedited, so the mistake fails loudly instead of running. The
+ * conditions (`--s0 10mM`, `--enzyme-conc 0.01mM`) keep real example
+ * values: they describe the reader's experiment, so any value is theirs to
+ * choose and none can be wrong about the enzyme.
+ */
+const MEASURED_PLACEHOLDER = {
+  km: '<your measured Km, e.g. in mM>',
+  vmax: '<your measured Vmax, e.g. in mM/s>',
+} as const;
+const CITE_PLACEHOLDER = '<author year, PMID>';
+
 interface Blocker {
   parameter: string;
   kind: 'condition' | 'literature';
@@ -400,7 +425,7 @@ function renderNextStep(
     emit(
       `\n${c(DIM, '  If you have a source for one of these, record it rather than')}\n` +
         `${c(DIM, '  typing a bare number — the value then travels with its citation:')}\n\n` +
-        `    ${c(BOLD, `--cite ${gaps[0]!.parameter}="Smith 2019, PMID 12345"`)}\n` +
+        `    ${c(BOLD, `--cite ${gaps[0]!.parameter}="${CITE_PLACEHOLDER}"`)}\n` +
         `${c(DIM, '      Caterva does not verify the source; it records that you supplied it.')}\n` +
         `\n${c(DIM, '  Or widen the search, understanding what you are accepting:')}\n\n` +
         `    ${c(BOLD, '--allow-cross-species')}\n` +
@@ -464,7 +489,7 @@ function renderNextStep(
   // an inhibitor of LDH is not an inhibitor of whatever enzyme this run is
   // about, and a real name here would be a wrong one presented as a
   // suggestion. So the heading names what has to be replaced.
-  const placeholders = parts.join(' ').match(/<[a-z]+>/g) ?? [];
+  const placeholders = parts.join(' ').match(/<[^<>]+>/g) ?? [];
   const heading =
     placeholders.length > 0
       ? `  In full, with the example values above; replace ${[...new Set(placeholders)].join(' and ')} ` +
@@ -1061,6 +1086,7 @@ export async function commandSimulateResolved(
     try {
       if (name === 'km') {
         const result = await resolveKinetic({
+          ecFlag: '--ec',
           enzymeName: options.enzyme,
           ecNumber: options.ec,
           substrate: options.substrate,
@@ -1080,7 +1106,7 @@ export async function commandSimulateResolved(
           blockers.push({
             parameter: 'km',
             kind: 'literature',
-            suggestion: '--km 10.7mM',
+            suggestion: `--km "${MEASURED_PLACEHOLDER.km}"`,
             why: because ? because.why : 'BRENDA and PubMed returned no Km for this system.',
           });
           continue;
@@ -1125,6 +1151,7 @@ export async function commandSimulateResolved(
           continue;
         }
         const result = await resolveKinetic({
+          ecFlag: '--ec',
           enzymeName: options.enzyme,
           ecNumber: options.ec,
           substrate: options.substrate,
@@ -1145,7 +1172,7 @@ export async function commandSimulateResolved(
           blockers.push({
             parameter: 'vmax',
             kind: 'literature',
-            suggestion: '--vmax 1.2mM/s',
+            suggestion: `--vmax "${MEASURED_PLACEHOLDER.vmax}"`,
             why: because
               ? because.why
               : 'No kcat was found for this system, so there is nothing to ' +
@@ -1250,6 +1277,7 @@ export async function commandSimulateResolved(
     const mode = KI_MODE_OF_MODEL[model];
     try {
       const result = await resolveKinetic({
+        ecFlag: '--ec',
         enzymeName: options.enzyme,
         ecNumber: options.ec,
         substrate: inhibitor,

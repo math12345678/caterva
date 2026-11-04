@@ -92,6 +92,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
   let result;
   try {
     result = await resolveKinetic({
+      ecFlag: '--ec',
       enzymeName: options.enzyme,
       ecNumber: options.ec,
       substrate,

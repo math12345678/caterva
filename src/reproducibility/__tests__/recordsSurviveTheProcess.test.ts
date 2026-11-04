@@ -34,6 +34,7 @@ import { ReproducibilityService, legacyRecordsDir, recordsDir } from '../reprodu
 
 let home: string;
 let originalHome: string | undefined;
+let originalRecordsDir: string | undefined;
 
 const INPUTS = {
   km: { value: 10.73, unit: 'mM', source: 'brenda_exact', confidence: 0.9 },
@@ -44,6 +45,12 @@ const OUTPUT = { trajectory: [{ time: 0, value: 10 }, { time: 1, value: 5.14 }] 
 
 beforeEach(() => {
   originalHome = process.env['HOME'];
+  // These tests are about the HOME-derived default, so the scratch
+  // CATERVA_RECORDS_DIR the jest globalSetup exports is lifted here; with it
+  // set, recordsDir() would never look at HOME and the legacy-directory test
+  // would be testing the override instead.
+  originalRecordsDir = process.env['CATERVA_RECORDS_DIR'];
+  delete process.env['CATERVA_RECORDS_DIR'];
   home = fs.mkdtempSync(path.join(os.tmpdir(), 'caterva-home-'));
   process.env['HOME'] = home;
 });
@@ -51,6 +58,7 @@ beforeEach(() => {
 afterEach(() => {
   if (originalHome === undefined) delete process.env['HOME'];
   else process.env['HOME'] = originalHome;
+  if (originalRecordsDir !== undefined) process.env['CATERVA_RECORDS_DIR'] = originalRecordsDir;
   fs.rmSync(home, { recursive: true, force: true });
 });
 

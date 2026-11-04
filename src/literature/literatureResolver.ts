@@ -98,6 +98,14 @@ export interface ResolverQuery {
    */
   modelSubstrate?: string;
   /**
+   * How the caller's interface spells "give the EC number", for the re-run
+   * an ambiguity or mismatch refusal recommends. The runner defaults to the
+   * API's request field, `ecNumber`; the CLI passes `--ec`, the flag it
+   * actually has. Without it an LDH ambiguity told a CLI user to "re-run
+   * with ecNumber 1.1.1.27", which no command line accepts.
+   */
+  ecFlag?: '--ec';
+  /**
    * The conditions the model is meant to represent, for Bakker's
    * condition-proximity axis.
    *
@@ -1130,7 +1138,8 @@ export async function resolveKinetic(
               ...(query.modelSubstrate ? { modelSubstrate: query.modelSubstrate } : {}),
             }
           : {}),
-        physiologicalReference: query.physiologicalReference
+        physiologicalReference: query.physiologicalReference,
+        ...(query.ecFlag ? { ecFlag: query.ecFlag } : {}),
       })
     );
     proc.stdin.end();

@@ -365,3 +365,93 @@ class TestMainWithBothNameAndNumber:
         )
         assert result["found"] is True
         assert result["km"] == 10.73
+
+
+class TestOrganismIsReadAsBrendaIndexesIt:
+    """"humans" reaches BRENDA as "Homo sapiens", by the shared normaliser.
+
+    Before 2026-11-02 the runner passed the typed organism through, so
+    "hexokinase on glucose in humans" was refused as "BRENDA holds this km
+    only for other organisms (... Homo sapiens ...)" -- the organism asked
+    for, listed as somebody else's, with a cited 6 mM (BRENDA ref 641068)
+    withheld.
+    """
+
+    @staticmethod
+    def _organism_reaching_the_lookup(monkeypatch, typed):
+        seen = {}
+
+        def resolve(*args, **kwargs):
+            seen["organism"] = kwargs["organism"]
+            return _golden()
+
+        result = _run_main(
+            monkeypatch,
+            {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
+             "organism": typed, "ecNumber": "1.1.1.27"},
+            resolve=resolve,
+        )
+        return seen["organism"], result
+
+    @pytest.mark.parametrize("typed", ["humans", "human", "H. sapiens", "HUMAN"])
+    def test_a_common_name_becomes_the_binomial(self, monkeypatch, typed):
+        organism, result = self._organism_reaching_the_lookup(monkeypatch, typed)
+        assert organism == "Homo sapiens"
+        # Said, not silent: the rewrite is the first line of the log.
+        assert result["logs"][0] == f"organism {typed!r} read as Homo sapiens (caterva.enzymes.index)"
+
+    def test_the_binomial_itself_is_untouched_and_unannounced(self, monkeypatch):
+        organism, result = self._organism_reaching_the_lookup(monkeypatch, "Homo sapiens")
+        assert organism == "Homo sapiens"
+        assert result["logs"] == ["BRENDA exact: 1.1.1.27, Homo sapiens, lactate"]
+
+    @pytest.mark.parametrize("typed", ["E. coli K-12", "Saccharomyces cerevisiae S288C"])
+    def test_a_strain_is_not_widened_to_its_species(self, monkeypatch, typed):
+        # They share a UniProt code with the species; the binomial would be
+        # a broader organism than the one named.
+        organism, result = self._organism_reaching_the_lookup(monkeypatch, typed)
+        assert organism == typed
+        assert not any(line.startswith("organism ") for line in result["logs"])
+
+    def test_a_name_the_table_lacks_is_passed_as_typed(self, monkeypatch):
+        organism, _ = self._organism_reaching_the_lookup(monkeypatch, "Thermus aquaticus")
+        assert organism == "Thermus aquaticus"
+
+
+class TestTheRerunIsSpelledInTheCallersInterface:
+    """A refusal's "re-run with" names a flag the caller can actually type.
+
+    The CLI's flag is --ec; the API's request field is ecNumber. Before
+    2026-11-02 the runner always wrote "ecNumber", so `scientific simulate`
+    told its user to "re-run with ecNumber 1.1.1.27".
+    """
+
+    _MISMATCH = {"enzymeName": "hexokinase", "substrate": "lactate",
+                 "organism": "Homo sapiens", "ecNumber": "1.1.1.27"}
+
+    def test_the_cli_spelling_is_used_when_the_cli_asks(self, monkeypatch):
+        result = _run_main(monkeypatch, {**self._MISMATCH, "ecFlag": "--ec"}, resolve=_never)
+        assert result["source"] == "ec_mismatch"
+        assert "Re-run with --ec 2.7.1.1 for 'hexokinase'" in result["ecRefusal"]
+        assert "and --ec 1.1.1.27 was given" in result["ecRefusal"]
+        assert "ecNumber" not in result["ecRefusal"]
+
+    def test_the_api_spelling_is_the_default(self, monkeypatch):
+        result = _run_main(monkeypatch, dict(self._MISMATCH), resolve=_never)
+        assert "Re-run with ecNumber 2.7.1.1" in result["ecRefusal"]
+
+    def test_any_other_spelling_is_not_printed_as_an_instruction(self, monkeypatch):
+        result = _run_main(monkeypatch, {**self._MISMATCH, "ecFlag": "--rm -rf"}, resolve=_never)
+        assert "--rm" not in result["ecRefusal"]
+        assert "Re-run with ecNumber 2.7.1.1" in result["ecRefusal"]
+
+    def test_an_ambiguous_name_names_the_cli_flag(self, monkeypatch):
+        result = _run_main(
+            monkeypatch,
+            {"enzymeName": "lactate dehydrogenase", "substrate": "pyruvate",
+             "organism": "Homo sapiens", "ecFlag": "--ec"},
+            resolve=_never,
+        )
+        assert result["source"] == "ec_ambiguous"
+        assert "re-run with --ec 1.1.1.27" in result["ecRefusal"]
+        assert "ecNumber" not in result["ecRefusal"]

@@ -135,7 +135,9 @@ class EcAgreement:
     named: list = field(default_factory=list)
 
 
-def check_ec_against_name(enzyme_name: str, organism: str, ec_number: str) -> EcAgreement:
+def check_ec_against_name(
+    enzyme_name: str, organism: str, ec_number: str, ec_flag: str = "ecNumber",
+) -> EcAgreement:
     """Does this name contradict this EC number? Decided by the one finder.
 
     THE ONLY QUESTION ASKED IS WHETHER THE NAME CONTRADICTS THE NUMBER. The
@@ -167,7 +169,7 @@ def check_ec_against_name(enzyme_name: str, organism: str, ec_number: str) -> Ec
     """
     ec = str(ec_number).strip()
     try:
-        named = resolve_enzyme(enzyme_name, organism)
+        named = resolve_enzyme(enzyme_name, organism, ec_flag)
     except enzyme_lookup.EnzymeNameNotResolved as exc:
         if exc.kind == "ambiguous":
             if ec in exc.candidates:
@@ -182,9 +184,9 @@ def check_ec_against_name(enzyme_name: str, organism: str, ec_number: str) -> Ec
                 False, True,
                 f"The enzyme name and the EC number given are not the same "
                 f"enzyme: '{enzyme_name}' names {len(exc.candidates)} enzymes "
-                f"({listed}), and ecNumber {ec} is none of them. A number the "
+                f"({listed}), and {ec_flag} {ec} is none of them. A number the "
                 f"name contradicts is a citation for the wrong protein, so "
-                f"nothing was looked up. Re-run with ecNumber "
+                f"nothing was looked up. Re-run with {ec_flag} "
                 f"{exc.recommended or exc.candidates[0]} for '{enzyme_name}', "
                 f"or with the name of the enzyme EC {ec} is.",
                 list(exc.candidates), list(exc.named_candidates),
@@ -205,15 +207,15 @@ def check_ec_against_name(enzyme_name: str, organism: str, ec_number: str) -> Ec
         False, True,
         f"The enzyme name and the EC number given are not the same enzyme: "
         f"'{enzyme_name}' is {label} by {named.source}'s reading "
-        f"({named.how}), and ecNumber {ec} was given. A number the name "
+        f"({named.how}), and {ec_flag} {ec} was given. A number the name "
         f"contradicts is a citation for the wrong protein, so nothing was "
-        f"looked up. Re-run with ecNumber {named.ec} for '{enzyme_name}', "
+        f"looked up. Re-run with {ec_flag} {named.ec} for '{enzyme_name}', "
         f"or with the name of the enzyme EC {ec} is.",
         [named.ec], [candidate],
     )
 
 
-def resolve_enzyme(enzyme_name: str, organism: str):
+def resolve_enzyme(enzyme_name: str, organism: str, ec_flag: str = "ecNumber"):
     """Enzyme name -> `NameResolution`, or `EnzymeNameNotResolved` naming the candidates.
 
     THE SAME POLICY EVERY OTHER COMMAND USES, NOT A COPY OF IT
@@ -249,7 +251,7 @@ def resolve_enzyme(enzyme_name: str, organism: str):
         return enzyme_lookup.fetch_ec_numbers_by_name(name, None)
 
     return enzyme_lookup.resolve_name(
-        enzyme_name, None, organism=organism, fetch=uniprot, rerun="ecNumber {ec}"
+        enzyme_name, None, organism=organism, fetch=uniprot, rerun=f"{ec_flag} {{ec}}"
     )
 
 
@@ -646,6 +648,36 @@ def _candidates_to_dict(candidates) -> list:
     ]
 
 
+def _canonical_organism(organism: str, log: list[str]) -> str:
+    """The organism as BRENDA indexes it: "humans" -> "Homo sapiens".
+
+    BRENDA files rows by binomial, and this runner passed the typed name
+    straight through. So "hexokinase on glucose in humans" was refused
+    with "BRENDA holds this km only for other organisms (... Homo sapiens
+    ...)": the organism asked for, listed as somebody else's, and a cited
+    6 mM (BRENDA ref 641068) withheld from the reader who asked for it.
+
+    Read by caterva.enzymes.index.organism_binomial, the one normaliser
+    every caller shares, so "human" means the same organism here as it
+    does to `caterva enzymes` and the finder. A name it does not hold, or a
+    strain more specific than the binomial, is passed through unchanged:
+    canonicalising is not guessing, and widening "E. coli K-12" to the
+    species would be. The rewrite is logged so it is never silent.
+    """
+    if not organism:
+        return organism
+    try:
+        from caterva.enzymes.index import organism_binomial  # noqa: PLC0415
+    except ImportError as exc:  # pragma: no cover - caterva is on PYTHONPATH in every caller
+        log.append(f"organism {organism!r} used as typed: caterva.enzymes unavailable ({exc})")
+        return organism
+    binomial = organism_binomial(organism)
+    if binomial is None or binomial == organism:
+        return organism
+    log.append(f"organism {organism!r} read as {binomial} (caterva.enzymes.index)")
+    return binomial
+
+
 def main() -> None:
     try:
         raw = sys.stdin.read()
@@ -664,6 +696,13 @@ def main() -> None:
         # answer to a question nobody finished asking.
         organism = payload.get("organism") or ""
         ec_number = payload.get("ecNumber", "")
+        #: How the caller's own interface spells "give the EC number", for
+        #: the re-run a refusal recommends. The API's request field is
+        #: `ecNumber`; the CLI's flag is `--ec`, and an LDH ambiguity told a
+        #: CLI user to "re-run with ecNumber 1.1.1.27" -- a flag the CLI does
+        #: not have. Only the two real spellings are accepted: this text is
+        #: printed as an instruction, so it is not a free-form field.
+        ec_flag = "--ec" if payload.get("ecFlag") == "--ec" else "ecNumber"
         parameter_type = payload.get("parameterType", "")
         quantity = payload.get("quantity", "km")
         if quantity not in ("km", "ki", "kcat"):
@@ -703,6 +742,7 @@ def main() -> None:
         #: the caller states, never assumed here (ADR 0012/0013).
         physiological = _parse_physiological(payload)
         resolution_log: list[str] = []
+        organism = _canonical_organism(organism, resolution_log)
 
         if parameter_type in RETIRED_PARAMETER_TYPES:
             domain = RETIRED_PARAMETER_TYPES[parameter_type]
@@ -729,7 +769,7 @@ def main() -> None:
                     "enzymeName or ecNumber is required to resolve real enzyme parameters"
                 )
             try:
-                named = resolve_enzyme(enzyme_name, organism)
+                named = resolve_enzyme(enzyme_name, organism, ec_flag)
             except enzyme_lookup.EnzymeNameNotResolved as exc:
                 if exc.kind == "lookup_failed":
                     # UniProt could not be asked: an error, as it always was,
@@ -805,7 +845,7 @@ def main() -> None:
             # than resolved in the number's favour. Silent when they agree:
             # the common case must stay silent, or the refusal is worthless
             # (test_one_candidate_is_not_an_ambiguity).
-            agreement = check_ec_against_name(enzyme_name, organism, ec_number)
+            agreement = check_ec_against_name(enzyme_name, organism, ec_number, ec_flag)
             if not agreement.agrees:
                 print(
                     json.dumps(
