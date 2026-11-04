@@ -99,6 +99,21 @@ class ComposedModel:
     #: Constants are then taken from rows that measured it (isoform.py), and
     #: the report says where no row did.
     isoform: Optional[str] = None
+    #: Why the enzyme the DESCRIPTION names was not made the subject, when
+    #: it names one and it was not ("hexokinase" in a three-step cascade:
+    #: one enzyme's constants on every step would be ADR 0076's
+    #: adjacent-paper miscitation). Without it the report said "no enzyme
+    #: was named" about a sentence that named one (ADR 0181).
+    unapplied_subject: Optional[str] = None
+
+    def no_subject_reason(self) -> str:
+        """Why nothing was searched for, in words that are true of the query.
+
+        "no enzyme was named", unless the description named one that was
+        not applied, and then what happened to it."""
+        if self.unapplied_subject:
+            return self.unapplied_subject
+        return "no enzyme was named"
 
     def compound_for(self, quantity: ResolvableQuantity) -> Optional[str]:
         """The compound a constant is measured for, or None if unnamed."""
@@ -377,8 +392,9 @@ class ComposedModel:
             )
 
         if self.structure_only:
+            reason = self.no_subject_reason()
             lines.append(
-                f"No enzyme was named, so nothing was searched for. The "
+                f"{reason[:1].upper()}{reason[1:]}, so nothing was searched for. The "
                 f"{len(self.resolvable)} constant(s) this model needs are: "
                 + ", ".join(q.parameter_id for q in self.resolvable)
                 + ". Name the enzyme and Caterva will look each one up; "
@@ -445,6 +461,17 @@ def compose(
     cascade" means MAP2K1 specifically would attach a real protein's
     measured constants to a generic three-tier model, which is the
     adjacent-paper miscitation of ADR 0076 wearing different clothes.
+
+    The caller that reads a subject OUT of a description is
+    `caterva.compose.__main__.read_description` (ADR 0181), before this is
+    called, and only under the rules that keep ADR 0076 true: an enzyme
+    named exactly or by EC number ("human hexokinase", "EC 2.7.1.1"), never
+    a class word ("MAP kinase", "kinase") or a fragment of a name; applied
+    only to a one-enzyme shape, never to a cascade, a competition or a
+    pathway, where the report says it was not applied and why; and a name
+    that is several enzymes refused with each named. What it read arrives
+    here as `subject`, `organism` and `substrate`, like the flags, and the
+    report states every reading.
     """
     recognition = recognise(query, name=name)
     composition = recognition.composition

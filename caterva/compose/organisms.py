@@ -16,6 +16,11 @@ or "bacteria" are not in it, because each is many species, and they pass
 through unchanged so the search reports what it found for them. Every
 rewrite is returned as a sentence for the report, so the reader sees what
 was actually searched.
+
+`caterva.enzymes.index.organism_code` is consulted after the table, so every
+spelling the enzyme finder reads ("H. sapiens", "S. cerevisiae") reaches the
+same binomial here; the plain-language reader (`caterva.enzymes.sentence`)
+uses that same function, so a description and a flag are read alike.
 """
 from __future__ import annotations
 
@@ -64,6 +69,19 @@ def normalise_organism(text: Optional[str]) -> Tuple[Optional[str], Optional[str
     if common is not None:
         return common, f"Read --organism {typed!r} as {common}."
     words = typed.split(" ")
+    # The enzyme index's `organism_code` is the normaliser every caller
+    # shares, and it reads "H. sapiens", "S. cerevisiae", "mice" and
+    # "porcine", which the table above does not: `--organism "H. sapiens"`
+    # was passed to BRENDA as typed and matched no row, while the enzyme
+    # finder in the same run read it as human. A binomial already written
+    # out is left to the path below, so a strain after it is kept.
+    from caterva.enzymes.index import ORGANISMS, organism_code
+
+    code = organism_code(typed)
+    if code is not None:
+        binomial = ORGANISMS[code][0]
+        if " ".join(words[:2]).lower() != binomial.lower():
+            return binomial, f"Read --organism {typed!r} as {binomial}."
     # A binomial is "Genus species": capital genus, lower-case epithet.
     # Only the first two words are touched, and only when alphabetic, so a
     # strain or serovar after them is left exactly as written.

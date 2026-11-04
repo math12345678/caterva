@@ -28,7 +28,10 @@ pathways need a pathway database (KEGG, Reactome), which is a different
 capability and is named as such in the refusal.
 
 The rule is: recognise a SHAPE, never a SUBJECT. "Cascade" is a shape.
-"Glycolysis" is a subject.
+"Glycolysis" is a subject. An ENZYME named in the description is not this
+grammar's business: `caterva.enzymes.sentence` reads it, by exact name or EC
+number only, and `compose/__main__.py` `read_description` applies it to a
+one-enzyme shape (ADR 0181). Nothing here changes what shape a query is.
 
 THE EXPANSION LIBRARIES ARE IMPORTED LATE, ON PURPOSE
 -----------------------------------------------------
