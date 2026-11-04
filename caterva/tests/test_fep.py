@@ -281,3 +281,15 @@ def test_a_name_that_is_several_enzymes_is_refused_before_brenda(tmp_path, capsy
     err = capsys.readouterr().err
     assert "EC 1.1.1.27 L-lactate dehydrogenase" in err and "re-run with --ec 1.1.1.27" in err
     assert "no Ki for" not in err
+
+
+def test_a_word_for_a_kind_of_enzyme_is_refused_as_bind_refuses_it(tmp_path, capsys):
+    assert run(tmp_path, "--ec", "protein") == 3
+    err = capsys.readouterr().err
+    assert "only once the label in 'L-protein' is set aside" in err and "no Ki for" not in err
+
+
+def test_an_organism_the_page_never_names_is_not_an_absence_of_ki(tmp_path, capsys):
+    assert run(tmp_path, "--organism", "humn") == 3
+    err = capsys.readouterr().err
+    assert "names no organism 'Humn' anywhere" in err and "no Ki for" not in err

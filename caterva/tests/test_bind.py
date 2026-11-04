@@ -257,3 +257,56 @@ def test_organism_is_read_by_the_shared_normaliser(typed):
     from caterva.bind.__main__ import organism_of
 
     assert organism_of(typed) == "Homo sapiens"
+
+
+# --- a class word, and an organism the page never names ----------------------
+# `--ec protein --organism pig --inhibitor 'diphenyleneiodonium chloride'`
+# printed "Read 'protein' as EC 1.8.1.4 (dihydrolipoyl dehydrogenase)" and
+# seven measured Ki rows (BRENDA ref 712097) for an enzyme nobody named.
+
+
+@pytest.mark.parametrize("word", ["protein", "enzyme", "peptidase", "protein kinase"])
+def test_a_word_for_a_kind_of_enzyme_is_refused_by_the_ec_option(word):
+    from caterva.enzymes.ec_option import read_ec_option
+
+    for organism in ("Homo sapiens", "Sus scrofa"):
+        got = read_ec_option(word, organism, uniprot=lambda name: pytest.fail("UniProt asked for a class word"))
+        assert got.ec is None, (word, organism, got)
+        assert got.refusal.startswith("Nothing was searched:") and got.notes == []
+
+
+@pytest.mark.parametrize("word", ["protein", "enzyme", "peptidase", "protein kinase"])
+def test_bind_refuses_a_word_for_a_kind_of_enzyme_before_reading_brenda(word, capsys, monkeypatch):
+    import caterva.bind.__main__ as cli
+
+    monkeypatch.setattr(cli, "read_page", lambda *a, **k: pytest.fail(f"BRENDA read for {word!r}"))
+    code = main(["--ec", word, "--organism", "pig", "--inhibitor", "diphenyleneiodonium chloride"])
+    out = capsys.readouterr()
+    assert code == 3 and out.out == ""
+    assert "Read " not in out.err and "Re-run with --ec <its EC number>" in out.err
+
+
+@pytest.mark.parametrize("typed, read_as", [("humn", "Humn"), ("potato", "Potato")])
+def test_an_organism_the_page_never_names_is_said_so_not_reported_as_no_ki_rows(typed, read_as, capsys):
+    # `--organism humn` printed "No Ki rows for EC 2.7.1.1 in Humn." (exit 3)
+    # while `human` lists the page's compounds.
+    for args in (["--list"], ["--survey"], ["--inhibitor", "gossypol"]):
+        code = main(["--ec", "1.1.1.27", "--organism", typed, "--html", str(KI_PAGE), *args])
+        out = capsys.readouterr()
+        said = out.out + out.err
+        assert code == 3, args
+        assert f"BRENDA's page for EC 1.1.1.27 names no organism {read_as!r} anywhere" in said, args
+        assert "No Ki rows" not in said and "No Ki for" not in said, args
+        assert "Homo sapiens" in said
+    if typed == "humn":
+        assert main(["--ec", "1.1.1.27", "--organism", typed, "--html", str(KI_PAGE), "--list"]) == 3
+        assert "Did you mean: Homo sapiens (human)?" in capsys.readouterr().out
+
+
+def test_an_organism_the_page_names_is_searched_as_before(capsys):
+    from caterva.bind.__main__ import organism_missing
+
+    html = KI_PAGE.read_text(encoding="utf-8")
+    assert organism_missing(html, "1.1.1.27", "Homo sapiens") is None
+    code, out, _ = run(capsys, "--list")
+    assert code == 0 and "gossypol" in out

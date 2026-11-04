@@ -209,7 +209,7 @@ def run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
     if args.survey:
         targets = cli.survey_targets(html, args.ec, organism, args.state)
         if not targets:
-            reason = f"No Ki rows for EC {args.ec} in {organism}."
+            reason = cli.no_ki_rows(html, args.ec, organism)
             return AdapterOutcome(exit_code=3, result=dict(base, report_text=reason),
                                   summary=reason, refusal=reason)
         text = cli.render_survey(cli.survey(html, args.ec, organism, args.state),
@@ -221,7 +221,7 @@ def run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
     if args.list:
         names = cli.compound_names(html, args.ec, organism)
         if not names:
-            reason = f"No Ki rows for EC {args.ec} in {organism}."
+            reason = cli.no_ki_rows(html, args.ec, organism)
             return AdapterOutcome(exit_code=3, result=dict(base, report_text=reason),
                                   summary=reason, refusal=reason)
         text = cli.render_list(names, args.ec, organism)
@@ -230,8 +230,8 @@ def run(request: Mapping[str, Any], ctx: RunContext) -> AdapterOutcome:
 
     measured = cli._rows(html, args.ec, organism, args.inhibitor)
     if not measured:
-        reason = cli.no_rows_for(args.inhibitor, args.ec, organism,
-                                 cli.compound_names(html, args.ec, organism))
+        reason = cli.organism_missing(html, args.ec, organism) or cli.no_rows_for(
+            args.inhibitor, args.ec, organism, cli.compound_names(html, args.ec, organism))
         return AdapterOutcome(exit_code=3, result=None, summary=reason.splitlines()[0],
                               refusal=reason)
 

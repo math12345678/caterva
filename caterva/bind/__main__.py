@@ -88,6 +88,50 @@ def organism_of(text: str) -> str:
     return organism if organism is not None else (text or "").strip()
 
 
+def organism_missing(html: str, ec: str, organism: Optional[str]) -> Optional[str]:
+    """The refusal to print when BRENDA's page names no organism `organism`
+    at all; None when the page does name it (or no organism was asked for).
+
+    `--organism humn` was capitalised to "Humn", searched, and reported as
+    "No Ki rows for EC 2.7.1.1 in Humn." (exit 3), while `human` lists six
+    compounds: a statement about the literature that was a statement about
+    spelling, and "potato" read the same way. `normalise_organism` cannot
+    tell a typo from a binomial it has no entry for ("Bacillus megaterium"
+    is neither in its table), but the page can: a name that appears nowhere
+    on it was never there to find. The did-you-mean list is drawn from the
+    organisms with Ki rows on this page and from the common names
+    `caterva.compose.organisms` reads, so nothing is suggested that was not
+    either measured here or already a reading Caterva makes."""
+    import difflib
+    import re
+
+    if not organism or re.search(r"(?<![A-Za-z])" + re.escape(organism) + r"(?![A-Za-z])", html):
+        return None
+    from caterva.compose.organisms import COMMON_NAMES
+
+    on_page = sorted({m.organism for m in _rows(html, ec, None, None) if m.organism})
+    guesses = difflib.get_close_matches(organism, on_page, n=3)
+    for common in difflib.get_close_matches(organism.lower(), list(COMMON_NAMES), n=2, cutoff=0.75):
+        species = COMMON_NAMES[common]
+        if not any(g.startswith(species) for g in guesses):
+            guesses.append(f"{species} ({common})")
+    lines = [f"BRENDA's page for EC {ec} names no organism {organism!r} anywhere: the page does not use "
+             f"that name, which is not a finding that {organism} has no Ki values."]
+    if guesses:
+        lines.append("Did you mean: " + "; ".join(guesses) + "?")
+    if on_page:
+        lines.append(f"{len(on_page)} organisms have Ki rows on this page, e.g. " + "; ".join(on_page[:5]) + ".")
+    lines.append("--organism takes the binomial as BRENDA writes it (Homo sapiens) or a common name "
+                 "such as human, mouse, rat, yeast, e. coli.")
+    return "\n".join(lines)
+
+
+def no_ki_rows(html: str, ec: str, organism: Optional[str]) -> str:
+    """What --list and --survey print when nothing came back: the organism
+    absent from the page (`organism_missing`), or a true absence of Ki rows."""
+    return organism_missing(html, ec, organism) or f"No Ki rows for EC {ec} in {organism}."
+
+
 def resolve_ec(text: str, organism: Optional[str]):
     """`--ec` read by the one enzyme-name policy (`caterva.enzymes.ec_option`):
     a name becomes its EC number with a sentence saying so, and a name that
@@ -362,7 +406,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva bind") -> in
     if a.survey:
         rows = survey(html, a.ec, organism, a.state)
         if not rows:
-            print(f"No Ki rows for EC {a.ec} in {organism}.")
+            print(no_ki_rows(html, a.ec, organism))
             return EXIT_REFUSED
         if a.json:
             print(json.dumps(rows, indent=2, default=str))
@@ -373,14 +417,15 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva bind") -> in
     if a.list:
         names = compound_names(html, a.ec, organism)
         if not names:
-            print(f"No Ki rows for EC {a.ec} in {organism}.")
+            print(no_ki_rows(html, a.ec, organism))
             return EXIT_REFUSED
         print(render_list(names, a.ec, organism))
         return EXIT_OK
 
     rows = _rows(html, a.ec, organism, a.inhibitor)
     if not rows:
-        print(no_rows_for(a.inhibitor, a.ec, organism, compound_names(html, a.ec, organism)),
+        print(organism_missing(html, a.ec, organism)
+              or no_rows_for(a.inhibitor, a.ec, organism, compound_names(html, a.ec, organism)),
               file=sys.stderr)
         return EXIT_REFUSED
 

@@ -36,7 +36,7 @@ KJ_PER_KCAL = 4.184
 
 
 def _target(a) -> Optional[Target]:
-    from caterva.bind.__main__ import _compound_names, _rows, organism_of, resolve_ec
+    from caterva.bind.__main__ import _compound_names, _rows, organism_missing, organism_of, resolve_ec
     from caterva.bind.core import target
     organism = organism_of(a.organism)
     # The same reading `caterva bind --ec` gives, so the target a run is
@@ -57,6 +57,11 @@ def _target(a) -> Optional[Target]:
         html = literature_module("brenda_client").fetch_brenda_html(a.ec)
     rows = _rows(html, a.ec, organism, a.inhibitor)
     if not rows:
+        # An organism the page never names is not an absence of Ki values.
+        missing = organism_missing(html, a.ec, organism)
+        if missing:
+            print(f"caterva fep: {missing}", file=sys.stderr)
+            return None
         names = _compound_names(html, a.ec, organism)
         print(f"caterva fep: no Ki for {a.inhibitor!r} with EC {a.ec} in {organism}; nothing to hold "
               f"a calculation to." + (f" Compounds with one: {'; '.join(names)}" if names else ""), file=sys.stderr)
