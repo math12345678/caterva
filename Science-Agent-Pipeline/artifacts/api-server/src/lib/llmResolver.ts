@@ -49,6 +49,16 @@ export interface EntityExtraction {
    * empty instead of assuming.
    */
   organismAssumed?: boolean;
+  /**
+   * Set by the CALLER when reading the query found it does not name ONE
+   * enzyme in ONE organism, so no lookup may be made for it
+   * (queryResolver's extractEntitiesFromQuery). Never sent to the runner:
+   * the resolver refuses before calling it, with this note as the reason.
+   */
+  extractionRefusal?: {
+    reason: "organism_ambiguous" | "ec_ambiguous" | "substrate_not_named";
+    note: string;
+  };
 }
 
 export interface LLMResolvedSimulation {

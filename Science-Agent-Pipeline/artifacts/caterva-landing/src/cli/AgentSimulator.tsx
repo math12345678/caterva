@@ -120,6 +120,58 @@ function seriesForResponse(response: SimulationResponse) {
   return keys.map((key) => ({ key, color: colorMap[key] ?? "#FDF8EE" }));
 }
 
+/**
+ * One parameter's provenance as the server reports it, on a 200 from
+ * /api/resolve, on its 422 refusal, and on every completed run.
+ */
+interface ParamProvenance {
+  origin: string;
+  source?: string;
+  citation?: string;
+  organism?: string;
+  citationStatus?: string;
+  note?: string;
+  unresolvedReason?: string;
+}
+
+/**
+ * Display units for the Michaelis-Menten keys. A unit is the label the
+ * engine's own numbers carry (Km and [S]0 in mM, Vmax in mM/s, kcat in
+ * 1/s), not a value, so stating it invents nothing.
+ */
+const PARAM_UNITS: Record<string, string> = {
+  km: "mM",
+  ki: "mM",
+  vmax: "mM/s",
+  kcat: "1/s",
+  s0: "mM",
+  i0: "mM",
+  enzyme_conc: "mM",
+  end: "s",
+};
+
+/** "resolved · BRENDA (ref 641068) — https://... · Homo sapiens" */
+function describeProvenance(p: ParamProvenance | undefined): string {
+  if (!p) return "no provenance reported";
+  const parts: string[] = [];
+  if (p.origin === "resolved") parts.push("resolved");
+  else if (p.origin === "user") parts.push("yours");
+  else if (p.origin === "default")
+    parts.push("default (illustrative, not literature)");
+  else parts.push(p.origin);
+  if (p.citation) parts.push(p.citation);
+  if (p.organism) parts.push(p.organism);
+  if (p.citationStatus === "flagged") parts.push("flagged");
+  return parts.join(" · ");
+}
+
+/**
+ * The enzyme concentration as the resolver reads it from prose ("with 50 nM
+ * enzyme", statedQuantities.ts). A plain decimal only: the phrase is read
+ * back by a pattern, and "5e-2 nM" is not a phrase anyone writes.
+ */
+const ENZYME_CONC_PATTERN = /^(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)$/;
+
 interface EnzymeInfo {
   ecNumber: string;
   name: string;
@@ -159,23 +211,73 @@ export default function AgentSimulator({
   const [enzymesError, setEnzymesError] = useState(false);
   const [showEnzymes, setShowEnzymes] = useState(false);
   const [paramErrors, setParamErrors] = useState<Record<string, string>>({});
+  // What the server sent, exactly as the form was seeded with it. A field
+  // is sent back with the run ONLY when it differs from this -- see
+  // handleSubmit for what re-sending everything cost.
+  const [seededParams, setSeededParams] = useState<Record<string, string>>(
+    {},
+  );
+  const [paramProvenance, setParamProvenance] = useState<
+    Record<string, ParamProvenance>
+  >({});
+  // The server's own refusal, shown as it wrote it: the message, and the
+  // per-key reasons (`details`) for whatever is still missing.
+  const [refusal, setRefusal] = useState<{
+    message: string;
+    details: Record<string, string>;
+    missingKeys: string[];
+  } | null>(null);
+  // [E]0 in nM: an experimental condition, typed by the person, never
+  // resolved or defaulted (ADR 0013), and uncitable by its nature.
+  const [enzymeConcNm, setEnzymeConcNm] = useState("");
   const [paramsCopied, setParamsCopied] = useState(false);
 
   const resolveBtnRef = useRef<HTMLButtonElement>(null);
 
+  // How Vmax gets a value, read from the server's reason for refusing it.
+  // `enzyme_conc_not_supplied`: a cited kcat exists to derive it from, so
+  // the missing piece is the person's enzyme concentration. Any other
+  // reason (no kcat found, or one withheld as another species'): there is
+  // nothing to derive it from, and only a Vmax they measured can stand in.
+  const vmaxRoute: "enzyme_conc" | "measured" | null =
+    refusal?.missingKeys.includes("vmax")
+      ? paramProvenance["vmax"]?.unresolvedReason === "enzyme_conc_not_supplied"
+        ? "enzyme_conc"
+        : "measured"
+      : null;
+
   const validateParams = (
     domain: string,
     params: Record<string, string>,
+    enzymeConc: string = enzymeConcNm,
+    route: typeof vmaxRoute = vmaxRoute,
   ): Record<string, string> => {
     const errors: Record<string, string> = {};
+    if (route === "enzyme_conc" && enzymeConc.trim() !== "") {
+      if (!ENZYME_CONC_PATTERN.test(enzymeConc.trim()) || Number(enzymeConc) <= 0) {
+        errors["enzyme_conc_nm"] = "A positive number in nM";
+      }
+    }
     const constraints = DOMAIN_CONSTRAINTS[domain];
     if (!constraints) return errors;
     for (const [key, value] of Object.entries(params)) {
       const c = constraints[key];
       if (!c) continue;
       const num = Number(value);
+      if (
+        key === "vmax" &&
+        route === "enzyme_conc" &&
+        value.trim() === "" &&
+        enzymeConc.trim() !== ""
+      ) {
+        // Derived server-side from the cited kcat and this [E]0.
+        continue;
+      }
       if (value.trim() === "" || Number.isNaN(num)) {
-        errors[key] = "Required";
+        errors[key] =
+          key === "vmax" && route === "enzyme_conc"
+            ? "Enter the enzyme concentration, or a Vmax you measured"
+            : "Required";
       } else if (c.min !== undefined && num < c.min) {
         errors[key] = `Min ${c.min}`;
       } else if (c.max !== undefined && num > c.max) {
@@ -232,6 +334,10 @@ export default function AgentSimulator({
     setResult(null);
     setResolvedDomain(null);
     setResolvedParams({});
+    setSeededParams({});
+    setParamProvenance({});
+    setRefusal(null);
+    setEnzymeConcNm("");
     setStage("resolving");
 
     try {
@@ -287,19 +393,35 @@ export default function AgentSimulator({
             if (!(key in seeded)) seeded[key] = String(value);
           }
 
+          const provenance: Record<string, ParamProvenance> =
+            err.parameterProvenance ?? {};
+          const route =
+            err.missingKeys.includes("vmax")
+              ? provenance["vmax"]?.unresolvedReason ===
+                "enzyme_conc_not_supplied"
+                ? "enzyme_conc"
+                : "measured"
+              : null;
           setResolvedDomain(domain);
           setEditableParams(seeded);
-          setParamErrors(validateParams(domain, seeded));
+          setSeededParams(seeded);
+          setParamProvenance(provenance);
+          setParamErrors(validateParams(domain, seeded, "", route));
           setReasoning("");
           setModelCitations([]);
           setFlags([]);
-          setError(
-            `${err.missingKeys.join(", ")} ${
-              err.missingKeys.length > 1 ? "are" : "is"
-            } yours to choose, not something the literature reports — fill ${
-              err.missingKeys.length > 1 ? "them" : "it"
-            } in below.`,
-          );
+          // The server's refusal, not a paraphrase of it. This used to say
+          // "vmax is yours to choose, not something the literature
+          // reports" -- for hexokinase, whose refusal reads "Vmax is
+          // kcat x [E]0 ... state the enzyme concentration and Vmax is
+          // derived and cited for you". The page told a student to make up
+          // the one number the server had just explained how to derive.
+          setRefusal({
+            message: typeof err.message === "string" ? err.message : "",
+            details:
+              err.details && typeof err.details === "object" ? err.details : {},
+            missingKeys: err.missingKeys as string[],
+          });
           setStage("idle");
           return;
         }
@@ -323,6 +445,12 @@ export default function AgentSimulator({
       const data = await response.json();
       setResolvedDomain(data.domain);
       setResolvedParams(data.parameters);
+      setParamProvenance(data.parameterProvenance ?? {});
+      setSeededParams(
+        Object.fromEntries(
+          Object.entries(data.parameters).map(([k, v]) => [k, String(v)]),
+        ),
+      );
       setReasoning(data.provenance.reasoning);
       setModelCitations(data.provenance.modelCitations || []);
       setFlags(data.provenance.flags || []);
@@ -337,6 +465,8 @@ export default function AgentSimulator({
           Object.fromEntries(
             Object.entries(data.parameters).map(([k, v]) => [k, String(v)]),
           ),
+          "",
+          null,
         ),
       );
       setStage("idle");
@@ -351,6 +481,13 @@ export default function AgentSimulator({
     setEditableParams(next);
     if (resolvedDomain) {
       setParamErrors(validateParams(resolvedDomain, next));
+    }
+  };
+
+  const handleEnzymeConcChange = (value: string) => {
+    setEnzymeConcNm(value);
+    if (resolvedDomain) {
+      setParamErrors(validateParams(resolvedDomain, editableParams, value));
     }
   };
 
@@ -435,11 +572,23 @@ export default function AgentSimulator({
     };
 
     try {
+      // ONLY what the person typed or changed goes back as `key=value`.
+      //
+      // Every field used to be re-sent, and the resolver reads `key=value`
+      // in the query as the person stating it (origin "user"): BRENDA's
+      // Km for human hexokinase, 6 mM (ref 641068), went in as "km=6" and
+      // came back from the run as km origin "user" with no citation, and
+      // the illustrative s0/end/points defaults came back as the
+      // student's own choices. The literature value was laundered into a
+      // personal one by the form meant to display it. An untouched field
+      // is left out, so the run resolves it again and its provenance --
+      // citation, organism, or "default" -- is the server's, not ours.
       const paramsForSubmit = Object.fromEntries(
-        Object.entries(editableParams).map(([k, v]) => [
-          k,
-          Number.parseFloat(v),
-        ]),
+        Object.entries(editableParams)
+          .filter(
+            ([k, v]) => v.trim() !== "" && v.trim() !== (seededParams[k] ?? ""),
+          )
+          .map(([k, v]) => [k, Number.parseFloat(v)]),
       );
       const overrides =
         Object.keys(paramsForSubmit).length > 0
@@ -447,7 +596,17 @@ export default function AgentSimulator({
               .map(([k, v]) => `${k}=${v}`)
               .join(" ")}`
           : "";
-      const job = await runSimulation({ query: query.trim() + overrides });
+      // [E]0 is sent as the phrase the resolver reads it from
+      // (statedQuantities.ts), so the run records the words it came from
+      // ("Read from your query: \"50 nM enzyme\"") and bridges Vmax from
+      // the cited kcat (ADR 0019).
+      const enzymeConc =
+        vmaxRoute === "enzyme_conc" && enzymeConcNm.trim() !== ""
+          ? ` with ${enzymeConcNm.trim()} nM enzyme`
+          : "";
+      const job = await runSimulation({
+        query: query.trim() + enzymeConc + overrides,
+      });
       const jobId = job.jobId;
 
       if (job.status === "completed" && job.result) {
@@ -654,14 +813,72 @@ export default function AgentSimulator({
               </span>
             </div>
 
+            {refusal && (
+              <div
+                data-testid="server-refusal"
+                className="mb-4 rounded-lg border border-yellow-500/20 bg-yellow-500/[0.04] p-3 text-[11px] leading-relaxed"
+              >
+                <div className="text-[10px] text-yellow-500/80 uppercase tracking-wide mb-1">
+                  the server refused to run this yet
+                </div>
+                {refusal.missingKeys.some((k) => refusal.details[k]) ? (
+                  refusal.missingKeys.map((k) =>
+                    refusal.details[k] ? (
+                      <p key={k} className="text-fg/80 mb-1">
+                        <span className="text-yellow-500/80">{k}:</span>{" "}
+                        {refusal.details[k]}
+                      </p>
+                    ) : null,
+                  )
+                ) : (
+                  <p className="text-fg/80">{refusal.message}</p>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-4">
+              {vmaxRoute === "enzyme_conc" && (
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] text-fg/66">
+                    Enzyme concentration [E]₀ (nM)
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    aria-label="enzyme concentration (nM)"
+                    value={enzymeConcNm}
+                    onChange={(e) => handleEnzymeConcChange(e.target.value)}
+                    className={`rounded-lg border bg-fg/[0.02] px-2.5 py-1.5 text-fg/85 text-[11px] outline-none transition-all duration-200 ${
+                      paramErrors["enzyme_conc_nm"]
+                        ? "border-red-500/30 focus:border-red-400/50"
+                        : "border-signal/30 focus:border-signal/50"
+                    }`}
+                  />
+                  <span className="text-[8px] text-fg/60">
+                    your experimental condition — not cited; Vmax is derived
+                    from the cited kcat × this
+                  </span>
+                  {paramErrors["enzyme_conc_nm"] && (
+                    <span className="text-[8px] text-red-400/60">
+                      {paramErrors["enzyme_conc_nm"]}
+                    </span>
+                  )}
+                </label>
+              )}
               {parameterFields.map((field) => {
                 const err = paramErrors[field.key];
+                const edited =
+                  (editableParams[field.key] ?? "").trim() !==
+                  (seededParams[field.key] ?? "");
+                const label =
+                  field.key === "vmax" && vmaxRoute === "measured"
+                    ? "Vmax you measured (mM/s) — no kcat to derive it"
+                    : field.key === "vmax" && vmaxRoute === "enzyme_conc"
+                      ? "Vmax you measured (mM/s) — optional"
+                      : field.label;
                 return (
                   <label key={field.key} className="flex flex-col gap-1">
-                    <span className="text-[10px] text-fg/66">
-                      {field.label}
-                    </span>
+                    <span className="text-[10px] text-fg/66">{label}</span>
                     <input
                       type="number"
                       step="any"
@@ -675,6 +892,16 @@ export default function AgentSimulator({
                           : "border-fg/[0.12] focus:border-signal/30"
                       }`}
                     />
+                    <span
+                      data-testid={`origin-${field.key}`}
+                      className="text-[8px] text-fg/60 break-words"
+                    >
+                      {edited && (editableParams[field.key] ?? "").trim() !== ""
+                        ? "yours — sent with the run as typed"
+                        : (editableParams[field.key] ?? "") === ""
+                          ? "missing"
+                          : describeProvenance(paramProvenance[field.key])}
+                    </span>
                     {err && (
                       <span className="text-[8px] text-red-400/60">{err}</span>
                     )}
@@ -832,6 +1059,41 @@ export default function AgentSimulator({
                     {paramsCopied ? "copied" : "copy"}
                   </button>
                 </div>
+                {/* Per parameter, where its number came from. The raw JSON
+                    alone showed "km": 6 with nothing to say whether that
+                    was BRENDA's human hexokinase value or a number someone
+                    typed -- and since the form re-sent every value, it was
+                    in fact reported as typed. */}
+                <ul
+                  data-testid="parameter-provenance"
+                  className="space-y-1 mb-2"
+                >
+                  {Object.keys(result.parameters).map((key) => {
+                    const p = (
+                      result.parameterProvenance as
+                        | Record<string, ParamProvenance>
+                        | undefined
+                    )?.[key];
+                    const value = (result.parameters as Record<string, unknown>)[
+                      key
+                    ];
+                    return (
+                      <li key={key} className="text-[10px] leading-snug">
+                        <span className="text-fg/85">
+                          {key} {String(value)}
+                          {PARAM_UNITS[key] ? ` ${PARAM_UNITS[key]}` : ""}
+                        </span>
+                        <span className="text-fg/66">
+                          {" — "}
+                          {describeProvenance(p)}
+                        </span>
+                        {p?.note && (
+                          <div className="text-fg/55 text-[9px]">{p.note}</div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
                 <pre className="text-fg/80 overflow-x-auto text-[11px]">
                   {JSON.stringify(result.parameters, null, 2)}
                 </pre>

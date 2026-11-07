@@ -63,6 +63,11 @@
       "<rootDir>/src"
     ],
     "testTimeout": 30000,
+    "globalSetup": "<rootDir>/src/testSupport/jestGlobalSetup.ts",
+    "globalTeardown": "<rootDir>/src/testSupport/jestGlobalTeardown.ts",
+    "setupFiles": [
+      "<rootDir>/src/testSupport/jestSetupEnv.ts"
+    ],
     "testMatch": [
       "**/__tests__/**/*.test.ts"
     ],
@@ -70,7 +75,8 @@
       "src/**/*.ts",
       "!src/**/*.test.ts",
       "!src/cli/**",
-      "!src/logger.ts"
+      "!src/logger.ts",
+      "!src/testSupport/**"
     ],
     "coverageThreshold": {
       "global": {

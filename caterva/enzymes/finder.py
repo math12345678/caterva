@@ -88,7 +88,13 @@ c. an exact ALTERNATIVE name of an enzyme with no protein in the organism asked
    words as another name;
 d. an abbreviation that is an exact alternative name of exactly one enzyme but
    that the table lists for others too (NOS is another name of D-nopaline
-   dehydrogenase and means nitric-oxide synthase).
+   dehydrogenase and means nitric-oxide synthase);
+e. a one-word query that matches only once a stereo label is set aside, when
+   other enzymes use the word as written: "protein" is not EC 1.8.1.4 because
+   it lists 'L-protein', nor "peptidase" the viral L-peptidase;
+f. an exact alternative name that is the family phrase of two or more other
+   accepted names and is not in the enzyme's own: "protein kinase" is listed
+   for histidine kinase and is the phrase in 'protein kinase C' and others.
 
 A table reading is never organism-blind: a gene symbol is offered only for an
 organism the table holds it for, because IDH1 is the NADP-dependent enzyme in
@@ -369,6 +375,10 @@ class Ambiguous:
     #: True when the candidates are what an abbreviation or symbol can mean:
     #: they are offered for a person to confirm, even if there is only one.
     confirm_only: bool = False
+    #: True when the query is a word for a kind of enzyme (rules e and f in
+    #: `resolve`): the refusal gives no example EC number, because the first
+    #: candidate is the misreading the rule exists to refuse.
+    class_word: bool = False
 
 
 Resolution = (Resolved, Ambiguous)
@@ -892,6 +902,12 @@ def resolve(
     d. An abbreviation that is an exact alternative name of exactly one
        enzyme but that is shared with other enzymes in the abbreviation
        table still needs confirmation.
+    e. A one-word query matched only once a stereo label was set aside
+       ('L-protein', 'D-enzyme', 'L-peptidase') is a choice when other
+       enzymes use the word as written.
+    f. An exact alternative name that is the family phrase inside two or
+       more other enzymes' accepted names, and not in its own enzyme's
+       accepted name ("protein kinase", "threonine aldolase"), is a choice.
 
     `recommended` is set across the WHOLE listed set (see `recommend`).
     A typo match is never resolved. A transferred EC number resolves to its
@@ -978,6 +994,51 @@ def resolve(
             query=text, candidates=tuple(ranked), suggestions_only=True, organism=code, release=release,
             reason=reason)
     if only is not None:
+        # Rule e. A one-word query that met this enzyme only once a label was
+        # set aside, while other enzymes carry the word as written. "protein"
+        # read as EC 1.8.1.4 through its other name 'L-protein', "enzyme" as
+        # EC 2.4.1.25 through 'D-enzyme', "peptidase" as the viral L-peptidase
+        # (EC 3.4.22.46) and "glutamyltransferase" as D-glutamyltransferase
+        # while gamma-glutamyltransferase is listed beside it: `caterva bind
+        # --ec protein --organism pig` then printed seven cited Ki rows of
+        # dihydrolipoyl dehydrogenase as the answer. In "L-lactate" the label
+        # qualifies a substrate and the rest of the name still says which
+        # enzyme; on a bare word the label was the whole of what told this
+        # enzyme apart, so the reading is a choice. A one-word name no other
+        # enzyme uses ("fuculokinase", "iduronidase") still resolves.
+        if only.tier in (TIER_ACCEPTED_TOLERANT, TIER_ALTERNATIVE_TOLERANT) and len(loose_key(text).split()) == 1:
+            others = [c for c in ranked if c.ec != only.ec and c.via == "name" and c.tier <= TIER_ALL_WORDS]
+            if others:
+                written = only.alternative_names[0] if only.alternative_names else only.name
+                return Ambiguous(
+                    query=text, candidates=tuple(ranked), recommended=None, organism=code, release=release,
+                    class_word=True,
+                    reason=(f"{text!r} matches EC {only.ec} ({only.name}) only once the label in '{written}' is "
+                            f"set aside, and {len(others)} other enzyme{'s' if len(others) != 1 else ''} "
+                            f"use{'s' if len(others) == 1 else ''} the word as written: on its own it names "
+                            "none of them"))
+        # Rule f. An exact OTHER name that is also the family word of other
+        # enzymes' accepted names, and is not in this enzyme's own accepted
+        # name. "protein kinase" is listed as another name of histidine kinase
+        # (EC 2.7.13.3) and is the phrase inside 'protein kinase C', 'cAMP-
+        # dependent protein kinase' and fourteen more; "threonine aldolase"
+        # resolved to serine hydroxymethyltransferase (EC 2.1.2.1) beside
+        # L-threonine aldolase. Two or more accepted names using the words
+        # make them a family the nomenclature names; one may be a qualified
+        # variant ("sorbitol dehydrogenase" is still L-iditol 2-dehydrogenase).
+        # An accepted name that holds the words is the enzyme they name, so
+        # "lipase" (triacylglycerol lipase) and "pepsin" (pepsin A) resolve.
+        if only.tier == TIER_ALTERNATIVE_EXACT and not only.abbreviation \
+                and f" {loose_key(text)} " not in f" {loose_key(only.name)} ":
+            family = [c for c in ranked if c.ec != only.ec and c.tier == TIER_ACCEPTED_PHRASE]
+            if len(family) >= 2:
+                return Ambiguous(
+                    query=text, candidates=tuple(ranked), recommended=None, organism=code, release=release,
+                    class_word=True,
+                    reason=(f"{text!r} is listed as another name of EC {only.ec} ({only.name}), and is also "
+                            f"the family name inside the accepted names of {len(family)} other enzymes, such as "
+                            + ", ".join(f"EC {c.ec} ({c.name})" for c in family[:2])
+                            + ": it names a kind of enzyme, not one"))
         if code and not only.has_organism_protein and only.tier in (TIER_ALTERNATIVE_EXACT, TIER_ALTERNATIVE_TOLERANT):
             # Rule c. Another name of an enzyme the organism does not have,
             # while an enzyme whose own name matches has one. An ACCEPTED
@@ -1052,6 +1113,9 @@ def refusal_text(ambiguous: Ambiguous, rerun: str = "--subject {ec}", shown: int
     elif ambiguous.suggestions_only:
         lines.append("Check the spelling; if one of these is the enzyme, re-run with "
                      + rerun.format(ec="<its EC number>"))
+    elif ambiguous.class_word:
+        lines.append("Name the enzyme itself: a wrong EC number is a citation for the wrong enzyme, not merely "
+                     "a wrong value. Re-run with " + rerun.format(ec="<its EC number>"))
     else:
         lines.append(
             "These are different enzymes, so Caterva will not pick one for you: a wrong EC number is a "

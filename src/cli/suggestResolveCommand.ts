@@ -52,6 +52,21 @@ export interface ParsedSystem {
   enzyme: string;
   substrate: string;
   organism: string;
+  /**
+   * What the question said, when `organism` is its canonical binomial
+   * ("humans" -> "Homo sapiens", readSystem.ts). Shown at confirmation so
+   * the reader agrees to the organism that will actually be searched.
+   */
+  organismTyped?: string;
+  /**
+   * The ONE enzyme the nomenclature resolves `enzyme` to, when it does
+   * (readSystem.ts, caterva.enzymes.question.enzyme_identity). Shown at
+   * confirmation: "enzyme enzyme" was agreed to while the Km that followed
+   * was cited for EC 2.4.1.25, 4-alpha-glucanotransferase, and nothing on
+   * the screen said so. Absent means "not decided offline", never "none".
+   */
+  ec?: string;
+  ecName?: string;
 }
 
 /** Words that are never an enzyme, substrate or organism. */
@@ -101,6 +116,10 @@ const PATTERNS: RegExp[] = [
   /\bfor\s+(.+?)\s+on\s+(.+?)\s+in\s+(.+)$/i,
   /^(.+?)\s+on\s+(.+?)\s+in\s+(.+)$/i,
   /\bof\s+(.+?)\s+with\s+(.+?)\s+in\s+(.+)$/i,
+  // "hexokinase with glucose in humans": the "of" form with nothing before
+  // it. Anchored at the start like the bare "on" form, so "of X with Y in Z"
+  // is still read by the pattern above, without "of" in the enzyme.
+  /^(.+?)\s+with\s+(.+?)\s+in\s+(.+)$/i,
 ];
 
 export function parseSystemFromQuery(query: string): ParsedSystem | null {

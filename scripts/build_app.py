@@ -483,6 +483,10 @@ IT RECOGNISES A SHAPE, NEVER A SUBJECT
     "two genes repressing each other" builds. "glycolysis" does not, and
     says why: naming a pathway needs a pathway database, and guessing one
     would be worse than refusing. Most refusals you meet are this.
+    An enzyme named exactly ("Michaelis-Menten kinetics of human hexokinase
+    on glucose") in a one-enzyme mechanism is searched for, and the report
+    says how each word was read; "kinase" is never one enzyme, and a name
+    that is several ("lactate dehydrogenase") is refused with each named.
 
 USEFUL FLAGS ON compose
     --screen        knock out every species in turn and rank the effects

@@ -437,3 +437,39 @@ def test_without_the_literature_layer_the_fit_is_reported_and_the_comparison_ref
     assert code == 3
     assert "## Verdict" in out and "Competitive inhibition" in out
     assert "not shipped in the app folder" in out and "not shipped in the app folder" in err
+
+
+# ---------------------------------------------------------------------------
+# --ec read by the one enzyme-name policy
+# ---------------------------------------------------------------------------
+# The text went to the resolver as the EC number, so `--ec hexokinase`
+# searched BRENDA for a page no enzyme is filed under.
+
+
+def test_an_enzyme_name_is_compared_as_its_ec_number_and_said_so(tmp_path):
+    path = synthetic_inhibition(tmp_path, "competitive")
+    asked = []
+
+    def recording(ec, organism, compound, **kw):
+        asked.append(ec)
+        return offline_resolver(ec, organism, compound, **kw)
+
+    by_name = ["--ec", "L-lactate dehydrogenase"] + LDH[2:]
+    code, out, _ = run([str(path), "--json"] + by_name, resolver=recording)
+    assert code == 0
+    assert asked and set(asked) == {"1.1.1.27"}
+    analysis = json.loads(out)
+    assert any(n.startswith("Read 'L-lactate dehydrogenase' as EC 1.1.1.27") for n in analysis["notes"])
+    code_n, out_n, _ = run([str(path), "--json"] + LDH, resolver=offline_resolver)
+    assert code_n == 0
+    assert json.loads(out_n)["literature"] == analysis["literature"]
+
+
+def test_a_name_that_is_several_enzymes_is_refused_naming_them(tmp_path):
+    path = synthetic_inhibition(tmp_path, "competitive")
+    code, out, err = run([str(path), "--ec", "lactate dehydrogenase"] + LDH[2:],
+                         resolver=lambda *a, **k: pytest.fail("searched for an unresolved name"))
+    assert code == 3
+    assert "## Verdict" in out  # the fit is still reported
+    assert "EC 1.1.1.27 L-lactate dehydrogenase" in out and "EC 1.1.1.28 D-lactate dehydrogenase" in out
+    assert "re-run with --ec 1.1.1.27" in err

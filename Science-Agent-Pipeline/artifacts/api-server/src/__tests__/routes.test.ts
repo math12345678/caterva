@@ -460,6 +460,19 @@ describe("POST /api/resolve", () => {
     // there -- filtering missing keys must not also filter out what
     // legitimately resolved.
     expect(res.body.resolvedParameters.km).toBe(10.73);
+    // The per-key reason and the per-key provenance travel with the
+    // refusal, so the page can show the server's own explanation and keep
+    // each value's origin instead of re-sending it as typed. Here km WAS
+    // typed, so "user" is the truth; a resolved Km would carry its
+    // citation the same way (webPathProvenance.test.ts).
+    expect(typeof res.body.details.vmax).toBe("string");
+    expect(res.body.details.vmax.length).toBeGreaterThan(0);
+    expect(res.body.parameterProvenance.km.origin).toBe("user");
+    expect(res.body.parameterProvenance.vmax.origin).toBe("default");
+    expect(res.body.parameterProvenance.vmax.unresolvedReason).toBeTruthy();
+    // The resolver's flags travel too: an "assumed: organism" made for the
+    // person was dropped on this path (webPathProvenance.test.ts).
+    expect(Array.isArray(res.body.flags)).toBe(true);
   });
 
   it("resolves an MM query", async () => {

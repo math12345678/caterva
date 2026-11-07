@@ -118,8 +118,13 @@ export function composeRequest(f: ComposeForm): ComposeRequest {
   for (const key of ["organism", "substrate", "inhibitor", "isoform"] as const) {
     if (f[key].trim()) request[key] = f[key].trim();
   }
-  // The engine is sent the EC number the person chose, never the text they typed.
-  if (isCompleteEc(f.subject)) request.subject = f.subject.trim();
+  // The EC number the person chose; else the name they typed and did not click, as typed. Dropping that name sent
+  // a run with no subject: it kept placeholders while the form showed "hexokinase" in the enzyme field, and nothing
+  // said it had been ignored. The engine reads a name by the same policy as `caterva compose --subject`
+  // (caterva/compose/__main__.py read_subject): exactly one enzyme is used and the report says how it was read;
+  // several are refused naming each, and ComposeResult offers them to choose from.
+  const subject = isCompleteEc(f.subject) ? f.subject.trim() : f.subjectSeed.trim() || f.subject.trim();
+  if (subject) request.subject = subject;
   if (f.any_mode) request.any_mode = true;
   if (f.no_simulate) request.no_simulate = true;
   if (f.no_analysis) request.no_analysis = true;
@@ -269,7 +274,8 @@ export default function ComposeScreen() {
           onChange={(ec) => setForm((f) => ({ ...f, subject: ec, subjectSeed: "", ...(ec === f.subject ? {} : { isoform: "" }) }))}
           organism={form.organism}
           seed={form.subjectSeed}
-          hint="A name, an abbreviation or an EC number. With one chosen, Km, kcat and Ki are searched in BRENDA; without one the model keeps labelled placeholders."
+          onQueryChange={(typed) => setForm((f) => (f.subject !== "" || f.subjectSeed === typed ? f : { ...f, subjectSeed: typed }))}
+          hint="A name, an abbreviation or an EC number. With one chosen, Km, kcat and Ki are searched in BRENDA. A name typed but not chosen is sent as typed: one enzyme is used and the report says how it was read; several are offered to choose from. With none, the model keeps labelled placeholders."
           error={err("subject")}
         />
         <Field label="Organism" optional hint={organismNote ?? "Never inferred; a measurement in another organism is never substituted."} error={err("organism")}>

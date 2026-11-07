@@ -67,6 +67,18 @@ describe('reading the system out of a plain-language question', () => {
     });
   });
 
+  it('accepts "X with Y in Z" with nothing before it', () => {
+    expect(parseSystemFromQuery('hexokinase with glucose in humans')).toEqual({
+      enzyme: 'hexokinase',
+      substrate: 'glucose',
+      organism: 'humans',
+    });
+    // The "of" form is still read by its own pattern, without "of" in the
+    // enzyme.
+    expect(parseSystemFromQuery('kinetics of pepsin with albumin in Sus scrofa')?.enzyme)
+      .toBe('pepsin');
+  });
+
   it('strips articles and trailing punctuation rather than passing them on', () => {
     const parsed = parseSystemFromQuery(
       'simulate of the hexokinase on the glucose in the Homo sapiens.',

@@ -102,7 +102,7 @@ export function parseUserCitations(
       return {
         citations,
         error:
-          '--cite needs a value, e.g. --cite km="Smith 2019, PMID 12345". ' +
+          '--cite needs a value, e.g. --cite km="<author year, PMID>". ' +
           'It attaches a source to a value you supplied yourself.',
       };
     }
@@ -113,7 +113,7 @@ export function parseUserCitations(
         citations,
         error:
           `--cite expects name=citation (got '${entry}'). ` +
-          'Example: --cite km="Smith 2019, PMID 12345".',
+          'Example: --cite km="<author year, PMID>".',
       };
     }
 

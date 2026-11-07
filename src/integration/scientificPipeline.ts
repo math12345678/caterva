@@ -336,6 +336,15 @@ export class ScientificPipeline {
           )
         : [];
 
+      // "No literature match" claims a search that found nothing. With no
+      // system named and an empty source database -- every plain `simulate`
+      // from the CLI, which initialises the pipeline with [] on purpose --
+      // nothing was searched, and saying "no match" told a student Caterva
+      // had looked and come back empty: wrong in the direction that makes
+      // the literature look absent rather than unasked.
+      const literatureSearched =
+        request.system !== undefined || this.literatureService.literatureCount() > 0;
+
       if (missingRequired.length > 0 || domainErrors.length > 0) {
         logger.error(
           { jobId, domain, missingRequired, domainErrors },
@@ -351,7 +360,10 @@ export class ScientificPipeline {
             ...domainErrors,
             ...missingRequired.map(param =>
               `Parameter '${param}': Required parameter '${param}' for domain '${domain}' has no ` +
-              'user-supplied value and no literature match; the run cannot proceed without either.'
+              (literatureSearched
+                ? 'user-supplied value and no literature match; the run cannot proceed without either.'
+                : 'user-supplied value, and no literature was searched for it (no system was ' +
+                  'named and no sources were supplied); the run cannot proceed without a value.')
             ),
           ],
           results: {
