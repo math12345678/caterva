@@ -365,15 +365,60 @@ def _chooser():
     Imported lazily and by name, so a runner on a tree without the chooser
     keeps working (and says, in its log and in `choices`, that nothing was
     chosen) instead of failing to start. Any other failure inside the
-    chooser -- BRENDA unreachable, a parse error -- is NOT caught here: a
-    choice that could not be made because the network failed is an error to
-    report, never a silent fall back to an unfiltered lookup.
+    chooser -- BRENDA unreachable, a parse error -- is NOT caught here but in
+    `_ask_strictly`, and becomes a refusal saying the page could not be read:
+    a report, never a silent fall back to an unfiltered lookup, and never
+    "BRENDA lists no row" when BRENDA was not reached.
     """
     try:
         from caterva.compose import defaults  # noqa: PLC0415
     except ImportError:
         return None
     return defaults
+
+
+class ChooserUnreadable(Exception):
+    """BRENDA's page could not be read while choosing, so nothing was chosen.
+
+    Kept apart from "BRENDA lists no row": the chooser's functions return
+    None for BOTH unless asked with `strict=True`, and a refusal that said
+    "BRENDA lists no Km row for any substrate" while BRENDA was simply down
+    would be false advice -- the person would go and name another organism
+    for an enzyme that has hundreds of rows.
+    """
+
+
+def _ask_strictly(fn, *args, **kwargs):
+    """Call a chooser function so that an unreadable page RAISES.
+
+    `strict=True` is the real chooser's switch for that (it is not in the
+    shared contract's signature, so a chooser without it is called as the
+    contract gives it, and its None stays ambiguous). Any error inside is
+    re-raised as ChooserUnreadable, which `choose_missing` turns into a
+    refusal saying the page could not be read -- a report, never a
+    traceback, and never an unfiltered lookup.
+    """
+    import inspect  # noqa: PLC0415
+
+    try:
+        accepts_strict = "strict" in inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        accepts_strict = False
+    try:
+        if accepts_strict:
+            return fn(*args, strict=True, **kwargs)
+        return fn(*args, **kwargs)
+    except Exception as exc:  # noqa: BLE001 - said, as a refusal
+        raise ChooserUnreadable(f"{type(exc).__name__}: {exc}") from exc
+
+
+def _unreadable_refusal(role: str, ec_number: str, quantity: str, why: str) -> str:
+    return (
+        f"No {role} was named, and BRENDA's page for EC {ec_number} could not be "
+        f"read to choose one ({why}), so nothing was looked up. This says "
+        "nothing about whether BRENDA has rows: try again, name the "
+        f"{role}, or supply {quantity}= from your own measurement."
+    )
 
 
 def choose_missing(
@@ -384,6 +429,7 @@ def choose_missing(
     model_substrate: Optional[str] = None,
     *,
     needs_kcat: bool = True,
+    allow_cross_species: bool = False,
 ) -> Filled:
     """Choose the organism and the substrate (or, for a Ki, the inhibitor)
     the caller left empty, from BRENDA's own rows (ADR 0182).
@@ -435,11 +481,17 @@ def choose_missing(
                 "(caterva.compose.defaults), so none was chosen."
             )
         else:
-            choice = chooser.choose_organism(
-                ec_number,
-                substrate=(model_substrate if is_ki else substrate) or None,
-                inhibitor=(substrate if is_ki else None) or None,
-            )
+            try:
+                choice = _ask_strictly(
+                    chooser.choose_organism,
+                    ec_number,
+                    substrate=(model_substrate if is_ki else substrate) or None,
+                    inhibitor=(substrate if is_ki else None) or None,
+                )
+            except ChooserUnreadable as exc:
+                filled.refusal = _unreadable_refusal("organism", ec_number, quantity, str(exc))
+                filled.refusal_source = "organism_not_chosen"
+                return filled
             if choice is None:
                 filled.refusal = (
                     f"No organism was named, and BRENDA holds no {label} row for "
@@ -489,14 +541,35 @@ def choose_missing(
         filled.refusal_source = f"{role}_not_named"
         return filled
 
-    if is_ki:
-        choice = chooser.choose_inhibitor(
-            ec_number, filled.organism or None, substrate=model_substrate or None
+    def ask(organism_scope: Optional[str]):
+        if is_ki:
+            return _ask_strictly(
+                chooser.choose_inhibitor,
+                ec_number, organism_scope, substrate=model_substrate or None,
+            )
+        return _ask_strictly(
+            chooser.choose_substrate, ec_number, organism_scope, needs_kcat=needs_kcat,
         )
-    else:
-        choice = chooser.choose_substrate(
-            ec_number, filled.organism or None, needs_kcat=needs_kcat
-        )
+
+    try:
+        choice = ask(filled.organism or None)
+        # The caller opted in to cross-species values (ADR 0024) and the
+        # organism holds no row for any substrate: the substrate is then
+        # chosen from every organism's rows, said in the log and the
+        # choice's own `why`, and the lookup that follows labels the value
+        # it finds as cross-species exactly as it would for a typed name.
+        if choice is None and filled.organism and allow_cross_species:
+            choice = ask(None)
+            if choice is not None:
+                filled.log.append(
+                    f"No {role} of EC {ec_number} has a {label} row in {filled.organism}; "
+                    f"{choice.chosen} was chosen from every organism's rows, because "
+                    "cross-species values were allowed."
+                )
+    except ChooserUnreadable as exc:
+        filled.refusal = _unreadable_refusal(role, ec_number, quantity, str(exc))
+        filled.refusal_source = f"{role}_not_named"
+        return filled
     if choice is None:
         # What is missing, and what fixes it -- never a placeholder offered
         # as if the literature had been consulted and agreed.
@@ -504,10 +577,12 @@ def choose_missing(
             f"No {role} was named, and BRENDA lists no {label} row for any "
             f"{role} of EC {ec_number}{where}, so none could be chosen and "
             "nothing was looked up. "
+            # With cross-species values allowed, every organism was already
+            # asked above, so "try another organism" would be false advice.
             + (
                 "Another organism may hold rows: name one, or opt in to "
                 "cross-species values. "
-                if filled.organism else ""
+                if filled.organism and not allow_cross_species else ""
             )
             + f"Or supply {quantity}= from your own measurement."
         )
@@ -1062,6 +1137,7 @@ def main() -> None:
         filled = choose_missing(
             ec_number, organism, substrate, quantity, model_substrate,
             needs_kcat=payload.get("needsKcat") is not False,
+            allow_cross_species=allow_cross_species,
         )
         resolution_log.extend(filled.log)
         if filled.refusal is not None:

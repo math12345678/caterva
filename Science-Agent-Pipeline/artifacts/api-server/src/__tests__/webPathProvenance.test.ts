@@ -39,6 +39,7 @@ type Entities = {
   substrate?: string;
   ecNumber?: string;
   organism?: string;
+  isoform?: string;
 };
 
 const seen: Entities[] = [];
@@ -454,6 +455,15 @@ describe("a gene symbol names its substrate after a connector", () => {
     expect(kmLookups().map((e) => [e.enzymeName, e.substrate])).toEqual([
       ["cyp2b6", "bupropion"],
     ]);
+  });
+
+  it("sends the gene symbol as the isoform, so another CYP's row is not cited as CYP2B6's", async () => {
+    // CYP2B6 resolves to EC 1.14.14.1, which every P450 monooxygenase
+    // shares; BRENDA's bupropion rows there are CYP2B6's, CYP2C19's and
+    // CYP2D6's. Without the isoform the runner would take the best row of
+    // any of them and the response would call it CYP2B6's.
+    await attempt("kinetics of CYP2B6 with bupropion in humans");
+    expect(kmLookups().map((e) => e.isoform)).toEqual(["CYP2B6"]);
   });
 
   it("states that it read the question as kinetics", async () => {

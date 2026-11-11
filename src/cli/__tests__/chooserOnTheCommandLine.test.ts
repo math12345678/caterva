@@ -170,4 +170,24 @@ describe('resolve chooses too', () => {
     expect(out).toContain('No substrate named; using D-glucose');
     expect((lines(looked)[0] as { substrate?: string }).substrate).toBe('D-glucose');
   });
+
+  it('under --json, the document itself says the substrate was chosen', () => {
+    // The person-facing line is not printed under --json (stdout is one
+    // document), so without `choices` in the document a script reading it
+    // got a Km "of D-glucose" with nothing saying nobody typed D-glucose.
+    const proc = spawnSync(TS_NODE, [CLI, 'resolve', 'hexokinase', '--organism', 'human', '--json'], {
+      cwd: REPO_ROOT,
+      env: {
+        ...process.env,
+        CATERVA_DEFAULTS_RUNNER: chooser(path.join(dir, 'json-asked.jsonl')),
+        CATERVA_LITERATURE_RUNNER: literature(path.join(dir, 'json-looked.jsonl')),
+      },
+      encoding: 'utf-8',
+      timeout: 150_000,
+    });
+    if (proc.status !== 0) throw new Error(`expected 0, got ${proc.status}\n${proc.stdout}${proc.stderr}`);
+    const doc = JSON.parse(proc.stdout) as { status: string; choices: Array<{ role: string; chosen: string }> };
+    expect(doc.status).toBe('found');
+    expect(doc.choices.map((c) => [c.role, c.chosen])).toEqual([['substrate', 'D-glucose']]);
+  });
 });

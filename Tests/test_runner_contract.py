@@ -1018,6 +1018,79 @@ def test_nothing_to_choose_from_says_what_is_missing_and_looks_nothing_up(monkey
     assert "km=" in result["choiceRefusal"]
 
 
+class _UnreadableChooser(_FakeChooser):
+    """The real chooser's shape when BRENDA cannot be reached: None unless
+    asked with strict=True, and then the network error."""
+
+    def choose_substrate(self, ec, organism, *, needs_kcat=True, strict=False):
+        self.asked.append(("substrate", ec, organism, strict))
+        if strict:
+            raise ConnectionError("BRENDA did not answer")
+        return None
+
+
+def test_brenda_unreachable_while_choosing_is_not_reported_as_brenda_having_no_rows(monkeypatch):
+    """A page that could not be read is a report saying so, not "no row".
+
+    The real chooser returns None for both "BRENDA lists nothing" and "the
+    page could not be read" unless asked strictly. Read as the first, the
+    refusal told the person to name another organism for an enzyme BRENDA
+    simply did not answer for.
+    """
+    chooser = _UnreadableChooser()
+    _with_chooser(monkeypatch, chooser)
+
+    def never(*a, **k):
+        raise AssertionError("looked up a constant with no substrate to look it up for")
+
+    result = run_main(monkeypatch, never, {"ecNumber": "2.7.1.1", "organism": "Homo sapiens"})
+    assert chooser.asked == [("substrate", "2.7.1.1", "Homo sapiens", True)]
+    assert result["ok"] is True and result["found"] is False
+    assert result["source"] == "substrate_not_named"
+    assert "could not be read" in result["choiceRefusal"]
+    assert "BRENDA did not answer" in result["choiceRefusal"]
+    assert "lists no" not in result["choiceRefusal"]
+
+
+def test_with_cross_species_allowed_an_organism_without_rows_chooses_from_every_organism(monkeypatch):
+    """The caller opted in to cross-species values: the substrate is chosen
+    from every organism's rows, and the advice never says "opt in"."""
+
+    class _OnlyAnywhere(_FakeChooser):
+        def choose_substrate(self, ec, organism, *, needs_kcat=True):
+            self.asked.append(("substrate", ec, organism))
+            return None if organism else _Choice("substrate", "D-glucose")
+
+    chooser = _OnlyAnywhere()
+    _with_chooser(monkeypatch, chooser)
+    looked_up = {}
+
+    def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None, **kwargs):
+        looked_up.update(organism=organism, substrate=substrate,
+                         cross=kwargs.get("allow_cross_species"))
+        return golden_result()
+
+    result = run_main(
+        monkeypatch, fake_resolve,
+        {"ecNumber": "2.7.1.1", "organism": "Homo sapiens", "allowCrossSpecies": True},
+    )
+    assert chooser.asked == [("substrate", "2.7.1.1", "Homo sapiens"),
+                             ("substrate", "2.7.1.1", None)]
+    # Still looked up in the organism asked for; the resolver labels a
+    # value from another species as cross-species, as for a typed name.
+    assert looked_up == {"organism": "Homo sapiens", "substrate": "D-glucose", "cross": True}
+    assert [c["chosen"] for c in result["choices"]] == ["D-glucose"]
+
+
+def test_without_cross_species_an_organism_without_rows_is_refused_with_both_fixes(monkeypatch):
+    _with_chooser(monkeypatch, _FakeChooser(substrate=None))
+    result = run_main(
+        monkeypatch, lambda *a, **k: golden_result(),
+        {"ecNumber": "2.7.1.1", "organism": "Homo sapiens"},
+    )
+    assert "name one, or opt in to cross-species values" in result["choiceRefusal"]
+
+
 def test_missing_ec_number_exhausted_uniprot_lookup_reports_not_found(monkeypatch):
     """When UniProt has nothing indexed under the given name, this must be
     an honest 'not found' -- never a fabricated EC number or Km, and never

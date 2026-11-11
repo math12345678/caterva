@@ -2117,6 +2117,11 @@ function isGeneSymbolAsTyped(name: string, query: string, needsDigit = true): bo
     .some((t) => t.toLowerCase() === name && shape.test(t));
 }
 
+/** The token `name` (lower-cased by the guess) as the query typed it: "CYP2B6". */
+function typedAs(name: string, query: string): string {
+  return query.split(/[^A-Za-z0-9-]+/).find((t) => t.toLowerCase() === name) ?? name;
+}
+
 /**
  * The words that introduce what an enzyme acts on, when its name has no
  * "-ase" word to end at: "CYP2B6 WITH bupropion", "trypsin ON casein".
@@ -2350,9 +2355,22 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
   // flag naming why and the alternatives. Undefined, not "": nothing here
   // invents a name.
   const refusal = enzymeRefusal ?? organismRefusal;
+  // A GENE SYMBOL IS ALSO THE ISOFORM. "CYP2B6" resolves through UniProt
+  // to EC 1.14.14.1, the number every cytochrome P450 monooxygenase shares,
+  // and BRENDA's bupropion rows under it are CYP2B6's, CYP2C19's and
+  // CYP2D6's alike. Sent without an isoform, the runner would take the best
+  // row of any of them and the response would call it CYP2B6's -- a number
+  // attached to a protein it was not measured on. Sent as the isoform, the
+  // runner keeps rows naming CYP2B6, refuses (isoform_withheld) when every
+  // row names another, and rowScopeFlags says so when a row names none.
+  // An isoform the query names in words ("isoform LDH-A") still wins.
+  const isoform =
+    extractIsoform(query) ??
+    (isGeneSymbolAsTyped(guess.name, query) ? typedAs(guess.name, query) : undefined);
   return {
     enzymeName: guess.name,
     ...(guess.substrate ? { substrate: guess.substrate } : {}),
+    ...(isoform ? { isoform } : {}),
     organism: namedOrganism ?? "Homo sapiens",
     organismAssumed: organismsNamed.length === 0,
     ecNumber: undefined,

@@ -1891,6 +1891,7 @@ async function main() {
       // lookup has no confirmation step: the choice is printed before the
       // value, and the flag to choose otherwise is named in the same line.
       let nothingToChoose: string | undefined;
+      const resolveChoices: AutomaticChoice[] = [];
       if ((!substrate || !organism) && (enzyme || ec)) {
         const typed = organism ? canonicalOrganism(organism).organism : undefined;
         const identity = ec ? { ec } : enzymeIdentity(enzyme!, typed);
@@ -1898,7 +1899,10 @@ async function main() {
           // For --quantity ki, --substrate names the INHIBITOR (BRENDA files
           // a Ki under it), so that is the role asked for.
           const role = (flags['quantity'] ?? 'km').toLowerCase() === 'ki' ? 'inhibitor' : 'substrate';
+          // Printed for a person; under --json stdout is one document, and
+          // the choices go into it instead (commandResolve's `choices`).
           const say = (choice: AutomaticChoice) => {
+            resolveChoices.push(choice);
             if (!booleans.has('json')) info(describeChoice(choice));
           };
           if (!organism) {
@@ -2039,6 +2043,7 @@ async function main() {
         quantity: quantityRaw,
         enzymeConc,
         json: booleans.has('json'),
+        choices: resolveChoices,
         allowCrossSpecies: booleans.has('allow-cross-species'),
         ...(typeof flags['isoform'] === 'string' ? { isoform: flags['isoform'] } : {}),
         ...(inhibitionMode ? { inhibitionMode } : {}),

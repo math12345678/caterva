@@ -46,6 +46,7 @@ generations scale linearly with their counters, and the queue limits
 
 from __future__ import annotations
 
+import inspect
 import json
 import pathlib
 import re
@@ -978,11 +979,27 @@ def _choose_for_requests(
         role = "inhibitor" if is_ki else "substrate"
         key = (str(ec), str(org or ""), role)
         if key not in made:
-            made[key] = (
-                defaults.choose_inhibitor(ec, org)
-                if is_ki
-                else defaults.choose_substrate(ec, org, needs_kcat=ec in kcat_ecs)
-            )
+            # Asked with strict=True where the chooser takes it, so a page
+            # that could not be read RAISES instead of reading as "no row":
+            # the refusal below would otherwise tell the caller BRENDA has
+            # nothing for an enzyme it merely could not reach.
+            fn = defaults.choose_inhibitor if is_ki else defaults.choose_substrate
+            kwargs: Dict[str, Any] = {} if is_ki else {"needs_kcat": ec in kcat_ecs}
+            try:
+                if "strict" in inspect.signature(fn).parameters:
+                    kwargs["strict"] = True
+            except (TypeError, ValueError):
+                pass
+            try:
+                made[key] = fn(ec, org, **kwargs)
+            except Exception as exc:  # noqa: BLE001 - reported, as a ValueError
+                raise ValueError(
+                    f"{entry.get('quantity')} names no {role}, and BRENDA's page for "
+                    f"EC {ec} could not be read to choose one ({type(exc).__name__}: "
+                    f"{exc}), so nothing was looked up. This says nothing about "
+                    f"whether BRENDA has rows: try again, add \"substrate\" to the "
+                    f"request, or supply {entry.get('quantity')} in \"sources\"."
+                ) from exc
             if made[key] is not None:
                 choices.append(made[key].to_json())
         choice = made[key]

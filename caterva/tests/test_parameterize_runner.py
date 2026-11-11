@@ -446,3 +446,22 @@ class TestAnUnnamedSubstrateIsChosen:
             resolve=brenda_like({"Km": [(HUMAN, 0.15, 7.4, 37.0, "HEPES")]}),
         )
         assert [c["chosen"] for c in payload["choices"]] == ["D-glucose"]
+
+    def test_brenda_unreachable_while_choosing_is_not_reported_as_no_rows(self, install) -> None:
+        """The real chooser returns None for "no row" and for "page not read"
+        alike unless asked with strict=True; asked so, the second is said as
+        what it is, not as BRENDA having nothing for the enzyme."""
+
+        class Unreadable(_FakeDefaults):
+            def choose_substrate(self, ec, organism, *, needs_kcat=True, strict=False):
+                self.asked.append(("substrate", ec, organism, strict))
+                if strict:
+                    raise ConnectionError("BRENDA did not answer")
+                return None
+
+        fake = install(Unreadable())
+        with pytest.raises(ValueError, match="could not be read") as raised:
+            caterva_runner._choose_for_requests(
+                [{"quantity": "Km", "ec_number": "2.7.1.1", "table": "km"}], "Homo sapiens")
+        assert "no Km row" not in str(raised.value)
+        assert fake.asked == [("substrate", "2.7.1.1", "Homo sapiens", True)]

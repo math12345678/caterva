@@ -35,6 +35,7 @@ import {
   type KineticQuantity,
 } from '../literature/literatureResolver';
 import { formatDerived, formatValue } from './formatNumber';
+import type { AutomaticChoice } from './chooseMissing';
 
 const BOLD = '[1m';
 const DIM = '[2m';
@@ -75,6 +76,11 @@ export interface ResolveOptions {
     temperatureToleranceC: number;
   };
   json: boolean;
+  /** The substrate (inhibitor) or organism the CLI CHOSE because none was
+   *  given (ADR 0182, chooseMissing.ts), in the order chosen. Printed
+   *  before the lookup for a person; under --json they are only in the
+   *  document, so every --json answer carries them, found or not. */
+  choices?: AutomaticChoice[];
 }
 
 /**
@@ -139,6 +145,9 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
             logs: result.logs,
             source: result.source,
             withheld: withheldSentence(result),
+            // The names this lookup was for that nobody typed: "not found
+            // for D-glucose" is about the substrate Caterva chose.
+            choices: options.choices ?? [],
             // Machine-readable too, not only in the prose above. A script
             // driving `resolve --json` is exactly the caller who would go
             // and fetch these.
@@ -212,7 +221,11 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
   }
 
   if (options.json) {
-    process.stdout.write(JSON.stringify({ ok: true, status: 'found', ...result }, null, 2) + '\n');
+    // `choices` beside the value: under --json nothing else says that the
+    // substrate (or organism) it is the constant of was chosen, not typed.
+    process.stdout.write(
+      JSON.stringify({ ok: true, status: 'found', ...result, choices: options.choices ?? [] }, null, 2) + '\n',
+    );
     return 0;
   }
 
