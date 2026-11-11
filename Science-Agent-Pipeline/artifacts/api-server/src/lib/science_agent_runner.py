@@ -74,6 +74,17 @@ Output JSON shape (success, quantity="km"):
 
 With quantity="ki" the value is emitted under "ki" instead of "km".
 
+Every output also carries "choices": the names this runner CHOSE because
+the payload left them empty (ADR 0182) -- the organism, the substrate, or
+for a Ki the inhibitor -- each as caterva.compose.defaults' Choice.to_json()
+({"role", "chosen", "why", "alternatives": [{"name", "rows"}], "considered"}),
+in the order chosen. A value found after a choice is BRENDA's row for exactly
+the chosen name; the client must state the choice beside it. When a name was
+needed and BRENDA holds nothing to choose it from, the answer is found=false
+with source "substrate_not_named", "inhibitor_not_named" or
+"organism_not_chosen" and "choiceRefusal", the sentence saying what is
+missing and what would fix it. See choose_missing().
+
 The citation's keys are camelCase, as `_citation_to_dict` writes them. This
 example said "reference_id" until 2026-09-30, and the TypeScript CLI, written
 against it, dropped every reference id the runner sent.
@@ -284,8 +295,12 @@ def taxon_id_for(organism: str | None) -> str | None:
 
 
 def resolve_substrate_from_kegg(ec_number: str) -> str | None:
-    """Live substrate-name lookup for an EC number via KEGG, used to fill
-    in a substrate name when the caller didn't supply one -- which happens
+    """Live substrate-name lookup for an EC number via KEGG.
+
+    Since ADR 0182 this is only the FALLBACK of `choose_missing`, for a
+    checkout without caterva.compose.defaults; the chooser, which counts
+    BRENDA's own rows, is what fills an unnamed substrate. It used to fill
+    in a substrate name whenever the caller didn't supply one -- which happens
     whenever the enzyme name came from the free-text guess in
     queryResolver.ts rather than the hardcoded enzymes.ts list (that list
     bundles a substrate per entry; a live-resolved enzyme has none yet).
@@ -320,6 +335,188 @@ def resolve_substrate_from_kegg(ec_number: str) -> str | None:
         return None
     substrates = enzyme_lookup.parse_kegg_substrates(text)
     return substrates[0] if substrates else None
+
+
+#: How a refusal names each constant. The keys are the runner's quantities.
+_QUANTITY_LABEL = {"km": "Km", "kcat": "kcat", "ki": "Ki"}
+
+
+@dataclass
+class Filled:
+    """What `choose_missing` decided: the names to look up, and why.
+
+    `choices` are `Choice.to_json()` dicts (caterva/compose/defaults.py),
+    one per name this runner chose, in the order chosen. `refusal` is set
+    when a name was needed and BRENDA holds no row to choose it from; it is
+    the sentence the person reads, saying what is missing and what fixes it.
+    """
+
+    organism: str
+    substrate: str
+    choices: list = field(default_factory=list)
+    log: list = field(default_factory=list)
+    refusal: Optional[str] = None
+    refusal_source: Optional[str] = None
+
+
+def _chooser():
+    """caterva.compose.defaults, or None in a checkout that predates it.
+
+    Imported lazily and by name, so a runner on a tree without the chooser
+    keeps working (and says, in its log and in `choices`, that nothing was
+    chosen) instead of failing to start. Any other failure inside the
+    chooser -- BRENDA unreachable, a parse error -- is NOT caught here: a
+    choice that could not be made because the network failed is an error to
+    report, never a silent fall back to an unfiltered lookup.
+    """
+    try:
+        from caterva.compose import defaults  # noqa: PLC0415
+    except ImportError:
+        return None
+    return defaults
+
+
+def choose_missing(
+    ec_number: str,
+    organism: str,
+    substrate: str,
+    quantity: str,
+    model_substrate: Optional[str] = None,
+    *,
+    needs_kcat: bool = True,
+) -> Filled:
+    """Choose the organism and the substrate (or, for a Ki, the inhibitor)
+    the caller left empty, from BRENDA's own rows (ADR 0182).
+
+    WHY THIS REPLACED THE KEGG FILL
+    -------------------------------
+    An empty substrate used to mean "any substrate": KEGG's first listed
+    substrate (KEGG is off by default, ADR 0068, so in practice never), or
+    BRENDA's rows unfiltered -- the Km of whichever substrate's row came
+    first, with nothing in the result naming it. The API's language-model
+    path, the curated enzyme table and /simulate/parameterize all reached
+    that. Refusing instead (ADR 0178/0181) was honest, and left a student
+    who asked about "hexokinase in humans" with placeholders while BRENDA
+    held 25 measured glucose rows.
+
+    The owner's rule since ADR 0182: choose the best-measured real option,
+    run with its real, cited values, and say what was chosen, why, and what
+    else there was. The chooser is caterva.compose.defaults, the one the
+    engine's report uses, so the API and `caterva compose` choose alike.
+    Every name chosen comes back in `choices`; the value the lookup then
+    returns is a row for exactly that name, through the same row filter a
+    typed name goes through.
+
+    Order: the organism first (choose_organism, told the substrate or
+    inhibitor when one was named), then the substrate or inhibitor in that
+    organism -- so "the most measured substrate" is counted in the organism
+    the value will come from.
+
+    Without the chooser (a checkout predating it) the old fill is the
+    fallback, stated as a choice when it names something: KEGG's first
+    substrate. With nothing to fill from, the lookup is refused with
+    source "substrate_not_named", which is what the API answered for an
+    unnamed substrate before ADR 0182; a Ki with no inhibitor is refused
+    likewise ("inhibitor_not_named"). Neither ever runs unfiltered.
+    """
+    filled = Filled(organism=organism, substrate=substrate)
+    label = _QUANTITY_LABEL.get(quantity, "Km")
+    is_ki = quantity == "ki"
+    role = "inhibitor" if is_ki else "substrate"
+    if not ec_number or (organism and substrate):
+        return filled
+    chooser = _chooser()
+
+    if not organism:
+        if chooser is None:
+            # As before: the resolver refuses an empty organism by itself.
+            filled.log.append(
+                "No organism was named, and this checkout has no chooser "
+                "(caterva.compose.defaults), so none was chosen."
+            )
+        else:
+            choice = chooser.choose_organism(
+                ec_number,
+                substrate=(model_substrate if is_ki else substrate) or None,
+                inhibitor=(substrate if is_ki else None) or None,
+            )
+            if choice is None:
+                filled.refusal = (
+                    f"No organism was named, and BRENDA holds no {label} row for "
+                    f"EC {ec_number} in any organism"
+                    + (f" for {substrate}" if substrate else "")
+                    + ", so none could be chosen and nothing was looked up. "
+                    f"Supply {quantity}= from your own measurement, or name an "
+                    "organism and a " + role + " BRENDA lists for this enzyme."
+                )
+                filled.refusal_source = "organism_not_chosen"
+                return filled
+            filled.organism = choice.chosen
+            filled.choices.append(choice.to_json())
+            filled.log.append(f"organism chosen: {choice.chosen} -- {choice.why}")
+
+    if filled.substrate:
+        return filled
+    where = f" in {filled.organism}" if filled.organism else ""
+
+    if chooser is None:
+        if not is_ki:
+            kegg = resolve_substrate_from_kegg(ec_number)
+            if kegg:
+                filled.substrate = kegg
+                filled.choices.append({
+                    "role": "substrate",
+                    "chosen": kegg,
+                    "why": (
+                        f"KEGG lists it first among EC {ec_number}'s substrates; "
+                        "this checkout has no BRENDA chooser, so its rows were not counted"
+                    ),
+                    "alternatives": [],
+                    "considered": 0,
+                })
+                filled.log.append(f"substrate chosen: {kegg} -- KEGG's first substrate")
+                return filled
+        filled.log.append(
+            f"No {role} was named, and this checkout has no chooser "
+            "(caterva.compose.defaults), so none was chosen."
+        )
+        filled.refusal = (
+            f"No {role} was named, and a {label} is the constant of one "
+            f"{role}: nothing was looked up, because a lookup without one "
+            f"returns whichever {role}'s row comes first. Name the {role}, "
+            f"or supply {quantity}= from your own measurement."
+        )
+        filled.refusal_source = f"{role}_not_named"
+        return filled
+
+    if is_ki:
+        choice = chooser.choose_inhibitor(
+            ec_number, filled.organism or None, substrate=model_substrate or None
+        )
+    else:
+        choice = chooser.choose_substrate(
+            ec_number, filled.organism or None, needs_kcat=needs_kcat
+        )
+    if choice is None:
+        # What is missing, and what fixes it -- never a placeholder offered
+        # as if the literature had been consulted and agreed.
+        filled.refusal = (
+            f"No {role} was named, and BRENDA lists no {label} row for any "
+            f"{role} of EC {ec_number}{where}, so none could be chosen and "
+            "nothing was looked up. "
+            + (
+                "Another organism may hold rows: name one, or opt in to "
+                "cross-species values. "
+                if filled.organism else ""
+            )
+            + f"Or supply {quantity}= from your own measurement."
+        )
+        filled.refusal_source = f"{role}_not_named"
+        return filled
+    filled.substrate = choice.chosen
+    filled.choices.append(choice.to_json())
+    filled.log.append(f"{role} chosen: {choice.chosen} -- {choice.why}")
+    return filled
 
 
 def resolve_kinetic_value(
@@ -825,18 +1022,12 @@ def main() -> None:
                    else "the enzyme nomenclature: " + named.how + ".")
             )
             resolution_log.extend(named.cautions)
-            if not substrate:
-                kegg_substrate = resolve_substrate_from_kegg(ec_number)
-                if kegg_substrate:
-                    substrate = kegg_substrate
-                    resolution_log.append(
-                        f"Resolved substrate '{substrate}' for EC {ec_number} via KEGG."
-                    )
-                else:
-                    resolution_log.append(
-                        f"No KEGG substrate found for EC {ec_number}; "
-                        "BRENDA lookup will be unfiltered by substrate."
-                    )
+            # NO SUBSTRATE IS NO LONGER FILLED HERE. This branch used to
+            # take KEGG's first substrate, or send BRENDA's rows unfiltered,
+            # and say so only in the log -- and only when the EC came from
+            # the name: an EC sent with no substrate skipped even that and
+            # went unfiltered. Both paths now meet `choose_missing` below,
+            # which picks the best-measured real substrate and says so.
 
         elif enzyme_name:
             # Both arrived. The number is used only when the name does not
@@ -864,6 +1055,31 @@ def main() -> None:
                 return
             if not agreement.checked:
                 resolution_log.append(agreement.note)
+
+        # What the caller did not name, chosen from BRENDA's own rows and
+        # reported as a choice (ADR 0182). Before the lookup, so the row
+        # filter applies to the chosen name exactly as to a typed one.
+        filled = choose_missing(
+            ec_number, organism, substrate, quantity, model_substrate,
+            needs_kcat=payload.get("needsKcat") is not False,
+        )
+        resolution_log.extend(filled.log)
+        if filled.refusal is not None:
+            print(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "found": False,
+                        "source": filled.refusal_source,
+                        "choices": filled.choices,
+                        "choiceRefusal": filled.refusal,
+                        "literatureCandidates": [],
+                        "logs": resolution_log,
+                    }
+                )
+            )
+            return
+        organism, substrate = filled.organism, filled.substrate
 
         result = resolve_kinetic_value(
             enzyme_name, substrate, organism, ec_number,
@@ -1059,6 +1275,10 @@ def main() -> None:
                 "citation": _citation_to_dict(result.citation),
                 "literatureCandidates": _candidates_to_dict(result.literature_candidates),
                 "logs": result.search_log,
+                # Every name this runner chose because the caller did not
+                # give one (ADR 0182), in the order chosen. The value above
+                # is the row for exactly that name; the client states it.
+                "choices": filled.choices,
             }
 
             # ADR 0019: a resolved kcat plus a caller-supplied enzyme
@@ -1127,6 +1347,9 @@ def main() -> None:
                         "relatedness": [v.model_dump() for v in result.relatedness],
                         "literatureCandidates": _candidates_to_dict(result.literature_candidates),
                         "logs": result.search_log,
+                        # A refusal for a chosen name is a refusal of THAT
+                        # name, and the client has to be able to say so.
+                        "choices": filled.choices,
                     }
                 )
             )

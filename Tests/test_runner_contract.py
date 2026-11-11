@@ -67,6 +67,19 @@ class _AnyReliability:
 ANY_RELIABILITY = _AnyReliability()
 
 
+@pytest.fixture(autouse=True)
+def _no_chooser_unless_a_test_brings_one(monkeypatch):
+    """Every test here runs without caterva.compose.defaults (ADR 0182).
+
+    The chooser counts BRENDA's rows over the network, and a payload with no
+    substrate reaches it. A contract test whose answer depends on BRENDA
+    being reachable is reporting the weather (see run_main), so the chooser
+    is absent unless a test installs a fake one; the tests that pin the
+    choosing do exactly that.
+    """
+    monkeypatch.setattr(science_agent_runner, "_chooser", lambda: None)
+
+
 def golden_result(cross_species: bool = False) -> KineticResult:
     """The golden G1 record, as the Python layer hands it to the runner."""
     return KineticResult(
@@ -266,6 +279,7 @@ def test_golden_found_output_shape(monkeypatch):
         "mechanismEvidence": None,
         "literatureCandidates": [],
         "logs": ["BRENDA exact: 1.1.1.27, Homo sapiens, lactate"],
+        "choices": [],  # nothing was chosen: the payload named all of it (ADR 0182)
     }
 
 
@@ -698,6 +712,7 @@ def test_not_found_output_shape(monkeypatch):
              "source": "pubmed", "doi": None}
         ],
         "logs": ["genuine gap"],
+        "choices": [],  # nothing was chosen: the payload named all of it (ADR 0182)
     }
 
 
@@ -758,6 +773,7 @@ def test_core_candidate_output_shape(monkeypatch):
              "source": "core", "doi": "10.1000/core.example"}
         ],
         "logs": ["genuine gap"],
+        "choices": [],  # nothing was chosen: the payload named all of it (ADR 0182)
     }
 
 
@@ -804,12 +820,15 @@ def test_missing_ec_number_resolves_it_live_via_uniprot(monkeypatch):
     assert any("Resolved EC 3.2.1.1" in line for line in result["logs"])
 
 
-def test_missing_ec_number_also_resolves_substrate_via_kegg(monkeypatch):
-    """A live-resolved enzyme has no substrate name from the (unused)
-    enzymes.ts entry, and BRENDA's Km table is dominated by noise without
-    one (see enzyme_lookup.py's module docstring). This confirms the
-    KEGG substrate lookup actually reaches fallback_logic.resolve_kinetic_value,
-    not just that the runner doesn't crash without one."""
+def test_without_the_chooser_kegg_names_the_substrate_and_says_it_chose(monkeypatch):
+    """A checkout without caterva.compose.defaults falls back to the old fill.
+
+    Was `test_missing_ec_number_also_resolves_substrate_via_kegg`. KEGG's
+    first substrate still reaches fallback_logic.resolve_kinetic_value, so
+    BRENDA's row filter applies -- but since ADR 0182 it is a CHOICE, and is
+    reported as one in `choices`, not only in the log. The autouse fixture
+    removes the chooser, which is what makes this the fallback.
+    """
     import enzyme_lookup
 
     monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda organism: "9606")
@@ -838,9 +857,165 @@ def test_missing_ec_number_also_resolves_substrate_via_kegg(monkeypatch):
     assert result["ok"] is True
     assert captured_args["substrate"] == "starch"
     assert captured_args["enzyme_ec"] == "3.2.1.1"
-    assert any(
-        "Resolved substrate 'starch'" in line for line in result["logs"]
+    assert [c["chosen"] for c in result["choices"]] == ["starch"]
+    assert result["choices"][0]["role"] == "substrate"
+    assert "KEGG" in result["choices"][0]["why"]
+
+
+def test_without_the_chooser_or_kegg_nothing_is_looked_up_unfiltered(monkeypatch):
+    """No chooser and no KEGG substrate: refused, never sent as "any".
+
+    Before ADR 0182 this case logged "BRENDA lookup will be unfiltered by
+    substrate" and returned whichever substrate's row came first.
+    """
+    monkeypatch.setattr(science_agent_runner, "resolve_substrate_from_kegg", lambda ec: None)
+
+    def never(*a, **k):
+        raise AssertionError("an unnamed substrate reached BRENDA unfiltered")
+
+    result = run_main(
+        monkeypatch, never,
+        {"ecNumber": "2.7.1.1", "enzymeName": "", "organism": "Homo sapiens"},
     )
+    assert result["found"] is False
+    assert result["source"] == "substrate_not_named"
+    assert result["choices"] == []
+    assert "Name the substrate" in result["choiceRefusal"]
+
+
+class _Choice:
+    """The shape caterva.compose.defaults.Choice has (the SHARED CONTRACT)."""
+
+    def __init__(self, role, chosen, alternatives=(), considered=3):
+        self.role, self.chosen = role, chosen
+        self.why = f"most measured {role} for this enzyme"
+        self.alternatives = alternatives
+        self.considered = considered
+
+    def to_json(self):
+        return {
+            "role": self.role, "chosen": self.chosen, "why": self.why,
+            "alternatives": [{"name": n, "rows": r} for n, r in self.alternatives],
+            "considered": self.considered,
+        }
+
+
+class _FakeChooser:
+    """Stands in for caterva.compose.defaults; records what it was asked."""
+
+    def __init__(self, substrate=None, inhibitor=None, organism=None):
+        self.asked = []
+        self._answers = {"substrate": substrate, "inhibitor": inhibitor, "organism": organism}
+
+    def choose_substrate(self, ec, organism, *, needs_kcat=True):
+        self.asked.append(("substrate", ec, organism))
+        return self._answers["substrate"]
+
+    def choose_inhibitor(self, ec, organism, substrate=None):
+        self.asked.append(("inhibitor", ec, organism, substrate))
+        return self._answers["inhibitor"]
+
+    def choose_organism(self, ec, substrate=None, inhibitor=None):
+        self.asked.append(("organism", ec, substrate, inhibitor))
+        return self._answers["organism"]
+
+
+def _with_chooser(monkeypatch, chooser):
+    monkeypatch.setattr(science_agent_runner, "_chooser", lambda: chooser)
+
+
+def test_an_unnamed_substrate_is_chosen_and_the_lookup_is_for_it(monkeypatch):
+    """ADR 0182: the best-measured substrate is chosen, looked up, stated."""
+    chooser = _FakeChooser(substrate=_Choice(
+        "substrate", "D-glucose", (("ATP", {"km": 106}), ("D-mannose", {"km": 9})),
+    ))
+    _with_chooser(monkeypatch, chooser)
+    looked_up = {}
+
+    def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None, **kwargs):
+        looked_up.update(ec=enzyme_ec, organism=organism, substrate=substrate)
+        return golden_result()
+
+    result = run_main(
+        monkeypatch, fake_resolve,
+        {"ecNumber": "2.7.1.1", "organism": "Homo sapiens"},
+    )
+    assert chooser.asked == [("substrate", "2.7.1.1", "Homo sapiens")]
+    # The value is the row for exactly the chosen name.
+    assert looked_up == {"ec": "2.7.1.1", "organism": "Homo sapiens", "substrate": "D-glucose"}
+    assert result["found"] is True
+    assert result["choices"] == [{
+        "role": "substrate", "chosen": "D-glucose",
+        "why": "most measured substrate for this enzyme",
+        "alternatives": [{"name": "ATP", "rows": {"km": 106}},
+                         {"name": "D-mannose", "rows": {"km": 9}}],
+        "considered": 3,
+    }]
+
+
+def test_a_named_substrate_asks_no_chooser(monkeypatch):
+    chooser = _FakeChooser()
+    _with_chooser(monkeypatch, chooser)
+    result = run_main(
+        monkeypatch, lambda *a, **k: golden_result(),
+        {"ecNumber": "1.1.1.27", "substrate": "lactate", "organism": "Homo sapiens"},
+    )
+    assert chooser.asked == []
+    assert result["choices"] == []
+
+
+def test_an_unnamed_inhibitor_is_chosen_for_a_ki(monkeypatch):
+    """A Ki's `substrate` is the inhibitor; the model's substrate guides it."""
+    chooser = _FakeChooser(inhibitor=_Choice("inhibitor", "oxamate", (("gossypol", {"ki": 4}),)))
+    _with_chooser(monkeypatch, chooser)
+    looked_up = {}
+
+    def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None, **kwargs):
+        looked_up["inhibitor"] = substrate
+        return golden_result()
+
+    result = run_main(
+        monkeypatch, fake_resolve,
+        {"ecNumber": "1.1.1.27", "organism": "Homo sapiens", "quantity": "ki",
+         "inhibitionMode": "competitive", "modelSubstrate": "pyruvate"},
+    )
+    assert chooser.asked == [("inhibitor", "1.1.1.27", "Homo sapiens", "pyruvate")]
+    assert looked_up["inhibitor"] == "oxamate"
+    assert [c["role"] for c in result["choices"]] == ["inhibitor"]
+
+
+def test_an_unnamed_organism_is_chosen_before_the_substrate(monkeypatch):
+    chooser = _FakeChooser(
+        organism=_Choice("organism", "Rattus norvegicus", (("Homo sapiens", {"km": 12}),)),
+        substrate=_Choice("substrate", "D-glucose"),
+    )
+    _with_chooser(monkeypatch, chooser)
+    looked_up = {}
+
+    def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None, **kwargs):
+        looked_up.update(organism=organism, substrate=substrate)
+        return golden_result()
+
+    result = run_main(monkeypatch, fake_resolve, {"ecNumber": "2.7.1.1"})
+    assert [a[0] for a in chooser.asked] == ["organism", "substrate"]
+    assert chooser.asked[1] == ("substrate", "2.7.1.1", "Rattus norvegicus")
+    assert looked_up == {"organism": "Rattus norvegicus", "substrate": "D-glucose"}
+    assert [c["role"] for c in result["choices"]] == ["organism", "substrate"]
+
+
+def test_nothing_to_choose_from_says_what_is_missing_and_looks_nothing_up(monkeypatch):
+    """BRENDA holds no row: a refusal naming what is missing and the fix."""
+    _with_chooser(monkeypatch, _FakeChooser(substrate=None))
+
+    def never(*a, **k):
+        raise AssertionError("looked up a constant with no substrate to look it up for")
+
+    result = run_main(monkeypatch, never, {"ecNumber": "3.4.21.79", "organism": "Homo sapiens"})
+    assert result["found"] is False
+    assert result["source"] == "substrate_not_named"
+    assert result["choices"] == []
+    assert "no Km row for any substrate of EC 3.4.21.79 in Homo sapiens" in result["choiceRefusal"]
+    assert "km=" in result["choiceRefusal"]
 
 
 def test_missing_ec_number_exhausted_uniprot_lookup_reports_not_found(monkeypatch):
@@ -923,6 +1098,7 @@ def test_cross_species_withheld_output_shape(monkeypatch):
         "literatureCandidates": [],
         "logs": ["Cross-species value(s) found in Oryctolagus cuniculus, "
                  "Sus scrofa but withheld: allow_cross_species=False"],
+        "choices": [],  # nothing was chosen: the payload named all of it (ADR 0182)
     }
 
 

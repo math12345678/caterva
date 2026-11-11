@@ -177,6 +177,8 @@ def _run_main(monkeypatch, payload, *, resolve, uniprot=_no_uniprot):
     _offline(monkeypatch, uniprot)
     monkeypatch.setattr(fallback_logic, "resolve_kinetic_value", resolve)
     monkeypatch.setattr(science_agent_runner, "resolve_substrate_from_kegg", lambda ec: None)
+    # Offline: the chooser (ADR 0182) counts BRENDA rows over the network.
+    monkeypatch.setattr(science_agent_runner, "_chooser", lambda: None)
     stdout = io.StringIO()
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
     monkeypatch.setattr(sys, "stdout", stdout)
