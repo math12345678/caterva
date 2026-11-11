@@ -109,14 +109,30 @@ function isChoice(value: unknown): value is AutomaticChoice {
   );
 }
 
-/** The chooser's JSON document: its last stdout line, or null. */
-function lastJsonLine(stdout: string): { choice?: unknown; note?: unknown } | null {
+type ChooserDocument = { choice?: unknown; note?: unknown };
+
+function parseObject(text: string): ChooserDocument | null {
   try {
-    const value: unknown = JSON.parse(stdout.trim().split('\n').pop() ?? '');
-    return typeof value === 'object' && value !== null ? (value as { choice?: unknown; note?: unknown }) : null;
+    const value: unknown = JSON.parse(text);
+    return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as ChooserDocument) : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * The chooser's JSON document, or null. `python -m caterva.compose.defaults
+ * --json` prints it indented over many lines (json.dumps(..., indent=2)), so
+ * the whole of stdout is read first; a document on the last line alone (a
+ * stand-in that logs before it answers) is read second. Reading only the
+ * last line made every real answer `}` and every choice "unavailable".
+ */
+function lastJsonLine(stdout: string): ChooserDocument | null {
+  const text = stdout.trim();
+  const whole = parseObject(text);
+  if (whole) return whole;
+  const start = text.lastIndexOf('\n{');
+  return parseObject(start >= 0 ? text.slice(start + 1) : (text.split('\n').pop() ?? ''));
 }
 
 /** Ask the chooser one question. Never throws: an error is `unavailable`. */

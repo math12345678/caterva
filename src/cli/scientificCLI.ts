@@ -1892,6 +1892,23 @@ async function main() {
       // value, and the flag to choose otherwise is named in the same line.
       let nothingToChoose: string | undefined;
       const resolveChoices: AutomaticChoice[] = [];
+      // A gene symbol ("CYP2B6") is one protein of its EC number, and its
+      // spelling names the organism: the lookup takes rows naming that
+      // protein (as --isoform would) and, with no --organism, searches the
+      // organism the symbol is a gene of, saying so -- never an organism
+      // chosen by row count for a human P450 (it chose Priestia megaterium).
+      let impliedIsoform: string | undefined;
+      if ((!substrate || !organism || flags['isoform'] === undefined) && enzyme && !ec) {
+        const typed = organism ? canonicalOrganism(organism).organism : undefined;
+        const identity = enzymeIdentity(enzyme, typed);
+        impliedIsoform = identity.isoform;
+        if (!organism && identity.impliedOrganism) {
+          organism = identity.impliedOrganism;
+          if (!booleans.has('json')) {
+            info(identity.impliedBecause ?? `No organism named; ${enzyme} names an enzyme of ${organism}, so ${organism} is searched. Pass --organism to use another.`);
+          }
+        }
+      }
       if ((!substrate || !organism) && (enzyme || ec)) {
         const typed = organism ? canonicalOrganism(organism).organism : undefined;
         const identity = ec ? { ec } : enzymeIdentity(enzyme!, typed);
@@ -2045,7 +2062,11 @@ async function main() {
         json: booleans.has('json'),
         choices: resolveChoices,
         allowCrossSpecies: booleans.has('allow-cross-species'),
-        ...(typeof flags['isoform'] === 'string' ? { isoform: flags['isoform'] } : {}),
+        ...(typeof flags['isoform'] === 'string'
+          ? { isoform: flags['isoform'] }
+          : impliedIsoform
+            ? { isoform: impliedIsoform }
+            : {}),
         ...(inhibitionMode ? { inhibitionMode } : {}),
         ...(modelSubstrate ? { modelSubstrate } : {}),
         physiologicalReference: physiological.reference,

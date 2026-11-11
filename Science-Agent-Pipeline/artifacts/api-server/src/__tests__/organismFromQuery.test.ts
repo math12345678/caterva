@@ -27,6 +27,7 @@ import { describe, expect, it } from "vitest";
 
 import { resolveQuery } from "../lib/queryResolver";
 import { matchOrganism } from "../lib/organisms";
+import { RequiredParametersMissingError } from "../lib/provenance";
 
 const TAIL = "with glucose vmax=5 s0=10 end=10 points=51";
 
@@ -58,24 +59,46 @@ describe("matchOrganism", () => {
 });
 
 describe("the named organism reaches the literature lookup", () => {
-  it("looks up E. coli when the query says E. coli", async () => {
-    const resolved = await resolveQuery(`simulate hexokinase in E. coli ${TAIL}`);
+  it("looks up yeast when the query says yeast", async () => {
+    const resolved = await resolveQuery(`simulate hexokinase in yeast ${TAIL}`);
     const km = resolved.parameterProvenance["km"]!;
-    expect(km.organism).toBe("Escherichia coli");
+    expect(km.organism).toBe("Saccharomyces cerevisiae");
     expect(km.origin).toBe("resolved");
+  }, 180000);
+
+  it("refuses E. coli, which BRENDA holds no hexokinase Km row for, rather than answer for another", async () => {
+    // These tests used E. coli until 2026-11-11, when the BRENDA parser
+    // began matching a row's ORGANISM cell exactly (ADR 0182): the "E. coli"
+    // value they resolved was a row whose commentary said "recombinantly
+    // expressed in Escherichia coli" -- another organism's enzyme. E. coli
+    // has no EC 2.7.1.1 (its glucose kinase is EC 2.7.1.2), and the lookup
+    // now says so, naming the organisms that do have rows.
+    let refusal: unknown;
+    try {
+      await resolveQuery(`simulate hexokinase in E. coli ${TAIL}`);
+    } catch (err) {
+      refusal = err;
+    }
+    expect(refusal).toBeInstanceOf(RequiredParametersMissingError);
+    const err = refusal as RequiredParametersMissingError;
+    expect(err.missing).toContain("km");
+    expect(err.details["km"]).toContain("No KM was measured in the requested organism");
+    expect(err.details["km"]).toContain("Homo sapiens");
+    expect(err.details["km"]).not.toContain("Escherichia coli");
   }, 180000);
 
   it("gives a different answer for a different organism", async () => {
     // The assertion that makes the one above meaningful. If the organism
     // were still discarded, both would return the same human number --
     // which is exactly what happened before.
-    const coli = await resolveQuery(`simulate hexokinase in E. coli ${TAIL}`);
+    const human = await resolveQuery(`simulate hexokinase in humans ${TAIL}`);
     const yeast = await resolveQuery(`simulate hexokinase in yeast ${TAIL}`);
 
+    expect(human.parameterProvenance["km"]!.organism).toBe("Homo sapiens");
     expect(yeast.parameterProvenance["km"]!.organism).toBe(
       "Saccharomyces cerevisiae",
     );
-    expect(coli.parameters["km"]).not.toBe(yeast.parameters["km"]);
+    expect(human.parameters["km"]).not.toBe(yeast.parameters["km"]);
   }, 300000);
 
   it("leaves the documented default alone when no organism is named", async () => {

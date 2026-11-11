@@ -926,7 +926,9 @@ class _FakeChooser:
         self.asked.append(("inhibitor", ec, organism, substrate))
         return self._answers["inhibitor"]
 
-    def choose_organism(self, ec, substrate=None, inhibitor=None):
+    def choose_organism(self, ec, substrate=None, inhibitor=None, *, needs=("km", "kcat")):
+        # `needs` as the real chooser takes it: what the lookup needs rows for.
+        self.needs = tuple(needs)
         self.asked.append(("organism", ec, substrate, inhibitor))
         return self._answers["organism"]
 

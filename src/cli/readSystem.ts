@@ -60,12 +60,33 @@ export function canonicalOrganism(typed: string): { organism: string; typed?: st
   return organism === typed ? { organism } : { organism, typed };
 }
 
-function identityOf(out: Record<string, unknown> | null): { ec?: string; ecName?: string } {
+/**
+ * The one EC an enzyme name resolves to, and for a gene symbol ("CYP2B6")
+ * the protein it is (`isoform`) and the organism its spelling implies when
+ * none was given (`impliedOrganism`, with the sentence saying so).
+ */
+export interface EnzymeIdentity {
+  ec?: string;
+  ecName?: string;
+  isoform?: string;
+  impliedOrganism?: string;
+  impliedBecause?: string;
+}
+
+function identityOf(out: Record<string, unknown> | null): EnzymeIdentity {
   const identity = out?.['identity'] as Record<string, unknown> | null | undefined;
   if (!identity || typeof identity['ec'] !== 'string') return {};
+  const text = (key: string): string | undefined =>
+    typeof identity[key] === 'string' && identity[key] ? (identity[key] as string) : undefined;
+  const isoform = text('isoform');
+  const impliedOrganism = text('implied_organism');
+  const impliedBecause = text('implied_because');
   return {
     ec: identity['ec'] as string,
-    ...(typeof identity['name'] === 'string' ? { ecName: identity['name'] as string } : {}),
+    ...(text('name') ? { ecName: text('name')! } : {}),
+    ...(isoform ? { isoform } : {}),
+    ...(impliedOrganism ? { impliedOrganism } : {}),
+    ...(impliedBecause ? { impliedBecause } : {}),
   };
 }
 
@@ -195,7 +216,7 @@ export function readPartialSystemFromQuery(query: string): PartialSystem | null 
 }
 
 /** The ONE EC an enzyme name resolves to offline, under an organism, or {}. */
-export function enzymeIdentity(enzyme: string, organism?: string): { ec?: string; ecName?: string } {
+export function enzymeIdentity(enzyme: string, organism?: string): EnzymeIdentity {
   return identityOf(ask({ organism: organism ?? '', enzyme }));
 }
 

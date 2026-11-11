@@ -2368,7 +2368,10 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
     extractIsoform(query) ??
     (isGeneSymbolAsTyped(guess.name, query) ? typedAs(guess.name, query) : undefined);
   return {
-    enzymeName: guess.name,
+    // A symbol as the query typed it ("CYP2B6", "PEPCK"), not the guess's
+    // lower-cased token: it is the name the runner's log, the PubMed query
+    // and every flag show, and "cyp2b6" is no protein's spelling.
+    enzymeName: isGeneSymbolAsTyped(guess.name, query, false) ? typedAs(guess.name, query) : guess.name,
     ...(guess.substrate ? { substrate: guess.substrate } : {}),
     ...(isoform ? { isoform } : {}),
     organism: namedOrganism ?? "Homo sapiens",

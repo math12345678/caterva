@@ -487,6 +487,10 @@ def choose_missing(
                     ec_number,
                     substrate=(model_substrate if is_ki else substrate) or None,
                     inhibitor=(substrate if is_ki else None) or None,
+                    # What THIS lookup needs rows for: a Ki lookup an organism
+                    # with Ki rows (for the inhibitor, when named); a Km one
+                    # Km and, unless the caller says it needs none, kcat rows.
+                    needs=("ki",) if is_ki else (("km", "kcat") if needs_kcat else ("km",)),
                 )
             except ChooserUnreadable as exc:
                 filled.refusal = _unreadable_refusal("organism", ec_number, quantity, str(exc))

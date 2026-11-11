@@ -449,14 +449,20 @@ describe("a gene symbol names its substrate after a connector", () => {
     // naming no substrate.
     await attempt("kinetics of CYP2B6 with bupropion in humans");
     expect(kmLookups().map((e) => [e.enzymeName, e.substrate])).toEqual([
-      ["cyp2b6", "bupropion"],
+      ["CYP2B6", "bupropion"],
     ]);
+  });
+
+  it("sends the symbol as typed, never the lower-cased token the reader matched on", async () => {
+    // "cyp2b6" reached the runner's log, the PubMed query and every flag.
+    await attempt("CYP2B6 with bupropion");
+    expect(seen.map((e) => e.enzymeName)).not.toContain("cyp2b6");
   });
 
   it("reads 'CYP2B6 with bupropion' as a kinetics question, not an unrecognised one", async () => {
     await attempt("CYP2B6 with bupropion");
     expect(kmLookups().map((e) => [e.enzymeName, e.substrate])).toEqual([
-      ["cyp2b6", "bupropion"],
+      ["CYP2B6", "bupropion"],
     ]);
   });
 

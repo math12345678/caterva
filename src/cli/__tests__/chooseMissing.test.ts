@@ -55,6 +55,21 @@ describe('askChooser reads the three answers the chooser can give', () => {
     expect(calls[0]).toEqual(['--ec', '2.7.1.1', '--role', 'substrate', '--json', '--organism', 'Homo sapiens']);
   });
 
+  it('reads the document the real chooser prints, indented over many lines', () => {
+    // `python -m caterva.compose.defaults --json` prints json.dumps(..., indent=2);
+    // reading only its last line ("}") made every real choice "unavailable".
+    const run: ChooserRunner = () => ({
+      status: 0,
+      stdout: JSON.stringify({ choice: GLUCOSE, note: 'chose' }, null, 2) + '\n',
+      stderr: '',
+    });
+    expect(askChooser({ ec: '2.7.1.1', role: 'substrate', organism: 'Homo sapiens' }, run)).toEqual({
+      kind: 'chosen',
+      choice: GLUCOSE,
+      note: 'chose',
+    });
+  });
+
   it('exit 3 is "BRENDA has nothing usable", with the note saying what is missing', () => {
     const { run } = stub({ substrate: { status: 3, note: 'BRENDA lists no Km row for EC 3.4.21.79 in Homo sapiens.' } });
     expect(askChooser({ ec: '3.4.21.79', role: 'substrate', organism: 'Homo sapiens' }, run)).toEqual({

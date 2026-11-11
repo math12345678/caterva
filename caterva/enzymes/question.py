@@ -147,6 +147,13 @@ def read_system(query: str) -> Optional[Dict[str, str]]:
 def enzyme_identity(enzyme: str, organism: Optional[str]) -> Optional[Dict[str, str]]:
     """{"ec", "name"} when the nomenclature resolves `enzyme` to ONE enzyme, else None.
 
+    A gene symbol is one protein of its EC number and implies an organism
+    ("CYP2B6": the isoform CYP2B6 of EC 1.14.14.1, a human gene), so its
+    identity also carries "isoform" and, when no organism was given,
+    "implied_organism" with "implied_because", the sentence that says so
+    (ADR 0182). A caller that searches without them would take another
+    protein's row, or another organism's, for the one typed.
+
     The confirmation used to show only the words: "enzyme enzyme / substrate
     maltotriose", while the citation that followed was for EC 2.4.1.25,
     4-alpha-glucanotransferase. A person agreeing to a system has to see the
@@ -162,7 +169,16 @@ def enzyme_identity(enzyme: str, organism: Optional[str]) -> Optional[Dict[str, 
     except Exception:  # an unreadable index is "not decided", never a guess
         return None
     if isinstance(result, Resolved) and result.candidate is not None:
-        return {"ec": result.ec, "name": result.candidate.name}
+        out = {"ec": result.ec, "name": result.candidate.name}
+        if getattr(result, "isoform", None):
+            out["isoform"] = str(result.isoform)
+        if getattr(result, "organism", None) and not organism:
+            out["implied_organism"] = str(result.organism)
+            because = next((n for n in getattr(result, "notes", ()) or ()
+                            if n.startswith("No organism was given")), None)
+            if because:
+                out["implied_because"] = because
+        return out
     return None
 
 
