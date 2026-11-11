@@ -948,7 +948,9 @@ alternatives, considered}`, `role` one of `"enzyme" | "organism" |
 "substrate" | "inhibitor"`, `why` the reason as a clause, `alternatives` the
 next-best options best first as `{name, rows}` with `rows` a table -> row
 count map (`{"km": 25, "kcat": 61}`, `{"ki": 7}`), and `considered` how many
-options were weighed. Every choice is also a plain-English note in
+options were weighed, the chosen one included (the options neither chosen nor
+listed are `considered - 1 - alternatives.length`). The shapes are
+`SearchChoice`, `ChoiceOption` and `ChoiceRole` on both sides. Every choice is also a plain-English note in
 `ComposeResult.notes`, ending with the flag that overturns it; `search.organism`,
 `search.substrate` and `search.compounds` carry the chosen values, so a page
 that offers "switch to D-mannose" re-runs with that value in the request's
