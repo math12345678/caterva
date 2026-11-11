@@ -307,9 +307,15 @@ class TestTheWholeCorpus:
         # scanned whole-page and its Km rows counted again as Ki and kcat
         # rows. The parser now returns no rows for a table a page's
         # navigation does not list. The 615 distinct commentaries are
-        # unchanged: the 436 rows dropped were copies, not new rows.
+        # unchanged by that: the 436 rows dropped were copies, not new rows.
         assert len(corpus) == 2362
-        assert len({c for _, _, c in corpus if c}) == 615
+        # 615 until 2026-11-11. Rows on the hexokinase page whose BRENDA
+        # reference has five digits ("94720") had no reference read, and the
+        # longest cell stood in for the commentary: three rows carried
+        # "Oryctolagus cuniculus" and "Eimeria tenella" -- their organism --
+        # as what they measured. The reference cell is read now, and one of
+        # them carries its real commentary, "41°C, pH 7.5".
+        assert len({c for _, _, c in corpus if c}) == 614
 
     def test_every_row_reads_as_checked_by_hand(self, corpus):
         wrong = {}

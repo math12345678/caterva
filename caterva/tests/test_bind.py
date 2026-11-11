@@ -200,10 +200,24 @@ def test_the_benchmark_rule(monkeypatch):
 # `--ec hexokinase` went to BRENDA as the number and printed "No Ki rows for
 # EC hexokinase in Homo sapiens.": an absence nobody had searched for.
 
-HK_PAGE = ROOT / "Tests" / "fixtures" / "brenda_hexokinase_fixture.html"
+#: The recorded full page, which has a Ki table. This was the cut-down Km
+#: fixture (brenda_hexokinase_fixture.html) until 2026-11-11: it has no Ki
+#: table, and its Km rows were listed as "compounds with a recorded Ki"
+#: through the parser's whole-page fallback, which no longer runs on a page
+#: whose navigation lists no Ki table.
+HK_RECORDED = ROOT / "Tests" / "fixtures" / "recorded" / "brenda_2.7.1.1.html.gz"
 
 
-def test_an_enzyme_name_is_read_as_its_ec_number_and_said_so(capsys, monkeypatch):
+@pytest.fixture
+def HK_PAGE(tmp_path):
+    import gzip
+    page = tmp_path / "brenda_2.7.1.1.html"
+    page.write_text(gzip.decompress(HK_RECORDED.read_bytes()).decode("utf-8", errors="replace"),
+                    encoding="utf-8")
+    return page
+
+
+def test_an_enzyme_name_is_read_as_its_ec_number_and_said_so(capsys, monkeypatch, HK_PAGE):
     import caterva.bind.__main__ as cli
 
     asked = []
