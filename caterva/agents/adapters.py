@@ -207,6 +207,11 @@ def to_parameter_source(
             commentary=getattr(result, "commentary", None),
             evidence_only=tuple(getattr(result, "evidence_only", []) or []),
             mode_default=mode_default_of(result),
+            # Read only when the resolver set them: a stand-in result that
+            # predates the fields (or a test's Mock) carries neither.
+            resolver_because=(because if isinstance(
+                because := getattr(result, "chosen_because", None), str) else None),
+            wide_spread=getattr(result, "wide_spread", False) is True,
         ),
         None,
     )

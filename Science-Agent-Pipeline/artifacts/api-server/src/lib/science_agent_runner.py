@@ -605,8 +605,16 @@ def resolve_kinetic_value(
     isoform: Optional[str] = None,
     inhibition_mode: Optional[str] = None,
     model_substrate: Optional[str] = None,
+    paired: bool = False,
 ) -> KineticResult:
     """Thin wrapper around the real fallback logic in Tests/fallback_logic.py.
+
+    ``paired`` (a Km or a kcat for a model that needs both): the two are
+    resolved together by fallback_logic.resolve_kinetic_pair, which takes
+    them from one paper when some paper holds a row of each among the rows
+    each choice is made from, and this call returns the half asked for. The
+    Km call and the kcat call each compute the same pair from the same page,
+    so the API carries the pair `caterva compose` does (ADR 0182).
 
     ``quantity`` selects which BRENDA table is read ("km" -> KM Values,
     "ki" -> Ki Values). One call resolves exactly one quantity, so Km and
@@ -627,6 +635,19 @@ def resolve_kinetic_value(
     owns nothing. Defaulting it True here would silently re-enable the
     behaviour ADR 0024 disabled, in a file nobody would think to check.
     """
+    if paired and quantity in ("km", "kcat") and substrate:
+        km, kcat = fallback_logic.resolve_kinetic_pair(
+            ec_number,
+            organism,
+            substrate,
+            enzyme_name=enzyme_name,
+            allow_cross_species=allow_cross_species,
+            allow_variants=allow_variants,
+            isoform=isoform,
+            inhibition_mode=inhibition_mode,
+            model_substrate=model_substrate,
+        )
+        return km if quantity == "km" else kcat
     return fallback_logic.resolve_kinetic_value(
         enzyme_ec=ec_number,
         organism=organism,
@@ -1165,6 +1186,10 @@ def main() -> None:
             isoform=isoform,
             inhibition_mode=inhibition_mode,
             model_substrate=model_substrate,
+            # A Michaelis-Menten model needs a Km and a kcat (Vmax = kcat *
+            # [E]0); a caller that needs only the Km says so with
+            # needsKcat: false, and its Km is chosen on its own.
+            paired=payload.get("needsKcat") is not False,
         )
         result.search_log = resolution_log + result.search_log
 
@@ -1282,6 +1307,11 @@ def main() -> None:
                     result.selected_form.model_dump()
                     if result.selected_form else None
                 ),
+                # Why this row was carried (the median of the best-described
+                # rows, what was set aside, the paired constant's paper) and
+                # whether the rows chosen from span more than 100-fold.
+                "chosenBecause": result.chosen_because,
+                "wideSpread": bool(result.wide_spread),
                 "selectionTie": (
                     result.selection_tie.model_dump()
                     if result.selection_tie else None

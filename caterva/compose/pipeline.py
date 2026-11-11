@@ -319,6 +319,21 @@ class ComposedModel:
             # would have returned (fallback_logic.ModeDefault).
             return motif_mode(quantity) if any_mode else None
 
+        wanted = [quantity for quantity in self.resolvable
+                  if quantity.table is not None and quantity.parameter_id not in skip]
+        # A Km and a kcat of one compound are taken from one paper when the
+        # literature allows (`fallback_logic.resolve_kinetic_pair`): both
+        # describe one enzyme turning one substrate, and two papers mean two
+        # preparations and often two temperatures. Only when the model asks
+        # for both: a model with no kcat keeps the Km the evidence alone picks.
+        tables_of: Dict[Any, set] = {}
+        for quantity in wanted:
+            tables_of.setdefault(self.compound_for(quantity), set()).add(quantity.table)
+
+        def paired(quantity: ResolvableQuantity) -> bool:
+            return (quantity.table in ("km", "kcat")
+                    and {"km", "kcat"} <= tables_of.get(self.compound_for(quantity), set()))
+
         return [
             ParameterRequest(
                 quantity=quantity.parameter_id,
@@ -336,9 +351,9 @@ class ComposedModel:
                 # The model's substrate, which a Ki's mode is judged against;
                 # only sent with a mode, ranked by or compared with.
                 model_substrate=(self.substrate if motif_mode(quantity) else None),
+                paired=paired(quantity),
             )
-            for quantity in self.resolvable
-            if quantity.table is not None and quantity.parameter_id not in skip
+            for quantity in wanted
         ]
 
     @property

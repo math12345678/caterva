@@ -399,7 +399,10 @@ def test_a_name_goes_through_the_one_policy_not_a_copy_in_the_adapter():
 # ---------------------------------------------------------------------------
 
 
-def test_human_hexokinase_carries_brenda_ref_641068(tmp_path):
+def test_human_hexokinase_carries_brenda_ref_739603(tmp_path):
+    # The Km and the kcat are taken from one paper, ref 739603, the one
+    # paper holding a row of each among the rows chosen from
+    # (fallback_logic.resolve_kinetic_pair, ADR 0182).
     progress = Recorder()
     with hexokinase_offline():
         code, out, err, outcome = both(
@@ -408,12 +411,13 @@ def test_human_hexokinase_carries_brenda_ref_641068(tmp_path):
     assert_parity(code, out, err, outcome)
     assert code == 0
     km = parameter(outcome.result, "reaction_Km")
-    assert km["value"] == 6.0 and km["unit"] == "mM"
+    assert km["value"] == 6.3 and km["unit"] == "mM"
     cite = km["provenance"]["citation"]
-    assert cite == {"text": "BRENDA ref 641068", "registry": "BRENDA", "reference_id": "641068",
+    assert cite == {"text": "BRENDA ref 739603", "registry": "BRENDA", "reference_id": "739603",
                     "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1", "via": "literature"}
     assert km["provenance"]["organism"] == "Homo sapiens"
-    assert "| `reaction_Km` | 6.0 mM | literature (Homo sapiens) | BRENDA ref 641068 |" in out
+    assert "| `reaction_Km` | 6.3 mM | literature (Homo sapiens) | BRENDA ref 739603 |" in out
+    assert "| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |" in out
     looked_up = [c[2] for c in progress.calls if c[0] == "stage" and c[1] == "search"]
     assert "Looking up reaction_Km in BRENDA's km table for EC 2.7.1.1" in looked_up
 
@@ -428,28 +432,31 @@ def hexokinase_claims(tmp_path_factory):
         return (*both(request, tmp), tmp)
 
 
-def test_the_km_claim_is_the_641068_row_its_page_its_paper_and_its_certificates(hexokinase_claims):
+def test_the_km_claim_is_the_739603_row_its_page_its_paper_and_its_certificates(hexokinase_claims):
     code, out, err, outcome, _ = hexokinase_claims
     assert_parity(code, out, err, outcome)
     assert code == 0
     claim = parameter(outcome.result, "reaction_Km")["provenance"]["claim"]
     assert claim["kind"] == "cited" and claim["id"].startswith("claim:sha256:")
     assert claim["rule"] == {"rule_id": "select.resolver", "version": 1, "adr": "ADR 0047"}
-    assert claim["row"]["reference"] == "641068"
+    assert claim["row"]["reference"] == "739603"
     assert claim["row"] == {
-        "locator": "brenda:2.7.1.1:km:Homo sapiens:D-glucose:641068:6:0", "value_text": "6", "unit": "mM",
-        "substrate": "D-glucose", "organism": "Homo sapiens", "commentary": "30°C, pH 7.5, wild-type",
-        "reference": "641068"}
+        "locator": "brenda:2.7.1.1:km:Homo sapiens:D-glucose:739603:6.3:0", "value_text": "6.3", "unit": "mM",
+        "substrate": "D-glucose", "organism": "Homo sapiens",
+        "commentary": "wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C",
+        "reference": "739603"}
     snapshot = claim["snapshot"]
     assert snapshot["id"] == f"sha256:{HEXOKINASE_SHA256}"
     assert snapshot["locator"] == "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1"
     assert snapshot["licence"] == "CC BY 4.0" and snapshot["retrieved_at"].endswith("Z")
     assert snapshot["served_from"].endswith("brenda_2.7.1.1.html.gz")
-    assert {c["matched"] for c in claim["certificates"]} >= {"641068", "6", "30°C, pH 7.5, wild-type"}
+    assert {c["matched"] for c in claim["certificates"]} >= {
+        "739603", "6.3", "wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C"}
     assert claim["refusal"] is None
     paper = claim["reference"]
-    assert paper["pmid"] == "7730377" and paper["url"] == "https://pubmed.ncbi.nlm.nih.gov/7730377/"
-    assert paper["title"].startswith("Human beta-cell glucokinase") and paper["year"] == "1995"
+    assert paper["pmid"] == "24723372" and paper["url"] == "https://pubmed.ncbi.nlm.nih.gov/24723372/"
+    assert paper["title"].startswith("Role of connecting loop I in catalysis and allosteric regulation "
+                                     "of human glucokinase")
     assert paper["journal"]
     kcat = parameter(outcome.result, "reaction_kcat")["provenance"]["claim"]
     assert kcat["kind"] == "cited" and kcat["row"]["reference"] == "739603" and kcat["row"]["value_text"] == "40.1"
@@ -466,7 +473,7 @@ def test_the_claim_on_a_number_is_the_claim_in_the_bundle_and_the_export(hexokin
         assert param["provenance"]["claim"]["id"] == by_identifier[param["id"]].ref
     assert result["claims"]["root"] == bundle.root
     assert result["claims"]["counts"] == {"cited": 2, "chosen": 3, "placeholder": 0, "refused": 0, "computed": 1}
-    assert result["claims"]["snapshots"] == 3, "the enzyme page and the two literature pages"
+    assert result["claims"]["snapshots"] == 2, "the enzyme page and the one paper both values come from"
     assert result["claims"]["notes"] == []
     csv_text = next(a for a in outcome.artifacts if a.name == "parameters.csv").content.decode("utf-8")
     rows = {r["identifier"]: r for r in csv.DictReader(io.StringIO(csv_text))}
@@ -481,10 +488,10 @@ def test_without_the_literature_pages_the_paper_is_null_and_the_section_says_so(
         code, out, err, outcome = both(request, tmp_path)
     assert_parity(code, out, err, outcome)
     km = parameter(outcome.result, "reaction_Km")["provenance"]["claim"]
-    assert km["kind"] == "cited" and km["row"]["reference"] == "641068"
+    assert km["kind"] == "cited" and km["row"]["reference"] == "739603"
     assert km["reference"] is None
     notes = outcome.result["claims"]["notes"]
-    assert len(notes) == 2 and all(n.startswith("reference page not captured for BRENDA ref ") for n in notes)
+    assert len(notes) == 1 and all(n.startswith("reference page not captured for BRENDA ref ") for n in notes)
     assert outcome.result["claims"]["counts"]["cited"] == 2
 
 
@@ -576,8 +583,10 @@ def test_a_noncompetitive_model_carries_the_noncompetitive_row_and_says_why(ldh)
 def test_the_readmes_gossypol_example(ldh):
     result = ldh["gossypol"][3].result
     ki = parameter(result, "reaction_Ki")
-    assert ki["value"] == 0.0014 and ki["provenance"]["citation"]["reference_id"] == "711801"
-    assert "LDH-B" in ki["provenance"]["commentary"]
+    # The median of the paper's three rows (LDH-B 0.0014, LDH-A 0.0019,
+    # LDH-C 0.0042 mM), not the lowest (ADR 0182).
+    assert ki["value"] == 0.0019 and ki["provenance"]["citation"]["reference_id"] == "711801"
+    assert "LDH-A" in ki["provenance"]["commentary"]
     kcat = parameter(result, "reaction_kcat")
     assert kcat["provenance"]["kind"] == "placeholder"
     assert kcat["provenance"]["reason"]  # the resolver's words for a value not found

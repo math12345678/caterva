@@ -296,11 +296,20 @@ class Spread:
     n_values: int
     references: Tuple[str, ...]
     chosen_because: Optional[str] = None
+    #: The resolver's own reason for the row (`Measurement.resolver_because`).
+    resolver_because: Optional[str] = None
 
     @property
     def carried_as(self) -> str:
-        """Why the carried value is the carried value."""
-        return self.chosen_because or "the resolver's pick, not a verdict"
+        """Why the carried value is the carried value: a re-selection's
+        reason, else the resolver's (the median of the best-described rows,
+        the paired constant's paper, the spread), else, for a resolver that
+        gave none, that it is the resolver's pick and not a verdict."""
+        if self.chosen_because:
+            return self.chosen_because
+        if self.resolver_because:
+            return f"chosen because {self.resolver_because}"
+        return "the resolver's pick, not a verdict"
 
     @property
     def fold(self) -> float:
@@ -413,6 +422,12 @@ class Measurement:
     #: not the resolver's pick: "the row for LDH-A, as --isoform asked".
     #: None means the resolver chose it.
     chosen_because: Optional[str] = None
+    #: The resolver's own reason for carrying the row it chose
+    #: (`KineticResult.chosen_because`): the median of the best-described
+    #: rows, what it set aside, the spread, and the paper a paired Km and
+    #: kcat share (ADR 0182). Not a re-selection: `chosen_because` stays
+    #: None for the resolver's pick, and wins over this when set.
+    resolver_because: Optional[str] = None
 
     @property
     def disagreement(self) -> Optional[Tuple[float, float]]:
@@ -441,7 +456,8 @@ class Measurement:
         references = tuple(sorted({str(r["reference_id"]) for r in rows if r.get("reference_id")}))
         return Spread(low=span[0], high=span[1], unit=self.unit, carried=float(self.value),
                       n_values=max(len(values), 2), references=references,
-                      chosen_because=self.chosen_because)
+                      chosen_because=self.chosen_because,
+                      resolver_because=self.resolver_because)
 
     def __post_init__(self) -> None:
         if not str(self.citation).strip():
@@ -915,6 +931,7 @@ def measured_from_search(search: Any) -> Dict[str, Measurement]:
             # number three layers downstream.
             alternatives=tuple(getattr(source, "candidates", ()) or ()),
             commentary=getattr(source, "commentary", None),
+            resolver_because=getattr(source, "resolver_because", None),
         )
     return out
 

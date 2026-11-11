@@ -46,16 +46,19 @@ const seen: Entities[] = [];
 let kcatAnswer: Record<string, unknown> = {};
 let kmAnswer: Record<string, unknown> = {};
 
+// The runner's answer since ADR 0182: the Km and the kcat from one paper,
+// ref 739603, the one paper holding a row of each among the rows chosen
+// from (fallback_logic.resolve_kinetic_pair).
 const HEXOKINASE_KM = {
   found: true,
-  km: 6,
+  km: 6.3,
   unit: "mM",
   organism: "Homo sapiens",
   source: "brenda_exact",
   crossSpecies: false,
   citation: {
     source: "BRENDA",
-    referenceId: "641068",
+    referenceId: "739603",
     url: "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
   },
   literatureCandidates: [],
@@ -121,10 +124,10 @@ describe("the refusal carries provenance, so a form can keep it", () => {
   it("reports the resolved Km's citation and the missing Vmax's reason", async () => {
     const err = await refusalOf("hexokinase glucose human");
     expect(err.missing).toEqual(["vmax"]);
-    expect(err.resolvedSoFar["km"]).toBe(6);
+    expect(err.resolvedSoFar["km"]).toBe(6.3);
     const km = err.parameterProvenance["km"]!;
     expect(km.origin).toBe("resolved");
-    expect(km.citation).toContain("(ref 641068)");
+    expect(km.citation).toContain("(ref 739603)");
     expect(km.organism).toBe("Homo sapiens");
     expect(err.parameterProvenance["vmax"]!.unresolvedReason).toBe(
       "enzyme_conc_not_supplied",
@@ -147,7 +150,7 @@ describe("the LLM path's refusal carries the same provenance", () => {
     const err = await refusalOf("hexokinase glucose human");
     expect(vi.mocked(resolveQueryWithLLM)).toHaveBeenCalled();
     expect(err.parameterProvenance["km"]!.origin).toBe("resolved");
-    expect(err.parameterProvenance["km"]!.citation).toContain("(ref 641068)");
+    expect(err.parameterProvenance["km"]!.citation).toContain("(ref 739603)");
     expect(err.parameterProvenance["vmax"]!.unresolvedReason).toBe(
       "enzyme_conc_not_supplied",
     );
@@ -161,7 +164,7 @@ describe("the run keeps the citation when the page sends only [E]0", () => {
     );
     const km = run.parameterProvenance["km"]!;
     expect(km.origin).toBe("resolved");
-    expect(km.citation).toContain("(ref 641068)");
+    expect(km.citation).toContain("(ref 739603)");
     expect(run.parameterProvenance["vmax"]!.origin).toBe("resolved");
     expect(run.parameterProvenance["enzyme_conc"]!.origin).toBe("user");
     // "in humans" was read as naming the organism, so no assumption is

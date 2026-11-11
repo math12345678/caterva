@@ -167,6 +167,11 @@ def test_golden_found_output_shape(monkeypatch):
         # candidate, or every surviving candidate reported the same value.
         # Distinct from a tie with no candidates, which cannot occur.
         "selectionTie": None,
+        # The resolver's own reason for the row, and whether the rows it
+        # chose from span more than 100-fold (ADR 0182). None and False
+        # because `golden_result()` is built by hand and carries neither.
+        "chosenBecause": None,
+        "wideSpread": False,
         # Empty because `golden_result()` is built by hand and carries no
         # frontier -- not because a resolution has none. A real resolution
         # attaches every surviving row with its reliability grades, which is
@@ -645,22 +650,28 @@ def test_ki_quantity_emits_ki_key(monkeypatch):
 
 def test_quantity_defaults_to_km(monkeypatch):
     """A payload with no quantity keeps the Km contract intact: the value
-    is emitted under "km" and the resolver is told quantity="km"."""
-    captured = {}
+    is emitted under "km" and the resolver is told quantity="km".
+
+    A Km is resolved with its kcat (resolve_kinetic_pair, ADR 0182) unless
+    the caller says it needs no kcat, so the resolver is asked for the Km
+    first and then the kcat, and the Km is what is emitted."""
+    asked = []
 
     def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None, **kwargs):
-        captured["quantity"] = kwargs.get("quantity", "km")
+        asked.append(kwargs.get("quantity", "km"))
         return golden_result()
 
-    result = run_main(
-        monkeypatch,
-        fake_resolve,
-        {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
-         "organism": "Homo sapiens", "ecNumber": "1.1.1.27"},
-    )
-    assert captured["quantity"] == "km"
+    payload = {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
+               "organism": "Homo sapiens", "ecNumber": "1.1.1.27"}
+    result = run_main(monkeypatch, fake_resolve, payload)
+    assert asked == ["km", "kcat"]
     assert result["km"] == 10.73
-    assert "ki" not in result
+    assert "ki" not in result and "kcat" not in result
+
+    asked.clear()
+    result = run_main(monkeypatch, fake_resolve, {**payload, "needsKcat": False})
+    assert asked == ["km"], "a caller that needs no kcat gets the Km chosen on its own"
+    assert result["km"] == 10.73
 
 
 def test_not_found_output_shape(monkeypatch):

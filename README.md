@@ -33,8 +33,9 @@
 caterva compose "Michaelis-Menten with a competitive inhibitor" \
     --subject 1.1.1.27 --organism human --substrate pyruvate --inhibitor gossypol
 # -> Km 0.03 mM for pyruvate (BRENDA ref 286469)
-#    Ki 0.0014 mM for gossypol (BRENDA ref 711801), and the report says the
-#    row measured isoform LDH-B and states no inhibition mode
+#    Ki 0.0019 mM for gossypol (BRENDA ref 711801), the median of that
+#    paper's three rows, and the report says the row measured isoform LDH-A
+#    and states no inhibition mode
 #    kcat: never measured in human, so it stays a labelled placeholder and
 #    the report names the organisms where it was measured
 ```

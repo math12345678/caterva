@@ -256,13 +256,22 @@ export interface ScienceAgentResult {
    *
    * On the LDH turnover table six non-dominated rows span 21.1 to 6467 — a
    * 306-fold range, every one wild-type with pH and temperature reported.
-   * The returned value is the lowest, and without this field nothing says
-   * the evidence found 6467 equally credible.
+   * The returned value is the median row, and without this field nothing
+   * says the evidence found 6467 equally credible.
    *
    * Absent means no tie was found. That is different from a tie with no
    * candidates, which is why `candidates` is checked rather than presence.
    */
   selectionTie?: SelectionTie | null;
+  /**
+   * Why this row was carried, in the resolver's words (ADR 0182): the
+   * median of the best-described rows, what was set aside as implausible or
+   * under-described, the spread, and, for a Km and a kcat taken together,
+   * the one paper both came from.
+   */
+  chosenBecause?: string | null;
+  /** The rows the value was chosen from span more than 100-fold. */
+  wideSpread?: boolean;
   /**
    * Every row on the non-dominated frontier, with the reliability grades
    * that weight it — Bakker's three axes, scored per candidate rather than

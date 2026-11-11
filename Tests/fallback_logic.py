@@ -2346,8 +2346,9 @@ def resolve_kinetic_pair(
     kwargs.pop("prefer_reference", None)
 
     def resolve(quantity, ref=None):
-        return resolve_kinetic_value(enzyme_ec, organism, substrate, html_provider=page,
-                                     quantity=quantity, prefer_reference=ref, **kwargs)
+        return resolve_kinetic_value(enzyme_ec=enzyme_ec, organism=organism, substrate=substrate,
+                                     html_provider=page, quantity=quantity, prefer_reference=ref,
+                                     **kwargs)
 
     km = resolve("km")
     km_ref = getattr(km.citation, "reference_id", None) if km.found and km.citation else None

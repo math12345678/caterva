@@ -6,7 +6,7 @@ On 2026-11-02 `caterva compose "Michaelis-Menten kinetics of human
 hexokinase on glucose"` built the model on the motif library's placeholder
 constants and said "no enzyme was named", and "hexokinase glucose human" was
 refused as no shape at all, while the same words as flags reached BRENDA's
-Km 6.0 mM (ref 641068) and kcat 40.1 1/s (ref 739603). These hold the
+Km and kcat. These hold the
 sentence to the flags' answer, and hold the reader to what it must never do:
 read a class word, a typo, a fragment or a lower-case English word as an
 enzyme, pick one of several, ground a cascade in one enzyme, or take a word
@@ -30,7 +30,10 @@ from caterva.enzymes.sentence import match_substrate, read_sentence
 from studio_kinetics_offline import context, hexokinase_offline, run_cli
 
 FLAGS = ["--no-simulate", "--no-analysis", "--no-ranking"]
-KM_ROW = "| `reaction_Km` | 6.0 mM | literature (Homo sapiens) | BRENDA ref 641068 |"
+#: The flags' answer on the recorded page: a Km and a kcat from one paper,
+#: ref 739603, the one paper holding a row of each among the rows chosen
+#: from (fallback_logic.resolve_kinetic_pair, ADR 0182).
+KM_ROW = "| `reaction_Km` | 6.3 mM | literature (Homo sapiens) | BRENDA ref 739603 |"
 KCAT_ROW = "| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |"
 
 
@@ -341,14 +344,14 @@ def test_the_studio_reads_the_sentence_the_way_the_terminal_does(tmp_path):
     assert outcome.exit_code == 0
     assert KM_ROW in outcome.result["report_markdown"]
     km = next(p for p in outcome.result["model"]["parameters"] if p["id"] == "reaction_Km")
-    assert km["value"] == 6.0 and km["provenance"]["citation"]["reference_id"] == "641068"
+    assert km["value"] == 6.3 and km["provenance"]["citation"]["reference_id"] == "739603"
 
 
 def test_the_export_carries_the_values_the_report_carries():
     with hexokinase_offline():
         code, out, err = _main(["hexokinase glucose human", "--export", "csv"])
     assert code == 0, err
-    assert "641068" in out and "739603" in out
+    assert "reaction_Km" in out and "739603" in out
 
 
 def test_antimony_compiles_the_shape_the_report_shows_with_the_values_it_carries():
@@ -358,9 +361,9 @@ def test_antimony_compiles_the_shape_the_report_shows_with_the_values_it_carries
     with hexokinase_offline():
         code, out, _ = _main(["hexokinase glucose human", "--antimony"])
     assert code == 0 and "reaction_Km" in out
-    assert "#   reaction_Km = 6 mM: BRENDA ref 641068 (Homo sapiens)" in out
+    assert "#   reaction_Km = 6.3 mM: BRENDA ref 739603 (Homo sapiens)" in out
     assert "#   reaction_kcat = 40.1 1/s: BRENDA ref 739603 (Homo sapiens)" in out
-    assert "  reaction_Km = 6.0;" in out and "  reaction_kcat = 40.1;" in out, \
+    assert "  reaction_Km = 6.3;" in out and "  reaction_kcat = 40.1;" in out, \
         "the compiled source carries the measured values, not the library's 0.1 and 100"
 
 
@@ -489,7 +492,7 @@ def test_an_unreadable_substrate_list_takes_nothing_and_says_so(monkeypatch):
 
 #: Every one of these grounded the model in another substrate's BRENDA row,
 #: citation and all, because one word of the compound's name matched it:
-#: D-glucose's Km 6.0 mM (ref 641068) for glucose 6-phosphate, 2-deoxy
+#: D-glucose's Km 6.0 mM (ref 641068, the pick then) for glucose 6-phosphate, 2-deoxy
 #: glucose and "glucose analogues"; D-fructose's 11.4 mM (ref 640237) for
 #: fructose 1,6-bisphosphate; D-glucosamine's 0.5 mM (ref 640230) for
 #: N-acetyl glucosamine.

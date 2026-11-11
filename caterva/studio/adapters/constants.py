@@ -286,8 +286,9 @@ def tie_provenance(raw: Mapping[str, Any]) -> Dict[str, Any]:
     """The engine's own account of a tie, as the provenance fields that carry it.
 
     When the evidence ranked several rows equal, the resolver says so in `selection_tie.reason`
-    ("3 rows were equally well evidenced ... taking the lowest, which the evidence does not
-    justify"), with the rows. That sentence is `chosen_because`, and the span is the `spread`."""
+    ("6 rows were equally well evidenced ... The value returned is the median row of those"),
+    with the rows. That sentence is `chosen_because`, and the span is the `spread`, whose
+    sentence carries the resolver's own reason for the row (`KineticResult.chosen_because`)."""
     tie = raw.get("selection_tie") or {}
     rows = tie.get("candidates") or []
     if len(rows) < 2 or not tie.get("reason"):
@@ -296,7 +297,8 @@ def tie_provenance(raw: Mapping[str, Any]) -> Dict[str, Any]:
 
     references = tuple(sorted({str(r["reference_id"]) for r in rows if r.get("reference_id")}))
     spread = Spread(low=float(tie["low"]), high=float(tie["high"]), unit=str(raw.get("unit") or ""),
-                    carried=float(raw["value"]), n_values=len(rows), references=references)
+                    carried=float(raw["value"]), n_values=len(rows), references=references,
+                    resolver_because=(str(raw["chosen_because"]) if raw.get("chosen_because") else None))
     return {"chosen_because": str(tie["reason"]), "spread": {
         "low": float(spread.low), "high": float(spread.high), "unit": str(spread.unit),
         "carried": float(spread.carried), "n_values": int(spread.n_values),

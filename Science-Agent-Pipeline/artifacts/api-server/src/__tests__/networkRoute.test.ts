@@ -52,7 +52,7 @@ const MM_SOURCES = {
   Vmax: { origin: "user" as const, note: "kcat x [E]0 from my assay" },
   Km: {
     origin: "resolved" as const,
-    citation: "BRENDA ref 641068, EC 2.7.1.1, Homo sapiens",
+    citation: "BRENDA ref 739603, EC 2.7.1.1, Homo sapiens",
   },
 };
 

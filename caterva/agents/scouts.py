@@ -37,7 +37,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field, replace
 from types import SimpleNamespace
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 try:
     from .assay_window import (
@@ -386,6 +386,10 @@ class ParameterScout:
             # but not the winner's explicitly_unreported claims, so none are
             # carried forward for it.
             explicitly_unreported=(),
+            # The resolver's reason described the row it chose, not this
+            # one; this re-selection's reason is `new_reason` below.
+            **({"resolver_because": None}
+               if "resolver_because" in getattr(source, "__dataclass_fields__", {}) else {}),
         )
         row_organism = best.get("organism") or None
         if row_organism and row_organism != source.organism:
@@ -424,17 +428,30 @@ def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
 
     Imported lazily: `fallback_logic` pulls in httpx and a dozen sibling
     modules, and the architecture must be testable without any of them.
+
+    A request marked `paired` (the model asks for a Km and a kcat of one
+    compound) is answered by `resolve_kinetic_pair`, once for both: the two
+    come from one paper when some paper holds a row of each among the rows
+    the resolver chooses from. The pair is kept for the life of this
+    resolver, keyed by everything the question depends on, so the Km
+    scout and the kcat scout (which may run on two threads) read one answer.
     """
+    import threading
+
+    pairs: Dict[Any, Any] = {}
+    locks: Dict[Any, threading.Lock] = {}
+    guard = threading.Lock()
 
     def resolve(request: Any, *, organism: Optional[str], allow_cross_species: bool):
         try:
-            from Tests.fallback_logic import resolve_kinetic_value  # type: ignore
+            from Tests.fallback_logic import resolve_kinetic_pair, resolve_kinetic_value  # type: ignore
         except ImportError:
             # Neither form resolves from an ordinary interpreter; the
             # checkout's Tests/ has to be put on the path (ADR 0178).
             from caterva.checkout import literature_module
-            resolve_kinetic_value = literature_module(
-                "fallback_logic").resolve_kinetic_value
+            literature = literature_module("fallback_logic")
+            resolve_kinetic_value = literature.resolve_kinetic_value
+            resolve_kinetic_pair = literature.resolve_kinetic_pair
 
         if not request.ec_number:
             raise ValueError(
@@ -453,12 +470,30 @@ def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
             for name in ("isoform", "inhibition_mode", "model_substrate", "compare_mode")
             if getattr(request, name, None)
         }
+        table = request.table or "km"
+        if getattr(request, "paired", False) is True and table in ("km", "kcat") and request.substrate:
+            key = (request.ec_number, organism or "", request.substrate, request.subject,
+                   bool(allow_cross_species), tuple(sorted(asked.items())))
+            with guard:
+                lock = locks.setdefault(key, threading.Lock())
+            with lock:
+                if key not in pairs:
+                    pairs[key] = resolve_kinetic_pair(
+                        request.ec_number,
+                        organism or "",
+                        request.substrate,
+                        enzyme_name=request.subject,
+                        allow_cross_species=allow_cross_species,
+                        **{**asked, **resolver_kwargs},
+                    )
+            km, kcat = pairs[key]
+            return km if table == "km" else kcat
         return resolve_kinetic_value(
             enzyme_ec=request.ec_number,
             organism=organism or "",
             substrate=request.substrate or "",
             enzyme_name=request.subject,
-            quantity=request.table or "km",
+            quantity=table,
             allow_cross_species=allow_cross_species,
             **{**asked, **resolver_kwargs},
         )

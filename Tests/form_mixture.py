@@ -324,7 +324,7 @@ def find_form_mixtures(
             f"The candidate rows name {len(forms)} different forms of {base}: "
             f"{described}.{magnitude} These are distinct gene products with "
             "their own kinetics, and a request for the enzyme did not ask for "
-            "one of them. Returning the lowest would pick a form rather than "
+            "one of them. Returning any one row would pick a form rather than "
             "answer the question."
         )
         mixtures.append(mixture)
