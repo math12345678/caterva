@@ -94,12 +94,12 @@ def test_ldh_uniprot_extracted_per_row(ldh_html):
     uniprot without a fallback - this locks in both, rather than assuming
     every row has the same accession."""
     entries = parse_brenda_km_html(ldh_html, "1.1.1.27", LDH_SUBSTRATES)
-    # Substrate label is the matched target string, not necessarily the
-    # fixture's verbatim cell text - "lactate" is a substring of the real
-    # cell text "(S)-lactate" and is what LDH_SUBSTRATES lists, so matched
-    # entries are labeled "lactate" here (confirmed by the failing
-    # assertion this replaced, which expected the verbatim cell text).
-    with_accession = [e for e in entries if e.substrate in ("lactate", "NAD+")]
+    # A row matched through a stereo descriptor keeps BRENDA's own name:
+    # "lactate" (what LDH_SUBSTRATES lists) matches the cell "(S)-lactate",
+    # and the row is labelled "(S)-lactate", the form it measured. Until
+    # 2026-11-11 it was relabelled with the target, "lactate", which is how
+    # "D-glucose" came to label 2-deoxy-D-glucose rows (substrate_matches).
+    with_accession = [e for e in entries if e.substrate in ("(S)-lactate", "NAD+")]
     without_accession = [e for e in entries if e.substrate == "pyruvate"]
     assert len(with_accession) == 4
     assert len(without_accession) == 2

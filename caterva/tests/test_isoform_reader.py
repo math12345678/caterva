@@ -302,7 +302,13 @@ class TestTheWholeCorpus:
         """The figures the audit was made on. A new page, or a parser change,
         changes them; the expected table then needs the new rows checked."""
         assert len({page for page, _, _ in corpus}) == 14
-        assert len(corpus) == 2798
+        # 2798 until 2026-11-11: a single-table fixture asked for a table it
+        # does not have (the LDH Km fixture asked for "Ki Values") was
+        # scanned whole-page and its Km rows counted again as Ki and kcat
+        # rows. The parser now returns no rows for a table a page's
+        # navigation does not list. The 615 distinct commentaries are
+        # unchanged: the 436 rows dropped were copies, not new rows.
+        assert len(corpus) == 2362
         assert len({c for _, _, c in corpus if c}) == 615
 
     def test_every_row_reads_as_checked_by_hand(self, corpus):
