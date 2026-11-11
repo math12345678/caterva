@@ -65,8 +65,10 @@ class ComposedModel:
     #: the resolver's documented default is", which the resolver states.
     organism: Optional[str] = None
     #: The substrate a kinetic constant belongs to. A motif knows it needs
-    #: a Km; it cannot know what the Km is FOR, so this is the caller's
-    #: (ADR 0178). Without it BRENDA's km and ki tables cannot be read.
+    #: a Km; it cannot know what the Km is FOR (ADR 0178), so it is the
+    #: caller's, or, when the caller named none, the best-measured one
+    #: BRENDA lists, chosen out loud (ADR 0182, `choices`). Without one
+    #: BRENDA's km and ki tables cannot be read.
     substrate: Optional[str] = None
     #: What a literature search actually returned, parameter id ->
     #: `Measurement`. Empty until `with_measured` is called, which is the
@@ -105,6 +107,14 @@ class ComposedModel:
     #: adjacent-paper miscitation). Without it the report said "no enzyme
     #: was named" about a sentence that named one (ADR 0181).
     unapplied_subject: Optional[str] = None
+    #: What Caterva chose for something the user did not name -- the enzyme
+    #: a name that is a few enzymes was taken as, the organism, the
+    #: substrate, the inhibitor -- in the order the choices were made, each
+    #: a `caterva.compose.defaults.Choice` (ADR 0182). Every one is a note
+    #: in the report and an entry of the studio's `search.choices`, so a
+    #: choice is never made without the reader being told, with the
+    #: alternatives and their row counts, how to overturn it.
+    choices: Tuple[Any, ...] = ()
 
     def no_subject_reason(self) -> str:
         """Why nothing was searched for, in words that are true of the query.

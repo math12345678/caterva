@@ -521,6 +521,9 @@ def search_summary(composed: Any, subject: Optional[str]) -> contract.SearchSumm
         "unused_compounds": {str(k): str(v) for k, v in model.unused_compounds().items()},
         "measured": len(model.measured),
         "placeholders": len(model.unmeasured),
+        # What Caterva chose for what the request did not name, in the
+        # order chosen (ADR 0182); each is also a note in `notes`.
+        "choices": [choice.to_json() for choice in getattr(model, "choices", ()) or ()],
     }
 
 
@@ -529,9 +532,13 @@ def verdict_view(verdict: Any) -> Optional[contract.VerdictView]:
         return None
     from caterva.compose.verdict import LICENCE
 
+    # The licence for THIS model: a partly grounded one names its mix
+    # (`Verdict.licence`, ADR 0182) instead of LICENCE's "the constants are
+    # the library's illustrative values".
+    licence = getattr(verdict, "licence", None)
     return {
         "verdict": verdict.verdict,
-        "licence": LICENCE[verdict.verdict],
+        "licence": licence if isinstance(licence, str) else LICENCE[verdict.verdict],
         "behaviour": verdict.behaviour,
         "conclusion": verdict.conclusion,
         "concerns": [dict({"source": c.source, "severity": c.severity, "detail": c.detail,

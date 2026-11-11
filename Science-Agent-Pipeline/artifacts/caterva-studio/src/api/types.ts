@@ -774,6 +774,8 @@ export interface SearchSummary {
   unused_compounds: Record<string, string>;
   measured: number;
   placeholders: number;
+  /** What Caterva chose for what the request did not name (ADR 0182), in order. */
+  choices: { role: "enzyme" | "organism" | "substrate" | "inhibitor"; chosen: string; why: string; alternatives: { name: string; rows: Record<string, number> }[]; considered: number }[];
 }
 
 export interface Concern {

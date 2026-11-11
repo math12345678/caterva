@@ -271,7 +271,24 @@ def test_the_sentence_and_the_flags_give_the_same_constants():
     assert rows(by_sentence) == rows(by_flags) and KM_ROW in rows(by_flags)
 
 
-def test_a_name_that_is_several_enzymes_refuses_with_the_command_to_type(monkeypatch):
+def _km_rows_per_ec(monkeypatch, rows_by_ec):
+    """`defaults.table_rows` answering `rows_by_ec[ec]` Km rows for any
+    organism, so which EC the data singles out is decided offline."""
+    from caterva.compose import defaults
+
+    def table_rows(ec, table, organism):
+        n = rows_by_ec.get(ec, 0) if table == "km" else 0
+        return tuple(defaults._Row("pyruvate", organism, "") for _ in range(n))
+
+    monkeypatch.setattr(defaults, "table_rows", table_rows)
+
+
+def test_a_name_that_is_several_enzymes_with_rows_for_both_refuses_with_the_command_to_type(
+        monkeypatch):
+    """Both readings of the name have measurements in the organism: that is a
+    question only the user can answer, refused as before (ADR 0181), even
+    though ADR 0182 lets the data break a tie it can break."""
+    _km_rows_per_ec(monkeypatch, {"1.1.1.27": 40, "1.1.1.28": 2})
     with _no_network(monkeypatch) as attempts:
         code, out, err = _main(["lactate dehydrogenase pyruvate human", *FLAGS])
     assert attempts == [], "an ambiguous name must not be searched for"
@@ -279,6 +296,41 @@ def test_a_name_that_is_several_enzymes_refuses_with_the_command_to_type(monkeyp
     assert "EC 1.1.1.27 L-lactate dehydrogenase" in out and "EC 1.1.1.28 D-lactate dehydrogenase" in out
     assert 'caterva compose "lactate dehydrogenase pyruvate human" --subject 1.1.1.27' in out
     assert "no enzyme was named" not in out.lower()
+    assert "Caterva used EC" not in out
+
+
+def test_a_name_the_data_singles_out_is_taken_and_the_others_named(monkeypatch):
+    """ADR 0182: of the two enzymes 'lactate dehydrogenase' matches best,
+    only one has Km rows in the organism, so it is the subject, as a choice
+    the report states with the other candidate and its rows."""
+    import caterva.compose.__main__ as cli
+
+    _km_rows_per_ec(monkeypatch, {"1.1.1.27": 12})
+    monkeypatch.setattr(cli, "brenda_km_substrates", lambda ec, org: {"pyruvate": 12})
+    args = _args(description="lactate dehydrogenase with pyruvate in human")
+    read = cli.read_description(args, err=io.StringIO())
+    assert read.name_refusal is None
+    assert (args.subject, args.organism, args.substrate) == ("1.1.1.27", "Homo sapiens", "pyruvate")
+    (choice,) = read.choices
+    assert choice.role == "enzyme" and choice.chosen == "1.1.1.27"
+    assert choice.note() == (
+        "Caterva used EC 1.1.1.27: your description names 'lactate dehydrogenase', which is not one "
+        "enzyme; L-lactate dehydrogenase is used because it is the only one of the 2 enzymes the "
+        "name matches best with Km rows in Homo sapiens (12 Km rows). Others: EC 1.1.1.28 (D-lactate "
+        "dehydrogenase) (no rows). Pass --subject EC to model another.")
+
+
+def test_a_class_word_is_never_settled_by_the_data(monkeypatch):
+    """'kinase' is not a few readings of one name; nothing is looked up."""
+    from caterva.compose import defaults
+
+    looked = []
+    monkeypatch.setattr(defaults, "table_rows", lambda *a: looked.append(a) or ())
+    import caterva.compose.__main__ as cli
+
+    read = cli.read_description(_args(description="Michaelis-Menten kinetics of a kinase"),
+                                err=io.StringIO())
+    assert looked == [] and read.choices == []
 
 
 def test_the_studio_reads_the_sentence_the_way_the_terminal_does(tmp_path):
@@ -299,11 +351,25 @@ def test_the_export_carries_the_values_the_report_carries():
     assert "641068" in out and "739603" in out
 
 
-def test_antimony_compiles_the_shape_the_report_shows(monkeypatch):
-    with _no_network(monkeypatch) as attempts:
+def test_antimony_compiles_the_shape_the_report_shows_with_the_values_it_carries():
+    """`--antimony` searched nothing and printed the library's placeholders
+    with no comment, while the report beside it carried BRENDA's values
+    (2026-11-11). It now carries the report's numbers, each origin said."""
+    with hexokinase_offline():
         code, out, _ = _main(["hexokinase glucose human", "--antimony"])
     assert code == 0 and "reaction_Km" in out
-    assert attempts == [], "--antimony searches nothing, so it looks nothing up"
+    assert "#   reaction_Km = 6 mM: BRENDA ref 641068 (Homo sapiens)" in out
+    assert "#   reaction_kcat = 40.1 1/s: BRENDA ref 739603 (Homo sapiens)" in out
+    assert "  reaction_Km = 6.0;" in out and "  reaction_kcat = 40.1;" in out, \
+        "the compiled source carries the measured values, not the library's 0.1 and 100"
+
+
+def test_antimony_without_an_enzyme_says_every_constant_is_a_placeholder(monkeypatch):
+    with _no_network(monkeypatch) as attempts:
+        code, out, _ = _main(["Michaelis-Menten with a competitive inhibitor", "--antimony"])
+    assert code == 0 and attempts == []
+    assert "#   reaction_Ki: PLACEHOLDER, the motif library's illustrative value -- no enzyme was " \
+           "named, so nothing was searched" in out
 
 
 # ---------------------------------------------------------------------------
@@ -441,14 +507,21 @@ def test_a_word_out_of_a_longer_compound_name_is_not_a_candidate(compound):
 
 
 @pytest.mark.parametrize("compound", COMPOUND_NAMES)
-def test_a_compound_brenda_does_not_list_is_refused_not_grounded_in_its_neighbour(compound):
+def test_a_compound_brenda_does_not_list_is_never_relabelled_as_its_neighbour(compound):
+    """The word is not read as D-glucose: the report says it was not used
+    and that the model is not of it, and the search runs for the
+    best-measured substrate BRENDA lists, named as such (ADR 0182). Each
+    cited row is D-glucose's, and nothing calls it the typed compound's.
+    (Before ADR 0182 this was a refusal, exit 3.)"""
     with hexokinase_offline():
         code, out, err = _main([f"Michaelis-Menten kinetics of human hexokinase on {compound}", *FLAGS])
-    assert code == 3, err
+    assert code == 0, err
     assert "in your description as the substrate" not in out
     assert f"No word of your description ({compound!r}) is a substrate BRENDA lists for EC 2.7.1.1" in out
-    assert "Re-run with --substrate NAME" in out
-    assert "| literature (Homo sapiens) |" not in out
+    assert "it was not used: the model is not of it" in out
+    assert "No substrate was named, so Caterva used D-glucose:" in out
+    assert KM_ROW in out
+    assert f"as the substrate {compound}" not in out and f"Km of {compound}" not in out
 
 
 def test_a_filler_word_still_separates_the_compound_from_the_request():

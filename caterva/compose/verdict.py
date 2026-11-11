@@ -146,6 +146,48 @@ class Verdict:
     #: Modules that could not run, with the reason. Silence about a check
     #: that did not run reads as a check that passed.
     unavailable: Mapping[str, str] = field(default_factory=dict)
+    #: (measured, still placeholders) by parameter id, when SOME constants
+    #: are measured and some are not. The verdict is then still STRUCTURAL
+    #: -- a conclusion about the whole system rests on every constant -- but
+    #: the licence says which constants are measured and which are not,
+    #: instead of claiming all of them are illustrative (`licence`).
+    partly: Optional[Tuple[Tuple[str, ...], Tuple[str, ...]]] = None
+
+    @property
+    def licence(self) -> str:
+        """What this verdict licenses, for THIS model.
+
+        LICENCE[STRUCTURAL] says "the constants are the library's
+        illustrative values". Printed above a provenance table with two of
+        three constants cited from BRENDA (granzyme B, 2026-11-11) it was
+        false, and a reader who believed the headline over the table
+        concluded nothing had been looked up. A partly grounded model gets
+        a licence that names the mix.
+        """
+        if self.verdict == STRUCTURAL and self.partly:
+            measured, placeholders = self.partly
+            total = len(measured) + len(placeholders)
+            return (
+                f"Questions about the MECHANISM, as for any structural model, and about the "
+                f"measured part of it: {len(measured)} of its {total} constants "
+                f"{'is' if len(measured) == 1 else 'are'} measured, "
+                f"with citations ({', '.join(measured)}), and {len(placeholders)} "
+                f"{'is' if len(placeholders) == 1 else 'are'} still the library's illustrative "
+                f"value{'s' if len(placeholders) != 1 else ''} ({', '.join(placeholders)}). Not "
+                f"questions about the particular enzyme as a whole: any conclusion that depends "
+                f"on {', '.join(placeholders)} rests on a placeholder."
+            )
+        return LICENCE[self.verdict]
+
+    @property
+    def heading(self) -> str:
+        """`VERDICT: STRUCTURAL`, with the mix when the model is partly grounded."""
+        text = f"VERDICT: {self.verdict.upper()}"
+        if self.verdict == STRUCTURAL and self.partly:
+            measured, placeholders = self.partly
+            text += (f" (partly grounded: {len(measured)} of "
+                     f"{len(measured) + len(placeholders)} constants measured)")
+        return text
 
     @property
     def blocking(self) -> Tuple[Concern, ...]:
@@ -175,9 +217,9 @@ class Verdict:
 
     def summary(self) -> str:
         lines = [
-            f"VERDICT: {self.verdict.upper()}",
+            self.heading,
             "",
-            f"What this supports: {LICENCE[self.verdict]}",
+            f"What this supports: {self.licence}",
         ]
         for concern in self.concerns:
             if concern.qualifier:
@@ -519,6 +561,76 @@ def _grounding(model: Any) -> Tuple[int, int, bool]:
         return 0, len(resolvable), False
 
 
+def _grounding_names(model: Any) -> Optional[Tuple[Tuple[str, ...], Tuple[str, ...]]]:
+    """(measured, placeholder) parameter ids, sorted; None when the model
+    does not say which (an object with counts only)."""
+    measured = getattr(model, "measured", None)
+    if not isinstance(measured, Mapping):
+        return None
+    placeholders = getattr(model, "placeholders", None)
+    if placeholders is None:
+        placeholders = getattr(model, "unmeasured", None)
+    if placeholders is None:
+        return None
+    try:
+        names = [getattr(p, "identifier", p) for p in placeholders]
+        return tuple(sorted(str(k) for k in measured)), tuple(sorted(str(n) for n in names))
+    except TypeError:
+        return None
+
+
+def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
+    """The remedy for a partly grounded model: the piece actually missing,
+    read from why each placeholder is one (`not_found`), or None when the
+    reasons do not say.
+
+    The remedy used to be "re-run with --organism set to one the provenance
+    table lists" for every partly measured model -- including granzyme B,
+    whose one placeholder was a Ki "not looked up" because no inhibitor was
+    named. Changing the organism would not have helped; naming the
+    inhibitor would. Each reason is classified, worst-first by how much
+    the reader can do about it.
+    """
+    reasons = dict(getattr(model, "not_found", {}) or {})
+    if not reasons:
+        return None
+    by_need: Dict[str, List[str]] = {}
+    for name in unmeasured:
+        reason = str(reasons.get(name, ""))
+        low = reason.lower()
+        if "--inhibitor" in reason:
+            need = "inhibitor"
+        elif "--substrate" in reason and "not looked up" in low:
+            need = "substrate"
+        elif "--product" in reason or "--compound" in reason:
+            need = "compound"
+        elif "other organism" in low or "available in" in low or "cross-species" in low:
+            need = "organism"
+        elif "not looked up" in low:
+            need = "refused"
+        else:
+            need = "nothing"
+        by_need.setdefault(need, []).append(name)
+    steps = []
+    if "inhibitor" in by_need:
+        steps.append(f"name the inhibitor with --inhibitor NAME, so {', '.join(by_need['inhibitor'])} "
+                     "is looked up (BRENDA files a Ki under the inhibitor)")
+    if "substrate" in by_need:
+        steps.append(f"name the substrate with --substrate NAME, so {', '.join(by_need['substrate'])} "
+                     "is looked up")
+    if "compound" in by_need:
+        steps.append(f"name the compound the provenance table asks for, so "
+                     f"{', '.join(by_need['compound'])} is looked up")
+    if "organism" in by_need:
+        steps.append(f"{', '.join(by_need['organism'])} is measured only in another organism: re-run "
+                     "with --organism set to one the provenance table lists, or supply it yourself")
+    if "refused" in by_need or "nothing" in by_need:
+        rest = by_need.get("refused", []) + by_need.get("nothing", [])
+        steps.append(f"supply {', '.join(rest)} yourself: the search has no usable BRENDA row for "
+                     f"{'it' if len(rest) == 1 else 'them'}, for the reason the provenance table gives")
+    return "; ".join(steps) if steps else None
+
+
 def _influence_is_informative(influence: Any) -> Optional[bool]:
     """Does the influence ranking single anything out? None = no ranking.
 
@@ -596,12 +708,16 @@ def _provenance_concerns(
                      remedy=str(refused).rstrip("."))],
             note,
         )
+    partial_remedy = None
     if measured:
+        names = _grounding_names(model)
+        still = f" ({', '.join(names[1])})" if names else ""
         detail = (
             f"{measured} constant(s) measured and {unmeasured} still the "
-            f"motif library's illustrative values"
+            f"motif library's illustrative values{still}"
         )
         note = f"{measured} measured, {unmeasured} unmeasured"
+        partial_remedy = _what_would_ground(model, names[1] if names else ())
     elif subject and not has_provenance:
         # THE CASE THAT USED TO READ AS GROUNDED. A subject was named, so a
         # search could be run -- and has not been. Say exactly that.
@@ -661,6 +777,10 @@ def _provenance_concerns(
         "supply the constants the provenance table lists, from your own "
         "measurements or a paper"
     )
+    if partial_remedy is not None:
+        # The piece actually missing, named (an inhibitor, a substrate, an
+        # organism), not the generic organism advice.
+        source = partial_remedy
     informative = _influence_is_informative(influence)
     if informative is True:
         remedy = f"{source} -- start with the top of its influence ranking"
@@ -971,8 +1091,14 @@ def form(
     else:
         verdict = GROUNDED
 
+    partly = None
+    if verdict == STRUCTURAL and measured > 0 and unmeasured > 0:
+        names = _grounding_names(model)
+        if names is not None:
+            partly = names
     return Verdict(
         verdict=verdict,
+        partly=partly,
         behaviour=behaviour_of(stability),
         concerns=tuple(concerns),
         conclusion=(

@@ -1130,6 +1130,13 @@ class SearchSummary(TypedDict):
     unused_compounds: Dict[str, str]
     measured: int
     placeholders: int
+    #: What Caterva chose for what the request did not name (ADR 0182), in
+    #: the order chosen, each `caterva.compose.defaults.Choice.to_json()`:
+    #: {"role": "enzyme" | "organism" | "substrate" | "inhibitor", "chosen",
+    #: "why", "alternatives": [{"name", "rows": {table: count}}],
+    #: "considered"}. Empty when nothing was chosen. Every choice is also a
+    #: plain-English note in `ComposeResult.notes`.
+    choices: List[Dict[str, Any]]
 
 
 class _ConcernRequired(TypedDict):
