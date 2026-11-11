@@ -19,15 +19,26 @@ THE POLICY
    protein from the organism asked about).
 3. Several: refuse, naming each candidate with its enzyme name and the
    proteins it lists for the organism, and end with the exact flag that
-   would accept one. Nothing is picked. An abbreviation or gene symbol (HK1,
-   SDH, AK, ACHE) is always this case, even when only one enzyme goes by it:
-   it is listed for a person to confirm and UniProt is not asked, because
-   the candidates the curated table lists are the choices (finder.py says
-   when an abbreviation may resolve and when it never does).
-4. Nothing, or only typo suggestions: ask the optional UniProt lookup, which
-   covers a protein name that is not an enzyme name. One complete EC number
-   from UniProt is returned; several are refused as in step 3; none is
-   refused with the did-you-mean suggestions the nomenclature had.
+   would accept one. Nothing is picked. A gene symbol, lab abbreviation or
+   curated alias that the symbol table maps to ONE enzyme in the organism
+   is not several: it resolves with its isoform and, when no organism was
+   given and the name implies one, the organism, each said in `notes`
+   ("HK2" is hexokinase, isoform HK2, Homo sapiens; ADR 0182). One several
+   enzymes go by (HK, SDH, AK, NOS, PEPCK with no organism) is this case.
+4. Nothing, or only typo suggestions: a spelling with one close enzyme name
+   is read as it and said ("acetylcholinestrase"); otherwise ask the
+   optional UniProt lookups: the protein-name search (a protein name that is
+   not an enzyme name), then, for a name shaped like a gene symbol, the
+   gene-name search in human unless an organism was given ("CYP2B6"). One
+   complete EC number from either is returned; for a cytochrome P450 gene
+   with several, EC 1.14.14.1, where BRENDA files P450 kinetics, is taken
+   and said; several otherwise are refused as in step 3; none is refused
+   with the did-you-mean suggestions the nomenclature had.
+
+A trailing point-mutation tag ("IDH1 R132H") is set aside before the name is
+read, and the note says the mutant is not modelled: the constants are
+searched for the enzyme, and BRENDA's rows for that mutant are not singled
+out.
 
 A caller with no UniProt lookup (the installed app has no literature layer)
 gets steps 1 to 3 and a refusal for 4. An EC number is read by the same
@@ -37,7 +48,7 @@ deleted one is refused.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 from .finder import (
@@ -92,17 +103,34 @@ class NameResolution:
     #: `nomenclature` or `uniprot`.
     source: str = "nomenclature"
     name: str = ""
+    #: The protein of the EC number the name was (HK2, CYP2B6), for
+    #: `--isoform`; None when the name is the whole enzyme.
+    isoform: Optional[str] = None
+    #: The organism (binomial) assumed because none was given and the name
+    #: implies one (Homo sapiens for HK2); None when none was assumed. A
+    #: caller fills `--organism` from it only when no organism was given.
+    organism: Optional[str] = None
+    #: Sentences saying what was assumed or read (the organism, the
+    #: isoform, a spelling, a mutation set aside). Each automatic choice is one.
+    read_notes: Tuple[str, ...] = ()
 
     def notes(self, query: str) -> List[str]:
-        """Sentences for a report: what the query was read as, then cautions."""
-        if self.ec == query.strip() and not self.cautions:
+        """Sentences for a report: what the query was read as, then what was
+        assumed, then cautions."""
+        if self.ec == query.strip() and not self.cautions and not self.read_notes:
             return []
         head = f"Read {query.strip()!r} as EC {self.ec}"
         if self.name:
             head += f" ({self.name})"
         out = [f"{head}: {self.how}."]
+        out.extend(n for n in self.read_notes if n not in out)
         out.extend(c for c in self.cautions if c not in out[0])
         return out
+
+    def to_json(self) -> Dict[str, object]:
+        return {"ec": self.ec, "name": self.name, "how": self.how, "source": self.source,
+                "isoform": self.isoform, "organism": self.organism, "notes": list(self.read_notes),
+                "cautions": list(self.cautions)}
 
 
 def _named(candidates: Sequence[Candidate]) -> List[Dict[str, object]]:
@@ -213,6 +241,114 @@ def literature_uniprot_lookup(timeout: Optional[float] = None) -> Optional[Calla
     return lambda name: lookup.fetch_ec_numbers_by_name(name, None, timeout=timeout)
 
 
+def literature_uniprot_gene_lookup(timeout: Optional[float] = None) -> Optional[Callable[..., Sequence[str]]]:
+    """UniProt's gene-name search from the literature layer, or None.
+
+    A function `(symbol, taxon_id) -> EC strings`; `taxon_id` None searches
+    every organism. Absent from an installed wheel, like the protein-name
+    lookup above.
+    """
+    from caterva.checkout import LiteratureLayerUnavailable, literature_module
+
+    try:
+        lookup = literature_module("enzyme_lookup")
+    except LiteratureLayerUnavailable:
+        return None
+    if not hasattr(lookup, "fetch_ec_numbers_by_gene"):
+        return None
+    if timeout is None:
+        return lambda symbol, taxon: lookup.fetch_ec_numbers_by_gene(symbol, taxon)
+    return lambda symbol, taxon: lookup.fetch_ec_numbers_by_gene(symbol, taxon, timeout=timeout)
+
+
+#: NCBI taxon ids of the organisms a gene-name search can be narrowed to.
+TAXON_IDS = {
+    "HUMAN": "9606", "MOUSE": "10090", "RAT": "10116", "YEAST": "559292", "ECOLI": "83333",
+    "BOVIN": "9913", "PIG": "9823", "CHICK": "9031", "ARATH": "3702", "BACSU": "224308",
+    "DROME": "7227", "CAEEL": "6239", "RABIT": "9986", "SCHPO": "284812", "DANRE": "7955",
+    "XENLA": "8355", "MYCTU": "83332", "HORSE": "9796", "SHEEP": "9940", "CAVPO": "10141",
+}
+
+#: A gene symbol shape worth asking UniProt's gene field about: no space, a
+#: letter first, at most 20 characters ("CYP2B6", "Hk2", "folA").
+_SYMBOL_SHAPE = re.compile(r"^[A-Za-z][A-Za-z0-9\-]{1,19}$")
+#: A point mutation written after a name: R132H, V600E, G12D.
+_MUTATION = re.compile(r"^[ACDEFGHIKLMNPQRSTVWY]\d{1,4}[ACDEFGHIKLMNPQRSTVWY*]$")
+
+
+def split_mutation(text: str) -> Tuple[str, Tuple[str, ...]]:
+    """(the name, the point-mutation tags typed after it): "IDH1 R132H" is ("IDH1", ("R132H",))."""
+    words = text.split()
+    tags: List[str] = []
+    while len(words) > 1 and _MUTATION.match(words[-1]):
+        tags.insert(0, words.pop())
+    return " ".join(words), tuple(tags)
+
+
+def mutation_note(name: str, tags: Sequence[str]) -> str:
+    return (f"{name} {'/'.join(tags)} is a mutant, and mutants are not modelled: the constants are searched "
+            f"for {name} itself, and BRENDA's rows for {'that mutant' if len(tags) == 1 else 'those mutants'} "
+            "are not singled out. Compare against the mutant's own papers before relying on them.")
+
+
+def _from_gene(
+    name: str, organism: Optional[str], gene: Callable[..., Sequence[str]], rerun: str,
+) -> Optional[NameResolution]:
+    """The UniProt gene-name search, after the protein-name search found nothing.
+
+    Human unless an organism was given, and said. Accepted only when it
+    yields ONE complete EC number, or several that include EC 1.14.14.1 for
+    a cytochrome P450 gene. None when it yields nothing or cannot be asked;
+    several are refused with the candidates named."""
+    from .index import ORGANISMS, organism_code
+    from .symbols import P450_EC, human_style
+
+    if not _SYMBOL_SHAPE.match(name):
+        return None
+    code = organism_code(organism)
+    taxon = TAXON_IDS.get(code) if code else TAXON_IDS["HUMAN"]
+    if code and taxon is None:
+        return None
+    try:
+        listed = [str(e) for e in gene(name, taxon)]
+    except Exception:  # noqa: BLE001 - the protein-name answer stands
+        return None
+    complete: List[str] = []
+    for ec in listed:
+        if _COMPLETE_EC.match(ec) and ec not in complete:
+            complete.append(ec)
+    notes: List[str] = []
+    assumed = None
+    if not code:
+        assumed = ORGANISMS["HUMAN"][0]
+        notes.append(f"No organism was given; {name} was looked up as a human gene symbol, so Homo sapiens "
+                     "was searched (pass --organism to change it).")
+    if len(complete) > 1 and P450_EC in complete and name.lower().startswith("cyp"):
+        notes.append(f"UniProt files {name} under several EC numbers ({', '.join(complete)}); EC {P450_EC} "
+                     "(unspecific monooxygenase) was read because BRENDA files cytochrome P450 kinetics there.")
+        complete = [P450_EC]
+    if not complete:
+        return None
+    if len(complete) > 1:
+        candidates = [found[0] for found in (find(ec, organism, limit=1) for ec in complete) if found]
+        ambiguous = Ambiguous(
+            query=name, candidates=tuple(candidates), recommended=None, confirm_only=True,
+            reason=f"UniProt files the gene {name!r} under {len(complete)} EC numbers",
+            organism=code, release=load_index().release)
+        if candidates:
+            raise _refuse(ambiguous, rerun, AMBIGUOUS)
+        return None
+    entry = load_index().get(complete[0])
+    isoform = name if human_style(name) or code else name
+    notes.append(f"Read {name!r} as the isoform {isoform} of EC {complete[0]}; the constants are taken from "
+                 "BRENDA rows that name it where there are any (pass --isoform to change it).")
+    return NameResolution(
+        ec=complete[0], source="uniprot", name=entry.name if entry else "", isoform=isoform,
+        organism=assumed, read_notes=tuple(notes),
+        how=(f"the enzyme nomenclature has no enzyme of that name, and UniProt files the reviewed entry of the "
+             f"{'human ' if not code else ''}gene {name} under exactly this EC number"))
+
+
 def resolve_enzyme_name(
     name: str,
     organism: Optional[str] = None,
@@ -220,6 +356,7 @@ def resolve_enzyme_name(
     uniprot: Optional[Callable[[str], Sequence[str]]] = None,
     rerun: str = "--subject {ec}",
     allow_unlisted_ec: bool = False,
+    gene: Optional[Callable[..., Sequence[str]]] = None,
 ) -> NameResolution:
     """The enzyme `name` identifies, or `NameNotResolved` naming the choices.
 
@@ -230,14 +367,22 @@ def resolve_enzyme_name(
     `rerun` ends a refusal, with `{ec}` for the enzyme. `allow_unlisted_ec`
     lets a well-formed EC number the nomenclature does not hold through
     unchanged, for a caller whose own database may know a number this
-    release does not.
+    release does not. `gene` is the optional UniProt gene-name lookup,
+    `(symbol, taxon_id) -> EC strings`; when `uniprot` is given and `gene`
+    is not, the literature layer's is used when present.
     """
     text = " ".join(str(name).split())
+    bare, mutations = split_mutation(text)
+    if mutations:
+        found = resolve_enzyme_name(bare, organism, uniprot=uniprot, rerun=rerun,
+                                    allow_unlisted_ec=allow_unlisted_ec, gene=gene)
+        return replace(found, read_notes=found.read_notes + (mutation_note(bare, mutations),))
     result = resolve(text, organism)
     if isinstance(result, Resolved):
         return NameResolution(
             ec=result.ec, how=result.how, cautions=result.cautions, source="nomenclature",
-            name=result.candidate.name if result.candidate else "")
+            name=result.candidate.name if result.candidate else "", isoform=result.isoform,
+            organism=result.organism, read_notes=result.notes)
 
     parts = read_ec(text)
     if parts is not None:
@@ -261,10 +406,22 @@ def resolve_enzyme_name(
         raise NameNotResolved(
             f"No enzyme named {text!r} is in the enzyme nomenclature (ExPASy ENZYME release {result.release}). "
             "Check the spelling, or pass the EC number directly if you know it.", [], [], NONE_FOUND)
-    return _from_uniprot(text, organism, uniprot, suggestions, rerun)
+    try:
+        return _from_uniprot(text, organism, uniprot, suggestions, rerun)
+    except NameNotResolved as exc:
+        if exc.kind not in (NONE_FOUND, SUGGESTIONS):
+            raise
+        if gene is None:
+            gene = literature_uniprot_gene_lookup()
+        if gene is not None:
+            found = _from_gene(text, organism, gene, rerun)
+            if found is not None:
+                return found
+        raise
 
 
 __all__ = [
-    "NameNotResolved", "NameResolution", "resolve_enzyme_name", "literature_uniprot_lookup", "refusal_view",
+    "NameNotResolved", "NameResolution", "resolve_enzyme_name", "literature_uniprot_lookup",
+    "literature_uniprot_gene_lookup", "refusal_view", "split_mutation", "mutation_note",
     "AMBIGUOUS", "SUGGESTIONS", "NONE_FOUND", "LOOKUP_FAILED", "DELETED_OR_UNKNOWN",
 ]

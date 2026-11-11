@@ -263,9 +263,13 @@ def test_a_stereo_prefix_never_changes_which_words_are_compared():
 @pytest.mark.parametrize(
     "typo, expected",
     [("lactat dehydrogenase", {"1.1.1.27", "1.1.1.28"}), ("hexokinse", {"2.7.1.1"}),
-     ("pyruvat kinase", {"2.7.1.40"}), ("acetylcholinesteras", {"3.1.1.7"})],
+     ("acetylcholinesteras", {"3.1.1.7"})],
 )
-def test_a_typo_gives_a_did_you_mean_and_never_resolves(typo, expected):
+def test_a_typo_that_is_not_one_clear_enzyme_name_gives_a_did_you_mean(typo, expected):
+    """Converted (ADR 0182): a spelling with ONE close enzyme name now resolves (below). These stay
+    did-you-mean: "lactat dehydrogenase" is as close to D- as to L-lactate dehydrogenase, and "hexokinse" and
+    "acetylcholinesteras" do not end the way an enzyme name ends, which is how "glucose 6-phosphate" is kept
+    from being read as glucose-6-phosphatase."""
     result = resolve(typo, "human")
     assert isinstance(result, Ambiguous)
     assert result.suggestions_only
@@ -274,17 +278,26 @@ def test_a_typo_gives_a_did_you_mean_and_never_resolves(typo, expected):
     assert "Did you mean" in refusal_text(result)
 
 
+def test_a_spelling_with_one_close_enzyme_name_resolves_and_says_so():
+    result = resolve("pyruvat kinase", "human")
+    assert isinstance(result, Resolved) and result.ec == "2.7.1.40"
+    assert result.notes and result.notes[0].startswith("Read 'pyruvat kinase' as pyruvate kinase (spelling)")
+    assert result.candidate.via == "typo"
+
+
 def test_a_typo_is_offered_only_when_nothing_better_matched():
     assert all(c.tier != TIER_TYPO for c in find("pyruvate kinase", limit=None))
     assert all(c.tier != TIER_TYPO for c in find("kinase", limit=None))
 
 
 def test_a_short_abbreviation_is_never_offered_close_spellings():
-    # DHFR is dihydrofolate reductase by the table; the close spellings the old
-    # finder would have offered for a four-letter word are never offered.
+    # DHFR is dihydrofolate reductase by the table, and now resolves to it
+    # (ADR 0182); the close spellings the old finder would have offered for a
+    # four-letter word are never offered.
     result = resolve("DHFR", "human")
-    assert isinstance(result, Ambiguous) and ecs(result.candidates) == ["1.5.1.3"]
-    assert all(c.tier != TIER_TYPO for c in result.candidates)
+    assert isinstance(result, Resolved) and result.ec == "1.5.1.3"
+    assert ecs(find("DHFR", "human", limit=None)) == ["1.5.1.3"]
+    assert all(c.tier != TIER_TYPO for c in find("DHFR", "human", limit=None))
     unknown = resolve("DHFQ", "human")
     assert isinstance(unknown, Ambiguous) and not unknown.candidates
 
@@ -375,12 +388,13 @@ def test_a_phrase_inside_a_longer_name_is_listed_but_never_resolved_to():
     """Found by running the names a lab types: "angiotensin converting enzyme"
     is the start of the accepted name of ACE2 (EC 3.4.17.23). ACE, the enzyme
     people mean, is EC 3.4.15.1. Resolving to the only phrase match would have
-    cited the wrong protein. The abbreviation table now offers ACE first, as a
-    reading to confirm, and the phrase match stays below it, flagged."""
+    cited the wrong protein. The curated table reads the name as ACE, and the
+    name resolves to it (ADR 0182); the phrase match stays listed below it, flagged."""
     result = resolve("angiotensin converting enzyme", "human")
-    assert isinstance(result, Ambiguous) and result.confirm_only
-    assert ecs(result.candidates[:2]) == ["3.4.15.1", "3.4.17.23"]
-    assert [c.partial for c in result.candidates[:2]] == [False, True]
+    assert isinstance(result, Resolved) and result.ec == "3.4.15.1"
+    listed = find("angiotensin converting enzyme", "human", limit=None)
+    assert ecs(listed[:2]) == ["3.4.15.1", "3.4.17.23"]
+    assert [c.partial for c in listed[:2]] == [False, True]
     # A phrase with nothing else beside it is only ever a suggestion.
     only = resolve("kinase C", "human")
     assert isinstance(only, Ambiguous) and only.suggestions_only
@@ -388,10 +402,14 @@ def test_a_phrase_inside_a_longer_name_is_listed_but_never_resolved_to():
 
 
 def test_a_unique_name_inside_a_longer_one_is_not_resolved_either():
-    for name in ("glutathione S-transferase", "NADH dehydrogenase", "PFK"):
+    result = resolve("NADH dehydrogenase", "human")
+    assert isinstance(result, Ambiguous) and (result.suggestions_only or len(result.candidates) > 1)
+    # "glutathione S-transferase" and "PFK" are fragments of longer names, but the curated table reads
+    # each as one enzyme, and that reading -- not the fragment -- is what resolves (ADR 0182).
+    for name, ec in (("glutathione S-transferase", "2.5.1.18"), ("PFK", "2.7.1.11")):
         result = resolve(name, "human")
-        assert isinstance(result, Ambiguous), name
-        assert result.suggestions_only or len(result.candidates) > 1, name
+        assert isinstance(result, Resolved) and result.ec == ec, name
+        assert result.candidate.via == "abbreviation" and not result.candidate.partial
 
 
 # --- a word for a kind of enzyme is not one enzyme -------------------------

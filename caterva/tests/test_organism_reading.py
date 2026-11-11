@@ -41,9 +41,12 @@ def test_a_strain_after_the_binomial_is_left_alone() -> None:
 
 @pytest.mark.parametrize("vague", ["monkey", "fish", "bacteria"])
 def test_a_name_for_many_species_is_not_guessed(vague: str) -> None:
-    organism, _ = normalise_organism(vague)
-    # Capitalised as a genus would be, never mapped to a species.
-    assert organism == vague.capitalize()
+    organism, note = normalise_organism(vague)
+    # Used exactly as typed, never mapped to a species and never re-cased
+    # into something that looks like a genus (ADR 0182: "Homo S" became
+    # "Homo s" that way); the note says it was not recognised.
+    assert organism == vague
+    assert note is not None and "was not recognised as one organism" in note
 
 
 def test_nothing_in_nothing_out() -> None:

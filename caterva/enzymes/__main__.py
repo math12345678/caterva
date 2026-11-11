@@ -178,7 +178,11 @@ def _json(query: str, organism: Optional[str], result: Any, shown: Sequence[Cand
         "candidates": [dict(c.to_dict(), compose=compose_line(c.ec, organism)) for c in shown],
     }
     if isinstance(result, Resolved):
-        payload.update(resolved_ec=result.ec, how=result.how, cautions=list(result.cautions))
+        payload.update(resolved_ec=result.ec, how=result.how, cautions=list(result.cautions),
+                       # ADR 0182: a symbol read as one enzyme carries its isoform and
+                       # the organism it implies, each said in `read_notes`.
+                       resolved_isoform=result.isoform, assumed_organism=result.organism,
+                       read_notes=list(result.notes))
     else:
         payload.update(
             reason=result.reason,

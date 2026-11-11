@@ -1,5 +1,5 @@
 {
- "about": "Hand-verified expectations for the enzyme finder, for the 169 names a reviewer ran on 2026-10-03 against 4 organisms (human, mouse, yeast, E. coli), plus the names of its 'right' list and of the wrong resolutions it found. `verified` is the set of EC numbers a name may legitimately resolve to or be recommended as, from the IUBMB nomenclature (ExPASy ENZYME) and UniProtKB; `expect` is the outcome class: resolved (one enzyme, `ec`), candidates (never resolved; the listed ECs include `include` and none of `exclude`), none-honest (nothing resolved and nothing listed outside `verified`), suggestions-only (nothing resolved, every candidate a fragment or did-you-mean), unresolved (nothing resolved, nothing else asserted), resolved-or-candidates (`ec` resolved or offered). `by_organism` replaces the expectation for one organism.",
+ "about": "Hand-verified expectations for the enzyme finder, for the 169 names a reviewer ran on 2026-10-03 against 4 organisms (human, mouse, yeast, E. coli), plus the names of its 'right' list and of the wrong resolutions it found. `verified` is the set of EC numbers a name may legitimately resolve to or be recommended as, from the IUBMB nomenclature (ExPASy ENZYME) and UniProtKB; `expect` is the outcome class: resolved (one enzyme, `ec`), candidates (never resolved; the listed ECs include `include` and none of `exclude`), none-honest (nothing resolved and nothing listed outside `verified`), suggestions-only (nothing resolved, every candidate a fragment or did-you-mean), unresolved (nothing resolved, nothing else asserted), resolved-or-candidates (`ec` resolved or offered). `by_organism` replaces the expectation for one organism. Since ADR 0182 (2026-11-11) a gene symbol, lab abbreviation or curated alias that the symbol table reads as ONE enzyme in the organism resolves to it, so those names moved from `candidates` to `resolved`; every resolution is still held to `verified`.",
  "organisms": [
   "human",
   "mouse",
@@ -25,20 +25,16 @@
     "2.7.1.146",
     "2.7.1.56"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.7.1.11"
-   ]
+   "expect": "resolved",
+   "ec": "2.7.1.11"
   },
   {
    "query": "PK",
    "verified": [
     "2.7.1.40"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.7.1.40"
-   ]
+   "expect": "resolved",
+   "ec": "2.7.1.40"
   },
   {
    "query": "LDH",
@@ -66,7 +62,13 @@
    "expect": "candidates",
    "include": [
     "1.1.1.37"
-   ]
+   ],
+   "by_organism": {
+    "E. coli": {
+     "expect": "resolved",
+     "ec": "1.1.1.37"
+    }
+   }
   },
   {
    "query": "ADH",
@@ -103,10 +105,8 @@
    "verified": [
     "2.7.3.2"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.7.3.2"
-   ]
+   "expect": "resolved",
+   "ec": "2.7.3.2"
   },
   {
    "query": "HK",
@@ -130,7 +130,17 @@
    "expect": "candidates",
    "include": [
     "1.1.1.49"
-   ]
+   ],
+   "by_organism": {
+    "human": {
+     "expect": "resolved",
+     "ec": "1.1.1.49"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "1.1.1.49"
+    }
+   }
   },
   {
    "query": "COX",
@@ -149,40 +159,32 @@
    "verified": [
     "1.15.1.1"
    ],
-   "expect": "candidates",
-   "include": [
-    "1.15.1.1"
-   ]
+   "expect": "resolved",
+   "ec": "1.15.1.1"
   },
   {
    "query": "ACHE",
    "verified": [
     "3.1.1.7"
    ],
-   "expect": "candidates",
-   "include": [
-    "3.1.1.7"
-   ]
+   "expect": "resolved",
+   "ec": "3.1.1.7"
   },
   {
    "query": "BCHE",
    "verified": [
     "3.1.1.8"
    ],
-   "expect": "candidates",
-   "include": [
-    "3.1.1.8"
-   ]
+   "expect": "resolved",
+   "ec": "3.1.1.8"
   },
   {
    "query": "DHFR",
    "verified": [
     "1.5.1.3"
    ],
-   "expect": "candidates",
-   "include": [
-    "1.5.1.3"
-   ]
+   "expect": "resolved",
+   "ec": "1.5.1.3"
   },
   {
    "query": "TS",
@@ -190,10 +192,8 @@
     "2.1.1.45",
     "2.1.1.148"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.1.1.45"
-   ]
+   "expect": "resolved",
+   "ec": "2.1.1.45"
   },
   {
    "query": "HMGCR",
@@ -211,6 +211,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "1.1.1.34"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "1.1.1.34"
     }
    }
   },
@@ -227,10 +235,8 @@
    "verified": [
     "3.1.4.35"
    ],
-   "expect": "candidates",
-   "include": [
-    "3.1.4.35"
-   ]
+   "expect": "resolved",
+   "ec": "3.1.4.35"
   },
   {
    "query": "CYP3A4",
@@ -250,6 +256,10 @@
     },
     "E. coli": {
      "expect": "unresolved"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "1.14.14.1"
     }
    }
   },
@@ -258,10 +268,8 @@
    "verified": [
     "2.1.1.6"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.1.1.6"
-   ]
+   "expect": "resolved",
+   "ec": "2.1.1.6"
   },
   {
    "query": "MAOA",
@@ -279,6 +287,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "1.4.3.4"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "1.4.3.4"
     }
    }
   },
@@ -298,6 +314,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "1.4.3.4"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "1.4.3.4"
     }
    }
   },
@@ -306,10 +330,8 @@
    "verified": [
     "2.4.2.30"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.4.2.30"
-   ]
+   "expect": "resolved",
+   "ec": "2.4.2.30"
   },
   {
    "query": "trypsin",
@@ -362,10 +384,8 @@
    "verified": [
     "3.4.23.16"
    ],
-   "expect": "candidates",
-   "include": [
-    "3.4.23.16"
-   ]
+   "expect": "resolved",
+   "ec": "3.4.23.16"
   },
   {
    "query": "beta-lactamase",
@@ -396,10 +416,8 @@
    "verified": [
     "3.2.1.17"
    ],
-   "expect": "candidates",
-   "include": [
-    "3.2.1.17"
-   ]
+   "expect": "resolved",
+   "ec": "3.2.1.17"
   },
   {
    "query": "luciferase",
@@ -427,17 +445,25 @@
    "include": [
     "1.11.1.6",
     "2.3.1.28"
-   ]
+   ],
+   "by_organism": {
+    "human": {
+     "expect": "resolved",
+     "ec": "1.11.1.6"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "1.11.1.6"
+    }
+   }
   },
   {
    "query": "GST",
    "verified": [
     "2.5.1.18"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.5.1.18"
-   ]
+   "expect": "resolved",
+   "ec": "2.5.1.18"
   },
   {
    "query": "LDHA",
@@ -456,13 +482,19 @@
      "expect": "none-honest"
     },
     "E. coli": {
-     "expect": "candidates",
-     "include": [
-      "1.1.1.28"
-     ],
+     "expect": "resolved",
+     "ec": "1.1.1.28",
      "exclude": [
       "1.1.1.27"
      ]
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "1.1.1.27"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "1.1.1.27"
     }
    },
    "verified_by_organism": {
@@ -486,6 +518,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "2.7.1.40"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.7.1.40"
     }
    }
   },
@@ -501,6 +541,18 @@
    "by_organism": {
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "4.2.1.11"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "4.2.1.11"
+    },
+    "yeast": {
+     "expect": "resolved",
+     "ec": "4.2.1.11"
     }
    }
   },
@@ -518,16 +570,22 @@
    ],
    "by_organism": {
     "yeast": {
-     "expect": "candidates",
-     "include": [
-      "1.1.1.41"
-     ],
+     "expect": "resolved",
+     "ec": "1.1.1.41",
      "exclude": [
       "1.1.1.42"
      ]
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "1.1.1.42"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "1.1.1.42"
     }
    },
    "verified_by_organism": {
@@ -587,10 +645,8 @@
    "verified": [
     "2.7.7.7"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.7.7.7"
-   ]
+   "expect": "resolved",
+   "ec": "2.7.7.7"
   },
   {
    "query": "topoisomerase",
@@ -633,6 +689,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "2.7.1.1"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.7.1.1"
     }
    }
   },
@@ -660,6 +724,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "4.1.2.13"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "4.1.2.13"
     }
    }
   },
@@ -691,6 +763,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "4.2.1.1"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "4.2.1.1"
     }
    }
   },
@@ -800,20 +880,16 @@
    "verified": [
     "2.7.2.3"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.7.2.3"
-   ]
+   "expect": "resolved",
+   "ec": "2.7.2.3"
   },
   {
    "query": "TPI",
    "verified": [
     "5.3.1.1"
    ],
-   "expect": "candidates",
-   "include": [
-    "5.3.1.1"
-   ]
+   "expect": "resolved",
+   "ec": "5.3.1.1"
   },
   {
    "query": "triosephosphate isomerase",
@@ -868,10 +944,8 @@
    "verified": [
     "2.5.1.18"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.5.1.18"
-   ]
+   "expect": "resolved",
+   "ec": "2.5.1.18"
   },
   {
    "query": "glucose oxidase",
@@ -886,20 +960,16 @@
    "verified": [
     "1.11.1.7"
    ],
-   "expect": "candidates",
-   "include": [
-    "1.11.1.7"
-   ]
+   "expect": "resolved",
+   "ec": "1.11.1.7"
   },
   {
    "query": "horseradish peroxidase",
    "verified": [
     "1.11.1.7"
    ],
-   "expect": "candidates",
-   "include": [
-    "1.11.1.7"
-   ]
+   "expect": "resolved",
+   "ec": "1.11.1.7"
   },
   {
    "query": "alkaline phosphatase",
@@ -914,10 +984,8 @@
    "verified": [
     "3.1.3.1"
    ],
-   "expect": "candidates",
-   "include": [
-    "3.1.3.1"
-   ]
+   "expect": "resolved",
+   "ec": "3.1.3.1"
   },
   {
    "query": "PTP1B",
@@ -934,6 +1002,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "3.1.3.48"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "3.1.3.48"
     }
    }
   },
@@ -952,6 +1028,14 @@
     },
     "E. coli": {
      "expect": "suggestions-only"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "2.7.10.2"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.7.10.2"
     }
    }
   },
@@ -970,6 +1054,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "2.7.10.1"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.7.10.1"
     }
    }
   },
@@ -1009,20 +1101,16 @@
    "verified": [
     "1.14.99.1"
    ],
-   "expect": "candidates",
-   "include": [
-    "1.14.99.1"
-   ]
+   "expect": "resolved",
+   "ec": "1.14.99.1"
   },
   {
    "query": "cyclooxygenase",
    "verified": [
     "1.14.99.1"
    ],
-   "expect": "candidates",
-   "include": [
-    "1.14.99.1"
-   ]
+   "expect": "resolved",
+   "ec": "1.14.99.1"
   },
   {
    "query": "lipase",
@@ -1124,10 +1212,8 @@
    "verified": [
     "3.2.1.23"
    ],
-   "expect": "candidates",
-   "include": [
-    "3.2.1.23"
-   ]
+   "expect": "resolved",
+   "ec": "3.2.1.23"
   },
   {
    "query": "tyrosinase",
@@ -1142,20 +1228,16 @@
    "verified": [
     "3.1.1.4"
    ],
-   "expect": "candidates",
-   "include": [
-    "3.1.1.4"
-   ]
+   "expect": "resolved",
+   "ec": "3.1.1.4"
   },
   {
    "query": "ribonuclease A",
    "verified": [
     "4.6.1.18"
    ],
-   "expect": "candidates",
-   "include": [
-    "4.6.1.18"
-   ]
+   "expect": "resolved",
+   "ec": "4.6.1.18"
   },
   {
    "query": "DPP4",
@@ -1172,6 +1254,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "3.4.14.5"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "3.4.14.5"
     }
    }
   },
@@ -1190,6 +1280,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "3.4.14.5"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "3.4.14.5"
     }
    }
   },
@@ -1239,6 +1337,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "2.7.11.22"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.7.11.22"
     }
    }
   },
@@ -1257,6 +1363,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "3.4.24.35"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "3.4.24.35"
     }
    }
   },
@@ -1291,6 +1405,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "2.7.11.1"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.7.11.1"
     }
    }
   },
@@ -1309,6 +1431,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "2.7.11.1"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.7.11.1"
     }
    }
   },
@@ -1335,6 +1465,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "2.1.1.37"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.1.1.37"
     }
    }
   },
@@ -1353,6 +1491,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "1.13.11.52"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "1.13.11.52"
     }
    }
   },
@@ -1367,16 +1513,22 @@
    ],
    "by_organism": {
     "yeast": {
-     "expect": "candidates",
-     "include": [
-      "6.3.4.5"
-     ],
+     "expect": "resolved",
+     "ec": "6.3.4.5",
      "exclude": [
       "3.5.3.1"
      ]
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "3.5.3.1"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "3.5.3.1"
     }
    },
    "verified_by_organism": {
@@ -1398,10 +1550,8 @@
    "verified": [
     "4.1.1.17"
    ],
-   "expect": "candidates",
-   "include": [
-    "4.1.1.17"
-   ]
+   "expect": "resolved",
+   "ec": "4.1.1.17"
   },
   {
    "query": "ornithine decarboxylase",
@@ -1429,17 +1579,33 @@
    "include": [
     "4.1.1.32",
     "4.1.1.49"
-   ]
+   ],
+   "by_organism": {
+    "human": {
+     "expect": "resolved",
+     "ec": "4.1.1.32"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "4.1.1.32"
+    },
+    "yeast": {
+     "expect": "resolved",
+     "ec": "4.1.1.49"
+    },
+    "E. coli": {
+     "expect": "resolved",
+     "ec": "4.1.1.49"
+    }
+   }
   },
   {
    "query": "FBPase",
    "verified": [
     "3.1.3.11"
    ],
-   "expect": "candidates",
-   "include": [
-    "3.1.3.11"
-   ]
+   "expect": "resolved",
+   "ec": "3.1.3.11"
   },
   {
    "query": "fructose-1,6-bisphosphatase",
@@ -1454,10 +1620,8 @@
    "verified": [
     "3.1.3.9"
    ],
-   "expect": "candidates",
-   "include": [
-    "3.1.3.9"
-   ]
+   "expect": "resolved",
+   "ec": "3.1.3.9"
   },
   {
    "query": "glycogen phosphorylase",
@@ -1493,10 +1657,8 @@
    "verified": [
     "1.2.4.1"
    ],
-   "expect": "candidates",
-   "include": [
-    "1.2.4.1"
-   ]
+   "expect": "resolved",
+   "ec": "1.2.4.1"
   },
   {
    "query": "pyruvate dehydrogenase",
@@ -1523,16 +1685,22 @@
    ],
    "by_organism": {
     "yeast": {
-     "expect": "candidates",
-     "include": [
-      "1.1.1.41"
-     ],
+     "expect": "resolved",
+     "ec": "1.1.1.41",
      "exclude": [
       "1.1.1.42"
      ]
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "1.1.1.42"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "1.1.1.42"
     }
    },
    "verified_by_organism": {
@@ -1602,10 +1770,8 @@
    "verified": [
     "3.4.15.1"
    ],
-   "expect": "candidates",
-   "include": [
-    "3.4.15.1"
-   ]
+   "expect": "resolved",
+   "ec": "3.4.15.1"
   },
   {
    "query": "catechol-O-methyltransferase",
@@ -1620,10 +1786,8 @@
    "verified": [
     "2.4.2.30"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.4.2.30"
-   ]
+   "expect": "resolved",
+   "ec": "2.4.2.30"
   },
   {
    "query": "xanthine oxidase",
@@ -1638,10 +1802,8 @@
    "verified": [
     "1.17.3.2"
    ],
-   "expect": "candidates",
-   "include": [
-    "1.17.3.2"
-   ]
+   "expect": "resolved",
+   "ec": "1.17.3.2"
   },
   {
    "query": "uricase",
@@ -1659,7 +1821,21 @@
    "expect": "candidates",
    "include": [
     "3.5.4.4"
-   ]
+   ],
+   "by_organism": {
+    "human": {
+     "expect": "resolved",
+     "ec": "3.5.4.4"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "3.5.4.4"
+    },
+    "yeast": {
+     "expect": "resolved",
+     "ec": "3.5.4.4"
+    }
+   }
   },
   {
    "query": "adenosine deaminase",
@@ -1685,7 +1861,21 @@
    "expect": "candidates",
    "include": [
     "2.4.2.1"
-   ]
+   ],
+   "by_organism": {
+    "human": {
+     "expect": "resolved",
+     "ec": "2.4.2.1"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.4.2.1"
+    },
+    "yeast": {
+     "expect": "resolved",
+     "ec": "2.4.2.1"
+    }
+   }
   },
   {
    "query": "hexokinase 1",
@@ -1698,10 +1888,19 @@
    ],
    "by_organism": {
     "yeast": {
-     "expect": "none-honest"
+     "expect": "resolved",
+     "ec": "2.7.1.1"
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "2.7.1.1"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.7.1.1"
     }
    }
   },
@@ -1710,10 +1909,8 @@
    "verified": [
     "2.7.1.1"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.7.1.1"
-   ]
+   "expect": "resolved",
+   "ec": "2.7.1.1"
   },
   {
    "query": "GCK",
@@ -1730,6 +1927,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "2.7.1.1"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.7.1.1"
     }
    }
   },
@@ -1748,6 +1953,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "1.1.1.27"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "1.1.1.27"
     }
    }
   },
@@ -1768,13 +1981,19 @@
      "expect": "none-honest"
     },
     "E. coli": {
-     "expect": "candidates",
-     "include": [
-      "1.1.1.28"
-     ],
+     "expect": "resolved",
+     "ec": "1.1.1.28",
      "exclude": [
       "1.1.1.27"
      ]
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "1.1.1.27"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "1.1.1.27"
     }
    },
    "verified_by_organism": {
@@ -1798,6 +2017,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "2.7.1.40"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.7.1.40"
     }
    }
   },
@@ -1816,6 +2043,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "2.7.1.40"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.7.1.40"
     }
    }
   },
@@ -1857,6 +2092,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "4.2.1.1"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "4.2.1.1"
     }
    }
   },
@@ -1875,6 +2118,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "4.2.1.1"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "4.2.1.1"
     }
    }
   },
@@ -1898,6 +2149,18 @@
    "by_organism": {
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "1.15.1.1"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "1.15.1.1"
+    },
+    "yeast": {
+     "expect": "resolved",
+     "ec": "1.15.1.1"
     }
    }
   },
@@ -1906,7 +2169,13 @@
    "verified": [
     "1.14.14.1"
    ],
-   "expect": "none-honest"
+   "expect": "none-honest",
+   "by_organism": {
+    "human": {
+     "expect": "resolved",
+     "ec": "1.14.14.1"
+    }
+   }
   },
   {
    "query": "CYP2C9",
@@ -1926,6 +2195,10 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "1.14.14.1"
     }
    }
   },
@@ -1952,20 +2225,16 @@
    "verified": [
     "3.1.1.7"
    ],
-   "expect": "candidates",
-   "include": [
-    "3.1.1.7"
-   ]
+   "expect": "resolved",
+   "ec": "3.1.1.7"
   },
   {
    "query": "BuChE",
    "verified": [
     "3.1.1.8"
    ],
-   "expect": "candidates",
-   "include": [
-    "3.1.1.8"
-   ]
+   "expect": "resolved",
+   "ec": "3.1.1.8"
   },
   {
    "query": "DHFR E coli",
@@ -1988,30 +2257,24 @@
    "verified": [
     "2.7.1.1"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.7.1.1"
-   ]
+   "expect": "resolved",
+   "ec": "2.7.1.1"
   },
   {
    "query": "HK3",
    "verified": [
     "2.7.1.1"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.7.1.1"
-   ]
+   "expect": "resolved",
+   "ec": "2.7.1.1"
   },
   {
    "query": "AST",
    "verified": [
     "2.6.1.1"
    ],
-   "expect": "candidates",
-   "include": [
-    "2.6.1.1"
-   ]
+   "expect": "resolved",
+   "ec": "2.6.1.1"
   },
   {
    "query": "SYK",
@@ -2028,6 +2291,14 @@
     },
     "E. coli": {
      "expect": "none-honest"
+    },
+    "human": {
+     "expect": "resolved",
+     "ec": "2.7.10.2"
+    },
+    "mouse": {
+     "expect": "resolved",
+     "ec": "2.7.10.2"
     }
    }
   },
@@ -2036,10 +2307,8 @@
    "verified": [
     "4.1.1.31"
    ],
-   "expect": "candidates",
-   "include": [
-    "4.1.1.31"
-   ]
+   "expect": "resolved",
+   "ec": "4.1.1.31"
   },
   {
    "query": "AK",
@@ -2058,10 +2327,8 @@
    "verified": [
     "5.3.1.9"
    ],
-   "expect": "candidates",
-   "include": [
-    "5.3.1.9"
-   ]
+   "expect": "resolved",
+   "ec": "5.3.1.9"
   }
  ]
 }

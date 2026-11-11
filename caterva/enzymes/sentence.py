@@ -17,11 +17,17 @@ WHAT IT READS, AND WHAT IT NEVER GUESSES
 ----------------------------------------
 * The ENZYME only through `finder.resolve`, and only when that resolution
   is not a choice and not a stretch: an EC number, an accepted name typed
-  exactly, a full alternative name typed exactly, or an abbreviation the
-  curated table confirms for one enzyme alone, typed with a capital letter
-  and at least three characters long ("PKA", never "ace" in a sentence).
-  Never a typo match, a phrase inside a longer name, a stereo-tolerant match
-  ("peptidase" is not "L-peptidase") or a gene symbol. A window of words
+  exactly, a full alternative name typed exactly, or a gene symbol, lab
+  abbreviation or curated alias the symbol table maps to ONE enzyme in the
+  organism (ADR 0182: "human HK2" is hexokinase, isoform HK2; "CYP2B6" is
+  EC 1.14.14.1, isoform CYP2B6, Homo sapiens assumed and said). A symbol is
+  read only when typed with a capital letter and at least three characters
+  long ("PKA", never "ace" in a sentence), and never when it is also a
+  substrate's abbreviation ("PEP", "FBP", "G6P"). A misspelt name is read
+  only when ONE enzyme name is that close and it is said
+  (`finder.spelling_match`: "acetylcholinestrase"). Never a phrase inside a
+  longer name or a stereo-tolerant match ("peptidase" is not
+  "L-peptidase"). A window of words
   that are all class words ("kinase", "protein kinase", "MAP kinase",
   "phosphatase", "dehydrogenase", "enzyme") is not read at all: the
   nomenclature lists "protein kinase" as another name of histidine kinase
@@ -41,10 +47,18 @@ WHAT IT READS, AND WHAT IT NEVER GUESSES
   lists for the resolved enzyme, never here: "glucose" is a substrate of
   hexokinase because BRENDA has Km rows for D-glucose, not because it looks
   like a sugar.
-* The INHIBITOR from "inhibited by X", "inhibitor X" and "<enzyme> by X"
-  in a sentence about inhibition, as typed; never from a "by" after any
-  other word ("measured by fluorescence"). The Ki search then looks it up
-  as it looks up `--inhibitor`.
+* The INHIBITOR from "inhibited by X", "blocked by X", "inhibitor X",
+  "X inhibitor", "in the presence of X" and "<enzyme> by X" in a sentence
+  about inhibition, as typed; never from a "by" after any other word
+  ("measured by fluorescence"). The Ki search then looks it up as it looks
+  up `--inhibitor`. A bare "with X" is only a POSSIBLE inhibitor
+  (`possible_inhibitor_text`): whether X is one is decided against
+  BRENDA's Ki list by the caller, never here.
+* The SUBSTRATE candidates follow the verbs people use for what an enzyme
+  does to its substrate ("metabolising midazolam", "cleaving BAPNA"), and a
+  verb is never part of a candidate. A virus or strain tag ("HIV-1",
+  "K-12") or a mutation ("R132H") is never a candidate; a mutation typed
+  after the enzyme is said to be not modelled (`mutations`).
 * The SUBSTRATE candidates are whole runs of words, never one word of a
   longer compound name ("glucose" out of "glucose 6-phosphate").
 
@@ -61,7 +75,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 from .finder import (
     TIER_ACCEPTED_EXACT, TIER_ACCEPTED_TOLERANT, TIER_ALTERNATIVE_EXACT, TIER_ALTERNATIVE_TOLERANT,
     TIER_EC,
-    Ambiguous, Resolved, _tables, loose_key, read_ec, resolve, strict_key,
+    Ambiguous, Resolved, _tables, is_abbreviation, loose_key, read_ec, resolve, spelling_match, strict_key,
 )
 from .index import ORGANISMS, load_index, organism_code
 
@@ -98,7 +112,33 @@ FILLER = frozenset({
     "values", "value", "km", "kcat", "vmax", "inhibition", "inhibited", "inhibitor", "inhibitors",
     "competitive", "noncompetitive", "non-competitive", "uncompetitive", "mixed", "converting",
     "conversion", "turning", "human", "humans", "cell", "cells", "enzyme", "enzymes",
+    "presence", "absence", "blocked", "blocking", "blocks", "block",
 }) | CLASS_WORDS
+
+#: Verbs for what an enzyme does to its substrate. Each ends a candidate
+#: (it is never part of one: "cleaving BAPNA" glued the verb onto the
+#: compound and matched nothing) and starts one, like "with" or "on".
+SUBSTRATE_VERBS = frozenset({
+    "metabolising", "metabolizing", "metabolises", "metabolizes", "metabolise", "metabolize",
+    "cleaving", "cleaves", "cleave", "hydrolysing", "hydrolyzing", "hydrolyses", "hydrolyzes",
+    "hydrolyse", "hydrolyze", "phosphorylating", "phosphorylates", "phosphorylate",
+    "oxidising", "oxidizing", "oxidises", "oxidizes", "oxidise", "oxidize", "reducing", "reduces",
+    "reduce", "converting", "converts", "convert", "turning", "turns", "acting", "acts",
+    "catalysing", "catalyzing", "processing", "processes", "degrading", "degrades",
+    "deaminating", "decarboxylating", "dephosphorylating", "dephosphorylates", "transferring",
+})
+FILLER = FILLER | SUBSTRATE_VERBS
+
+#: Words that introduce a substrate candidate.
+_INTRODUCERS = frozenset({"with", "on", "for", "of", "and", "using", "over"}) | SUBSTRATE_VERBS
+
+#: A virus, strain or construct tag: never a compound ("HIV-1", "K-12",
+#: "MG1655", "BL21", "S288C").
+_TAG = re.compile(
+    r"^(?:(?:hiv|htlv|siv|hcv|hbv|hpv|sars|mers|cov)(?:-?\d+)?|sars-cov-?\d*|[a-z]{0,3}-?\d{2,5}[a-z]?\d*|\d+)$",
+    re.IGNORECASE)
+#: A point mutation: R132H, V600E.
+_MUTATION = re.compile(r"^[ACDEFGHIKLMNPQRSTVWY]\d{1,4}[ACDEFGHIKLMNPQRSTVWY*]$")
 
 #: Organism-table aliases that are also ordinary English words and are
 #: therefore not read from a sentence ("man" is an alias of Homo sapiens in
@@ -154,6 +194,22 @@ class SentenceReading:
     unread_organism: Optional[Tuple[str, str]] = None
     #: The description with the enzyme, organism and inhibitor spans removed.
     remainder: str = ""
+    #: The protein of `ec` the enzyme words name (HK2, CYP2B6, PTGS2), for
+    #: `--isoform`; None when they name the whole enzyme. (ADR 0182)
+    isoform: Optional[str] = None
+    #: True when `organism` was not named but assumed from the enzyme's
+    #: name (a human gene symbol, HIV-1 protease); `organism_note` says so.
+    organism_assumed: bool = False
+    #: Sentences about how the enzyme words were read beyond the name: the
+    #: isoform, a spelling, a mutation set aside. Part of `enzyme_note`.
+    read_notes: Tuple[str, ...] = ()
+    #: The words after a bare "with" (or "in the presence of" in a sentence
+    #: not about inhibition) when no inhibitor was read: a compound that may
+    #: be the inhibitor. The caller decides, against BRENDA's Ki list and
+    #: the substrates BRENDA lists, never this reader.
+    possible_inhibitor_text: Optional[str] = None
+    #: Point mutations typed after the enzyme ("R132H"): not modelled, said.
+    mutations: Tuple[str, ...] = ()
 
     @property
     def names_enzyme(self) -> bool:
@@ -166,6 +222,8 @@ class SentenceReading:
         name = f" ({self.enzyme_name})" if self.enzyme_name else ""
         how = self.how or "read from your description"
         text = f"Read {self.enzyme_text!r} in your description as EC {self.ec}{name}: {how}."
+        if self.read_notes:
+            text += " " + " ".join(self.read_notes)
         if self.cautions:
             text += " " + " ".join(self.cautions)
         return text
@@ -179,6 +237,9 @@ class SentenceReading:
     def organism_note(self) -> Optional[str]:
         if self.organism is None:
             return None
+        if self.organism_assumed:
+            return (f"Your description names no organism; {self.enzyme_text!r} names an enzyme of "
+                    f"{self.organism}, so {self.organism} was searched (pass --organism to change it).")
         if self.organism_text == self.organism:
             return f"Read the organism {self.organism} from your description."
         return f"Read {self.organism_text!r} in your description as {self.organism}."
@@ -208,6 +269,82 @@ class SentenceReading:
                 + ", so no enzyme was read from it: a model grounded in one of several named enzymes "
                 "would carry constants for a protein the sentence did not single out.")
         return out
+
+
+# ---------------------------------------------------------------------------
+# Substrate abbreviations
+# ---------------------------------------------------------------------------
+
+#: Lab abbreviations of substrates, and the names BRENDA lists the compound
+#: under. Each value is a list of GROUPS: the names in one group are one
+#: compound spelled the ways BRENDA's rows spell it (trypsin's page lists
+#: "N-benzoyl-DL-arginine 4-nitroanilide", "Nalpha-benzoyl-DL-arginine
+#: 4-nitroanilide" and "Nalpha-benzoyl-DL-arginine-4-nitroanilide"), and a
+#: later group is a different compound the letters are also used for (L-BAPNA
+#: after DL-BAPNA). `match_substrate` takes the first group with a name
+#: BRENDA lists, and within it the spelling with the most rows. Checked
+#: against the live BRENDA pages for 3.4.21.4, 3.2.1.23, 3.1.3.1, 2.7.1.40,
+#: 3.1.1.7 and 3.4.15.1 on 2026-11-11.
+SUBSTRATE_ABBREVIATIONS: Dict[str, Tuple[Tuple[str, ...], ...]] = {
+    "bapna": (
+        ("N-benzoyl-DL-arginine 4-nitroanilide", "Nalpha-benzoyl-DL-arginine 4-nitroanilide",
+         "Nalpha-benzoyl-DL-arginine-4-nitroanilide", "N-alpha-benzoyl-DL-arginine 4-nitroanilide",
+         "N-benzoyl-DL-arginine-4-nitroanilide", "N-benzoyl-DL-arginine p-nitroanilide",
+         "Nalpha-benzoyl-DL-arginine p-nitroanilide", "benzoyl-DL-arginine-p-nitroanilide"),
+        ("benzoyl-L-arginine-p-nitroanilide", "N-benzoyl-L-arginine-p-nitroanilide",
+         "N-alpha-benzoyl-L-arginine 4-nitroanilide", "N-alpha-benzoyl-L-arginine-p-nitroanilide",
+         "Nalpha-benzoyl-L-arginine 4-nitroanilide", "N-benzoyl-L-arginine 4-nitroanilide",
+         "Nalpha-benzoyl-L-arginine-4-nitroanilide"),
+    ),
+    "lbapna": (
+        ("benzoyl-L-arginine-p-nitroanilide", "N-benzoyl-L-arginine-p-nitroanilide",
+         "N-alpha-benzoyl-L-arginine 4-nitroanilide", "N-alpha-benzoyl-L-arginine-p-nitroanilide",
+         "Nalpha-benzoyl-L-arginine 4-nitroanilide", "N-benzoyl-L-arginine 4-nitroanilide",
+         "Nalpha-benzoyl-L-arginine-4-nitroanilide"),
+    ),
+    "baee": (
+        ("Nalpha-benzoyl-L-arginine ethyl ester", "N-alpha-benzoyl-L-arginine ethyl ester",
+         "N-benzoyl-L-arginine ethyl ester", "N-alpha-benzoyl-L-Arg ethyl ester", "N-benzoyl-L-Arg ethyl ester",
+         "benzoyl-L-arginine ethyl ester", "benzoyl-Arg ethyl ester"),
+    ),
+    "onpg": (
+        ("2-nitrophenyl beta-D-galactopyranoside", "2-nitrophenyl-beta-D-galactopyranoside",
+         "o-nitrophenyl beta-D-galactopyranoside", "o-nitrophenyl-beta-D-galactopyranoside",
+         "2-nitrophenyl beta-D-galactoside", "2-nitrophenyl-beta-D-galactoside",
+         "o-nitrophenyl beta-D-galactoside", "o-nitrophenyl-beta-D-galactoside",
+         "ortho-nitrophenyl-beta-D-galactopyranoside"),
+    ),
+    "pnpp": (("4-nitrophenyl phosphate", "p-nitrophenyl phosphate", "4-nitrophenylphosphate",
+              "p-nitrophenylphosphate"),),
+    "pnpa": (("4-nitrophenyl acetate", "p-nitrophenyl acetate"),),
+    "pep": (("phosphoenolpyruvate",),),
+    "atch": (("acetylthiocholine", "acetyl thiocholine", "acetylthiocholine iodide", "acetylthiocholine chloride"),),
+    "atci": (("acetylthiocholine iodide", "acetylthiocholine"),),
+    "btch": (("butyrylthiocholine", "S-butyrylthiocholine", "butyrylthiocholine iodide"),),
+    "g6p": (("D-glucose 6-phosphate", "glucose 6-phosphate", "D-glucose-6-phosphate"),),
+    "f6p": (("D-fructose 6-phosphate", "fructose 6-phosphate", "D-fructose-6-phosphate"),),
+    "fbp": (("D-fructose 1,6-bisphosphate", "fructose 1,6-bisphosphate", "D-fructose-1,6-bisphosphate"),),
+    "f16bp": (("D-fructose 1,6-bisphosphate", "fructose 1,6-bisphosphate", "D-fructose-1,6-bisphosphate"),),
+    "nad": (("NAD+", "beta-NAD+"),),
+    "nadh": (("NADH", "beta-NADH"),),
+    "nadp": (("NADP+", "beta-NADP+"),),
+    "nadph": (("NADPH", "beta-NADPH"),),
+    "nicotinamideadeninedinucleotide": (("NAD+",),),
+    "hhl": (("hippuryl-His-Leu", "hippuryl-L-His-L-Leu", "hippuryl-L-histidyl-L-leucine", "Hip-His-Leu"),),
+    "akg": (("2-oxoglutarate",),),
+    "aaket": (("2-oxoglutarate",),),
+    "2og": (("2-oxoglutarate",),),
+    "accoa": (("acetyl-CoA",),),
+    "sam": (("S-adenosyl-L-methionine",),),
+    "adomet": (("S-adenosyl-L-methionine",),),
+    "dhf": (("7,8-dihydrofolate", "dihydrofolate"),),
+    "thf": (("5,6,7,8-tetrahydrofolate", "tetrahydrofolate"),),
+}
+
+
+def _substrate_key(text: str) -> str:
+    """Letters and digits only, lower case: "pNPP", "p-NPP" and "PNPP" are one key."""
+    return re.sub(r"[^0-9a-z]+", "", (text or "").lower())
 
 
 # ---------------------------------------------------------------------------
@@ -359,6 +496,19 @@ def _acceptable(result: Resolved, typed: str) -> bool:
         return False
     if candidate.tier == TIER_EC:
         return True
+    if _substrate_key(typed) in SUBSTRATE_ABBREVIATIONS:
+        # "PEP", "FBP", "G6P": a compound in a sentence, whatever enzyme
+        # the letters are also an abbreviation of.
+        return False
+    if candidate.via == "abbreviation" or (result.isoform is not None or result.notes) and candidate.via != "typo":
+        # A symbol, abbreviation or alias the table reads as ONE enzyme
+        # (ADR 0182). Written as one: a capital letter and three
+        # characters ("HK2", "CYP2B6", "AChE"), or a name in words
+        # ("angiotensin-converting enzyme", "HIV-1 protease").
+        if is_abbreviation(typed):
+            letters = re.sub(r"[^0-9A-Za-z]", "", typed)
+            return len(letters) >= 3 and any(ch.isupper() for ch in typed)
+        return True
     if candidate.partial or candidate.via != "name":
         return False
     if candidate.tier not in (TIER_ACCEPTED_EXACT, TIER_ALTERNATIVE_EXACT):
@@ -413,7 +563,9 @@ def _could_be_a_name(text: str) -> bool:
     global _KEYS
     if _KEYS is None:
         _KEYS = _name_keys()
-    return strict_key(text) in _KEYS or loose_key(text) in _KEYS
+    from .symbols import load_symbols
+
+    return strict_key(text) in _KEYS or loose_key(text) in _KEYS or load_symbols().knows(text)
 
 
 def _read_ec(tokens: List[_Token]) -> List[Tuple[int, int, str]]:
@@ -454,15 +606,43 @@ def _phrase_after(tokens: List[_Token], i: int) -> Optional[Tuple[int, int]]:
     return (i, j) if j > i else None
 
 
+def _about_inhibition(tokens: List[_Token]) -> bool:
+    return any(t.low.startswith(("inhibit", "block")) for t in tokens)
+
+
+def _phrase_before(tokens: List[_Token], i: int) -> Optional[Tuple[int, int]]:
+    """The run of unconsumed, non-joining, non-filler words ending just before i."""
+    j = i
+    while j > 0 and not tokens[j - 1].used and not _joins(tokens[j - 1]) and tokens[j - 1].low not in FILLER:
+        j -= 1
+    return (j, i) if j < i else None
+
+
 def _read_inhibitor(tokens: List[_Token]) -> Optional[Tuple[int, int]]:
     lows = [t.low for t in tokens]
-    about_inhibition = any(w.startswith("inhibit") for w in lows)
+    about_inhibition = _about_inhibition(tokens)
     for i, word in enumerate(lows):
         start = None
-        if word in ("inhibitor", "inhibitors") and i + 1 < len(tokens) and not _joins(tokens[i + 1]):
+        if word in ("inhibitor", "inhibitors") and i + 1 < len(tokens) and not _joins(tokens[i + 1]) \
+                and not all(t.low in FILLER for t in tokens[i + 1:(_phrase_after(tokens, i + 1) or (i, i + 1))[1]]):
             start = i + 1
+        elif word in ("inhibitor", "inhibitors") and i > 0:
+            # "a celecoxib inhibitor"? No: "X inhibitor" is "the drug X as
+            # the inhibitor" only when X is not the enzyme ("a COX-2
+            # inhibitor" names the enzyme, already consumed) and not a
+            # mode ("competitive inhibitor", filler).
+            span = _phrase_before(tokens, i)
+            if span is not None:
+                # "ACE inhibitor", "kinase inhibitor": an inhibitor OF an
+                # enzyme, not a compound called that.
+                typed = " ".join(t.raw for t in tokens[span[0]:span[1]])
+                if not _could_be_a_name(typed):
+                    return span
+            continue
+        elif word == "presence" and about_inhibition and i + 2 < len(tokens) and lows[i + 1] == "of":
+            start = i + 2
         elif (word == "by" and about_inhibition and i > 0
-              and (lows[i - 1].startswith("inhibit") or tokens[i - 1].used)):
+              and (lows[i - 1].startswith(("inhibit", "block")) or tokens[i - 1].used)):
             # Only "inhibited by X", "inhibition by X" or "<enzyme or
             # organism> by X". Any "by" after an inhibition word read
             # "competitive inhibition of hexokinase on glucose measured by
@@ -478,6 +658,29 @@ def _read_inhibitor(tokens: List[_Token]) -> Optional[Tuple[int, int]]:
             if not all(w in FILLER for w in words):
                 return span
     return None
+
+
+#: How the symbol table's sentence about an assumed organism starts; that
+#: sentence goes to `organism_note`, not the enzyme note.
+_ASSUMED = "No organism was given"
+
+
+def _is_tag(raw: str) -> bool:
+    """A virus, strain or construct tag, a bare number or a mutation: never a
+    compound. A substrate abbreviation ("G6P", "F6P") is not a tag."""
+    if _substrate_key(raw) in SUBSTRATE_ABBREVIATIONS:
+        return False
+    return bool(_TAG.match(raw) or _MUTATION.match(raw))
+
+
+def _assumed_organism(read_organism, given: Optional[str], assumed: Optional[str], organisms) -> Dict[str, object]:
+    """organism fields of the reading: the one named, else the one the
+    enzyme's name implies when nothing was given or named."""
+    if read_organism is not None:
+        return {"organism": read_organism[1], "organism_text": read_organism[0]}
+    if assumed and not given and not organisms:
+        return {"organism": assumed, "organism_text": None, "organism_assumed": True}
+    return {"organism": None, "organism_text": None}
 
 
 def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
@@ -539,6 +742,26 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
         for k in range(first, last):
             tokens[k].used = True
 
+    if not hits and ambiguity is None and near is None:
+        # A misspelt name: ONE enzyme name within a letter or two, ending
+        # the way an enzyme name ends (finder.spelling_match). Said, never
+        # silent: the note reads "Read 'acetylcholinestrase' as
+        # acetylcholinesterase (spelling)".
+        for first, last, words in _windows(tokens):
+            if len(words) > 3 or any(w.used for w in words) or _is_class_window(words):
+                continue
+            if any(w.low in FILLER for w in words):
+                continue
+            typed = text[words[0].start:words[-1].end]
+            if spelling_match(typed) is None:
+                continue
+            result = resolve(typed, rank_by)
+            if isinstance(result, Resolved) and result.candidate is not None and result.candidate.via == "typo":
+                hits.append((first, last, typed, result))
+                for k in range(first, last):
+                    tokens[k].used = True
+                break
+
     enzyme: Optional[Tuple[str, Resolved]] = None
     others: List[Tuple[str, str, str]] = []
     distinct_ecs = []
@@ -553,6 +776,36 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
         for ec, (typed, result) in distinct_ecs:
             name = result.candidate.name if result.candidate else ""
             others.append((typed, ec, name))
+
+    # A point mutation typed right after the enzyme ("IDH1 R132H") is not
+    # modelled: set aside and said, never a substrate candidate.
+    mutations: List[str] = []
+    if enzyme is not None:
+        for first, last, typed_hit, _ in hits:
+            k = last
+            while k < len(tokens) and not tokens[k].used and _MUTATION.match(tokens[k].raw):
+                mutations.append(tokens[k].raw)
+                tokens[k].used = True
+                k += 1
+    # The isoform and assumed organism of the enzyme, from any window that
+    # named it: "beta lactamase TEM-1" reads the enzyme from "beta
+    # lactamase" and the isoform from "TEM-1".
+    isoform: Optional[str] = None
+    assumed: Optional[str] = None
+    read_notes: List[str] = []
+    if enzyme is not None:
+        for _, _, _, result in sorted(hits, key=lambda hit: hit[0]):
+            if result.ec != enzyme[1].ec:
+                continue
+            if result.isoform and isoform is None:
+                isoform = result.isoform
+            if result.organism and assumed is None:
+                assumed = result.organism
+            read_notes.extend(n for n in result.notes if n not in read_notes and not n.startswith(_ASSUMED))
+        if mutations:
+            from .policy import mutation_note
+
+            read_notes.append(mutation_note(enzyme[0], mutations))
 
     unread_organism = _misspelt_organism(tokens) if not organisms and (hits or ambiguity) else None
     inhibitor_span = _read_inhibitor(tokens)
@@ -583,15 +836,28 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
             if w is not None and w.low not in FILLER:
                 run.append(w)
                 continue
-            if run:
+            if run and not all(_is_tag(t.raw) for t in run):
                 phrase = text[run[0].start:run[-1].end]
                 if phrase not in candidates:
                     candidates.append(phrase)
             run = []
 
+    possible_inhibitor: Optional[str] = None
     for i, token in enumerate(tokens):
-        if token.low in ("with", "on", "for", "of", "and", "using") and not token.used:
-            add(_phrase_after(tokens, i + 1))
+        if token.low in _INTRODUCERS and not token.used:
+            span = _phrase_after(tokens, i + 1)
+            before = len(candidates)
+            add(span)
+            if token.low == "with" and possible_inhibitor is None and inhibitor_text is None \
+                    and len(candidates) > before:
+                possible_inhibitor = candidates[before]
+        elif (token.low == "presence" and i + 2 < len(tokens) and tokens[i + 1].low == "of"
+              and possible_inhibitor is None and inhibitor_text is None):
+            span = _phrase_after(tokens, i + 2)
+            if span is not None:
+                phrase = text[tokens[span[0]].start:tokens[span[1] - 1].end]
+                if not all(t.low in FILLER for t in tokens[span[0]:span[1]]):
+                    possible_inhibitor = phrase
     i = 0
     while i < len(tokens):
         span = _phrase_after(tokens, i)
@@ -608,13 +874,14 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
             text=text, enzyme_text=typed, ec=result.ec,
             enzyme_name=result.candidate.name if result.candidate else None,
             how=result.how, cautions=tuple(result.cautions),
-            organism=read_organism[1] if read_organism else None,
-            organism_text=read_organism[0] if read_organism else None,
             substrate_text=candidates[0] if candidates else None,
             substrate_candidates=tuple(candidates), inhibitor_text=inhibitor_text,
             organisms_named=tuple((t, b) for _, _, t, b in organisms) if len(distinct) > 1 else (),
-            unread_organism=unread_organism, remainder=remainder)
-    return SentenceReading(near=near if ambiguity is None and not others else None,
+            unread_organism=unread_organism, remainder=remainder,
+            isoform=isoform, read_notes=tuple(read_notes), possible_inhibitor_text=possible_inhibitor,
+            mutations=tuple(mutations),
+            **_assumed_organism(read_organism, organism, assumed, organisms))
+    return SentenceReading(possible_inhibitor_text=possible_inhibitor,near=near if ambiguity is None and not others else None,
         text=text, enzyme_text=ambiguity_text if ambiguity is not None else None,
         organism=read_organism[1] if read_organism else None,
         organism_text=read_organism[0] if read_organism else None,
@@ -655,6 +922,36 @@ class SubstrateMatch:
     prefix_set_aside: bool = False
     #: (typed, BRENDA name) for every match, when there was more than one.
     rivals: Tuple[Tuple[str, str], ...] = field(default_factory=tuple)
+    #: The abbreviation that was expanded ("BAPNA"), when the match came
+    #: through SUBSTRATE_ABBREVIATIONS; None otherwise.
+    abbreviation: Optional[str] = None
+
+    def note(self) -> Optional[str]:
+        """A sentence for the expansion of an abbreviation, or None."""
+        if self.name is None or self.abbreviation is None:
+            return None
+        return (f"Read {self.abbreviation!r} as {self.name}, the name BRENDA lists for that abbreviation's "
+                "compound.")
+
+
+def _expand(typed: str, listed: Sequence[str], counts: Dict[str, int]) -> Optional[str]:
+    """BRENDA's name for an abbreviation typed, or None. See SUBSTRATE_ABBREVIATIONS."""
+    groups = SUBSTRATE_ABBREVIATIONS.get(_substrate_key(typed))
+    if not groups:
+        return None
+    by_key: Dict[str, List[str]] = {}
+    for name in listed:
+        by_key.setdefault(strict_key(name), []).append(name)
+    for group in groups:
+        found: List[str] = []
+        for spelling in group:
+            for name in by_key.get(strict_key(spelling), ()):
+                if name not in found:
+                    found.append(name)
+        if found:
+            # One compound, spelled several ways: the spelling with the most rows.
+            return sorted(found, key=lambda n: (-counts.get(n, 0), found.index(n)))[0]
+    return None
 
 
 def match_substrate(candidates: Sequence[str], listed: Sequence[str]) -> SubstrateMatch:
@@ -668,17 +965,32 @@ def match_substrate(candidates: Sequence[str], listed: Sequence[str]) -> Substra
     "glucose") are a choice, and so are two candidates that each name a
     different substrate ("glucose and ATP"): either returns no name and the
     rivals, so the caller's refusal, which lists BRENDA's substrates, runs.
+
+    A lab abbreviation ("BAPNA", "ONPG", "pNPP", "PEP", "ATCh", "G6P") is
+    expanded to the names BRENDA lists the compound under
+    (SUBSTRATE_ABBREVIATIONS) and accepted only as one of them; `listed`
+    may be a mapping of name to row count, and then the spelling of that
+    compound with the most rows is taken.
     """
+    counts: Dict[str, int] = dict(listed) if isinstance(listed, dict) else {}
+    listed = list(listed)
     by_key: Dict[str, List[str]] = {}
     stripped: Dict[str, List[str]] = {}
     for name in listed:
         by_key.setdefault(strict_key(name), []).append(name)
         stripped.setdefault(_without_stereo(name), []).append(name)
     found: List[Tuple[str, str, bool]] = []
+    expanded: Dict[str, str] = {}
     for typed in candidates:
         key = strict_key(typed)
         if not key:
             continue
+        if key not in by_key:
+            name = _expand(typed, listed, counts)
+            if name is not None:
+                found.append((typed, name, False))
+                expanded[name] = typed
+                continue
         exact = by_key.get(key)
         if exact:
             if len(set(exact)) == 1:
@@ -692,10 +1004,12 @@ def match_substrate(candidates: Sequence[str], listed: Sequence[str]) -> Substra
     names = sorted({name for _, name, _ in found})
     if len(names) == 1:
         typed, name, prefix = next(f for f in found if f[1] == names[0])
-        return SubstrateMatch(name=name, typed=typed, prefix_set_aside=prefix)
+        return SubstrateMatch(name=name, typed=typed, prefix_set_aside=prefix,
+                              abbreviation=expanded.get(name) if expanded.get(name) == typed else None)
     return SubstrateMatch(rivals=tuple((t, n) for t, n, _ in found))
 
 
 __all__ = [
-    "CLASS_WORDS", "SentenceReading", "SubstrateMatch", "match_substrate", "read_sentence",
+    "CLASS_WORDS", "SUBSTRATE_ABBREVIATIONS", "SUBSTRATE_VERBS", "SentenceReading", "SubstrateMatch",
+    "match_substrate", "read_sentence",
 ]

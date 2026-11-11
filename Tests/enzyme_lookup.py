@@ -453,6 +453,44 @@ def fetch_ec_numbers_by_name(
     return parse_ec_number_candidates(r.json())
 
 
+#: NCBI taxon of Homo sapiens: a gene symbol is searched in human unless the
+#: caller says otherwise, because a symbol is one organism's (IDH1 is the
+#: NADP enzyme in human and the NAD one in yeast).
+HUMAN_TAXON = "9606"
+
+#: A gene symbol as UniProt's `gene_exact:` field takes it: letters, digits,
+#: hyphen, dot. Anything else is not sent, so a sentence never becomes a query.
+_GENE_SYMBOL = re.compile(r"^[A-Za-z][A-Za-z0-9.\-]{1,19}$")
+
+
+def fetch_ec_numbers_by_gene(
+    symbol: str, taxon_id: str | None = HUMAN_TAXON, timeout: float = 15
+) -> list[str]:
+    """Every EC number UniProt files the reviewed entries of GENE `symbol` under.
+
+    The protein-name search above cannot find "CYP2B6": no protein is NAMED
+    that, it is the gene. This asks UniProt's exact gene-name field instead
+    (`gene_exact:CYP2B6 AND reviewed:true AND organism_id:9606`), human by
+    default because a gene symbol is one organism's. The caller decides
+    what several EC numbers mean; this returns them all, in UniProt's
+    order, duplicates dropped. A text that is not shaped like a gene
+    symbol is not sent and gives [].
+    """
+    symbol = (symbol or "").strip()
+    if not _GENE_SYMBOL.match(symbol):
+        return []
+    query = f"gene_exact:{symbol} AND reviewed:true"
+    if taxon_id:
+        query += f" AND organism_id:{taxon_id}"
+    r = retry_get(
+        UNIPROT_SEARCH_URL,
+        params={"query": query, "fields": "accession,ec,gene_primary", "format": "json", "size": 25},
+        timeout=timeout,
+    )
+    r.raise_for_status()
+    return parse_ec_number_candidates(r.json())
+
+
 class EnzymeNameNotResolved(ValueError):
     """A name did not identify exactly one enzyme.
 
