@@ -106,9 +106,25 @@ export function rowsLine(rows: Record<string, number>): string {
  */
 export function rerunPatch(choices: readonly SearchChoice[], index: number, option: string): RerunPatch {
   const patch: RerunPatch = {};
-  for (const earlier of choices.slice(0, index)) patch[FIELD_OF_ROLE[earlier.role]] = earlier.chosen;
-  patch[FIELD_OF_ROLE[choices[index].role]] = option;
+  for (const earlier of choices.slice(0, index)) patch[FIELD_OF_ROLE[earlier.role]] = fieldValue(earlier.role, earlier.chosen);
+  patch[FIELD_OF_ROLE[choices[index].role]] = fieldValue(choices[index].role, option);
   return patch;
+}
+
+/** An EC number anywhere in a string: "EC 4.1.3.7 (citrate (Si)-synthase)" -> "4.1.3.7". */
+const EC_IN = /\b(\d+\.\d+\.\d+\.n?\d+)\b/;
+
+/**
+ * What a chosen or offered name puts in its request field. An enzyme
+ * alternative is written for a reader ("EC 2.3.3.1 (citrate (Re)-synthase)",
+ * caterva/compose/defaults.py), and the subject field takes the bare EC
+ * number: sent as written, the run would get no subject at all and a name
+ * to read instead, which is not the enzyme the chip named. Every other role
+ * is the name itself.
+ */
+export function fieldValue(role: ChoiceRole, name: string): string {
+  if (role !== "enzyme") return name;
+  return EC_IN.exec(name)?.[1] ?? name;
 }
 
 /**

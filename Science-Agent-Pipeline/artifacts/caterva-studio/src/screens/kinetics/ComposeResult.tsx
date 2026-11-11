@@ -362,20 +362,29 @@ function LedgerRows({ values, name }: { values: { key: string; name: string; v: 
  * of a one-enzyme model was looked up for the search's substrate, and its Ki for the one inhibitor the search
  * named. The engine takes a row only for exactly that compound (ADR 0182), so this repeats what it searched for;
  * a model with two Km constants (two enzymes) gets nothing, because which substrate is whose is not in the row.
+ *
+ * ONLY WHEN NO OTHER COMPOUND COULD HAVE BEEN SEARCHED. The engine looks a constant up under the compound
+ * named for its own port first (`--compound S=D-fructose`, caterva/compose/pipeline.py `compound_for`), and
+ * only then under the substrate or "@inhibitor"; a product's constant goes under "@product". None of that is
+ * in the row. So once the search used any compound but "@inhibitor", a lone Km may have been measured for a
+ * compound other than `search.substrate`, and a lone Ki for another than "@inhibitor": the ledger names
+ * nothing rather than print a compound beside a number that was not measured for it.
  */
 export function compoundOf(v: SourcedValue, result: Result): string | null {
   if (v.provenance.kind !== "measured" || !v.label) return null;
   const same = result.model.parameters.filter((p) => p.label === v.label).length;
   if (same !== 1) return null;
   const s = result.search;
+  const searched = Object.keys(s.compounds ?? {});
+  if (searched.some((port) => port !== "@inhibitor")) return null;
   if ((v.label === "Km" || v.label === "kcat") && s.substrate) return `substrate ${s.substrate}`;
-  const inhibitors = Object.entries(s.compounds ?? {}).filter(([port]) => port === "@inhibitor");
-  if (v.label === "Ki" && inhibitors.length === 1) return `inhibitor ${inhibitors[0][1]}`;
+  const inhibitor = s.compounds?.["@inhibitor"];
+  if (v.label === "Ki" && inhibitor) return `inhibitor ${inhibitor}`;
   return null;
 }
 
 /** How many of the model's constants are measured, and from where: the page's one-glance answer to "is this real data?". */
-export function measuredTally(result: Result): { measured: number; placeholders: number; total: number; brenda: boolean } {
+export function measuredTally(result: Result): { measured: number; placeholders: number; total: number; brenda: boolean; crossSpecies: number } {
   const constants = result.model.parameters;
   const measured = constants.filter((p) => p.provenance.kind === "measured");
   return {
@@ -383,6 +392,7 @@ export function measuredTally(result: Result): { measured: number; placeholders:
     placeholders: constants.filter((p) => p.provenance.kind === "placeholder").length,
     total: constants.length,
     brenda: measured.length > 0 && measured.every((p) => (p.provenance.citation?.registry ?? "").toUpperCase() === "BRENDA"),
+    crossSpecies: measured.filter((p) => p.provenance.cross_species).length,
   };
 }
 
@@ -401,6 +411,9 @@ export function MeasuredBadge({ result }: { result: Result }) {
       <span className="k-measured-count">
         {t.measured} of {plural(t.total, "constant")} measured{source}
       </span>
+      {/* "Measured" alone would read as measured in the model's organism; a row from another one says so in the
+          ledger, and the count here says so before the ledger is reached. */}
+      {t.crossSpecies ? <span className="text-caution">{` (${t.crossSpecies} in another organism than the model's)`}</span> : null}
       {t.placeholders ? (
         <>
           {" · "}
@@ -480,6 +493,14 @@ function Search({ result }: { result: Result }) {
   );
 }
 
+/** The engine writes a choice's why as a clause ("of the 12 substrates BRENDA lists ..."); shown alone, it is a sentence. */
+function sentence(clause: string): string {
+  const t = clause.trim();
+  if (!t) return t;
+  const head = t[0].toUpperCase() + t.slice(1);
+  return /[.!?]$/.test(head) ? head : `${head}.`;
+}
+
 const ROLE_WORD: Record<SearchChoice["role"], string> = {
   substrate: "substrate",
   inhibitor: "inhibitor",
@@ -516,7 +537,7 @@ function ChoicePanel({
           {choice.role === "organism" ? <em>{choice.chosen}</em> : choice.chosen}
         </span>
       </p>
-      {choice.why ? <p className="k-choice-why">{plain(choice.why)}</p> : null}
+      {choice.why ? <p className="k-choice-why">{sentence(plain(choice.why))}</p> : null}
       {listed.length ? (
         <div className="k-choice-alts">
           <p className="k-choice-alts-label muted">

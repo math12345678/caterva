@@ -31,7 +31,7 @@ import hexokinaseDetail from "@/__fixtures__/api/enzymes/detail-2.7.1.1-human.js
 import gossypol from "@/__fixtures__/api/kinetics/compose-ldh-gossypol.json";
 import shapes from "@/__fixtures__/api/kinetics/compose-shapes.json";
 import { frame, json, mockServer, setSessionToken, sseResponse } from "@/__tests__/helpers";
-import { choicesOf, mismatchOf, rerunPatch, rowsLine, type SearchChoice } from "@/api/choices";
+import { choicesOf, fieldValue, mismatchOf, rerunPatch, rowsLine, type SearchChoice } from "@/api/choices";
 import { resetRunStreamsForTests } from "@/api/runs";
 import type { ComposeResult, RunRecord } from "@/api/types";
 
@@ -105,6 +105,19 @@ describe("reading the choices a result carries", () => {
     // Switching the organism lets the engine choose the substrate again, for the new organism.
     expect(rerunPatch(choices, 0, "Saccharomyces cerevisiae")).toEqual({ organism: "Saccharomyces cerevisiae" });
     expect(rerunPatch([{ ...SUBSTRATE_CHOICE, role: "enzyme" }], 0, "2.7.1.2")).toEqual({ subject: "2.7.1.2" });
+  });
+
+  it("sends an enzyme alternative written for a reader as the bare EC number the subject field takes", () => {
+    // caterva/compose/defaults.py names an enzyme alternative "EC 2.3.3.1 (citrate (Re)-synthase)"; sent as
+    // written it would be a name to read, not a subject, and the run would not be about the enzyme on the chip.
+    const enzyme: SearchChoice = { role: "enzyme", chosen: "2.3.3.16", why: "", alternatives: [], considered: 2 };
+    expect(rerunPatch([enzyme], 0, "EC 2.3.3.1 (citrate (Re)-synthase)")).toEqual({ subject: "2.3.3.1" });
+    expect(rerunForm({ description: "Michaelis Menten" }, rerunPatch([enzyme], 0, "EC 2.3.3.1 (citrate (Re)-synthase)"))).toMatchObject({
+      subject: "2.3.3.1",
+      subjectSeed: "",
+    });
+    // Other roles are the name itself, an "EC" in it included.
+    expect(fieldValue("substrate", "EC 1.1.1.1 substrate")).toBe("EC 1.1.1.1 substrate");
   });
 
   it("re-runs the run's own request with the field set, and clears an isoform when the enzyme or organism moves", () => {
@@ -190,6 +203,31 @@ describe("measured or placeholder, at a glance", () => {
       expect(line.textContent!.indexOf(p.provenance.organism!)).toBeLessThan(line.textContent!.indexOf(compound));
       expect(line.textContent!.indexOf(compound)).toBeLessThan(line.textContent!.indexOf(p.provenance.citation!.text));
     }
+  });
+
+  it("names no compound once the search could have looked a constant up under another compound than the substrate", () => {
+    // `--compound S=D-fructose` puts the substrate port's Km under D-fructose (pipeline.py compound_for), and
+    // the row does not say so: printing "substrate pyruvate" beside it would cite a number for the wrong compound.
+    const result = cap<ComposeResult>(gossypol.result);
+    const portNamed: ComposeResult = { ...result, search: { ...result.search, compounds: { ...result.search.compounds, S: "D-fructose" } } };
+    for (const p of result.model.parameters.filter((v) => v.provenance.kind === "measured")) {
+      expect(compoundOf(p, result)).not.toBeNull();
+      expect(compoundOf(p, portNamed)).toBeNull();
+    }
+    const product: ComposeResult = { ...result, search: { ...result.search, compounds: { "@product": "lactate" } } };
+    expect(result.model.parameters.filter((p) => p.provenance.kind === "measured").map((p) => compoundOf(p, product))).toEqual([null, null]);
+  });
+
+  it("says in the badge how many measured constants come from another organism than the model's", () => {
+    const result = cap<ComposeResult>(gossypol.result);
+    const firstMeasured = result.model.parameters.findIndex((p) => p.provenance.kind === "measured");
+    const parameters = result.model.parameters.map((p, i) =>
+      i === firstMeasured ? { ...p, provenance: { ...p.provenance, cross_species: true } } : p,
+    );
+    const crossed: ComposeResult = { ...result, model: { ...result.model, parameters } };
+    expect(measuredTally(crossed).crossSpecies).toBe(1);
+    render(<ComposeResultView result={crossed} run={cap<RunRecord>(gossypol.run)} />);
+    expect(screen.getByTestId("measured-badge")).toHaveTextContent("(1 in another organism than the model's)");
   });
 
   it("names no compound where the row does not say whose it is", () => {
