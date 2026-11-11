@@ -34,6 +34,8 @@ import {
   type InhibitionMode,
   type KineticQuantity,
 } from '../literature/literatureResolver';
+import { formatDerived, formatValue } from './formatNumber';
+import type { AutomaticChoice } from './chooseMissing';
 
 const BOLD = '[1m';
 const DIM = '[2m';
@@ -74,6 +76,11 @@ export interface ResolveOptions {
     temperatureToleranceC: number;
   };
   json: boolean;
+  /** The substrate (inhibitor) or organism the CLI CHOSE because none was
+   *  given (ADR 0182, chooseMissing.ts), in the order chosen. Printed
+   *  before the lookup for a person; under --json they are only in the
+   *  document, so every --json answer carries them, found or not. */
+  choices?: AutomaticChoice[];
 }
 
 /**
@@ -138,6 +145,9 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
             logs: result.logs,
             source: result.source,
             withheld: withheldSentence(result),
+            // The names this lookup was for that nobody typed: "not found
+            // for D-glucose" is about the substrate Caterva chose.
+            choices: options.choices ?? [],
             // Machine-readable too, not only in the prose above. A script
             // driving `resolve --json` is exactly the caller who would go
             // and fetch these.
@@ -211,13 +221,17 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
   }
 
   if (options.json) {
-    process.stdout.write(JSON.stringify({ ok: true, status: 'found', ...result }, null, 2) + '\n');
+    // `choices` beside the value: under --json nothing else says that the
+    // substrate (or organism) it is the constant of was chosen, not typed.
+    process.stdout.write(
+      JSON.stringify({ ok: true, status: 'found', ...result, choices: options.choices ?? [] }, null, 2) + '\n',
+    );
     return 0;
   }
 
   const label = quantity.toUpperCase();
   process.stdout.write(
-    `\n${c(GREEN, '✓')} ${c(BOLD, `${label} = ${result.value} ${result.unit}`)}\n\n`,
+    `\n${c(GREEN, '✓')} ${c(BOLD, `${label} = ${formatValue(result.value)} ${result.unit}`)}\n\n`,
   );
 
   const rows: Array<[string, string]> = [
@@ -239,7 +253,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
   if (result.bridgedVmax !== undefined) {
     rows.push([
       'Vmax',
-      `${result.bridgedVmax} mM/s  ${DIM}= kcat × [E]0, computed by the engine${RESET}`,
+      `${formatDerived(result.bridgedVmax)} mM/s  ${DIM}= kcat × [E]0, computed by the engine${RESET}`,
     ]);
   }
 
@@ -279,7 +293,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
     for (const row of rows) {
       const unit = row.unit ? ` ${row.unit}` : '';
       const ref = row.reference_id ? c(DIM, `  [ref ${row.reference_id}]`) : '';
-      process.stdout.write(`    ${row.value}${unit}${ref}\n`);
+      process.stdout.write(`    ${formatValue(row.value)}${unit}${ref}\n`);
       process.stdout.write(
         c(DIM, `        ${row.grades.assay_completeness} / ` +
           `${row.grades.condition_proximity} / ${row.grades.organism_match}\n`),
@@ -332,7 +346,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
       const ref = cand.reference_id ? c(DIM, `  [ref ${cand.reference_id}]`) : '';
       const returned = cand.selected ? c(DIM, '  (returned)') : '';
       process.stdout.write(
-        `${mark}${cand.value}${cand.unit ? ' ' + cand.unit : ''}${ref}${returned}\n` +
+        `${mark}${formatValue(cand.value)}${cand.unit ? ' ' + cand.unit : ''}${ref}${returned}\n` +
           (cand.conditions ? `${c(DIM, '        ' + cand.conditions)}\n` : ''),
       );
     }

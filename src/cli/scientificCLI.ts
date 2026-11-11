@@ -14,7 +14,15 @@ import { convertConcentration, vmaxInSubstrateUnitsPerSecond } from '../units';
 import { exportModel, type ExportProvenance } from './exportArtifacts';
 import { formatResolveCommand } from './suggestResolveCommand';
 import { confirmSystem, terminalIO } from './confirmSystem';
-import { canonicalOrganism, flagsContradicting, readSystemFromQuery } from './readSystem';
+import {
+  canonicalOrganism,
+  enzymeIdentity,
+  flagsContradicting,
+  readPartialSystemFromQuery,
+  readSystemFromQuery,
+} from './readSystem';
+import { askChooser, completeByChoosing, describeChoice, type AutomaticChoice } from './chooseMissing';
+import type { ParsedSystem } from './suggestResolveCommand';
 import { commandDomains } from './commandDomains';
 import { commandEnsemble } from './commandEnsemble';
 
@@ -1190,8 +1198,11 @@ ${colors.bright}Commands:${colors.reset}
     Never invents a value.
     ${colors.dim}Example:${colors.reset} resolve "lactate dehydrogenase" --substrate pyruvate --organism "Homo sapiens"
     ${colors.dim}Options:${colors.reset}
-      --substrate NAME     substrate the constant was measured against (required)
-      --organism NAME      organism to search for (required)
+      --substrate NAME     substrate the constant was measured against. Left
+                           out, the substrate with the most BRENDA rows is
+                           chosen, and the choice and the others are printed
+      --organism NAME      organism to search for; chosen the same way when
+                           left out
       --ec NUMBER          EC number, if you know it (else resolved via UniProt)
       --quantity km|ki|kcat  which constant to resolve (default: km)
       --cite NAME="SOURCE"  Attach a source to a value YOU supplied, e.g.
@@ -1281,7 +1292,9 @@ ${colors.bright}Commands:${colors.reset}
   simulate <query> --resolve --enzyme E --substrate S --organism O [options]
     Look up the kinetics from literature, run the simulation, and print
     where every number came from. Refuses to run on anything it could not
-    source -- no parameter is ever defaulted.
+    source -- no parameter is ever defaulted. A substrate or organism the
+    question leaves out is chosen from BRENDA (the best-measured one) and
+    shown, with the alternatives, before you confirm.
     ${colors.dim}Example:${colors.reset}
       simulate mm --resolve --enzyme "lactate dehydrogenase" \\
         --substrate pyruvate --organism "Homo sapiens" \\
@@ -1500,7 +1513,40 @@ async function main() {
           // gets the old refusal plus the exact command. A default-confirm
           // would be the silent inference this forbids, with a prompt in the
           // code that nobody ever sees.
-          const parsed = readSystemFromQuery(query);
+          let parsed: ParsedSystem | null = readSystemFromQuery(query);
+          // NO SUBSTRATE OR NO ORGANISM IS A CHOICE NOW, NOT A REFUSAL
+          // (ADR 0182). When the sentence and the flags name the enzyme but
+          // not the substrate or the organism, the engine's chooser picks
+          // the best-measured real one from BRENDA, and the confirmation
+          // below shows what it chose, why, and the alternatives -- the
+          // person still agrees to the whole system before anything is
+          // cited. When BRENDA has nothing to choose from, the old refusal
+          // stands, followed by the chooser's sentence saying what is
+          // missing. See chooseMissing.ts.
+          let nothingToChoose: string | undefined;
+          if (!parsed) {
+            const partial = readPartialSystemFromQuery(query);
+            const typedOrganism = organism ? canonicalOrganism(organism) : undefined;
+            const named = {
+              enzyme: partial?.enzyme ?? enzyme,
+              ec: partial?.ec ?? ec,
+              ecName: partial?.ecName,
+              organism: partial?.organism ?? typedOrganism?.organism,
+              organismTyped: partial?.organism !== undefined ? partial.organismTyped : typedOrganism?.typed,
+              substrate,
+            };
+            if (!named.ec && named.enzyme) {
+              Object.assign(named, enzymeIdentity(named.enzyme, named.organism));
+            }
+            if (named.ec && (named.enzyme || ec)) {
+              const completed = completeByChoosing(named);
+              if (completed.kind === 'complete') {
+                parsed = completed.system;
+              } else if (completed.kind === 'nothing') {
+                nothingToChoose = completed.note;
+              }
+            }
+          }
           // A flag the sentence contradicts is refused BEFORE anything is
           // confirmed: the reading below used to overwrite all three names,
           // so `"hexokinase glucose mouse" --organism human` cited mouse
@@ -1528,9 +1574,14 @@ async function main() {
             : null;
 
           if (parsed && decision?.confirmed === true) {
-            enzyme = parsed.enzyme;
+            enzyme = parsed.enzyme.startsWith('EC ') && ec ? enzyme : parsed.enzyme;
             substrate = parsed.substrate;
             organism = parsed.organism;
+            // Said again after the confirmation, on stderr, so a --yes run's
+            // transcript and a --json run's log both carry the choice.
+            for (const choice of parsed.choices ?? []) {
+              if (!booleans.has('json')) info(describeChoice(choice));
+            }
           } else {
             error(
               '--resolve needs --substrate, --organism, and either --enzyme or --ec. ' +
@@ -1538,6 +1589,10 @@ async function main() {
               'confirmation: attaching a real citation to a system you did not ' +
               'name is provenance for the wrong measurement.'
             );
+            if (nothingToChoose) {
+              // What is missing, and what would fix it: the chooser's words.
+              console.error('\n' + colors.dim + nothingToChoose + colors.reset);
+            }
             if (parsed) {
               // The parse succeeded and was refused, or could not be put. Say
               // which, because "declined" and "nobody was there to ask" are
@@ -1825,16 +1880,69 @@ async function main() {
 
     case 'resolve': {
       const { flags, booleans } = parseArgs(rest);
-      const substrate = flags['substrate'];
-      const organism = flags['organism'];
+      let substrate = flags['substrate'];
+      let organism = flags['organism'];
       const enzyme = flags['enzyme'] ?? rest.find(a => !a.startsWith('--'));
       const ec = flags['ec'];
+
+      // A missing substrate (the inhibitor, for --quantity ki) or organism
+      // is CHOSEN from BRENDA by the engine's chooser and said, with why and
+      // the alternatives (ADR 0182) -- once the enzyme is one EC number. A
+      // lookup has no confirmation step: the choice is printed before the
+      // value, and the flag to choose otherwise is named in the same line.
+      let nothingToChoose: string | undefined;
+      const resolveChoices: AutomaticChoice[] = [];
+      if ((!substrate || !organism) && (enzyme || ec)) {
+        const typed = organism ? canonicalOrganism(organism).organism : undefined;
+        const identity = ec ? { ec } : enzymeIdentity(enzyme!, typed);
+        if (identity.ec) {
+          // For --quantity ki, --substrate names the INHIBITOR (BRENDA files
+          // a Ki under it), so that is the role asked for.
+          const role = (flags['quantity'] ?? 'km').toLowerCase() === 'ki' ? 'inhibitor' : 'substrate';
+          // Printed for a person; under --json stdout is one document, and
+          // the choices go into it instead (commandResolve's `choices`).
+          const say = (choice: AutomaticChoice) => {
+            resolveChoices.push(choice);
+            if (!booleans.has('json')) info(describeChoice(choice));
+          };
+          if (!organism) {
+            const answer = askChooser({
+              ec: identity.ec,
+              role: 'organism',
+              ...(substrate && role === 'substrate' ? { substrate } : {}),
+            });
+            if (answer.kind === 'chosen') {
+              organism = answer.choice.chosen;
+              say(answer.choice);
+            } else if (answer.kind === 'nothing') {
+              nothingToChoose = answer.note;
+            }
+          }
+          if (!substrate && organism && !nothingToChoose) {
+            const answer = askChooser({
+              ec: identity.ec,
+              role,
+              organism: typed ?? organism,
+            });
+            if (answer.kind === 'chosen') {
+              substrate = answer.choice.chosen;
+              say(answer.choice);
+            } else if (answer.kind === 'nothing') {
+              nothingToChoose = answer.note;
+            }
+          }
+        }
+      }
 
       if (!substrate || !organism || (!enzyme && !ec)) {
         error(
           'resolve needs a substrate, an organism, and either an enzyme name ' +
           'or an EC number.'
         );
+        if (nothingToChoose) {
+          // What is missing, and what would fix it: the chooser's words.
+          console.error(colors.dim + nothingToChoose + colors.reset);
+        }
         info('Example: resolve "lactate dehydrogenase" --substrate pyruvate --organism "Homo sapiens"');
         // Nothing is guessed from the query text: attaching a real citation
         // to a system the user never named is provenance for the wrong
@@ -1935,6 +2043,7 @@ async function main() {
         quantity: quantityRaw,
         enzymeConc,
         json: booleans.has('json'),
+        choices: resolveChoices,
         allowCrossSpecies: booleans.has('allow-cross-species'),
         ...(typeof flags['isoform'] === 'string' ? { isoform: flags['isoform'] } : {}),
         ...(inhibitionMode ? { inhibitionMode } : {}),

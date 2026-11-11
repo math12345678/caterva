@@ -209,6 +209,11 @@ export interface ParameterizePayload extends CatervaResult {
   model: RawLiteratureBuild | null;
   summary: string;
   simulation: LiteratureSimulation;
+  /** Every substrate (or inhibitor) the runner chose for a request that
+   *  named none (ADR 0182), as caterva.compose.defaults' Choice.to_json().
+   *  Unknown until read with `readChoices`: absent from a runner that
+   *  predates choosing. The route states each as a "chosen" flag. */
+  choices?: unknown;
 }
 
 function fromRawBuild(build: RawLiteratureBuild): LiteratureBuild {

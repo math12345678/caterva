@@ -39,6 +39,7 @@ type Entities = {
   substrate?: string;
   ecNumber?: string;
   organism?: string;
+  isoform?: string;
 };
 
 const seen: Entities[] = [];
@@ -355,25 +356,130 @@ describe("the guess path sends the substrate the person named", () => {
     expect(kmLookups()[0]!.substrate).toBe("glucose");
   });
 
-  it("refuses, and looks nothing up, when no substrate is named", async () => {
-    // Measured 2026-11-03 on the live runner: "pyruvate carboxylase in
-    // humans" went out with substrate "", the runner logged "BRENDA lookup
-    // will be unfiltered by substrate", and the Km of whichever substrate
-    // came first (pyruvate, ref 649744) came back with nothing naming it.
+  it("asks the runner to choose a substrate when none is named, and states the choice", async () => {
+    // Was "refuses, and looks nothing up, when no substrate is named"
+    // (ADR 0178/0181). Measured 2026-11-03: "pyruvate carboxylase in humans"
+    // went out with substrate "", the runner logged "BRENDA lookup will be
+    // unfiltered by substrate", and the pyruvate row came back unnamed.
+    // Since ADR 0182 the substrate goes out unnamed and the runner CHOOSES
+    // the best-measured one, looks the Km up for exactly it, and sends the
+    // choice back; the response states it with the alternatives.
+    kmAnswer = {
+      ...HEXOKINASE_KM,
+      km: 0.08,
+      citation: { ...HEXOKINASE_KM.citation, referenceId: "649744" },
+      choices: [
+        {
+          role: "substrate",
+          chosen: "pyruvate",
+          why: "most Km and kcat rows for EC 6.4.1.1 in Homo sapiens",
+          alternatives: [
+            { name: "ATP", rows: { km: 4 } },
+            { name: "HCO3-", rows: { km: 3, kcat: 1 } },
+          ],
+          considered: 3,
+        },
+      ],
+    };
     const err = await refusalOf("pyruvate carboxylase in humans");
-    expect(seen).toEqual([]);
+    expect(kmLookups().map((e) => [e.enzymeName, e.substrate])).toEqual([
+      ["pyruvate carboxylase", undefined],
+    ]);
+    const km = err.parameterProvenance["km"]!;
+    expect(km.origin).toBe("resolved");
+    expect(km.note).toContain("Km of pyruvate, the substrate Caterva chose");
+    const chosen = err.flags.find((f) => f.startsWith("substrate chosen: pyruvate"));
+    expect(chosen).toContain("most Km and kcat rows for EC 6.4.1.1 in Homo sapiens");
+    expect(chosen).toContain("ATP (Km 4 rows); HCO3- (Km 3 rows, kcat 1 row)");
+    expect(chosen).toContain('"<enzyme> with <substrate>"');
+  });
+
+  it("the kcat bridge looks up the substrate the Km's lookup chose", async () => {
+    kmAnswer = {
+      ...HEXOKINASE_KM,
+      choices: [
+        { role: "substrate", chosen: "D-glucose", why: "most measured", alternatives: [], considered: 1 },
+      ],
+    };
+    await attempt("hexokinase in humans with 50 nM enzyme");
+    const kcat = seen.find((e) => e.quantity === "kcat");
+    expect(kcat?.substrate).toBe("D-glucose");
+  });
+
+  it("says what is missing when BRENDA has nothing to choose from", async () => {
+    kmAnswer = {
+      found: false,
+      source: "substrate_not_named",
+      choiceRefusal:
+        "No substrate was named, and BRENDA lists no Km row for any substrate of EC 6.4.1.1 " +
+        "in Homo sapiens, so none could be chosen and nothing was looked up.",
+      choices: [],
+      literatureCandidates: [],
+      logs: [],
+    };
+    const err = await refusalOf("pyruvate carboxylase in humans");
     const km = err.parameterProvenance["km"]!;
     expect(km.origin).toBe("default");
     expect(km.unresolvedReason).toBe("substrate_not_named");
-    expect(err.resolvedSoFar).not.toHaveProperty("km");
-    expect(err.details["km"]).toContain('"pyruvate carboxylase with <substrate>"');
+    expect(err.details["km"]).toContain("BRENDA lists no Km row for any substrate of EC 6.4.1.1");
   });
 
-  it("a table enzyme keeps its documented substrate default", async () => {
-    // enzymes.ts names a substrate for each enzyme it lists, so the refusal
-    // above is for guessed names only.
+  it("a table enzyme with no substrate named is not given the table's first one", async () => {
+    // Was "a table enzyme keeps its documented substrate default": the
+    // table's substrates[0] was sent with no flag, so "hexokinase in humans"
+    // was silently a glucose query (and trypsin's was "protein"). It now
+    // goes out unnamed, for the runner to choose and say so.
     await attempt("hexokinase in humans");
-    expect(kmLookups().map((e) => e.substrate)).toEqual(["glucose"]);
+    expect(kmLookups().map((e) => e.substrate)).toEqual([undefined]);
+    seen.length = 0;
+    await attempt("hexokinase with mannose in humans");
+    expect(kmLookups().map((e) => e.substrate)).toEqual(["mannose"]);
+  });
+});
+
+describe("a gene symbol names its substrate after a connector", () => {
+  const kmLookups = () => seen.filter((e) => e.quantity !== "kcat");
+
+  it("reads CYP2B6 as the enzyme and bupropion as the substrate", async () => {
+    // Found by the live baseline: "kinetics of CYP2B6 with bupropion" asked
+    // UniProt for an enzyme called "cyp2b6 bupropion" and was refused for
+    // naming no substrate.
+    await attempt("kinetics of CYP2B6 with bupropion in humans");
+    expect(kmLookups().map((e) => [e.enzymeName, e.substrate])).toEqual([
+      ["cyp2b6", "bupropion"],
+    ]);
+  });
+
+  it("reads 'CYP2B6 with bupropion' as a kinetics question, not an unrecognised one", async () => {
+    await attempt("CYP2B6 with bupropion");
+    expect(kmLookups().map((e) => [e.enzymeName, e.substrate])).toEqual([
+      ["cyp2b6", "bupropion"],
+    ]);
+  });
+
+  it("sends the gene symbol as the isoform, so another CYP's row is not cited as CYP2B6's", async () => {
+    // CYP2B6 resolves to EC 1.14.14.1, which every P450 monooxygenase
+    // shares; BRENDA's bupropion rows there are CYP2B6's, CYP2C19's and
+    // CYP2D6's. Without the isoform the runner would take the best row of
+    // any of them and the response would call it CYP2B6's.
+    await attempt("kinetics of CYP2B6 with bupropion in humans");
+    expect(kmLookups().map((e) => e.isoform)).toEqual(["CYP2B6"]);
+  });
+
+  it("states that it read the question as kinetics", async () => {
+    let flags: string[] = [];
+    try {
+      flags = (await resolveQuery("CYP2B6 with bupropion")).provenance.flags;
+    } catch (err) {
+      if (!(err instanceof RequiredParametersMissingError)) throw err;
+      flags = err.flags;
+    }
+    expect(flags.join(" ")).toContain("read as: enzyme kinetics of CYP2B6 with bupropion");
+  });
+
+  it("does not take later words as a substrate without a connector", async () => {
+    await attempt("lysozyme kinetics from hen egg white");
+    expect(kmLookups()[0]?.substrate).toBeUndefined();
   });
 });
 

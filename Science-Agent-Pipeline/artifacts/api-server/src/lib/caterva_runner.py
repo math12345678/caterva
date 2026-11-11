@@ -46,6 +46,7 @@ generations scale linearly with their counters, and the queue limits
 
 from __future__ import annotations
 
+import inspect
 import json
 import pathlib
 import re
@@ -880,6 +881,14 @@ def run_parameterize(
             "placeholder value intact."
         )
 
+    # An unnamed substrate (or, for a Ki, inhibitor) is CHOSEN, not left
+    # empty: brenda_resolver sends `substrate=request.substrate or ""`,
+    # which BRENDA's row filter reads as "any", and the value that came back
+    # was whichever substrate's row came first. See _choose_for_requests.
+    raw_requests, choices = _choose_for_requests(
+        raw_requests, params.get("organism")
+    )
+
     requests = [
         ParameterRequest(
             quantity=str(entry["quantity"]),
@@ -922,7 +931,91 @@ def run_parameterize(
 
     payload = _serialise_search(search)
     payload["simulation"] = _simulate_search(search, caller_sources, params)
+    # Every name chosen for the caller (ADR 0182), in the order chosen, as
+    # caterva.compose.defaults' Choice.to_json(). The route states each one.
+    payload["choices"] = choices
     return payload
+
+
+def _choose_for_requests(
+    raw_requests: list, organism: Any
+) -> tuple:
+    """Fill each request's missing substrate (or inhibitor) from BRENDA.
+
+    Returns (requests, choices). The chooser is caterva.compose.defaults,
+    the one `caterva compose` and the science-agent runner use (ADR 0182):
+    the best-measured real name, stated with why and with the alternatives
+    and their row counts. One choice per (EC number, organism, role), so a
+    Km and a kcat of the same enzyme in one request are looked up for the
+    same substrate; asked with needs_kcat when any request for that enzyme
+    is a kcat.
+
+    A request whose EC number is unknown is left alone: brenda_resolver
+    already refuses it by name. When BRENDA holds no row to choose from the
+    request is refused with what is missing and what fixes it -- a
+    ValueError, which the route reports -- rather than sent unfiltered. A
+    checkout without the chooser leaves the requests as they were and
+    returns no choices, so "chose nothing" is visible as an empty list.
+    """
+    try:
+        from caterva.compose import defaults  # noqa: PLC0415
+    except ImportError:
+        return raw_requests, []
+
+    def table_of(entry: Dict[str, Any]) -> str:
+        return str(entry.get("table") or "km").lower()
+
+    kcat_ecs = {e.get("ec_number") for e in raw_requests if table_of(e) == "kcat"}
+    made: Dict[tuple, Any] = {}
+    choices: list = []
+    out: list = []
+    for entry in raw_requests:
+        ec = entry.get("ec_number")
+        if not ec or entry.get("substrate"):
+            out.append(entry)
+            continue
+        org = entry.get("organism") or organism or None
+        is_ki = table_of(entry) == "ki"
+        role = "inhibitor" if is_ki else "substrate"
+        key = (str(ec), str(org or ""), role)
+        if key not in made:
+            # Asked with strict=True where the chooser takes it, so a page
+            # that could not be read RAISES instead of reading as "no row":
+            # the refusal below would otherwise tell the caller BRENDA has
+            # nothing for an enzyme it merely could not reach.
+            fn = defaults.choose_inhibitor if is_ki else defaults.choose_substrate
+            kwargs: Dict[str, Any] = {} if is_ki else {"needs_kcat": ec in kcat_ecs}
+            try:
+                if "strict" in inspect.signature(fn).parameters:
+                    kwargs["strict"] = True
+            except (TypeError, ValueError):
+                pass
+            try:
+                made[key] = fn(ec, org, **kwargs)
+            except Exception as exc:  # noqa: BLE001 - reported, as a ValueError
+                raise ValueError(
+                    f"{entry.get('quantity')} names no {role}, and BRENDA's page for "
+                    f"EC {ec} could not be read to choose one ({type(exc).__name__}: "
+                    f"{exc}), so nothing was looked up. This says nothing about "
+                    f"whether BRENDA has rows: try again, add \"substrate\" to the "
+                    f"request, or supply {entry.get('quantity')} in \"sources\"."
+                ) from exc
+            if made[key] is not None:
+                choices.append(made[key].to_json())
+        choice = made[key]
+        if choice is None:
+            label = {"ki": "Ki", "kcat": "kcat"}.get(table_of(entry), "Km")
+            raise ValueError(
+                f"{entry.get('quantity')} names no {role}, and BRENDA lists no "
+                f"{label} row for any {role} of EC {ec}"
+                + (f" in {org}" if org else "")
+                + ", so none could be chosen and nothing was looked up. Add "
+                f"\"substrate\" to the request (the {role} the constant is "
+                "for), name another organism, or supply "
+                f"{entry.get('quantity')} in \"sources\" from your own measurement."
+            )
+        out.append({**entry, "substrate": choice.chosen})
+    return out, choices
 
 
 def _simulate_search(

@@ -386,7 +386,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "82 test files -- query resolution, parameter provenance, " +
+          "83 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
@@ -461,7 +461,16 @@ export const TEST_SUITES: TestSuite[] = [
         // The 12 more are webPathProvenance.test.ts's review cases (guinea
         // pig, a reagent's organism, a guessed enzyme with no substrate, two
         // enzymes): 886.
-        passed: 886,
+        //
+        // Measured 2026-11-11 on fix/rv-web (ADR 0182, choosing an unnamed
+        // substrate), vitest run with the project venv on PATH: 83 files,
+        // 900 tests. 899 passed in the full run; the one failure was
+        // frontDoorRouteCoverage's twenty-query route test, an HTTP parse
+        // error under load, which passed run alone with frontDoorCoverage
+        // (6 of 6). The 14 more: automaticChoice.test.ts (6) and the
+        // converted and new cases in webPathProvenance and
+        // inhibitorIsTheKiCompound (8): 900.
+        passed: 900,
         skipped: 0,
         failed: 0,
       },
@@ -473,10 +482,10 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "7 test files -- component rendering, nav/section integrity, " +
+          "8 test files -- component rendering, nav/section integrity, " +
           "page-claim accuracy, disabled-source claims, the merged " +
           "MuleRun chapters' content, and the resolve-to-run provenance " +
-          "round trip",
+          "round trip, and the automatic-choice notes",
         // Measured 2026-09-28, `vitest run`: 6 files, 44 passed (33, plus
         // three MergedChapters tests from the MuleRun merge and two that pin
         // the inhibitor attribution to BRENDA ref 739793's pyruvate row, plus
@@ -493,8 +502,11 @@ export const TEST_SUITES: TestSuite[] = [
         // and shows across a 422, Recent Runs' cached label, the playground
         // preset's labels) and one more PageClaims test (the stale LDH and
         // AChE presets replaced by two tests): `vitest run` on 2026-11-02,
-        // from a JSON report, 7 files, 64 passed.
-        passed: 64,
+        // from a JSON report, 7 files, 64 passed. Plus ChoiceNotes.test.tsx
+        // (5: a substrate Caterva chose stays on screen beside the Km, on the
+        // 422 path too; ADR 0182): `vitest run` on 2026-11-11, 8 files, 69
+        // passed.
+        passed: 69,
         skipped: 0,
         failed: 0,
       },
@@ -506,7 +518,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "76 test files -- the `scientific` CLI end to end and its " +
+          "79 test files -- the `scientific` CLI end to end and its " +
           "refusals, the literature resolver, the Python engine bridge, " +
           "inhibition models, exports, request validation, result storage " +
           "and reproducibility checks",
@@ -521,7 +533,14 @@ export const TEST_SUITES: TestSuite[] = [
         // 76 suites, 981 tests, all passing, none skipped; ~/.caterva's
         // history and records were unchanged by the run (the new
         // testsDoNotWriteHome guard is one of the four new files): 981.
-        passed: 981,
+        //
+        // Measured 2026-11-11 on fix/rv-web (ADR 0182: the CLI chooses an
+        // unnamed substrate or organism and shows it): jest, 79 suites, 1001
+        // tests. 1000 passed in the full run; documentedExamplesRun's
+        // `catalog 1.1.1.27` (a live BRENDA fetch) exited 1 under load and
+        // passed run alone (5 of 5). The three new files are chooseMissing,
+        // formatNumber and chooserOnTheCommandLine: 1001.
+        passed: 1001,
         skipped: 0,
         failed: 0,
       },

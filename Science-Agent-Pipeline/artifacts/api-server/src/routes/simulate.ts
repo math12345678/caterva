@@ -34,6 +34,7 @@ import {
   type CompositionReport,
   type ParameterizePayload,
 } from "../lib/literatureSearch";
+import { choiceFlag, readChoices } from "../lib/automaticChoice";
 import * as queue from "../lib/queue";
 import { findCachedEntryByQuery, persistJob } from "../lib/cache";
 import { simulateLimiter } from "../lib/rateLimit";
@@ -601,6 +602,10 @@ async function runParameterizePipeline(
             : "The resolved set was not simulated."),
         modelCitations: [],
         flags: [
+          // A substrate or inhibitor a request did not name, chosen from
+          // BRENDA (ADR 0182): stated first, because every value below that
+          // was looked up for it is the constant of THAT name.
+          ...readChoices(engineResult.choices).map(choiceFlag),
           ...(search.chosenOrganism
             ? [`chosen_organism: ${search.chosenOrganism}`]
             : ["no_organism_chosen: the search did not settle on one."]),

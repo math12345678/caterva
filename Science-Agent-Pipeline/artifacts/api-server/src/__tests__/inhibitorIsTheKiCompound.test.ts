@@ -62,11 +62,89 @@ describe("the Ki lookup uses the inhibitor", () => {
     expect(km?.substrate).toBe("pyruvate");
   });
 
-  it("does not look a Ki up at all when no inhibitor is named", async () => {
-    const refusal = await settle(resolveQuery("competitive inhibition of lactate dehydrogenase with pyruvate"));
-    const calls = mocked.mock.calls.map(([arg]) => arg as { quantity: string });
-    expect(calls.some((c) => c.quantity === "ki")).toBe(false);
-    expect(refusal).toContain("a Ki belongs to the inhibitor, and the query names none");
+  it("asks the runner to choose the inhibitor when none is named, with the model's substrate", async () => {
+    // Was "does not look a Ki up at all when no inhibitor is named". Since
+    // ADR 0182 the Ki is looked up with the inhibitor left empty, and the
+    // runner chooses the one BRENDA holds the most Ki rows for; the model's
+    // own substrate goes with it, so the choice and the row ranking are
+    // against the substrate this model is of.
+    await settle(resolveQuery("competitive inhibition of lactate dehydrogenase with pyruvate"));
+    const calls = mocked.mock.calls.map(
+      ([arg]) => arg as { quantity: string; substrate?: string; modelSubstrate?: string },
+    );
+    const ki = calls.find((c) => c.quantity === "ki");
+    expect(ki).toBeDefined();
+    expect(ki?.substrate).toBe("");
+    expect(ki?.modelSubstrate).toBe("pyruvate");
+  });
+
+  it("states the chosen inhibitor, and the Ki's provenance names it", async () => {
+    mocked.mockImplementation(async (entities) => {
+      if (entities.quantity !== "ki") return NOT_FOUND;
+      return {
+        found: true,
+        ki: 0.026,
+        unit: "mM",
+        organism: "Homo sapiens",
+        source: "brenda_exact",
+        crossSpecies: false,
+        citation: {
+          source: "BRENDA",
+          referenceId: "711801",
+          url: "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+        },
+        choices: [
+          {
+            role: "inhibitor",
+            chosen: "oxamate",
+            why: "most Ki rows for EC 1.1.1.27 in Homo sapiens",
+            alternatives: [{ name: "gossypol", rows: { ki: 4 } }],
+            considered: 9,
+          },
+        ],
+        literatureCandidates: [],
+        logs: [],
+      };
+    });
+    try {
+      const { RequiredParametersMissingError } = await import("../lib/provenance");
+      let flags: string[] = [];
+      let kiNote: string | undefined;
+      try {
+        const run = await resolveQuery("competitive inhibition of lactate dehydrogenase with pyruvate");
+        flags = run.provenance.flags;
+        kiNote = run.parameterProvenance["ki"]?.note;
+      } catch (err) {
+        if (!(err instanceof RequiredParametersMissingError)) throw err;
+        flags = err.flags;
+        kiNote = err.parameterProvenance["ki"]?.note;
+      }
+      const chosen = flags.find((f) => f.startsWith("inhibitor chosen: oxamate"));
+      expect(chosen).toContain("most Ki rows for EC 1.1.1.27 in Homo sapiens");
+      expect(chosen).toContain("gossypol (Ki 4 rows)");
+      expect(kiNote).toContain("Ki of oxamate, the inhibitor Caterva chose");
+    } finally {
+      mocked.mockImplementation(async () => NOT_FOUND);
+    }
+  });
+
+  it("says what is missing when there was no inhibitor to choose", async () => {
+    const refusalText =
+      "No inhibitor was named, and BRENDA lists no Ki row for any inhibitor of EC 1.1.1.27 " +
+      "in Homo sapiens, so none could be chosen and nothing was looked up.";
+    mocked.mockImplementation(async (entities) =>
+      entities.quantity === "ki"
+        ? { found: false, source: "inhibitor_not_named", choiceRefusal: refusalText, choices: [], literatureCandidates: [], logs: [] }
+        : NOT_FOUND,
+    );
+    try {
+      const refusal = await settle(
+        resolveQuery("competitive inhibition of lactate dehydrogenase with pyruvate"),
+      );
+      expect(refusal).toContain("BRENDA lists no Ki row for any inhibitor of EC 1.1.1.27");
+    } finally {
+      mocked.mockImplementation(async () => NOT_FOUND);
+    }
   });
 });
 
