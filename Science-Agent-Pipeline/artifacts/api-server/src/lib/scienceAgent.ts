@@ -135,6 +135,11 @@ export interface ScienceAgentResult {
    * the enzyme (ADR 0029). Populated only when
    * `source === "variant_withheld"`. */
   variantCandidatesAvailable?: string[];
+  /** Every row's value, "1e-06 1/s (BRENDA ref 729224)", when each is
+   * outside the physically plausible range for the constant: a unit slip or
+   * a misfiled row is far likelier than a measurement, so none is used.
+   * Populated only when `source === "implausible_withheld"`. */
+  implausibleValues?: string[];
   /** The isoforms BRENDA's rows measured, when the one asked for is not
    * among them. Populated only when `source === "isoform_withheld"`. */
   isoformsAvailable?: string[];

@@ -247,6 +247,14 @@ class KineticResult(BaseModel):
     #: reasoning could drift.
     cross_species_candidates: "list[TiedCandidate]" = []
 
+    #: Every row of the pool a value would have been chosen from, as
+    #: "1e-06 1/s (BRENDA ref 729224)", when EVERY one is outside the
+    #: physically plausible range for the quantity (PLAUSIBLE_FOR_SELECTION).
+    #: Populated only for source="implausible_withheld": such a value is a
+    #: unit slip or a misfiled row far more often than a measurement, and
+    #: none is reported as one.
+    implausible_values: "list[str]" = []
+
     #: Variant descriptors ("Y124C", "isozyme H4") for rows that WERE found
     #: and were withheld because they measure a variant rather than the
     #: enzyme. Populated only for source="variant_withheld".
@@ -822,6 +830,33 @@ PLAUSIBLE_FOR_SELECTION = {
     "kcat": (1e-3, 1e8, "1/s"),
     "km": (1e-7, 1e4, "mM"),
 }
+
+def _implausible_withheld(best, rows, quantity, log, tier):
+    """A not-found result when the row chosen is outside the plausible range,
+    which `_best_evidenced` allows only when EVERY row is (it sets
+    implausible rows aside whenever a plausible one exists); None otherwise.
+
+    The carbonic anhydrase kcat of 1e-06 1/s was carried as GROUNDED while
+    its rows had plausible company; with none, the choice would still be a
+    number no enzyme has, so nothing is reported and the rows are named."""
+    q = _quantity_of(rows, quantity)
+    bounds = PLAUSIBLE_FOR_SELECTION.get(q)
+    if not bounds or best is None:
+        return None
+    low, high, unit = bounds
+    if low <= best.km_value <= high:
+        return None
+    values = [f"{e.km_value:g} {getattr(e, 'unit', None) or unit} (BRENDA ref {_ref(e)})" for e in rows]
+    log.append(f"{tier}: every candidate {q} row is outside the physically plausible range "
+               f"({low:g} to {high:g} {unit}): {'; '.join(values)}; none is reported as a "
+               f"measurement (a unit slip or a misfiled row is far likelier)")
+    return KineticResult(
+        found=False,
+        source="implausible_withheld",
+        implausible_values=values,
+        search_log=log,
+    )
+
 
 #: A spread of the values chosen from wider than this is recorded on the
 #: result (`wide_spread`) so the report can flag it. The median pick stands.
@@ -1932,6 +1967,9 @@ def resolve_kinetic_value(
             exact, log, "exact match", organism, quantity=quantity,
             prefer_reference=prefer_reference, detail=chosen,
         )
+        withheld_as_implausible = _implausible_withheld(best, exact, quantity, log, "exact match")
+        if withheld_as_implausible is not None:
+            return withheld_as_implausible
         _state_the_form(chosen, best, substrate, log, "exact match")
         # After the choice, because whether a row contradicts the model
         # depends on what the row returned states (ki_mode.evidence_against).
@@ -2187,6 +2225,9 @@ def resolve_kinetic_value(
             prefer_reference=prefer_reference,
             detail=chosen,
         )
+        withheld_as_implausible = _implausible_withheld(best, acceptable, quantity, log, "cross-species")
+        if withheld_as_implausible is not None:
+            return withheld_as_implausible
         _state_the_form(chosen, best, substrate, log, "cross-species")
         evidence = (_mechanism_evidence(ranked, best, mode, model_substrate, isoform, log)
                     if mode else None)

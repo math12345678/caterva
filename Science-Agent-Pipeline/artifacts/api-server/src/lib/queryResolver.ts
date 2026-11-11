@@ -596,6 +596,7 @@ function buildUnresolvedKineticProvenance(
     | "cross_species_withheld"
     | "cross_species_too_distant"
     | "variant_withheld"
+    | "implausible_withheld"
     | "isoform_withheld"
     | "mode_withheld"
     | "ec_not_resolved"
@@ -713,6 +714,24 @@ function buildUnresolvedKineticProvenance(
         `an isozyme is a different gene product, so neither is a ${K} for the ` +
         `enzyme you asked about. Re-run with allowVariants to use one, ` +
         `understanding that the result describes that variant.`,
+    };
+  }
+
+  // Every row is a number no enzyme has (a kcat of 1e-06 1/s): reported
+  // as the rows it is, never as "not found" and never as a measurement.
+  if (reason === "implausible_withheld") {
+    const named =
+      organismsAvailable && organismsAvailable.length > 0
+        ? ` (${organismsAvailable.join("; ")})`
+        : "";
+    return {
+      origin: "default",
+      unresolvedReason: "implausible_withheld",
+      note:
+        `Every ${K} BRENDA holds for this system${named} is outside the physically ` +
+        `plausible range for a ${K}. A value like that is a unit slip or a misfiled ` +
+        `row far more often than a measurement, so none was used; supply ${key}= ` +
+        `from a source you have checked.`,
     };
   }
 
@@ -1024,6 +1043,12 @@ async function applyKineticResolution(
           key,
           "variant_withheld",
           agentResult.variantCandidatesAvailable,
+        );
+      } else if (agentResult.source === "implausible_withheld") {
+        provenanceUpdates[key] = buildUnresolvedKineticProvenance(
+          key,
+          "implausible_withheld",
+          agentResult.implausibleValues,
         );
       } else if (agentResult.source === "cross_species_withheld") {
         provenanceUpdates[key] = buildUnresolvedKineticProvenance(
@@ -1354,6 +1379,15 @@ async function applyVmaxFromKcatResolution(
         "Every kcat BRENDA holds for this enzyme" +
         (variants.length > 0 ? ` (${variants.join(", ")})` : "") +
         " was measured on a sequence variant, not on the enzyme as found, " +
+        "so Vmax was not bridged from it."
+      );
+    }
+    if (agentResult.source === "implausible_withheld") {
+      const values = agentResult.implausibleValues ?? [];
+      return (
+        "Every kcat BRENDA holds for this enzyme" +
+        (values.length > 0 ? ` (${values.join("; ")})` : "") +
+        " is outside the physically plausible range for a turnover number, " +
         "so Vmax was not bridged from it."
       );
     }

@@ -543,6 +543,11 @@ def build_report(
                 "every value found was measured on a protein variant rather "
                 "than the enzyme as found"
             ),
+            "implausible_withheld": (
+                "every value found is outside the physically plausible range "
+                "for this constant, a unit slip or a misfiled row far more "
+                "often than a measurement, so none was used"
+            ),
             "ec_ambiguous": (
                 "the enzyme name matched more than one EC number, and "
                 "choosing one would cite a different protein"

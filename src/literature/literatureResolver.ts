@@ -589,6 +589,10 @@ export interface UnresolvedKinetic {
   isoformsAvailable: string[];
   variantCandidatesAvailable: string[];
   crossSpeciesOrganismsAvailable: string[];
+  /** Every row's value, "1e-06 1/s (BRENDA ref 729224)", when each is outside
+   * the physically plausible range for the constant. Empty (or absent)
+   * unless `source` is "implausible_withheld". */
+  implausibleValues?: string[];
   /** What the Ki rows state ("competitive inhibition versus NADH"), when
    * `--mode` asked for another mechanism and every row states one. Empty
    * unless `source` is "mode_withheld". */
@@ -698,6 +702,11 @@ export function withheldSentence(
     case 'variant_withheld':
       return `BRENDA's rows for this ${result.quantity} were all measured on protein variants ` +
         `(${list(result.variantCandidatesAvailable, 'unnamed')}), which describe the variant, not the enzyme.`;
+    case 'implausible_withheld':
+      return `Every ${result.quantity} row BRENDA holds for this system ` +
+        `(${list(result.implausibleValues ?? [], 'unnamed')}) is outside the physically plausible ` +
+        `range for it. A value like that is a unit slip or a misfiled row far more often than a ` +
+        `measurement, so none was used.`;
     case 'cross_species_withheld':
       return `BRENDA holds this ${result.quantity} only for other organisms ` +
         `(${list(result.crossSpeciesOrganismsAvailable, 'unnamed')}). Pass --allow-cross-species ` +
@@ -1183,6 +1192,7 @@ export async function resolveKinetic(
       variantCandidatesAvailable: names(parsed['variantCandidatesAvailable']),
       crossSpeciesOrganismsAvailable: names(parsed['crossSpeciesOrganismsAvailable']),
       modesAvailable: names(parsed['modesAvailable']),
+      implausibleValues: names(parsed['implausibleValues']),
     };
   }
 

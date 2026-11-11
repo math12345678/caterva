@@ -181,6 +181,49 @@ chosen ones, since a typed exact name is the same claim. A loosely typed name
 BRENDA does not list exactly is not judged, and a row that cannot be found is
 not withheld.
 
+### Integrated: one paper for a Km and its kcat, and no implausible value
+
+The rows above were measured on the engine branch alone. Merged with the
+literature layer's new pick (the median of the best-described rows, not the
+minimum) two more rules hold for every caller -- `caterva compose`, the
+Studio, the API's runner and the TypeScript CLI:
+
+- **A Km and a kcat of one substrate come from one paper when one holds
+  both.** `fallback_logic.resolve_kinetic_pair` resolves the two together;
+  when their papers differ but some paper holds a row of each among the rows
+  each was chosen from, both are taken from it. Compose marks the two
+  requests `paired` (`ComposedModel.parameter_requests`) and the live
+  resolver answers both from one pair; the API's runner pairs a Km or a
+  kcat unless the caller sends `needsKcat: false`. Human hexokinase and
+  D-glucose is now **Km 6.3 mM and kcat 40.1 1/s, both BRENDA ref 739603**
+  (a human glucokinase paper, pH 7.6 and 25 C for both; the Km row is a
+  K0.5 with a Hill coefficient of 1.8, which its SOURCE ROW line says), where
+  the independent picks carried HK-I's 0.06 mM (ref 640237, 37 C) beside
+  another paper's 60.4 1/s (ref 703624). The Km rows chosen from span 0.034
+  to 6.3 mM, 185-fold, and the report says so. A lookup of a Km alone
+  (`scripts/cite.py`, the Studio's constants) still takes the median,
+  0.06 mM.
+- **Why each row was carried is said.** The resolver's own reason
+  (`KineticResult.chosen_because`: the median of how many rows, what was set
+  aside, the paired constant's paper, a spread wider than 100-fold) reaches
+  the report's "Where the evidence did not settle" line in place of "the
+  resolver's pick, not a verdict", the Studio's spread sentence, and the
+  API's `chosenBecause` / `wideSpread`.
+- **An implausible value is never reported.** Rows outside the plausible
+  range (a kcat below 1e-3 or above 1e8 1/s, a Km below 1e-7 or above 1e4
+  mM) were already set aside when plausible rows existed; when every row is
+  outside it the constant is now withheld (`implausible_withheld`, each row
+  named) instead of carried. Human carbonic anhydrase and CO2 now carries
+  Km 9.3 mM and kcat 1.4e6 1/s, both ref 729384, live.
+- **A compound named beside the substrate is the inhibitor when BRENDA
+  lists Ki rows for it**: "hexokinase with glucose in the presence of
+  glucose 6-phosphate in human" builds competitive inhibition with
+  D-glucose 6-phosphate; "dihydrofolate reductase with dihydrofolate and
+  methotrexate in E. coli" carries methotrexate's Ki (0.0059 mM, ref
+  655867). A gene symbol on the TypeScript CLI's `resolve` ("CYP2B6") now
+  searches the organism the symbol is a gene of, with the symbol as the
+  isoform, as compose does; it chose Priestia megaterium by row count.
+
 ## Consequences
 
 - A run with no substrate, organism or inhibitor reads BRENDA's page for the
@@ -214,4 +257,6 @@ not withheld.
   The spread note beside a carried value can still count a neighbour's row
   among "one source reports 2 values".
 - The resolver's choice among the chosen substrate's rows (the lowest of a
-  spread, the carbonic anhydrase kcat of 1e-6 1/s) is not addressed here.
+  spread, the carbonic anhydrase kcat of 1e-6 1/s) was not addressed on the
+  engine branch; the literature layer's median pick and the integration
+  above address it.

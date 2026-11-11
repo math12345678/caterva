@@ -1439,6 +1439,10 @@ def main() -> None:
                         # that cannot name what it refused leaves the opt-in
                         # it demands unexercisable.
                         "variantCandidatesAvailable": result.variant_candidates_available,
+                        # Every row's value, when each is outside the
+                        # physically plausible range (source
+                        # "implausible_withheld"): named, never used.
+                        "implausibleValues": result.implausible_values,
                         # Which isoforms the rows measured, when the one
                         # asked for is not among them.
                         "isoformsAvailable": result.isoforms_available,

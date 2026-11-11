@@ -277,10 +277,26 @@ class TestThePickIsTheMedianOfTheBestDescribedRows:
                                    row(0.4, "X", ref="700003"), row(0.9, "X", ref="700004")]})
         assert resolve(html, "X", "km").value == 0.4
 
-    def test_when_every_row_is_implausible_the_rows_are_kept_and_nothing_is_set_aside(self):
-        html = page({"Turnover Numbers": [row(1e-05, "X", ref="700001")]})
+    def test_when_every_row_is_implausible_none_is_reported_and_each_is_named(self):
+        """With no plausible row to prefer, the pick would still be a number
+        no enzyme has. It is withheld, never reported as a measurement, and
+        the rows are named so a reader can check them."""
+        html = page({"Turnover Numbers": [row(1e-05, "X", ref="700001"), row(2e-06, "X", ref="700002")]})
         r = resolve(html, "X", "kcat")
-        assert r.value == 1e-05 and r.set_aside == []
+        assert r.found is False and r.value is None
+        assert r.source == "implausible_withheld"
+        assert r.implausible_values == ["1e-05 1/s (BRENDA ref 700001)", "2e-06 1/s (BRENDA ref 700002)"]
+        assert any("outside the physically plausible range" in line for line in r.search_log)
+
+    def test_compose_says_why_an_implausible_constant_is_a_placeholder(self):
+        from caterva.agents.adapters import to_parameter_source
+
+        html = page({"Turnover Numbers": [row(1e-05, "X", ref="700001")]})
+        source, reason = to_parameter_source("reaction_kcat", resolve(html, "X", "kcat"))
+        assert source is None
+        assert reason.startswith("every row BRENDA holds for this constant is outside the physically "
+                                 "plausible range")
+        assert "the values: 1e-05 1/s (BRENDA ref 700001)" in reason
 
     def test_the_median_is_an_actual_row_never_an_average(self):
         html = page({"KM Values": [row(v, "X", ref=f"70000{i}")

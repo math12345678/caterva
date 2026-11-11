@@ -585,6 +585,12 @@ export interface ParameterProvenance {
     | "cross_species_withheld"
     | "cross_species_too_distant"
     | "variant_withheld"
+    /**
+     * Every row BRENDA holds is outside the physically plausible range for
+     * the constant (a kcat below 1e-3 1/s, a Km below 1e-7 mM): a unit slip
+     * or a misfiled row, far likelier than a measurement, and never used.
+     */
+    | "implausible_withheld"
     /** An isoform was asked for and every row measured another one. */
     | "isoform_withheld"
     /**

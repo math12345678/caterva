@@ -82,6 +82,11 @@ NOT_FOUND_REASONS = {
         "every row BRENDA holds for this constant measured a protein variant, "
         "and variants are withheld (ADR 0029)"
     ),
+    "implausible_withheld": (
+        "every row BRENDA holds for this constant is outside the physically "
+        "plausible range for it (a unit slip or a misfiled row is far likelier "
+        "than a measurement), so none is used"
+    ),
 }
 
 #: Where each refusal's list of what it withheld is, what to call it, and
@@ -90,6 +95,7 @@ _WITHHELD_LISTS = {
     "isoform_withheld": ("isoforms_available", "the rows measured", ", "),
     "mode_withheld": ("modes_available", "the rows state", "; "),
     "variant_withheld": ("variant_candidates_available", "the variants", ", "),
+    "implausible_withheld": ("implausible_values", "the values", "; "),
 }
 
 FOUND_SOURCES = frozenset({"brenda_exact", "brenda_cross_species"})
