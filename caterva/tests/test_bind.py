@@ -286,7 +286,8 @@ def test_bind_refuses_a_word_for_a_kind_of_enzyme_before_reading_brenda(word, ca
     assert "Read " not in out.err and "Re-run with --ec <its EC number>" in out.err
 
 
-@pytest.mark.parametrize("typed, read_as", [("humn", "Humn"), ("potato", "Potato")])
+# A word no table holds is used exactly as typed, never re-cased into a genus (ADR 0182).
+@pytest.mark.parametrize("typed, read_as", [("humn", "humn"), ("potato", "potato")])
 def test_an_organism_the_page_never_names_is_said_so_not_reported_as_no_ki_rows(typed, read_as, capsys):
     # `--organism humn` printed "No Ki rows for EC 2.7.1.1 in Humn." (exit 3)
     # while `human` lists the page's compounds.

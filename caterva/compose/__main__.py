@@ -1130,6 +1130,11 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
     elif reading.ec:
         args.subject = reading.ec
         out.notes.append(reading.enzyme_note())
+        # ADR 0182: a symbol is one protein of its EC number ("HK2"); the
+        # enzyme note says the constants come from rows that name it, so the
+        # isoform is searched for unless --isoform set one.
+        if getattr(reading, "isoform", None) and not getattr(args, "isoform", None):
+            args.isoform = reading.isoform
     elif reading.ambiguity is not None:
         from caterva.enzymes.policy import AMBIGUOUS, _refuse
 
@@ -1278,6 +1283,12 @@ def read_subject(model: Any, args: Any) -> Tuple[Any, Optional[str], Optional[st
     except NameNotResolved as exc:
         return model, None, f"No search was run: {exc}", exc
     note = " ".join(resolution.notes(subject)) or None
+    # ADR 0182: what the name implies (the isoform of "HK2", Homo sapiens
+    # for a human gene symbol) fills only what no flag set; the notes say so.
+    if getattr(resolution, "isoform", None) and not getattr(args, "isoform", None):
+        args.isoform = resolution.isoform
+    if getattr(resolution, "organism", None) and not getattr(args, "organism", None):
+        args.organism = resolution.organism
     if resolution.ec != (model.subject or "").strip():
         model = replace(model, subject=resolution.ec)
     return model, note, None, None
