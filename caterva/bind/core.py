@@ -266,8 +266,73 @@ def _hyphen_code_reading(m: "re.Match") -> Optional[str]:
     return m.group(0)
 
 
+# -- Carbonic anhydrase, phosphodiesterase and cytochrome P450 (2026-11-11) ---
+#
+# Three families BRENDA writes in their own nomenclature, which the forms
+# above did not read. The baseline of 2026-11-11 found:
+#
+# * carbonic anhydrase (EC 4.2.1.1): "isozyme CA II" read as "CA" (the one
+#   token after the keyword), so CA I, CA II and CA IX rows all read "CA" and
+#   matched each other; "hCA II" and "CA II" read as no isoform at all. CA
+#   isozymes run to XV, past `_ROMAN`. Read here: "CA II", "CA-II", "CAII",
+#   "CA2", "hCA II" (h, b: human, bovine) and "carbonic anhydrase II", all as
+#   "CA-II"; a number is written as its numeral so "CA2" and "CA II" are one
+#   reading. Not read in "CA1 neurons" or "hippocampal CA1", which name a
+#   brain region.
+# * phosphodiesterase: "PDE5", "PDE5A", "PDE-5", "PDE5A1", "phosphodiesterase
+#   5", read run together ("PDE5A"). The family number, subfamily letter and
+#   variant number are compared as a hierarchy (`_hierarchy`): "PDE5" and
+#   "PDE5A" are one, "PDE4A" and "PDE4B" are two.
+# * cytochrome P450: "CYP2B6", "CYP 2B6", "P450 2B6", "P-450 2B6",
+#   "cytochrome P450 2B6", read "CYP2B6". "CYP2B6" and "CYP2B1" are two
+#   isoforms; a request "2B6" is CYP2B6.
+_CA_NUMERAL = r"(?:XVI|XV|XIV|XIII|XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)"
+_CA_NAME = re.compile(
+    r"(?<![\w-])[hb]?(?:CA|[Cc]arbonic anhydrase)"
+    rf"(?:[ -]?(?P<roman>{_CA_NUMERAL})(?P<sub>[a-c])?|[ -]?(?P<num>\d{{1,2}})(?P<nsub>[a-c])?)"
+    r"(?![\w-])"
+)
+_BRAIN_REGION = re.compile(r"^\s+(?:neurons?|pyramidal|region|field|area|subfield)\b", re.IGNORECASE)
+_ROMAN_OF = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VIII",
+             9: "IX", 10: "X", 11: "XI", 12: "XII", 13: "XIII", 14: "XIV", 15: "XV", 16: "XVI"}
+_PDE_NAME = re.compile(
+    r"(?<![\w-])(?:PDE[ -]?|[Pp]hosphodiesterase[ -])"
+    r"(?P<fam>\d{1,2})(?P<sub>[A-D])?(?P<var>\d{1,2})?(?![\w-])"
+)
+_CYP_CODE = r"\d{1,2}[A-Z]{1,2}\d{0,3}"
+_CYP_NAME = re.compile(
+    rf"(?<![\w-])(?:CYP[ -]?|P-?450[ -]?)(?P<code>{_CYP_CODE})(?![\w-])"
+)
+
+
+def _ca_reading(m: "re.Match") -> Optional[str]:
+    if _BRAIN_REGION.match(m.string[m.end():]) or re.search(
+            r"hippocamp\w*\s+$", m.string[:m.start()], re.IGNORECASE):
+        return None
+    if m.group("roman"):
+        return f"CA-{m.group('roman')}{m.group('sub') or ''}"
+    if re.match(r"\s*(?:[mµun]?M\b|%|°|mg\b|min\b|h\b|s\b)", m.string[m.end():]):
+        # "CA 2 mM": an amount of something abbreviated CA, not CA II.
+        return None
+    number = int(m.group("num"))
+    if number not in _ROMAN_OF:
+        return None
+    return f"CA-{_ROMAN_OF[number]}{m.group('nsub') or ''}"
+
+
+def _pde_reading(m: "re.Match") -> Optional[str]:
+    return f"PDE{m.group('fam')}{m.group('sub') or ''}{m.group('var') or ''}"
+
+
+def _cyp_reading(m: "re.Match") -> Optional[str]:
+    return f"CYP{m.group('code')}"
+
+
 #: Every form a name can take, in the order tried at one position.
 _FORMS = (
+    (_CA_NAME, _ca_reading),
+    (_PDE_NAME, _pde_reading),
+    (_CYP_NAME, _cyp_reading),
     (_FULL_NAME, _full_name_reading),
     (_STEM_NAME, _stem_reading),
     (_GLUCOKINASE, _glucokinase_reading),
@@ -359,14 +424,37 @@ def _compared_as(name: str) -> tuple:
     reading = read_isoform(name) or name
     out = []
     for part in isoform_names(reading):
+        tiers = _hierarchy(part)
+        if tiers is not None:
+            out.append((isoform_key(part), None, False, tiers))
+            continue
         abbreviated = _ABBREVIATED.fullmatch(part)
         if abbreviated:
-            out.append((isoform_key(part), isoform_key(abbreviated.group(1)), True))
+            out.append((isoform_key(part), isoform_key(abbreviated.group(1)), True, None))
         elif _CODE_ALONE.fullmatch(part):
-            out.append((isoform_key(part), isoform_key(part), False))
+            out.append((isoform_key(part), isoform_key(part), False, None))
         else:
-            out.append((isoform_key(part), None, False))
+            out.append((isoform_key(part), None, False, None))
     return tuple(out)
+
+
+_PDE_TIERS = re.compile(r"PDE(\d{1,2})([A-D])?(\d{1,2})?")
+_CYP_TIERS = re.compile(r"(?:CYP)?(\d{1,2})([A-Z]{1,2})?(\d{1,3})?")
+
+
+def _hierarchy(part: str) -> Optional[tuple]:
+    """("PDE", ("5", "A")) for "PDE5A", ("CYP", ("2", "B", "6")) for "CYP2B6"
+    or a bare "2B6", None for a name of any other family. These families name
+    an isoform by family, subfamily and member, and a name that stops early
+    ("PDE5") names every member below it ("PDE5A")."""
+    m = _PDE_TIERS.fullmatch(part)
+    if m:
+        return ("PDE", tuple(g for g in m.groups() if g))
+    if part.startswith("CYP") or re.fullmatch(r"\d{1,2}[A-Z]{1,2}\d{1,3}", part):
+        m = _CYP_TIERS.fullmatch(part)
+        if m and m.group(2):
+            return ("CYP", tuple(g for g in m.groups() if g))
+    return None
 
 
 def _one_protein(a: str, b: str) -> bool:
@@ -383,6 +471,16 @@ def _one(x: tuple, y: tuple) -> bool:
         return True
     if _one_protein(x[0], y[0]):
         return True
+    if x[3] is not None or y[3] is not None:
+        # A hierarchical name (PDE, CYP) is one isoform with another only in
+        # its own family and only when one name continues the other:
+        # "PDE5" and "PDE5A", never "PDE4A" and "PDE4B" or "CYP2B6" and
+        # "CYP2B1". A code alone ("II") is not compared with one.
+        if x[3] is None or y[3] is None or x[3][0] != y[3][0]:
+            return False
+        a, b = x[3][1], y[3][1]
+        shorter = min(len(a), len(b))
+        return a[:shorter] == b[:shorter]
     # A code alone and the same code after an abbreviation; never two
     # abbreviations ("HK-1" and "HXK-1"), which the keys already compared.
     return x[1] is not None and x[1] == y[1] and x[2] != y[2]
