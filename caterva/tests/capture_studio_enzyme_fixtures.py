@@ -2,6 +2,8 @@
 
     cd <repository root> && PYTHONPATH=$PWD python caterva/tests/capture_studio_enzyme_fixtures.py
 
+(`--choices-only` makes only the run with automatic choices, ADR 0182.)
+
 Every file written under
 Science-Agent-Pipeline/artifacts/caterva-studio/src/__fixtures__/api/enzymes/
 is what the studio server answered to a real request, through
@@ -121,6 +123,31 @@ def run(app: Any, kind: str, request: Dict[str, Any], name: str) -> None:
     print("wrote", path.relative_to(REPO), record["status"], record["outcome"]["meaning"] if record.get("outcome") else "")
 
 
+CHOICES_FIXTURE = "compose-hexokinase-chosen-organism-and-substrate"
+
+
+def capture_choices(app: Any) -> None:
+    """The run whose `search.choices` the Studio's choice panel is tested on
+    (src/screens/kinetics/choices.test.tsx): EC 2.7.1.1 with neither an
+    organism nor a substrate, against the recorded hexokinase page."""
+    run(app, "compose", {"description": "Michaelis Menten", "subject": "2.7.1.1"}, CHOICES_FIXTURE)
+
+
+def capture_choices_only() -> None:
+    """`--choices-only`: just that run, leaving every other fixture as recorded."""
+    from studio_kinetics_offline import hexokinase_offline
+
+    work = Path(tempfile.mkdtemp(prefix="caterva-enzyme-fixtures-"))
+    SCRATCH[:] = [str(work), str(work.resolve())]
+    os.environ["XDG_CACHE_HOME"] = str(work / "cache")
+    app = make_app(work)
+    try:
+        with hexokinase_offline():
+            capture_choices(app)
+    finally:
+        app.close()
+
+
 @contextlib.contextmanager
 def structure_recordings() -> Iterator[None]:
     """The UniProt and RCSB answers of caterva/tests/fixtures/structure/ldh_human.json, replayed."""
@@ -218,6 +245,9 @@ def main() -> None:
             run(app, "compose", {"description": "Michaelis Menten", "subject": "2.7.1.1", "organism": "human",
                                  "substrate": "glucose", "compounds": {"@inhibitor": "gossypol"}},
                 "compose-michaelis-menten-unused-inhibitor")
+            # ADR 0182: no organism and no substrate named; the engine chooses both from the page's rows
+            # and records each choice in `search.choices` (the Studio's choice panel).
+            capture_choices(app)
             run(app, "constants", {"enzyme": "lactate dehydrogenase", "organism": "human", "substrate": "pyruvate"},
                 "constants-name-several-enzymes")
             run(app, "constants", {"ec": "2.7.1.1", "organism": "human", "substrate": "glucose"},
@@ -283,4 +313,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    capture_choices_only() if "--choices-only" in sys.argv[1:] else main()

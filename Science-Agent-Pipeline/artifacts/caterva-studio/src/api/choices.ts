@@ -10,35 +10,16 @@
  * with how many usable rows of each constant BRENDA holds for them, so the
  * person can switch with one click.
  *
- * WHY THESE SHAPES LIVE HERE AND NOT IN types.ts
- * types.ts is mirrored key by key against caterva/studio/contract.py
- * (caterva/tests/test_studio_contract.py). The choice was added to the engine
- * and to the page in parallel; reading it through `choicesOf` keeps the page
- * honest about a result that predates it (an old run has no `choices` key at
- * all, and shows no panel) without declaring a contract key the Python side
- * may not have yet. Once contract.SearchSummary carries `choices`, the same
- * key goes on SearchSummary in types.ts and these interfaces move with it.
+ * The shapes (`SearchChoice`, `ChoiceOption`, `ChoiceRole`) are declared in
+ * types.ts beside `SearchSummary.choices`, mirrored key by key against
+ * caterva/studio/contract.py (caterva/tests/test_studio_contract.py); this
+ * module is how the page reads and acts on them. `choicesOf` still reads
+ * defensively: a run recorded before ADR 0182 has no `choices` key at all,
+ * and shows no panel.
  */
-import type { ComposeResult } from "./types";
+import type { ChoiceOption, ChoiceRole, ComposeResult, SearchChoice } from "./types";
 
-/** Which field of the request an automatic choice filled. "enzyme" is the subject (an EC number). */
-export type ChoiceRole = "substrate" | "inhibitor" | "organism" | "enzyme";
-
-/** One option BRENDA had for a role, with how many usable rows of each constant it holds ({"km": 9, "kcat": 4}). */
-export interface ChoiceOption {
-  name: string;
-  rows: Record<string, number>;
-}
-
-/** caterva/compose/defaults.py `Choice.to_json()`: what was chosen, the plain-English why, and what else there was. */
-export interface SearchChoice {
-  role: ChoiceRole;
-  chosen: string;
-  why: string;
-  alternatives: ChoiceOption[];
-  /** How many options were weighed in all, listed as alternatives or not. */
-  considered: number;
-}
+export type { ChoiceOption, ChoiceRole, SearchChoice };
 
 /** The request fields a re-run can set: one per choice role ("enzyme" is the subject). */
 export type RerunField = "subject" | "organism" | "substrate" | "inhibitor";

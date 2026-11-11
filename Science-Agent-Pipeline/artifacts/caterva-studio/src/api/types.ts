@@ -64,6 +64,8 @@ export type ProvenanceKind = "measured" | "fitted" | "computed" | "placeholder" 
  */
 export type MarkKind = ProvenanceKind | "ai";
 export type ChosenBy = "user" | "default";
+/** Which field of a compose request an automatic choice filled (ADR 0182); "enzyme" is the subject, as an EC number. */
+export type ChoiceRole = "enzyme" | "organism" | "substrate" | "inhibitor";
 export type Nonfinite = "nan" | "inf" | "-inf";
 export type ErrorCode =
   | "malformed"
@@ -774,8 +776,25 @@ export interface SearchSummary {
   unused_compounds: Record<string, string>;
   measured: number;
   placeholders: number;
-  /** What Caterva chose for what the request did not name (ADR 0182), in order. */
-  choices: { role: "enzyme" | "organism" | "substrate" | "inhibitor"; chosen: string; why: string; alternatives: { name: string; rows: Record<string, number> }[]; considered: number }[];
+  /** What Caterva chose for what the request did not name (ADR 0182), in order; [] when nothing was chosen. */
+  choices: SearchChoice[];
+}
+
+/** One option BRENDA had for a choice, with its usable rows per table ({"km": 9, "kcat": 4}). */
+export interface ChoiceOption {
+  name: string;
+  rows: Record<string, number>;
+}
+
+/** caterva/compose/defaults.py `Choice.to_json()`: what was chosen, the plain-English why, and what else there was. */
+export interface SearchChoice {
+  role: ChoiceRole;
+  chosen: string;
+  why: string;
+  /** The next-best options, best first. */
+  alternatives: ChoiceOption[];
+  /** How many options were weighed in all, the chosen one included: those neither chosen nor listed are considered - 1 - alternatives.length. */
+  considered: number;
 }
 
 export interface Concern {

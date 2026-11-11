@@ -1,0 +1,1591 @@
+{
+ "captured": {
+  "kind": "compose",
+  "request": {
+   "description": "Michaelis Menten",
+   "subject": "2.7.1.1"
+  }
+ },
+ "run": {
+  "schema": "caterva.studio.run/1",
+  "id": "20261111-194024-compose-e8d6650f",
+  "kind": "compose",
+  "title": "Michaelis Menten, EC 2.7.1.1",
+  "status": "done",
+  "created_at": "2026-11-11T19:40:24.517Z",
+  "started_at": "2026-11-11T19:40:24.521Z",
+  "finished_at": "2026-11-11T19:40:43.173Z",
+  "caterva_version": "0.7.0",
+  "cli": [
+   "caterva",
+   "compose",
+   "Michaelis Menten",
+   "--subject",
+   "2.7.1.1"
+  ],
+  "request": {
+   "description": "Michaelis Menten",
+   "subject": "2.7.1.1"
+  },
+  "outcome": {
+   "exit_code": 0,
+   "meaning": "produced",
+   "summary": "VERDICT: GROUNDED",
+   "reason": null,
+   "has_result": true
+  },
+  "error": null,
+  "artifacts": [
+   {
+    "name": "report.md",
+    "content_type": "text/markdown; charset=utf-8",
+    "bytes": 9991,
+    "description": "the report caterva compose prints for this request"
+   },
+   {
+    "name": "model.xml",
+    "content_type": "application/xml",
+    "bytes": 9644,
+    "description": "SBML Level 3, every value's origin in its notes (caterva compose --export sbml)"
+   },
+   {
+    "name": "model.ant",
+    "content_type": "text/plain; charset=utf-8",
+    "bytes": 6290,
+    "description": "Antimony source, every value's origin beside it (caterva compose --export antimony)"
+   },
+   {
+    "name": "parameters.csv",
+    "content_type": "text/csv; charset=utf-8",
+    "bytes": 3834,
+    "description": "every number, its origin and its citation (caterva compose --export csv)"
+   },
+   {
+    "name": "methods.md",
+    "content_type": "text/markdown; charset=utf-8",
+    "bytes": 4728,
+    "description": "a methods paragraph grouped by origin (caterva compose --export methods)"
+   },
+   {
+    "name": "claims.zip",
+    "content_type": "application/zip",
+    "bytes": 312275,
+    "description": "the run's claims bundle (manifest.json, claims.jsonl, rows.jsonl, snapshots.jsonl, snapshots/<hex>.gz): unzip it and run `caterva verify DIR` to re-check it offline (caterva compose --claims DIR)"
+   },
+   {
+    "name": "claims.json",
+    "content_type": "application/json",
+    "bytes": 9046,
+    "description": "the bundle's manifest and its claim, row and snapshot records, without the pinned bytes"
+   }
+  ],
+  "progress": {
+   "stage": "exports",
+   "label": "Writing the SBML, Antimony, CSV and methods exports",
+   "fraction": null
+  }
+ },
+ "result_status": 200,
+ "result": {
+  "query": "Michaelis Menten",
+  "recognition": {
+   "rule": "michaelis_menten",
+   "reading": "Michaelis-Menten"
+  },
+  "model": {
+   "species": [
+    {
+     "id": "reaction_S",
+     "initial": {
+      "value": 1.0,
+      "unit": "mM",
+      "provenance": {
+       "kind": "chosen",
+       "by": "default",
+       "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model.",
+       "claim": {
+        "id": "claim:sha256:449e3895c597b8db0e00715cd1866aed8f5913cbb4410efbecd67e34c7d9097b",
+        "kind": "chosen",
+        "rule": {
+         "rule_id": "chosen.starting_amount",
+         "version": 1,
+         "adr": "ADR 0044"
+        },
+        "row": null,
+        "snapshot": null,
+        "reference": null,
+        "certificates": [],
+        "refusal": null
+       }
+      },
+      "id": "reaction_S",
+      "label": "S"
+     }
+    },
+    {
+     "id": "reaction_P",
+     "initial": {
+      "value": 0.0,
+      "unit": "mM",
+      "provenance": {
+       "kind": "chosen",
+       "by": "default",
+       "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model.",
+       "claim": {
+        "id": "claim:sha256:684079f228e29a31b1200e49a802b26fcdcbcd0aa45f18be281f3e1ea5d2d2d2",
+        "kind": "chosen",
+        "rule": {
+         "rule_id": "chosen.starting_amount",
+         "version": 1,
+         "adr": "ADR 0044"
+        },
+        "row": null,
+        "snapshot": null,
+        "reference": null,
+        "certificates": [],
+        "refusal": null
+       }
+      },
+      "id": "reaction_P",
+      "label": "P"
+     }
+    },
+    {
+     "id": "reaction_E",
+     "initial": {
+      "value": 0.001,
+      "unit": "mM",
+      "provenance": {
+       "kind": "chosen",
+       "by": "default",
+       "reason": "CHOSEN, NOT MEASURED: a starting amount, which is yours to set. No paper supplies it, so its absence from the literature is not a gap in this model.",
+       "claim": {
+        "id": "claim:sha256:ca36762339a105ba639ea1a21a74a5f08adc6fc40860aba2720c2d276e1d8139",
+        "kind": "chosen",
+        "rule": {
+         "rule_id": "chosen.starting_amount",
+         "version": 1,
+         "adr": "ADR 0044"
+        },
+        "row": null,
+        "snapshot": null,
+        "reference": null,
+        "certificates": [],
+        "refusal": null
+       }
+      },
+      "id": "reaction_E",
+      "label": "E"
+     }
+    }
+   ],
+   "reactions": [
+    {
+     "id": "reaction_catalysis",
+     "rate_law": "reaction_kcat * reaction_E * reaction_S / (reaction_Km + reaction_S)"
+    }
+   ],
+   "parameters": [
+    {
+     "value": 40.1,
+     "unit": "1/s",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "BRENDA ref 739603",
+       "registry": "BRENDA",
+       "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+       "via": "literature",
+       "reference_id": "739603"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": 7.6,
+       "temperature_c": 25.0,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "wild-type, pH 7.6, 25 °C",
+      "scope": [],
+      "chosen_because": null,
+      "spread": {
+       "low": 40.1,
+       "high": 101.0,
+       "unit": "1/s",
+       "carried": 40.1,
+       "n_values": 4,
+       "references": [
+        "702282",
+        "703624",
+        "739603"
+       ],
+       "sentence": "3 sources report 4 values (BRENDA ref 702282, 703624, 739603), spanning 40.1 to 101 1/s (2.52-fold); this model carries 40.1, chosen because 40.1 1/s (BRENDA ref 739603) is the one remaining row from BRENDA ref 739603, the paper the paired constant came from; the 4 remaining rows span 40.1 to 101 1/s; of the 13 candidate rows (after the organism, substrate, isoform and variant checks): 9 row(s) not stating both pH and temperature passed over; which one is right is a question about the papers. The range is not an uncertainty estimate: it is bounded by which rows are in the database"
+      },
+      "claim": {
+       "id": "claim:sha256:b73bbb32a8bb289625044c2d591bb5b7c150914f49cd958d97f48c789051e0f3",
+       "kind": "cited",
+       "rule": {
+        "rule_id": "select.resolver",
+        "version": 1,
+        "adr": "ADR 0047"
+       },
+       "row": {
+        "locator": "brenda:2.7.1.1:kcat:Homo sapiens:D-glucose:739603:40.1:0",
+        "value_text": "40.1",
+        "unit": "1/s",
+        "substrate": "D-glucose",
+        "organism": "Homo sapiens",
+        "commentary": "wild-type, pH 7.6, 25 °C",
+        "reference": "739603"
+       },
+       "snapshot": {
+        "id": "sha256:3a69b492abcd7253b301d7a002f60d52a971ba9352a3a2559ec5f12f5060ef91",
+        "locator": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+        "retrieved_at": "2026-11-11T19:40:26Z",
+        "licence": "CC BY 4.0",
+        "served_from": "/Users/smyan/Desktop/Coding/caterva-wt/realvalues/Tests/fixtures/recorded/brenda_2.7.1.1.html.gz"
+       },
+       "reference": null,
+       "certificates": [
+        {
+         "matched": "739603"
+        },
+        {
+         "matched": "40.1"
+        },
+        {
+         "matched": "wild-type, pH 7.6, 25 °C"
+        },
+        {
+         "matched": "D-glucose"
+        },
+        {
+         "matched": "Homo sapiens"
+        }
+       ],
+       "refusal": null
+      }
+     },
+     "id": "reaction_kcat",
+     "label": "kcat"
+    },
+    {
+     "value": 6.3,
+     "unit": "mM",
+     "provenance": {
+      "kind": "measured",
+      "citation": {
+       "text": "BRENDA ref 739603",
+       "registry": "BRENDA",
+       "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+       "via": "literature",
+       "reference_id": "739603"
+      },
+      "organism": "Homo sapiens",
+      "cross_species": false,
+      "conditions": {
+       "ph": 7.6,
+       "temperature_c": 25.0,
+       "buffer": null,
+       "unreported": []
+      },
+      "commentary": "wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C",
+      "scope": [],
+      "chosen_because": null,
+      "spread": {
+       "low": 0.034,
+       "high": 6.3,
+       "unit": "mM",
+       "carried": 6.3,
+       "n_values": 6,
+       "references": [
+        "640237",
+        "640261",
+        "641067",
+        "641068",
+        "739603"
+       ],
+       "sentence": "5 sources report 6 values (BRENDA ref 640237, 640261, 641067, 641068, 739603), spanning 0.034 to 6.3 mM (185-fold); this model carries 6.3, chosen because 6.3 mM (BRENDA ref 739603) is the one remaining row from BRENDA ref 739603, the paper the paired constant came from; the 6 remaining rows span 0.034 to 6.3 mM, a 185-fold spread: the literature disagrees by more than 100-fold, so this one value hides most of what is known; of the 13 candidate rows (after the organism, substrate, isoform and variant checks): 7 row(s) not stating both pH and temperature passed over; which one is right is a question about the papers. The range is not an uncertainty estimate: it is bounded by which rows are in the database"
+      },
+      "claim": {
+       "id": "claim:sha256:20173e76216a551721c48359117631d30818199d992597f59728e595fb9efd20",
+       "kind": "cited",
+       "rule": {
+        "rule_id": "select.resolver",
+        "version": 1,
+        "adr": "ADR 0047"
+       },
+       "row": {
+        "locator": "brenda:2.7.1.1:km:Homo sapiens:D-glucose:739603:6.3:0",
+        "value_text": "6.3",
+        "unit": "mM",
+        "substrate": "D-glucose",
+        "organism": "Homo sapiens",
+        "commentary": "wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C",
+        "reference": "739603"
+       },
+       "snapshot": {
+        "id": "sha256:3a69b492abcd7253b301d7a002f60d52a971ba9352a3a2559ec5f12f5060ef91",
+        "locator": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1",
+        "retrieved_at": "2026-11-11T19:40:26Z",
+        "licence": "CC BY 4.0",
+        "served_from": "/Users/smyan/Desktop/Coding/caterva-wt/realvalues/Tests/fixtures/recorded/brenda_2.7.1.1.html.gz"
+       },
+       "reference": null,
+       "certificates": [
+        {
+         "matched": "739603"
+        },
+        {
+         "matched": "6.3"
+        },
+        {
+         "matched": "wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C"
+        },
+        {
+         "matched": "D-glucose"
+        },
+        {
+         "matched": "Homo sapiens"
+        }
+       ],
+       "refusal": null
+      }
+     },
+     "id": "reaction_Km",
+     "label": "Km"
+    }
+   ],
+   "conservation_laws": [
+    "reaction_S + reaction_P",
+    "reaction_E"
+   ],
+   "unconserved": [],
+   "concentration_unit": "mM",
+   "motifs": [
+    {
+     "name": "catalytic_step",
+     "basis": "Michaelis-Menten under the quasi-steady-state assumption (Briggs & Haldane 1925): the enzyme-substrate complex is short-lived relative to the reaction, so its concentration is treated as constant. Valid while [E]0 << [S]; it fails for a tightly-binding enzyme at low substrate, where the free-substrate approximation breaks down.",
+     "copies": 1
+    }
+   ]
+  },
+  "search": {
+   "asked": true,
+   "refused": false,
+   "note": "2 constant(s) resolved from the literature: reaction_Km, reaction_kcat",
+   "subject": "2.7.1.1",
+   "ec": "2.7.1.1",
+   "organism": "Homo sapiens",
+   "substrate": "D-glucose",
+   "isoform": null,
+   "compounds": {},
+   "unused_compounds": {},
+   "measured": 2,
+   "placeholders": 0,
+   "choices": [
+    {
+     "role": "organism",
+     "chosen": "Homo sapiens",
+     "why": "of the 41 organisms with rows under EC 2.7.1.1, Homo sapiens is used when it has rows for every constant this model needs (Km, kcat), and it does (159 Km, 92 kcat)",
+     "alternatives": [
+      {
+       "name": "Saccharomyces cerevisiae",
+       "rows": {
+        "km": 16,
+        "kcat": 2
+       }
+      },
+      {
+       "name": "Solanum chacoense",
+       "rows": {
+        "km": 8,
+        "kcat": 9
+       }
+      },
+      {
+       "name": "Eimeria tenella",
+       "rows": {
+        "km": 8,
+        "kcat": 6
+       }
+      },
+      {
+       "name": "Mus musculus",
+       "rows": {
+        "km": 5,
+        "kcat": 7
+       }
+      },
+      {
+       "name": "Cryptosporidium parvum",
+       "rows": {
+        "km": 4,
+        "kcat": 4
+       }
+      }
+     ],
+     "considered": 41
+    },
+    {
+     "role": "substrate",
+     "chosen": "D-glucose",
+     "why": "of the 10 substrates BRENDA lists Km rows for under EC 2.7.1.1 in Homo sapiens, it has the most Km and kcat rows (25 Km, 61 kcat; the cosubstrate ATP set aside)",
+     "alternatives": [
+      {
+       "name": "2-deoxy-D-glucose",
+       "rows": {
+        "km": 5,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "D-mannose",
+       "rows": {
+        "km": 9,
+        "kcat": 0
+       }
+      },
+      {
+       "name": "D-fructose",
+       "rows": {
+        "km": 7,
+        "kcat": 0
+       }
+      },
+      {
+       "name": "D-glucosamine",
+       "rows": {
+        "km": 3,
+        "kcat": 0
+       }
+      },
+      {
+       "name": "2-deoxyglucose",
+       "rows": {
+        "km": 1,
+        "kcat": 0
+       }
+      }
+     ],
+     "considered": 10
+    }
+   ]
+  },
+  "verdict": {
+   "verdict": "grounded",
+   "licence": "Questions about the system whose constants these are, AT the conditions those constants were measured at. Not questions about other conditions, other organisms, or other enzyme concentrations unless the report says those were checked.",
+   "behaviour": "one stable state was found, and the search did not find another -- which is not the same as there being none",
+   "conclusion": null,
+   "concerns": [
+    {
+     "source": "isozymes",
+     "severity": "grounded",
+     "detail": "EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat",
+     "remedy": "pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused",
+     "qualifier": "EC 2.7.1.1 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them"
+    }
+   ],
+   "next_step": "pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused",
+   "consulted": {
+    "units": "all 1 rate law(s) balance",
+    "scale": "all 5 numbers examined are possible",
+    "predictions": "all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold",
+    "provenance": "all 2 constant(s) measured, with provenance",
+    "isozymes": "EC 2.7.1.1 is 5 proteins in human, none chosen",
+    "assumptions": "0 violated, 1 undecided",
+    "stability": "1 stable state(s) from 24 starting points",
+    "robustness": "nothing to resample: every constant is measured (the spread between published values is under 'Where the evidence did not settle on one value')"
+   },
+   "unavailable": {
+    "validate": "not run -- pass --validate (or `validation=`) for the cross-module consistency check"
+   },
+   "text": "VERDICT: GROUNDED\n\nWhat this supports: Questions about the system whose constants these are, AT the conditions those constants were measured at. Not questions about other conditions, other organisms, or other enzyme concentrations unless the report says those were checked.\n\nQualified: EC 2.7.1.1 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\n1 concern(s), worst first:\n  - [isozymes] EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nDo this next: pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nChecked: assumptions (0 violated, 1 undecided); isozymes (EC 2.7.1.1 is 5 proteins in human, none chosen); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold); provenance (all 2 constant(s) measured, with provenance); robustness (nothing to resample: every constant is measured (the spread between published values is under 'Where the evidence did not settle on one value')); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 1 rate law(s) balance).\n\n1 check(s) did NOT run: validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point."
+  },
+  "stability": {
+   "rounding_tolerance": 1e-06,
+   "count_caveat": null,
+   "starts_tried": 24,
+   "species": [
+    "reaction_S",
+    "reaction_P",
+    "reaction_E"
+   ],
+   "notes": [],
+   "fixed_points": [
+    {
+     "state": {
+      "reaction_S": -2.8901787796324762e-18,
+      "reaction_P": 1.0000000000000002,
+      "reaction_E": 0.001
+     },
+     "residual": 1.8396217311628936e-20,
+     "eigenvalues": [
+      {
+       "re": -0.006365079365079365,
+       "im": 0.0
+      }
+     ],
+     "classification": "stable",
+     "physical": true,
+     "stable": true,
+     "oscillatory": false,
+     "slowest_timescale": 157.1072319201995,
+     "description": "stable at reaction_E=0.001, reaction_P=1, reaction_S=-2.89e-18; settles over ~157 time units"
+    }
+   ],
+   "text": "1 steady state(s) found from 24 starting points:   - stable at reaction_E=0.001, reaction_P=1, reaction_S=-2.89e-18; settles over ~157 time units These are numerical results from a root find, not derived facts. The conservation laws this model reports ARE derived; these are what a solver converged to, with the residuals shown."
+  },
+  "trajectory": {
+   "times": [
+    0.0,
+    3.1421446384039897,
+    6.284289276807979,
+    9.42643391521197,
+    12.568578553615959,
+    15.710723192019948,
+    18.85286783042394,
+    21.995012468827927,
+    25.137157107231918,
+    28.27930174563591,
+    31.421446384039896,
+    34.56359102244389,
+    37.70573566084788,
+    40.84788029925187,
+    43.99002493765585,
+    47.132169576059844,
+    50.274314214463836,
+    53.41645885286783,
+    56.55860349127182,
+    59.7007481296758,
+    62.84289276807979,
+    65.98503740648378,
+    69.12718204488777,
+    72.26932668329177,
+    75.41147132169576,
+    78.55361596009975,
+    81.69576059850374,
+    84.83790523690772,
+    87.9800498753117,
+    91.1221945137157,
+    94.26433915211969,
+    97.40648379052368,
+    100.54862842892767,
+    103.69077306733166,
+    106.83291770573565,
+    109.97506234413964,
+    113.11720698254364,
+    116.25935162094763,
+    119.4014962593516,
+    122.5436408977556,
+    125.68578553615959,
+    128.8279301745636,
+    131.97007481296757,
+    135.11221945137154,
+    138.25436408977555,
+    141.39650872817953,
+    144.53865336658353,
+    147.6807980049875,
+    150.8229426433915,
+    153.9650872817955,
+    157.1072319201995,
+    160.24937655860347,
+    163.39152119700748,
+    166.53366583541145,
+    169.67581047381543,
+    172.81795511221944,
+    175.9600997506234,
+    179.10224438902742,
+    182.2443890274314,
+    185.3865336658354,
+    188.52867830423938,
+    191.67082294264338,
+    194.81296758104736,
+    197.95511221945137,
+    201.09725685785534,
+    204.23940149625932,
+    207.38154613466332,
+    210.5236907730673,
+    213.6658354114713,
+    216.80798004987528,
+    219.9501246882793,
+    223.09226932668327,
+    226.23441396508727,
+    229.37655860349125,
+    232.51870324189525,
+    235.66084788029923,
+    238.8029925187032,
+    241.9451371571072,
+    245.0872817955112,
+    248.2294264339152,
+    251.37157107231917,
+    254.51371571072318,
+    257.6558603491272,
+    260.79800498753116,
+    263.94014962593513,
+    267.0822942643391,
+    270.2244389027431,
+    273.3665835411471,
+    276.5087281795511,
+    279.6508728179551,
+    282.79301745635905,
+    285.9351620947631,
+    289.07730673316706,
+    292.21945137157104,
+    295.361596009975,
+    298.50374064837905,
+    301.645885286783,
+    304.788029925187,
+    307.930174563591,
+    311.07231920199496,
+    314.214463840399,
+    317.35660847880297,
+    320.49875311720695,
+    323.6408977556109,
+    326.78304239401496,
+    329.92518703241893,
+    333.0673316708229,
+    336.2094763092269,
+    339.35162094763086,
+    342.4937655860349,
+    345.6359102244389,
+    348.77805486284285,
+    351.9201995012468,
+    355.06234413965086,
+    358.20448877805484,
+    361.3466334164588,
+    364.4887780548628,
+    367.6309226932668,
+    370.7730673316708,
+    373.9152119700748,
+    377.05735660847876,
+    380.19950124688273,
+    383.34164588528677,
+    386.48379052369074,
+    389.6259351620947,
+    392.7680798004987,
+    395.91022443890273,
+    399.0523690773067,
+    402.1945137157107,
+    405.33665835411466,
+    408.47880299251864,
+    411.6209476309227,
+    414.76309226932665,
+    417.9052369077306,
+    421.0473815461346,
+    424.18952618453864,
+    427.3316708229426,
+    430.4738154613466,
+    433.61596009975057,
+    436.75810473815454,
+    439.9002493765586,
+    443.04239401496255,
+    446.18453865336653,
+    449.3266832917705,
+    452.46882793017454,
+    455.6109725685785,
+    458.7531172069825,
+    461.89526184538647,
+    465.0374064837905,
+    468.1795511221945,
+    471.32169576059846,
+    474.46384039900244,
+    477.6059850374064,
+    480.74812967581045,
+    483.8902743142144,
+    487.0324189526184,
+    490.1745635910224,
+    493.3167082294264,
+    496.4588528678304,
+    499.60099750623436,
+    502.74314214463834,
+    505.8852867830423,
+    509.02743142144635,
+    512.1695760598503,
+    515.3117206982544,
+    518.4538653366583,
+    521.5960099750623,
+    524.7381546134662,
+    527.8802992518703,
+    531.0224438902743,
+    534.1645885286782,
+    537.3067331670823,
+    540.4488778054862,
+    543.5910224438902,
+    546.7331670822942,
+    549.8753117206982,
+    553.0174563591022,
+    556.1596009975062,
+    559.3017456359102,
+    562.4438902743142,
+    565.5860349127181,
+    568.7281795511221,
+    571.8703241895262,
+    575.0124688279301,
+    578.1546134663341,
+    581.296758104738,
+    584.4389027431421,
+    587.5810473815461,
+    590.72319201995,
+    593.8653366583541,
+    597.0074812967581,
+    600.149625935162,
+    603.291770573566,
+    606.43391521197,
+    609.576059850374,
+    612.718204488778,
+    615.860349127182,
+    619.002493765586,
+    622.1446384039899,
+    625.286783042394,
+    628.428927680798
+   ],
+   "columns": {
+    "reaction_S": [
+     1.0,
+     0.9828678433247949,
+     0.965990175435566,
+     0.9493643733625713,
+     0.9329878092807373,
+     0.916857851386161,
+     0.9009718649021244,
+     0.8853272128511733,
+     0.8699212571216094,
+     0.8547513592913923,
+     0.8398148814516367,
+     0.8251091870846644,
+     0.8106316419184781,
+     0.7963796147712865,
+     0.7823504783570259,
+     0.7685416100668404,
+     0.7549503927466128,
+     0.7415742154595707,
+     0.7284104742445325,
+     0.715456572852531,
+     0.702709923447608,
+     0.6901679472803834,
+     0.6778280753741993,
+     0.6656877491829609,
+     0.6537444212289907,
+     0.6419955557208832,
+     0.630438629148825,
+     0.6190711308778116,
+     0.6078905636872158,
+     0.5968944443225347,
+     0.5860803040155637,
+     0.5754456890011713,
+     0.5649881609841448,
+     0.5547052976117856,
+     0.5445946929204807,
+     0.5346539577706954,
+     0.5248807202418846,
+     0.5152726260301419,
+     0.5058273388229827,
+     0.4965425406548945,
+     0.487415932234208,
+     0.4784452332658163,
+     0.4696281827569819,
+     0.46096253929694964,
+     0.4524460813191175,
+     0.44407660735288973,
+     0.43585193626355495,
+     0.4277699074613142,
+     0.4198283811014949,
+     0.41202523827066667,
+     0.4043583811642089,
+     0.3968257332307757,
+     0.3894252393148176,
+     0.38215486578169106,
+     0.37501260063768554,
+     0.3679964536159943,
+     0.3611044562659007,
+     0.3543346620228004,
+     0.34768514627546776,
+     0.34115400639993454,
+     0.3347393617996979,
+     0.32843935392782436,
+     0.32225214630398424,
+     0.3161759245051854,
+     0.3102088961605213,
+     0.30434929093191315,
+     0.29859536048524815,
+     0.29294537844500057,
+     0.28739764034818915,
+     0.28195046358878756,
+     0.2766021873497516,
+     0.27135117252580876,
+     0.2661958016424495,
+     0.2611344787687133,
+     0.2561656294164414,
+     0.2512877004354537,
+     0.24649915990308188,
+     0.24179849700990722,
+     0.23718422193206218,
+     0.23265486570289196,
+     0.22820898007814738,
+     0.22384513739905224,
+     0.21956193044292432,
+     0.21535797227523965,
+     0.21123189609517862,
+     0.20718235508014227,
+     0.20320802221940487,
+     0.19930759015022967,
+     0.19547977098822414,
+     0.19172329615671257,
+     0.1880369162079951,
+     0.18441940064668683,
+     0.18086953774898135,
+     0.17738613437985642,
+     0.17396801580609475,
+     0.1706140255098019,
+     0.16732302499963075,
+     0.16409389361969048,
+     0.16092552835675775,
+     0.15781684364722118,
+     0.1547667711828983,
+     0.1517742597149308,
+     0.14883827485738227,
+     0.14595779889043425,
+     0.14313183056312598,
+     0.14035938489477387,
+     0.13763949297689257,
+     0.13497120177657834,
+     0.13235357393507294,
+     0.1297856875746599,
+     0.12726663609431024,
+     0.12479552797765799,
+     0.1223714865924667,
+     0.11999364999322418,
+     0.117661170738658,
+     0.11537321566952409,
+     0.1131289657233955,
+     0.11092761575339763,
+     0.10876837433492419,
+     0.10665046355902585,
+     0.10457311885971737,
+     0.10253558881036713,
+     0.10053713494179062,
+     0.09857703154969331,
+     0.09665456551637909,
+     0.09476903611273045,
+     0.09291975483698837,
+     0.0911060452055644,
+     0.08932724260522136,
+     0.08758269408097498,
+     0.08587175819254482,
+     0.0841938048057595,
+     0.08254821495186829,
+     0.08093438062089442,
+     0.07935170462784728,
+     0.07779960040482488,
+     0.07627749187578692,
+     0.07478481324801813,
+     0.0733210088929738,
+     0.07188553314117106,
+     0.07047785016236582,
+     0.06909743377320259,
+     0.06774376730909813,
+     0.0664163434474373,
+     0.06511466407200324,
+     0.06383824011051893,
+     0.06258659138662644,
+     0.06135924648482571,
+     0.06015574259617677,
+     0.058975625376376,
+     0.05781844880220318,
+     0.05668377503470124,
+     0.055571174276356744,
+     0.05448022464165067,
+     0.05341051202132157,
+     0.052361629947166824,
+     0.05133317946601658,
+     0.05032476900913905,
+     0.04933601426248414,
+     0.04836653804634227,
+     0.04741597019006396,
+     0.04648394740845499,
+     0.045570113186813685,
+     0.04467411765962608,
+     0.043795617494142645,
+     0.04293427577876375,
+     0.04208976190725915,
+     0.041261751468477145,
+     0.040449926139024345,
+     0.0396539735723408,
+     0.03887358729456925,
+     0.038108466601077674,
+     0.03735831645059982,
+     0.0366228473666493,
+     0.0359017753381452,
+     0.03519482171839626,
+     0.03450171313186721,
+     0.033822181378796216,
+     0.03315596333897231,
+     0.032502800883469,
+     0.03186244078324938,
+     0.031234634617596874,
+     0.030619138690508006,
+     0.030015713943296312,
+     0.02942412586751382,
+     0.028844144425835758,
+     0.028275543968108493,
+     0.02771810314955277,
+     0.027171604854957843,
+     0.026635836118503495,
+     0.02611058804714581,
+     0.02559565574770847,
+     0.02509083825059801,
+     0.024595938437937857,
+     0.024110762973566242,
+     0.023635122230538746,
+     0.023168830223643397,
+     0.022711704542309984,
+     0.02226356628177835,
+     0.021824239979663963,
+     0.02139355355176136
+    ],
+    "reaction_P": [
+     0.0,
+     0.017132156675205176,
+     0.03400982456443405,
+     0.05063562663742866,
+     0.0670121907192626,
+     0.08314214861383883,
+     0.09902813509787535,
+     0.1146727871488264,
+     0.13007874287839033,
+     0.14524864070860735,
+     0.160185118548363,
+     0.1748908129153354,
+     0.18936835808152172,
+     0.2036203852287133,
+     0.217649521642974,
+     0.2314583899331594,
+     0.24504960725338695,
+     0.25842578454042914,
+     0.27158952575546724,
+     0.2845434271474689,
+     0.29729007655239187,
+     0.30983205271961645,
+     0.32217192462580063,
+     0.33431225081703897,
+     0.34625557877100926,
+     0.3580044442791167,
+     0.3695613708511749,
+     0.3809288691221883,
+     0.3921094363127841,
+     0.40310555567746537,
+     0.4139196959844364,
+     0.4245543109988287,
+     0.4350118390158551,
+     0.44529470238821445,
+     0.4554053070795192,
+     0.4653460422293046,
+     0.4751192797581153,
+     0.48472737396985793,
+     0.4941726611770172,
+     0.5034574593451054,
+     0.5125840677657921,
+     0.5215547667341838,
+     0.5303718172430181,
+     0.5390374607030504,
+     0.5475539186808824,
+     0.5559233926471102,
+     0.564148063736445,
+     0.5722300925386857,
+     0.5801716188985049,
+     0.5879747617293332,
+     0.5956416188357909,
+     0.6031742667692243,
+     0.6105747606851823,
+     0.6178451342183088,
+     0.6249873993623144,
+     0.6320035463840055,
+     0.638895543734099,
+     0.6456653379771993,
+     0.652314853724532,
+     0.6588459936000652,
+     0.6652606382003019,
+     0.6715606460721754,
+     0.6777478536960153,
+     0.6838240754948143,
+     0.6897911038394784,
+     0.6956507090680865,
+     0.7014046395147514,
+     0.7070546215549991,
+     0.7126023596518105,
+     0.718049536411212,
+     0.723397812650248,
+     0.728648827474191,
+     0.7338041983575502,
+     0.7388655212312863,
+     0.7438343705835584,
+     0.748712299564546,
+     0.7535008400969178,
+     0.7582015029900925,
+     0.7628157780679374,
+     0.7673451342971078,
+     0.7717910199218523,
+     0.7761548626009475,
+     0.7804380695570755,
+     0.7846420277247601,
+     0.7887681039048211,
+     0.7928176449198574,
+     0.7967919777805949,
+     0.80069240984977,
+     0.8045202290117756,
+     0.8082767038432871,
+     0.8119630837920045,
+     0.8155805993533128,
+     0.8191304622510184,
+     0.8226138656201434,
+     0.826031984193905,
+     0.8293859744901978,
+     0.832676975000369,
+     0.8359061063803093,
+     0.839074471643242,
+     0.8421831563527786,
+     0.8452332288171015,
+     0.848225740285069,
+     0.8511617251426175,
+     0.8540422011095654,
+     0.8568681694368737,
+     0.8596406151052257,
+     0.8623605070231071,
+     0.8650287982234214,
+     0.8676464260649268,
+     0.8702143124253399,
+     0.8727333639056895,
+     0.8752044720223419,
+     0.8776285134075331,
+     0.8800063500067755,
+     0.8823388292613418,
+     0.8846267843304757,
+     0.8868710342766042,
+     0.8890723842466022,
+     0.8912316256650756,
+     0.8933495364409739,
+     0.8954268811402823,
+     0.8974644111896327,
+     0.8994628650582092,
+     0.9014229684503066,
+     0.9033454344836207,
+     0.9052309638872694,
+     0.9070802451630114,
+     0.9088939547944355,
+     0.9106727573947785,
+     0.9124173059190248,
+     0.914128241807455,
+     0.9158061951942403,
+     0.9174517850481315,
+     0.9190656193791055,
+     0.9206482953721525,
+     0.9222003995951751,
+     0.923722508124213,
+     0.9252151867519818,
+     0.926678991107026,
+     0.9281144668588288,
+     0.929522149837634,
+     0.9309025662267972,
+     0.9322562326909017,
+     0.9335836565525626,
+     0.9348853359279967,
+     0.936161759889481,
+     0.9374134086133734,
+     0.9386407535151742,
+     0.9398442574038232,
+     0.941024374623624,
+     0.9421815511977968,
+     0.9433162249652987,
+     0.9444288257236432,
+     0.9455197753583493,
+     0.9465894879786784,
+     0.9476383700528331,
+     0.9486668205339834,
+     0.949675230990861,
+     0.9506639857375159,
+     0.9516334619536577,
+     0.9525840298099361,
+     0.953516052591545,
+     0.9544298868131864,
+     0.955325882340374,
+     0.9562043825058574,
+     0.9570657242212363,
+     0.9579102380927409,
+     0.9587382485315228,
+     0.9595500738609757,
+     0.9603460264276592,
+     0.9611264127054308,
+     0.9618915333989223,
+     0.9626416835494002,
+     0.9633771526333507,
+     0.9640982246618548,
+     0.9648051782816037,
+     0.9654982868681329,
+     0.9661778186212039,
+     0.9668440366610276,
+     0.9674971991165309,
+     0.9681375592167505,
+     0.9687653653824031,
+     0.969380861309492,
+     0.9699842860567037,
+     0.9705758741324861,
+     0.9711558555741643,
+     0.9717244560318915,
+     0.9722818968504472,
+     0.9728283951450422,
+     0.9733641638814965,
+     0.9738894119528543,
+     0.9744043442522916,
+     0.9749091617494021,
+     0.9754040615620623,
+     0.9758892370264338,
+     0.9763648777694613,
+     0.9768311697763568,
+     0.9772882954576901,
+     0.9777364337182218,
+     0.9781757600203361,
+     0.9786064464482387
+    ],
+    "reaction_E": [
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001,
+     0.001
+    ]
+   },
+   "end": 628.428927680798,
+   "points": 201,
+   "window_basis": "4 x the slowest settling time (157), derived from the Jacobian's smallest non-zero eigenvalue",
+   "invariants": [
+    {
+     "law": "reaction_S + reaction_P",
+     "initial": 1.0,
+     "final": 1.0,
+     "worst_drift": 4.440892098500626e-16,
+     "held": true
+    },
+    {
+     "law": "reaction_E",
+     "initial": 0.001,
+     "final": 0.001,
+     "worst_drift": 0.0,
+     "held": true
+    }
+   ],
+   "checked": true,
+   "sound": true,
+   "unmeasured": [],
+   "text": "Integrated to t=628.4 in 201 points (4 x the slowest settling time (157), derived from the Jacobian's smallest non-zero eigenvalue). Final state: reaction_E=0.001, reaction_P=0.9786, reaction_S=0.02139. All 2 conservation law(s) survived the integration: `reaction_S + reaction_P` held to 4.44e-16; `reaction_E` held to 0.00e+00. The integrator does not know these exist, so this is an independent check that the numbers are right."
+  },
+  "sensitivity": {
+   "quantity": "settling time",
+   "base_value": 157.1072319201995,
+   "sensitivities": [
+    {
+     "parameter": "reaction_kcat",
+     "value": 40.1,
+     "relative": -1.0000046416103154,
+     "absolute": -3.9179042680984484,
+     "negligible": false,
+     "unresolvable": false
+    },
+    {
+     "parameter": "reaction_Km",
+     "value": 6.3,
+     "relative": 0.9999999999999905,
+     "absolute": 24.937655860348887,
+     "negligible": false,
+     "unresolvable": false
+    }
+   ],
+   "skipped": {},
+   "conserved_by": "reaction_S + reaction_P",
+   "resolution": 4.641588833612782e-05
+  },
+  "sweeps": [],
+  "sections": [],
+  "notes": [
+   "one enzyme turning one substrate into one product, under the quasi-steady-state assumption",
+   "No organism was named, so Caterva used Homo sapiens: of the 41 organisms with rows under EC 2.7.1.1, Homo sapiens is used when it has rows for every constant this model needs (Km, kcat), and it does (159 Km, 92 kcat). Others: Saccharomyces cerevisiae (16 Km, 2 kcat); Solanum chacoense (8 Km, 9 kcat); Eimeria tenella (8 Km, 6 kcat); Mus musculus (5 Km, 7 kcat); Cryptosporidium parvum (4 Km, 4 kcat); and 35 more. Pass --organism NAME to model another.",
+   "No substrate was named, so Caterva used D-glucose: of the 10 substrates BRENDA lists Km rows for under EC 2.7.1.1 in Homo sapiens, it has the most Km and kcat rows (25 Km, 61 kcat; the cosubstrate ATP set aside). Others: 2-deoxy-D-glucose (5 Km, 1 kcat); D-mannose (9 Km); D-fructose (7 Km); D-glucosamine (3 Km); 2-deoxyglucose (1 Km); and 4 more. Pass --substrate NAME to model another.",
+   "2 constant(s) resolved from the literature: reaction_Km, reaction_kcat"
+  ],
+  "report_markdown": "# michaelis_menten\n\n> Michaelis Menten\n\n## Verdict\n\n```\nVERDICT: GROUNDED\n\nWhat this supports: Questions about the system whose constants these are, AT the conditions those constants were measured at. Not questions about other conditions, other organisms, or other enzyme concentrations unless the report says those were checked.\n\nQualified: EC 2.7.1.1 is 5 proteins in human and no --isoform was given, so the constants may belong to any of them.\n\nWhat this model does: one stable state was found, and the search did not find another -- which is not the same as there being none\n\n1 concern(s), worst first:\n  - [isozymes] EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat -- pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nDo this next: pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused\n\nChecked: assumptions (0 violated, 1 undecided); isozymes (EC 2.7.1.1 is 5 proteins in human, none chosen); predictions (all 3 predicted amounts across 1 steady state(s) are amounts a cell could hold); provenance (all 2 constant(s) measured, with provenance); robustness (nothing to resample: every constant is measured (the spread between published values is under 'Where the evidence did not settle on one value')); scale (all 5 numbers examined are possible); stability (1 stable state(s) from 24 starting points); units (all 1 rate law(s) balance).\n\n1 check(s) did NOT run: validate (not run -- pass --validate (or `validation=`) for the cross-module consistency check). Those are unexamined, not passed.\n\nThis page is a reading of the sections below, not a measurement of its own. There is deliberately no score: the worst finding sets the verdict and is named, because a model that is structurally sound and numerically absurd is not 'medium' -- it has one specific problem, and naming it is the point.\n```\n\n## Structure\n\nRecognised as: **michaelis menten** (Michaelis-Menten).\n\n3 species, 1 reactions, 2 parameters.\n\n| reaction | rate law |\n|---|---|\n| `reaction_catalysis` | `reaction_kcat * reaction_E * reaction_S / (reaction_Km + reaction_S)` |\n\n- one enzyme turning one substrate into one product, under the quasi-steady-state assumption.\n- No organism was named, so Caterva used Homo sapiens: of the 41 organisms with rows under EC 2.7.1.1, Homo sapiens is used when it has rows for every constant this model needs (Km, kcat), and it does (159 Km, 92 kcat). Others: Saccharomyces cerevisiae (16 Km, 2 kcat); Solanum chacoense (8 Km, 9 kcat); Eimeria tenella (8 Km, 6 kcat); Mus musculus (5 Km, 7 kcat); Cryptosporidium parvum (4 Km, 4 kcat); and 35 more. Pass --organism NAME to model another.\n- No substrate was named, so Caterva used D-glucose: of the 10 substrates BRENDA lists Km rows for under EC 2.7.1.1 in Homo sapiens, it has the most Km and kcat rows (25 Km, 61 kcat; the cosubstrate ATP set aside). Others: 2-deoxy-D-glucose (5 Km, 1 kcat); D-mannose (9 Km); D-fructose (7 Km); D-glucosamine (3 Km); 2-deoxyglucose (1 Km); and 4 more. Pass --substrate NAME to model another.\n- 2 constant(s) resolved from the literature: reaction_Km, reaction_kcat.\n\n## Invariants\n\nThese are **derived**, not asserted: they are the left null space of this model's own stoichiometry matrix, computed exactly over rationals.\n\n- `reaction_S + reaction_P` is constant\n- `reaction_E` is constant\n\n## Dimensions\n\nAll 1 rate laws balance, in dimension and in scale. Checked before compilation: a law with the wrong dimensions integrates perfectly well and is wrong by whatever factor the mistake introduced.\n\n## Where the numbers come from\n\n**2 of 2 constant(s) came from the literature**, searched for `2.7.1.1` in Homo sapiens, substrate D-glucose. Each constant is looked up under the compound it belongs to.\n\n| quantity | value | origin | source |\n|---|---|---|---|\n| `reaction_Km` | 6.3 mM | literature (Homo sapiens) | BRENDA ref 739603 |\n| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |\n\n### Which isozyme\n\nEC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries (HKDC1, HK1, HK2, HK3, GCK) and no --isoform was given, so the cited constants may belong to any of them; isozymes of one enzyme can differ many-fold in Km and kcat. Pass --isoform with one of these names (for example --isoform HKDC1) to take each constant from a row whose commentary names that isozyme; a constant whose rows name none is kept and flagged, and one whose rows all name another isozyme is refused.\n\n### The conditions these were measured under\n\n- `reaction_Km` — measured at pH 7.6, 25 °C.\n- `reaction_kcat` — measured at pH 7.6, 25 °C.\n\nNo two of the 2 constants above differ by more than the thresholds this project treats as serious (1 pH unit, 10 °C), so they can be read as describing comparable experiments. That is a check on the conditions the sources STATED, not a claim that the assays were otherwise alike.\n\n### Where the evidence did not settle on one value\n\n- `reaction_Km`: 5 sources report 6 values (BRENDA ref 640237, 640261, 641067, 641068, 739603), spanning **0.034 to 6.3 mM** (185-fold). The model carries 6.3 — chosen because 6.3 mM (BRENDA ref 739603) is the one remaining row from BRENDA ref 739603, the paper the paired constant came from; the 6 remaining rows span 0.034 to 6.3 mM, a 185-fold spread: the literature disagrees by more than 100-fold, so this one value hides most of what is known; of the 13 candidate rows (after the organism, substrate, isoform and variant checks): 7 row(s) not stating both pH and temperature passed over; which one is right is a question about the papers.\n- `reaction_kcat`: 3 sources report 4 values (BRENDA ref 702282, 703624, 739603), spanning **40.1 to 101 1/s** (2.52-fold). The model carries 40.1 — chosen because 40.1 1/s (BRENDA ref 739603) is the one remaining row from BRENDA ref 739603, the paper the paired constant came from; the 4 remaining rows span 40.1 to 101 1/s; of the 13 candidate rows (after the organism, substrate, isoform and variant checks): 9 row(s) not stating both pH and temperature passed over; which one is right is a question about the papers.\n\nThese spreads are carried through to the model rather than averaged away. They are **not an uncertainty estimate**: the range is bounded by which rows happen to be in the database, not by any statement about the true value. A conclusion that changes across one of these ranges rests on a choice the evidence did not make for you.\n\n**Yours to set** (3): `reaction_S`, `reaction_P`, `reaction_E`. Starting amounts and any cooperativity — no paper supplies these, and they are recorded as your choices rather than as measurements.\n\n## Behaviour\n\n1 steady state(s) found from 24 starting points:   - stable at reaction_E=0.001, reaction_P=1, reaction_S=-2.89e-18; settles over ~157 time units These are numerical results from a root find, not derived facts. The conservation laws this model reports ARE derived; these are what a solver converged to, with the residuals shown.\n\n## Time course\n\nIntegrated to t=628.4 in 201 points (4 x the slowest settling time (157), derived from the Jacobian's smallest non-zero eigenvalue). Final state: reaction_E=0.001, reaction_P=0.9786, reaction_S=0.02139. All 2 conservation law(s) survived the integration: `reaction_S + reaction_P` held to 4.44e-16; `reaction_E` held to 0.00e+00. The integrator does not know these exist, so this is an independent check that the numbers are right.\n\nEvery species stays inside what a cell can hold for the whole run (3 examined, none skipped). A capacity check, not a claim the curve is right.\n\n## Claims\n\nRoot claim: `claim:sha256:38834bf0602e108f3730fd9ad2dc9538bde07550ee5b8c45c772b52549a03486` (computed; model = michaelis_menten(2.7.1.1, D-glucose, Homo sapiens))\nClaims written: 6 -- 2 cited, 3 chosen, 0 placeholder, 0 refused, 1 computed; 2 row(s) and 1 pinned page(s) in the bundle.\n\n- `reaction_S`: chosen, 1 mM -- `claim:sha256:449e3895c597b8db0e00715cd1866aed8f5913cbb4410efbecd67e34c7d9097b`\n- `reaction_P`: chosen, 0 mM -- `claim:sha256:684079f228e29a31b1200e49a802b26fcdcbcd0aa45f18be281f3e1ea5d2d2d2`\n- `reaction_E`: chosen, 0.001 mM -- `claim:sha256:ca36762339a105ba639ea1a21a74a5f08adc6fc40860aba2720c2d276e1d8139`\n- `reaction_kcat`: cited, 40.1 1/s -- `claim:sha256:b73bbb32a8bb289625044c2d591bb5b7c150914f49cd958d97f48c789051e0f3`\n- `reaction_Km`: cited, 6.3 mM -- `claim:sha256:20173e76216a551721c48359117631d30818199d992597f59728e595fb9efd20`\n- reference page not captured for BRENDA ref 739603 of EC 2.7.1.1: ConnectionError: no recording answers https://www.brenda-enzymes.org/literature.php; this test does not go live. `caterva why` will name the reference id, not the paper.\n\nBundle: <data dir>/runs/20261111-194024-compose-e8d6650f/claims\nRe-check offline: caterva verify <data dir>/runs/20261111-194024-compose-e8d6650f/claims\n\nA claim is a derivation, not a verdict: `caterva verify` re-checks that each stated reason still holds against the pinned bytes, not whether the paper was right.\n\n---\n\nBuilt by Caterva's compositional model builder. The structure was recognised deterministically from the description — no language model was involved and no API key is required. Conservation laws are exact; steady states and sweeps are numerical, and say so where they appear.\n",
+  "exports": {
+   "sbml": {
+    "available": true,
+    "artifact": "model.xml",
+    "refused": null
+   },
+   "antimony": {
+    "available": true,
+    "artifact": "model.ant",
+    "refused": null
+   },
+   "csv": {
+    "available": true,
+    "artifact": "parameters.csv",
+    "refused": null
+   },
+   "methods": {
+    "available": true,
+    "artifact": "methods.md",
+    "refused": null
+   }
+  },
+  "claims": {
+   "root": "claim:sha256:38834bf0602e108f3730fd9ad2dc9538bde07550ee5b8c45c772b52549a03486",
+   "counts": {
+    "cited": 2,
+    "chosen": 3,
+    "placeholder": 0,
+    "refused": 0,
+    "computed": 1
+   },
+   "rows": 2,
+   "snapshots": 1,
+   "notes": [
+    "reference page not captured for BRENDA ref 739603 of EC 2.7.1.1: ConnectionError: no recording answers https://www.brenda-enzymes.org/literature.php; this test does not go live. `caterva why` will name the reference id, not the paper."
+   ],
+   "bundle": "claims.zip",
+   "listing": "claims.json",
+   "text": "Root claim: `claim:sha256:38834bf0602e108f3730fd9ad2dc9538bde07550ee5b8c45c772b52549a03486` (computed; model = michaelis_menten(2.7.1.1, D-glucose, Homo sapiens))\nClaims written: 6 -- 2 cited, 3 chosen, 0 placeholder, 0 refused, 1 computed; 2 row(s) and 1 pinned page(s) in the bundle.\n\n- `reaction_S`: chosen, 1 mM -- `claim:sha256:449e3895c597b8db0e00715cd1866aed8f5913cbb4410efbecd67e34c7d9097b`\n- `reaction_P`: chosen, 0 mM -- `claim:sha256:684079f228e29a31b1200e49a802b26fcdcbcd0aa45f18be281f3e1ea5d2d2d2`\n- `reaction_E`: chosen, 0.001 mM -- `claim:sha256:ca36762339a105ba639ea1a21a74a5f08adc6fc40860aba2720c2d276e1d8139`\n- `reaction_kcat`: cited, 40.1 1/s -- `claim:sha256:b73bbb32a8bb289625044c2d591bb5b7c150914f49cd958d97f48c789051e0f3`\n- `reaction_Km`: cited, 6.3 mM -- `claim:sha256:20173e76216a551721c48359117631d30818199d992597f59728e595fb9efd20`\n- reference page not captured for BRENDA ref 739603 of EC 2.7.1.1: ConnectionError: no recording answers https://www.brenda-enzymes.org/literature.php; this test does not go live. `caterva why` will name the reference id, not the paper.\n\nBundle: <data dir>/runs/20261111-194024-compose-e8d6650f/claims\nRe-check offline: caterva verify <data dir>/runs/20261111-194024-compose-e8d6650f/claims\n\nA claim is a derivation, not a verdict: `caterva verify` re-checks that each stated reason still holds against the pinned bytes, not whether the paper was right."
+  }
+ },
+ "events": [
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261111-194024-compose-e8d6650f",
+    "seq": 1,
+    "at": "2026-11-11T19:40:24.520Z",
+    "status": "queued"
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261111-194024-compose-e8d6650f",
+    "seq": 2,
+    "at": "2026-11-11T19:40:24.522Z",
+    "status": "running"
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261111-194024-compose-e8d6650f",
+    "seq": 3,
+    "at": "2026-11-11T19:40:24.639Z",
+    "stage": "compose",
+    "label": "Composing the model from its description",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261111-194024-compose-e8d6650f",
+    "seq": 4,
+    "at": "2026-11-11T19:40:26.093Z",
+    "stage": "search",
+    "label": "Searching the literature for 2.7.1.1",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261111-194024-compose-e8d6650f",
+    "seq": 5,
+    "at": "2026-11-11T19:40:30.897Z",
+    "stage": "search",
+    "label": "Looking up reaction_kcat in BRENDA's kcat table for EC 2.7.1.1",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261111-194024-compose-e8d6650f",
+    "seq": 6,
+    "at": "2026-11-11T19:40:30.898Z",
+    "stage": "search",
+    "label": "Looking up reaction_Km in BRENDA's km table for EC 2.7.1.1",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261111-194024-compose-e8d6650f",
+    "seq": 7,
+    "at": "2026-11-11T19:40:37.247Z",
+    "stage": "claims",
+    "label": "Writing the claims bundle to <data dir>/runs/20261111-194024-compose-e8d6650f/claims",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261111-194024-compose-e8d6650f",
+    "seq": 8,
+    "at": "2026-11-11T19:40:40.157Z",
+    "stage": "dossier",
+    "label": "Building the dossier: stability, time course, influence ranking, sweeps, verdict",
+    "fraction": null
+   }
+  },
+  {
+   "event": "stage",
+   "data": {
+    "run_id": "20261111-194024-compose-e8d6650f",
+    "seq": 9,
+    "at": "2026-11-11T19:40:43.055Z",
+    "stage": "exports",
+    "label": "Writing the SBML, Antimony, CSV and methods exports",
+    "fraction": null
+   }
+  },
+  {
+   "event": "result",
+   "data": {
+    "run_id": "20261111-194024-compose-e8d6650f",
+    "seq": 10,
+    "at": "2026-11-11T19:40:43.173Z",
+    "outcome": {
+     "exit_code": 0,
+     "meaning": "produced",
+     "summary": "VERDICT: GROUNDED",
+     "reason": null,
+     "has_result": true
+    }
+   }
+  },
+  {
+   "event": "status",
+   "data": {
+    "run_id": "20261111-194024-compose-e8d6650f",
+    "seq": 11,
+    "at": "2026-11-11T19:40:43.173Z",
+    "status": "done",
+    "outcome": {
+     "exit_code": 0,
+     "meaning": "produced",
+     "summary": "VERDICT: GROUNDED",
+     "reason": null,
+     "has_result": true
+    }
+   }
+  },
+  {
+   "event": "end",
+   "data": {
+    "run_id": "20261111-194024-compose-e8d6650f",
+    "seq": 12,
+    "at": "2026-11-11T19:40:43.173Z",
+    "status": "done"
+   }
+  }
+ ]
+}

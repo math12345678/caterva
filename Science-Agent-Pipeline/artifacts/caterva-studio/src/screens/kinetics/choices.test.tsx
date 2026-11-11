@@ -4,14 +4,14 @@
  * A compose request that names an enzyme and leaves the substrate, the
  * inhibitor or the organism blank runs with the best-measured real option
  * BRENDA has; the result's `search.choices` says what was chosen, why, and
- * what else there was with BRENDA's row counts. These tests render the real
- * recorded hexokinase run (src/__fixtures__/api/enzymes, captured from the
- * studio server) with a `choices` list in the contract's shape added to its
- * search: the engine side of the contract (caterva/compose/defaults.py) was
- * written in parallel, so no run with choices had been recorded yet. The
- * alternatives' names and row counts below are that stand-in's; every other
- * number is read from the fixture. Re-record a run once the engine has
- * landed and swap it in.
+ * what else there was with BRENDA's row counts. These tests render a real
+ * recorded run with choices (src/__fixtures__/api/enzymes/compose-hexokinase-
+ * chosen-organism-and-substrate.json: EC 2.7.1.1 with no organism and no
+ * substrate, captured from the studio server against the recorded hexokinase
+ * page by caterva/tests/capture_studio_enzyme_fixtures.py --choices-only):
+ * the engine chose Homo sapiens, then D-glucose, and every name, row count
+ * and sentence below is read from that run. An older recorded run (with a
+ * substrate named, so no `choices` key) is the "result without choices".
  *
  * Also here: an old result without `choices` still renders (and says how many
  * constants are measured), a field that contradicts the description is a
@@ -26,6 +26,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 
+import composeChosen from "@/__fixtures__/api/enzymes/compose-hexokinase-chosen-organism-and-substrate.json";
 import composeHexokinase from "@/__fixtures__/api/enzymes/compose-hexokinase-human-glucose.json";
 import hexokinaseDetail from "@/__fixtures__/api/enzymes/detail-2.7.1.1-human.json";
 import gossypol from "@/__fixtures__/api/kinetics/compose-ldh-gossypol.json";
@@ -45,34 +46,26 @@ const recorded = composeHexokinase as unknown as Captured;
 const baseResult = cap<ComposeResult>(recorded.result);
 const baseRun = cap<RunRecord>(recorded.run);
 
-/** The contract-shaped stand-in: the substrate the recorded run used, as the engine would report having chosen it. */
-const SUBSTRATE_CHOICE: SearchChoice = {
-  role: "substrate",
-  chosen: baseResult.search.substrate!,
-  why: `It has the most Km and kcat rows for EC ${baseResult.search.ec} in ${baseResult.search.organism} in BRENDA.`,
-  alternatives: [
-    { name: "D-mannose", rows: { km: 9, kcat: 4 } },
-    { name: "D-fructose", rows: { km: 6 } },
-  ],
-  considered: 5,
-};
-const ORGANISM_CHOICE: SearchChoice = {
-  role: "organism",
-  chosen: baseResult.search.organism!,
-  why: "It has the most measured rows for this enzyme in BRENDA.",
-  alternatives: [{ name: "Saccharomyces cerevisiae", rows: { km: 31, kcat: 12 } }],
-  considered: 2,
-};
+/** The recorded run in which the engine chose the organism, then the substrate. */
+const chosen = composeChosen as unknown as Captured;
+const chosenResult = cap<ComposeResult>(chosen.result);
+const chosenRun = cap<RunRecord>(chosen.run);
+const [ORGANISM_CHOICE, SUBSTRATE_CHOICE] = chosenResult.search.choices as [SearchChoice, SearchChoice];
 
 function withChoices(choices: SearchChoice[], notes: string[] = baseResult.notes): ComposeResult {
   return { ...baseResult, notes, search: { ...baseResult.search, choices } as ComposeResult["search"] };
 }
 
-/** The recorded request with the substrate left blank, as a request the engine chose a substrate for would be. */
-function blankSubstrateRun(): RunRecord {
-  const { substrate: _dropped, ...request } = baseRun.request;
-  return { ...baseRun, request };
-}
+describe("the recorded run with choices", () => {
+  it("is a run the engine chose an organism and a substrate for, as the contract shapes them", () => {
+    expect(chosenRun.request).toEqual({ description: "Michaelis Menten", subject: "2.7.1.1" });
+    expect(ORGANISM_CHOICE).toMatchObject({ role: "organism", chosen: "Homo sapiens", considered: 41 });
+    expect(SUBSTRATE_CHOICE).toMatchObject({ role: "substrate", chosen: "D-glucose", considered: 10 });
+    expect(chosenResult.search).toMatchObject({ organism: "Homo sapiens", substrate: "D-glucose", measured: 2 });
+    // Each choice is also a note, in the engine's words.
+    expect(chosenResult.notes.some((n) => n.startsWith("No substrate was named, so Caterva used D-glucose:"))).toBe(true);
+  });
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -81,7 +74,7 @@ afterEach(() => {
 
 describe("reading the choices a result carries", () => {
   it("reads each choice in the order the engine made it, and nothing from a result that has none", () => {
-    expect(choicesOf(withChoices([ORGANISM_CHOICE, SUBSTRATE_CHOICE])).map((c) => c.role)).toEqual(["organism", "substrate"]);
+    expect(choicesOf(chosenResult).map((c) => c.role)).toEqual(["organism", "substrate"]);
     // Every run recorded before the engine chose: no key at all.
     expect("choices" in baseResult.search).toBe(false);
     expect(choicesOf(baseResult)).toEqual([]);
@@ -136,30 +129,34 @@ describe("reading the choices a result carries", () => {
 
 describe("the choices panel", () => {
   it("says what Caterva chose, why, and offers each alternative with its BRENDA row counts", () => {
-    render(<ComposeResultView result={withChoices([SUBSTRATE_CHOICE])} run={blankSubstrateRun()} onRerun={vi.fn()} />);
+    render(<ComposeResultView result={chosenResult} run={chosenRun} onRerun={vi.fn()} />);
     const panel = screen.getByRole("region", { name: "Caterva chose the substrate" });
     expect(panel).toHaveTextContent(SUBSTRATE_CHOICE.chosen);
-    expect(panel).toHaveTextContent(SUBSTRATE_CHOICE.why);
-    expect(within(panel).getByRole("button", { name: /Run again with the substrate D-mannose \(9 Km, 4 kcat rows in BRENDA\)/ })).toHaveTextContent(
-      "D-mannose · 9 Km, 4 kcat",
+    // The engine's clause, as a sentence: "of the 10 substrates ..." opens with a capital.
+    expect(panel).toHaveTextContent(`Of the 10 substrates BRENDA lists Km rows for under EC 2.7.1.1 in Homo sapiens`);
+    expect(panel).toHaveTextContent(SUBSTRATE_CHOICE.why.slice(1));
+    expect(within(panel).getByRole("button", { name: /Run again with the substrate D-mannose \(9 Km, 0 kcat rows in BRENDA\)/ })).toHaveTextContent(
+      "D-mannose · 9 Km, 0 kcat",
     );
-    expect(within(panel).getByRole("button", { name: /D-fructose/ })).toHaveTextContent("D-fructose · 6 Km");
-    // Five weighed: the chosen one, two listed, two more not listed.
-    expect(panel).toHaveTextContent("2 more options weighed and not listed");
+    expect(within(panel).getByRole("button", { name: /2-deoxy-D-glucose/ })).toHaveTextContent("2-deoxy-D-glucose · 5 Km, 1 kcat");
+    // `considered` counts the chosen one (defaults.Choice): 10 weighed, D-glucose chosen, 5 listed, 4 more.
+    expect(panel).toHaveTextContent("4 more options weighed and not listed");
+    const organisms = screen.getByRole("region", { name: "Caterva chose the organism" });
+    expect(organisms).toHaveTextContent("35 more options weighed and not listed");
   });
 
   it("runs again with the alternative a chip names", async () => {
     const onRerun = vi.fn();
-    render(<ComposeResultView result={withChoices([ORGANISM_CHOICE, SUBSTRATE_CHOICE])} run={blankSubstrateRun()} onRerun={onRerun} />);
+    render(<ComposeResultView result={chosenResult} run={chosenRun} onRerun={onRerun} />);
     await userEvent.click(screen.getByRole("button", { name: /Run again with the substrate D-mannose/ }));
     expect(onRerun).toHaveBeenCalledWith({ organism: ORGANISM_CHOICE.chosen, substrate: "D-mannose" });
   });
 
   it("lists the alternatives without offering them on a screen that cannot run compose", () => {
-    render(<ComposeResultView result={withChoices([SUBSTRATE_CHOICE])} run={blankSubstrateRun()} />);
+    render(<ComposeResultView result={chosenResult} run={chosenRun} />);
     const panel = screen.getByRole("region", { name: "Caterva chose the substrate" });
     expect(within(panel).queryByRole("button")).toBeNull();
-    expect(panel).toHaveTextContent("D-mannose · 9 Km, 4 kcat");
+    expect(panel).toHaveTextContent("D-mannose · 9 Km, 0 kcat");
   });
 
   it("is absent, and the page still renders, for an old result with no choices", () => {
@@ -297,12 +294,12 @@ describe("the Compose screen", () => {
 
   it("submits a new run at once when a chip is clicked, with that field set and the rest of the request kept", async () => {
     setSessionToken("t0k");
-    const run = blankSubstrateRun();
-    const result = withChoices([SUBSTRATE_CHOICE]);
+    const run = chosenRun;
+    const result = chosenResult;
     const { seen } = mockServer((req) => {
       if (req.url === `/api/runs/${run.id}`) return json(200, run);
       if (req.url === `/api/runs/${run.id}/result`) return json(200, result);
-      if (req.url === `/api/runs/${run.id}/events`) return sseResponse(recorded.events.map((e, i) => frame(e.event, i + 1, e.data)));
+      if (req.url === `/api/runs/${run.id}/events`) return sseResponse(chosen.events.map((e, i) => frame(e.event, i + 1, e.data)));
       if (req.url === "/api/compose/shapes") return json(200, shapes);
       if (req.url.startsWith(`/api/enzymes/${String(run.request.subject)}`)) return json(200, hexokinaseDetail.body);
       if (req.method === "POST" && req.url === "/api/runs") return json(400, { error: { code: "malformed", message: "stop here" } });
@@ -313,7 +310,8 @@ describe("the Compose screen", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Run again with the substrate D-mannose/ }));
     await waitFor(() => expect(seen.some((r) => r.method === "POST")).toBe(true));
     const post = seen.find((r) => r.method === "POST")!;
-    expect(post.body).toEqual({ kind: "compose", request: { ...run.request, substrate: "D-mannose" } });
+    // The organism chosen before the substrate is kept: the chip's row counts were counted in it.
+    expect(post.body).toEqual({ kind: "compose", request: { ...run.request, organism: "Homo sapiens", substrate: "D-mannose" } });
     // The form shows the request that was sent.
     expect(screen.getByLabelText(/^Substrate/)).toHaveValue("D-mannose");
   });

@@ -127,6 +127,7 @@ def test_the_literals_and_their_tuples_agree():
         (contract.ErrorCode, contract.ERROR_CODES), (contract.Need, contract.NEEDS),
         (contract.Theme, contract.THEMES), (contract.EventName, contract.EVENT_NAMES),
         (contract.SectionStatus, contract.SECTION_STATUSES),
+        (contract.ChoiceRole, contract.CHOICE_ROLES),
     ]
     for literal, members in pairs:
         assert get_args(literal) == members
@@ -415,3 +416,28 @@ def test_a_name_refusal_is_never_an_outage() -> None:
     )
     assert outcome["meaning"] == "refused"
     assert "network" not in outcome
+
+
+# ---------------------------------------------------------------------------
+# The engine's sentence the page reads as a field contradicting the description
+# ---------------------------------------------------------------------------
+
+
+def test_the_engines_flag_wins_notes_are_the_sentence_the_page_matches():
+    """The Studio turns "Your description names ...; --subject X was used,
+    because a flag wins over the description." into a warning with the run the
+    description asked for (src/api/choices.ts `MISMATCH`). That pattern is
+    read out of choices.ts here and matched against what read_description
+    really writes, so a reworded note fails this test instead of silently
+    dropping the warning."""
+    from caterva.compose.__main__ import build_parser, read_description
+
+    source = (STUDIO_UI / "src" / "api" / "choices.ts").read_text(encoding="utf-8")
+    pattern = re.search(r"const MISMATCH = /(.+)/;", source).group(1).replace("\\/", "/")
+    mismatch = re.compile(pattern.replace("(?<", "(?P<"))
+    args = build_parser().parse_args(["Michaelis-Menten kinetics of human hexokinase", "--subject", "1.1.1.27",
+                                      "--organism", "Saccharomyces cerevisiae"])
+    notes = read_description(args).notes
+    found = {m.group(4): (m.group(2), m.group(3), m.group(5)) for m in map(mismatch.match, notes) if m}
+    assert found == {"subject": ("hexokinase", "EC 2.7.1.1", "1.1.1.27"),
+                     "organism": ("human", "Homo sapiens", "Saccharomyces cerevisiae")}

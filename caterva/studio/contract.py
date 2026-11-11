@@ -175,6 +175,11 @@ ASSISTANT_PROVENANCE_KIND = "ai"
 ChosenBy = Literal["user", "default"]
 CHOSEN_BY: Tuple[str, ...] = ("user", "default")
 
+#: Which field of a compose request an automatic choice filled (ADR 0182):
+#: "enzyme" is the subject, as an EC number.
+ChoiceRole = Literal["enzyme", "organism", "substrate", "inhibitor"]
+CHOICE_ROLES: Tuple[str, ...] = ("enzyme", "organism", "substrate", "inhibitor")
+
 Nonfinite = Literal["nan", "inf", "-inf"]
 NONFINITE: Tuple[str, ...] = ("nan", "inf", "-inf")
 
@@ -1113,6 +1118,26 @@ class ModelStructure(TypedDict):
     motifs: List[MotifRow]
 
 
+class ChoiceOption(TypedDict):
+    """One option BRENDA had for a choice, with its usable rows per table
+    ({"km": 9, "kcat": 4})."""
+    name: str
+    rows: Dict[str, int]
+
+
+class SearchChoice(TypedDict):
+    """`caterva.compose.defaults.Choice.to_json()` (ADR 0182)."""
+    role: ChoiceRole
+    chosen: str
+    #: The reason, as a clause ("of the 10 substrates BRENDA lists ...").
+    why: str
+    #: The next-best options, best first.
+    alternatives: List[ChoiceOption]
+    #: How many options were weighed in all, THE CHOSEN ONE INCLUDED: the
+    #: options neither chosen nor listed number considered - 1 - len(alternatives).
+    considered: int
+
+
 class SearchSummary(TypedDict):
     asked: bool
     refused: bool
@@ -1131,12 +1156,9 @@ class SearchSummary(TypedDict):
     measured: int
     placeholders: int
     #: What Caterva chose for what the request did not name (ADR 0182), in
-    #: the order chosen, each `caterva.compose.defaults.Choice.to_json()`:
-    #: {"role": "enzyme" | "organism" | "substrate" | "inhibitor", "chosen",
-    #: "why", "alternatives": [{"name", "rows": {table: count}}],
-    #: "considered"}. Empty when nothing was chosen. Every choice is also a
-    #: plain-English note in `ComposeResult.notes`.
-    choices: List[Dict[str, Any]]
+    #: the order chosen. Empty when nothing was chosen. Every choice is also
+    #: a plain-English note in `ComposeResult.notes`.
+    choices: List[SearchChoice]
 
 
 class _ConcernRequired(TypedDict):
@@ -2804,6 +2826,7 @@ MIRRORED_UNIONS: Mapping[str, Tuple[str, ...]] = {
     "ProvenanceKind": PROVENANCE_KINDS,
     "ChosenBy": CHOSEN_BY,
     "Nonfinite": NONFINITE,
+    "ChoiceRole": CHOICE_ROLES,
     "ErrorCode": ERROR_CODES,
     "Need": NEEDS,
     "Theme": THEMES,
