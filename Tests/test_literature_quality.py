@@ -416,6 +416,15 @@ class TestIsozymeSpellingsAreReadWithoutMatchingAnotherIsozyme:
         assert read_isoform("hippocampal CA1 neurons") is None
         assert read_isoform("pH 7.5, CA 2 mM") is None
 
+    def test_an_inhibitor_written_cai_and_a_calcium_ion_are_not_isozymes(self):
+        """Found in review: "CAI" (a carbonic anhydrase inhibitor) read as
+        CA I, and "CA2+" as CA II, so such a row could answer a CA I or CA
+        II request for an isozyme it never named."""
+        from caterva.bind.core import read_isoform
+        assert read_isoform("a sulfonamide CAI, pH 7.5") is None
+        assert read_isoform("CA2+ dependent") is None
+        assert read_isoform("hCAI") == "CA-I" and read_isoform("CA I") == "CA-I"
+
     @pytest.mark.parametrize("commentary", [
         "CYP2B6", "isoform CYP2B6", "P450 2B6", "cytochrome P450 2B6, pH 7.4", "CYP 2B6"])
     def test_cyp2b6_in_every_spelling_and_never_cyp2b1(self, commentary):

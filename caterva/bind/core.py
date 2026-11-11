@@ -310,7 +310,17 @@ def _ca_reading(m: "re.Match") -> Optional[str]:
             r"hippocamp\w*\s+$", m.string[:m.start()], re.IGNORECASE):
         return None
     if m.group("roman"):
+        if m.group(0) == "CAI":
+            # "CAI" run together is the field's abbreviation for a carbonic
+            # anhydrase INHIBITOR ("a sulfonamide CAI"), not CA I; reading it
+            # as an isozyme would let a row about any isozyme answer a CA I
+            # request (found in review, 2026-11-11). "CA I", "CA-I" and
+            # "hCAI" are still read.
+            return None
         return f"CA-{m.group('roman')}{m.group('sub') or ''}"
+    if m.string[m.end():m.end() + 1] == "+":
+        # "CA2+": a calcium ion written in capitals, not CA II.
+        return None
     if re.match(r"\s*(?:[mµun]?M\b|%|°|mg\b|min\b|h\b|s\b)", m.string[m.end():]):
         # "CA 2 mM": an amount of something abbreviated CA, not CA II.
         return None
