@@ -115,6 +115,11 @@
 .enz-option[data-disabled="true"] .enz-ec {
   color: var(--muted);
 }
+/* The previous query's rows, kept on screen while the next answer loads: dimmed, and not choosable. */
+.enz-option[data-stale="true"] {
+  opacity: 0.55;
+  cursor: progress;
+}
 .enz-foot {
   display: grid;
   gap: 0.25rem;
