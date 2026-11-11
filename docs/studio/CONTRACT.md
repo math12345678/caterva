@@ -938,6 +938,25 @@ test holds the whole report, section included, to the command run with
 id as `--export FORMAT --claims DIR` writes them (the CSV's `claim_id`
 column, the SBML notes' `CLAIM` line, the Antimony `# claim:` comment).
 
+`ComposeResult.search.choices` (amended 2026-11-11, ADR 0182; always present,
+empty when nothing was chosen) lists what Caterva chose for what the request
+did not name, in the order the choices were made: the enzyme a name that is a
+few enzymes was taken as (only when BRENDA's Km rows single one out), then the
+organism, the substrate and the inhibitor. Each entry is
+`caterva.compose.defaults.Choice.to_json()`: `{role, chosen, why,
+alternatives, considered}`, `role` one of `"enzyme" | "organism" |
+"substrate" | "inhibitor"`, `why` the reason as a clause, `alternatives` the
+next-best options best first as `{name, rows}` with `rows` a table -> row
+count map (`{"km": 25, "kcat": 61}`, `{"ki": 7}`), and `considered` how many
+options were weighed. Every choice is also a plain-English note in
+`ComposeResult.notes`, ending with the flag that overturns it; `search.organism`,
+`search.substrate` and `search.compounds` carry the chosen values, so a page
+that offers "switch to D-mannose" re-runs with that value in the request's
+`substrate`. `VerdictView.licence` is the licence for this model: a
+STRUCTURAL verdict over a partly measured model names which constants are
+measured and which are still placeholders (`Verdict.licence`), and
+`next_step` names the missing piece (an inhibitor, a substrate, an organism).
+
 ## 14. Gaps: what the CLI prints that has no structured form yet
 
 Each is fixed by its owner with an accessor beside the printer that the

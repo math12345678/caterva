@@ -1,0 +1,190 @@
+# ADR 0182: A named enzyme gets its best-measured substrate, said out loud
+
+**Status:** Accepted, implemented
+
+**Date:** 2026-11-11
+
+**Relates to:** ADR 0024 (refusing versus defaulting an unsourced parameter;
+cross-species stays opt-in, and that part is unchanged), ADR 0076 (the
+adjacent paper is the one you miscite; a choice picks the question, never
+relabels a neighbour's answer), ADR 0178 (a motif cannot know what its Km is
+FOR; this supersedes its refuse-without-a-substrate rule), ADR 0181 (the
+sentence names the enzyme; this supersedes its "otherwise the existing refusal
+runs" for a substrate)
+
+## Context
+
+On 2026-11-11 the product owner ran 56 descriptions a professor would type
+through `caterva compose` on main (10cd687), each with a note of whether
+BRENDA really holds the data:
+
+| outcome | runs |
+|---|---|
+| every constant measured and cited | 7 |
+| some measured, some placeholders | 4 |
+| every constant a placeholder | 39 |
+| refused or crashed | 6 |
+
+By cause, 26 were **no substrate named**: the enzyme was read, the organism
+was read, and `_search_resolved` returned before a single table was looked
+at, because "a motif knows it needs a Km; it cannot know what the Km is FOR"
+(ADR 0178). The refusal then listed what BRENDA holds -- for human hexokinase
+D-glucose with 25 Km rows and, on the same page, 61 kcat rows. The kcat and
+the Ki were not looked up either, because the whole search was gated on the
+Km's substrate. The others: gene symbols not read (9; out of scope here),
+names that are a few enzymes (3), no organism (the search chose Eimeria
+tenella for hexokinase and Musca domestica for chymotrypsin), an inhibitor
+named in the sentence but dropped ("dihydrofolate reductase with
+methotrexate" built plain Michaelis-Menten), and two runs that crashed with
+an uncaught `ExportRefused` traceback ("pepsin" and "alpha-amylase" with a
+substrate and no organism).
+
+Read as a user reads it, the report said "placeholder, placeholder,
+placeholder" under a list of the measurements it had declined to use. The
+owner's summary -- the actual data is never used -- was a fair reading of
+39 of 56 runs, and it was about to reach the professors the product is for.
+
+ADR 0178's refusal was right about what must never happen (a Km cited for a
+reaction nobody asked about, presented as the one they did) and wrong about
+the remedy: the cure for an unstated choice is a stated one, not no answer.
+
+## Decision
+
+**When the user names an enzyme but not its substrate, inhibitor or
+organism, Caterva chooses the best-measured real option BRENDA holds, runs
+the search with it, and says in the report what it chose, why, and what the
+alternatives are with their row counts, so the user can switch with one
+flag.** Placeholders remain only where BRENDA has no usable row, and then the
+report says exactly what is missing and what would fix it.
+
+`caterva/compose/defaults.py` makes the choices, from the one BRENDA page the
+search reads anyway, parsed by the resolver's own parsers in permissive mode,
+so a count is a count of rows the resolver can reach:
+
+| role | ranked by | never |
+|---|---|---|
+| organism (none named) | Homo sapiens if it has rows for every constant the model needs; else the organism covering the most of them (a Km and a kcat count only when one substrate has both), then the most rows, then the name; the named substrate and inhibitor are honoured | an organism with no row for the substrate named; switching an organism the user NAMED |
+| substrate | cosubstrates and cofactors (ATP, NAD(P)(H), FAD, FMN, CoA, water, H+, phosphate, diphosphate, SAM, O2, metal ions) set aside unless nothing else has rows; then both a Km and a kcat row in the organism; then one BRENDA files under Natural Substrates; then the most Km + kcat rows; then the name | a word of the sentence relabelled as a listed substrate (ADR 0076): "glucose 6-phosphate" is not D-glucose, and the report says the typed word was not used |
+| inhibitor | Ki rows in the organism, the chosen substrate excluded; a substrate or product of the reaction (from BRENDA's Natural Substrates and Substrates/Products tables: D-glucose 6-phosphate for hexokinase) and cofactors ranked after every other compound with a row; then the most Ki rows; then the name | -- |
+| enzyme (a name that is a few enzymes) | of the finder's best-tied candidates, at most four, the only one with Km rows in the organism, or with no organism one with five times the rows of every other | a class word, an abbreviation or symbol, typo suggestions, or two candidates that both have rows: those stay refused with the candidates named (ADR 0181) |
+
+Spellings that differ only in case or spacing are one compound; anything
+subtler ("Z-Gly-Pro-Arg-pNA" and "N-benzyloxycarbonyl-...") is left as
+BRENDA wrote it.
+
+**Order.** In `_choose_what_was_not_named`, before the search: the organism
+(given the substrate and inhibitor when named), then the substrate (in that
+organism), then the inhibitor (given both). Each is filled into the request as
+if the flag had been typed, so the resolver matches rows to that name exactly
+as it always has, and every value it returns is a real BRENDA row for exactly
+the compound and organism stated beside it. Flags and words of the sentence
+always win; a choice never replaces them.
+
+**Every choice is said.** `ComposedModel.choices` carries each
+`Choice`; each becomes a note in the report, for example
+
+> No substrate was named, so Caterva used D-glucose: of the 10 substrates
+> BRENDA lists Km rows for under EC 2.7.1.1 in Homo sapiens, it has the most
+> Km and kcat rows (25 Km, 61 kcat; the cosubstrate ATP set aside). Others:
+> 2-deoxy-D-glucose (5 Km, 1 kcat); D-mannose (9 Km); D-fructose (7 Km);
+> D-glucosamine (3 Km); 2-deoxyglucose (1 Km); and 4 more. Pass --substrate
+> NAME to model another.
+
+and an entry of the Studio's `search.choices` (`Choice.to_json()`:
+`{role, chosen, why, alternatives: [{name, rows}], considered}`, documented in
+docs/studio/CONTRACT.md). `--export` prints them to stderr as `Chose: ...`;
+`python -m caterva.compose.defaults --ec EC [--organism] [--substrate]
+[--role] --json` prints what would be chosen (exit 3 when nothing can be).
+
+**When nothing can be chosen**, the refusal names the real blocker:
+
+- an organism the user named with no Km row for the EC at all ("glucose-6-
+  phosphate dehydrogenase in S. cerevisiae") is refused as the organism, with
+  the organisms that have Km rows and their counts, never "pass --substrate";
+- a page that could not be read keeps ADR 0178's "Re-run with --substrate
+  NAME";
+- no Ki row for any inhibitor leaves the Ki a placeholder whose reason names
+  `--inhibitor`.
+
+**What came with it.**
+
+- A description that named an enzyme and an inhibitor and no mechanism
+  ("dihydrofolate reductase with methotrexate", where methotrexate has a Ki
+  row and no Km row under EC 1.5.1.3) reads the word as the inhibitor and is
+  built as competitive inhibition, the note quoting the modes BRENDA's rows
+  for that inhibitor state.
+- The verdict of a partly measured model stays STRUCTURAL (a conclusion
+  about the whole system rests on every constant) but no longer claims every
+  constant is illustrative: its heading says "partly grounded: 2 of 3
+  constants measured", its licence names which are measured and which are
+  placeholders, and "Do this next" names the missing piece -- the inhibitor,
+  the substrate, the organism -- read from each placeholder's reason, instead
+  of advising a different organism for a Ki that was never looked up.
+- The search note no longer says a constant "not looked up" was searched and
+  "returned nothing".
+- A search over every organism that settles on none is a report naming the
+  organisms, not an `ExportRefused` traceback.
+- `--antimony` reads and searches exactly as the report does, compiles the
+  measured values into the source, and prefixes a comment block naming each
+  constant's origin; it printed the library's placeholders without a word
+  while the report beside it carried three cited values.
+
+## Verified live, 2026-11-11
+
+BRENDA live, this branch. "Before" is the 2026-11-11 baseline on main.
+
+| description | before | after |
+|---|---|---|
+| `"Michaelis-Menten of granzyme B with a competitive inhibitor" --organism "Homo sapiens"` | exit 3, all three placeholders | exit 0, GROUNDED. Chose 2-aminobenzoyl-IEPDSSMEK-dnp (3 Km, 3 kcat; tied with Boc-Ala-Ala-Asp-SBzl, broken by name) and the inhibitor with the most human Ki rows: Km 0.0058 mM and kcat 4.4 1/s (BRENDA ref 652110), Ki 0.013 mM (ref 732601), all Homo sapiens |
+| `"hexokinase Michaelis-Menten kinetics" --organism human` | exit 3, placeholders | exit 0. Chose D-glucose (25 Km, 61 kcat; ATP set aside): Km 6.0 mM (ref 641068), kcat 40.1 1/s (ref 739603) |
+| `"acetylcholinesterase from human, Michaelis-Menten"` | exit 3, placeholders | exit 0. Chose acetylthiocholine (40 Km, 3 kcat; acetylcholine has 4 Km and no human kcat): Km 0.086 mM, kcat 93 1/s (ref 775647) |
+| `"chymotrypsin follows Michaelis-Menten kinetics"` (no organism) | exit 3, placeholders; with a substrate, Musca domestica | exit 0. Chose Homo sapiens (covers Km and kcat; Bos taurus, 136 Km and 143 kcat, listed first among the others) and L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide: Km 0.219 mM, kcat 22.8 1/s (ref 769319) |
+| `"carbonic anhydrase in human follows Michaelis-Menten"` | exit 3, placeholders | exit 0. Chose CO2 (61 Km, 59 kcat): Km 9.3 mM (ref 729384), kcat 1e-06 1/s (ref 729224) -- the resolver's pick among CO2's kcat rows, physically absurd, unchanged here (Not done) |
+| `"angiotensin-converting enzyme inhibited by captopril" --subject 3.4.15.1 --organism human` | exit 3, placeholders | exit 0. Chose angiotensin I, the natural substrate (11 Km, 3 kcat; hippuryl-His-Leu, 18 Km, listed): Km 0.011 mM, kcat 52 1/s (ref 669424), Ki of captopril 1e-05 mM (ref 650001) |
+| `"xanthine oxidase inhibited by allopurinol"` | exit 3, placeholders; with xanthine, human Km and kcat and no Ki | exit 0, GROUNDED. Chose Bos taurus, the one organism with an allopurinol Ki row (the note says Homo sapiens does not cover it), and xanthine: Km 0.01208 mM (ref 766313), kcat 16.2 1/s (ref 393008), Ki 0.0018 mM (ref 676739) |
+| `"glucose-6-phosphate dehydrogenase Michaelis-Menten" --organism "S. cerevisiae"` | exit 3, "Re-run with --substrate NAME" | exit 3, "BRENDA holds no Km row for EC 1.1.1.49 in Saccharomyces cerevisiae ... The organism, not the substrate, is what is missing", listing Homo sapiens (57 rows), Escherichia coli (19), Trypanosoma cruzi (14), ...; the verdict's next step is the same sentence |
+| `"lactate dehydrogenase with pyruvate in human"` | exit 3, name refused | exit 0. EC 1.1.1.27 chosen (the only one of 1.1.1.27 and 1.1.1.28 with human Km rows, 6), pyruvate read from the sentence: Km 0.03 mM (ref 286469); kcat a labelled placeholder (human has none; the organisms that do are named). Verdict "STRUCTURAL (partly grounded: 1 of 2 constants measured)", next step the organism |
+| `"dihydrofolate reductase with methotrexate in E. coli"` | plain Michaelis-Menten, methotrexate dropped | exit 0, competitive inhibition ("BRENDA's Ki rows for methotrexate ... state: competitive (1 row)"), 7,8-dihydrofolate chosen: Km 0.0007 mM (ref 747067), kcat 5.3 1/s (ref 674549), Ki 0.0059 mM (ref 655867) |
+| `"kinetics of pepsin" --substrate hemoglobin` | uncaught `ExportRefused` traceback | exit 0. Chose Saurida micropectoralis, the organism with the most hemoglobin Km and kcat rows (no human row): Km 0.10764 mM, kcat 18.3 1/s (ref 771228) |
+| `"citrate synthase Michaelis-Menten"` | exit 3, name refused | exit 0. EC 2.3.3.1 chosen (28 Km rows against 4 for 2.3.3.3), Homo sapiens, acetyl-CoA: Km 0.0077 mM, kcat 260 1/s (ref 756131). With `--organism mouse` still refused: neither EC has a mouse row |
+| `"HIV-1 protease with a competitive inhibitor" --subject 3.4.23.16` | exit 3, placeholders | exit 0. Chose Human immunodeficiency virus 1 (not a binomial, read from the table's organism cells), Lys-Ala-Arg-Val-Nle-Phe(4-NO2)-Glu-Ala-Nle-Gly and indinavir (25 Ki rows): Km 0.017 mM, kcat 5.6 1/s (ref 678346), Ki 3.1e-06 mM (ref 664013) |
+| `"thrombin with a competitive inhibitor in human" --substrate D-Phe-Pro-Arg-4-nitroanilide --inhibitor argatroban --antimony` | kcat = 100, Km = 0.1, Ki = 0.5, no comment | kcat = 3.5, Km = 0.00033, Ki = 6.4e-06, each with its BRENDA ref in a comment |
+
+All 56 baseline descriptions re-run: 34 fully measured (was 7), 3 partly
+measured, 19 without a measured constant; HIV-1 protease with `--subject`
+was one of the 19 (its organism is not a binomial) and, re-checked after the
+fix in this ADR, is measured, so 35 / 3 / 18. Of those 18, 14 are names the
+sentence reader does not read (gene symbols, "HIV-1 protease",
+"angiotensin-converting enzyme", "amylase", a typo), 3 are organisms with no
+row (yeast G6PD, human urease, mouse citrate synthase: refused as the
+organism, correctly), and 1 is a name of two enzymes whose Km rows do not single
+one out ("PEPCK", no organism), refused with both named.
+
+## Consequences
+
+- A run with no substrate, organism or inhibitor reads BRENDA's page for the
+  choice before the search: two to four extra parses of a page that can be
+  four megabytes (about two seconds each), shared by an in-process cache keyed
+  on the page's digest. The page itself is fetched once (http_retry's memo).
+- Exit 3 now means a search could not be run for a reason the user can act
+  on (no rows in the named organism, a page that could not be read, a name
+  that is several enzymes with measurements for each), not "you did not name
+  a substrate".
+- A choice is a modelling decision Caterva made. It is printed with its
+  alternatives every time, and `search.choices` lets a page offer the switch;
+  it is never silent, and never made where the user said something.
+
+## Not done
+
+- Gene symbols and abbreviations (HK2, CYP2B6, PTP1B, COX-2) are still not
+  read (nine of the 56); that is the names workstream's.
+- Isozyme ranking within a chosen substrate (MAO-A rows for MAO-B, GCK rows
+  for "hexokinase") is unchanged: the existing isozyme concern still says
+  when rows name different proteins.
+- The inhibitor's mode is not used to rank inhibitors: a chosen inhibitor
+  whose rows state another mode is withheld by the existing mode selection,
+  with its reason, rather than another inhibitor being tried.
+- Substrate spellings that differ chemically but not textually (Z- versus
+  N-benzyloxycarbonyl-) are not merged, so their counts stay split.
+- The resolver's choice among the chosen substrate's rows (the lowest of a
+  spread, the carbonic anhydrase kcat of 1e-6 1/s) is not addressed here.
