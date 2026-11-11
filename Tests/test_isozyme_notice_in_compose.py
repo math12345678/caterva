@@ -101,9 +101,15 @@ def test_the_notice_is_also_beside_the_constants(compose):
 
 
 def test_the_notice_does_not_change_what_was_measured(compose):
+    """The constants are the resolver's picks, notice or no notice. Since
+    2026-11-11 those are the median rows of the human D-glucose rows that
+    state pH and temperature (ADR 0182): Km 0.06 mM, a hexokinase I row,
+    and kcat 60.4 1/s. Until then they were 6.0 mM and 40.1 1/s, glucokinase
+    rows. That the pick moves from one isozyme to another is the notice's
+    whole point."""
     _, out = compose("--organism", "human")
-    assert "| `reaction_Km` | 6.0 mM | literature (Homo sapiens) | BRENDA ref 641068 |" in out
-    assert "| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |" in out
+    assert "| `reaction_Km` | 0.06 mM | literature (Homo sapiens) | BRENDA ref 640237 |" in out
+    assert "| `reaction_kcat` | 60.4 1/s | literature (Homo sapiens) | BRENDA ref 703624 |" in out
 
 
 def test_typing_an_isoform_does_not_silence_the_notice_while_a_cited_row_names_no_isozyme(compose):
@@ -176,13 +182,20 @@ def test_the_notice_goes_quiet_only_when_every_cited_constants_row_states_the_is
 
 def test_it_does_not_fire_when_the_nomenclature_lists_no_protein_for_the_organism(compose):
     # The nomenclature's UniProt entries for EC 2.7.1.1 name no E. coli
-    # protein, so there is no isozyme to name; the recorded page holds an
-    # E. coli Km, and the recorded NCBI and UniProt answers cover E. coli.
-    # (A pig case used here needed a UniProt query no recording holds; the
-    # one-protein case is pinned below on the function itself.)
+    # protein, so there is no isozyme to name. (A pig case used here needed
+    # a UniProt query no recording holds; the one-protein case is pinned
+    # below on the function itself.)
+    #
+    # This asserted an E. coli Km "resolved from the literature" until
+    # 2026-11-11. The recorded page holds no E. coli hexokinase row: the
+    # parser matched "Escherichia coli" anywhere in a row, and Trypanosoma
+    # cruzi's hexokinase, "expressed in Escherichia coli" (ref 640265), was
+    # carried as E. coli's. Matched on the organism cell, nothing is found,
+    # and the Km stays a placeholder naming the organisms that do have one.
     code, out = compose("--organism", "Escherichia coli")
     assert code == 0
-    assert "resolved from the literature: reaction_Km" in out
+    assert "resolved from the literature: reaction_Km" not in out
+    assert "| `reaction_Km` | 0.1 mM | **placeholder** |" in out
     assert "isozyme" not in out and "Qualified:" not in out
 
 

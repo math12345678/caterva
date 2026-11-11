@@ -225,8 +225,10 @@ class TestEvidenceAgainstTheMechanism:
 class TestNoStatedMode:
     def test_gossypol_is_unchanged_and_the_log_says_why(self):
         # BRENDA 711801: three rows, one per isoform, none stating a mode.
+        # The mode changes nothing; the median row (ADR 0182) is LDH-A's,
+        # where the minimum, LDH-B's 0.0014, was returned until 2026-11-11.
         r = ki("1.1.1.27", "gossypol", inhibition_mode="competitive", model_substrate="pyruvate")
-        assert r.found and r.value == 0.0014 and r.commentary.startswith("LDH-B")
+        assert r.found and r.value == 0.0019 and r.commentary.startswith("LDH-A")
         assert ("No exact-match row states competitive inhibition; kept the 3 of 3 exact-match "
                 "row(s) stating no mode, so whether the value is the competitive constant is "
                 "unknown") in r.search_log
