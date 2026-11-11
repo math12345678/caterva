@@ -396,6 +396,13 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
   // measured against, as the runner parsed them from the row's commentary.
   // The API puts the same reading into provenance.flags; this is the other
   // half, which `check_both_front_ends_read_it.py` requires.
+  // WHY THIS ROW (ADR 0182), in the resolver's words, and said loudly when
+  // the rows it was chosen from disagree by more than 100-fold.
+  if (result.chosenBecause) {
+    const head = result.wideSpread ? `${c(YELLOW, '⚠')} ${c(BOLD, 'Why this row (the literature disagrees by more than 100-fold)')}` : c(BOLD, 'Why this row');
+    process.stdout.write(`\n${head}\n${c(DIM, '  ' + result.chosenBecause)}\n`);
+  }
+
   const scopeLines = rowScopeLines(String(result.quantity), result.rowScope);
   if (scopeLines.length > 0) {
     process.stdout.write(`\n${c(YELLOW, '⚠')} ${c(BOLD, 'What the source row measured')}\n`);

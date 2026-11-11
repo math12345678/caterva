@@ -333,6 +333,14 @@ export interface ResolvedKinetic {
    * that also gives LDH-A's and LDH-C's and states no mode for any.
    */
   commentary?: string | null;
+  /**
+   * Why this row was carried, in the resolver's words (ADR 0182): the
+   * median of how many rows, what was set aside, the spread, the paper a
+   * paired Km and kcat share. `wideSpread` when those rows span more than
+   * 100-fold.
+   */
+  chosenBecause?: string | null;
+  wideSpread?: boolean;
   rowScope?: RowScope | null;
   /**
    * A row that is evidence against the model's mechanism (runner key
@@ -976,6 +984,8 @@ export function mapFoundResult(
     // reason -- a check on presence would inherit the ambiguity it was
     // written to remove.
     selectionTie: parseSelectionTie(parsed['selectionTie']),
+    ...(typeof parsed['chosenBecause'] === 'string' ? { chosenBecause: parsed['chosenBecause'] as string } : {}),
+    ...(parsed['wideSpread'] === true ? { wideSpread: true } : {}),
     // Read through rather than cast: a row with no usable value or no grades
     // is not a candidate, and letting one through would put a blank line in
     // front of a student where a measurement should be.

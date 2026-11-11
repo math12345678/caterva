@@ -151,7 +151,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "184 test files -- kinetics & Michaelis-Menten correctness, " +
+          "188 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -267,10 +267,14 @@ export const TEST_SUITES: TestSuite[] = [
         // One skip was the codegen selftest, run before node was on PATH;
         // with it there, test_guard_selftests.py passed in full. The other
         // is the Swift type-check (Sparkle not unpacked): 7209.
-        passed: 7209,
-        skipped: 1,
+        //
+        // Measured 2026-11-11 (ADR 0182) on the merged tree of the five
+        // real-values branches, caterva/tests with pytest-xdist (-n 8):
+        // 7433 tests, 7431 passed, 2 skipped, 0 failed, 754 s.
+        passed: 7431,
+        skipped: 2,
         failed: 0,
-        collected: 7210,
+        collected: 7433,
       },
     ],
   },
@@ -280,7 +284,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "96 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "97 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -373,10 +377,14 @@ export const TEST_SUITES: TestSuite[] = [
         // ADR count (178, now 179), which check_documented_counts.py --write
         // then fixed; test_documented_counts.py passed in full after it.
         // 1691 + 1: 1692.
-        passed: 1692,
+        //
+        // Measured 2026-11-11 (ADR 0182) on the merged tree of the five
+        // real-values branches, Tests/ with pytest-xdist (-n 8): 1750 tests,
+        // 1750 passed, 0 skipped, 0 failed, 647 s.
+        passed: 1750,
         skipped: 0,
         failed: 0,
-        collected: 1692,
+        collected: 1750,
       },
     ],
   },

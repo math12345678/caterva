@@ -32,6 +32,19 @@ selection_tie.fold_range   # same sentence. This is the number that tells a
                            # student the evidence disagreed 11-fold; it reaches
                            # them, as words.
 
+set_aside                  # inside chosen_because: "1 physically implausible
+                           # row(s) set aside (outside 0.001 to 1e+08 1/s):
+                           # 1e-06 1/s (BRENDA ref 729224)". Rendered by the
+                           # API's "<K> chosen:" flag (wide spread) and the
+                           # CLI's "Why this row" (ADR 0182).
+spread_fold                # same sentence: "the 6 remaining rows span 0.034
+                           # to 6.3 mM, a 185-fold spread".
+candidate_references       # internal: the references resolve_kinetic_pair
+                           # pairs a Km and a kcat by. What a reader needs of
+                           # it -- that both came from one paper -- is in
+                           # chosen_because ("the paper the paired constant
+                           # came from") and in the two citations.
+
 relatedness.shared_rank    # inside RelatednessVerdict.reason, rendered by
                            # buildUnresolvedKineticProvenance on the
                            # cross_species_too_distant path -- the branch Jeske

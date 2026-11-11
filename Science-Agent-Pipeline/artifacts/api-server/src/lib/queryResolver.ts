@@ -1198,6 +1198,13 @@ async function applyKineticResolution(
       // the pool it came from held something the reader should look at.
       flags.push(...poolFindingFlags(key, agentResult.poolFindings));
       flags.push(...selectionTieFlags(key, agentResult.selectionTie));
+      // Why this row (ADR 0182): the median of how many rows, what was set
+      // aside as implausible, the paired constant's paper. Flagged when the
+      // rows chosen from span more than 100-fold, when one value hides most
+      // of what is known; the sentence is the resolver's, verbatim.
+      if (agentResult.wideSpread && agentResult.chosenBecause) {
+        flags.push(`${key.toUpperCase()} chosen: ${agentResult.chosenBecause}.`);
+      }
       flags.push(
         ...ensembleCandidateFlags(key, agentResult.ensembleCandidates),
       );
