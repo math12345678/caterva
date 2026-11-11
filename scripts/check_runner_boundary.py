@@ -125,6 +125,19 @@ EMITTED_AS: dict[str, str | None] = {
     "cross_species_flag": "crossSpecies",
     "cross_species_organisms_available": "crossSpeciesOrganismsAvailable",
     "variant_candidates_available": "variantCandidatesAvailable",
+    # ADR 0182. Every row's value when each is outside the plausible range
+    # (source "implausible_withheld"), and why the row carried was carried.
+    "implausible_values": "implausibleValues",
+    "chosen_because": "chosenBecause",
+    "wide_spread": "wideSpread",
+    # Carried inside chosen_because's sentence ("1 physically implausible
+    # row(s) set aside ...: 1e-06 1/s (BRENDA ref 729224)", "a 185-fold
+    # spread"); docs/undelivered-fields-baseline.txt records the same.
+    "set_aside": None,
+    "spread_fold": None,
+    # How resolve_kinetic_pair finds a paper with a Km and a kcat row; the
+    # pair itself crosses as the two citations.
+    "candidate_references": None,
     "variant": "variant",
     # ADR 0092. Crosses as `preparation`, beside `variant`: the same
     # question one category over -- ADR 0029 asks whether the row measured
