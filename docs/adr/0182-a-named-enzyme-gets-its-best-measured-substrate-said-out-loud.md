@@ -138,9 +138,9 @@ BRENDA live, this branch. "Before" is the 2026-11-11 baseline on main.
 | `"Michaelis-Menten of granzyme B with a competitive inhibitor" --organism "Homo sapiens"` | exit 3, all three placeholders | exit 0, GROUNDED. Chose 2-aminobenzoyl-IEPDSSMEK-dnp (3 Km, 3 kcat; tied with Boc-Ala-Ala-Asp-SBzl, broken by name) and the inhibitor with the most human Ki rows: Km 0.0058 mM and kcat 4.4 1/s (BRENDA ref 652110), Ki 0.013 mM (ref 732601), all Homo sapiens |
 | `"hexokinase Michaelis-Menten kinetics" --organism human` | exit 3, placeholders | exit 0. Chose D-glucose (25 Km, 61 kcat; ATP set aside): Km 6.0 mM (ref 641068), kcat 40.1 1/s (ref 739603) |
 | `"acetylcholinesterase from human, Michaelis-Menten"` | exit 3, placeholders | exit 0. Chose acetylthiocholine (40 Km, 3 kcat; acetylcholine has 4 Km and no human kcat): Km 0.086 mM, kcat 93 1/s (ref 775647) |
-| `"chymotrypsin follows Michaelis-Menten kinetics"` (no organism) | exit 3, placeholders; with a substrate, Musca domestica | exit 0. Chose Homo sapiens (covers Km and kcat; Bos taurus, 136 Km and 143 kcat, listed first among the others) and L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide: Km 0.219 mM, kcat 22.8 1/s (ref 769319) |
+| `"chymotrypsin follows Michaelis-Menten kinetics"` (no organism) | exit 3, placeholders; with a substrate, Musca domestica | exit 0. Chose Homo sapiens (covers Km and kcat; Bos taurus, 136 Km and 143 kcat, listed first among the others) and L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide: kcat 22.8 1/s (ref 769319); Km a labelled placeholder, because the 0.219 mM the search returned (ref 769319) is the N-succinyl compound's row (see "A value is never carried under a neighbour's name") |
 | `"carbonic anhydrase in human follows Michaelis-Menten"` | exit 3, placeholders | exit 0. Chose CO2 (61 Km, 59 kcat): Km 9.3 mM (ref 729384), kcat 1e-06 1/s (ref 729224) -- the resolver's pick among CO2's kcat rows, physically absurd, unchanged here (Not done) |
-| `"angiotensin-converting enzyme inhibited by captopril" --subject 3.4.15.1 --organism human` | exit 3, placeholders | exit 0. Chose angiotensin I, the natural substrate (11 Km, 3 kcat; hippuryl-His-Leu, 18 Km, listed): Km 0.011 mM, kcat 52 1/s (ref 669424), Ki of captopril 1e-05 mM (ref 650001) |
+| `"angiotensin-converting enzyme inhibited by captopril" --subject 3.4.15.1 --organism human` | exit 3, placeholders | exit 0. Chose angiotensin I, the natural substrate (11 Km, 3 kcat; hippuryl-His-Leu, 18 Km, listed): kcat 52 1/s (ref 669424), Ki of captopril 1e-05 mM (ref 650001); Km a labelled placeholder, because the 0.011 mM the search returned (ref 669424) is [Phe9,Arg10]angiotensin I's row. STRUCTURAL, partly grounded, 2 of 3 |
 | `"xanthine oxidase inhibited by allopurinol"` | exit 3, placeholders; with xanthine, human Km and kcat and no Ki | exit 0, GROUNDED. Chose Bos taurus, the one organism with an allopurinol Ki row (the note says Homo sapiens does not cover it), and xanthine: Km 0.01208 mM (ref 766313), kcat 16.2 1/s (ref 393008), Ki 0.0018 mM (ref 676739) |
 | `"glucose-6-phosphate dehydrogenase Michaelis-Menten" --organism "S. cerevisiae"` | exit 3, "Re-run with --substrate NAME" | exit 3, "BRENDA holds no Km row for EC 1.1.1.49 in Saccharomyces cerevisiae ... The organism, not the substrate, is what is missing", listing Homo sapiens (57 rows), Escherichia coli (19), Trypanosoma cruzi (14), ...; the verdict's next step is the same sentence |
 | `"lactate dehydrogenase with pyruvate in human"` | exit 3, name refused | exit 0. EC 1.1.1.27 chosen (the only one of 1.1.1.27 and 1.1.1.28 with human Km rows, 6), pyruvate read from the sentence: Km 0.03 mM (ref 286469); kcat a labelled placeholder (human has none; the organisms that do are named). Verdict "STRUCTURAL (partly grounded: 1 of 2 constants measured)", next step the organism |
@@ -159,6 +159,27 @@ sentence reader does not read (gene symbols, "HIV-1 protease",
 row (yeast G6PD, human urease, mouse citrate synthase: refused as the
 organism, correctly), and 1 is a name of two enzymes whose Km rows do not single
 one out ("PEPCK", no organism), refused with both named.
+
+### A value is never carried under a neighbour's name
+
+Found in review of this ADR's own live table. The resolver finds a compound's
+rows by looking for its name INSIDE each row's compound cell (the literature
+layer's documented courtesy, so "lactate" reaches "(S)-lactate"). A name
+Caterva now chooses is BRENDA's exact spelling, and inside longer names it is
+another compound: "L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide"
+reached the N-succinyl compound's rows, and chymotrypsin's Km was carried as
+0.219 mM (ref 769319) -- the succinyl compound's value, which the choice's
+note named as the alternative. ACE's angiotensin I Km, 0.011 mM, was
+[Phe9,Arg10]angiotensin I's. "D-glucose" reaches 2-deoxy-D-glucose likewise.
+
+So after the search, each Km, kcat and Ki carried is traced back to its
+BRENDA row by reference and value (`defaults.neighbour_of`); when the
+compound the constant is for is a name the table lists exactly and the row
+is another compound's, the value is withheld, a labelled placeholder whose
+reason names the other compound. This applies to typed names as well as
+chosen ones, since a typed exact name is the same claim. A loosely typed name
+BRENDA does not list exactly is not judged, and a row that cannot be found is
+not withheld.
 
 ## Consequences
 
@@ -186,5 +207,11 @@ one out ("PEPCK", no organism), refused with both named.
   with its reason, rather than another inhibitor being tried.
 - Substrate spellings that differ chemically but not textually (Z- versus
   N-benzyloxycarbonyl-) are not merged, so their counts stay split.
+- The resolver is not taught to match compound cells exactly, so a
+  neighbour's row is withheld rather than replaced by the right compound's
+  best row (chymotrypsin's L-alanyl compound has four human Km rows of its
+  own; the Km stays a placeholder). That belongs in the literature layer.
+  The spread note beside a carried value can still count a neighbour's row
+  among "one source reports 2 values".
 - The resolver's choice among the chosen substrate's rows (the lowest of a
   spread, the carbonic anhydrase kcat of 1e-6 1/s) is not addressed here.

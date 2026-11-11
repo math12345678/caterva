@@ -148,6 +148,11 @@ class Choice:
     considered: int = 0
     #: The row counts behind the chosen option, for the note's parenthesis.
     rows: Dict[str, int] = field(default_factory=dict)
+    #: When the user DID name something and it could not be used, the
+    #: clause that says so ("'glucose 6-phosphate' in your description is
+    #: not a substrate BRENDA lists ..."): the note then opens with it
+    #: instead of "No substrate was named", which would be false.
+    instead: Optional[str] = None
 
     def to_json(self) -> dict:
         return {
@@ -164,6 +169,8 @@ class Choice:
                 "substrate": "--substrate NAME", "inhibitor": "--inhibitor NAME"}[self.role]
         if self.role == "enzyme":
             head = f"Caterva used EC {self.chosen}: {self.why}."
+        elif self.instead:
+            head = f"{self.instead}, so Caterva used {self.chosen}: {self.why}."
         else:
             head = f"No {self.role} was named, so Caterva used {self.chosen}: {self.why}."
         if self.alternatives:
@@ -183,6 +190,11 @@ class _Row:
     compound: str
     organism: Optional[str]
     conditions: str
+    #: The row's value and BRENDA reference, so a value the search returned
+    #: can be traced back to the row, and the compound, it came from
+    #: (`neighbour_of`).
+    value: Optional[float] = None
+    reference_id: Optional[str] = None
 
 
 #: (client, page digest, ec, table, organism) -> rows. A page fetched again
@@ -240,7 +252,9 @@ def table_rows(ec: str, table: str, organism: Optional[str]) -> Tuple[_Row, ...]
         parsed = parse(html, ec, [], organism, require_substrate_match=False)
         out = tuple(
             _Row(str(r.substrate), getattr(r, "organism", None) or organism,
-                 str(getattr(r, "conditions", "") or ""))
+                 str(getattr(r, "conditions", "") or ""),
+                 _number(getattr(r, "km_value", None)),
+                 None if getattr(r, "reference_id", None) is None else str(r.reference_id))
             for r in parsed
             if getattr(r, "table_scoped", True) and getattr(r, "substrate", None)
             and str(r.substrate) != "unknown compound"
@@ -249,6 +263,13 @@ def table_rows(ec: str, table: str, organism: Optional[str]) -> Tuple[_Row, ...]
         _PARSED.clear()
     _PARSED[key] = out
     return out
+
+
+def _number(value: object) -> Optional[float]:
+    try:
+        return None if value is None else float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
 
 
 def _key(name: str) -> str:
@@ -331,20 +352,24 @@ def _plural(n: int, word: str) -> str:
 
 
 def choose_substrate(ec: str, organism: Optional[str], *, needs_kcat: bool = True,
-                     strict: bool = False) -> Optional[Choice]:
+                     strict: bool = False, among: Optional[Sequence[str]] = None) -> Optional[Choice]:
     """The best-measured substrate BRENDA lists Km rows for, for `ec` in
     `organism` (any organism when None); None when it lists none, or the
     page cannot be read (`strict` lets that error out instead, so a caller
-    can tell the two apart)."""
+    can tell the two apart). `among` limits the choice to those names
+    (the listed substrates a word of the description matched, when it
+    matched several): the user's word decides the field, the rows decide
+    within it."""
     try:
-        return _choose_substrate(ec, organism, needs_kcat)
+        return _choose_substrate(ec, organism, needs_kcat, among)
     except Exception:  # noqa: BLE001 - a choice that cannot be made is no choice
         if strict:
             raise
         return None
 
 
-def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool) -> Optional[Choice]:
+def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
+                      among: Optional[Sequence[str]] = None) -> Optional[Choice]:
     counts = _Counts()
     counts.add("km", table_rows(ec, "km", organism))
     tables = ["km"]
@@ -352,6 +377,9 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool) -> Opt
         counts.add("kcat", table_rows(ec, "kcat", organism))
         tables.append("kcat")
     candidates = counts.keys("km")
+    if among:
+        allowed = {_key(n) for n in among}
+        candidates = [k for k in candidates if k in allowed]
     if not candidates:
         return None
     try:
@@ -398,7 +426,8 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool) -> Opt
         how += "; only cosubstrates and cofactors have rows here, so one of them was used"
     clause = f"; the cosubstrate{'s' if len(aside) > 1 else ''} {', '.join(aside[:3])} set aside" \
         if aside else ""
-    why = (f"of the {_plural(len(candidates), 'substrate')} BRENDA lists Km rows for under "
+    which = " that your word matches" if among else ""
+    why = (f"of the {_plural(len(candidates), 'substrate')}{which} BRENDA lists Km rows for under "
            f"{_where(ec, organism)}, {how} ({measured}{clause})")
     alternatives = tuple(Option(counts.name(k), rows(k)) for k in ranked[1:1 + ALTERNATIVES_NAMED])
     return Choice("substrate", name, why, alternatives, len(candidates), dict(r))
@@ -479,6 +508,52 @@ def _choose_inhibitor(ec: str, organism: Optional[str], substrate: Optional[str]
         why += "; the cofactor " + ", ".join(counts.name(k) for k in cof[:3]) + " set aside"
     alternatives = tuple(Option(counts.name(k), {"ki": n(k)}) for k in ranked[1:1 + ALTERNATIVES_NAMED])
     return Choice("inhibitor", name, why, alternatives, len(candidates), {"ki": n(best)})
+
+
+# ---------------------------------------------------------------------------
+# A value the search returned, traced back to the compound of its row
+# ---------------------------------------------------------------------------
+
+
+def neighbour_of(ec: str, table: str, compound: str, organism: Optional[str],
+                 value: float, reference_id: str) -> Optional[Tuple[str, ...]]:
+    """The compound(s) whose BRENDA row the search's value actually is, when
+    that row is NOT `compound`'s; None when it is, or when this cannot tell.
+
+    WHY THIS EXISTS. The resolver finds a compound's rows by looking for its
+    name INSIDE each row's compound cell. Asked for "L-alanyl-L-alanyl-
+    L-prolyl-L-phenylalanine p-nitroanilide" (the substrate chosen for
+    chymotrypsin in Homo sapiens, 2026-11-11) it also took every row of
+    "N-succinyl-L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide",
+    and carried 0.219 mM from ref 769319 -- a row of the succinyl compound,
+    which the choice's own note listed as the ALTERNATIVE -- as the chosen
+    substrate's Km. "D-glucose" likewise takes 2-deoxy-D-glucose's rows on
+    the hexokinase page. That is a neighbour's value under another
+    compound's name (ADR 0076), and a choice made automatically must never
+    be what produces one.
+
+    Applied only when `compound` is a name BRENDA's table itself lists
+    (case and spacing aside), because only then is "the row is another
+    compound's" decidable: a name typed loosely ("lactate", which BRENDA
+    files as "(S)-lactate") is found ONLY inside other names, and that is
+    the resolver's documented courtesy, not a relabel. The row is found by
+    its BRENDA reference and value among the organism's rows; when none
+    matches, nothing can be said and None is returned.
+    """
+    if not compound or reference_id is None or value is None:
+        return None
+    want = _key(compound)
+    rows = table_rows(ec, table, organism)
+    listed = any(_key(r.compound) == want for r in rows) or any(
+        _key(r.compound) == want for r in table_rows(ec, table, None))
+    if not listed:
+        return None
+    ref = str(reference_id)
+    same = [r for r in rows if r.reference_id == ref and r.value is not None
+            and abs(r.value - float(value)) <= 1e-9 * max(1.0, abs(float(value)))]
+    if not same or any(_key(r.compound) == want for r in same):
+        return None
+    return tuple(sorted({r.compound for r in same}))
 
 
 # ---------------------------------------------------------------------------
@@ -723,7 +798,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 __all__ = [
     "ALTERNATIVES_NAMED", "COFACTORS", "Choice", "Option", "ROLES", "choose_enzyme",
     "choose_inhibitor", "choose_organism", "choose_substrate", "is_cofactor", "ki_compounds",
-    "ki_modes", "km_organisms", "main", "table_rows",
+    "ki_modes", "km_organisms", "main", "neighbour_of", "table_rows",
 ]
 
 

@@ -519,7 +519,11 @@ def test_a_compound_brenda_does_not_list_is_never_relabelled_as_its_neighbour(co
     assert "in your description as the substrate" not in out
     assert f"No word of your description ({compound!r}) is a substrate BRENDA lists for EC 2.7.1.1" in out
     assert "it was not used: the model is not of it" in out
-    assert "No substrate was named, so Caterva used D-glucose:" in out
+    # The choice's note must not say "No substrate was named": one was,
+    # and BRENDA does not list it. It says that, then what was used.
+    assert "No substrate was named" not in out
+    assert (f"No substrate BRENDA lists Km rows for under EC 2.7.1.1 in Homo sapiens was named (no "
+            f"word of your description, {compound!r}, is one), so Caterva used D-glucose:") in out
     assert KM_ROW in out
     assert f"as the substrate {compound}" not in out and f"Km of {compound}" not in out
 

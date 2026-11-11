@@ -598,7 +598,12 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
     for name in unmeasured:
         reason = str(reasons.get(name, ""))
         low = reason.lower()
-        if "--inhibitor" in reason:
+        if "never carried under this one's" in low:
+            # The row the search returned was another compound's and was
+            # withheld (`__main__._neighbours_withheld`): naming the compound
+            # again would return it again.
+            need = "neighbour"
+        elif "--inhibitor" in reason:
             need = "inhibitor"
         elif "--substrate" in reason and "not looked up" in low:
             need = "substrate"
@@ -612,6 +617,10 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
             need = "nothing"
         by_need.setdefault(need, []).append(name)
     steps = []
+    if "neighbour" in by_need:
+        steps.append(f"supply {', '.join(by_need['neighbour'])} yourself, or model the compound the "
+                     "provenance table names: the row the search returned is another compound's, "
+                     "so it was withheld")
     if "inhibitor" in by_need:
         steps.append(f"name the inhibitor with --inhibitor NAME, so {', '.join(by_need['inhibitor'])} "
                      "is looked up (BRENDA files a Ki under the inhibitor)")

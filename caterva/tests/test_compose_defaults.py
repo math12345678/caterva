@@ -381,3 +381,77 @@ def test_the_studio_result_carries_each_choice_in_order(tmp_path):
     assert search["substrate"] == "D-glucose" and search["measured"] == 2
     assert any(n.startswith("No substrate was named, so Caterva used D-glucose:")
                for n in outcome.result["notes"])
+
+
+# ---------------------------------------------------------------------------
+# Review of ADR 0182: a value is never carried under a neighbour's name
+# ---------------------------------------------------------------------------
+
+
+def test_a_value_whose_row_is_a_longer_named_compound_is_traced_to_it(recorded):
+    """The resolver finds "D-glucose" inside "2-deoxy-D-glucose". On the
+    recorded page 1.9 mM (ref 641068) is a 2-deoxy-D-glucose row and 6.0 mM
+    (same ref) a D-glucose row: the first is the neighbour, the second is
+    not, and a name BRENDA does not list exactly is never judged."""
+    assert defaults.neighbour_of("2.7.1.1", "km", "D-glucose", "Homo sapiens", 1.9, "641068") == (
+        "2-deoxy-D-glucose",)
+    assert defaults.neighbour_of("2.7.1.1", "km", "D-glucose", "Homo sapiens", 6.0, "641068") is None
+    assert defaults.neighbour_of("2.7.1.1", "km", "glucose", "Homo sapiens", 1.9, "641068") is None
+    assert defaults.neighbour_of("2.7.1.1", "km", "D-glucose", "Homo sapiens", 1.9, "999999") is None
+    assert recorded == []
+
+
+def test_a_neighbours_value_returned_by_the_search_is_withheld_and_said(recorded, monkeypatch):
+    """Chymotrypsin, 2026-11-11: the substrate chosen was L-alanyl-...-
+    p-nitroanilide and the Km carried (0.219 mM, ref 769319) was the
+    N-succinyl compound's row. Here the same shape on the recorded page: a
+    search that hands back 2-deoxy-D-glucose's 1.9 mM as D-glucose's Km.
+    It is withheld, the other compound is named, and the kcat (D-glucose's
+    own row) is still carried."""
+    from types import SimpleNamespace
+
+    from caterva.compose import narrowed, pipeline
+    from caterva.compose.__main__ import search_the_literature
+    from caterva.compose.export import Measurement
+
+    monkeypatch.setattr(pipeline, "compose_and_parameterise", lambda query, **kw: (
+        None, SimpleNamespace(build=None, branches=(), undecided=())))
+    returned = {
+        # As the search builds it: the reference in the citation only.
+        "reaction_Km": Measurement(value=1.9, unit="mM", citation="BRENDA ref 641068",
+                                   organism="Homo sapiens"),
+        "reaction_kcat": Measurement(value=40.1, unit="1/s", citation="BRENDA ref 739603",
+                                     organism="Homo sapiens", reference_id="739603"),
+    }
+    monkeypatch.setattr(narrowed, "select_for_model",
+                        lambda *a, **k: narrowed.Selection(measured=dict(returned)))
+    model = compose("Michaelis Menten", subject="2.7.1.1")
+    found, note, refused = search_the_literature(
+        model, _args(subject="2.7.1.1", organism="Homo sapiens", substrate="D-glucose"))
+    assert refused is False and recorded == []
+    assert set(found.measured) == {"reaction_kcat"}
+    reason = found.not_found["reaction_Km"]
+    assert "is BRENDA's row for 2-deoxy-D-glucose, not for D-glucose" in reason
+    assert "1.9 mM, BRENDA ref 641068" in reason
+    assert "returned by the search and not used (reaction_Km)" in note
+
+
+def test_a_word_that_matches_several_substrates_is_chosen_among_them_only(monkeypatch):
+    """'glucose' matched D-glucose and beta-D-glucose; the choice is made
+    between those two by their rows, never D-mannose for having more."""
+    _rows(monkeypatch, {("km", "Homo sapiens"): {"D-mannose": 30, "D-glucose": 4, "beta-D-glucose": 2},
+                        ("kcat", "Homo sapiens"): {"D-mannose": 30, "D-glucose": 1}})
+    choice = defaults.choose_substrate("2.7.1.1", "Homo sapiens",
+                                       among=("D-glucose", "beta-D-glucose"))
+    assert choice.chosen == "D-glucose" and choice.considered == 2
+    assert "of the 2 substrates that your word matches" in choice.why
+    assert [o.name for o in choice.alternatives] == ["beta-D-glucose"]
+
+
+def test_a_choice_made_instead_of_a_named_word_does_not_say_nothing_was_named():
+    choice = defaults.Choice("substrate", "D-glucose", "of the 10 substrates ...",
+                             instead="No word of your description ('G6P') is a substrate BRENDA lists")
+    assert choice.note().startswith("No word of your description ('G6P') is a substrate BRENDA "
+                                    "lists, so Caterva used D-glucose:")
+    assert "No substrate was named" not in choice.note()
+    assert "instead" not in choice.to_json(), "the Studio contract's shape is unchanged"

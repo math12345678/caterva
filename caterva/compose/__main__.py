@@ -1225,7 +1225,13 @@ def _enzyme_the_data_singles_out(reading: Any, args: Any) -> Optional[Any]:
             or getattr(ambiguity, "suggestions_only", False) or not ambiguity.candidates):
         return None
     best = min(c.tier for c in ambiguity.candidates)
-    tied = [(c.ec, c.name) for c in ambiguity.candidates if c.tier == best]
+    tied_candidates = [c for c in ambiguity.candidates if c.tier == best]
+    # A fragment of a longer name, a typo, an abbreviation or a class match
+    # is not a reading of the name the user typed: never settled by rows.
+    if any(getattr(c, "partial", False) or getattr(c, "abbreviation", False)
+           or getattr(c, "via", "name") not in ("name", "ec") for c in tied_candidates):
+        return None
+    tied = [(c.ec, c.name) for c in tied_candidates]
     from caterva.compose.defaults import ENZYME_CANDIDATES_CONSIDERED, choose_enzyme
 
     if len(tied) > ENZYME_CANDIDATES_CONSIDERED:
@@ -1308,7 +1314,14 @@ def _substrate_from(args: Any, reading: Any, out: DescriptionReading) -> bool:
         out.notes.append(
             "Your description's words match more than one substrate BRENDA lists for EC "
             f"{ec}{where} (" + "; ".join(f"{t!r} as {n}" for t, n in match.rivals)
-            + "), so none was chosen.")
+            + "), so none was read as the substrate; the search chooses among them by their rows.")
+        # The choice is held to what the user's word matched (ADR 0182):
+        # "glucose" decides between D-glucose and beta-D-glucose by rows, and
+        # never becomes D-mannose because D-mannose is better measured.
+        _remember(args, substrate_among=tuple(n for _, n in match.rivals),
+                  substrate_instead=(
+                      "Your description's words match several substrates BRENDA lists ("
+                      + "; ".join(f"{t!r} as {n}" for t, n in match.rivals) + ")"))
     else:
         # The word is never relabelled as a listed substrate (ADR 0076).
         # The search then chooses the best-measured one BRENDA lists and
@@ -1318,7 +1331,23 @@ def _substrate_from(args: Any, reading: Any, out: DescriptionReading) -> bool:
             f"No word of your description ({shown}) is a substrate BRENDA lists for EC {ec}{where}, "
             "so none was taken as the substrate, and if you typed one it was not used: the model is "
             "not of it. Pass --substrate with BRENDA's own name for the compound you meant.")
+        # The choice's note must not then open "No substrate was named":
+        # the user may well have named one BRENDA does not list.
+        _remember(args, substrate_instead=(
+            f"No substrate BRENDA lists Km rows for under EC {ec}"
+            + (f" in {args.organism}" if args.organism else "")
+            + f" was named (no word of your description, {shown}, is one)"))
     return False
+
+
+def _remember(args: Any, **fields: Any) -> None:
+    """Carry what the reader learned to the search's choice (`args` is the
+    one object both see); silently nothing for an args that refuses it."""
+    for name, value in fields.items():
+        try:
+            setattr(args, name, value)
+        except (AttributeError, TypeError):  # pragma: no cover - a frozen args
+            pass
 
 
 def _inhibitor_from(ec: str, organism: Optional[str],
@@ -1581,14 +1610,24 @@ def _choose_what_was_not_named(model: Any, args: Any) -> Tuple[Any, Optional[str
             return replace(model, choices=tuple(choices)), blocked
 
     if needs_substrate:
+        among = getattr(args, "substrate_among", None)
+        among = tuple(among) if isinstance(among, (tuple, list)) and among else None
         try:
             chosen = defaults.choose_substrate(ec, args.organism, needs_kcat="kcat" in tables,
-                                               strict=True)
+                                               strict=True, among=among)
+            if chosen is None and among:
+                # None of the matched names has a row here after all: the
+                # whole list, said as such by the `instead` clause.
+                chosen = defaults.choose_substrate(ec, args.organism, needs_kcat="kcat" in tables,
+                                                   strict=True)
         except Exception:  # noqa: BLE001 - the page could not be read: the old refusal
             chosen = None
             unreadable = True
         else:
             unreadable = False
+        instead = getattr(args, "substrate_instead", None)
+        if chosen is not None and isinstance(instead, str) and instead:
+            chosen = replace(chosen, instead=instead)
         if chosen is None:
             where = f" in {args.organism}" if args.organism else ""
             missing = ", ".join(t for t in tables if t in ("km", "kcat", "ki"))
@@ -1727,11 +1766,17 @@ def _search_resolved(
                   if undecided else "no organism gave a value for every constant")
                + ". Re-run with --organism NAME")
         return replace(model, search_refused=why), f"No measured value was used: {why}", True
-    measured = chosen.measured
+    measured = dict(chosen.measured)
+    # A value whose BRENDA row is another compound's -- the resolver finds
+    # a name inside longer names -- is withheld, never carried under the
+    # name the user typed or Caterva chose (`_neighbours_withheld`).
+    neighbours = _neighbours_withheld(model, measured, ec)
+    for identifier in neighbours:
+        measured.pop(identifier, None)
     # Constants the search returned a value for, or found rows for, and did
     # not use. They end up placeholders like the ones the search found
     # nothing for, and must not be described as found-nothing.
-    withheld: Dict[str, str] = chosen.withheld
+    withheld: Dict[str, str] = {**chosen.withheld, **neighbours}
     not_found.update(withheld)
     selection_notes = chosen.notes
     if getattr(args, "isoform", None):
@@ -1835,6 +1880,54 @@ def _search_resolved(
     if selection_notes:
         note += ". " + "; ".join(selection_notes)
     return sourced, note, False
+
+
+def _neighbours_withheld(model: Any, measured: Mapping[str, Any], ec: Optional[str]) -> Dict[str, str]:
+    """parameter id -> the reason it is withheld, for each value the search
+    returned whose BRENDA row is a different compound's than the one the
+    constant is for (`defaults.neighbour_of`).
+
+    Found by reviewing ADR 0182's own live run: chymotrypsin in Homo
+    sapiens, the substrate chosen as L-alanyl-L-alanyl-L-prolyl-L-
+    phenylalanine p-nitroanilide, carried Km 0.219 mM (ref 769319), which is
+    BRENDA's row for the N-succinyl compound the note named as the
+    alternative. Withholding it leaves a labelled placeholder with the
+    reason; the other compound is named, so the reader can model it
+    instead. A page that cannot be read withholds nothing: the search read
+    the same page, and an unverifiable check is not a failed one.
+    """
+    if not ec or not measured:
+        return {}
+    from caterva.compose import defaults
+
+    out: Dict[str, str] = {}
+    for q in getattr(model, "resolvable", ()) or ():
+        m = measured.get(q.parameter_id)
+        if m is None or q.table not in ("km", "kcat", "ki"):
+            continue
+        compound = model.compound_for(q)
+        # The search's Measurement carries the reference in its citation
+        # ("BRENDA ref 769319"), not always in `reference_id`.
+        ref = getattr(m, "reference_id", None)
+        if ref is None:
+            cited = re.search(r"BRENDA ref (\d+)", str(getattr(m, "citation", "") or ""))
+            ref = cited.group(1) if cited else None
+        try:
+            other = defaults.neighbour_of(
+                ec, q.table, compound, getattr(m, "organism", None) or getattr(model, "organism", None),
+                m.value, ref)
+        except Exception:  # noqa: BLE001 - unverifiable is not wrong
+            other = None
+        if not other:
+            continue
+        flag = "--inhibitor" if q.table == "ki" else "--substrate"
+        out[q.parameter_id] = (
+            f"withheld: the value the search returned ({m.value:g} {m.unit}, BRENDA ref "
+            f"{ref}) is BRENDA's row for {' / '.join(other)}, not for {compound} -- the "
+            f"search matches a name inside longer names, and another compound's value is never "
+            f"carried under this one's (ADR 0076). Pass {flag} with that name to model it, or "
+            f"supply this constant yourself")
+    return out
 
 
 def _not_looked_up(skipped: Mapping[str, str]) -> str:
