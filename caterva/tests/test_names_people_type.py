@@ -416,3 +416,88 @@ def test_the_recorded_hexokinase_page_gives_g6p_nothing_and_glucose_d_glucose():
     assert match_substrate(["G6P"], counts).name is None
     reading = read_sentence("human HK2 on glucose")
     assert match_substrate(reading.substrate_candidates, counts).name == "D-glucose"
+
+
+# ---------------------------------------------------------------------------
+# Review of the branch (2026-11-11): what a name implies is claimed only where
+# it is used, and a P450 row is read as the P450 it names
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("commentary, isoform", [
+    # The live BRENDA page for EC 1.14.14.1 writes which P450 a fenthion Km
+    # measured as a bare name, with no "isoform" before it.
+    ("CYP2C19, at pH 7.4 and 37°C", "CYP2C19"),
+    ("CYP3A4, desulfuration by recombinant human CYPs to fenthion-oxon", "CYP3A4"),
+    ("complex POR-CYP1A1, pH 7.5, 37°C", "CYP1A1"),
+    ("recombinant enzyme CYP2D6", "CYP2D6"),
+    ("CYP2C9*1, pH 7.4", "CYP2C9"),
+    ("cytochrome P450 3A4", "CYP3A4"),
+    ("desulfuration by recombinant human CYPs to fenthion-oxon", None),
+])
+def test_a_p450_row_is_read_as_the_p450_it_names(commentary, isoform):
+    from caterva.bind.core import read_isoform
+
+    assert read_isoform(commentary) == isoform
+
+
+def test_a_cyp2c19_row_is_never_taken_for_cyp2b6():
+    """`compose --subject CYP2B6` sets --isoform CYP2B6. A row naming CYP2C19 must rank as ANOTHER isoform's
+    (refused), not as a row naming none ("whether it measured CYP2B6 is unknown"), which it read as before."""
+    from caterva.bind.core import same_isoform
+    from caterva.compose.ki_mode import Reading, isoform_rank
+
+    assert not same_isoform("CYP2B6", "CYP2C19") and not same_isoform("CYP3A4", "CYP3A5")
+    assert same_isoform("CYP3A4", "P450 3A4") and same_isoform("cyp2b6", "CYP2B6")
+    row = Reading(None, None, "CYP2C19", "CYP2C19, at pH 7.4 and 37°C")
+    assert isoform_rank(row, "CYP2B6") is None, "another isoform's row is never a fallback"
+    assert isoform_rank(Reading(None, None, "CYP2B6", "CYP2B6"), "CYP2B6") == 0
+
+
+def test_a_command_that_takes_only_the_ec_number_never_claims_the_isoform_or_organism_was_searched():
+    """`bind --ec`, `rates --ec`, `fep --ec` and `structure --subject` use only the EC number. Their notes said
+    "so Homo sapiens was searched" and "the constants are taken from BRENDA rows that name it" while they
+    searched every organism and every P450. Now they say what the name implies and the flag that applies it."""
+    from caterva.enzymes.ec_option import read_ec_option
+
+    option = read_ec_option("CYP2B6", None, uniprot=None)
+    assert option.ec == "1.14.14.1"
+    text = " ".join(option.notes)
+    assert "was searched" not in text and "constants are taken" not in text, text
+    assert "--isoform CYP2B6" in text and '--organism "Homo sapiens"' in text, text
+
+
+def test_compose_claims_the_isoform_and_organism_only_when_it_applied_them(monkeypatch):
+    from dataclasses import dataclass
+    from types import SimpleNamespace
+
+    import caterva.enzymes.policy as policy
+    from caterva.compose.__main__ import read_subject
+
+    monkeypatch.setattr(policy, "literature_uniprot_lookup", lambda *a, **k: None)
+
+    @dataclass(frozen=True)
+    class Model:
+        subject: str
+        ec_number: object = None
+
+    args = SimpleNamespace(subject="CYP2B6", organism=None, isoform=None)
+    model, note, refusal, _ = read_subject(Model("CYP2B6"), args)
+    assert refusal is None and model.subject == "1.14.14.1"
+    assert (args.isoform, args.organism) == ("CYP2B6", "Homo sapiens")
+    assert "constants are taken from BRENDA rows that name it" in note and "Homo sapiens was searched" in note
+
+    args = SimpleNamespace(subject="CYP2B6", organism="Homo sapiens", isoform="CYP3A4")
+    _, note, _, _ = read_subject(Model("CYP2B6"), args)
+    assert args.isoform == "CYP3A4", "a flag wins"
+    assert "constants are taken from BRENDA rows that name it" not in note, note
+    assert "--isoform CYP3A4 was used, because a flag wins" in note, note
+
+
+def test_an_abbreviated_binomial_keeps_the_strain_typed_after_it():
+    from caterva.compose.organisms import normalise_organism
+
+    assert normalise_organism("E. coli BL21") == (
+        "Escherichia coli BL21", "Read --organism 'E. coli BL21' as Escherichia coli BL21.")
+    assert normalise_organism("HIV-1")[0] == "Human immunodeficiency virus 1"
+    assert normalise_organism("Mus musculus C57BL/6") == ("Mus musculus C57BL/6", None)

@@ -56,6 +56,12 @@ COMMON_NAMES = {
     # One species, and not a pig: "guinea pig" must never reach "pig".
     "guinea pig": "Cavia porcellus",
     "guinea pigs": "Cavia porcellus",
+    # BRENDA's organism for HIV-1 protease and reverse transcriptase rows
+    # (checked on the page for 3.4.23.16, 2026-11-11). Not plain "HIV",
+    # which is HIV-1 or HIV-2.
+    "hiv-1": "Human immunodeficiency virus 1",
+    "hiv 1": "Human immunodeficiency virus 1",
+    "hiv1": "Human immunodeficiency virus 1",
 }
 
 
@@ -71,7 +77,9 @@ def known_binomials() -> Tuple[str, ...]:
     from caterva.enzymes.index import ORGANISMS
 
     found = {binomial for binomial, _, _ in ORGANISMS.values()} | set(COMMON_NAMES.values())
-    return tuple(sorted(found))
+    # Two words each: "Human immunodeficiency virus 1" is a name, not a
+    # binomial, and is read only through the common names above.
+    return tuple(sorted(b for b in found if len(b.split()) == 2))
 
 
 def _words(typed: str) -> List[str]:
@@ -162,6 +170,15 @@ def normalise_organism(text: Optional[str]) -> Tuple[Optional[str], Optional[str
         matches = _abbreviation_matches(typed)
         if matches is not None and len(matches) == 1:
             return matches[0], f"Read --organism {typed!r} as {matches[0]}."
+        head = re.match(r"^(\S+\.?\s*\S+?)\s+(\S.*)$", typed)
+        if matches is None and head is not None:
+            # "E. coli BL21", "S cerevisiae S288C": an abbreviated binomial
+            # and a strain. The binomial is read as above; the strain after
+            # it is kept exactly as typed, as for "Escherichia coli K-12".
+            first = _abbreviation_matches(head.group(1))
+            if first is not None and len(first) == 1:
+                read = f"{first[0]} {head.group(2)}"
+                return read, (None if read == typed else f"Read --organism {typed!r} as {read}.")
         if matches or not _full_binomial(typed):
             return typed, _not_recognised(typed, matches or _close_to(typed))
     # A binomial is "Genus species": capital genus, lower-case epithet.

@@ -881,7 +881,7 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
             isoform=isoform, read_notes=tuple(read_notes), possible_inhibitor_text=possible_inhibitor,
             mutations=tuple(mutations),
             **_assumed_organism(read_organism, organism, assumed, organisms))
-    return SentenceReading(possible_inhibitor_text=possible_inhibitor,near=near if ambiguity is None and not others else None,
+    return SentenceReading(possible_inhibitor_text=possible_inhibitor, near=near if ambiguity is None and not others else None,
         text=text, enzyme_text=ambiguity_text if ambiguity is not None else None,
         organism=read_organism[1] if read_organism else None,
         organism_text=read_organism[0] if read_organism else None,

@@ -114,16 +114,40 @@ class NameResolution:
     #: isoform, a spelling, a mutation set aside). Each automatic choice is one.
     read_notes: Tuple[str, ...] = ()
 
-    def notes(self, query: str) -> List[str]:
+    def notes(self, query: str, *, isoform_applied: bool = False, organism_applied: bool = False) -> List[str]:
         """Sentences for a report: what the query was read as, then what was
-        assumed, then cautions."""
+        assumed, then cautions.
+
+        Two of the reading's sentences are claims about the SEARCH ("the
+        constants are taken from BRENDA rows that name HK2", "so Homo
+        sapiens was searched"), and they are true only for a caller that
+        put the isoform and organism into its search. `caterva compose`
+        does (read_subject) and says so with `isoform_applied` /
+        `organism_applied`. Every other caller -- `caterva bind --ec`,
+        `rates --ec`, `fep --ec`, `structure --subject` -- takes only the
+        EC number, and printed both claims anyway: `rates --ec CYP2B6` said
+        Homo sapiens was searched and the constants came from CYP2B6 rows
+        while it searched every organism and every P450 (review of ADR
+        0182, 2026-11-11). For those callers each claim is replaced by what
+        the name implies and the flag that would apply it.
+        """
         if self.ec == query.strip() and not self.cautions and not self.read_notes:
             return []
-        head = f"Read {query.strip()!r} as EC {self.ec}"
+        typed = query.strip()
+        head = f"Read {typed!r} as EC {self.ec}"
         if self.name:
             head += f" ({self.name})"
         out = [f"{head}: {self.how}."]
-        out.extend(n for n in self.read_notes if n not in out)
+        for note in self.read_notes:
+            if self.isoform and is_isoform_claim(note) and not isoform_applied:
+                note = (f"{typed!r} names the isoform {self.isoform} of EC {self.ec}, but this search was not "
+                        f"narrowed to it: rows of every isoform were read (pass --isoform {self.isoform} where "
+                        "the command takes one).")
+            elif self.organism and is_organism_claim(note) and not organism_applied:
+                note = (f"{typed!r} names an enzyme of {self.organism}, but no organism was given and this search "
+                        f"was not narrowed to one (pass --organism \"{self.organism}\" to search it).")
+            if note not in out:
+                out.append(note)
         out.extend(c for c in self.cautions if c not in out[0])
         return out
 
@@ -131,6 +155,22 @@ class NameResolution:
         return {"ec": self.ec, "name": self.name, "how": self.how, "source": self.source,
                 "isoform": self.isoform, "organism": self.organism, "notes": list(self.read_notes),
                 "cautions": list(self.cautions)}
+
+
+#: How the reading's two claims about the search begin (symbols._assumed_note,
+#: finder._reading_notes, _from_gene below): see `NameResolution.notes`.
+_ORGANISM_CLAIM = "No organism was given"
+_ISOFORM_CLAIM = re.compile(r"^Read .+ as the isoform .+; the constants are taken from BRENDA rows")
+
+
+def is_organism_claim(note: str) -> bool:
+    """True for the sentence saying an organism nobody gave was searched."""
+    return note.startswith(_ORGANISM_CLAIM)
+
+
+def is_isoform_claim(note: str) -> bool:
+    """True for the sentence saying the constants come from rows naming the isoform."""
+    return bool(_ISOFORM_CLAIM.match(note))
 
 
 def _named(candidates: Sequence[Candidate]) -> List[Dict[str, object]]:
@@ -301,7 +341,7 @@ def _from_gene(
     a cytochrome P450 gene. None when it yields nothing or cannot be asked;
     several are refused with the candidates named."""
     from .index import ORGANISMS, organism_code
-    from .symbols import P450_EC, human_style
+    from .symbols import P450_EC
 
     if not _SYMBOL_SHAPE.match(name):
         return None
@@ -339,9 +379,15 @@ def _from_gene(
             raise _refuse(ambiguous, rerun, AMBIGUOUS)
         return None
     entry = load_index().get(complete[0])
-    isoform = name if human_style(name) or code else name
-    notes.append(f"Read {name!r} as the isoform {isoform} of EC {complete[0]}; the constants are taken from "
-                 "BRENDA rows that name it where there are any (pass --isoform to change it).")
+    # The gene is one protein of the EC number. Carried as the isoform only
+    # when the EC number is several proteins in the organism (or the index
+    # cannot say), as SymbolTable.read does: for the one protein of its EC
+    # number, `--isoform` would only drop rows that name it another way.
+    counts = entry.counts if entry is not None else {}
+    isoform: Optional[str] = name if entry is None or counts.get(code or "HUMAN", 0) != 1 else None
+    if isoform:
+        notes.append(f"Read {name!r} as the isoform {isoform} of EC {complete[0]}; the constants are taken from "
+                     "BRENDA rows that name it where there are any (pass --isoform to change it).")
     return NameResolution(
         ec=complete[0], source="uniprot", name=entry.name if entry else "", isoform=isoform,
         organism=assumed, read_notes=tuple(notes),

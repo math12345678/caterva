@@ -1135,6 +1135,11 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
         # isoform is searched for unless --isoform set one.
         if getattr(reading, "isoform", None) and not getattr(args, "isoform", None):
             args.isoform = reading.isoform
+        elif getattr(reading, "isoform", None) and args.isoform != reading.isoform:
+            # The enzyme note above says the constants come from rows naming
+            # the description's isoform; the flag's isoform is the one used.
+            out.notes.append(f"Your description names the isoform {reading.isoform}; --isoform {args.isoform} "
+                             "was used instead, because a flag wins over the description.")
     elif reading.ambiguity is not None:
         from caterva.enzymes.policy import AMBIGUOUS, _refuse
 
@@ -1282,13 +1287,19 @@ def read_subject(model: Any, args: Any) -> Tuple[Any, Optional[str], Optional[st
             allow_unlisted_ec=True)
     except NameNotResolved as exc:
         return model, None, f"No search was run: {exc}", exc
-    note = " ".join(resolution.notes(subject)) or None
     # ADR 0182: what the name implies (the isoform of "HK2", Homo sapiens
-    # for a human gene symbol) fills only what no flag set; the notes say so.
-    if getattr(resolution, "isoform", None) and not getattr(args, "isoform", None):
+    # for a human gene symbol) fills only what no flag set, and the notes
+    # claim a search narrowed to it only when it was filled here.
+    isoform_applied = bool(getattr(resolution, "isoform", None) and not getattr(args, "isoform", None))
+    organism_applied = bool(getattr(resolution, "organism", None) and not getattr(args, "organism", None))
+    if isoform_applied:
         args.isoform = resolution.isoform
-    if getattr(resolution, "organism", None) and not getattr(args, "organism", None):
+    if organism_applied:
         args.organism = resolution.organism
+    notes = resolution.notes(subject, isoform_applied=isoform_applied, organism_applied=organism_applied)
+    if getattr(resolution, "isoform", None) and not isoform_applied and args.isoform != resolution.isoform:
+        notes.append(f"--isoform {args.isoform} was used, because a flag wins over what {subject.strip()!r} implies.")
+    note = " ".join(notes) or None
     if resolution.ec != (model.subject or "").strip():
         model = replace(model, subject=resolution.ec)
     return model, note, None, None
