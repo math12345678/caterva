@@ -52,6 +52,7 @@ from brenda_client import (
     fetch_brenda_html,
     has_data_table,
     parse_brenda_km_html,
+    substrate_matches,
 )
 from citation import Citation, citation_from_brenda_entry, pubmed_url
 from effector import Effector
@@ -1145,6 +1146,32 @@ def _best_evidenced(
     return chosen, _tie_of(kept, chosen), list(kept)
 
 
+def _state_the_form(chosen: dict, best, asked: str | None, log, tier) -> None:
+    """Say so when the row carried names the compound more precisely than
+    the request did.
+
+    A request naming no stereochemistry ("lactate", "glucose") matches the
+    rows of every form BRENDA writes ("(S)-lactate", "beta-D-glucose";
+    `brenda_client.substrate_matches`), and the parser keeps BRENDA's name
+    on each. The report states the compound the user typed beside the
+    number, so without this sentence a "(R)-lactate" row would be cited as
+    "lactate" with nothing saying which form was measured (found in review,
+    2026-11-11). Spelling alone ("acetyl thiocholine") is not a different
+    form and is not mentioned."""
+    measured = getattr(best, "substrate", None)
+    if not asked or not measured or not getattr(best, "substrate_verified", True):
+        return
+    if measured.strip().lower() == asked.strip().lower() or not substrate_matches(measured, asked):
+        return
+    if substrate_matches(asked, measured):  # the same compound, spelled otherwise
+        return
+    clause = (f"BRENDA names this row's compound {measured!r}, a stated form of the "
+              f"{asked!r} asked for")
+    if chosen.get("chosen_because"):
+        chosen["chosen_because"] += f"; {clause}"
+    log.append(f"{tier}: {clause}")
+
+
 def _tie_of(kept, chosen):
     """`find_tie`, with its reason saying how THIS resolver broke the tie.
 
@@ -1221,11 +1248,13 @@ def _score_frontier(
             # frontier holds rows of every substrate the table has. Read by
             # the agents' assay-window re-selection, which can move to
             # another substrate's row only in the second case and says so
-            # (caterva/agents/scouts.py). The label says nothing more in the
-            # first: the match is a substring of the compound cell, and on
-            # the committed LDH turnover page a "pyruvate" request's
-            # phenylpyruvate rows (94.7 and 6467 1/s, ref 761568) read
-            # "pyruvate".
+            # (caterva/agents/scouts.py). In the first case the label is the
+            # name asked for, or BRENDA's own when the row was matched through
+            # a stereo descriptor ("(S)-lactate" for "lactate"); since
+            # 2026-11-11 the whole compound is matched
+            # (brenda_client.substrate_matches), so the LDH turnover page's
+            # phenylpyruvate rows (94.7 and 6467 1/s, ref 761568) no longer
+            # read "pyruvate".
             "substrate": getattr(entry, "substrate", None),
             # The row's assay conditions, as PARSED by the existing
             # condition parser (`_parse_ph` / `_parse_temperature` /
@@ -1903,6 +1932,7 @@ def resolve_kinetic_value(
             exact, log, "exact match", organism, quantity=quantity,
             prefer_reference=prefer_reference, detail=chosen,
         )
+        _state_the_form(chosen, best, substrate, log, "exact match")
         # After the choice, because whether a row contradicts the model
         # depends on what the row returned states (ki_mode.evidence_against).
         evidence = (_mechanism_evidence(ranked, best, mode, model_substrate, isoform, log)
@@ -2157,6 +2187,7 @@ def resolve_kinetic_value(
             prefer_reference=prefer_reference,
             detail=chosen,
         )
+        _state_the_form(chosen, best, substrate, log, "cross-species")
         evidence = (_mechanism_evidence(ranked, best, mode, model_substrate, isoform, log)
                     if mode else None)
         return KineticResult(

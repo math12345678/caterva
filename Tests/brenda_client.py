@@ -457,6 +457,39 @@ def substrate_matches(compound: str, target: str) -> bool:
     return bool(prefix) and c[prefix.end():] == t
 
 
+#: `_STEREO_PREFIX` without its start anchor, for finding a compound inside
+#: running text rather than at the start of a cell.
+_STEREO_RUN = r"(?:(?:\([0-9A-Za-z,+\-]+\)|[DL]{1,2}|alpha|beta|cis|trans|[αβ])-)+"
+
+
+def substrate_named_in(text: str, target: str) -> str | None:
+    """The target compound as `text` names it, or None when it names it
+    only as part of another compound.
+
+    For a row with no compound cell (EC 3.1.1.7 writes "0.0146 | Homo
+    sapiens | - | hemolysate ..."), the whole row is the only text there is,
+    and the match used to be a substring of it: a commentary reading "with
+    2-deoxy-D-glucose as substrate" made the row a "D-glucose" row, and
+    "phenylpyruvate" a "pyruvate" one -- the miscitation `substrate_matches`
+    closed for rows WITH a compound cell, left open for rows without one
+    (found in review, 2026-11-11). The same rules apply here as there: the
+    name must stand as a whole word (not after a letter, digit or hyphen,
+    not before one), spaces inside it are ignored ("acetyl thiocholine"),
+    and a stereo descriptor before it is accepted only when the target
+    carries none itself. The span returned is the text's own spelling, so a
+    row matched through a descriptor is labelled "(S)-lactate", not
+    "lactate"."""
+    if not text or not target:
+        return None
+    t = _substrate_key(target)
+    if not t:
+        return None
+    body = r"\s*".join(re.escape(ch) for ch in t)
+    stereo = "" if _STEREO_PREFIX.match(t) else f"(?:{_STEREO_RUN})?"
+    m = re.search(rf"(?<![\w\-]){stereo}{body}(?![\w\-])", text, re.IGNORECASE)
+    return " ".join(m.group(0).split()) if m else None
+
+
 #: A reference cell: one BRENDA reference id or several, comma-separated
 #: ("697525,701131"). Group 1 is the first.
 _REFERENCE_CELL = re.compile(r"(\d{1,7})(?:\s*,\s*\d{1,7})*")
@@ -684,10 +717,17 @@ def parse_brenda_km_html(
                     )
                     break
         else:
-            haystack = full_text.lower()
+            # No compound cell: the row's text is all there is, and the
+            # compound must stand in it as a whole name, by the same rules
+            # (`substrate_named_in`). This was `sub.lower() in full_text`,
+            # which still read "2-deoxy-D-glucose" in a commentary as
+            # D-glucose.
             for sub in target_substrates:
-                if sub.lower() in haystack:
-                    matched_substrate = sub
+                named = substrate_named_in(full_text, sub)
+                if named is not None:
+                    matched_substrate = (
+                        sub if _substrate_key(named) == _substrate_key(sub) else named
+                    )
                     break
 
         substrate_verified = True

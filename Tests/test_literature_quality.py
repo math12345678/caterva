@@ -206,6 +206,38 @@ class TestTheSubstrateIsTheWholeCompound:
                   parse_brenda_turnover_html(html, "2.7.1.1", ["glucose"], "Homo sapiens")}
         assert labels == {"D-glucose", "beta-D-glucose"}
 
+    def test_a_row_with_no_compound_cell_is_matched_on_the_whole_name_too(self):
+        """Found in review: a row whose organism sits in cell 1 (EC 3.1.1.7's
+        layout) has no compound cell, and the match on its text was still a
+        substring, so a commentary naming 2-deoxy-D-glucose made it a
+        D-glucose row and phenylpyruvate a pyruvate one."""
+        html = page({"KM Values": [
+            ["0.5", "Homo sapiens", "-", "with 2-deoxy-D-glucose, pH 7.5, 25°C", "700001"],
+            ["0.7", "Homo sapiens", "-", "with D-glucose, pH 7.5, 25°C", "700002"],
+            ["0.9", "Homo sapiens", "-", "phenylpyruvate, pH 7, 30°C", "700003"],
+            ["1.1", "Homo sapiens", "-", "acetyl thiocholine, pH 7, 30°C", "700004"],
+        ]})
+        glucose = parse_brenda_km_html(html, "2.7.1.1", ["D-glucose"], "Homo sapiens")
+        assert [(e.km_value, e.substrate) for e in glucose] == [(0.7, "D-glucose")]
+        assert parse_brenda_km_html(html, "2.7.1.1", ["pyruvate"], "Homo sapiens") == []
+        spaced = parse_brenda_km_html(html, "3.1.1.7", ["acetylthiocholine"], "Homo sapiens")
+        assert [(e.km_value, e.substrate) for e in spaced] == [(1.1, "acetylthiocholine")]
+        assert bc.substrate_named_in("with (S)-lactate, pH 7", "lactate") == "(S)-lactate"
+
+    def test_the_form_a_row_measured_is_said_when_the_request_named_none(self):
+        """Found in review: the report prints the compound typed beside the
+        number, so a "(R)-lactate" row carried for "lactate" must say which
+        form it measured."""
+        html = page({"KM Values": [row(0.5, "(S)-lactate"),
+                                   row(0.7, "(R)-lactate", ref="700002"),
+                                   row(0.9, "(S)-lactate", ref="700003")]})
+        r = resolve(html, "lactate", "km")
+        assert r.value == 0.7
+        assert "BRENDA names this row's compound '(R)-lactate'" in r.chosen_because
+        same = resolve(page({"KM Values": [row(0.5, "acetylthiocholine iodide")]}),
+                       "acetylthiocholine", "km")
+        assert "names this row's compound" not in same.chosen_because
+
 
 class TestTheReferenceIsTheReferenceCell:
     def test_five_digit_and_listed_references_are_read_and_a_value_never_is(self):
