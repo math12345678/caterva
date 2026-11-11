@@ -10,6 +10,7 @@ import ExportButtons from "@/components/ui/export-buttons";
 import ShareSimulation from "./ShareSimulation";
 import TerminalWindow from "./TerminalWindow";
 import LineChart from "./LineChart";
+import ChoiceNotes, { splitChoiceFlags } from "./ChoiceNotes";
 
 type PipelineStage =
   | "idle"
@@ -409,7 +410,16 @@ export default function AgentSimulator({
           setParamErrors(validateParams(domain, seeded, "", route));
           setReasoning("");
           setModelCitations([]);
-          setFlags([]);
+          // The refusal's flags, not none. They carry what the server
+          // ASSUMED or CHOSE to get as far as it did -- "substrate chosen:
+          // D-glucose ..." beside a Km it resolved for that substrate --
+          // and the seeded Km below is only honest with that sentence on
+          // screen (ADR 0182).
+          setFlags(
+            Array.isArray(err.flags)
+              ? (err.flags as unknown[]).filter((f): f is string => typeof f === "string")
+              : [],
+          );
           // The server's refusal, not a paraphrase of it. This used to say
           // "vmax is yours to choose, not something the literature
           // reports" -- for hexokinase, whose refusal reads "Vmax is
@@ -916,9 +926,10 @@ export default function AgentSimulator({
               </p>
             )}
 
-            {flags.length > 0 && (
+            <ChoiceNotes flags={flags} />
+            {splitChoiceFlags(flags).others.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
-                {flags.map((f, i) => (
+                {splitChoiceFlags(flags).others.map((f, i) => (
                   <span
                     key={i}
                     className="text-[9px] text-yellow-500/60 bg-yellow-500/[0.06] rounded px-1.5 py-0.5"
@@ -1105,10 +1116,13 @@ export default function AgentSimulator({
                 <p className="text-fg/80 mb-2 leading-relaxed">
                   {result.provenance.reasoning}
                 </p>
+                {result.provenance.flags && (
+                  <ChoiceNotes flags={result.provenance.flags} />
+                )}
                 {result.provenance.flags &&
-                  result.provenance.flags.length > 0 && (
+                  splitChoiceFlags(result.provenance.flags).others.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-2">
-                      {result.provenance.flags.map((flag, i) => (
+                      {splitChoiceFlags(result.provenance.flags).others.map((flag, i) => (
                         <span
                           key={i}
                           className="text-[9px] text-yellow-500/50 bg-yellow-500/[0.05] rounded px-1.5 py-0.5"

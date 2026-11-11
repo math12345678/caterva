@@ -1,3 +1,4 @@
+import type { AutomaticChoice } from "./automaticChoice";
 import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import path from "node:path";
@@ -99,6 +100,18 @@ export interface ScienceAgentResult {
    *  "lactate" matches by substring and "L-lactate" returns nothing —
    *  and the student is told the literature is empty when it is not. */
   substratesAvailable?: string[];
+  /** Every name the runner CHOSE because the request left it empty (ADR
+   *  0182): the substrate, the inhibitor for a Ki, or the organism, each as
+   *  caterva.compose.defaults' Choice.to_json(), in the order chosen. A
+   *  value found after a choice is BRENDA's row for exactly that name.
+   *  queryResolver states each one as a "<role> chosen:" flag. Absent from
+   *  a runner that predates choosing; read with `readChoices`. */
+  choices?: AutomaticChoice[];
+  /** Set when a name was needed and BRENDA holds nothing to choose it from
+   *  (source "substrate_not_named", "inhibitor_not_named" or
+   *  "organism_not_chosen"): the runner's sentence saying what is missing
+   *  and what would fix it. Shown to the person as written. */
+  choiceRefusal?: string;
   /** EC numbers UniProt indexed under the enzyme NAME, when it matched more
    *  than one. An EC number is the identity of the protein every citation
    *  refers to, so the runner refuses to pick and names them (ADR 0127).
