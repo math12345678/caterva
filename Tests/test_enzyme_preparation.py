@@ -186,7 +186,7 @@ def test_the_search_log_says_it_too() -> None:
 # ---------------------------------------------------------------------------
 # When the curator says the modification did not matter
 #
-# Golden tuple G2 pins Km 0.09 for human AChE / acetyl thiocholine. That row
+# Golden tuple G2 pinned Km 0.09 until 2026-11-11 for human AChE / acetyl thiocholine. That row
 # is PEGylated — so a blanket exclusion would have deleted a hand-verified
 # golden value. Its commentary reads:
 #
@@ -235,7 +235,7 @@ def test_a_modification_with_no_such_clause_still_warns() -> None:
 
 
 def test_the_golden_g2_row_does_not_warn_for_km() -> None:
-    """End to end. G2 is a real golden tuple and its row is PEGylated; the
+    """End to end. G2's former row (ref 649716) is PEGylated; the
     resolver must not warn, because the source says Km is unaffected."""
     result = resolve_kinetic_value(
         "3.1.1.7",
@@ -250,8 +250,12 @@ def test_the_golden_g2_row_does_not_warn_for_km() -> None:
         allow_cross_species=False,
         quantity="km",
         lineage_provider=fixture_lineage_provider,
+        # The PEGylated row's own paper. Since 2026-11-11 the median of the
+        # two human rows is the other one (0.025, ref 728999, G2's value
+        # now), so the PEGylated row is asked for by its reference.
+        prefer_reference="649716",
     )
-    assert result.value == 0.09, "G2's pinned value"
+    assert result.value == 0.09, "the PEGylated row, ref 649716"
     assert result.preparation is not None
     assert result.preparation.status == "modified"
     assert result.preparation.stated_not_to_affect == "KM"

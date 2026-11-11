@@ -225,14 +225,17 @@ def test_extractor_finds_effectors_across_the_real_ldh_fixture():
     caught an assumption the unit tests could not -- they were all passing.
     """
     import pathlib
-    from brenda_client import parse_brenda_km_html, KM_TABLE_LABEL
+    from brenda_client import parse_brenda_km_html, TURNOVER_TABLE_LABEL
 
     html = pathlib.Path(__file__).parent.joinpath(
         "fixtures", "brenda_ldh_kcat_fixture.html"
     ).read_text(errors="replace")
+    # Read as the table it is. This asked for KM_TABLE_LABEL and got the
+    # turnover rows only through the whole-page fallback; since 2026-11-11 a
+    # table the page's navigation does not list yields no rows.
     rows = parse_brenda_km_html(
         html, "1.1.1.27", [], target_organism=None,
-        require_substrate_match=False, table_label=KM_TABLE_LABEL,
+        require_substrate_match=False, table_label=TURNOVER_TABLE_LABEL,
     )
     assert rows, "fixture parsed to nothing; this test would pass vacuously"
 

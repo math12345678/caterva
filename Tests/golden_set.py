@@ -51,11 +51,17 @@ GOLDEN = [
         "organism": "Homo sapiens",
         "fixture": "brenda_ache_fixture.html",
         "expected": {
-            "km": 0.09,
+            #: WAS 0.09 mM / ref 649716, the only row the substring match
+            #: found for "acetyl thiocholine". The fixture's human table also
+            #: holds the same compound written "acetylthiocholine", 0.025 mM
+            #: (ref 728999, pH 7.4, 37 C); since 2026-11-11 both are matched
+            #: (brenda_client.substrate_matches) and the median row of the
+            #: two, the lower of the middle pair, is returned (ADR 0182).
+            "km": 0.025,
             "unit": "mM",
             "organism": "Homo sapiens",
             "source": "brenda_exact",
-            "ref": "649716",
+            "ref": "728999",
             "cross_species_flag": False,
         },
     },
@@ -98,7 +104,10 @@ GOLDEN = [
         "fixture": "brenda_ldh_ki_fixture.html",
         "quantity": "ki",
         "expected": {
-            "km": 0.0014,
+            #: WAS 0.0014 (LDH-B), the minimum of ref 711801's three rows
+            #: (0.0014 / 0.0019 / 0.0042). The median row, LDH-A's, since
+            #: 2026-11-11 (ADR 0182).
+            "km": 0.0019,
             "unit": "mM",
             "organism": "Homo sapiens",
             "source": "brenda_exact",
@@ -132,7 +141,10 @@ GOLDEN = [
             #: This tuple is Jeske's own example made concrete, and the
             #: before/after is the clearest evidence in the repository that
             #: her third recommendation was worth implementing.
-            "km": 0.0014,
+            #:
+            #: 0.0014 until 2026-11-11; the median of the three human rows,
+            #: 0.0019 (LDH-A), since (ADR 0182).
+            "km": 0.0019,
             "unit": "mM",
             "organism": "Homo sapiens",
             "source": "brenda_cross_species",

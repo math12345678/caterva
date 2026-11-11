@@ -52,6 +52,7 @@ from brenda_client import (
     fetch_brenda_html,
     has_data_table,
     parse_brenda_km_html,
+    substrate_matches,
 )
 from citation import Citation, citation_from_brenda_entry, pubmed_url
 from effector import Effector
@@ -301,6 +302,34 @@ class KineticResult(BaseModel):
     #: None means no tie was found, which is different from an empty tie:
     #: see `SelectionTie.is_tied`.
     selection_tie: "SelectionTie | None" = None
+
+    #: Why THIS row was carried, in plain English, on every found result:
+    #: which rows were set aside and for what (implausible values, missing
+    #: pH or temperature, mutants), and that the value is the median row of
+    #: what remained -- an actual measurement with its own reference, never
+    #: an average. See `_best_evidenced` and ADR 0182.
+    chosen_because: str | None = None
+
+    #: Rows set aside before the choice because the value is physically
+    #: implausible for the quantity (a kcat below 1e-3 or above 1e8 1/s, a
+    #: Km below 1e-7 or above 1e4 mM) while plausible rows existed. Each is
+    #: {"value", "unit", "reference_id", "reason"}. Kept, not discarded, so
+    #: a reader can see what was not used and argue with it.
+    set_aside: list = []
+
+    #: max/min across the rows the choice was made from, when they differ.
+    spread_fold: float | None = None
+
+    #: True when that spread exceeds WIDE_SPREAD_FOLD (100-fold). The median
+    #: pick stands; the report should say that the literature disagrees by
+    #: more than two orders of magnitude, because one number then hides most
+    #: of what is known.
+    wide_spread: bool = False
+
+    #: The BRENDA reference of every row the choice was made from. Read by
+    #: `resolve_kinetic_pair` to find a Km and a kcat measured in one paper.
+    candidate_references: list[str] = []
+
     #: The chosen row's BRENDA commentary, verbatim ("competitive versus
     #: NADH, pH 7.5, 37 C", "LDH-B, pH not specified ..."). It says which
     #: isoform and, for a Ki, which inhibition mode the value measured, and
@@ -773,48 +802,331 @@ def search_pubmed_candidates(
     return candidates
 
 
+#: Physically plausible ranges used to SET ASIDE rows before the choice, per
+#: quantity, as (low, high, unit). Narrower than brenda_client's flagging
+#: bounds (KCAT_PLAUSIBLE_MIN_PER_S is 1e-6, a cross-layer contract under ADR
+#: 0003), on purpose: those bounds drop a row from every use, these only
+#: decide which rows a pick is made from when plausible ones exist.
+#:
+#: kcat: below 1e-3 1/s is one turnover every quarter of an hour, which in
+#: BRENDA is almost always a unit slip (min^-1 or a specific activity
+#: entered as a turnover number); above 1e8 1/s is past the diffusion
+#: limit. The case that made this necessary: human carbonic anhydrase and
+#: CO2, rows spanning 1e-06 to 1.4e6 1/s, and the minimum, 1e-06, was carried
+#: as GROUNDED. CA II's true kcat is ~1e6 1/s.
+#: Km: below 1e-7 mM (0.1 nM) and above 1e4 mM (10 M, past the solubility of
+#: almost anything) are not Michaelis constants.
+#: Ki is not bounded here: tight-binding inhibitors reach picomolar Ki
+#: honestly, and a lower bound would set the best inhibitors aside.
+PLAUSIBLE_FOR_SELECTION = {
+    "kcat": (1e-3, 1e8, "1/s"),
+    "km": (1e-7, 1e4, "mM"),
+}
+
+#: A spread of the values chosen from wider than this is recorded on the
+#: result (`wide_spread`) so the report can flag it. The median pick stands.
+WIDE_SPREAD_FOLD = 100.0
+
+
+def _quantity_of(entries, quantity):
+    """'km' | 'kcat' | 'ki' for these rows: the caller's word, else the unit."""
+    if quantity:
+        return quantity
+    unit = getattr(entries[0], "unit", None) if entries else None
+    return "kcat" if unit == "1/s" else "km"
+
+
+def _ref(entry):
+    return getattr(entry, "reference_id", None) or "no reference"
+
+
+def _is_mutant(entry) -> bool:
+    """A row whose commentary says it measured a mutant or other non-isozyme
+    variant ("mutant R132H", "C123A"). An isozyme row is not a mutant: when
+    it is still in the pool, the isoform step kept it as the isoform asked
+    for."""
+    verdict = getattr(entry, "variant", None)
+    return bool(verdict is not None and verdict.status == "variant"
+                and verdict.kind != "isozyme")
+
+
+def _kitz_wilson(entry) -> bool:
+    """Whether a Ki row was "determined from Kitz-Wilson plots": the K_I of
+    an irreversible inactivation, which `caterva compose` ranks after every
+    reversible constant (caterva.compose.ki_mode). The median must not land
+    on one when a reversible row exists: human MAO-B and benzylhydrazine
+    (ref 702238) would carry 0.048 mM, the Kitz-Wilson row, as its Ki. The
+    pattern is compose's own, so the two cannot disagree on what one is."""
+    try:
+        from caterva.compose.ki_mode import _KITZ_WILSON as pattern
+    except ImportError:  # the flat layout, without the caterva package
+        import re
+        pattern = re.compile(r"\bKitz[\s-]*Wilson\b", re.IGNORECASE)
+    return bool(pattern.search(getattr(entry, "conditions", None) or ""))
+
+
+def _effector_key(effector) -> str:
+    return " ".join((getattr(effector, "compound_text", "") or "").lower().split())
+
+
+def _added_compounds(entry, rows) -> list:
+    """The compounds `entry` was measured WITH, where a row of the same paper
+    in `rows` was measured WITHOUT them: the treated arm of that paper's own
+    presence/absence experiment."""
+    ref = getattr(entry, "reference_id", None)
+    if not ref:
+        return []
+    absent = {
+        _effector_key(x)
+        for other in rows if getattr(other, "reference_id", None) == ref
+        for x in (getattr(other, "effectors", None) or []) if x.presence == "absent"
+    }
+    return [
+        x.compound_text for x in (getattr(entry, "effectors", None) or [])
+        if x.presence == "present" and _effector_key(x) in absent
+    ]
+
+
+def _treated_arm(entry, rows) -> bool:
+    """Whether `entry` is the "in the presence of X" arm of an experiment
+    whose "in the absence of X" arm is also in `rows`.
+
+    The case: human carbonic anhydrase II and CO2, BRENDA ref 702518 reports
+    Km 13 mM "in the absence of timolol" and 0.012 and 0.013 mM "in the
+    presence of" 4.5 and 2.0 mM timolol. The enzyme's own Km is the control
+    arm; the median of all three was 0.013, a thousandfold below CA II's
+    textbook ~10 mM. Only a designed contrast within one paper is read this
+    way: a cofactor every row of a paper states as present (Mg2+ for a
+    kinase) is the assay, not a treatment, and is left alone."""
+    return bool(_added_compounds(entry, rows))
+
+
+def _has_any_condition(entry) -> bool:
+    return (getattr(entry, "assay_ph", None) is not None
+            or getattr(entry, "assay_temperature_c", None) is not None)
+
+
+def _has_conditions(entry) -> bool:
+    return (getattr(entry, "assay_ph", None) is not None
+            and getattr(entry, "assay_temperature_c", None) is not None)
+
+
+def _median_row(rows):
+    """The row whose value is the median of `rows`: an actual row, so the
+    citation stays one real measurement. With an even count, the lower of
+    the two middle rows (no row holds the mean of the two, and an average
+    of two papers is a number neither paper reported). Ties in value keep
+    the rows' order, so the choice is deterministic."""
+    ordered = sorted(rows, key=lambda e: e.km_value)
+    return ordered[(len(ordered) - 1) // 2], len(ordered) % 2 == 0
+
+
 def _best_evidenced(
     entries, log, tier, requested_organism=None, relatedness_by_organism=None,
-    quantity=None,
+    quantity=None, prefer_reference=None, detail=None,
 ):
-    """Narrow to the non-dominated rows, then take the minimum of those.
+    """Choose the row a model carries, and say why in plain English.
 
-    Bakker's advice was to let reliability drive the choice. Until now the
-    score was computed, emitted, displayed -- and ignored here, where the
-    only decision that consumes it is made. Selection was
-    `min(key=km_value)`: take the smallest number.
+    THE POLICY (ADR 0182), in order, each step applied only when it leaves
+    at least one row:
 
-    That is not neutral. A poorly-described measurement is more likely to
-    sit in the tail, and a minimum seeks the tail. On human LDH it discarded
-    the pool's only STRENDA-complete row (0.045, pH 7.4 and 37 C) for one
-    where BRENDA reported no commentary whatsoever (0.03).
+    1. Set aside physically implausible values (`PLAUSIBLE_FOR_SELECTION`),
+       naming each. Carbonic anhydrase and CO2 in human carried kcat 1e-06
+       1/s out of rows reaching 1.4e6, labelled GROUNDED.
+    2. Prefer the control arm of a paper's own presence/absence experiment
+       over its treated arm (`_treated_arm`), rows that carry a BRENDA
+       reference over rows that carry none (a value with no reference cannot
+       be checked), and rows stating both pH and temperature (STRENDA, ADR
+       0010) -- or, when none states both, rows stating one -- in that order.
+    3. For a Ki, prefer reversible constants over Kitz-Wilson inactivation
+       constants (`_kitz_wilson`). Prefer rows not measuring a mutant ("mutant", "R132H", "C123A").
+       `_partition_variants` already removes them unless allow_variants is
+       set; this keeps the preference when it is.
+    4. Across organisms only, the non-dominated frontier (`evidence_rank`,
+       ADR 0047), which ranks the closer relative first. In one organism
+       it is skipped (see the comment at the step).
+    5. When `prefer_reference` names a paper with a row still in the pool,
+       take from that paper's rows: a Km and a kcat from one paper were
+       measured on one preparation under one assay, and pairing two papers
+       mixes them (`resolve_kinetic_pair`).
+    6. Take the MEDIAN row of what remains.
 
-    Dominance needs no weights: a row is dropped only when another beats it
-    on EVERY axis. Among what survives, `min()` remains, and remains
-    arbitrary -- see ADR 0047. The arbitrariness is now confined to rows
-    that no other row beats outright.
+    WHY THE MEDIAN, NOT THE MINIMUM. This was `min(key=km_value)` over the
+    frontier. A minimum seeks the tail, and the tail is where unit slips and
+    unusual preparations sit: hexokinase/D-glucose kcat in human carried the
+    bottom of 40.1-101 1/s, TEM-1/ampicillin 5.4 of 5.4-3660 1/s. The median
+    row is the measurement the literature sits around, it is robust to one
+    wild value at either end, and it is still a real row with a real
+    reference -- an average would be a number no paper reported.
+
+    When what remains still spans more than WIDE_SPREAD_FOLD, the pick stands
+    and `detail["wide_spread"]` is set so the report can say so.
+
+    `detail`, when a dict is passed, receives `chosen_because`, `set_aside`,
+    `spread_fold`, `wide_spread` and `candidate_references`.
     """
-    if len(entries) < 2:
-        _report_preparation(entries[0], log, tier, quantity)
+    q = _quantity_of(entries, quantity)
+    rows = list(entries)
+    passed_over = []  # plain-English clauses, in the order applied
+    set_aside = []
+
+    bounds = PLAUSIBLE_FOR_SELECTION.get(q)
+    if bounds and len(rows) > 1:
+        low, high, unit = bounds
+        implausible = [e for e in rows if not (low <= e.km_value <= high)]
+        if implausible and len(implausible) < len(rows):
+            rows = [e for e in rows if low <= e.km_value <= high]
+            for e in implausible:
+                side = "below" if e.km_value < low else "above"
+                reason = (f"{e.km_value:g} {unit} is {side} the physically plausible range "
+                          f"for a {q} ({low:g} to {high:g} {unit})")
+                set_aside.append({"value": float(e.km_value), "unit": getattr(e, "unit", unit),
+                                  "reference_id": getattr(e, "reference_id", None),
+                                  "reason": reason})
+            listed = "; ".join(f"{s['value']:g} {unit} (BRENDA ref {s['reference_id'] or '?'})"
+                               for s in set_aside)
+            passed_over.append(f"{len(implausible)} physically implausible row(s) set aside "
+                               f"(outside {low:g} to {high:g} {unit}): {listed}")
+            log.append(f"{tier}: set aside {len(implausible)} of {len(entries)} row(s) as "
+                       f"physically implausible for a {q}: {listed}")
+
+    controls = [e for e in rows if not _treated_arm(e, rows)]
+    if controls and len(controls) < len(rows):
+        treated = [e for e in rows if _treated_arm(e, rows)]
+        added = sorted({x for e in treated for x in _added_compounds(e, rows)})
+        passed_over.append(f"{len(treated)} row(s) measured with {', '.join(added)} added "
+                           "passed over for the same paper's control without it")
+        log.append(f"{tier}: kept the {len(controls)} of {len(rows)} row(s) that are not the "
+                   f"treated arm of a presence/absence experiment ({', '.join(added)})")
+        rows = controls
+
+    if q == "ki":
+        reversible = [e for e in rows if not _kitz_wilson(e)]
+        if reversible and len(reversible) < len(rows):
+            passed_over.append(f"{len(rows) - len(reversible)} Kitz-Wilson row(s) (the K_I of an "
+                               "irreversible inactivation, not a reversible Ki) passed over")
+            log.append(f"{tier}: kept the {len(reversible)} of {len(rows)} row(s) that are not "
+                       "Kitz-Wilson inactivation constants")
+            rows = reversible
+
+    cited = [e for e in rows if getattr(e, "reference_id", None)]
+    if cited and len(cited) < len(rows):
+        passed_over.append(f"{len(rows) - len(cited)} row(s) with no BRENDA reference passed over")
+        log.append(f"{tier}: kept the {len(cited)} of {len(rows)} row(s) that carry a reference")
+        rows = cited
+
+    complete = [e for e in rows if _has_conditions(e)]
+    partial = [e for e in rows if _has_any_condition(e)]
+    if complete and len(complete) < len(rows):
+        passed_over.append(f"{len(rows) - len(complete)} row(s) not stating both pH and "
+                           "temperature passed over")
+        log.append(f"{tier}: kept the {len(complete)} of {len(rows)} row(s) stating both pH "
+                   "and temperature")
+        rows = complete
+    elif not complete and partial and len(partial) < len(rows):
+        # No row states both: one stating either is still a better-described
+        # measurement than one stating neither (the order evidence_rank's
+        # assay-completeness axis uses: complete > partial > absent).
+        passed_over.append(f"{len(rows) - len(partial)} row(s) stating neither pH nor "
+                           "temperature passed over (no row states both)")
+        log.append(f"{tier}: no row states both pH and temperature; kept the {len(partial)} "
+                   f"of {len(rows)} row(s) stating one of them")
+        rows = partial
+
+    wild = [e for e in rows if not _is_mutant(e)]
+    if wild and len(wild) < len(rows):
+        passed_over.append(f"{len(rows) - len(wild)} mutant row(s) passed over for wild-type ones")
+        log.append(f"{tier}: kept the {len(wild)} of {len(rows)} row(s) not measuring a mutant")
+        rows = wild
+
+    if len(rows) < 2 or not relatedness_by_organism:
+        # In one organism the frontier's remaining axis is the variant
+        # STATEMENT (an explicit "wild-type" beats a row saying nothing),
+        # and applying it there shrank Escherichia coli beta-lactamase and
+        # ampicillin kcat to the two rows of mutagenesis papers that write
+        # "wild-type enzyme" (90.7 and 3660 1/s), out of 13 rows stating pH
+        # and temperature (live, 2026-11-11). Steps 2 and 3 already prefer
+        # complete conditions and non-mutants; a row saying nothing about
+        # the protein is the ordinary case (`_partition_variants`), not a
+        # weaker one, so in one organism every remaining row is a candidate.
+        kept = list(rows)
+    else:
+        # Across organisms the frontier is what ranks the closer relative
+        # first (ADR 0024, relatedness_depth), and it stays.
+        kept = evidence_rank.frontier(rows, requested_organism, relatedness_by_organism)
+        for line in evidence_rank.describe_discards(
+            rows, kept, requested_organism, relatedness_by_organism
+        ):
+            log.append(f"{tier}: {line}")
+        if len(kept) < len(rows):
+            passed_over.append(f"{len(rows) - len(kept)} row(s) another row beats on every "
+                               "evidence axis passed over")
+            log.append(f"{tier}: {len(kept)} of {len(rows)} row(s) are non-dominated")
+
+    pick_from = kept
+    paired = None
+    if prefer_reference:
+        same_paper = [e for e in kept if getattr(e, "reference_id", None) == str(prefer_reference)]
+        if same_paper:
+            pick_from = same_paper
+            paired = str(prefer_reference)
+            log.append(f"{tier}: {len(same_paper)} row(s) from BRENDA ref {paired}, the paper "
+                       "the paired constant came from; choosing among those")
+        else:
+            log.append(f"{tier}: no remaining row is from BRENDA ref {prefer_reference}, the "
+                       "paired constant's paper; the two constants come from different papers")
+
+    chosen, even = _median_row(pick_from)
+    values = [e.km_value for e in kept]
+    lo, hi = min(values), max(values)
+    fold = (hi / lo) if lo > 0 and hi != lo else None
+    wide = bool(fold is not None and fold > WIDE_SPREAD_FOLD)
+
+    unit = getattr(chosen, "unit", None) or ""
+    n = len(pick_from)
+    if n == 1 and paired:
+        how = f"the one remaining row from BRENDA ref {paired}, the paper the paired constant came from"
+    elif n == 1:
+        how = "the only row remaining"
+    elif even:
+        how = (f"the lower of the two middle values of the {n} remaining rows"
+               + (f" from BRENDA ref {paired}, the paper the paired constant came from"
+                  if paired else "")
+               + " (a median row, so the value is one real measurement, not an average)")
+    else:
+        how = (f"the median of the {n} remaining rows"
+               + (f" from BRENDA ref {paired}, the paper the paired constant came from"
+                  if paired else "")
+               + " (an actual row, so the value is one real measurement, not an average)")
+    because = f"{chosen.km_value:g} {unit} (BRENDA ref {_ref(chosen)}) is {how}"
+    if fold is not None:
+        because += f"; the {len(kept)} remaining rows span {lo:g} to {hi:g} {unit}"
+        if wide:
+            because += (f", a {fold:.3g}-fold spread: the literature disagrees by more than "
+                        f"{WIDE_SPREAD_FOLD:g}-fold, so this one value hides most of what is known")
+    if passed_over:
+        because += (f"; of the {len(entries)} candidate rows (after the organism, substrate, "
+                    "isoform and variant checks): " + "; ".join(passed_over))
+    log.append(f"{tier}: chose {because}")
+    if wide:
+        log.append(f"{tier}: WIDE SPREAD -- the rows chosen from span {fold:.3g}-fold")
+    if detail is not None:
+        detail.update(
+            chosen_because=because,
+            set_aside=set_aside,
+            spread_fold=fold,
+            wide_spread=wide,
+            candidate_references=sorted({str(e.reference_id) for e in kept
+                                         if getattr(e, "reference_id", None)}),
+        )
+
+    _report_preparation(chosen, log, tier, quantity)
+    if len(kept) < 2:
         # One row is its own frontier. Returned as a list of one rather
         # than empty: an ensemble over a single measurement is a
         # legitimate (if narrow) ensemble, and an empty list here would
         # read downstream as 'nothing was resolved'.
-        return entries[0], None, list(entries)
-    kept = evidence_rank.frontier(
-        entries, requested_organism, relatedness_by_organism
-    )
-    for line in evidence_rank.describe_discards(
-        entries, kept, requested_organism, relatedness_by_organism
-    ):
-        log.append(f"{tier}: {line}")
-    if len(kept) < len(entries):
-        log.append(
-            f"{tier}: {len(kept)} of {len(entries)} row(s) are non-dominated; "
-            "choosing the lowest value among those"
-        )
-    chosen = min(kept, key=lambda e: e.km_value)
-    _report_preparation(chosen, log, tier, quantity)
+        return chosen, None, list(kept)
     # The tie is computed HERE, where `kept` exists, and returned alongside
     # the row. Recomputing it at the call site would need the frontier
     # again, and a second frontier is a second implementation.
@@ -831,7 +1143,56 @@ def _best_evidenced(
     # BRENDA, which would be a second resolution of the same query -- the
     # duplicate-source-of-truth defect that this comment's first paragraph
     # already refuses one level up.
-    return chosen, find_tie(kept, chosen), list(kept)
+    return chosen, _tie_of(kept, chosen), list(kept)
+
+
+def _state_the_form(chosen: dict, best, asked: str | None, log, tier) -> None:
+    """Say so when the row carried names the compound more precisely than
+    the request did.
+
+    A request naming no stereochemistry ("lactate", "glucose") matches the
+    rows of every form BRENDA writes ("(S)-lactate", "beta-D-glucose";
+    `brenda_client.substrate_matches`), and the parser keeps BRENDA's name
+    on each. The report states the compound the user typed beside the
+    number, so without this sentence a "(R)-lactate" row would be cited as
+    "lactate" with nothing saying which form was measured (found in review,
+    2026-11-11). Spelling alone ("acetyl thiocholine") is not a different
+    form and is not mentioned."""
+    measured = getattr(best, "substrate", None)
+    if not asked or not measured or not getattr(best, "substrate_verified", True):
+        return
+    if measured.strip().lower() == asked.strip().lower() or not substrate_matches(measured, asked):
+        return
+    if substrate_matches(asked, measured):  # the same compound, spelled otherwise
+        return
+    clause = (f"BRENDA names this row's compound {measured!r}, a stated form of the "
+              f"{asked!r} asked for")
+    if chosen.get("chosen_because"):
+        chosen["chosen_because"] += f"; {clause}"
+    log.append(f"{tier}: {clause}")
+
+
+def _tie_of(kept, chosen):
+    """`find_tie`, with its reason saying how THIS resolver broke the tie.
+
+    selection_tie.find_tie's sentence says the value "was chosen by taking
+    the lowest". That was true of `min()` and is not of the median row, and
+    the sentence reaches every report as the constant's `chosen_because`
+    (caterva/studio/adapters/constants.py), so it is rewritten here rather
+    than left to describe a rule that no longer runs."""
+    tie = find_tie(kept, chosen)
+    if tie is None:
+        return None
+    spread = f"{tie.low:g} to {tie.high:g}" + (
+        f", a {tie.fold_range:.3g}-fold range" if tie.fold_range is not None else "")
+    return tie.model_copy(update={"reason": (
+        f"{len(kept)} rows were equally well evidenced -- no row beats another on assay "
+        f"completeness, what it states about the protein, and organism match -- and their "
+        f"values span {spread}. The value returned is the median row of those, an actual "
+        "measurement with its own reference rather than an average. That spread is "
+        "disagreement in the literature, not a measurement uncertainty, and the alternatives "
+        "are listed so it can be read as such."
+    )})
 
 
 def _score_frontier(
@@ -887,11 +1248,13 @@ def _score_frontier(
             # frontier holds rows of every substrate the table has. Read by
             # the agents' assay-window re-selection, which can move to
             # another substrate's row only in the second case and says so
-            # (caterva/agents/scouts.py). The label says nothing more in the
-            # first: the match is a substring of the compound cell, and on
-            # the committed LDH turnover page a "pyruvate" request's
-            # phenylpyruvate rows (94.7 and 6467 1/s, ref 761568) read
-            # "pyruvate".
+            # (caterva/agents/scouts.py). In the first case the label is the
+            # name asked for, or BRENDA's own when the row was matched through
+            # a stereo descriptor ("(S)-lactate" for "lactate"); since
+            # 2026-11-11 the whole compound is matched
+            # (brenda_client.substrate_matches), so the LDH turnover page's
+            # phenylpyruvate rows (94.7 and 6467 1/s, ref 761568) no longer
+            # read "pyruvate".
             "substrate": getattr(entry, "substrate", None),
             # The row's assay conditions, as PARSED by the existing
             # condition parser (`_parse_ph` / `_parse_temperature` /
@@ -1431,6 +1794,7 @@ def resolve_kinetic_value(
     inhibition_mode: str | None = None,
     model_substrate: str | None = None,
     compare_mode: str | None = None,
+    prefer_reference: str | None = None,
 ) -> KineticResult:
     """Resolve a kinetic value for (enzyme, organism, substrate) by trying
     BRENDA exact match, then BRENDA cross-species, then PubMed literature
@@ -1462,6 +1826,12 @@ def resolve_kinetic_value(
     returned asked for ``compare_mode``. `caterva compose --any-mode` sends
     it, so its report can name the row its default carries. Refused
     beside ``inhibition_mode``; not applied to anything but a Ki.
+
+    ``prefer_reference`` is a BRENDA reference id: when a row from that
+    paper survives every filter, the value is taken from that paper's rows
+    (`_best_evidenced` step 5). `resolve_kinetic_pair` passes the Km's paper
+    when it resolves the kcat, so the two constants of one model come from
+    one measurement when the literature allows it.
     """
     table_label = QUANTITY_TABLE_LABELS.get(quantity, KM_TABLE_LABEL)
     quantity_upper = {"ki": "Ki", "kcat": "kcat"}.get(quantity, "Km")
@@ -1557,9 +1927,12 @@ def resolve_kinetic_value(
                 f"{len(contrasts)} presence/absence contrast(s) in the candidate pool: "
                 + "; ".join(c.compound for c in contrasts)
             )
+        chosen = {}
         best, tie, frontier = _best_evidenced(
-            exact, log, "exact match", organism, quantity=quantity
+            exact, log, "exact match", organism, quantity=quantity,
+            prefer_reference=prefer_reference, detail=chosen,
         )
+        _state_the_form(chosen, best, substrate, log, "exact match")
         # After the choice, because whether a row contradicts the model
         # depends on what the row returned states (ki_mode.evidence_against).
         evidence = (_mechanism_evidence(ranked, best, mode, model_substrate, isoform, log)
@@ -1582,6 +1955,7 @@ def resolve_kinetic_value(
             variant=best.variant,
             preparation=_preparation_of(best),
             selection_tie=tie,
+            **chosen,
             # No physiological reference at this layer -- it is a runner
             # input, supplied per request, and the resolver never sees it.
             # So `condition_proximity` grades `not_assessed` for every row,
@@ -1765,6 +2139,7 @@ def resolve_kinetic_value(
         # returned while the other arm of its own experiment sits unmentioned
         # in the same pool is half an answer, and the reader cannot ask for
         # the other half without being told it exists.
+        chosen = {}
         contrasts = find_contrasts([(e.km_value, e.conditions) for e in acceptable])
         mixtures = find_form_mixtures([(e.km_value, e.conditions) for e in acceptable])
         source_rows = [(e.km_value, e.organism, e.conditions) for e in acceptable]
@@ -1809,7 +2184,10 @@ def resolve_kinetic_value(
             # relatedness_depth axis in evidence_rank.
             relatedness_by_organism,
             quantity=quantity,
+            prefer_reference=prefer_reference,
+            detail=chosen,
         )
+        _state_the_form(chosen, best, substrate, log, "cross-species")
         evidence = (_mechanism_evidence(ranked, best, mode, model_substrate, isoform, log)
                     if mode else None)
         return KineticResult(
@@ -1831,6 +2209,7 @@ def resolve_kinetic_value(
             variant=best.variant,
             preparation=_preparation_of(best),
             selection_tie=tie,
+            **chosen,
             # No physiological reference at this layer -- it is a runner
             # input, supplied per request, and the resolver never sees it.
             # So `condition_proximity` grades `not_assessed` for every row,
@@ -1935,6 +2314,62 @@ def resolve_kinetic_value(
         substrates_available=available,
         search_log=log,
     )
+
+
+def resolve_kinetic_pair(
+    enzyme_ec: str,
+    organism: str,
+    substrate: str,
+    html_provider: HtmlProvider = fetch_brenda_html,
+    **kwargs,
+) -> "tuple[KineticResult, KineticResult]":
+    """`(km, kcat)` for one model, from one paper when the literature allows.
+
+    A Km and a kcat from two papers were measured on two preparations, often
+    at two temperatures (DHFR in E. coli: Km at 20 C from one paper, kcat at
+    15 C from another). So each is resolved by the ordinary policy, and when
+    their papers differ but some paper holds rows for BOTH among the rows
+    each choice was made from, the pair is re-chosen from the paper whose
+    two rows sit nearest the two medians (on a log scale). Each value is
+    still that paper's own row for this enzyme, organism and substrate; when
+    no paper has both, the independent choices stand and each result's log
+    says the constants come from different papers.
+
+    The page is fetched once: `html_provider` is wrapped in a cache for the
+    duration of the call. Every other keyword goes to `resolve_kinetic_value`.
+    """
+    import functools
+    import math
+
+    page = functools.lru_cache(maxsize=None)(html_provider)
+    kwargs.pop("quantity", None)
+    kwargs.pop("prefer_reference", None)
+
+    def resolve(quantity, ref=None):
+        return resolve_kinetic_value(enzyme_ec, organism, substrate, html_provider=page,
+                                     quantity=quantity, prefer_reference=ref, **kwargs)
+
+    km = resolve("km")
+    km_ref = getattr(km.citation, "reference_id", None) if km.found and km.citation else None
+    kcat = resolve("kcat", km_ref)
+    if not (km.found and kcat.found):
+        return km, kcat
+    kcat_ref = getattr(kcat.citation, "reference_id", None) if kcat.citation else None
+    if km_ref and km_ref == kcat_ref:
+        return km, kcat
+    common = set(km.candidate_references) & set(kcat.candidate_references)
+    if not common:
+        return km, kcat
+
+    def nearest(result, ref):
+        rows = [c["value"] for c in result.ensemble_candidates
+                if str(c.get("reference_id")) == ref and (c.get("value") or 0) > 0]
+        if not rows or not result.value or result.value <= 0:
+            return math.inf
+        return min(abs(math.log10(v) - math.log10(result.value)) for v in rows)
+
+    best = min(sorted(common), key=lambda r: nearest(km, r) + nearest(kcat, r))
+    return resolve("km", best), resolve("kcat", best)
 
 
 if __name__ == "__main__":

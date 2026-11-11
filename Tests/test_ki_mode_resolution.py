@@ -225,8 +225,10 @@ class TestEvidenceAgainstTheMechanism:
 class TestNoStatedMode:
     def test_gossypol_is_unchanged_and_the_log_says_why(self):
         # BRENDA 711801: three rows, one per isoform, none stating a mode.
+        # The mode changes nothing; the median row (ADR 0182) is LDH-A's,
+        # where the minimum, LDH-B's 0.0014, was returned until 2026-11-11.
         r = ki("1.1.1.27", "gossypol", inhibition_mode="competitive", model_substrate="pyruvate")
-        assert r.found and r.value == 0.0014 and r.commentary.startswith("LDH-B")
+        assert r.found and r.value == 0.0019 and r.commentary.startswith("LDH-A")
         assert ("No exact-match row states competitive inhibition; kept the 3 of 3 exact-match "
                 "row(s) stating no mode, so whether the value is the competitive constant is "
                 "unknown") in r.search_log
@@ -555,6 +557,21 @@ class TestTheSameRowAsCompose:
         assert unranked.found
         measured = composed_from(unranked)
         resolved = asked_for(ec, inhibitor, organism, mode, substrate, isoform)
+        if (resolved.found and "Kitz-Wilson" in (resolved.commentary or "")
+                and not any(c.get("conditions") == resolved.commentary
+                            for c in unranked.ensemble_candidates)):
+            # THE ONE PLACE THE OLD ORDER NOW PARTS FROM THE RESOLVER. Since
+            # 2026-11-11 the unasked answer passes Kitz-Wilson rows over
+            # when a reversible Ki exists (ADR 0182: the median must not land
+            # on an inactivation constant), so they are not among the rows
+            # it hands compose, and choosing among those, for a mode or an
+            # isoform only a Kitz-Wilson row is left for, finds nothing. The
+            # resolver, asked with the mode, ranks every row and takes the
+            # Kitz-Wilson row as the last resort, as TestKitzWilson pins.
+            # That is why compose asks with the mode.
+            assert any("Kitz-Wilson" in line for line in unranked.search_log), \
+                unranked.search_log
+            return
         if isoform:
             by_isoform = select_isoform(measured, isoform)
             if "reaction_Ki" in by_isoform.refused:
