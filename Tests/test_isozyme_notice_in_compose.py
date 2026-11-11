@@ -102,14 +102,15 @@ def test_the_notice_is_also_beside_the_constants(compose):
 
 def test_the_notice_does_not_change_what_was_measured(compose):
     """The constants are the resolver's picks, notice or no notice. Since
-    2026-11-11 those are the median rows of the human D-glucose rows that
-    state pH and temperature (ADR 0182): Km 0.06 mM, a hexokinase I row,
-    and kcat 60.4 1/s. Until then they were 6.0 mM and 40.1 1/s, glucokinase
-    rows. That the pick moves from one isozyme to another is the notice's
-    whole point."""
+    2026-11-11 a Km and a kcat come from one paper when one holds both
+    (ADR 0182, resolve_kinetic_pair): ref 739603, a glucokinase study, Km
+    6.3 mM and kcat 40.1 1/s. Picked apart they were HK-I's 0.06 mM beside
+    another paper's 60.4 1/s, and before the median 6.0 mM and 40.1 1/s.
+    That the pick moves from one isozyme to another is the notice's whole
+    point."""
     _, out = compose("--organism", "human")
-    assert "| `reaction_Km` | 0.06 mM | literature (Homo sapiens) | BRENDA ref 640237 |" in out
-    assert "| `reaction_kcat` | 60.4 1/s | literature (Homo sapiens) | BRENDA ref 703624 |" in out
+    assert "| `reaction_Km` | 6.3 mM | literature (Homo sapiens) | BRENDA ref 739603 |" in out
+    assert "| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |" in out
 
 
 def test_typing_an_isoform_does_not_silence_the_notice_while_a_cited_row_names_no_isozyme(compose):
@@ -155,7 +156,7 @@ def test_a_label_no_protein_carries_says_it_matched_nothing(compose):
     code, out = compose("--organism", "human", "--isoform", "HK9")
     assert code == 0
     assert "--isoform 'HK9' is not a gene symbol or name the enzyme nomenclature's UniProt entries give" in out
-    assert "| `reaction_Km` | 6.0 mM |" in out or "refused" in out
+    assert "| `reaction_Km` | 6.3 mM |" in out or "refused" in out
 
 
 def _model_whose_rows_say(*commentaries):

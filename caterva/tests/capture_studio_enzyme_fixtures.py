@@ -52,6 +52,10 @@ NEUTRAL_SCRATCH = "/tmp/caterva-enzyme-fixtures"
 def neutral(text: str) -> str:
     for spelling in sorted(SCRATCH, key=len, reverse=True):
         text = text.replace(spelling, NEUTRAL_SCRATCH)
+    # The checkout's own path (a recorded page's `served_from`), as the
+    # kinetics fixtures write it.
+    for spelling in sorted({str(REPO), str(REPO.resolve())}, key=len, reverse=True):
+        text = text.replace(spelling, "<repository>")
     return text
 
 

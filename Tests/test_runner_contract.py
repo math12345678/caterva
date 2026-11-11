@@ -709,6 +709,7 @@ def test_not_found_output_shape(monkeypatch):
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
         "variantCandidatesAvailable": [],
+        "implausibleValues": [],
         # The isoforms the rows measured, when an isoform was asked for and
         # none of them is it (source "isoform_withheld"). Empty otherwise.
         "isoformsAvailable": [],
@@ -770,6 +771,7 @@ def test_core_candidate_output_shape(monkeypatch):
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
         "variantCandidatesAvailable": [],
+        "implausibleValues": [],
         # The isoforms the rows measured, when an isoform was asked for and
         # none of them is it (source "isoform_withheld"). Empty otherwise.
         "isoformsAvailable": [],
@@ -1170,6 +1172,7 @@ def test_cross_species_withheld_output_shape(monkeypatch):
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
         "variantCandidatesAvailable": [],
+        "implausibleValues": [],
         # The isoforms the rows measured, when an isoform was asked for and
         # none of them is it (source "isoform_withheld"). Empty otherwise.
         "isoformsAvailable": [],
