@@ -889,6 +889,19 @@ def run_parameterize(
         raw_requests, params.get("organism")
     )
 
+    # A Km and a kcat of one enzyme and compound are taken from one paper
+    # when one holds both (fallback_logic.resolve_kinetic_pair), as
+    # `caterva compose` and the single-constant runner take them (ADR 0182).
+    tables_by_key: Dict[Any, set] = {}
+    for entry in raw_requests:
+        key = (entry.get("ec_number"), entry.get("substrate"))
+        tables_by_key.setdefault(key, set()).add(entry.get("table"))
+
+    def paired(entry: Dict[str, Any]) -> bool:
+        key = (entry.get("ec_number"), entry.get("substrate"))
+        return (entry.get("table") in ("km", "kcat") and bool(entry.get("substrate"))
+                and {"km", "kcat"} <= tables_by_key.get(key, set()))
+
     requests = [
         ParameterRequest(
             quantity=str(entry["quantity"]),
@@ -898,6 +911,7 @@ def run_parameterize(
             ec_number=entry.get("ec_number"),
             table=entry.get("table"),
             expected_unit=entry.get("expected_unit"),
+            paired=paired(entry),
         )
         for entry in raw_requests
     ]
