@@ -34,6 +34,7 @@ import {
   type InhibitionMode,
   type KineticQuantity,
 } from '../literature/literatureResolver';
+import { formatDerived, formatValue } from './formatNumber';
 
 const BOLD = '[1m';
 const DIM = '[2m';
@@ -217,7 +218,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
 
   const label = quantity.toUpperCase();
   process.stdout.write(
-    `\n${c(GREEN, '✓')} ${c(BOLD, `${label} = ${result.value} ${result.unit}`)}\n\n`,
+    `\n${c(GREEN, '✓')} ${c(BOLD, `${label} = ${formatValue(result.value)} ${result.unit}`)}\n\n`,
   );
 
   const rows: Array<[string, string]> = [
@@ -239,7 +240,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
   if (result.bridgedVmax !== undefined) {
     rows.push([
       'Vmax',
-      `${result.bridgedVmax} mM/s  ${DIM}= kcat × [E]0, computed by the engine${RESET}`,
+      `${formatDerived(result.bridgedVmax)} mM/s  ${DIM}= kcat × [E]0, computed by the engine${RESET}`,
     ]);
   }
 
@@ -279,7 +280,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
     for (const row of rows) {
       const unit = row.unit ? ` ${row.unit}` : '';
       const ref = row.reference_id ? c(DIM, `  [ref ${row.reference_id}]`) : '';
-      process.stdout.write(`    ${row.value}${unit}${ref}\n`);
+      process.stdout.write(`    ${formatValue(row.value)}${unit}${ref}\n`);
       process.stdout.write(
         c(DIM, `        ${row.grades.assay_completeness} / ` +
           `${row.grades.condition_proximity} / ${row.grades.organism_match}\n`),
@@ -332,7 +333,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
       const ref = cand.reference_id ? c(DIM, `  [ref ${cand.reference_id}]`) : '';
       const returned = cand.selected ? c(DIM, '  (returned)') : '';
       process.stdout.write(
-        `${mark}${cand.value}${cand.unit ? ' ' + cand.unit : ''}${ref}${returned}\n` +
+        `${mark}${formatValue(cand.value)}${cand.unit ? ' ' + cand.unit : ''}${ref}${returned}\n` +
           (cand.conditions ? `${c(DIM, '        ' + cand.conditions)}\n` : ''),
       );
     }

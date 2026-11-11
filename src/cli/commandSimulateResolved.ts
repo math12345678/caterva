@@ -56,6 +56,7 @@ import {
   PRODUCT_INHIBITION_CAVEAT,
   type InhibitionModel,
 } from './inhibitionModels';
+import { formatDerived, formatValue } from './formatNumber';
 
 const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
@@ -80,6 +81,9 @@ export interface ParameterProvenance {
   crossSpecies?: boolean;
   /** true when the CLI had to assume the unit rather than being told. */
   unitAssumed?: boolean;
+  /** true for a value Caterva computed (Vmax = kcat x [E]0): printed to
+   *  four significant figures, not to the float's last noisy digit. */
+  derived?: boolean;
   /** Bakker's axes as (axis -> grade), for the exported model file. */
   reliability?: Record<string, string>;
   /** The same axes as (axis -> why). Carried separately from the grades
@@ -1185,6 +1189,7 @@ export async function commandSimulateResolved(
           name: 'vmax',
           value: result.bridgedVmax,
           unit: 'mM/s',
+          derived: true,
           origin: `${result.source} → kcat x [E]0`,
           citation: result.citation
             ? `${result.citation.source} ref ${result.citation.reference_id ?? '?'}`
@@ -1924,7 +1929,11 @@ function printProvenance(rows: ParameterProvenance[]): void {
   process.stdout.write(`\n${c(BOLD, 'Parameters and where they came from')}\n`);
 
   const nameWidth = Math.max(...rows.map((r) => r.name.length), 4);
-  const valueStrings = rows.map((r) => `${r.value} ${r.unit}`);
+  // Display only (formatNumber.ts): a computed Vmax to 4 s.f., everything
+  // else with the float's noise removed. --json keeps the full values.
+  const valueStrings = rows.map(
+    (r) => `${r.derived ? formatDerived(r.value) : formatValue(r.value)} ${r.unit}`,
+  );
   const valueWidth = Math.max(...valueStrings.map((v) => v.length), 5);
 
   rows.forEach((row, index) => {
