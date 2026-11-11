@@ -113,6 +113,9 @@ FILLER = frozenset({
     "competitive", "noncompetitive", "non-competitive", "uncompetitive", "mixed", "converting",
     "conversion", "turning", "human", "humans", "cell", "cells", "enzyme", "enzymes",
     "presence", "absence", "blocked", "blocking", "blocks", "block",
+    # "carbonic anhydrase in human follows Michaelis-Menten": a verb of the
+    # request, which was read as a compound and said to be "not a substrate".
+    "follows", "follow", "following", "obeys", "obey", "obeying",
 }) | CLASS_WORDS
 
 #: Verbs for what an enzyme does to its substrate. Each ends a candidate

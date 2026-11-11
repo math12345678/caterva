@@ -1303,7 +1303,30 @@ def _substrate_from(args: Any, reading: Any, out: DescriptionReading) -> bool:
             f"BRENDA's substrate list for EC {ec} could not be read, so no word of your description "
             f"({shown}) was taken as the substrate.")
         return False
-    match = match_substrate(reading.substrate_candidates, list(listed))
+    # The mapping, not its keys: with the row counts, an abbreviation that
+    # BRENDA lists under several spellings takes the best-measured one.
+    match = match_substrate(reading.substrate_candidates, listed)
+    possible = getattr(reading, "possible_inhibitor_text", None)
+    others = [c for c in ((possible,) if possible else ()) + tuple(reading.substrate_candidates)
+              if match.name is not None and strict_key_of(c) != strict_key_of(match.typed)]
+    if others and not getattr(args, "inhibitor", None):
+        # Another compound beside the substrate that was read ("with X", "in
+        # the presence of X", "dihydrofolate and methotrexate"): it is the
+        # inhibitor when BRENDA lists Ki rows for it under this EC number,
+        # and nothing otherwise (the reader only flags it: sentence.py). A
+        # "with X" the reader flagged is tried first.
+        inhibitor = _inhibitor_from(ec, args.organism, others, prefix_set_aside=True)
+        if inhibitor is not None:
+            typed, name = inhibitor
+            args.inhibitor = name
+            args.substrate = match.name
+            how = (" (its stereo or anomer prefix set aside, the only substrate BRENDA lists under "
+                   "that name)" if match.prefix_set_aside else "")
+            out.notes.append(
+                f"Read {match.typed!r} in your description as the substrate {match.name}, which "
+                f"BRENDA lists for EC {ec}{where}{how}, and {typed!r} as the inhibitor {name}, "
+                f"which BRENDA lists Ki rows for under EC {ec}{where}.")
+            return True
     if match.name is None and not match.rivals and not getattr(args, "inhibitor", None):
         inhibitor = _inhibitor_from(ec, args.organism, reading.substrate_candidates)
         if inhibitor is not None:
@@ -1350,6 +1373,11 @@ def _substrate_from(args: Any, reading: Any, out: DescriptionReading) -> bool:
     return False
 
 
+def strict_key_of(name: Optional[str]) -> str:
+    """A compound name with case and spacing set aside."""
+    return " ".join((name or "").split()).casefold()
+
+
 def _remember(args: Any, **fields: Any) -> None:
     """Carry what the reader learned to the search's choice (`args` is the
     one object both see); silently nothing for an args that refuses it."""
@@ -1360,22 +1388,31 @@ def _remember(args: Any, **fields: Any) -> None:
             pass
 
 
-def _inhibitor_from(ec: str, organism: Optional[str],
-                    candidates: Sequence[str]) -> Optional[Tuple[str, str]]:
+def _inhibitor_from(ec: str, organism: Optional[str], candidates: Sequence[str],
+                    *, prefix_set_aside: bool = False) -> Optional[Tuple[str, str]]:
     """(the word as typed, BRENDA's name) for the first candidate that is,
     case aside, a compound BRENDA lists Ki rows for under `ec` (in
-    `organism`); None when none is, or the page cannot be read. Exact
-    names only, as for a substrate: "methotrexate", never a word inside
-    a longer compound's name."""
+    `organism`); None when none is, or the page cannot be read. Whole
+    names only, never a word inside a longer compound's name: exactly, case
+    aside ("methotrexate"), or with `prefix_set_aside` by the substrate's
+    rule (`match_substrate`: "glucose 6-phosphate" for the one listed
+    "D-glucose 6-phosphate"). The looser rule is for a compound named
+    BESIDE a substrate already read, which can only be the inhibitor; a
+    word that was the only candidate ("hexokinase on glucose 6-phosphate")
+    may be a substrate BRENDA does not list, and is not relabelled."""
+    from caterva.enzymes.sentence import match_substrate
+
     try:
         from caterva.compose.defaults import ki_compounds
 
         listed = ki_compounds(ec, organism)
     except Exception:  # noqa: BLE001 - not reading one is not reading one
         return None
-    by_key = {" ".join(n.split()).casefold(): n for n in listed}
+    by_key = {strict_key_of(n): n for n in listed}
     for typed in candidates:
-        name = by_key.get(" ".join(typed.split()).casefold())
+        name = by_key.get(strict_key_of(typed))
+        if name is None and prefix_set_aside:
+            name = match_substrate((typed,), list(listed)).name
         if name is not None:
             return typed, name
     return None

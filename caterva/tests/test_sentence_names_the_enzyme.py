@@ -565,3 +565,50 @@ def test_a_misspelt_organism_reaches_the_report(monkeypatch):
 def test_a_word_that_only_sits_before_the_enzyme_is_not_called_an_organism():
     assert read_sentence("Michaelis-Menten kinetics of muscle hexokinase on glucose").unread_organism is None
     assert read_sentence("Michaelis-Menten kinetics of human hexokinase on glucose").unread_organism is None
+
+
+# ---------------------------------------------------------------------------
+# A compound named beside the substrate, and the counts the match is given
+# ---------------------------------------------------------------------------
+
+
+def test_a_compound_beside_the_substrate_that_brenda_lists_ki_rows_for_is_the_inhibitor():
+    """"in the presence of glucose 6-phosphate" beside "with glucose" was
+    flagged by the reader as a possible inhibitor (`possible_inhibitor_text`)
+    and dropped by compose, which built plain Michaelis-Menten. BRENDA lists
+    Ki rows for D-glucose 6-phosphate under EC 2.7.1.1 in human, so it is the
+    inhibitor, by the substrate's rule (the D- set aside, the only listed
+    name it fits), and the model has a place for it."""
+    with hexokinase_offline():
+        code, out, err = _main(["hexokinase with glucose in the presence of glucose 6-phosphate in human",
+                                *FLAGS])
+    assert code == 0, err
+    assert ("Read 'glucose' in your description as the substrate D-glucose, which BRENDA lists for "
+            "EC 2.7.1.1 for Homo sapiens (its stereo or anomer prefix set aside, the only substrate "
+            "BRENDA lists under that name), and 'glucose 6-phosphate' as the inhibitor D-glucose "
+            "6-phosphate, which BRENDA lists Ki rows for under EC 2.7.1.1 for Homo sapiens.") in out
+    assert "the model is competitive inhibition" in out
+    ki_row = out.split("| `reaction_Ki` |", 1)[1].split("\n", 1)[0]
+    assert "literature (Homo sapiens)" in ki_row and "BRENDA ref" in ki_row
+
+
+def test_the_substrate_match_is_given_the_row_counts_not_only_the_names(monkeypatch):
+    """`match_substrate` takes the best-measured spelling of an abbreviation
+    only when it is given the counts; compose passed `list(listed)`."""
+    import caterva.compose.__main__ as compose_main
+    import caterva.enzymes.sentence as sentence
+
+    seen = []
+    real = sentence.match_substrate
+
+    def spy(candidates, listed):
+        seen.append(listed)
+        return real(candidates, listed)
+
+    monkeypatch.setattr(sentence, "match_substrate", spy)
+    monkeypatch.setattr(compose_main, "brenda_km_substrates", lambda ec, organism: {"D-glucose": 25, "ATP": 106})
+    args = argparse.Namespace(subject="2.7.1.1", organism="Homo sapiens", substrate=None, inhibitor=None)
+    out = compose_main.DescriptionReading("hexokinase on glucose in human")
+    compose_main._substrate_from(args, read_sentence("hexokinase on glucose in human"), out)
+    assert seen and seen[0] == {"D-glucose": 25, "ATP": 106}
+    assert args.substrate == "D-glucose"
