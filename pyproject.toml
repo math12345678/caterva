@@ -181,7 +181,7 @@ exclude = ["caterva.tests", "caterva.tests.*"]
 # (caterva/_literature/, copied from Tests/ by scripts/vendor_literature.py,
 # git-ignored) are flat modules imported by caterva.checkout, so they ship as
 # data beside the package rather than as a subpackage.
-caterva = ["core/data/*.json", "core/data/README.md", "enzymes/data/enzyme_index.json.gz", "enzymes/data/protein_names.json.gz", "enzymes/data/symbols.json", "enzymes/data/NOTICE.txt", "studio/static/*", "studio/static/**/*", "_literature/*.py", "_literature/README.txt"]
+caterva = ["core/data/*.json", "core/data/README.md", "enzymes/data/enzyme_index.json.gz", "enzymes/data/protein_names.json.gz", "enzymes/data/symbols.json", "enzymes/data/aliases.json", "enzymes/data/NOTICE.txt", "studio/static/*", "studio/static/**/*", "_literature/*.py", "_literature/README.txt"]
 
 [tool.setuptools.exclude-package-data]
 caterva = ["conftest.py", "pytest.ini", ".coverage"]

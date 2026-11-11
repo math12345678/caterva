@@ -25,25 +25,31 @@ def ecs(candidates):
     return [c.ec for c in candidates]
 
 
-# --- H1: a short abbreviation or symbol never resolves by itself -------------------------
+# --- H1: a symbol resolves only when the table reads it as ONE enzyme (ADR 0182) ---------
 
 
 @pytest.mark.parametrize(
-    "name, right, wrong",
+    "name, right, wrong, one",
     [
-        ("HK1", "2.7.1.1", "2.7.13.1"), ("HK2", "2.7.1.1", "2.7.13.1"), ("HK3", "2.7.1.1", "2.7.13.1"),
-        ("SDH", "1.3.5.1", "1.1.99.32"), ("NOS", "1.14.13.39", "1.5.1.19"), ("AST", "2.6.1.1", "2.3.1.109"),
-        ("SYK", "2.7.10.2", "6.1.1.6"), ("PEPC", "4.1.1.31", "3.4.23.3"), ("AK", "2.7.4.3", "2.7.2.1"),
+        ("HK1", "2.7.1.1", "2.7.13.1", True), ("HK2", "2.7.1.1", "2.7.13.1", True),
+        ("HK3", "2.7.1.1", "2.7.13.1", True), ("AST", "2.6.1.1", "2.3.1.109", True),
+        ("SYK", "2.7.10.2", "6.1.1.6", True), ("PEPC", "4.1.1.31", "3.4.23.3", True),
+        ("SDH", "1.3.5.1", "1.1.99.32", False), ("NOS", "1.14.13.39", "1.5.1.19", False),
+        ("AK", "2.7.4.3", "2.7.2.1", False),
     ],
 )
-def test_the_wrong_resolutions_the_review_found_are_choices_now(name, right, wrong):
+def test_the_wrong_resolutions_the_review_found_are_now_the_right_enzyme_or_a_choice(name, right, wrong, one):
     """Human, as in the review: HK1 resolved to a histidine kinase, SDH to L-sorbose 1-dehydrogenase, NOS to
     D-nopaline dehydrogenase, AST to arginine N-succinyltransferase, SYK to lysine--tRNA ligase (SYK_HUMAN is a
-    mnemonic), PEPC to gastricsin, AK to acetate kinase."""
+    mnemonic), PEPC to gastricsin, AK to acetate kinase. A symbol the table maps to one enzyme in human now
+    resolves to THAT enzyme (owner decision, ADR 0182); one the table lists for several stays a choice. Neither
+    is ever the wrong one."""
     result = resolve(name, "human")
+    if one:
+        assert isinstance(result, Resolved) and result.ec == right, (name, result)
+        return
     assert isinstance(result, Ambiguous), f"{name} resolved to EC {getattr(result, 'ec', None)}"
     assert result.confirm_only and result.recommended is None
-    assert right in ecs(result.candidates)
     assert ecs(result.candidates).index(right) == 0, "the enzyme the table lists for it comes first"
     stray = [c for c in result.candidates if c.ec == wrong]
     assert all(c.partial or c.tier > TIER_ABBREVIATION for c in stray), "the wrong one is not offered as a reading of it"
@@ -61,10 +67,21 @@ def test_a_confirmed_abbreviation_is_an_exact_alternative_name_the_table_lists_f
     assert isinstance(resolve("SDH", "human"), Ambiguous)
 
 
-def test_a_symbol_the_table_lists_is_never_resolved_even_for_one_enzyme():
-    for name in ("COMT", "PARP1", "SOD", "ACHE", "DHFR", "LDHA", "GCK", "DPP4", "CYP2C9", "MMP9"):
+def test_a_symbol_the_table_lists_for_one_enzyme_resolves_to_it_with_its_isoform():
+    """Converted from "...is never resolved even for one enzyme" (ADR 0182): a gene symbol is one protein of
+    one EC number in one organism, and the isoform travels with the EC so the search can use it."""
+    # The isoform travels only where the EC number is several human proteins in the index: MMP9 is the one
+    # human protein of EC 3.4.24.35, so no isoform is carried for it.
+    expected = {"COMT": ("2.1.1.6", "COMT"), "PARP1": ("2.4.2.30", "PARP1"), "SOD": ("1.15.1.1", None),
+                "ACHE": ("3.1.1.7", None), "DHFR": ("1.5.1.3", None), "LDHA": ("1.1.1.27", "LDHA"),
+                "GCK": ("2.7.1.1", "GCK"), "DPP4": ("3.4.14.5", "DPP4"), "CYP2C9": ("1.14.14.1", "CYP2C9"),
+                "MMP9": ("3.4.24.35", None)}
+    for name, (ec, isoform) in expected.items():
         result = resolve(name, "human")
-        assert isinstance(result, Ambiguous) and result.confirm_only and len(result.candidates) >= 1, name
+        assert isinstance(result, Resolved) and (result.ec, result.isoform) == (ec, isoform), (name, result)
+        assert result.organism is None, "human was given, so nothing was assumed"
+        if isoform:
+            assert any(isoform in n for n in result.notes), "the isoform is said"
 
 
 def test_the_right_list_still_resolves_and_the_symbols_in_it_are_offered_for_confirmation():
@@ -81,7 +98,7 @@ def test_the_right_list_still_resolves_and_the_symbols_in_it_are_offered_for_con
             assert isinstance(result, Resolved) and result.ec == ec, (name, organism)
     for name, ec in {"SOD": "1.15.1.1", "COMT": "2.1.1.6", "PARP1": "2.4.2.30"}.items():
         result = resolve(name, "human")
-        assert isinstance(result, Ambiguous) and ecs(result.candidates) == [ec], name
+        assert isinstance(result, Resolved) and result.ec == ec, name
 
 
 def test_a_unique_exact_alternative_name_that_is_a_full_name_resolves():
@@ -106,7 +123,8 @@ def test_the_part_of_an_entry_name_before_the_underscore_is_not_read_as_a_gene_s
     index = load_index()
     assert any(p.entry_name == "SYK_HUMAN" for p in index.get("6.1.1.6").proteins["HUMAN"])
     result = resolve("SYK", "human")
-    assert ecs(result.candidates) == ["2.7.10.2"], "only the gene SYK's enzyme, from the symbol table"
+    assert isinstance(result, Resolved) and result.ec == "2.7.10.2", "only the gene SYK's enzyme, from the symbol table"
+    assert ecs(find("SYK", "human", limit=None)) == ["2.7.10.2"], "the mnemonic SYK_HUMAN is not offered"
     # A mnemonic the table does not know is listed for the organism asked about, as a mnemonic, never resolved.
     listed = find("NAGA", "human", limit=None)
     mnemonic = [c for c in listed if c.via == "mnemonic"]
@@ -178,9 +196,13 @@ def test_a_single_letter_or_a_short_query_must_be_a_word_of_the_name_not_somethi
 
 
 def test_gpi_in_human_offers_glucose_6_phosphate_isomerase_first_and_recommends_nothing():
+    # The human gene GPI is glucose-6-phosphate isomerase and the abbreviation table agrees: one enzyme
+    # (ADR 0182). GPI-phospholipase D is still listed by `find`, only as a fragment.
     result = resolve("GPI", "human")
-    assert result.recommended is None and ecs(result.candidates)[0] == "5.3.1.9"
-    pld = [c for c in result.candidates if c.ec == "3.1.4.50"]
+    assert isinstance(result, Resolved) and result.ec == "5.3.1.9"
+    listed = find("GPI", "human", limit=None)
+    assert ecs(listed)[0] == "5.3.1.9"
+    pld = [c for c in listed if c.ec == "3.1.4.50"]
     assert pld and all(c.partial for c in pld), "GPI-phospholipase D is only a fragment match"
 
 
@@ -192,7 +214,10 @@ def test_a_recommendation_needs_one_listed_enzyme_with_the_organisms_protein_acr
     assert citrate.recommended is None, "ATP citrate synthase also has human proteins, further down the list"
     assert [c.ec for c in citrate.candidates if c.has_organism_protein] != []
     for name in ("GPI", "ADH", "HK1", "COX"):
-        assert resolve(name, "human").recommended is None, "an abbreviation is not evidence about which enzyme was meant"
+        result = resolve(name, "human")
+        # A symbol is read as the table's one enzyme or left a choice; it never makes a recommendation.
+        assert isinstance(result, Resolved) or result.recommended is None, \
+            "an abbreviation is not evidence about which enzyme was meant"
 
 
 def test_the_count_in_the_reason_agrees_with_what_is_listed():
@@ -243,9 +268,11 @@ def test_the_symbols_and_names_a_lab_types_offer_the_right_enzyme_as_a_candidate
 def test_a_symbol_is_never_offered_across_organisms():
     """IDH1 is the NADP-dependent enzyme in human and mouse, the NAD-dependent one in yeast, and a bacterium has
     no gene of that name in the table. The yeast entry is not a human candidate and the reverse."""
-    human, mouse = ecs(resolve("IDH1", "human").candidates), ecs(resolve("IDH1", "mouse").candidates)
-    yeast = ecs(resolve("IDH1", "yeast").candidates)
-    assert human == mouse == ["1.1.1.42"] and yeast == ["1.1.1.41"]
+    # Each organism's IDH1 is now read as its one enzyme (ADR 0182), never another organism's.
+    human, mouse, yeast = (resolve("IDH1", o) for o in ("human", "mouse", "yeast"))
+    assert all(isinstance(r, Resolved) for r in (human, mouse, yeast))
+    assert human.ec == mouse.ec == "1.1.1.42" and yeast.ec == "1.1.1.41"
+    assert ecs(find("IDH1", "yeast", limit=None)) == ["1.1.1.41"]
     assert "1.1.1.41" not in ecs(find("IDH1", "human", limit=None))
     ecoli = resolve("IDH1", "E. coli")
     assert isinstance(ecoli, Ambiguous) and not ecoli.candidates
@@ -260,10 +287,13 @@ def test_a_symbol_is_never_offered_across_organisms():
 def test_nonsense_returns_no_match_not_a_suggestion_from_one_shared_character_class():
     """"ethanol dehydrogenase" is not "methanol dehydrogenase" mistyped, "CYP2C9" is not a fenbendazole
     monooxygenase's symbol one edit away, and "HIV protease" is not "NIa protease"."""
-    for name, organism in [("ethanol dehydrogenase", "human"), ("CYP2D6", "human"), ("zzqx protein", None),
+    for name, organism in [("ethanol dehydrogenase", "human"), ("zzqx protein", None),
                            ("DHFR E coli", "human"), ("HIV reverse transcriptase", "human")]:
         result = resolve(name, organism)
         assert isinstance(result, Ambiguous) and not result.candidates, (name, ecs(result.candidates))
+    # CYP2D6 is now a curated alias (ADR 0182): EC 1.14.14.1, never a monooxygenase one edit away.
+    cyp = resolve("CYP2D6", "human")
+    assert isinstance(cyp, Resolved) and (cyp.ec, cyp.isoform) == ("1.14.14.1", "CYP2D6")
     assert ecs(resolve("CYP2C9", "mouse").candidates) == [] or all(
         c.partial for c in resolve("CYP2C9", "mouse").candidates)
     for typo, ec in [("hexokinse", "2.7.1.1"), ("lactat dehydrogenase", "1.1.1.27"), ("acetylcholinesteras", "3.1.1.7")]:

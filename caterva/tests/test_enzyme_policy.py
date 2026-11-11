@@ -215,16 +215,20 @@ def test_an_abbreviation_is_a_refusal_naming_what_it_can_mean_and_uniprot_is_not
         asked.append(name)
         return ["3.4.21.4"]
 
-    for name in ("LDH", "HK1", "ACHE", "SDH"):
+    # HK1 and ACHE are one enzyme each in human and now resolve (ADR 0182, tested below); LDH and SDH
+    # are several and stay a refusal.
+    for name in ("LDH", "SDH"):
         with pytest.raises(NameNotResolved) as raised:
             resolve_enzyme_name(name, "human", uniprot=uniprot)
         assert raised.value.kind == AMBIGUOUS and raised.value.confirm_only, name
         assert raised.value.named and "will not choose for you" in str(raised.value)
         assert raised.value.recommended is None
+    for name, ec in (("HK1", "2.7.1.1"), ("ACHE", "3.1.1.7")):
+        assert resolve_enzyme_name(name, "human", uniprot=uniprot).ec == ec
     assert asked == [], "the candidates the table lists are the choices; UniProt is not consulted"
     with pytest.raises(NameNotResolved) as raised:
-        resolve_enzyme_name("ACHE", "human", rerun="--ec {ec}")
-    assert str(raised.value).endswith("re-run with --ec 3.1.1.7")
+        resolve_enzyme_name("SDH", "human", rerun="--ec {ec}")
+    assert str(raised.value).endswith("re-run with --ec 1.3.5.1")
 
 
 def test_the_literature_lookup_is_available_in_a_checkout():

@@ -49,3 +49,14 @@ reading; its abbreviation rows were chosen by hand and each states its basis.
 Nothing here states or implies that the UniProt Consortium endorses Caterva.
 If you use these names in scientific work, cite UniProt. To rebuild the files:
 make enzyme-symbols.
+
+
+aliases.json -- curated by hand
+
+Names people type for one enzyme (CYP2B6, COX-2, MAO-B, PTP1B, HIV-1
+protease, angiotensin-converting enzyme, PEPCK per organism), written by hand
+on the date the file records in `checked`. Each row cites its basis: an HGNC
+gene symbol with its UniProtKB accession, or the IUBMB nomenclature. It is
+not generated, and is not rebuilt by make enzyme-symbols. Every EC number in
+it is checked against enzyme_index.json.gz by
+caterva/tests/test_names_people_type.py.

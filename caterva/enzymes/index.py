@@ -71,6 +71,11 @@ ORGANISMS: Dict[str, Tuple[str, str, Tuple[str, ...]]] = {
     "MYCTU": ("Mycobacterium tuberculosis", "M. tuberculosis", ("m. tuberculosis",)),
     "HORSE": ("Equus caballus", "horse", ("e. caballus",)),
     "SHEEP": ("Ovis aries", "sheep", ("o. aries",)),
+    # "guinea pig" is one species, and it is NOT a pig: without this row a
+    # sentence "guinea pig trypsin" read the word "pig" as Sus scrofa, and
+    # `--organism "guinea pig"` was case-fixed to "Guinea pig", which no
+    # BRENDA row carries.
+    "CAVPO": ("Cavia porcellus", "guinea pig", ("guinea pigs", "c. porcellus")),
 }
 
 #: What a code covers when it is narrower than the name people type for it.

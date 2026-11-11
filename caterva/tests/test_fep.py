@@ -292,4 +292,4 @@ def test_a_word_for_a_kind_of_enzyme_is_refused_as_bind_refuses_it(tmp_path, cap
 def test_an_organism_the_page_never_names_is_not_an_absence_of_ki(tmp_path, capsys):
     assert run(tmp_path, "--organism", "humn") == 3
     err = capsys.readouterr().err
-    assert "names no organism 'Humn' anywhere" in err and "no Ki for" not in err
+    assert "names no organism 'humn' anywhere" in err and "no Ki for" not in err

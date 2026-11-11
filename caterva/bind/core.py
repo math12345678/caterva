@@ -184,6 +184,19 @@ _KEYWORD_TOKEN = re.compile(
     r"(?:\s+and\s+(?:(?:isozyme|isoenzyme|isoform)\s+)?(?P<token2>[A-Za-z0-9][A-Za-z0-9-]*))?"
 )
 _HYPHEN_CODE = re.compile(r"(?<![\w-])(?P<stem>[A-Z]{2,5})-(?P<code>[A-Z0-9]{1,2})(?![\w-]|\.\d)")
+#: A cytochrome P450 named by its family, subfamily and number: "CYP2C19",
+#: "CYP3A4*1", "POR-CYP1A1", "P450 2D6", "cytochrome P450 3A4". BRENDA files
+#: every human P450's drug-metabolism rows under one EC number, 1.14.14.1,
+#: and writes which P450 a row measured as a bare name with no "isoform"
+#: before it ("CYP2C19, at pH 7.4 and 37°C"). Before this form those rows
+#: read as naming NO isoform, so `--isoform CYP2B6` (which `caterva compose
+#: --subject CYP2B6` now sets, ADR 0182) took CYP2C19's, CYP2C9's or
+#: CYP3A4's fenthion Km as a row "whether it measured CYP2B6 is unknown" --
+#: when the row says plainly it did not (live page for 1.14.14.1, read
+#: 2026-11-11). A hyphen may come before it ("POR-CYP1A1" is the reductase
+#: complex of CYP1A1), so only a letter or digit stops it.
+_CYP = re.compile(
+    r"(?<![A-Za-z0-9])(?:CYP|Cyp|cytochrome P450|P450)[ -]?(?P<code>\d{1,3}[A-Z]{1,2}\d{1,3})(?![A-Za-z0-9])")
 #: Upper-case prefixes of hyphenated codes that name no protein: cofactors,
 #: nucleotides, "EC-" and nucleic acids.
 _NOT_A_STEM = frozenset({
@@ -260,6 +273,10 @@ def _glucokinase_reading(m: "re.Match") -> Optional[str]:
     return f"{word} {m.group('code')}" if m.group("code") else word
 
 
+def _cyp_reading(m: "re.Match") -> Optional[str]:
+    return "CYP" + m.group("code").upper()
+
+
 def _hyphen_code_reading(m: "re.Match") -> Optional[str]:
     if m.group("stem") in _NOT_A_STEM or _STRAIN_CONTEXT.search(m.string[:m.start()]):
         return None
@@ -271,6 +288,7 @@ _FORMS = (
     (_FULL_NAME, _full_name_reading),
     (_STEM_NAME, _stem_reading),
     (_GLUCOKINASE, _glucokinase_reading),
+    (_CYP, _cyp_reading),
     (_HYPHEN_CODE, _hyphen_code_reading),
 )
 #: "... and" before a second name: "isozymes LDH-A and LDH-B".
