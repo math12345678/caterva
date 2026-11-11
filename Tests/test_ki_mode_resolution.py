@@ -557,6 +557,21 @@ class TestTheSameRowAsCompose:
         assert unranked.found
         measured = composed_from(unranked)
         resolved = asked_for(ec, inhibitor, organism, mode, substrate, isoform)
+        if (resolved.found and "Kitz-Wilson" in (resolved.commentary or "")
+                and not any(c.get("conditions") == resolved.commentary
+                            for c in unranked.ensemble_candidates)):
+            # THE ONE PLACE THE OLD ORDER NOW PARTS FROM THE RESOLVER. Since
+            # 2026-11-11 the unasked answer passes Kitz-Wilson rows over
+            # when a reversible Ki exists (ADR 0182: the median must not land
+            # on an inactivation constant), so they are not among the rows
+            # it hands compose, and choosing among those, for a mode or an
+            # isoform only a Kitz-Wilson row is left for, finds nothing. The
+            # resolver, asked with the mode, ranks every row and takes the
+            # Kitz-Wilson row as the last resort, as TestKitzWilson pins.
+            # That is why compose asks with the mode.
+            assert any("Kitz-Wilson" in line for line in unranked.search_log), \
+                unranked.search_log
+            return
         if isoform:
             by_isoform = select_isoform(measured, isoform)
             if "reaction_Ki" in by_isoform.refused:
