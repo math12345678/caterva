@@ -131,6 +131,12 @@ class IsozymeNotice:
     #: or other strain's enzyme is not in the reference proteome, and the listed proteins are
     #: then not its isozymes.
     isoform_listed: bool = True
+    #: With no isoform asked for: the one isozyme every cited row names (by
+    #: its words, its UniProt cell or its paper), when they all name the same
+    #: one. The notice then says whose constants these are instead of "may
+    #: belong to any of them" (third round's review: human hexokinase's rows
+    #: all named GCK).
+    measured_as: Optional[str] = None
 
     @property
     def broad(self) -> bool:
@@ -170,6 +176,10 @@ class IsozymeNotice:
         if self.isoform:
             return (f"{self.isoform} was asked for, but {self._which()} not state which "
                     f"isozyme of EC {self.ec} it measured")
+        if self.measured_as:
+            return (f"EC {self.ec} is {self.count} proteins in {self.label} and no --isoform was given; "
+                    f"every cited row names {self.measured_as}, so these are {self.measured_as}'s "
+                    "constants, not the other proteins'")
         if self.broad:
             return (f"EC {self.ec} is a broad class ({self.count} different proteins in {self.label}) and no "
                     "--isoform was given, so the constants may belong to any of them")
@@ -203,6 +213,11 @@ class IsozymeNotice:
                     f"proteins{named}, but {names} {'comes' if len(self.unstated) == 1 else 'come'} from a row "
                     f"that does not say which isozyme it measured, so whether it measured {self.isoform} is "
                     "unknown; isozymes of one enzyme can differ many-fold in Km and kcat")
+        if self.measured_as:
+            return (f"EC {self.ec} is {self.count} {self.label} proteins{named} and no --isoform was given; "
+                    f"every cited row names {self.measured_as} (in its words, its UniProt cell or its "
+                    f"paper's other entries), so the model is of {self.measured_as}, and another of these "
+                    "proteins can differ many-fold in Km and kcat")
         if self.broad:
             return (f"{self.count} different {self.label} proteins share EC {self.ec} (a broad class: the "
                     "nomenclature files them under one number, and they are not isozymes of one enzyme) and "
@@ -344,8 +359,21 @@ def notice_for_model(model: Any) -> Optional[IsozymeNotice]:
             str(identifier) for identifier in sorted(measured)
             if not _states(getattr(measured[identifier], "commentary", None), isoform)
             and not _states_by_accession(measured[identifier], isoform)]
-    return isozyme_notice(getattr(model, "subject", None), getattr(model, "organism", None), isoform,
-                          unstated=unstated)
+    notice = isozyme_notice(getattr(model, "subject", None), getattr(model, "organism", None), isoform,
+                            unstated=unstated)
+    if notice is None or isoform:
+        return notice
+    readings = [getattr(m, "row_isoform", None) for m in measured.values()]
+    if readings and all(isinstance(r, str) and r for r in readings):
+        try:
+            from caterva.bind.core import same_isoform
+        except ImportError:  # pragma: no cover - flat layout
+            return notice
+        first = readings[0]
+        if all(r == first or same_isoform(r, first) for r in readings[1:]):
+            from dataclasses import replace as _replace
+            return _replace(notice, measured_as=first)
+    return notice
 
 
 __all__ = ["BROAD_CLASS", "IsozymeNotice", "describe_isoform", "isozyme_notice", "notice_for_model", "organism_precise"]

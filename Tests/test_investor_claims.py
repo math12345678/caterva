@@ -47,6 +47,14 @@ def isolated_root(tmp_path, monkeypatch, *, docs=("FAKE.md",)):
     monkeypatch.setattr(guard, "ROOT", tmp_path)
     monkeypatch.setattr(guard, "PUBLIC_MARKETING", ())
     monkeypatch.setattr(guard, "INVESTOR_DOCS", docs)
+    # Every claim counted from the suite is given a fixed live value: with
+    # ROOT moved, `_live_test_total` shells out to a tree that is not there
+    # and returns -1, so whether a claim was "re-derived" depended on which
+    # test had filled its cache first in the worker (an xdist-order flake
+    # seen when a test file was added, 2026-11-12).
+    for label, (pattern, live, tolerance) in list(guard.CLAIMS.items()):
+        if live is guard._live_test_total:
+            monkeypatch.setitem(guard.CLAIMS, label, (pattern, lambda: 1863, tolerance))
 
 
 def test_investor_numbers_match_the_repository() -> None:

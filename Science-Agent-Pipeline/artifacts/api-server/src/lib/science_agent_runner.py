@@ -1331,6 +1331,12 @@ def main() -> None:
                 # whether the rows chosen from span more than 100-fold.
                 "chosenBecause": result.chosen_because,
                 "wideSpread": bool(result.wide_spread),
+                # What the carried row IS, beyond its value: "the row is a
+                # K0.5 with a Hill coefficient of 1.8, not a Michaelis-Menten
+                # Km", "the row's UniProt accession (P35557) is GCK". Compose
+                # and the Studio said these; the API and the TypeScript CLI
+                # printed a plain Km (third round's review).
+                "rowNotes": list(getattr(result, "row_notes", None) or []),
                 "selectionTie": (
                     result.selection_tie.model_dump()
                     if result.selection_tie else None

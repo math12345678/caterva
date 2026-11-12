@@ -172,6 +172,9 @@ def test_golden_found_output_shape(monkeypatch):
         # because `golden_result()` is built by hand and carries neither.
         "chosenBecause": None,
         "wideSpread": False,
+        # What the carried row is (third round of the real-values review):
+        # empty for the hand-built row.
+        "rowNotes": [],
         # Empty because `golden_result()` is built by hand and carries no
         # frontier -- not because a resolution has none. A real resolution
         # attaches every surviving row with its reliability grades, which is

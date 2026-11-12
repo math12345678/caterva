@@ -896,6 +896,18 @@ function buildUnresolvedKineticProvenance(
  * alternatives; this puts the name beside the number itself, so the value
  * is never read as the constant of something the reader did not see named.
  */
+
+/**
+ * The provenance note: the choice Caterva made, then what the carried row is
+ * (`rowNotes`), each said once. Undefined when there is neither.
+ */
+function provenanceNote(chosen: string | undefined | null, rowNotes?: string[]): string | undefined {
+  const parts = [chosen, ...(rowNotes ?? []).map((n) => `the row: ${n}`)].filter(
+    (p): p is string => typeof p === "string" && p.length > 0,
+  );
+  return parts.length > 0 ? parts.join("; ") : undefined;
+}
+
 function chosenNote(key: string, choices: AutomaticChoice[]): string | undefined {
   const label = key === "ki" ? "Ki" : key === "kcat" ? "kcat" : "Km";
   const role = key === "ki" ? "inhibitor" : "substrate";
@@ -1204,8 +1216,16 @@ async function applyKineticResolution(
         citationStatus,
         assayConditions: toAssayConditions(agentResult.assayConditions, agentResult.effectors),
         citationLocators: buildCitationLocators(agentResult.citation),
-        ...(chosenNote(key, [...(entities.choices ?? []), ...readChoices(agentResult.choices)])
-          ? { note: chosenNote(key, [...(entities.choices ?? []), ...readChoices(agentResult.choices)]) }
+        ...(provenanceNote(
+          chosenNote(key, [...(entities.choices ?? []), ...readChoices(agentResult.choices)]),
+          agentResult.rowNotes,
+        )
+          ? {
+              note: provenanceNote(
+                chosenNote(key, [...(entities.choices ?? []), ...readChoices(agentResult.choices)]),
+                agentResult.rowNotes,
+              ),
+            }
           : {}),
       });
 
@@ -1255,6 +1275,12 @@ async function applyKineticResolution(
       // of what is known; the sentence is the resolver's, verbatim.
       if (agentResult.wideSpread && agentResult.chosenBecause) {
         flags.push(`${key.toUpperCase()} chosen: ${agentResult.chosenBecause}.`);
+      }
+      // What the carried row is (a K0.5, an isoform named by its UniProt
+      // cell, a construct): compose and the Studio said it, and the API
+      // answered a plain Km (third round of the real-values review).
+      for (const note of agentResult.rowNotes ?? []) {
+        flags.push(`${key.toUpperCase()} row: ${note}.`);
       }
       flags.push(
         ...ensembleCandidateFlags(key, agentResult.ensembleCandidates),

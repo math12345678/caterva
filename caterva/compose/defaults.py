@@ -583,6 +583,24 @@ def _matches(compound: str, target: str) -> bool:
     return bool(match(compound, target))
 
 
+#: A protein or polydisperse polymer as a substrate: its molar Km rests on
+#: an assumed molecular weight and its rows span orders of magnitude. Papain
+#: was modelled on casein (kcat rows 2.8e-7 to 1.79 1/s) over BAEE and
+#: Bz-Phe-Val-Arg-pNA (third round's review). Ranked after defined small
+#: molecules with rows, never excluded: a name the user types is used.
+_MACROMOLECULE = re.compile(
+    r"^(?:azo|alpha-|beta-|kappa-|denatured |acid-denatured |soluble |dephosphorylated |"
+    r"heat-denatured |succinylated |acetylated )?(?:casein|haemoglobin|hemoglobin|globin|albumin|"
+    r"bovine serum albumin|bsa|gelatin|collagen|elastin|keratin|fibrin|fibrinogen|ovalbumin|"
+    r"myoglobin|insulin chain b|starch|amylose|amylopectin|glycogen|cellulose|chitin|chitosan|"
+    r"xylan|pectin|dextran|pullulan|inulin|peptidoglycan|dna|rna|poly\(.+\))s?$", re.IGNORECASE)
+
+
+def is_macromolecule(name: str) -> bool:
+    """A protein or polydisperse polymer named as a substrate (`_MACROMOLECULE`)."""
+    return bool(_MACROMOLECULE.match((name or "").strip()))
+
+
 def is_cofactor(name: str) -> bool:
     """True for a cosubstrate, cofactor or small ion (COFACTORS)."""
     key = _PREFIX.sub("", _key(name))
@@ -1045,6 +1063,9 @@ def _named_by_enzyme_name(name: str, compound: str) -> bool:
     except Exception:  # noqa: BLE001
         return False
     mine = key(compound)
+    # Outside parentheses only: "glutathione reductase (NADPH)" names its
+    # cofactor there, not the compound it is named for.
+    name = re.sub(r"\([^()]*\)", " ", name)
     return len(mine) >= 3 and ((len(mine) >= 6 and mine in key(name)) or any(
         key(word) == mine for word in re.split(r"[\s/(),]+", name) if word))
 
@@ -1101,6 +1122,7 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
         return (cofactor(k), rows(k)["km"] == 0,
                 bool(isoform) and not counts.names_isoform(k, tables), bool(neighbours[k]),
                 not has_both(k), rows(k)["km"] > 0 and counts.own(k, "km") == 0,
+                is_macromolecule(counts.name(k)) and k not in named,
                 k not in natural, -total(k), -counts.papers(k, tables), k not in named,
                 counts.name(k).casefold())
 
@@ -1154,6 +1176,13 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
                 + " more rows, but each measured a construct or altered preparation, an apparent "
                   "constant with an inhibitor or effector present, or a K0.5, which the search "
                   "passes over for the enzyme's own constant")
+    polymers = [counts.name(k) for k in candidates if is_macromolecule(counts.name(k))
+                and k not in named and total(k) > total(best) and has_both(k) == has_both(best)]
+    if polymers and r["km"] and not is_macromolecule(name):
+        how += ("; " + ", ".join(polymers[:3]) + (" has" if len(polymers) == 1 else " have")
+                + " more rows, but a protein or polymer substrate's molar Km rests on an assumed "
+                  "molecular weight and its rows span orders of magnitude, so defined small "
+                  "molecules rank first")
     aside = [counts.name(k) for k in ranked if cofactor(k) and total(k) >= total(best)]
     if cofactor(best):
         aside = []
@@ -1490,8 +1519,22 @@ def _choose_organism(ec: str, substrate: Optional[str], inhibitor: Optional[str]
         # zanamivir Ki rows (2026-11-12).
         return bool(inhibitor) and per[o].get("ki", 0) == 0
 
+    studied: Dict[str, int] = {}
+
+    def breadth(o: str) -> int:
+        # Rows of every compound under the EC in the organism: how widely its
+        # enzyme was studied. Breaks a tie on the named compound's rows before
+        # the alphabet does: trypsin and BAPNA was modelled in Boops boops,
+        # first by name of five fish with one row each (third round's review).
+        if o not in studied:
+            try:
+                studied[o] = sum(len(_usable(table_rows(ec, t, o)).rows) for t in ("km", "kcat"))
+            except Exception:  # noqa: BLE001
+                studied[o] = 0
+        return studied[o]
+
     def rank(o: str) -> tuple:
-        return (without_named_ki(o), -covered(o), -sum(per[o].values()), o)
+        return (without_named_ki(o), -covered(o), -sum(per[o].values()), -breadth(o), o)
 
     ranked = sorted(organisms, key=rank)
     full = len(needs)
@@ -1520,11 +1563,17 @@ def _choose_organism(ec: str, substrate: Optional[str], inhibitor: Optional[str]
                 > (covered(best), sum(per[best].values())) for o in organisms):
             named_first = (f"; organisms with no Ki row for {inhibitor}, the inhibitor named, rank "
                            f"after those with one, however many other rows they have")
+        on_rows = _tied(ranked, rank, drop=2)
         tied = _tied(ranked, rank)
-        most = "as many rows as any other" if tied else "the most rows"
+        most = "as many rows as any other" if on_rows else "the most rows"
+        broke = [o for o in on_rows if o not in tied]
+        by_breadth = (f"; it ties on those rows with {_shown(broke)}, and has more Km and kcat rows "
+                      f"of every compound under EC {ec} ({breadth(best)} against at most "
+                      f"{max(breadth(o) for o in broke)}), so its enzyme is the more widely studied"
+                      if broke else "")
         how = (f"it has rows for {covered(best)} of the {full} constant(s) this model needs "
                f"({what}) and {most} of those that do ({counts}){lacking}{named_first}"
-               f"{_tie_clause(tied)}")
+               f"{by_breadth}{_tie_clause(tied)}")
     why = f"of the {_plural(len(organisms), 'organism')} with rows under EC {ec}, {how}"
     alternatives = tuple(Option(o, dict(per[o])) for o in ranked[1:1 + ALTERNATIVES_NAMED])
     return Choice("organism", best, why, alternatives, len(organisms), dict(r))

@@ -148,3 +148,17 @@ selected_form.value  # Prose-carried, verified by reading `selectedFormFlags`:
                      # it renders `form.reason` and nothing else. The value is
                      # named inside that sentence. Not machine-readable, same
                      # caveat as Category 1 above.
+
+# ---------------------------------------------------------------------------
+# Third round of the real-values review (2026-11-12)
+# ---------------------------------------------------------------------------
+row_uniprot                # the carried row's own single UniProt accession,
+                           # read in-process by resolve_kinetic_pair to keep a
+                           # Km and a kcat to one protein. The API's citation
+                           # and rowNotes ("the row's UniProt accession (P35557)
+                           # is GCK") carry what a reader needs of it.
+isoform_unnamed_withheld   # how many rows naming no isoform were set aside
+                           # with another protein's field; said in the
+                           # search_log line and, in compose, in the
+                           # placeholder's reason ("the 2 naming none sit
+                           # among them").

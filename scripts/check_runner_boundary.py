@@ -142,7 +142,16 @@ EMITTED_AS: dict[str, str | None] = {
     # as the two citations), and what the carried row is, which is also in
     # chosen_because's sentence ("what the carried row is: a K0.5 ...").
     "pairable": None,
-    "row_notes": None,
+    # What the carried row is: crosses as `rowNotes`, printed by the API's
+    # flags and provenance note and by the TypeScript CLI (third round).
+    "row_notes": "rowNotes",
+    # The carried row's own single UniProt accession, read by
+    # resolve_kinetic_pair to keep a pair to one protein; the API's answer
+    # names the row's accession in its citation.
+    "row_uniprot": None,
+    # How many rows naming no isoform were set aside with the field of
+    # another protein (source "isoform_withheld"); said in the log.
+    "isoform_unnamed_withheld": None,
     # The isoform the carried row measured, by its words or UniProt cell.
     # Read in-process by `caterva compose` (Measurement.row_isoform); the
     # API's answer names it in chosen_because ("the row's UniProt accession

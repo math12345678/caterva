@@ -118,14 +118,26 @@ def _where_rows_are(ec: str, table: str, accessions: Set[str]) -> str:
         rows = defaults.table_rows(ec, table, None)
     except Exception:  # noqa: BLE001
         return ""
-    where = Counter(r.organism or "an organism BRENDA names otherwise" for r in rows
-                    if set(_accessions(r)) & accessions)
+    mine = [r for r in rows if set(_accessions(r)) & accessions]
+    where = Counter(r.organism or "an organism BRENDA names otherwise" for r in mine)
     if not where:
         return (f"; BRENDA's {table} rows under EC {ec} carry no row with UniProt "
                 f"{', '.join(sorted(accessions))}")
+    # Which compounds those rows measured: TEM-1's four E. coli P62593 rows
+    # are cephalothin and nitrocefin, not ampicillin, and "the search did not
+    # rank one of them" read as if ampicillin rows for TEM-1 existed (third
+    # round's review). The compound is the way to them.
+    compounds = Counter(r.compound for r in mine if getattr(r, "compound", None))
+    measured = ""
+    if compounds:
+        listed = ", ".join(f"{c} ({n})" for c, n in compounds.most_common(4))
+        first = compounds.most_common(1)[0][0]
+        measured = (f": they measured {listed}, not the compound modelled, so re-run with "
+                    f"--{'inhibitor' if table == 'ki' else 'substrate'} {first} to model this protein "
+                    "with one of them")
     return ("; BRENDA's rows with UniProt " + ", ".join(sorted(accessions)) + " are in "
             + ", ".join(f"{o} ({n} {table} row{'s' if n != 1 else ''})" for o, n in where.most_common(3))
-            + ", and the search did not rank one of them for this constant")
+            + (measured or ", and the search did not rank one of them for this constant"))
 
 
 def _proteins(ec: str, organism: Optional[str], isoform: str) -> Tuple[Set[str], Dict[str, str]]:

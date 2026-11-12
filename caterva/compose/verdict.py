@@ -467,8 +467,13 @@ def _prediction_concerns(
             f"had nothing left of its own to say"
         )
 
+    # "all 3 predicted amounts ... are amounts a cell could hold (11 already
+    # non-physical, not re-counted here)" read as a contradiction (third
+    # round's review): the 11 are other steady states, which the analysis
+    # section already marked non-physical, and this check judged the rest.
     aside = (
-        f" ({skipped} already non-physical, not re-counted here)"
+        f"; {skipped} other steady state(s) the analysis section already "
+        f"marked non-physical are not judged again here"
         if skipped else ""
     )
     if all(r.verdict == UNEXAMINED for r in judged):
@@ -516,12 +521,123 @@ def _isozyme_concerns(model: Any) -> Tuple[List[Concern], Optional[str]]:
         return [], None
     notice = notice_for_model(model)
     if notice is None:
-        return [], None
+        return _isozymes_the_rows_name(model)
     return (
         [Concern(source="isozymes", severity=GROUNDED, detail=notice.detail,
                  remedy=notice.remedy, qualifier=notice.headline)],
         notice.summary,
     )
+
+
+def _isozymes_the_rows_name(model: Any) -> Tuple[List[Concern], Optional[str]]:
+    """For an organism the enzyme index does not list in full: the isozymes
+    BRENDA's own rows name there, when the cited rows name none of them.
+
+    Pig heart malate dehydrogenase: BRENDA's Sus scrofa rows name the
+    cytosolic and the mitochondrial isoenzyme (oxaloacetate Km 0.0083 and
+    0.0348 mM, ref 656579); the chooser set those aside, the carried rows name
+    neither, and the verdict was a plain GROUNDED (third round's review)."""
+    measured = getattr(model, "measured", None)
+    ec, organism = getattr(model, "subject", None), getattr(model, "organism", None)
+    if not isinstance(measured, Mapping) or not measured or not ec or not organism:
+        return [], None
+    if getattr(model, "isoform", None):
+        return [], None
+    if any(isinstance(getattr(m, "row_isoform", None), str) and getattr(m, "row_isoform")
+           for m in measured.values()):
+        return [], None
+    try:
+        from caterva.bind.core import read_isoform
+        from caterva.compose import defaults
+
+        named: Dict[str, int] = {}
+        for table in ("km", "kcat"):
+            for row in defaults.table_rows(str(ec), table, organism):
+                reading = read_isoform(row.conditions) if getattr(row, "isozyme", False) else None
+                if reading:
+                    named[reading] = named.get(reading, 0) + 1
+    except Exception:  # noqa: BLE001 - an unread page names nothing
+        return [], None
+    if len(named) < 2:
+        return [], None
+    listed = ", ".join(f"{n} ({c} row{'s' if c != 1 else ''})" for n, c in sorted(named.items()))
+    return ([Concern(
+        source="isozymes", severity=GROUNDED,
+        detail=(f"BRENDA's rows for EC {ec} in {organism} name isozymes ({listed}), and the cited rows "
+                "name none, so which of them the constants measured is unknown; isozymes of one "
+                "enzyme can differ many-fold in Km and kcat"),
+        remedy=("pass --isoform with the one meant to take each constant from rows that name it"),
+        qualifier=(f"BRENDA's {organism} rows name isozymes ({', '.join(sorted(named))}) and the "
+                   "cited rows name none of them"))],
+        f"{organism} rows name {len(named)} isozymes; the cited rows name none")
+
+
+def _row_kind_concerns(model: Any) -> List[Concern]:
+    """What the cited rows are, where it narrows what the model licenses:
+    a Km that is a K0.5 of cooperative kinetics, and constants whose rows
+    name two different proteins.
+
+    Human hexokinase carries glucokinase's K0.5 (6.3 mM, Hill coefficient
+    1.8, ref 739603) in a hyperbolic rate law, under a plain GROUNDED whose
+    only qualifier said the constants "may belong to any of" five isozymes,
+    while the row notes said which one (third round's review). Of GROUNDED
+    severity, like the isozyme concern: a qualifier under "What this
+    supports", not a lower grade."""
+    measured = getattr(model, "measured", None)
+    if not isinstance(measured, Mapping) or not measured:
+        return []
+    try:
+        from caterva.compose.row_scope import _HALF_SATURATION, _HILL
+    except ImportError:  # pragma: no cover - flat layout
+        return []
+    out: List[Concern] = []
+    by_id = {getattr(q, "parameter_id", None): q for q in getattr(model, "resolvable", ())}
+    for name in sorted(measured):
+        q = by_id.get(name)
+        if getattr(q, "table", None) != "km":
+            continue
+        text = str(getattr(measured[name], "commentary", "") or "")
+        if not _HALF_SATURATION.search(text):
+            continue
+        hill = _HILL.search(text)
+        what = f"a K0.5 with a Hill coefficient of {hill.group(1)}" if hill else "a K0.5"
+        isoform = getattr(measured[name], "row_isoform", None)
+        of = f" ({isoform}'s)" if isoform else ""
+        out.append(Concern(
+            source="row_scope", severity=GROUNDED,
+            detail=(f"`{name}` carries {what}{of}, the half-saturation constant of a cooperative "
+                    "enzyme, not a Michaelis-Menten Km: the hyperbolic rate law approximates it"),
+            remedy=("model it as cooperative ('Hill kinetics') with that K0.5 and Hill coefficient, "
+                    "or read conclusions near half-saturation as approximate"),
+            qualifier=(f"{name} is {what}{of}, not a Michaelis-Menten Km, so this hyperbolic model "
+                       "approximates a cooperative enzyme")))
+    isoforms = {name: getattr(m, "row_isoform", None) for name, m in measured.items()}
+    named = {iso for iso in isoforms.values() if isinstance(iso, str) and iso}
+    if len(named) > 1:
+        try:
+            from caterva.bind.core import same_isoform
+            from caterva.enzymes.finder import isozymes
+            several = isozymes(str(getattr(model, "subject", "") or ""),
+                               getattr(model, "organism", None)).count >= 2
+        except Exception:  # noqa: BLE001 - unknown is not several
+            several = False
+        if not several:
+            # An organism the enzyme index lists one protein for (or none):
+            # readings of human isozyme names in its rows are noise.
+            return out
+        distinct: List[str] = []
+        for iso in sorted(named):
+            if not any(same_isoform(iso, d) for d in distinct):
+                distinct.append(iso)
+        if len(distinct) > 1:
+            listed = "; ".join(f"`{n}`: {i}" for n, i in sorted(isoforms.items()) if i)
+            out.append(Concern(
+                source="row_scope", severity=GROUNDED,
+                detail=f"the cited rows name different proteins ({listed}), so the model combines "
+                       "constants of more than one protein",
+                remedy="pass --isoform with one of them to take every constant from its rows",
+                qualifier="the cited constants come from rows of different proteins"))
+    return out
 
 
 def _grounding(model: Any) -> Tuple[int, int, bool]:
@@ -671,8 +787,8 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
     if "isoform" in by_need:
         steps.append(f"{', '.join(by_need['isoform'])}: every row the search found measured another "
                      "isoform than the one asked for: re-run with --substrate set to one the provenance table "
-                     "lists as measured on this isoform, or with --isoform set to the one the provenance table names to "
-                     "model that protein, or supply it yourself")
+                     "lists as measured on this isoform, or supply it yourself (--isoform set to the one the "
+                     "provenance table names would model that other protein instead)")
     if "isoform_elsewhere" in by_need:
         steps.append(f"{', '.join(by_need['isoform_elsewhere'])}: no row in this organism names the "
                      "isoform asked for: re-run with --organism set to one the provenance table lists "
@@ -1058,6 +1174,7 @@ def form(
     concerns += isozyme_concerns
     if isozyme_note:
         consulted["isozymes"] = isozyme_note
+    concerns += _row_kind_concerns(model)
 
     try:
         from .assumptions import check as check_assumptions

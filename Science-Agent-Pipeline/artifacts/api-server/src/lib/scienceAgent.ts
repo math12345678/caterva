@@ -285,6 +285,13 @@ export interface ScienceAgentResult {
   /** The rows the value was chosen from span more than 100-fold. */
   wideSpread?: boolean;
   /**
+   * What the carried row IS beyond its value, in the resolver's words: "the
+   * row is a K0.5 with a Hill coefficient of 1.8, not a Michaelis-Menten
+   * Km", "the row's UniProt accession (P35557) is GCK", a construct, a range.
+   * Absent from runners older than the third real-values round.
+   */
+  rowNotes?: string[];
+  /**
    * Every row on the non-dominated frontier, with the reliability grades
    * that weight it — Bakker's three axes, scored per candidate rather than
    * only for the winner.

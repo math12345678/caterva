@@ -1133,10 +1133,18 @@ def _added_compounds(entry, rows) -> list:
     # An ion is not an addition: with and without K+ is pyruvate kinase's
     # essential activator present or withdrawn (`_withdrawn_ions`), and the
     # arm WITH it is the enzyme's physiological constant.
+    # "chimera with Haemophilus influenzae enzyme": a construct of two
+    # proteins, not a compound added to the assay. Read as one, the note
+    # said rows "measured with Haemophilus influenzae enzyme ... added"
+    # (third round's review); `construct_of` names it a chimera instead.
+    if (row_form.construct_of(getattr(entry, "conditions", None)) or "").startswith(
+            "a chimeric construct"):
+        return []
     return [
         x.compound_text for x in (getattr(entry, "effectors", None) or [])
         if x.presence == "present" and (plain or _effector_key(x) in absent)
         and not row_form.is_ion(x.compound_text)
+        and not re.search(r"\benzyme\b|\bprotein\b", x.compound_text or "", re.IGNORECASE)
     ]
 
 
@@ -1291,6 +1299,13 @@ def _row_notes(entry, quantity) -> list:
     construct = row_form.construct_of(text)
     if construct:
         notes.append(f"the row measured {construct}, not the native enzyme")
+    reaction = _REACTION_NAMED.search(text or "")
+    if reaction:
+        # "CYP3A4, desulfuration ... to fenthion-oxon" (ref 706823) beside the
+        # same paper's sulfoxidation row: which reaction the Km is of (third
+        # round's review).
+        notes.append(f"the row measured one reaction of the compound, {reaction.group(1)} to "
+                     f"{reaction.group(2).strip()}")
     inhibitors = list(getattr(entry, "inhibitors_present", None) or [])
     if inhibitors:
         notes.append(f"the row was measured with {', '.join(inhibitors)} present, an inhibitor or effector: an "
@@ -1308,6 +1323,12 @@ def _row_notes(entry, quantity) -> list:
         notes.append(f"the row names no isoform itself; its paper (BRENDA ref {entry.reference_id}) "
                      f"names only {paper} in its other entries on BRENDA's page")
     return notes
+
+
+#: A reaction named with its product in a commentary: "desulfuration ... to
+#: fenthion-oxon", "N-demethylation to norketamine".
+_REACTION_NAMED = re.compile(
+    r"\b((?:[A-Za-z]-)?[a-z]+(?:ation|oxidation|ylation|lysis))\b[^,;]{0,40}?\bto\s+([^,;]{3,60})")
 
 
 def _treated_arm(entry, rows) -> bool:

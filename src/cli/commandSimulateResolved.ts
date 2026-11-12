@@ -124,6 +124,12 @@ export interface ParameterProvenance {
    * table would present that constant as the model's mechanism.
    */
   rowScope?: string[];
+  /**
+   * What the carried row is (a K0.5, an isoform named by accession, a
+   * construct), in the resolver's words: printed under the value, as
+   * compose's report and the Studio print them (third real-values round).
+   */
+  rowNotes?: string[];
 }
 
 /**
@@ -1163,6 +1169,7 @@ export async function commandSimulateResolved(
           reliabilityReasons: reliabilityReasons(result),
           assayConditions: assayConditionsFor(result),
           rowScope: rowScopeOf(result, options.isoform),
+          rowNotes: result.rowNotes && result.rowNotes.length > 0 ? result.rowNotes : undefined,
         });
       } else {
         // Vmax is not a BRENDA table. It is kcat x [E]0, and [E]0 is a
@@ -1238,6 +1245,7 @@ export async function commandSimulateResolved(
           reliabilityReasons: reliabilityReasons(result),
           assayConditions: assayConditionsFor(result),
           rowScope: rowScopeOf(result, options.isoform),
+          rowNotes: result.rowNotes && result.rowNotes.length > 0 ? result.rowNotes : undefined,
         });
       }
     } catch (err) {
@@ -1342,6 +1350,7 @@ export async function commandSimulateResolved(
           inhibitor,
           askedMode: mode,
           rowScope: rowScopeOf(result, options.isoform),
+          rowNotes: result.rowNotes && result.rowNotes.length > 0 ? result.rowNotes : undefined,
         });
       } else {
         // "mode_withheld" is not "no Ki": BRENDA holds constants for this
@@ -2006,6 +2015,11 @@ function printProvenance(rows: ParameterProvenance[]): void {
     }
     for (const sentence of row.rowScope ?? []) {
       for (const line of wrap(sentence, 66)) {
+        process.stdout.write(`  ${' '.repeat(nameWidth)}  ${c(YELLOW, line)}\n`);
+      }
+    }
+    for (const note of row.rowNotes ?? []) {
+      for (const line of wrap(`the row: ${note}`, 66)) {
         process.stdout.write(`  ${' '.repeat(nameWidth)}  ${c(YELLOW, line)}\n`);
       }
     }
