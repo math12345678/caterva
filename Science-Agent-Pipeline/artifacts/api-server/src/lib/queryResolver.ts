@@ -610,6 +610,8 @@ function buildUnresolvedKineticProvenance(
   modelMode?: InhibitionMode,
   ecRefusal?: string,
   lookedUpFor?: { name: string; named: boolean },
+  /** The organism Caterva chose because none was named, when it did. */
+  organismChosen?: string,
 ): ParameterProvenance {
   const K = key.toUpperCase();
 
@@ -745,11 +747,21 @@ function buildUnresolvedKineticProvenance(
     return {
       origin: "default",
       unresolvedReason: "cross_species_withheld",
-      note:
-        `No ${K} was measured in the requested organism. BRENDA holds a ${K} ` +
-        `for ${named}. Kinetic parameters are species-specific, so it was not ` +
-        `substituted; re-run with allowCrossSpecies to use it, understanding ` +
-        `that the resulting model is not a model of the organism you asked for.`,
+      // An organism Caterva CHOSE was not "requested", nor "the organism you
+      // asked for": "acetylcholinesterase inhibited by physostigmine" names
+      // none, and was told both (review of 2026-11-12). Said as what it is,
+      // with the other way out: naming the organism.
+      note: organismChosen
+        ? `No ${K} was measured in ${organismChosen}, the organism Caterva chose because ` +
+          `none was named (the "organism chosen" flag says why). BRENDA holds a ${K} ` +
+          `for ${named}. Kinetic parameters are species-specific, so it was not ` +
+          `substituted; name one of those organisms in the query to model it, or re-run ` +
+          `with allowCrossSpecies to use it here, understanding that the resulting model ` +
+          `then mixes organisms.`
+        : `No ${K} was measured in the requested organism. BRENDA holds a ${K} ` +
+          `for ${named}. Kinetic parameters are species-specific, so it was not ` +
+          `substituted; re-run with allowCrossSpecies to use it, understanding ` +
+          `that the resulting model is not a model of the organism you asked for.`,
     };
   }
 
@@ -1074,10 +1086,20 @@ async function applyKineticResolution(
           agentResult.implausibleValues,
         );
       } else if (agentResult.source === "cross_species_withheld") {
+        const organismChoice = [...(entities.choices ?? []), ...readChoices(agentResult.choices)].find(
+          (c) => c.role === "organism" && c.chosen === working.organism,
+        );
         provenanceUpdates[key] = buildUnresolvedKineticProvenance(
           key,
           "cross_species_withheld",
           agentResult.crossSpeciesOrganismsAvailable,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          organismChoice?.chosen,
         );
       } else if (agentResult.source === "cross_species_too_distant") {
         // The user DID opt in, and the check still refused. Reporting this

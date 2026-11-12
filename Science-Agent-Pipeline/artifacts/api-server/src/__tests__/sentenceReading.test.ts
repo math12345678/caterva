@@ -185,3 +185,46 @@ describe("parseReading", () => {
     expect(parseReading("Traceback")).toBeNull();
   });
 });
+
+describe("a Ki withheld for another organism, in an organism Caterva chose", () => {
+  beforeEach(() => {
+    vi.stubEnv("CATERVA_SENTENCE_READER", STANDIN);
+    mocked.mockClear();
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  // Review, 2026-11-12: "acetylcholinesterase inhibited by physostigmine"
+  // names no organism; Caterva chose Mus musculus, and the Ki's note said
+  // "No KI was measured in the requested organism ... not a model of the
+  // organism you asked for". Nobody requested or asked for it.
+  it("says the organism was chosen, not requested", async () => {
+    mocked.mockImplementation((async (query: { quantity: string }) =>
+      query.quantity === "ki"
+        ? {
+            found: false,
+            source: "cross_species_withheld",
+            crossSpeciesOrganismsAvailable: ["Gallus gallus"],
+            literatureCandidates: [],
+            logs: [],
+          }
+        : {
+            found: true,
+            km: 0.0167,
+            unit: "mM",
+            organism: "Bos taurus",
+            source: "brenda_exact",
+            citation: { source: "BRENDA", referenceId: "766313", url: "https://www.brenda-enzymes.org/" },
+            literatureCandidates: [],
+            logs: [],
+          }) as unknown as typeof resolveKineticValue);
+    let note = "";
+    try {
+      await resolveQuery("xanthine oxidase inhibited by allopurinol");
+    } catch (err) {
+      note = (err as { parameterProvenance?: Record<string, { note?: string }> }).parameterProvenance?.ki?.note ?? "";
+    }
+    expect(note).toContain("No KI was measured in Bos taurus, the organism Caterva chose because none was named");
+    expect(note).toContain("Gallus gallus");
+    expect(note).not.toMatch(/requested organism|organism you asked for/);
+  });
+});
