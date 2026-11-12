@@ -1636,6 +1636,19 @@ def _organism_has_no_rows(ec: str, organism: str) -> Optional[str]:
             f"or supply the constants yourself.")
 
 
+def _inhibition_mode(model: Any, args: Any) -> Optional[str]:
+    """The inhibition mode the search will ask a Ki for (the motif's; none
+    under --any-mode), so an inhibitor is chosen by the rows it will take."""
+    if getattr(args, "any_mode", False):
+        return None
+    from caterva.compose.row_scope import INHIBITION_TABLES, MODE_OF_MOTIF
+
+    for q in getattr(model, "resolvable", ()) or ():
+        if q.table in INHIBITION_TABLES and MODE_OF_MOTIF.get(q.motif_name):
+            return MODE_OF_MOTIF[q.motif_name]
+    return None
+
+
 def _choose_what_was_not_named(model: Any, args: Any) -> Tuple[Any, Optional[str]]:
     """Choose, out loud, the organism, substrate and inhibitor the user did
     not name, before the search, so the search is run for them (ADR 0182).
@@ -1677,17 +1690,18 @@ def _choose_what_was_not_named(model: Any, args: Any) -> Tuple[Any, Optional[str
         if blocked is not None:
             return replace(model, choices=tuple(choices)), blocked
 
+    isoform = getattr(args, "isoform", None) or None
     if needs_substrate:
         among = getattr(args, "substrate_among", None)
         among = tuple(among) if isinstance(among, (tuple, list)) and among else None
         try:
             chosen = defaults.choose_substrate(ec, args.organism, needs_kcat="kcat" in tables,
-                                               strict=True, among=among)
+                                               strict=True, among=among, isoform=isoform)
             if chosen is None and among:
                 # None of the matched names has a row here after all: the
                 # whole list, said as such by the `instead` clause.
                 chosen = defaults.choose_substrate(ec, args.organism, needs_kcat="kcat" in tables,
-                                                   strict=True)
+                                                   strict=True, isoform=isoform)
         except Exception:  # noqa: BLE001 - the page could not be read: the old refusal
             chosen = None
             unreadable = True
@@ -1709,7 +1723,8 @@ def _choose_what_was_not_named(model: Any, args: Any) -> Tuple[Any, Optional[str
         choices.append(chosen)
 
     if needs_inhibitor:
-        chosen = defaults.choose_inhibitor(ec, args.organism, args.substrate)
+        chosen = defaults.choose_inhibitor(ec, args.organism, args.substrate, isoform=isoform,
+                                           mode=_inhibition_mode(model, args))
         if chosen is not None:
             args.inhibitor = chosen.chosen
             choices.append(chosen)

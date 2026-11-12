@@ -944,12 +944,20 @@ did not name, in the order the choices were made: the enzyme a name that is a
 few enzymes was taken as (only when BRENDA's Km rows single one out), then the
 organism, the substrate and the inhibitor. Each entry is
 `caterva.compose.defaults.Choice.to_json()`: `{role, chosen, why,
-alternatives, considered}`, `role` one of `"enzyme" | "organism" |
+alternatives, considered, rows, instead}`, `role` one of `"enzyme" | "organism" |
 "substrate" | "inhibitor"`, `why` the reason as a clause, `alternatives` the
 next-best options best first as `{name, rows}` with `rows` a table -> row
 count map (`{"km": 25, "kcat": 61}`, `{"ki": 7}`), and `considered` how many
 options were weighed, the chosen one included (the options neither chosen nor
-listed are `considered - 1 - alternatives.length`). The shapes are
+listed are `considered - 1 - alternatives.length`). `rows` is the chosen
+option's own count map, and every count (the chosen option's and the
+alternatives') is of rows the search can use: not a variant's, not another
+isoform's than the one the model is of, not another inhibition mode's for a
+Ki (amended 2026-11-12). `instead` is `null`, or, when the request named
+something that could not be used, the clause saying so ("No substrate BRENDA
+lists Km rows for ... was named (no word of your description, 'midazolam',
+is one)"), which the note opens with in place of "No substrate was named".
+The shapes are
 `SearchChoice`, `ChoiceOption` and `ChoiceRole` on both sides. Every choice is also a plain-English note in
 `ComposeResult.notes`, ending with the flag that overturns it; `search.organism`,
 `search.substrate` and `search.compounds` carry the chosen values, so a page

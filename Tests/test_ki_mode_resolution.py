@@ -406,6 +406,8 @@ class TestRowsNamingNoIsoformThroughTheResolver:
                                               ("cross-species", "brenda_cross_species")])
     def test_a_row_naming_no_isoform_is_taken_when_none_for_the_isoform_can_be(
             self, monkeypatch, tier, source):
+        # `row` serves the LDH row without its own UniProt cell (P00338,
+        # LDHA), so it stands for an MAO row naming no isoform.
         _pool_of(monkeypatch, [self.row(*self.MAO_A), self.row(*self.NONCOMPETITIVE)], tier)
         r = self.resolve(tier, *self.MAO_A[:2], inhibition_mode="noncompetitive", isoform="MAO-A")
         assert r.found and r.source == source, r.search_log

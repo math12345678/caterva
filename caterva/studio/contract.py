@@ -1125,8 +1125,7 @@ class ChoiceOption(TypedDict):
     rows: Dict[str, int]
 
 
-class SearchChoice(TypedDict):
-    """`caterva.compose.defaults.Choice.to_json()` (ADR 0182)."""
+class _SearchChoiceRequired(TypedDict):
     role: ChoiceRole
     chosen: str
     #: The reason, as a clause ("of the 10 substrates BRENDA lists ...").
@@ -1136,6 +1135,20 @@ class SearchChoice(TypedDict):
     #: How many options were weighed in all, THE CHOSEN ONE INCLUDED: the
     #: options neither chosen nor listed number considered - 1 - len(alternatives).
     considered: int
+
+
+class SearchChoice(_SearchChoiceRequired, total=False):
+    """`caterva.compose.defaults.Choice.to_json()` (ADR 0182). `rows` and
+    `instead` are always written since 2026-11-12, and optional here because
+    a result saved before then has neither."""
+    #: The chosen option's own row counts, the rows the search can use
+    #: ({"km": 4, "kcat": 1}), as `alternatives[].rows` counts them.
+    rows: Dict[str, int]
+    #: When the request DID name something that could not be used, the
+    #: clause saying so ("No substrate BRENDA lists ... was named (no word of
+    #: your description, 'midazolam', is one)"); None when nothing was set
+    #: aside and the note opens "No substrate was named".
+    instead: Optional[str]
 
 
 class SearchSummary(TypedDict):

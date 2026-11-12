@@ -795,6 +795,10 @@ export interface SearchChoice {
   alternatives: ChoiceOption[];
   /** How many options were weighed in all, the chosen one included: those neither chosen nor listed are considered - 1 - alternatives.length. */
   considered: number;
+  /** The chosen option's own rows the search can use, per table ({ km: 4, kcat: 1 }). Absent from results before 2026-11-12. */
+  rows?: Record<string, number>;
+  /** The clause saying a word the request named was set aside, or null when nothing was. Absent from results before 2026-11-12. */
+  instead?: string | null;
 }
 
 export interface Concern {
