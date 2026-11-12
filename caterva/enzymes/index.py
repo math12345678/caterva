@@ -117,6 +117,14 @@ ORGANISMS: Dict[str, Tuple[str, str, Tuple[str, ...]]] = {
     "MAIZE": ("Zea mays", "maize", ("corn", "z. mays")),
     "TOBAC": ("Nicotiana tabacum", "tobacco", ("n. tabacum",)),
     "SOLLC": ("Solanum lycopersicum", "tomato", ("tomatoes", "s. lycopersicum")),
+    # Renamed species, typed by their old names: BRENDA files the Candida
+    # rugosa (C. cylindracea) lipase under Diutina rugosa and the
+    # Pseudomonas cepacia lipase under Burkholderia cepacia (EC 3.1.1.3,
+    # checked 2026-11-12). "lipase from Candida rugosa" was refused with "no
+    # Km row in Candida rugosa" while BRENDA holds six.
+    "DIURU": ("Diutina rugosa", "Candida rugosa", (
+        "c. rugosa", "candida cylindracea", "c. cylindracea", "d. rugosa")),
+    "BURCE": ("Burkholderia cepacia", "Burkholderia cepacia", ("pseudomonas cepacia", "p. cepacia", "b. cepacia")),
 }
 
 #: What a code covers when it is narrower than the name people type for it.

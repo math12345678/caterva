@@ -609,3 +609,24 @@ def test_an_unread_source_is_never_replaced_by_a_chosen_organism(monkeypatch):
     assert refusal is not None and refusal.startswith("No search was run")
     assert "'watermelon seeds'" in refusal and "--organism" in refusal
     assert "Zea mays (71 rows); Homo sapiens (59 rows)" in refusal
+
+
+def test_sars_cov_2_mpro_searches_sars_cov_2_never_the_2003_virus():
+    """"SARS-CoV-2 Mpro kinetics" was GROUNDED on BRENDA ref 707753, a row of
+    the 2003 SARS-CoV main protease (organism 'Severe acute respiratory
+    syndrome-related coronavirus'): the alias named no organism and the
+    best-measured one was chosen. Plain "Mpro" still names none."""
+    reading = read_sentence("SARS-CoV-2 Mpro kinetics")
+    assert reading.ec == "3.4.22.69"
+    assert reading.organism == "Severe acute respiratory syndrome coronavirus 2" and reading.organism_assumed
+    assert read_sentence("Mpro kinetics").organism is None
+
+
+@pytest.mark.parametrize("text, organism", [
+    ("lipase from Candida rugosa with p-nitrophenyl butyrate", "Diutina rugosa"),
+    ("lipase from Candida cylindracea", "Diutina rugosa"),
+    ("lipase from Pseudomonas cepacia", "Burkholderia cepacia"),
+])
+def test_a_renamed_species_is_read_as_the_name_brenda_files_it_under(text, organism):
+    assert read_sentence(text).organism == organism
+    assert normalise_organism(text.split(" from ")[1].split(" with ")[0])[0] == organism
