@@ -57,9 +57,13 @@ ORGANISMS: Dict[str, Tuple[str, str, Tuple[str, ...]]] = {
         "e.coli", "ecoli", "e. coli k-12", "e. coli k12", "escherichia coli k-12",
         "escherichia coli k12", "e. coli mg1655", "e. coli k-12 mg1655",
         "escherichia coli str. k-12 substr. mg1655")),
-    "BOVIN": ("Bos taurus", "cow", ("bovine", "cattle", "b. taurus")),
-    "PIG": ("Sus scrofa", "pig", ("porcine", "s. scrofa")),
-    "CHICK": ("Gallus gallus", "chicken", ("g. gallus",)),
+    "BOVIN": ("Bos taurus", "cow", ("bovine", "cattle", "b. taurus", "cows", "calf", "ox", "beef")),
+    "PIG": ("Sus scrofa", "pig", ("porcine", "s. scrofa", "pigs", "hog", "swine")),
+    # "hen egg white lysozyme" is the chicken's: a hen is a female chicken,
+    # and BRENDA files hen egg-white lysozyme under Gallus gallus.
+    "CHICK": ("Gallus gallus", "chicken", (
+        "g. gallus", "chickens", "chick", "hen", "hens", "hen's", "hen egg", "hen egg white", "hen egg-white",
+        "hen's egg white", "hen eggwhite", "egg white", "egg-white")),
     "ARATH": ("Arabidopsis thaliana", "Arabidopsis", ("arabidopsis", "a. thaliana")),
     "BACSU": ("Bacillus subtilis", "B. subtilis", ("b. subtilis",)),
     "DROME": ("Drosophila melanogaster", "fruit fly", ("fruit fly", "drosophila", "d. melanogaster")),
@@ -76,6 +80,22 @@ ORGANISMS: Dict[str, Tuple[str, str, Tuple[str, ...]]] = {
     # `--organism "guinea pig"` was case-fixed to "Guinea pig", which no
     # BRENDA row carries.
     "CAVPO": ("Cavia porcellus", "guinea pig", ("guinea pigs", "c. porcellus")),
+    # The common names enzymologists use for the classic enzyme sources, each
+    # one species in the literature: jack-bean urease, electric-eel
+    # acetylcholinesterase, mushroom tyrosinase (the commercial enzyme is
+    # Agaricus bisporus'), horseradish peroxidase, spinach Rubisco, barley
+    # and sweet-potato beta-amylase, soybean lipoxygenase. Unread, "urease
+    # from jack bean" chose Klebsiella aerogenes and said no organism had
+    # been named (round-1 finding F04). Counts only: the index lists no
+    # proteins for them.
+    "CANEN": ("Canavalia ensiformis", "jack bean", ("jack beans", "jackbean", "jack-bean", "c. ensiformis")),
+    "ELEEL": ("Electrophorus electricus", "electric eel", ("electric eels", "e. electricus")),
+    "AGABI": ("Agaricus bisporus", "mushroom", ("mushrooms", "button mushroom", "common mushroom", "a. bisporus")),
+    "ARMRU": ("Armoracia rusticana", "horseradish", ("a. rusticana",)),
+    "SPIOL": ("Spinacia oleracea", "spinach", ("s. oleracea",)),
+    "HORVU": ("Hordeum vulgare", "barley", ("h. vulgare",)),
+    "SOYBN": ("Glycine max", "soybean", ("soybeans", "soya", "soya bean", "soy bean", "g. max")),
+    "IPOBA": ("Ipomoea batatas", "sweet potato", ("sweet potatoes", "i. batatas")),
 }
 
 #: What a code covers when it is narrower than the name people type for it.

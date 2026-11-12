@@ -242,12 +242,15 @@ def test_stereo_labels_are_tolerated_but_rank_below_an_exact_match():
     assert find("aldehyde reductase")[0].tier < TIER_ACCEPTED_TOLERANT
 
 
-def test_a_greek_letter_is_read_as_its_name_and_ranks_below_the_spelled_name():
+def test_a_greek_letter_is_read_as_its_name():
+    # The letter is the name written another way, not a near spelling: it
+    # used to rank at the tolerant tier, and the sentence reader then set
+    # "β-galactosidase" aside as a stereo-label match (round-1 F12).
     spelled, greek = find("alpha-amylase")[0], find("α-amylase")[0]
     assert spelled.ec == greek.ec == "3.2.1.1"
-    assert spelled.tier == TIER_ACCEPTED_EXACT and greek.tier == TIER_ACCEPTED_TOLERANT
+    assert spelled.tier == greek.tier == TIER_ACCEPTED_EXACT
     assert loose_key("α-amylase") == loose_key("alpha-amylase") == "alpha amylase"
-    assert strict_key("α-amylase") != strict_key("alpha-amylase")
+    assert strict_key("α-amylase") == strict_key("alpha-amylase") == "alpha amylase"
 
 
 def test_a_stereo_prefix_never_changes_which_words_are_compared():

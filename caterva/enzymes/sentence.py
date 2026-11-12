@@ -35,11 +35,20 @@ WHAT IT READS, AND WHAT IT NEVER GUESSES
   cascade" grounded in one of them would be the adjacent-paper miscitation
   of ADR 0076. A name that is several enzymes ("lactate dehydrogenase") is
   returned as `ambiguity` for the caller to refuse with the candidates named,
-  never skipped and never picked.
+  never skipped and never picked. So are, when nothing else names an
+  enzyme, an abbreviation several enzymes go by ("LDH", "HMG-CoA reductase"
+  with no organism), the head word of several names ("amylase", "DNA
+  polymerase", "aldehyde dehydrogenase") and a near spelling with no single
+  reading ("hexokinaze"): each used to be dropped, and the report said no
+  enzyme was named (round-1 findings M7, F12; `_names_some_enzyme`).
 * The ORGANISM through `index.organism_code`, the one normaliser every caller
   shares, so "human", "humans", "human's", "H. sapiens", "E. coli" and
   "yeast" are read the same way here as `--organism` reads them; and a
-  binomial written after "in" or "from" ("in Thermus thermophilus"). A near
+  binomial written after "in" or "from" ("in Thermus thermophilus"); the
+  index also holds the classic enzyme sources by common name (jack bean,
+  hen egg white, electric eel, mushroom). Words after "from" just after the
+  enzyme that name no organism it knows are said, and not tried as a
+  substrate (`unread_organism` with no close name). A near
   spelling where an organism goes ("humna hexokinase") is never read as one,
   and is said (`unread_organism`).
 * The SUBSTRATE only as CANDIDATES (`substrate_candidates`). Whether one is
@@ -73,9 +82,10 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from .finder import (
-    TIER_ACCEPTED_EXACT, TIER_ACCEPTED_TOLERANT, TIER_ALTERNATIVE_EXACT, TIER_ALTERNATIVE_TOLERANT,
-    TIER_EC,
-    Ambiguous, Resolved, _tables, is_abbreviation, loose_key, read_ec, resolve, spelling_match, strict_key,
+    TIER_ACCEPTED_EXACT, TIER_ACCEPTED_TOLERANT, TIER_ALTERNATIVE_EXACT, TIER_ALTERNATIVE_PHRASE,
+    TIER_ALTERNATIVE_TOLERANT, TIER_EC,
+    TIER_TYPO, Ambiguous, Resolved, _ENZYME_ENDING, _outside_parentheses, _tables, compact_name_key, is_abbreviation, loose_key, read_ec,
+    resolve, spelling_match, strict_key,
 )
 from .index import ORGANISMS, load_index, organism_code
 
@@ -193,8 +203,10 @@ class SentenceReading:
     organisms_named: Tuple[Tuple[str, str], ...] = ()
     #: (typed, organism name it is close to) for a word placed where an
     #: organism goes that is a near spelling of one ("humna"), when no
-    #: organism was read. Never read as that organism: said.
-    unread_organism: Optional[Tuple[str, str]] = None
+    #: organism was read; (typed, None) for words after "from" just after
+    #: the enzyme that name no organism Caterva knows. Never read as an
+    #: organism: said.
+    unread_organism: Optional[Tuple[str, Optional[str]]] = None
     #: The description with the enzyme, organism and inhibitor spans removed.
     remainder: str = ""
     #: The protein of `ec` the enzyme words name (HK2, CYP2B6, PTGS2), for
@@ -249,6 +261,11 @@ class SentenceReading:
 
     def unread_organism_note(self) -> str:
         typed, close = self.unread_organism
+        if close is None:
+            return (f"{typed!r} in your description stands where the organism goes, but it is not an organism "
+                    "name Caterva knows, so no organism was read from your description and it was not tried "
+                    "as a substrate (pass --organism with the binomial BRENDA uses, e.g. --organism "
+                    "\"Canavalia ensiformis\" for jack bean).")
         return (f"{typed!r} in your description was not read as an organism: it is close to {close!r}, "
                 f"but a near spelling is never taken as one, so no organism was read from your "
                 f"description (pass --organism if you mean one).")
@@ -342,6 +359,48 @@ SUBSTRATE_ABBREVIATIONS: Dict[str, Tuple[Tuple[str, ...], ...]] = {
     "adomet": (("S-adenosyl-L-methionine",),),
     "dhf": (("7,8-dihydrofolate", "dihydrofolate"),),
     "thf": (("5,6,7,8-tetrahydrofolate", "tetrahydrofolate"),),
+    # Round-1 finding F13 (2026-11-11): "glutathione S-transferase with CDNB"
+    # matched nothing and the cosubstrate glutathione was chosen instead,
+    # and "catalase with hydrogen peroxide" said the typed compound "was
+    # not used" before using H2O2, the same molecule. Spellings checked
+    # against the live BRENDA pages for 2.5.1.18, 1.11.1.6, 1.11.1.7,
+    # 3.1.1.7, 3.1.1.8, 1.8.1.7, 1.1.1.34, 1.1.1.37, 5.3.1.1, 1.2.1.12,
+    # 4.1.1.39, 3.1.4.17, 3.4.22.56, 3.5.2.6 and 4.2.1.1 on 2026-11-11.
+    "cdnb": (("1-chloro-2,4-dinitrobenzene",),),
+    "hydrogenperoxide": (("H2O2", "hydrogen peroxide"),),
+    "h2o2": (("H2O2", "hydrogen peroxide"),),
+    "abts": (("2,2'-azinobis(3-ethylbenzthiazoline-6-sulfonic acid)",
+              "2,2'-azino-bis-(3-ethylbenzthiazole-6-sulfonic acid)",
+              "2,2'-azino-bis(3-ethylbenzthiazole-6-sulfonic acid)",
+              "2,2'-azino-bis(3-ethylbenzthiazoline-6-sulfonic acid)",
+              "2,2'-azino-bis (3-ethylbenzthiazoline-6-sulphonic acid)",
+              "2,2'-azino-bis(3-ethylbenzothiazoline-6-sulfonic acid)"),),
+    "tmb": (("3,3',5,5'-tetramethylbenzidine",),),
+    "opd": (("o-phenylenediamine",),),
+    "ach": (("acetylcholine", "acetylcholine chloride", "acetylcholine iodide"),),
+    "gsh": (("glutathione", "reduced glutathione"),),
+    "reducedglutathione": (("glutathione", "reduced glutathione"),),
+    "gssg": (("GSSG", "glutathione disulfide", "oxidized glutathione"),),
+    "glutathionedisulfide": (("GSSG", "glutathione disulfide", "oxidized glutathione"),),
+    "oxidizedglutathione": (("GSSG", "glutathione disulfide", "oxidized glutathione"),),
+    "oxidisedglutathione": (("GSSG", "glutathione disulfide", "oxidized glutathione"),),
+    "hmgcoa": (("3-hydroxy-3-methylglutaryl-CoA", "HMG-CoA", "3-hydroxy-3-methylglutaryl-coenzyme A"),
+               ("(S)-3-hydroxy-3-methylglutaryl-CoA",)),
+    "oaa": (("oxaloacetate",),),
+    "dhap": (("glycerone phosphate", "dihydroxyacetone phosphate", "dihydroxyacetone 3-phosphate"),),
+    "gap": (("D-glyceraldehyde 3-phosphate", "D-glyceraldehyde-3-phosphate"),),
+    "rubp": (("D-ribulose 1,5-bisphosphate", "D-ribulose-1,5-bisphosphate"),),
+    "cyclicamp": (("3',5'-cAMP", "cAMP", "adenosine 3',5'-cyclic phosphate"),),
+    "cyclicgmp": (("3',5'-cGMP", "cGMP", "guanosine 3',5'-cyclic phosphate"),),
+    "acdevdamc": (("acetyl-DEVD-7-amido-4-methylcoumarin", "Ac-DEVD-4-methylcoumarin 7-amide",
+                   "Ac-DEVD-AMC", "acetyl-Asp-Glu-Val-Asp-7-amido-4-methylcoumarin"),),
+    "acdevdpna": (("acetyl-DEVD-4-nitroanilide", "Ac-DEVD-pNA", "acetyl-Asp-Glu-Val-Asp-4-nitroanilide"),),
+    "carbondioxide": (("CO2",),),
+    "bicarbonate": (("HCO3-", "bicarbonate"),),
+    "hco3": (("HCO3-", "bicarbonate"),),
+    "oxygen": (("O2",),),
+    "water": (("H2O", "water"),),
+    "penicilling": (("benzylpenicillin", "penicillin G"),),
 }
 
 
@@ -488,8 +547,45 @@ def _misspelt_organism(tokens: List[_Token]) -> Optional[Tuple[str, str]]:
     return None
 
 
+#: Words that read as a compound, never as where an enzyme came from.
+_COMPOUND_LIKE = re.compile(r"\d|(?:ose|ate|ide|ine|ol|one|ene|yl|ium|ase)$")
+
+
+def _unread_source(tokens: List[_Token], text: str) -> Optional[Tuple[str, None]]:
+    """(typed, None) for the words after "from" just after the enzyme
+    ("urease from sword bean") when no organism was read from them: that is
+    where a description says whose enzyme it is.
+
+    They used to be passed over, tried as substrate words ("No word ('hen
+    egg white') is a substrate BRENDA lists"), and the report then said "No
+    organism was named" while choosing one (round-1 finding F04). They are
+    taken out of the substrate candidates and said to be an organism Caterva
+    does not know, never read as one.
+    """
+    for i, token in enumerate(tokens):
+        if token.low != "from" or token.used or i == 0 or not tokens[i - 1].used:
+            continue
+        span = _phrase_after(tokens, i + 1)
+        if span is None:
+            continue
+        words = tokens[span[0]:span[1]]
+        if all(w.low in FILLER for w in words) or any(_COMPOUND_LIKE.search(w.low) for w in words):
+            # "hexokinase from glucose": a compound, not a source.
+            continue
+        for w in words:
+            w.used = True
+        return text[words[0].start:words[-1].end], None
+    return None
+
+
 def _is_class_window(words: Sequence[_Token]) -> bool:
-    return all(w.low.strip("-") in CLASS_WORDS or w.low in STOPWORDS for w in words)
+    """Only class words and joining words. A capital letter on its own is a
+    name's, not the article: "protein kinase A" is cAMP-dependent protein
+    kinase, and reading its "A" as "a" set the whole window aside."""
+    # The window's first word is the article whatever its case ("A kinase
+    # and a phosphatase"); a capital letter after a class word is the name's.
+    return all(w.low.strip("-") in CLASS_WORDS or _joins(w) or (k == 0 and w.low in STOPWORDS)
+               for k, w in enumerate(words))
 
 
 def _acceptable(result: Resolved, typed: str) -> bool:
@@ -544,6 +640,98 @@ def _reportable(result: Ambiguous) -> bool:
     return (best.tier <= TIER_ALTERNATIVE_TOLERANT and all(not c.partial and c.via == "name" for c in tied))
 
 
+def _could_be_enzyme_words(typed: str) -> bool:
+    """Cheap test before `resolve` for the not-one-enzyme pass: an
+    abbreviation the symbol table holds, or words whose last one ends the
+    way an enzyme's name ends (-ase, -zyme, -in)."""
+    from .symbols import load_symbols
+
+    if load_symbols().knows(typed) or _could_be_a_name(typed):
+        return True
+    words = loose_key(typed).split()
+    if not words or not (_ENZYME_ENDING.search(words[-1]) or len(words) == 1 and _TYPO_ENDING.search(words[-1])):
+        return False
+    # Several words: each one a word of some enzyme name ("DNA polymerase",
+    # "aldehyde dehydrogenase"), so a run like "kinase cascade with
+    # phosphatases" never reaches the finder's slow fuzzy search.
+    vocabulary = _tables(load_index()).vocabulary
+    if len(words) > 1:
+        return all(w in vocabulary for w in words)
+    word = words[0]
+    if _ENZYME_ENDING.search(word) and (word in vocabulary or _could_be_a_name(typed)):
+        return True
+    # A near spelling: not a word of any name, nor a plural of one
+    # ("phosphatases"), and close to one -- checked here because the
+    # finder's own fuzzy search over every name takes seconds.
+    if word in vocabulary or word.rstrip("s") in vocabulary or word.rstrip("s") in CLASS_WORDS:
+        return False
+    import difflib
+
+    return bool(difflib.get_close_matches(word, _long_vocabulary(), n=1, cutoff=0.8))
+
+
+_LONG_VOCABULARY: Optional[List[str]] = None
+
+
+def _long_vocabulary() -> List[str]:
+    """Words of enzyme names at least eight letters long and ending -ase."""
+    global _LONG_VOCABULARY
+    if _LONG_VOCABULARY is None:
+        _LONG_VOCABULARY = sorted(w for w in _tables(load_index()).vocabulary
+                                  if len(w) >= 8 and w.endswith("ase"))
+    return _LONG_VOCABULARY
+
+
+#: A word one letter away from ending -ase ("hexokinaze", "lipasse" aside).
+_TYPO_ENDING = re.compile(r"(?:a.e|.se|as.)$")
+
+
+def _names_some_enzyme(result: Ambiguous, typed: str) -> bool:
+    """Whether an `Ambiguous` the reader would otherwise pass over is still
+    the description naming an enzyme, to be refused with its candidates:
+
+    * an abbreviation or symbol offered for confirmation (`confirm_only`),
+      written as one (a capital letter, three characters: "LDH", "NOS",
+      "tPA"), or a name the symbol table lists ("HMG-CoA reductase");
+    * words that are a whole-word phrase inside the names of the enzymes
+      that match best, ending the way an enzyme's name ends ("amylase",
+      "DNA polymerase", "aldehyde dehydrogenase");
+    * a near spelling (`suggestions_only`, typo candidates) of a word of at
+      least eight letters ending -ase or -zyme that no enzyme name uses
+      ("hexokinaze").
+
+    A class word ("kinase", "protein kinase") is none of these: the caller
+    has already set class windows aside, and the finder marks the rest.
+    """
+    from .finder import SPELLING_MIN_LENGTH
+    from .symbols import load_symbols
+
+    if not result.candidates or result.class_word:
+        return False
+    best = min(c.tier for c in result.candidates)
+    tied = [c for c in result.candidates if c.tier == best]
+    letters = re.sub(r"[^0-9A-Za-z]", "", typed)
+    if result.confirm_only:
+        written_as_one = len(letters) >= 3 and any(ch.isupper() for ch in typed)
+        return written_as_one and (is_abbreviation(typed) or load_symbols().knows(typed))
+    last = strict_key(typed).split()[-1]
+    if all(c.tier == TIER_TYPO for c in result.candidates):
+        return (" " not in strict_key(typed) and len(last) >= SPELLING_MIN_LENGTH
+                and _TYPO_ENDING.search(last) is not None and last not in _tables(load_index()).vocabulary)
+    if not _ENZYME_ENDING.search(last) or len(last) < 5:
+        return False
+    # A phrase inside the names (not words scattered over one) that is the
+    # HEAD of at least one of them -- the words its name ends on, a
+    # qualifier in parentheses aside: "amylase" ends "alpha-amylase",
+    # "aldehyde dehydrogenase" ends "aldehyde dehydrogenase (NAD(+))".
+    # "heparin" is inside "heparin lyase" but heads no name: a compound.
+    if best > TIER_ALTERNATIVE_PHRASE or not all(c.partial and c.via == "name" for c in tied):
+        return False
+    tail = f" {loose_key(typed)}"
+    return any(f" {loose_key(_outside_parentheses(name))}".endswith(tail)
+               for c in tied for name in (c.name, *c.alternative_names))
+
+
 def _name_keys() -> frozenset:
     """Every key an enzyme name can be met by: strict, loose and bare.
 
@@ -556,6 +744,9 @@ def _name_keys() -> frozenset:
     keys = set()
     for name in tables.names:
         keys.update((name.strict, name.loose, name.bare))
+    # A name written with its spaces moved ("butyrylcholinesterase" for
+    # "butyrylcholine esterase"), which `resolve` reads as that name.
+    keys.update("compact:" + key for key in tables.compact)
     return frozenset(keys)
 
 
@@ -568,7 +759,8 @@ def _could_be_a_name(text: str) -> bool:
         _KEYS = _name_keys()
     from .symbols import load_symbols
 
-    return strict_key(text) in _KEYS or loose_key(text) in _KEYS or load_symbols().knows(text)
+    return (strict_key(text) in _KEYS or loose_key(text) in _KEYS
+            or "compact:" + compact_name_key(text) in _KEYS or load_symbols().knows(text))
 
 
 def _read_ec(tokens: List[_Token]) -> List[Tuple[int, int, str]]:
@@ -765,6 +957,31 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
                     tokens[k].used = True
                 break
 
+    if not hits and ambiguity is None and near is None:
+        # Words that are an enzyme's name but not ONE enzyme's: an
+        # abbreviation several enzymes go by ("LDH", "HMG-CoA reductase"),
+        # the head word of several names ("amylase": alpha- and
+        # beta-amylase), or a near spelling with no single reading
+        # ("hexokinaze"). Each used to be passed over without a word, and
+        # the report then said "no enzyme was named -- name the enzyme"
+        # about a description that had named one (round-1 findings M7,
+        # F12). Returned as `ambiguity`, so the caller refuses with the
+        # candidates named, as for "lactate dehydrogenase"; never resolved.
+        for first, last, words in _windows(tokens):
+            if len(words) > 4 or any(w.used for w in words) or _is_class_window(words):
+                continue
+            if any(_joins(w) for w in words) or any(w.low in FILLER and w.low not in CLASS_WORDS for w in words):
+                continue
+            typed = text[words[0].start:words[-1].end]
+            if _substrate_key(typed) in SUBSTRATE_ABBREVIATIONS or not _could_be_enzyme_words(typed):
+                continue
+            result = resolve(typed, rank_by)
+            if isinstance(result, Ambiguous) and _names_some_enzyme(result, typed):
+                ambiguity, ambiguity_text = result, typed
+                for k in range(first, last):
+                    tokens[k].used = True
+                break
+
     enzyme: Optional[Tuple[str, Resolved]] = None
     others: List[Tuple[str, str, str]] = []
     distinct_ecs = []
@@ -811,6 +1028,8 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
             read_notes.append(mutation_note(enzyme[0], mutations))
 
     unread_organism = _misspelt_organism(tokens) if not organisms and (hits or ambiguity) else None
+    if unread_organism is None and not organisms and (hits or ambiguity):
+        unread_organism = _unread_source(tokens, text)
     inhibitor_span = _read_inhibitor(tokens)
     inhibitor_text = None
     if inhibitor_span is not None:
@@ -933,8 +1152,8 @@ class SubstrateMatch:
         """A sentence for the expansion of an abbreviation, or None."""
         if self.name is None or self.abbreviation is None:
             return None
-        return (f"Read {self.abbreviation!r} as {self.name}, the name BRENDA lists for that abbreviation's "
-                "compound.")
+        return (f"Read {self.abbreviation!r} as {self.name}, the name BRENDA lists that compound under "
+                "(the same molecule, written another way).")
 
 
 def _expand(typed: str, listed: Sequence[str], counts: Dict[str, int]) -> Optional[str]:

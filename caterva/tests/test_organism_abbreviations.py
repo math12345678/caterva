@@ -72,8 +72,12 @@ def test_the_note_for_an_ambiguous_initial_names_the_closest_organisms():
 
 
 def test_a_binomial_no_table_holds_only_has_its_case_fixed():
-    assert normalise_organism("thermus thermophilus") == (
-        "Thermus thermophilus", "Read --organism 'thermus thermophilus' as Thermus thermophilus.")
+    # Case fixed, and said to be unrecognised: "Read ... as" claimed a match
+    # ("electric eel" came back "Read as Electric eel", round-1 F04).
+    searched, note = normalise_organism("thermus thermophilus")
+    assert searched == "Thermus thermophilus"
+    assert note.startswith("--organism 'thermus thermophilus' is not an organism Caterva knows")
+    assert "Read --organism" not in note
     assert normalise_organism("Human immunodeficiency virus 1") == ("Human immunodeficiency virus 1", None)
     assert normalise_organism("Escherichia coli K-12")[0] == "Escherichia coli K-12"
 

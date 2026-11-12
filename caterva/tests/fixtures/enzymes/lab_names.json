@@ -1763,7 +1763,13 @@
    "include": [
     "1.1.1.34",
     "1.1.1.88"
-   ]
+   ],
+   "by_organism": {
+    "human": {"expect": "resolved", "ec": "1.1.1.34"},
+    "mouse": {"expect": "resolved", "ec": "1.1.1.34"},
+    "yeast": {"expect": "resolved", "ec": "1.1.1.34"}
+   },
+   "note": "Round-1 F12 (2026-11-11): in a eukaryote HMG-CoA reductase is the NADPH enzyme, EC 1.1.1.34 (human HMGCR, yeast HMG1/HMG2; the statin target); EC 1.1.1.88 is the NADH-dependent bacterial class II enzyme. With E. coli (or no organism) it stays a choice (data/aliases.json)."
   },
   {
    "query": "angiotensin converting enzyme",

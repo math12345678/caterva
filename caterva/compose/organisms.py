@@ -191,7 +191,14 @@ def normalise_organism(text: Optional[str]) -> Tuple[Optional[str], Optional[str
         fixed[1] = fixed[1].lower()
     canonical = " ".join(fixed)
     if canonical != typed:
-        return canonical, f"Read --organism {typed!r} as {canonical}."
+        # Not "Read ... as": nothing was recognised. "electric eel" came back
+        # "Read --organism 'electric eel' as Electric eel", which a reader
+        # takes for a match, and the search then said BRENDA held no row "in
+        # Electric eel" (round-1 finding F04).
+        return canonical, (f"--organism {typed!r} is not an organism Caterva knows; it was searched as "
+                           f"{canonical!r}, written as BRENDA writes a binomial (genus capitalised, epithet "
+                           "lower case). If it is a common name, pass the binomial instead (for example "
+                           "--organism \"Electrophorus electricus\" for electric eel).")
     return typed, None
 
 

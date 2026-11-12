@@ -165,9 +165,28 @@ _CONFIG_PREFIX = re.compile(r"(?<![0-9a-z])(?:dl|ld|d|l)-")
 
 
 def strict_key(text: str) -> str:
-    """Case, punctuation, hyphens and spacing set aside; nothing else."""
-    folded = unicodedata.normalize("NFKC", text).lower()
+    """Case, punctuation, hyphens and spacing set aside, and a Greek letter
+    read as its name; nothing else.
+
+    "β-galactosidase" is "beta-galactosidase" written with the letter, not a
+    near spelling of it: the letter used to survive this key, so the
+    nomenclature's "beta-galactosidase" was met only at the tolerant tier
+    and the sentence reader set it aside as a stereo-label match ("kinetics
+    of β-galactosidase in E. coli" was refused with the grammar's list of
+    shapes, 2026-11-11). A Greek letter is spelled out in every name the
+    nomenclature and BRENDA list, so reading it as its name loses nothing.
+    """
+    folded = unicodedata.normalize("NFKC", text)
+    for greek, name in _GREEK.items():
+        folded = folded.replace(greek, name)
+    folded = folded.lower()
     return " ".join(re.sub(r"[\W_]+", " ", folded).split())
+
+
+def compact_name_key(text: str) -> str:
+    """The strict key with its spaces removed: "butyrylcholine esterase" and
+    "butyrylcholinesterase" are one name written two ways."""
+    return strict_key(text).replace(" ", "")
 
 
 def loose_key(text: str) -> str:
@@ -478,6 +497,8 @@ class _Tables:
         #: not a misspelling of another ("ethanol" is not "methanol" mistyped).
         self.vocabulary: set = set()
         self.symbols: Dict[str, List[Tuple[str, str]]] = {}
+        #: compact_name_key -> the names written that way once spaces are set aside.
+        self.compact: Dict[str, List[_Name]] = {}
         for ec, entry in index.entries.items():
             if entry.status != ACTIVE or not entry.name:
                 continue
@@ -488,6 +509,7 @@ class _Tables:
                     ec, accepted, text, strict_key(text), loose, frozenset(loose.split()),
                     frozenset(loose_key(_outside_parentheses(text)).split()),
                     loose_key(_glued_aside(text)), is_abbreviation(text)))
+                self.compact.setdefault(compact_name_key(text), []).append(self.names[-1])
             for proteins in entry.proteins.values():
                 for protein in proteins:
                     self.symbols.setdefault(strict_key(protein.symbol), []).append((ec, protein.entry_name))
@@ -924,6 +946,10 @@ def resolve(
                                 isoform=reading.isoform, organism=reading.assumed_organism,
                                 notes=_reading_notes(text, reading))
         return result
+    if isinstance(result, Ambiguous) and read_ec(text) is None and not result.confirm_only and not result.class_word:
+        spaced = _spacing_variant(text, code, index)
+        if spaced is not None:
+            return spaced
     if isinstance(result, Ambiguous) and read_ec(text) is None and (
             not result.candidates or result.suggestions_only and all(c.tier == TIER_TYPO for c in result.candidates)):
         spelled = spelling_match(text, index=index)
@@ -932,13 +958,72 @@ def resolve(
             ranked = _search(name, code, index)
             head = next((c for c in ranked if c.ec == ec), None) or _candidate(
                 index, index.entries[ec], TIER_TYPO, "close spelling", code, via="typo")
-            how = (f"read as {name} (spelling): it is the one enzyme name within a letter or two of what was "
-                   "typed, and no other comes close")
+            closest = _closest_listed_name(text, ec, index)
+            if closest is not None and strict_key(closest) != strict_key(name):
+                how = (f"read as {name} (spelling): {text!r} is within a letter or two of {closest!r}, a name "
+                       "the nomenclature lists for it, and no other enzyme's name comes close")
+            else:
+                how = (f"read as {name} (spelling): it is the one enzyme name within a letter or two of what "
+                       "was typed, and no other comes close")
             head = Candidate(**{**head.__dict__, "why": how, "via": "typo"})
             return Resolved(ec=ec, how=how, candidate=head, cautions=_cautions(index, head, ranked),
                             notes=(f"Read {text!r} as {name} (spelling); pass --subject with an EC number "
                                    "if you meant another enzyme.",))
     return result
+
+
+def _closest_listed_name(text: str, ec: str, index: EnzymeIndex) -> Optional[str]:
+    """The name listed for `ec` closest to `text`, as the nomenclature writes it.
+
+    The spelling note quotes it, so a reader sees which listed name the
+    typed word was close to: "butyrylcholinesterase" is one letter and a
+    space from 'butyrylcholine esterase', and the note used to name only the
+    accepted name 'cholinesterase', seven letters shorter (round-1 F15)."""
+    import difflib
+
+    key = strict_key(text)
+    names = [n for n in _tables(index).names if n.ec == ec]
+    if not names:
+        return None
+    return max(names, key=lambda n: difflib.SequenceMatcher(None, n.strict, key, autojunk=False).ratio()).text
+
+
+#: The shortest name, in letters, read through a spacing difference alone.
+SPACING_MIN_LENGTH = 8
+
+
+def _spacing_variant(text: str, code: Optional[str], index: EnzymeIndex) -> Optional[Resolved]:
+    """ONE enzyme whose listed name is `text` with spaces or hyphens moved, else None.
+
+    "butyrylcholinesterase" is the nomenclature's "butyrylcholine esterase"
+    (EC 3.1.1.8) written as one word. It used to be read through the
+    spelling tier, and the report said it was "within a letter or two of
+    what was typed", which a reader takes for a typo Caterva corrected
+    (round-1 finding F15). Nothing was misspelt: the name is listed, and the
+    note now quotes it. Read only when every name written that way belongs
+    to one enzyme, the name is a word and not an abbreviation, and it is at
+    least SPACING_MIN_LENGTH letters.
+    """
+    key = compact_name_key(text)
+    if len(re.sub(r"[^a-z]", "", key)) < SPACING_MIN_LENGTH:
+        return None
+    names = [n for n in _tables(index).compact.get(key, ()) if not n.abbreviation]
+    if any(n.strict == strict_key(text) for n in names):
+        # Typed exactly as listed: `_resolve` has already decided it, and a
+        # refusal there ("protein kinase", a class word) stands.
+        return None
+    ecs = {n.ec for n in names}
+    if len(ecs) != 1 or len(names) != len(_tables(index).compact.get(key, ())):
+        return None
+    name = sorted(names, key=lambda n: (not n.accepted, n.text))[0]
+    ranked = _search(name.text, code, index)
+    head = next((c for c in ranked if c.ec == name.ec and not c.partial), None)
+    if head is None:
+        return None
+    how = (f"listed as {'the accepted name' if name.accepted else 'another name for this enzyme'}: "
+           f"'{name.text}', which is what was typed with the spacing or hyphens written differently")
+    head = Candidate(**{**head.__dict__, "why": how})
+    return Resolved(ec=name.ec, how=how, candidate=head, cautions=_cautions(index, head, ranked))
 
 
 def _only_rivals_by_abbreviation(result: "Ambiguous", ec: str) -> bool:
