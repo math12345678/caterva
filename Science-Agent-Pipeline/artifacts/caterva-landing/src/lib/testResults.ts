@@ -151,7 +151,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "192 test files -- kinetics & Michaelis-Menten correctness, " +
+          "193 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -276,10 +276,14 @@ export const TEST_SUITES: TestSuite[] = [
         // the rows, chooser, engine, names and web branches, caterva/tests
         // with pytest-xdist (-n 8): 7738 tests, 7736 passed, 2 skipped, 0
         // failed, 258 s.
-        passed: 7736,
+        //
+        // Measured 2026-11-12 (ADR 0182, third round's fixes) on
+        // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
+        // 7766 tests, 7764 passed, 2 skipped, 0 failed, 598 s.
+        passed: 7764,
         skipped: 2,
         failed: 0,
-        collected: 7738,
+        collected: 7766,
       },
     ],
   },
@@ -289,7 +293,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "98 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "99 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -390,10 +394,14 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-11-12 (ADR 0182, second round) on the same merged
         // tree, Tests/ with pytest-xdist (-n 8): 1832 tests, 1832 passed, 0
         // skipped, 0 failed, 202 s.
-        passed: 1832,
+        //
+        // Measured 2026-11-12 (ADR 0182, third round's fixes) on
+        // fix/studio-real-values, Tests/ with pytest-xdist (-n 8): 1871
+        // tests, 1871 passed, 0 skipped, 0 failed, 206 s.
+        passed: 1871,
         skipped: 0,
         failed: 0,
-        collected: 1832,
+        collected: 1871,
       },
     ],
   },
