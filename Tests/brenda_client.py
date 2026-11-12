@@ -140,6 +140,11 @@ class BRENDAKmEntry(BaseModel):
     #: enzyme's own. Filled by fallback_logic._brenda_entries, which holds the
     #: page; empty from the parser alone.
     inhibitors_present: List[str] = Field(default_factory=list)
+    #: The one isoform the row's PAPER names in its other entries on the
+    #: page (row_form.paper_isoforms), for a row whose own words and own
+    #: UniProt cell name none. Filled by fallback_logic._brenda_entries;
+    #: None from the parser alone, and when the paper names none or several.
+    paper_isoform: str | None = None
 
 
 # Keywords that mark a substrate as an engineered/reporter construct rather

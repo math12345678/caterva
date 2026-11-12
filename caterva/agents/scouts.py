@@ -92,6 +92,20 @@ def _row_description(source: Any) -> str:
     return f"{source.value} {source.unit or ''} @ {conditions}".strip()
 
 
+#: The clause `fallback_logic.resolve_kinetic_pair` adds to both constants of
+#: a matched pair.
+_PAIR_CLAUSE = re.compile(r"\) are one measurement: BRENDA ref ")
+
+
+def _one_measurement_with_its_pair(request: Any, result: Any) -> bool:
+    """Whether the resolver carried this constant as one paper's matched Km
+    and kcat pair (a paired request whose reason says so)."""
+    if getattr(request, "paired", False) is not True:
+        return False
+    because = getattr(result, "chosen_because", None)
+    return isinstance(because, str) and bool(_PAIR_CLAUSE.search(because))
+
+
 def _row_citation(resolver_citation: Optional[str], reference_id: Any) -> str:
     """The citation of a row the assay window re-selected, in the form the
     adapter cites the resolver's own row (`citation_text`): "BRENDA ref
@@ -195,7 +209,20 @@ class ParameterScout:
             )
         if source is not None:
             windows = self._windows(view, quantity)
-            if windows:
+            if windows and _one_measurement_with_its_pair(self.request, result):
+                # A Km and a kcat carried as one paper's matched pair are one
+                # measurement: moving one of them alone into a window gives
+                # a model of two measurements whose report still says one.
+                # Beta-lactamase TEM-1 with clavulanate: Km 0.0504 and kcat
+                # 444.18 1/s, ref 771150's pair, became Km 0.0504 with ref
+                # 663646's kcat 0.37 1/s, while the Km's reason still named
+                # 444.18 (ADR 0182, second round's review).
+                notes.append(
+                    f"{quantity} is carried as one measurement with its paired constant, so "
+                    f"the assay window ({'; '.join(str(w.requirement) for w in windows)}) was "
+                    "not applied to it alone: moving one of the pair would combine two "
+                    "measurements")
+            elif windows:
                 source, reason, window_note = self._re_select_under_window(
                     quantity, source, windows, reason
                 )

@@ -656,7 +656,81 @@ def _brenda_entries(
         inhibitors = _inhibitor_keys(ec_number, html)
         for e in entries:
             e.inhibitors_present = _inhibitors_in_assay(e, inhibitors, substrate)
+    if entries:
+        papers = _paper_isoform_map(ec_number, html)
+        for e in entries:
+            e.paper_isoform = _paper_isoform(e, papers)
     return entries
+
+
+#: (EC, page digest) -> row_form.paper_isoforms of the page.
+_PAPER_ISOFORMS: dict = {}
+#: A reading that is a code alone ("1", "II", "b"): which enzyme's code is not said.
+_BARE_CODE = re.compile(r"^(?:\d{1,2}|[IVX]{1,4}|[A-Za-z])[a-z]?$")
+
+
+def _paper_isoform_map(ec_number: str, html: str) -> dict:
+    """`row_form.paper_isoforms` of the page, parsed once per page."""
+    import hashlib
+    key = (ec_number, hashlib.sha1(html.encode("utf-8", "replace")).hexdigest())
+    if key not in _PAPER_ISOFORMS:
+        try:
+            _PAPER_ISOFORMS[key] = row_form.paper_isoforms(ec_number, html)
+        except Exception:  # a page that cannot be read names no paper's isoform
+            _PAPER_ISOFORMS[key] = {}
+    return _PAPER_ISOFORMS[key]
+
+
+def _canonical_isoform(ec_number, organism, reading):
+    """The enzyme index's label for the protein `reading` names ("glucokinase",
+    "HK-IV" and "GCK" are all GCK under EC 2.7.1.1 in human), else `reading`."""
+    try:
+        from caterva.enzymes.finder import isozymes
+        from caterva.enzymes.isozyme import _listed
+    except ImportError:
+        return reading
+    try:
+        found = isozymes(ec_number, organism)
+        listed = _listed(found, reading) if found.organism and found.count > 1 else None
+    except Exception:
+        return reading
+    return listed[0].label if listed else reading
+
+
+def _cell_is_read(entry) -> bool:
+    """Whether the row's own UniProt cell names a protein the enzyme index
+    files under its EC (one isoform, several, or THE enzyme of a
+    one-protein organism): then the cell, not the paper, says what the row
+    measured. A cell the index does not know (ref 734041's seven NDM
+    accessions under EC 3.5.2.6) says nothing, and the paper is read."""
+    if not getattr(entry, "uniprot_from_row", False):
+        return False
+    try:
+        return bool(row_form.isoforms_of_accessions(entry.ec_number, entry.uniprot))
+    except Exception:  # an index that cannot be read leaves the cell as the word
+        return True
+
+
+def _paper_isoform(entry, papers) -> "str | None":
+    """The isoform(s) the entry's paper names elsewhere on the page, for a
+    row whose own words and own UniProt cell name none, joined as the
+    isoform reader joins two ("NDM-3 and NDM-4") when several; else None.
+
+    Several are read as a UniProt cell listing several proteins is
+    (`_row_isoform`): a row of a paper naming only NDM variants is not
+    TEM-1's, while it names none of them for a request of any one."""
+    if not getattr(entry, "reference_id", None) or _cell_is_read(entry):
+        return None
+    try:
+        if _isoform_of(getattr(entry, "conditions", None)):
+            return None
+        readings = papers.get(((entry.organism or "").lower(), str(entry.reference_id))) or ()
+        readings = [_canonical_isoform(entry.ec_number, entry.organism, r) for r in readings
+                    if not _BARE_CODE.match(r.strip())]
+        distinct = row_form.distinct_isoforms(readings, _same_isoform)
+        return " and ".join(distinct) if distinct else None
+    except ImportError:
+        return None
 
 
 #: (EC, page digest) -> the compound keys BRENDA lists Ki rows for.
@@ -1154,6 +1228,10 @@ def _row_notes(entry, quantity) -> list:
     if (accession_isoform and not commentary_isoform
             and row_form.proteins_in_organism_of(entry.ec_number, entry.uniprot) > 1):
         notes.append(f"the row's UniProt accession ({entry.uniprot}) is {accession_isoform}")
+    paper = getattr(entry, "paper_isoform", None)
+    if paper and " and " not in paper and not commentary_isoform and not accession_isoform:
+        notes.append(f"the row names no isoform itself; its paper (BRENDA ref {entry.reference_id}) "
+                     f"names only {paper} in its other entries on BRENDA's page")
     return notes
 
 
@@ -1721,6 +1799,14 @@ def _row_isoform(entry, isoform=None):
     if named:
         return named
     from_cell = _isoform_from_accession(entry)
+    if not from_cell and not _cell_is_read(entry):
+        # Neither its words nor its own cell: the isoform(s) its paper's
+        # other entries on the page name (`_paper_isoform`), if any, read as
+        # a cell is below. Ref 722237's "67.6 | D-glucose | Homo sapiens |
+        # - | wild-type, 37°C" is glucokinase's by its paper's synonyms, and
+        # was HK2's kcat; ref 734041's ampicillin rows, a paper naming only
+        # NDM variants, were TEM-1's.
+        from_cell = getattr(entry, "paper_isoform", None)
     if not from_cell or " and " not in from_cell:
         return from_cell
     if isoform is None or any(_same_isoform(part, isoform) for part in from_cell.split(" and ")):
@@ -1739,7 +1825,7 @@ def _same_isoform(a, b):
     return same_isoform(a, b)
 
 
-def _partition_isoform(entries, isoform, log, where):
+def _partition_isoform(entries, isoform, log, where, wild_first=False):
     """`(rows, matched, refused_isoforms)` for a request for one isoform.
 
     Rows naming the isoform win. Failing those, rows naming no isoform are
@@ -1747,18 +1833,48 @@ def _partition_isoform(entries, isoform, log, where):
     those too, every row measured another isoform: `rows` is empty and
     `refused_isoforms` names what exists. The same three cases, in the same
     order, as `caterva compose --isoform` (caterva/compose/isoform.py).
+
+    The second round's review (2026-11-12):
+
+    - A row names the isoform by its words, its own UniProt cell or the
+      other entries of its paper (`_row_isoform`).
+    - With `wild_first` (no mutant asked for, variants not allowed), the
+      three cases are decided on the rows not measuring a variant first:
+      PKM2's kcat was refused as "every row measured a variant" because the
+      one row whose cell names PKM (P14618) is the mutant PKM2 G415R, while
+      ref 674499's wild-type rows name no isoform.
     """
     try:
         named = [(e, _row_isoform(e, isoform)) for e in entries]
+        if wild_first:
+            wild = [(e, iso) for e, iso in named if not _is_variant_row(e, iso, isoform)]
+            if wild and len(wild) < len(named):
+                rows, matched, _ = _isoform_tiers(wild, isoform, len(entries), log, where)
+                if rows:
+                    return rows, matched, []
+        rows, matched, refused = _isoform_tiers(named, isoform, len(entries), log, where)
     except ImportError:
         log.append(f"isoform {isoform!r} asked for, but caterva's isoform reader is not "
                    f"importable here, so {where} rows were NOT filtered by isoform")
         return entries, False, []
+    return rows, matched, refused
+
+
+def _is_variant_row(entry, iso, isoform) -> bool:
+    """A row `_partition_variants` would withhold, an isozyme row of the
+    isoform asked for excepted."""
+    verdict = getattr(entry, "variant", None)
+    if verdict is None or verdict.status != "variant":
+        return False
+    return not (verdict.kind == "isozyme" and _same_isoform(iso, isoform))
+
+
+def _isoform_tiers(named, isoform, total, log, where):
     matching = [e for e, iso in named if _same_isoform(iso, isoform)]
-    if matching:
-        log.append(f"Kept the {len(matching)} of {len(entries)} {where} row(s) measuring {isoform}")
-        return matching, True, []
     unnamed = [e for e, iso in named if iso is None]
+    if matching:
+        log.append(f"Kept the {len(matching)} of {total} {where} row(s) measuring {isoform}")
+        return matching, True, []
     if unnamed:
         log.append(f"No {where} row names {isoform}; kept the {len(unnamed)} naming no isoform, "
                    f"which may or may not have measured it")
@@ -2275,7 +2391,8 @@ def resolve_kinetic_value(
         pool = exact
         isoform_matched = False
         if isoform:
-            exact, isoform_matched, other_isoforms = _partition_isoform(exact, isoform, log, "exact-match")
+            exact, isoform_matched, other_isoforms = _partition_isoform(
+                exact, isoform, log, "exact-match", wild_first=not allow_variants and not mutation)
             if not exact:
                 return _isoform_withheld_result(isoform, other_isoforms, log)
         if mutation:
@@ -2539,7 +2656,8 @@ def resolve_kinetic_value(
         isoform_matched = False
         if isoform:
             acceptable, isoform_matched, other_isoforms = _partition_isoform(
-                acceptable, isoform, log, "cross-species")
+                acceptable, isoform, log, "cross-species",
+                wild_first=not allow_variants and not mutation)
             if not acceptable:
                 return _isoform_withheld_result(isoform, other_isoforms, log)
         if mutation:

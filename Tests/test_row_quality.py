@@ -197,13 +197,26 @@ class TestConstructsAreSetAsideAndNamed:
         ("in presence of 20% methanol", "an assay with a cosolvent or denaturant added"),
         ("immobilized enzyme, pH 7.5, 25°C", "an immobilised enzyme"),
         ("37°C, pH 4.7, HIV-1 subtype C protease", "a named subtype or variant of the enzyme"),
+        # Bovine trypsin and BAEE, ref 668032, beside its "wild-type" row
+        # (review of the second round, 2026-11-12).
+        ("enzyme with O-carboxymethyl-poly-beta-cyclodextrin attached to surface, pH 8.0, 25°C",
+         "a chemically modified enzyme"),
+        ("enzyme conjugated to gold nanoparticles, pH 7.0", "a chemically modified enzyme"),
+        # Triosephosphate isomerase, T. brucei, ref 682787, beside its
+        # "wild-type, pH 7.4, 25°C" pair (review of the second round).
+        ("in complex with monomer from Trypanosoma cruzi, pH 7.4, 25°C",
+         "a hybrid enzyme (subunits of two proteins)"),
+        ("in complex with mutant C15A of Trypanosoma cruzi enzyme, pH 7.4, 25°C",
+         "a hybrid enzyme (subunits of two proteins)"),
     ])
     def test_read(self, commentary, what):
         assert row_form.construct_of(commentary).startswith(what)
 
     @pytest.mark.parametrize("commentary", [
         "without addition of methanol", "tACE, 37°C, pH 8.3", "pH 8, 0.1% (w/v) PEG 8000",
-        "wild-type enzyme, pH 7.5"])
+        "wild-type enzyme, pH 7.5", "coupled assay with lactate dehydrogenase, pH 7.5",
+        "substrate: conjugated bile acid, pH 7.0", "bile acids conjugated to taurine, pH 7.0",
+        "in complex with calmodulin, pH 7.5", "enzyme in complex with NADH, 25°C"])
     def test_not_a_construct(self, commentary):
         assert row_form.construct_of(commentary) is None
 
@@ -222,6 +235,28 @@ class TestConstructsAreSetAsideAndNamed:
         r = value("3.4.15.1", "Homo sapiens", "hippuryl-His-Leu", "kcat",
                   page({"Turnover Numbers": kcat}))
         assert r.value == 15.1 and any("chimeric" in n for n in r.row_notes)
+
+    def test_an_interspecies_heterodimer_is_passed_over_for_the_wild_type_pair(self):
+        """Triosephosphate isomerase, T. brucei, D-glyceraldehyde 3-phosphate
+        (live, 2026-11-12): Km 0.31 mM and kcat 5000 1/s were carried, the
+        rows "in complex with monomer from Trypanosoma cruzi"; the same
+        paper's wild-type pair is 0.46 mM and 5170 1/s."""
+        s, org = "D-glyceraldehyde 3-phosphate", "Trypanosoma brucei"
+        km = [row(0.31, s, org, "in complex with monomer from Trypanosoma cruzi, pH 7.4, 25°C",
+                  "682787"),
+              row(0.28, s, org, "in complex with mutant C15A of Trypanosoma cruzi enzyme, pH 7.4, "
+                  "25°C", "682787"),
+              row(0.46, s, org, "wild-type, pH 7.4, 25°C", "682787"),
+              row(0.38, s, org, "wild-type, 25°C, pH 7.4", "690940")]
+        kcat = [row(5000, s, org, "in complex with monomer from Trypanosoma cruzi, pH 7.4, 25°C",
+                    "682787"),
+                row(2170, s, org, "in complex with mutant C15A of Trypanosoma cruzi enzyme, pH "
+                    "7.4, 25°C", "682787"),
+                row(5170, s, org, "wild-type, pH 7.4, 25°C", "682787"),
+                row(4183, s, org, "wild-type, 25°C, pH 7.4", "690940")]
+        k, c = pair("5.3.1.1", org, s, page({"KM Values": km, "Turnover Numbers": kcat}))
+        assert (k.value, c.value) in {(0.46, 5170), (0.38, 4183)}
+        assert not any("hybrid" in n for n in k.row_notes + c.row_notes)
 
     def test_a_cosolvent_row_is_passed_over_for_its_control(self):
         km = [row(0.0096, "Nalpha-benzoyl-L-arginine ethyl ester", "Bos taurus",
@@ -281,6 +316,72 @@ class TestTheUniprotColumnSaysWhichIsozyme:
         r = value("2.7.1.1", "Homo sapiens", "D-glucose", "kcat", page({"Turnover Numbers": kcat}),
                   isoform="HK2")
         assert r.value == 20.0
+
+    def test_a_row_naming_none_is_its_papers_isoform(self):
+        """Ref 722237's "67.6 | D-glucose | Homo sapiens | - | wild-type,
+        37°C" names no isoform, and was carried as HK1's and HK2's kcat; the
+        page's synonyms give that paper "hGK" and "glucokinase" (review of
+        the second round, 2026-11-12)."""
+        kcat = [row(67.6, "D-glucose", "Homo sapiens",
+                    "wild-type, 37°C, pH not specified in the puclication", "722237")]
+        synonyms = [["hGK", "Homo sapiens", "-", "-", "722237"],
+                    ["glucokinase", "Homo sapiens", "-", "-", "672225 , 702116 , 722237"]]
+        html = page({"Turnover Numbers": kcat, "Synonyms": synonyms})
+        r = value("2.7.1.1", "Homo sapiens", "D-glucose", "kcat", html, isoform="HK2")
+        assert not r.found and r.source == "isoform_withheld" and r.isoforms_available == ["GCK"]
+        unasked = value("2.7.1.1", "Homo sapiens", "D-glucose", "kcat", html)
+        assert unasked.row_isoform == "GCK"
+        assert any("its paper (BRENDA ref 722237) names only GCK" in n for n in unasked.row_notes)
+
+    def test_a_paper_naming_two_isoforms_names_none(self):
+        kcat = [row(67.6, "D-glucose", "Homo sapiens", "wild-type, 37°C", "722237")]
+        synonyms = [["glucokinase", "Homo sapiens", "-", "-", "722237"],
+                    ["hexokinase II", "Homo sapiens", "-", "-", "722237"]]
+        html = page({"Turnover Numbers": kcat, "Synonyms": synonyms})
+        r = value("2.7.1.1", "Homo sapiens", "D-glucose", "kcat", html, isoform="HK2")
+        assert r.found and r.value == 67.6 and r.row_isoform is None
+
+    def test_a_paper_naming_only_other_isoforms_is_theirs(self):
+        """"beta lactamase TEM-1 with ampicillin" in E. coli (live,
+        2026-11-12): no ampicillin row of EC 3.5.2.6 names TEM-1. Ref
+        775641's synonyms say NDM-4, ref 771150's CTX-M-15 (which the isoform
+        reader did not read), and ref 734041's seven indistinguishable rows
+        belong to a paper naming only NDM variants; each was carried in turn
+        as a TEM-1 row "naming no isoform"."""
+        km = [row(0.03172, "ampicillin", "Escherichia coli", "pH 7.5, 25°C, wild-type enzyme",
+                  "771150"),
+              row(0.127, "ampicillin", "Escherichia coli", "pH 7.5, 25°C, wild-type enzyme",
+                  "775641"),
+              # Its own cell lists seven accessions the enzyme index does not
+              # file under EC 3.5.2.6, which say nothing; its paper does.
+              row(0.207, "ampicillin", "Escherichia coli", "pH 7.2, 25°C, recombinant enzyme",
+                  "734041", "I3VKD5 , H6WZS9 , A0A0F6N6D4")]
+        synonyms = [["CTX-M-15", "Escherichia coli", "-", "-", "771150"],
+                    ["NDM-4", "Escherichia coli", "-", "-", "775641 , 734041"],
+                    ["NDM-12", "Escherichia coli", "-", "-", "734041"]]
+        html = page({"KM Values": km, "Synonyms": synonyms})
+        r = value("3.5.2.6", "Escherichia coli", "ampicillin", "km", html, isoform="TEM-1")
+        assert not r.found and r.source == "isoform_withheld"
+        assert set(r.isoforms_available) >= {"CTX-M-15", "NDM-4"}
+        ctx = value("3.5.2.6", "Escherichia coli", "ampicillin", "km", html, isoform="CTX-M-15")
+        assert ctx.found and ctx.value == 0.03172
+        # A request for one NDM variant: ref 734041 names it among others,
+        # so its row names none of them, as a cell listing several does.
+        ndm = value("3.5.2.6", "Escherichia coli", "ampicillin", "km", html, isoform="NDM-12")
+        assert ndm.found and ndm.value == 0.207 and ndm.row_isoform is None
+
+    def test_a_mutant_naming_the_isoform_does_not_shut_out_wild_type_rows(self):
+        """PKM2's kcat was refused as "every row measured a variant": the one
+        row whose cell names PKM (P14618) is the mutant PKM2 G415R, and ref
+        674499's wild-type rows name no isoform."""
+        kcat = [row(0.57, "phosphoenolpyruvate", "Homo sapiens", "mutant PKM2G415R, pH 7.6, 37°C",
+                    "760578", "P14618"),
+                row(1182, "phosphoenolpyruvate", "Homo sapiens",
+                    "wild type enzyme, in the presence of K+, in 50 mM Mes-Tris, pH 6.0, at 25°C",
+                    "674499")]
+        r = value("2.7.1.40", "Homo sapiens", "phosphoenolpyruvate", "kcat",
+                  page({"Turnover Numbers": kcat}), isoform="PKM2")
+        assert r.found and r.value == 1182
 
     def test_cyp2b6_never_carries_a_cyp3a5_ki(self):
         ki = [row(0.004, "erdafitinib", "Homo sapiens", "substrate rivaroxaban, pH 7.4, 37°C",

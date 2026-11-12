@@ -76,11 +76,32 @@ _CONSTRUCTS = (
     (re.compile(r"\bfusion\s+(?:protein|enzyme|construct)\b|\bfused\s+(?:to|with)\b"
                 r"|\bin\s+fusion\s+with\b|\bfusion\s+with\b|\bsurface[- ]displayed\b", re.IGNORECASE),
      "a fusion construct"),
+    # "in complex with monomer from Trypanosoma cruzi, pH 7.4, 25°C"
+    # (triosephosphate isomerase, T. brucei, ref 682787, beside the same
+    # paper's "wild-type, pH 7.4, 25°C"): an interspecies heterodimer, carried
+    # as T. brucei TIM in the review of the second round (2026-11-12). A
+    # complex with a ligand or a regulatory protein is not one.
+    (re.compile(r"\bin\s+complex\s+with\s+(?:an?\s+|the\s+)?(?:intact\s+|wild[- ]type\s+"
+                r"|mutant\s+\S+\s+(?:of\s+)?)?(?:monomer|subunit|protomer)s?\b"
+                r"|\bin\s+complex\s+with\s+(?:an?\s+|the\s+)?(?:mutant\s+\S+\s+)?of\s+"
+                r"[A-Z][a-z]+\s+[a-z]+\b|\bhybrid\s+(?:enzyme|dimer|tetramer|protein)\b"
+                r"|\b(?:interspecies|hybrid)\s+heterodimer\b", re.IGNORECASE),
+     "a hybrid enzyme (subunits of two proteins)"),
     (re.compile(r"\bimmobi(?:li[sz]|iz)ed\b|\bimmobili[sz]ation\b|\bcross[- ]?linked\s+"
                 r"(?:enzyme|crystal|aggregate)", re.IGNORECASE),
      "an immobilised enzyme"),
     (re.compile(r"\b[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*-modified\b|\bchemically\s+modified\b"
-                r"|\bmodified\s+enzyme\b|\bpegylat\w+|\bglycated\b|\bacetylated\s+enzyme\b",
+                r"|\bmodified\s+enzyme\b|\bpegylat\w+|\bglycated\b|\bacetylated\s+enzyme\b"
+                # "enzyme with O-carboxymethyl-poly-beta-cyclodextrin attached
+                # to surface" (bovine trypsin and BAEE, ref 668032, beside its
+                # "wild-type" row): a polymer conjugate.
+                r"|\battached\s+to\s+(?:the\s+)?(?:enzyme\s+|protein\s+)?surface\b"
+                # The enzyme conjugated, not a substrate: "glycine-conjugated
+                # bile acid" and "bile acids conjugated to taurine" are
+                # substrates (review, 2026-11-12).
+                r"|\b(?:enzyme|protein)\s+(?:was\s+|is\s+)?conjugated\s+(?:to|with)\b"
+                r"|\b(?:enzyme|protein)[- ]conjugates?\b"
+                r"|\bgrafted\s+(?:to|onto|with)\b|\bencapsulated\b|\bentrapped\b",
                 re.IGNORECASE),
      "a chemically modified enzyme"),
     (re.compile(rf"\b\d+(?:\.\d+)?\s*%\s*(?:\(?[vw]/[vw]\)?\s*)?(?:{_COSOLVENTS})\b"
@@ -196,6 +217,95 @@ def proteins_in_organism_of(ec: Optional[str], cell: Optional[str]) -> int:
     entries = _labels_of_ec(ec)
     code = next((c for acc, _, c in entries if acc == found[0]), None)
     return sum(1 for _, _, c in entries if c == code) if code else 0
+
+
+# -- Isoform from the paper's other entries -------------------------------------------
+
+#: The tables of a BRENDA page whose rows say which protein one reference
+#: studied: the synonyms a paper used, the organism table's accessions, and
+#: the commentary of its other measurements.
+_PAPER_TABLES = ("Synonyms", "Organisms", "KM Values", "Turnover Numbers", "kcat/KM Values",
+                 "Ki Values", "IC50 Values", "Specific Activity", "Protein Variants")
+_REFERENCES = re.compile(r"^\d{1,7}(?:\s*,\s*\d{1,7})*$")
+_BINOMIAL = re.compile(r"[A-Z][a-z]+ [a-z][a-z.-]+(?: [a-z.-]+)?")
+
+
+def paper_isoforms(ec: Optional[str], html: str) -> dict:
+    """{(organism, reference): (isoform, ...)}: the isoforms each reference's
+    rows name anywhere among `_PAPER_TABLES` of the page, by their words
+    (caterva's isoform reader) or by their own UniProt cell, one organism at
+    a time (the organism lower-cased as its row cell spells it).
+
+    A row naming no isoform is not thereby of unknown protein: BRENDA's
+    "67.6 | D-glucose | Homo sapiens | - | wild-type, 37°C | 722237" names
+    none, and the same paper's synonyms ("hGK", "glucokinase") and its
+    mutants (T228M, the MODY mutation) are glucokinase's. That row was
+    carried as HK1's and HK2's kcat with "names no isoform" (the second
+    adversarial round's review, 2026-11-12). {} where the page or caterva's
+    isoform reader cannot be read."""
+    try:
+        from bs4 import BeautifulSoup
+        from caterva.bind.core import read_isoform
+        from brenda_client import _find_table_container
+    except ImportError:
+        return {}
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        return {}
+    found: dict = {}
+    for label in _PAPER_TABLES:
+        table = _find_table_container(soup, label)
+        if table is None:
+            continue
+        for row in table.find_all("div", id=re.compile(r"r\d+(?:sr\d+)?$")):
+            cells = [c.get_text(" ", strip=True) for c in row.find_all("div", recursive=False)]
+            refs_cell = next((c for c in reversed(cells) if _REFERENCES.match(c or "")), None)
+            if not refs_cell:
+                continue
+            refs = [r.strip() for r in refs_cell.split(",") if r.strip()]
+            organism = next((c for c in cells if _BINOMIAL.fullmatch(c or "")), None)
+            if organism is None:
+                continue
+            readings = []
+            cell = next((c for c in cells if accessions(c) and not _REFERENCES.match(c)), None)
+            if cell and len(accessions(cell)) == 1 and proteins_in_organism_of(ec, cell) > 1:
+                readings.extend(isoforms_of_accessions(ec, cell))
+            texts = [c for c in cells if c not in (refs_cell, organism, cell)]
+            if label not in ("Synonyms", "Organisms"):
+                # The commentary only: a kinetic row's first cells are its
+                # value and its compound.
+                texts = texts[2:]
+            for text in texts:
+                try:
+                    reading = read_isoform(text)
+                except Exception:
+                    reading = None
+                if reading:
+                    readings.append(reading)
+            for ref in refs:
+                kept = found.setdefault((organism.lower(), ref), [])
+                for reading in readings:
+                    if reading not in kept:
+                        kept.append(reading)
+    return {key: tuple(value) for key, value in found.items()}
+
+
+def distinct_isoforms(readings, same) -> list:
+    """`readings` with each isoform once, by `same` (an isoform comparison),
+    in the order first named."""
+    distinct: list = []
+    for reading in readings or ():
+        if not any(reading == kept or same(reading, kept) for kept in distinct):
+            distinct.append(reading)
+    return distinct
+
+
+def one_isoform(readings, same) -> Optional[str]:
+    """The one isoform `readings` name, by `same` (an isoform comparison),
+    or None when they name none or several."""
+    distinct = distinct_isoforms(readings, same)
+    return distinct[0] if len(distinct) == 1 else None
 
 
 # -- Matching a Km row with a kcat row ---------------------------------------------

@@ -60,7 +60,8 @@ def recorded_hexokinase() -> str:
 # div.cell markup: value | compound | organism | uniprot | commentary | ref.
 
 _TAB_IDS = {"KM Values": "tab12", "Turnover Numbers": "tab44", "kcat/KM Values": "tab305",
-            "Ki Values": "tab49", "IC50 Values": "tab54", "Inhibitors": "tab11"}
+            "Ki Values": "tab49", "IC50 Values": "tab54", "Inhibitors": "tab11",
+            "Synonyms": "tab39"}
 
 
 def page(tables: dict) -> str:

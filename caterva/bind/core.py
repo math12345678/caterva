@@ -324,6 +324,29 @@ _CYP_NAME = re.compile(
     rf"(?<![\w-])(?:CYP[ -]?|P-?450[ -]?)(?P<code>{_CYP_CODE})(?![\w-])"
 )
 
+# -- Beta-lactamases (review of the second adversarial round, 2026-11-12) -----
+#
+# BRENDA files every beta-lactamase under EC 3.5.2.6 and names which one a
+# paper measured in its synonyms ("CTX-M-15", "NDM-4", "TEM-149"). The forms
+# above read "NDM-4" and "TEM-1" but not "CTX-M-15" (a family name with a
+# hyphen of its own) nor a three-digit allele ("TEM-149", "OXA-163"), so
+# "beta lactamase TEM-1 with ampicillin" carried ref 771150's CTX-M-15 rows
+# as rows "naming no isoform". Read here, family and allele as written.
+_BETA_LACTAMASE = re.compile(
+    r"(?<![\w-])(?:bla)?(?P<fam>CTX-M|TEM|SHV|OXA|KPC|NDM|VIM|IMP|CMY|GES|PER|VEB|DHA|FOX"
+    r"|SME|IMI|NMC|GIM|SPM|AIM|SIM|BEL|PSE|CARB)-(?P<num>\d{1,3})(?![\w-]|\.\d)"
+    # The chromosomal class C enzyme, written without a number: "AmpC
+    # beta-lactamase" (ref 663646's synonym, whose ampicillin pair was
+    # carried for TEM-1).
+    r"|(?<![\w-])(?P<ampc>AmpC|ampC)(?![\w-])"
+)
+
+
+def _beta_lactamase_reading(m: "re.Match") -> Optional[str]:
+    if m.group("ampc"):
+        return "AmpC"
+    return f"{m.group('fam')}-{m.group('num')}"
+
 
 def _ca_reading(m: "re.Match") -> Optional[str]:
     if _BRAIN_REGION.match(m.string[m.end():]) or re.search(
@@ -363,6 +386,7 @@ _FORMS = (
     (_CA_NAME, _ca_reading),
     (_PDE_NAME, _pde_reading),
     (_CYP_NAME, _cyp_reading),
+    (_BETA_LACTAMASE, _beta_lactamase_reading),
     (_FULL_NAME, _full_name_reading),
     (_STEM_NAME, _stem_reading),
     (_GLUCOKINASE, _glucokinase_reading),

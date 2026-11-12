@@ -259,6 +259,17 @@ now a rule in `fallback_logic._best_evidenced` (row facts read by
 | glucose oxidase's Aga2 surface-display fusion carried over the soluble enzyme | "in fusion with" is a fusion construct |
 | carbonic anhydrase I's "25 mM hydroxyurea" row beside the plain one | a compound the Ki table lists, given bare at a concentration, is an inhibitor in the assay |
 
+Review of the round, live (2026-11-12):
+
+| found | rule now |
+|---|---|
+| HK1 and HK2 carrying ref 722237's "67.6 \| D-glucose \| - \| wild-type, 37°C", a row naming no isoform from a paper whose other entries on the page ("hGK", "glucokinase", T228M) are glucokinase's | a row naming no isoform in its words or its own UniProt cell takes the isoform(s) its paper's other entries on BRENDA's page name (synonyms, organism accessions, other measurements), read as a UniProt cell is: one names it, several name none of them for a request of any one and are another protein's for a request of none |
+| "beta lactamase TEM-1 with ampicillin" carrying, as TEM-1 rows "naming no isoform", ref 775641 (NDM-4), then ref 771150 (CTX-M-15, which the isoform reader did not read), then ref 734041 (a paper naming only NDM variants, whose UniProt cell the enzyme index does not know), then ref 663646 (AmpC, 0.0062 mM and 0.43 1/s) | the isoform reader reads beta-lactamase names ("CTX-M-15", three-digit alleles such as "TEM-149", "AmpC"); a UniProt cell the enzyme index does not know says nothing, so the paper is read. No E. coli ampicillin row on BRENDA's page names TEM-1; live, the constants now come from rows whose papers name no beta-lactamase (Km 0.148 mM and kcat 1090 1/s, ref 209359, one paper), still flagged as naming none; clavulanate's only Ki row (ref 663646) is withheld as AmpC's |
+| PKM2's kcat refused as "every row measured a variant": the one row whose cell names PKM is the mutant G415R | when no mutant is asked for, the isoform tiers are decided on rows not measuring a variant first |
+| triosephosphate isomerase (T. brucei) carrying 0.31 mM and 5000 1/s, rows "in complex with monomer from Trypanosoma cruzi", over the same paper's wild-type pair | an interspecies or hybrid heterodimer is a construct (a complex with a ligand or regulatory protein is not) |
+| bovine trypsin's "enzyme with O-carboxymethyl-poly-beta-cyclodextrin attached to surface" beside its wild-type row | a polymer-conjugated, grafted, encapsulated or entrapped enzyme is a modified enzyme (a conjugated substrate is not) |
+| TEM-1 with clavulanate: a window moving the kcat of ref 771150's matched pair to another paper's row, while the Km's reason still named the pair | a constant carried as one measurement with its pair is not moved alone by an assay window; the report says so |
+
 ## Consequences
 
 - A run with no substrate, organism or inhibitor reads BRENDA's page for the
