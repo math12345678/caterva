@@ -427,3 +427,60 @@ def test_the_ambiguity_refusal_and_the_organism_sentence_are_two_sentences(monke
     assert "None of them has a row." in refusal
     before = refusal[:refusal.index("None of them")].rstrip()
     assert before.endswith((".", "!", "?", ")"))
+
+
+# ---------------------------------------------------------------------------
+# With an isoform asked for, the way out is counted from rows naming it
+# ---------------------------------------------------------------------------
+
+
+def test_an_organism_is_offered_for_an_isoform_only_when_its_rows_name_it(monkeypatch):
+    """CYP3A4, human kcat: EC 1.14.14.1 has no human Turnover row, and the
+    advice was "re-run with --organism Bacillus licheniformis". That run is
+    refused again by the isoform rule (its rows are CYP102A7's), so no
+    organism whose rows name another protein is offered."""
+    monkeypatch.setattr(defaults, "table_rows", _variant_rows({
+        ("kcat", "Bacillus licheniformis"): [("dodecanoic acid", 9, "CYP102A7, pH 7.5")],
+        ("kcat", "Bacillus subtilis"): [("hexadecanoic acid", 3, "wild-type")],
+        ("km", "Homo sapiens"): [("fenthion", 4, "CYP3A4")],
+    }))
+    model = _Model((_Q("reaction_kcat", "kcat"),), substrate="testosterone", isoform="CYP3A4")
+    reason = "nothing found in BRENDA or the literature search" + _clause("kcat", None, "substrate")
+    out = cli._said_for_the_organism(model, {"reaction_kcat": reason}, "1.14.14.1", "Homo sapiens")
+    said = out["reaction_kcat"]
+    assert "Bacillus" not in said and "--organism" not in said
+    assert "no row of that table in any organism names CYP3A4" in said
+    assert "supply it yourself" in said
+    step = _what_would_ground(SimpleNamespace(not_found=out), ["reaction_kcat"])
+    assert "--organism" not in step and "another organism" not in step
+    assert step.startswith("supply reaction_kcat yourself")
+
+
+def test_an_organism_whose_rows_name_the_isoform_is_offered_by_that_count(monkeypatch):
+    monkeypatch.setattr(defaults, "table_rows", _variant_rows({
+        ("kcat", "Mus musculus"): [("testosterone", 2, "CYP3A4, recombinant"), ("testosterone", 5, "CYP1A1")],
+        ("kcat", "Bacillus subtilis"): [("hexadecanoic acid", 3, "wild-type")],
+    }))
+    model = _Model((_Q("reaction_kcat", "kcat"),), substrate="testosterone", isoform="CYP3A4")
+    reason = "x" + _clause("kcat", None, "substrate")
+    said = cli._said_for_the_organism(model, {"reaction_kcat": reason}, "1.14.14.1", "Homo sapiens")["reaction_kcat"]
+    assert "Organisms with kcat rows for EC 1.14.14.1 naming CYP3A4: Mus musculus (2 rows)" in said
+    assert "Bacillus" not in said
+
+
+def test_an_isoform_no_compound_was_measured_on_does_not_send_to_substrate():
+    """CYP3A4 in Bacillus licheniformis: no row there names CYP3A4 for any
+    substrate, so "--substrate set to one measured on this isoform" leads
+    nowhere; the step names --isoform or supplying it."""
+    reason = ("every row BRENDA holds for this constant measured another isoform than the one asked "
+              "for -- the rows measured: CYP102A7. BRENDA has no Km row naming CYP3A4 under EC "
+              "1.14.14.1 in Bacillus licheniformis for any substrate")
+    step = _what_would_ground(SimpleNamespace(not_found={"reaction_Km": reason}), ["reaction_Km"])
+    assert "--substrate" not in step
+    assert "--isoform" in step and "supply it yourself" in step
+    named = reason.replace("BRENDA has no Km row naming CYP3A4 under EC 1.14.14.1 in Bacillus "
+                           "licheniformis for any substrate",
+                           "The substrates with Km rows naming CYP3A4 under EC 1.14.14.1 in Homo "
+                           "sapiens: fenthion (4 rows). Re-run with --substrate set to one of them")
+    step = _what_would_ground(SimpleNamespace(not_found={"reaction_Km": named}), ["reaction_Km"])
+    assert "--substrate" in step

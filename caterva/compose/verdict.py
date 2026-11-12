@@ -46,6 +46,7 @@ and burying it in a subsection would waste it.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -608,7 +609,12 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
             # all (`__main__._what_the_organism_holds`): no compound fills it.
             need = "organism_missing"
         elif "measured another isoform" in low:
-            need = "isoform"
+            # `__main__._measured_on_the_isoform` says whether any compound
+            # has rows naming the isoform there; when none has, offering
+            # --substrate would lead to the same placeholder.
+            need = ("isoform_unmeasured" if re.search(r"naming \S+ under EC \S+ in .+ for any "
+                                                      r"(substrate|inhibitor)", reason)
+                    else "isoform")
         elif "--inhibitor set to" in reason:
             # The inhibitor named has no Ki row; others do. It WAS looked up.
             need = "other_inhibitor"
@@ -652,6 +658,11 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
                      "isoform than the one asked for: re-run with --substrate set to one the provenance table "
                      "lists as measured on this isoform, or with --isoform set to the one the provenance table names to "
                      "model that protein, or supply it yourself")
+    if "isoform_unmeasured" in by_need:
+        steps.append(f"{', '.join(by_need['isoform_unmeasured'])}: every row the search found measured "
+                     "another isoform than the one asked for, and no row in this organism names that "
+                     "isoform for any compound: re-run with --isoform set to the one the provenance table "
+                     "names to model that protein, or supply it yourself")
     if "inhibitor" in by_need:
         steps.append(f"name the inhibitor with --inhibitor NAME, so {', '.join(by_need['inhibitor'])} "
                      "is looked up (BRENDA files a Ki under the inhibitor)")

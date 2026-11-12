@@ -280,12 +280,22 @@ thing actually missing (`caterva/compose/__main__.py`,
   so and the step is to supply the constant. The refusal's sentence that no
   candidate has the organism is now its own sentence ("... --subject 2.3.3.1.
   None of ...").
+- **With an isoform asked for, an organism is offered only for rows naming
+  it.** "CYP3A4 metabolising testosterone in human" has no human kcat row on
+  EC 1.14.14.1, and the reason listed Bacillus licheniformis (9 rows) to
+  re-run in; those rows measured CYP102A7, so that run was refused again by
+  the isoform rule. The organisms listed now count only rows that name the
+  isoform, and when none does the reason says no organism's rows name it and
+  the step is to supply the constant. An isoform placeholder with no compound
+  measured on the isoform in that organism no longer advises `--substrate`.
 
 Live after: AChE/donepezil and COX-2/celecoxib Ki placeholders name
-`--inhibitor` and the human inhibitors; CYP3A4/midazolam's kcat names the
-organism as the blocker (Bacillus licheniformis 9, Bacillus subtilis 3,
-Rhodococcus ruber 2, Priestia megaterium 1 non-variant rows; following
-`--substrate fenthion` gives Km 0.089 mM ref 706823); PTGS2/arachidonic
+`--inhibitor` and the human inhibitors; CYP3A4's human kcat says EC
+1.14.14.1 has no human Turnover row and no organism's rows name CYP3A4, so
+it is to be supplied (following the Km placeholder's `--substrate fenthion
+--isoform CYP3A4` gives Km 0.089 mM ref 706823); "glucokinase with glucose
+in human" followed with `--subject 2.7.1.1 --isoform GCK` is GROUNDED (Km
+6.0 mM ref 641068, kcat 37.0 1/s ref 702320); PTGS2/arachidonic
 acid and COX-2/celecoxib say every kcat row on EC 1.14.99.1 is a variant's
 and to supply it; "citrate synthase --organism mouse" followed with
 `--subject 2.3.3.1 --organism human` is GROUNDED (Km 0.0077 mM, kcat 260

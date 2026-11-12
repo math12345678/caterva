@@ -2234,7 +2234,8 @@ def _said_for_the_organism(model: Any, reasons: Mapping[str, str], ec: Optional[
             continue
         try:
             clause = _what_the_organism_holds(ec, q.table, model.compound_for(q), where,
-                                              "inhibitor" if q.table == "ki" else "substrate")
+                                              "inhibitor" if q.table == "ki" else "substrate",
+                                              isoform=isoform)
         except Exception:  # noqa: BLE001 - the resolver's clause stands
             continue
         out[name] = _NAME_MISS.sub(lambda _m: clause, reason, count=1)
@@ -2285,9 +2286,15 @@ def _usable(rows: Iterable[Any]) -> List[Any]:
 
 
 def _what_the_organism_holds(ec: str, table: str, compound: Optional[str], organism: str,
-                             role: str) -> str:
+                             role: str, isoform: Optional[str] = None) -> str:
     """The clause for `_said_for_the_organism`, from BRENDA's own rows.
-    Only rows the search would use are counted or offered (`_usable`)."""
+    Only rows the search would use are counted or offered (`_usable`).
+
+    With an isoform asked for, an organism is offered as the way out only
+    for rows that name that isoform: "CYP3A4 ... in human" has no human kcat
+    row on EC 1.14.14.1, and the organisms that have one are Bacillus and
+    Streptomyces, whose rows measured CYP102 enzymes; re-running there is
+    refused again by the isoform rule, so it is not offered."""
     from caterva.compose import defaults
 
     label = defaults.TABLE_NAMES[table]
@@ -2308,6 +2315,18 @@ def _what_the_organism_holds(ec: str, table: str, compound: Optional[str], organ
         for row in every:
             if row.organism:
                 organisms[row.organism] = organisms.get(row.organism, 0) + 1
+        if organisms and isoform:
+            from caterva.bind.core import read_isoform, same_isoform
+
+            organisms = {}
+            for row in every:
+                if row.organism and same_isoform(read_isoform(row.conditions), isoform):
+                    organisms[row.organism] = organisms.get(row.organism, 0) + 1
+            if not organisms:
+                return (f" -- BRENDA holds no {label} row for EC {ec} in {organism} at all, and no row "
+                        f"of that table in any organism names {isoform} (BRENDA's rows for that EC number "
+                        f"measured other proteins): neither another {role} nor a different species "
+                        "would fill it, so supply it yourself")
         if not organisms:
             if every_row:
                 return (f" -- every {label} row BRENDA holds for EC {ec}, in any organism, measured a "
@@ -2324,7 +2343,8 @@ def _what_the_organism_holds(ec: str, table: str, compound: Optional[str], organ
         if elsewhere:
             text += (f". {label} rows{named} are in: {_counted(elsewhere)}, each that organism's "
                      "measurement, never substituted for yours (ADR 0024)")
-        text += (f". Organisms with {label} rows for EC {ec} that are not of a variant: "
+        which = f"naming {isoform}" if isoform else "that are not of a variant"
+        text += (f". Organisms with {label} rows for EC {ec} {which}: "
                  f"{_counted(organisms)}. Re-run with --organism set to one of them to model that "
                  "organism, or supply it yourself")
         return text

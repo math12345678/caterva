@@ -40,6 +40,7 @@ enzyme gets its best-measured substrate, said out loud (ADR 0182).
 - A substrate word of the description survives a failed read of BRENDA's substrate list: the read is retried, and if it still fails the search refuses, instead of the chooser modelling another substrate under "No substrate was named" ("hexokinase with mannose in human" carried D-glucose's Km).
 - "pepsin with hemoglobin" is pepsin acting on hemoglobin, not cooperative binding: a compound named beside an enzyme is not read as a mechanism when it is the only cue for one.
 - A placeholder's way out counts only rows the search would use: an organism, compound or isoform whose rows all measured a protein variant is no longer offered ("PTGS2 with arachidonic acid" in human was sent to Mus musculus, whose kcat rows are all COX-2 N580A); when nothing usable is left anywhere, the reason says so and "Do this next" is to supply the constant.
+- With an isoform asked for, a placeholder offers an organism only for rows that name that isoform ("CYP3A4 ... in human" was sent to Bacillus licheniformis, whose kcat rows are CYP102A7's, and that run was refused again); when no organism's rows name it, the step is to supply the constant, and an isoform placeholder with no compound measured on the isoform no longer advises `--substrate`.
 - A Ki or kcat placeholder no longer calls PubMed's answer "candidate papers were found": the papers are what PubMed returned for the search's words, not checked to name the compound (a made-up inhibitor name got the same sentence).
 
 ## [0.7.0] - 2026-11-01
