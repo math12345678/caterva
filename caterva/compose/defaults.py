@@ -417,6 +417,13 @@ _LETTER_LOCANT = re.compile(r"(?<![A-Za-z0-9])([pom])-(?=[a-z])")
 _LOCANT_NUMBER = {"o": "2", "m": "3", "p": "4"}
 
 
+def _search_key(name: str) -> str:
+    """A name as the resolver compares names (brenda_client._substrate_key):
+    case, whitespace and a counter-ion aside. The rows one spelling reaches."""
+    text = _COUNTER_ION.sub("", " ".join((name or "").split()))
+    return re.sub(r"\s+", "", text).casefold()
+
+
 def _group_key(name: str) -> str:
     """The key spellings of one compound share: case, whitespace and a
     counter-ion aside (as the resolver compares names,
@@ -578,12 +585,27 @@ class _Counts:
             self.spellings.setdefault(k, Counter())[row.compound] += 1
 
     def usable(self, key: str, table: str) -> _Usable:
+        """What the search can use of one compound's rows, summed over its
+        spellings. Each spelling is judged as the search judges the rows it
+        reaches when asked for that spelling (`_search_key`), so rows naming
+        the isoform under one spelling do not set aside rows naming none
+        under another."""
         found = self._usable.get((key, table))
         if found is None:
-            rows = self.by_table.get(table, {}).get(key, [])
-            found = _usable(rows, self.isoform, self.mode if table == "ki" else None, self.substrate)
+            found = _Usable([])
+            for rows in self._by_spelling(key, table).values():
+                part = _usable(rows, self.isoform, self.mode if table == "ki" else None,
+                               self.substrate)
+                found.rows.extend(part.rows)
+                found.set_aside.update(part.set_aside)
             self._usable[(key, table)] = found
         return found
+
+    def _by_spelling(self, key: str, table: str) -> Dict[str, List[_Row]]:
+        out: Dict[str, List[_Row]] = {}
+        for row in self.by_table.get(table, {}).get(key, []):
+            out.setdefault(_search_key(row.compound), []).append(row)
+        return out
 
     def name(self, key: str) -> str:
         """The spelling the search is asked for: the one with the most usable
@@ -592,14 +614,35 @@ class _Counts:
         spellings = self.spellings[key]
 
         def reach(spelling: str) -> int:
-            target = _key(spelling)
+            target = _search_key(spelling)
             return sum(1 for t in self.by_table for r in self.usable(key, t).rows
-                       if _key(r.compound) == target)
+                       if _search_key(r.compound) == target)
         return sorted(spellings, key=lambda s: (-reach(s), -spellings[s], s))[0]
 
     def other_spellings(self, key: str) -> List[str]:
         chosen = self.name(key)
-        return sorted({s for s in self.spellings[key] if _key(s) != _key(chosen)})
+        return sorted({s for s in self.spellings[key] if _search_key(s) != _search_key(chosen)})
+
+    def reached(self, key: str, tables: Sequence[str]) -> Dict[str, int]:
+        """Usable rows per table under the spelling the search is asked for
+        (`name`): the rows its value is taken from."""
+        target = _search_key(self.name(key))
+        return {t: sum(1 for r in self.usable(key, t).rows if _search_key(r.compound) == target)
+                for t in tables}
+
+    def spelled_clause(self, key: str, tables: Sequence[str]) -> str:
+        """"; BRENDA also spells it X, counted as the same compound; the
+        search takes the rows spelled Y (n Km)" -- empty for one spelling."""
+        spelled = self.other_spellings(key)
+        if not spelled:
+            return ""
+        out = f"; BRENDA also spells it {', '.join(spelled[:3])}, counted as the same compound"
+        reached, total = self.reached(key, tables), self.rows(key, tables)
+        if reached != total:
+            labels = {"km": "Km", "kcat": "kcat", "ki": "Ki"}
+            out += (f"; the search is asked for {self.name(key)} and takes the rows spelled so ("
+                    + ", ".join(f"{n} {labels.get(t, t)}" for t, n in reached.items()) + ")")
+        return out
 
     def rows(self, key: str, tables: Sequence[str]) -> Dict[str, int]:
         """Usable rows per table: what a count in a note means."""
@@ -620,7 +663,12 @@ class _Counts:
         return out
 
     def names_isoform(self, key: str, tables: Sequence[str]) -> bool:
-        return any(self.usable(key, t).names_isoform for t in tables)
+        """Whether the rows the search reaches under the spelling it is asked
+        for (`name`) name the isoform."""
+        spelling = _search_key(self.name(key))
+        return any(_usable(self._by_spelling(key, t).get(spelling, []), self.isoform,
+                           self.mode if t == "ki" else None, self.substrate).names_isoform
+                   for t in tables)
 
     def keys(self, table: str) -> List[str]:
         return list(self.by_table.get(table, {}))
@@ -840,9 +888,7 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
         how += "; only cosubstrates and cofactors have rows here, so one of them was used"
     clause = f"; the cosubstrate{'s' if len(aside) > 1 else ''} {', '.join(aside[:3])} set aside" \
         if aside else ""
-    spelled = counts.other_spellings(best)
-    spelled_clause = (f"; BRENDA also spells it {', '.join(spelled[:3])}, counted as the same "
-                      f"compound" if spelled else "")
+    spelled_clause = counts.spelled_clause(best, tables)
     which = " that your word matches" if among else ""
     why = (f"of the {_plural(len(candidates), 'substrate')}{which} BRENDA lists Km rows for under "
            f"{_where(ec, organism)}{_isoform_clause(isoform)}, {how} ({measured}{spelled_clause}"
@@ -930,7 +976,8 @@ def _choose_inhibitor(ec: str, organism: Optional[str], substrate: Optional[str]
         how = ("none has a Ki row the search can use, so this, the most measured, will stay a "
                "placeholder unless the search finds another row")
     else:
-        how = f"it has the most ({_plural(n(best), 'Ki row')})"
+        how = (f"it has {'as many as any other' if tied else 'the most'} "
+               f"({_plural(n(best), 'Ki row')})")
     why = (f"of the {_plural(len(candidates), 'compound')} with Ki rows under "
            f"{_where(ec, organism)}"
            + (f" (the substrate {substrate} aside)" if excluded in counts.keys("ki") else "")
@@ -954,9 +1001,9 @@ def _choose_inhibitor(ec: str, organism: Optional[str], substrate: Optional[str]
                 f"the search can use" + _not_counted(counts.set_aside(top, ["ki"])).replace(
                     "; not counted, because the search cannot use them:", " --"))
     why += tie_clause
-    spelled = counts.other_spellings(best)
+    spelled = counts.spelled_clause(best, ["ki"])
     if spelled:
-        why += f" (BRENDA also spells it {', '.join(spelled[:3])}, counted as the same compound)"
+        why += f" ({spelled[2:]})"
     why += _not_counted(counts.set_aside(best, ["ki"]))
     alternatives = tuple(Option(counts.name(k), {"ki": n(k)}, USABLE_NONE)
                          for k in ranked[1:1 + ALTERNATIVES_NAMED])

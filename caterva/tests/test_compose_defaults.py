@@ -804,3 +804,56 @@ def test_the_contract_names_every_field_a_choice_carries():
     block = ts[ts.index("export interface SearchChoice"):]
     block = block[:block.index("\n}")]
     assert "rows?: Record<string, number>;" in block and "instead?: string | null;" in block
+
+
+def test_each_spelling_is_judged_as_the_search_judges_the_rows_it_reaches(monkeypatch):
+    """PTP1B in human: "4-nitrophenyl phosphate" has one row naming PTP1B
+    (1.4 mM, ref 663621) and "p-nitrophenyl phosphate" rows naming no
+    isoform. Asked for either spelling, the search takes that spelling's own
+    rows, so the one row naming PTP1B does not set aside the other
+    spelling's rows; and a substrate whose searched spelling has rows naming
+    PTP1B (6,8-difluoro-4-methylumbelliferyl phosphate, ref 730324) ranks
+    first, since EC 3.1.3.48 is every protein-tyrosine phosphatase and a row
+    naming none may be any of them."""
+    difmup = "6,8-difluoro-4-methylumbelliferyl phosphate"
+    km = ([_row("4-nitrophenyl phosphate", "isoform PTP1B, pH 7.0", ref="663621", value=1.4)]
+          + [_row("p-nitrophenyl phosphate", "pH 7.0, 30°C", ref=str(680000 + i)) for i in range(4)]
+          + [_row(difmup, "isoform PTP1B, pH 7.2", ref="730324"),
+             _row(difmup, "isoform PTP1B, 25°C", ref="730325")])
+    kcat = [_row(n, c, ref=r) for n, c, r in ((difmup, "isoform PTP1B", "730324"),
+                                               ("p-nitrophenyl phosphate", "pH 7.0", "680000"))]
+    _given(monkeypatch, {"km": km, "kcat": kcat})
+    choice = defaults.choose_substrate("3.1.3.48", "Homo sapiens", isoform="PTPN1")
+    assert choice.chosen == difmup
+    assert "substrates whose rows do not name PTPN1 rank after it" in choice.why
+    (npp,) = [o for o in choice.alternatives if "nitrophenyl" in o.name]
+    assert npp.name == "p-nitrophenyl phosphate" and npp.rows == {"km": 5, "kcat": 1}
+
+
+def test_an_inhibitor_tied_on_every_count_is_not_said_to_have_the_most(monkeypatch):
+    """Granzyme B in human, competitive: six inhibitors at one usable Ki row
+    each, one reference each; the note said "it has the most (1 Ki row)" of
+    the one the name broke the tie for (m1)."""
+    _given(monkeypatch, {"ki": [_row("B-inhibitor", "competitive", ref="2"),
+                                _row("A-inhibitor", "competitive", ref="1")]})
+    choice = defaults.choose_inhibitor("3.4.21.79", "Homo sapiens", mode="competitive")
+    assert choice.chosen == "A-inhibitor"
+    assert "it has as many as any other (1 Ki row)" in choice.why
+    assert "the most" not in choice.why
+    assert "taken first by name (alphabetically)" in choice.why
+
+
+def test_a_merged_compound_says_which_spelling_the_search_takes(monkeypatch):
+    """PTP1B in human: "p-nitrophenyl phosphate" and "4-nitrophenyl
+    phosphate" are counted as one compound, but the search, asked for one
+    spelling, takes only that spelling's rows (brenda_client compares names
+    by case, whitespace and counter-ion). The note says so, so a count of
+    both spellings is not read as the rows the cited value was drawn from."""
+    km = ([_row("p-nitrophenyl phosphate", "pH 7.0", ref=str(680000 + i)) for i in range(3)]
+          + [_row("4-nitrophenyl phosphate", "pH 7.0", ref="95007")])
+    _given(monkeypatch, {"km": km, "kcat": [_row("p-nitrophenyl phosphate", "pH 7.0", ref="680000")]})
+    choice = defaults.choose_substrate("3.1.3.48", "Homo sapiens")
+    assert choice.chosen == "p-nitrophenyl phosphate" and choice.rows == {"km": 4, "kcat": 1}
+    assert ("BRENDA also spells it 4-nitrophenyl phosphate, counted as the same compound; the "
+            "search is asked for p-nitrophenyl phosphate and takes the rows spelled so "
+            "(3 Km, 1 kcat)") in choice.why
