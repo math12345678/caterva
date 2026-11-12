@@ -137,6 +137,14 @@ def test_the_command_line_prints_the_contract_shape_and_exits_3_on_nothing(recor
 @pytest.mark.parametrize("name, cofactor", [
     ("ATP", True), ("beta-NAD+", True), ("NADPH", True), ("Mg2+", True), ("CoA", True),
     ("H2O", True), ("D-glucose", False), ("CO2", False), ("acetyl-CoA", False), ("pyruvate", False),
+    # The respiratory quinones are succinate dehydrogenase's electron acceptor,
+    # as NAD+ is a dehydrogenase's: live, "competitive inhibition of succinate
+    # dehydrogenase by malonate" chose ubiquinone, and paired malonate's Ki
+    # (competitive versus succinate) with ubiquinone's Km (review, 2026-11-12).
+    ("ubiquinone", True), ("ubiquinone-2", True), ("ubiquinone 9", True), ("menaquinol", True),
+    ("decylubiquinone", True), ("coenzyme Q10", True), ("plastoquinone-9", True),
+    # A phenol oxidase's or quinone reductase's own substrate is not set aside.
+    ("hydroquinone", False), ("1,4-benzoquinone", False), ("succinate", False),
 ])
 def test_cofactors_are_recognised_and_substrates_are_not(name, cofactor):
     assert defaults.is_cofactor(name) is cofactor
@@ -179,6 +187,34 @@ def test_an_organism_is_chosen_for_the_inhibitor_named(monkeypatch):
     assert "it has rows for 3 of the 3 constant(s) this model needs" in choice.why
     assert "Homo sapiens, preferred when it covers them all, does not" in choice.why
     assert choice.alternatives[0].name == "Homo sapiens"
+
+
+def test_the_command_line_chooses_the_organism_for_the_constants_asked_for(monkeypatch, capsys):
+    """`resolve "xanthine oxidase" --quantity ki` names no inhibitor and no
+    organism. Counted for Km and kcat the organism was Homo sapiens, which
+    has no Ki row at all, and the run was refused "no inhibitor to choose"
+    (review of 2026-11-12). `--needs ki` counts the Ki rows."""
+    _rows(monkeypatch, {
+        ("km", "Homo sapiens"): {"xanthine": 6}, ("kcat", "Homo sapiens"): {"xanthine": 3},
+        ("km", "Bos taurus"): {"xanthine": 4}, ("kcat", "Bos taurus"): {"xanthine": 2},
+        ("ki", "Bos taurus"): {"allopurinol": 3, "febuxostat": 2},
+    })
+    assert defaults.main(["--ec", "1.17.3.2", "--role", "organism", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["choice"]["chosen"] == "Homo sapiens"
+    assert defaults.main(["--ec", "1.17.3.2", "--role", "organism", "--needs", "ki", "--json"]) == 0
+    printed = json.loads(capsys.readouterr().out)
+    assert printed["choice"]["chosen"] == "Bos taurus"
+    assert "(Ki)" in printed["choice"]["why"] and "5 Ki" in printed["choice"]["why"]
+
+
+def test_the_command_line_refuses_a_constant_it_does_not_know(monkeypatch, capsys):
+    _rows(monkeypatch, {("ki", "Bos taurus"): {"allopurinol": 1}})
+    assert defaults.main(["--ec", "1.17.3.2", "--role", "organism", "--needs", "vmax", "--json"]) == 2
+    assert "--needs takes km, kcat and ki" in capsys.readouterr().err
+    _rows(monkeypatch, {("km", "Bos taurus"): {"xanthine": 1}})
+    assert defaults.main(["--ec", "1.17.3.2", "--role", "organism", "--needs", "ki", "--json"]) == 3
+    assert json.loads(capsys.readouterr().out)["note"] == (
+        "BRENDA holds no Ki rows under EC 1.17.3.2 (every organism), so there is no organism to choose.")
 
 
 def test_an_organism_with_a_km_for_one_substrate_and_a_kcat_for_another_covers_one(monkeypatch):

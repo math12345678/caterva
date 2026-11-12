@@ -172,7 +172,8 @@ describe('resolve: provenance is never buried', () => {
     // citation to a system the user never named.
     const { code, stdout, stderr } = runCli(['resolve', 'lactate dehydrogenase']);
     expect(code).toBe(1);
-    expect(stdout + stderr).toMatch(/needs a substrate, an organism/i);
+    expect(stdout + stderr).toMatch(/could not settle the system/i);
+    expect(stdout + stderr).toMatch(/a substrate and organism \(--substrate, --organism\)/);
   });
 });
 

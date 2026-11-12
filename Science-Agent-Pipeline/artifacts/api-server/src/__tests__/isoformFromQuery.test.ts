@@ -134,4 +134,18 @@ describe("rowScopeFlags with an isoform named in the query", () => {
     expect(rowScopeFlags("ki", { isoform: "HXK-1", ...unstated }, "HK-1")[0]).toContain("not HK-1, the one the query names");
     expect(rowScopeFlags("ki", { isoform: "MAO-A", ...unstated }, "B")[0]).toContain("not B, the one the query names");
   });
+
+  it("takes the runner's verdict on whether the row's isoform is the one asked for", () => {
+    // "HK2 with glucose": the runner kept BRENDA's "hexokinase II" row (ref
+    // 702867) for HK2, by caterva.bind.core.same_isoform, which asks UniProt
+    // whether two names are one protein. This side's regex mirror called it
+    // "not HK2, ... a different protein's constant" (adversarial round,
+    // 2026-11-11). The runner's verdict, when it sends one, decides.
+    const scope = { inhibitionMode: "unstated", versus: null };
+    expect(rowScopeFlags("km", { isoform: "HK-II", ...scope, sameIsoformAsRequested: true }, "HK2")).toEqual([]);
+    expect(rowScopeFlags("km", { isoform: "HK-2", ...scope, sameIsoformAsRequested: false }, "HK2")[0])
+      .toContain("not HK2, the one the query names");
+    // Without a verdict (an older runner), the mirror still compares.
+    expect(rowScopeFlags("km", { isoform: "HK-II", ...scope }, "HK2")[0]).toContain("not HK2");
+  });
 });

@@ -309,6 +309,31 @@ def test_row_scope_crosses_the_boundary(monkeypatch):
                                   "kitzWilson": False}
 
 
+def test_row_scope_says_whether_the_row_is_the_isoform_asked_for(monkeypatch):
+    """"HK2 with glucose" (adversarial round, 2026-11-11): the resolver kept
+    BRENDA's "wild type hexokinase II" row (ref 702867) for HK2, and the API
+    then called it "not HK2, ... a different protein's constant", because
+    its TypeScript mirror of same_isoform does not know HK-II is HK2. The
+    runner now says so itself, by caterva.bind.core.same_isoform."""
+    row = golden_result()
+    row.commentary = "wild type hexokinase II"
+    payload = {"enzymeName": "hexokinase", "substrate": "D-glucose",
+               "organism": "Homo sapiens", "ecNumber": "2.7.1.1", "quantity": "km",
+               "isoform": "HK2"}
+    result = run_main(monkeypatch, lambda *a, **k: row, payload)
+    assert result["rowScope"]["isoform"]
+    assert result["rowScope"]["sameIsoformAsRequested"] is True
+
+    row.commentary = "wild type hexokinase I"
+    result = run_main(monkeypatch, lambda *a, **k: row, payload)
+    assert result["rowScope"]["sameIsoformAsRequested"] is False
+
+    # No isoform asked for: nothing to compare, and no key.
+    del payload["isoform"]
+    result = run_main(monkeypatch, lambda *a, **k: row, payload)
+    assert "sameIsoformAsRequested" not in result["rowScope"]
+
+
 def test_a_kitz_wilson_row_says_what_it_is(monkeypatch):
     """BRENDA ref 702238's MAO-B phenylhydrazine row, as the committed page
     (Tests/fixtures/ki_mode/brenda_1.4.3.4.html.gz) serves it. It states no

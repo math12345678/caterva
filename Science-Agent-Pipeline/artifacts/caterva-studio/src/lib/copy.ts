@@ -137,6 +137,36 @@ const SENTENCE_PATTERNS: [RegExp, Rewrite][] = [
     "set Isoform to the name the papers write (for example $1)",
   ],
   [/pass the one simulated \(--isoform\)/g, "set Isoform to the one simulated"],
+  // "Pass --isoform with one of these names (for example --isoform HKDC1) to take ..."
+  [
+    /([Pp])ass --isoform with one of these names \(for example --isoform ([^)]+)\)/g,
+    (_m, p: string, example: string) => `${p === "P" ? "S" : "s"}et Isoform to one of these names (for example ${example})`,
+  ],
+  // A flag with its argument's placeholder ("--organism NAME", "--subject
+  // EC") is a field to set, not a word to swap: "Pass --organism NAME to
+  // model another" became "Pass Organism NAME to model another" (found in
+  // Studio run 20261111-223741-compose-6cabf85f).
+  // "Pass --organism NAME to model another." (each ADR 0182 choice's note)
+  [
+    /\b([Pp])ass --([a-z][a-z0-9-]*) (?:NAME|EC|N|VALUE)\b/g,
+    (_m, p: string, flag: string) => `${p === "P" ? "S" : "s"}et the ${FLAG_FIELD[flag] ?? flag.replace(/-/g, " ")} field`,
+  ],
+  // "Re-run with --substrate NAME." / "re-run with --organism NAME"
+  [
+    /\b([Rr])e-run with --([a-z][a-z0-9-]*) (?:NAME|EC|N|VALUE)\b/g,
+    (_m, r: string, flag: string) =>
+      `${r === "R" ? "S" : "s"}et the ${FLAG_FIELD[flag] ?? flag.replace(/-/g, " ")} field and run it again`,
+  ],
+  // "name the substrate with --substrate NAME, so ..."
+  [
+    / with --([a-z][a-z0-9-]*) (?:NAME|EC|N|VALUE)\b/g,
+    (_m, flag: string) => ` in the ${FLAG_FIELD[flag] ?? flag.replace(/-/g, " ")} field`,
+  ],
+  // Any other flag with a placeholder: the field, named as one.
+  [
+    /(?<![\w-])--([a-z][a-z0-9-]*) (?:NAME|EC|N|VALUE)\b/g,
+    (_m, flag: string) => `the ${FLAG_FIELD[flag] ?? flag.replace(/-/g, " ")} field`,
+  ],
   // "not run -- pass --validate (or `validation=`) for the cross-module consistency check"
   [/pass --validate \(or `validation=`\)/g, "tick Cross-checks"],
   [/pass --robustness \(or `robustness=`\)/g, "tick Robustness to the placeholders"],

@@ -44,7 +44,17 @@ export default defineConfig({
     // Test configuration only. The product must never set either variable
     // (Tests/test_recorded_env_is_test_only.py): a recorded answer served
     // to a user would be presented as the database's current one.
+    //
+    // CATERVA_SENTENCE_READER "off": resolveQuery reads an enzyme query with
+    // compose's reader (src/lib/sentenceReader.ts, `python -m
+    // caterva.compose.read`), which fetches BRENDA pages to make its ADR 0182
+    // choices. The suites about something else read the query with the
+    // API's older reader instead, as when the reader is unavailable; the
+    // suites about the reading (sentenceReading.test.ts) set a stand-in
+    // script per test, and caterva/tests/test_compose_read.py pins the
+    // reader itself, offline.
     env: {
+      CATERVA_SENTENCE_READER: "off",
       CATERVA_BRENDA_RECORDED: path.resolve(__dirname, "../../../Tests/fixtures/recorded"),
       CATERVA_HTTP_RECORDED: path.resolve(__dirname, "../../../Tests/fixtures/recorded/http"),
     },

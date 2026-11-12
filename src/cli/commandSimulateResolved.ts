@@ -299,8 +299,8 @@ function notFoundBecause(
  * undefined when the row says nothing worth a line. Read from the runner's
  * `rowScope` (parsed in Python by caterva.bind.core), never re-derived.
  */
-function rowScopeOf(result: ResolvedKinetic): string[] | undefined {
-  const lines = rowScopeLines(result.quantity, result.rowScope);
+function rowScopeOf(result: ResolvedKinetic, isoform?: string): string[] | undefined {
+  const lines = rowScopeLines(result.quantity, result.rowScope, isoform);
   return lines.length > 0 ? lines : undefined;
 }
 
@@ -355,6 +355,11 @@ function rowScopeOf(result: ResolvedKinetic): string[] | undefined {
 const MEASURED_PLACEHOLDER = {
   km: '<your measured Km, e.g. in mM>',
   vmax: '<your measured Vmax, e.g. in mM/s>',
+  // "acetylcholinesterase inhibited by donepezil in human", live 2026-11-11:
+  // no Ki row, and the command printed "in full, with the example values"
+  // ended `--ki 5mM` -- a number for donepezil, whose Ki is nanomolar,
+  // that nobody measured, runnable as printed.
+  ki: '<your measured Ki, e.g. in mM>',
 } as const;
 const CITE_PLACEHOLDER = '<author year, PMID>';
 
@@ -365,6 +370,25 @@ interface Blocker {
   suggestion?: string;
   /** One line the reader can act on. */
   why: string;
+  /**
+   * Whether --allow-cross-species could fill this gap: true when the lookup
+   * said BRENDA holds the constant for other organisms
+   * ("cross_species_withheld"), false when it said something else (no row
+   * in any organism, an isoform or variant withheld), absent when it did not
+   * say. "Or widen the search ... --allow-cross-species" was printed under
+   * every gap: live, for "acetylcholinesterase inhibited by donepezil in
+   * human", where BRENDA has no donepezil Ki in any organism, so the advice
+   * could only return the same refusal (review of 2026-11-12; ADR 0182
+   * asks for correct advice).
+   */
+  crossSpecies?: boolean;
+}
+
+/** `crossSpecies` for a lookup that found nothing (see Blocker). */
+function crossSpeciesCouldFill(result: { found: boolean; source?: string | null }): boolean | undefined {
+  if (result.found) return false;
+  if (!result.source) return undefined;
+  return result.source === 'cross_species_withheld';
 }
 
 /**
@@ -430,12 +454,18 @@ function renderNextStep(
       `\n${c(DIM, '  If you have a source for one of these, record it rather than')}\n` +
         `${c(DIM, '  typing a bare number — the value then travels with its citation:')}\n\n` +
         `    ${c(BOLD, `--cite ${gaps[0]!.parameter}="${CITE_PLACEHOLDER}"`)}\n` +
-        `${c(DIM, '      Caterva does not verify the source; it records that you supplied it.')}\n` +
-        `\n${c(DIM, '  Or widen the search, understanding what you are accepting:')}\n\n` +
-        `    ${c(BOLD, '--allow-cross-species')}\n` +
-        `${c(DIM, '      a value measured in a related organism, still checked for')}\n` +
-        `${c(DIM, '      taxonomic proximity and reported as a substitution.')}\n`,
+        `${c(DIM, '      Caterva does not verify the source; it records that you supplied it.')}\n`,
     );
+    // Only where it can help: a gap the lookup said exists in another
+    // organism, or one it said nothing about. Not when the run already has it.
+    if (options.allowCrossSpecies !== true && gaps.some((b) => b.crossSpecies !== false)) {
+      emit(
+        `\n${c(DIM, '  Or widen the search, understanding what you are accepting:')}\n\n` +
+          `    ${c(BOLD, '--allow-cross-species')}\n` +
+          `${c(DIM, '      a value measured in a related organism, still checked for')}\n` +
+          `${c(DIM, '      taxonomic proximity and reported as a substitution.')}\n`,
+      );
+    }
   }
 
   // The whole command, so it can be copied rather than reassembled. Built
@@ -1112,6 +1142,7 @@ export async function commandSimulateResolved(
             kind: 'literature',
             suggestion: `--km "${MEASURED_PLACEHOLDER.km}"`,
             why: because ? because.why : 'BRENDA and PubMed returned no Km for this system.',
+            crossSpecies: crossSpeciesCouldFill(result),
           });
           continue;
         }
@@ -1131,7 +1162,7 @@ export async function commandSimulateResolved(
           reliability: reliabilityGrades(result),
           reliabilityReasons: reliabilityReasons(result),
           assayConditions: assayConditionsFor(result),
-          rowScope: rowScopeOf(result),
+          rowScope: rowScopeOf(result, options.isoform),
         });
       } else {
         // Vmax is not a BRENDA table. It is kcat x [E]0, and [E]0 is a
@@ -1181,6 +1212,7 @@ export async function commandSimulateResolved(
               ? because.why
               : 'No kcat was found for this system, so there is nothing to ' +
                 'multiply by [E]0 to obtain Vmax.',
+            crossSpecies: crossSpeciesCouldFill(result),
           });
           continue;
         }
@@ -1205,7 +1237,7 @@ export async function commandSimulateResolved(
           reliability: reliabilityGrades(result),
           reliabilityReasons: reliabilityReasons(result),
           assayConditions: assayConditionsFor(result),
-          rowScope: rowScopeOf(result),
+          rowScope: rowScopeOf(result, options.isoform),
         });
       }
     } catch (err) {
@@ -1309,7 +1341,7 @@ export async function commandSimulateResolved(
           requestedTaxonId: result.requestedTaxonId ?? undefined,
           inhibitor,
           askedMode: mode,
-          rowScope: rowScopeOf(result),
+          rowScope: rowScopeOf(result, options.isoform),
         });
       } else {
         // "mode_withheld" is not "no Ki": BRENDA holds constants for this
@@ -1326,10 +1358,11 @@ export async function commandSimulateResolved(
         blockers.push({
           parameter: 'ki',
           kind: 'literature',
-          suggestion: '--ki 5mM',
+          suggestion: `--ki "${MEASURED_PLACEHOLDER.ki}"`,
           why: because
             ? because.why
             : `No inhibition constant for ${inhibitor} in the literature for this system.`,
+          crossSpecies: crossSpeciesCouldFill(result),
         });
       }
     } catch (err) {

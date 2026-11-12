@@ -133,6 +133,16 @@ COFACTORS = frozenset({
 })
 _METAL_ION = re.compile(
     r"^(?:mg|mn|ca|zn|fe|co|ni|cu|k|na|li|cd|ba|sr|cl|hco3)(?:\d?[+-])+$", re.IGNORECASE)
+#: The respiratory quinones (and their quinols), any chain length: a
+#: quinone oxidoreductase's electron acceptor, as NAD+ is a dehydrogenase's.
+#: Live on 2026-11-12, "competitive inhibition of succinate dehydrogenase by
+#: malonate" chose ubiquinone (24 Km rows in E. coli) over succinate (8), and
+#: paired malonate's Ki, which competes with succinate, with ubiquinone's Km.
+#: Only the named carriers: "hydroquinone" or "1,4-benzoquinone" can be a
+#: laccase's or a quinone reductase's own substrate.
+_QUINONE_CARRIER = re.compile(
+    r"^(?:(?:decyl)?ubiquin(?:one|ol)|menaquin(?:one|ol)|plastoquin(?:one|ol)|caldariellaquinone"
+    r"|coenzyme q)(?:[- ]?\d+)?$")
 _PREFIX = re.compile(r"^(?:alpha|beta|α|β)-", re.IGNORECASE)
 #: The every-organism parse's own test of an organism cell
 #: (brenda_client.GENERIC_ORGANISM_PATTERN), restated so this module reads it
@@ -548,7 +558,8 @@ def _matches(compound: str, target: str) -> bool:
 def is_cofactor(name: str) -> bool:
     """True for a cosubstrate, cofactor or small ion (COFACTORS)."""
     key = _PREFIX.sub("", _key(name))
-    return key in _COFACTOR_KEYS or bool(_METAL_ION.match(key))
+    return (key in _COFACTOR_KEYS or bool(_METAL_ION.match(key.replace(" ", "")))
+            or bool(_QUINONE_CARRIER.match(key)))
 
 
 # ---------------------------------------------------------------------------
@@ -1426,6 +1437,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--isoform", help="the isoform the model is of (substrate, inhibitor)")
     parser.add_argument("--mode", help="the model's inhibition mode (--role inhibitor)")
     parser.add_argument("--no-kcat", action="store_true", help="the model needs no kcat")
+    parser.add_argument("--needs", help="--role organism: the constants the organism must have rows "
+                                        "for, comma-separated from km, kcat, ki (default km,kcat). "
+                                        "`resolve --quantity ki` with no inhibitor asks for ki: "
+                                        "an organism chosen for its Km and kcat rows can have no Ki "
+                                        "row at all (xanthine oxidase: Homo sapiens, where every Ki "
+                                        "is Bos taurus's)")
     parser.add_argument("--json", action="store_true", help="print {choice, note} as JSON")
     return parser
 
@@ -1435,6 +1452,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     from caterva.compose.organisms import normalise_organism
 
     organism, _ = normalise_organism(args.organism)
+    needs: Tuple[str, ...] = ("km",) if args.no_kcat else ("km", "kcat")
+    if args.needs:
+        asked = tuple(t.strip().lower() for t in args.needs.split(",") if t.strip())
+        unknown = [t for t in asked if t not in ("km", "kcat", "ki")]
+        if not asked or unknown:
+            print(f"--needs takes km, kcat and ki, comma-separated (got {args.needs!r})", file=sys.stderr)
+            return 2
+        needs = asked
     error: Optional[str] = None
     choice: Optional[Choice] = None
     if not EC_NUMBER.fullmatch(args.ec.strip()):
@@ -1452,7 +1477,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             choice = choose_inhibitor(args.ec, organism, args.substrate, strict=True,
                                       isoform=args.isoform, mode=args.mode)
         else:
-            needs = ("km",) if args.no_kcat else ("km", "kcat")
             choice = choose_organism(args.ec, args.substrate, args.inhibitor, needs=needs, strict=True)
     except Exception as exc:  # noqa: BLE001 - said, and exit 3
         error = f"BRENDA's page for EC {args.ec} could not be read: {type(exc).__name__}: {exc}"
@@ -1461,7 +1485,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     elif error is not None:
         note = error
     else:
-        table = {"substrate": "Km", "inhibitor": "Ki", "organism": "Km"}[args.role]
+        table = {"substrate": "Km", "inhibitor": "Ki",
+                 "organism": TABLE_NAMES[needs[0]]}[args.role]
         note = (f"BRENDA holds no {table} rows under {_where(args.ec, organism)}"
                 + (f" for {args.substrate}" if args.role == "organism" and args.substrate else "")
                 + f", so there is no {args.role} to choose.")

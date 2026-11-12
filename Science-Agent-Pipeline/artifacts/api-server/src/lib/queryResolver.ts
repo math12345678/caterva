@@ -31,6 +31,7 @@ import { verifiableMetricsCollector } from "./verifiable-metrics";
 import { validateSTREANDA } from "./strenda-validator";
 import { verifyParameterAgainstLiterature } from "./literature-verifier";
 import { getDomainCitation } from "./domain-literature";
+import { readSentenceOutcome, type SentenceReading } from "./sentenceReader";
 
 /**
  * Type-safe validator for numeric assay conditions.
@@ -342,7 +343,7 @@ export function rowScopeFlags(
   if (isoform) {
     if (!scope.isoform) {
       out.push(`${name}: the source row names no isoform, so whether it measured ${isoform}, the one the query names, is unknown.`);
-    } else if (!sameIsoform(scope.isoform, isoform)) {
+    } else if (!(scope.sameIsoformAsRequested ?? sameIsoform(scope.isoform, isoform))) {
       out.push(`${name} was measured on isoform ${scope.isoform}, not ${isoform}, the one the query names: a different protein's constant.`);
     }
   } else if (scope.isoform) {
@@ -608,6 +609,9 @@ function buildUnresolvedKineticProvenance(
   ecCandidates?: string[],
   modelMode?: InhibitionMode,
   ecRefusal?: string,
+  lookedUpFor?: { name: string; named: boolean },
+  /** The organism Caterva chose because none was named, when it did. */
+  organismChosen?: string,
 ): ParameterProvenance {
   const K = key.toUpperCase();
 
@@ -743,11 +747,21 @@ function buildUnresolvedKineticProvenance(
     return {
       origin: "default",
       unresolvedReason: "cross_species_withheld",
-      note:
-        `No ${K} was measured in the requested organism. BRENDA holds a ${K} ` +
-        `for ${named}. Kinetic parameters are species-specific, so it was not ` +
-        `substituted; re-run with allowCrossSpecies to use it, understanding ` +
-        `that the resulting model is not a model of the organism you asked for.`,
+      // An organism Caterva CHOSE was not "requested", nor "the organism you
+      // asked for": "acetylcholinesterase inhibited by physostigmine" names
+      // none, and was told both (review of 2026-11-12). Said as what it is,
+      // with the other way out: naming the organism.
+      note: organismChosen
+        ? `No ${K} was measured in ${organismChosen}, the organism Caterva chose because ` +
+          `none was named (the "organism chosen" flag says why). BRENDA holds a ${K} ` +
+          `for ${named}. Kinetic parameters are species-specific, so it was not ` +
+          `substituted; name one of those organisms in the query to model it, or re-run ` +
+          `with allowCrossSpecies to use it here, understanding that the resulting model ` +
+          `then mixes organisms.`
+        : `No ${K} was measured in the requested organism. BRENDA holds a ${K} ` +
+          `for ${named}. Kinetic parameters are species-specific, so it was not ` +
+          `substituted; re-run with allowCrossSpecies to use it, understanding ` +
+          `that the resulting model is not a model of the organism you asked for.`,
     };
   }
 
@@ -839,18 +853,29 @@ function buildUnresolvedKineticProvenance(
   // This is the same courtesy the two branches above extend to organisms
   // and variants, for the field a reader is far MORE likely to get wrong:
   // an organism has one binomial name, a metabolite has a dozen aliases.
+  //
+  // The sentence names what was looked up and whether the user named it. A
+  // Ki is looked up for the INHIBITOR, so "the substrate you named" was
+  // wrong for "acetylcholinesterase inhibited by donepezil in human" (the
+  // user named an inhibitor and no substrate), and a name Caterva chose
+  // was never "named" (adversarial round, 2026-11-11).
   if (reason === "not_found" && substratesAvailable && substratesAvailable.length > 0) {
+    const role = key === "ki" ? "inhibitor" : "substrate";
+    const what = lookedUpFor?.name
+      ? `${lookedUpFor.name}, the ${role} ${lookedUpFor.named ? "you named" : "Caterva chose"}`
+      : `the ${role} you named`;
     return {
       origin: "default",
       unresolvedReason: "not_found",
       note:
-        `No ${K} was found for the substrate you named, but this enzyme ` +
-        `reports ${K} values for: ${substratesAvailable.join(", ")}. ` +
-        `Substrate names differ between databases and papers, so the one ` +
-        `you meant may be spelled differently above. Caterva does not ` +
-        `substitute one substrate for another — a similar name can be a ` +
-        `salt, a stereoisomer or an ester, which is a different molecule — ` +
-        `so re-run with the name you meant.`,
+        `No ${K} was found for ${what}, but this enzyme reports ${K} ` +
+        `values for these ${role}s: ${substratesAvailable.join(", ")}. ` +
+        `${role[0].toUpperCase()}${role.slice(1)} names differ between ` +
+        `databases and papers, so the one you meant may be spelled ` +
+        `differently above. Caterva does not substitute one ${role} for ` +
+        `another — a similar name can be a salt, a stereoisomer or an ` +
+        `ester, which is a different molecule — so re-run with the name you ` +
+        `meant.`,
     };
   }
 
@@ -942,6 +967,11 @@ async function applyKineticResolution(
   if (entities.organismAssumed) {
     flags.push(assumedOrganismFlag(entities.organism, kineticKeys));
   }
+  // What compose's reading of the query said about it ("Read 'HK2' as the
+  // isoform HK2 ...", the substrate a word was read as), before the choices.
+  for (const note of entities.readNotes ?? []) {
+    flags.push(`read: ${note}`);
+  }
 
   // The names the lookups are for. A name the runner CHOSE for the first
   // lookup (the Km's substrate) is written back here, so the Ki that
@@ -964,6 +994,11 @@ async function applyKineticResolution(
       }
     }
   };
+
+  // The choices made while reading the query (the organism, counted for
+  // every constant the model needs and the inhibitor named), stated first,
+  // in the order they were made.
+  adoptChoices(entities.choices ?? []);
 
   // Accumulate parameter changes to avoid repeated object spreading
   const parameterUpdates: Record<string, number | number[]> = {};
@@ -1051,10 +1086,20 @@ async function applyKineticResolution(
           agentResult.implausibleValues,
         );
       } else if (agentResult.source === "cross_species_withheld") {
+        const organismChoice = [...(entities.choices ?? []), ...readChoices(agentResult.choices)].find(
+          (c) => c.role === "organism" && c.chosen === working.organism,
+        );
         provenanceUpdates[key] = buildUnresolvedKineticProvenance(
           key,
           "cross_species_withheld",
           agentResult.crossSpeciesOrganismsAvailable,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          organismChoice?.chosen,
         );
       } else if (agentResult.source === "cross_species_too_distant") {
         // The user DID opt in, and the check still refused. Reporting this
@@ -1083,12 +1128,18 @@ async function applyKineticResolution(
           agentResult.ecRefusal,
         );
       } else {
+        const lookedUp = key === "ki" ? working.inhibitor : working.substrate;
+        const named = key === "ki" ? entities.inhibitor : entities.substrate;
         provenanceUpdates[key] = buildUnresolvedKineticProvenance(
           key,
           "not_found",
           undefined,
           undefined,
           agentResult.substratesAvailable,
+          undefined,
+          undefined,
+          undefined,
+          lookedUp ? { name: lookedUp, named: Boolean(named) && named === lookedUp } : undefined,
         );
       }
       // THE OFFER GOES IN THE PROVENANCE NOTE, NOT IN A FLAG.
@@ -1153,8 +1204,8 @@ async function applyKineticResolution(
         citationStatus,
         assayConditions: toAssayConditions(agentResult.assayConditions, agentResult.effectors),
         citationLocators: buildCitationLocators(agentResult.citation),
-        ...(chosenNote(key, readChoices(agentResult.choices))
-          ? { note: chosenNote(key, readChoices(agentResult.choices)) }
+        ...(chosenNote(key, [...(entities.choices ?? []), ...readChoices(agentResult.choices)])
+          ? { note: chosenNote(key, [...(entities.choices ?? []), ...readChoices(agentResult.choices)]) }
           : {}),
       });
 
@@ -1512,6 +1563,14 @@ async function applyVmaxFromKcatResolution(
     `Bridged Vmax=${agentResult.vmax} mM/s from a literature kcat= ` +
       `${agentResult.kcat} 1/s and the enzyme_conc supplied in the query.`,
   );
+  // What the kcat's row measured, said as the Km's is. Live on 2026-11-12,
+  // "HK2 with glucose with 50 nM enzyme" (and "HK1 ...") bridged kcat 60.4
+  // 1/s from BRENDA ref 703624, a glucokinase paper whose row names no
+  // isoform, under a Km said to be HK2's, and nothing said so; the CLI
+  // did (rowScopeLines). The same row-scope reading as the Km's.
+  flags.push(...selectedFormFlags("kcat", agentResult.selectedForm));
+  flags.push(...preparationFlags("kcat", agentResult.preparation));
+  flags.push(...rowScopeFlags("kcat", agentResult.rowScope, entities.isoform));
 
   return { parameters, parameterProvenance, flags };
 }
@@ -1973,7 +2032,22 @@ const NOT_SUBSTRATE_WORDS = new Set([
   "extract", "purified", "recombinant", "native", "wild-type", "mutant",
   "variant", "isoform", "subunit", "complex", "family", "gene", "protein",
   "cascade", "pathway", "signaling", "signalling", "domain",
-  "ph", "temperature", "mg", "ml", "from", "by", "at",
+  "ph", "temperature", "mg", "ml", "from", "at",
+  // The model, not a compound: "hexokinase Michaelis-Menten kinetics" was
+  // sent as a Km lookup for a substrate called "michaelis-menten kinetics"
+  // and refused as "no KM for the substrate you named" (found 2026-11-11).
+  "michaelis", "menten", "michaelis-menten", "follows", "follow", "obeys",
+  "kinetics", "kinetic", "rate", "rates", "turnover", "behaviour", "behavior",
+]);
+
+/**
+ * Words after which what follows is the inhibitor, never the substrate:
+ * "xanthine oxidase BY allopurinol", "acetylcholinesterase INHIBITED by
+ * donepezil". Reading the substrate stops at them; the inhibitor is
+ * extractInhibitor's to read.
+ */
+const INHIBITOR_CLAUSE_WORDS = new Set([
+  "by", "inhibited", "inhibition", "inhibitor", "inhibitors", "inhibits", "blocked",
 ]);
 
 /** What the guess path read: the enzyme, and the substrate if one was named. */
@@ -2074,7 +2148,8 @@ function guessEnzymeNameFromQuery(query: string): EnzymeGuess | undefined {
     // row for is refused with the labels it does have.
     let j = best.end + 1;
     const skippable = (w: string) => breaksName(w) || NOT_SUBSTRATE_WORDS.has(w);
-    while (j < tokens.length && skippable(tokens[j]!)) j++;
+    while (j < tokens.length && skippable(tokens[j]!) && !INHIBITOR_CLAUSE_WORDS.has(tokens[j]!)) j++;
+    if (j < tokens.length && INHIBITOR_CLAUSE_WORDS.has(tokens[j]!)) j = tokens.length;
     const substrateWords: string[] = [];
     while (
       j < tokens.length &&
@@ -2127,10 +2202,11 @@ function guessEnzymeNameFromQuery(query: string): EnzymeGuess | undefined {
   let k = end;
   let connected = false;
   const skippable = (w: string) => breaks(w) || NOT_SUBSTRATE_WORDS.has(w);
-  while (k < tokens.length && skippable(tokens[k]!)) {
+  while (k < tokens.length && skippable(tokens[k]!) && !INHIBITOR_CLAUSE_WORDS.has(tokens[k]!)) {
     if (SUBSTRATE_CONNECTORS.has(tokens[k]!)) connected = true;
     k++;
   }
+  if (k < tokens.length && INHIBITOR_CLAUSE_WORDS.has(tokens[k]!)) connected = false;
   const substrateWords: string[] = [];
   while (connected && k < tokens.length && !skippable(tokens[k]!)) {
     substrateWords.push(tokens[k]!);
@@ -2355,12 +2431,20 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
     // words were looked for. The guess path's reading (the words after the
     // name and its connector) is the second source; the runner's row filter
     // then answers for whatever was named.
-    const substrate =
-      matched.substrates.find((s) => lower.includes(s)) ?? guessEnzymeNameFromQuery(query)?.substrate;
+    const inhibitor = extractInhibitor(query);
+    // The inhibitor is never the substrate: "competitive inhibition of
+    // xanthine oxidase by allopurinol" carried BRENDA's Km of allopurinol
+    // as a substrate as the model's Km (found 2026-11-11).
+    const isInhibitor = (s: string) =>
+      inhibitor !== undefined && s.toLowerCase().includes(inhibitor.toLowerCase());
+    const substrate = [
+      matched.substrates.find((s) => lower.includes(s)),
+      guessEnzymeNameFromQuery(query)?.substrate,
+    ].find((s): s is string => s !== undefined && !isInhibitor(s));
     return {
       enzymeName: matched.enzymeName,
       ...(substrate ? { substrate } : {}),
-      inhibitor: extractInhibitor(query),
+      inhibitor,
       isoform: extractIsoform(query),
       organism: namedOrganism ?? matched.organism,
       organismAssumed: organismsNamed.length === 0,
@@ -2418,6 +2502,92 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
     organism: namedOrganism ?? "Homo sapiens",
     organismAssumed: organismsNamed.length === 0,
     ecNumber: undefined,
+    ...(refusal ? { extractionRefusal: refusal } : {}),
+  };
+}
+
+/**
+ * Said when compose's reader was asked for a reading and gave none.
+ *
+ * The query is then read by the API's older reader, which reads some
+ * sentences differently from `caterva compose` (the reason the reader is
+ * asked at all, sentenceReader.ts). Answering with another reader's reading
+ * and not saying so is answering another question in silence.
+ */
+export function readerUnavailableFlag(why: string): string {
+  return (
+    `read: compose's sentence reader gave no reading (${why}), so this query was ` +
+    "read by the API's older reader, which can read a sentence differently from " +
+    "`caterva compose`. Check the enzyme, organism, substrate and inhibitor below, " +
+    "or send the query again."
+  );
+}
+
+/**
+ * The domain each single-enzyme grammar rule compose builds is served by.
+ * A rule with no domain here leaves the keyword classification standing.
+ */
+const DOMAIN_OF_RULE: Record<string, string> = {
+  michaelis_menten: "mm",
+  competitive_inhibition: "mm_competitive_inhibition",
+};
+
+const ENZYME_DOMAINS = new Set(["mm", "mm_competitive_inhibition"]);
+
+/**
+ * The domain for `reading`, given the keywords' choice `byKeywords`.
+ *
+ * Compose's rule wins between the two enzyme domains, and supplies one when
+ * no keyword matched: "xanthine oxidase inhibited by allopurinol" matched no
+ * keyword and was refused as unrecognised, while compose built competitive
+ * inhibition with allopurinol's Ki. A query the keywords read as another
+ * domain (an SSA, a network) is not taken over by an enzyme word in it.
+ */
+export function domainForReading(
+  reading: SentenceReading | null,
+  byKeywords: string | undefined,
+): string | undefined {
+  if (!reading?.ec || !reading.rule) return byKeywords;
+  const fromRule = DOMAIN_OF_RULE[reading.rule];
+  if (!fromRule) return byKeywords;
+  if (byKeywords === undefined || ENZYME_DOMAINS.has(byKeywords)) return fromRule;
+  return byKeywords;
+}
+
+/**
+ * The entities compose's reading names, or undefined when it read no one
+ * enzyme (the older reader is then used, and the runner's enzyme policy
+ * answers for the name).
+ *
+ * Everything comes from the reading: the EC number (chymotrypsin is
+ * 3.4.21.1, not trypsin's 3.4.21.4), the isoform a gene symbol is ("HK2"),
+ * the substrate only as BRENDA lists it (never "michaelis-menten kinetics",
+ * never the inhibitor), the inhibitor, and the organism NAMED or CHOSEN by
+ * the chooser with the inhibitor and every constant the model needs in view
+ * (Bos taurus for allopurinol, where human has no Ki row). Each choice
+ * travels in `choices` and becomes a "<role> chosen:" flag naming why and
+ * the alternatives; nothing is "assumed".
+ */
+export function entitiesFromReading(
+  reading: SentenceReading | null,
+  query: string,
+): EntityExtraction | undefined {
+  if (!reading?.ec) return undefined;
+  const organismRefusal = organismConflict(matchOrganisms(query));
+  const blocked = reading.refusal
+    ? { reason: "not_found" as const, note: reading.refusal }
+    : undefined;
+  const refusal = organismRefusal ?? blocked;
+  return {
+    enzymeName: reading.enzymeText ?? `EC ${reading.ec}`,
+    ecNumber: reading.ec,
+    ...(reading.substrate ? { substrate: reading.substrate } : {}),
+    ...(reading.inhibitor ? { inhibitor: reading.inhibitor } : {}),
+    ...(reading.isoform ? { isoform: reading.isoform } : {}),
+    organism: reading.organism ?? "",
+    organismAssumed: false,
+    choices: reading.choices,
+    readNotes: reading.notes,
     ...(refusal ? { extractionRefusal: refusal } : {}),
   };
 }
@@ -2588,10 +2758,20 @@ function provenanceViolations(
  * Generate flags about parameter extraction from query overrides.
  * Consolidated pattern used in both LLM and fallback resolution paths.
  */
+/**
+ * Said when the query gives no parameter value. It said "using defaults"
+ * until 2026-11-11, on responses whose Km was resolved and cited too: false
+ * on exactly the responses that matter. Where each value came from is
+ * parameterProvenance's to say, per key; that every value is a default is
+ * said separately, when it is so (isAllDefaults).
+ */
+const NO_VALUES_GIVEN =
+  "No parameter values were given in the query; parameterProvenance says where each value came from.";
+
 function buildParameterExtractionFlags(overrides: Record<string, number>): string[] {
   const extractionFlags: string[] = [];
   if (Object.keys(overrides).length === 0) {
-    extractionFlags.push("No parameters were extracted from the query; using defaults.");
+    extractionFlags.push(NO_VALUES_GIVEN);
   }
   if (Object.keys(overrides).length > 0) {
     extractionFlags.push("Applied parameter overrides found in the query string.");
@@ -2856,14 +3036,22 @@ export async function resolveQuery(
     const organismRefusal = organismConflict(organismsInText);
     const organismNamed =
       matchOrganism(query) ?? (llmResult.entities?.organism || undefined);
-    const llmEntities: EntityExtraction | undefined = llmResult.entities
+    // Compose's reading wins over the model's for an enzyme query: one
+    // sentence, one reading, whichever front end it was typed into.
+    const llmOutcome = ENZYME_DOMAINS.has(llmResult.domain)
+      ? await readSentenceOutcome(query)
+      : { reading: null, unavailable: null };
+    const llmReading = llmOutcome.reading;
+    if (llmOutcome.unavailable) flags.push(readerUnavailableFlag(llmOutcome.unavailable));
+    const llmEntities: EntityExtraction | undefined = entitiesFromReading(llmReading, query) ??
+      (llmResult.entities
       ? {
           ...llmResult.entities,
           organism: organismNamed ?? "Homo sapiens",
           organismAssumed: organismNamed === undefined,
           ...(organismRefusal ? { extractionRefusal: organismRefusal } : {}),
         }
-      : undefined;
+      : undefined);
     // A proposal the model made and the resolver did not use. Said, not
     // hidden: the same courtesy the discarded modelCitations get below.
     if (llmResult.ecNumberDropped && llmResult.ecNumberDroppedReason) {
@@ -2925,9 +3113,7 @@ export async function resolveQuery(
       Object.keys(effectiveOverrides).length === 0 &&
       Object.keys(llmResult.parameters).length === 0
     ) {
-      flags.push(
-        "No parameters were extracted from the query; using defaults.",
-      );
+      flags.push(NO_VALUES_GIVEN);
     } else if (Object.keys(effectiveOverrides).length > 0) {
       flags.push("Applied parameter overrides found in the query string.");
     }
@@ -3165,6 +3351,30 @@ export async function resolveQuery(
   // after a connector: whether the symbol really is an enzyme is then the
   // runner's question, and a symbol that names none is refused there by
   // name (ec_not_resolved), which says more than "unrecognised".
+  // Compose's reading of the sentence (sentenceReader.ts), asked only when
+  // the query may be about an enzyme: the keywords chose an enzyme domain,
+  // or none.
+  const outcome =
+    best === undefined || ENZYME_DOMAINS.has(best.domain)
+      ? await readSentenceOutcome(query)
+      : { reading: null, unavailable: null };
+  const reading = outcome.reading;
+  const readDomain = domainForReading(reading, best?.domain);
+  if (readDomain !== best?.domain) {
+    best = DOMAIN_DEFAULTS.find((d) => d.domain === readDomain) ?? best;
+  }
+  // Without compose's reading, an inhibitor the query names still makes the
+  // model competitive inhibition, as compose builds it (ADR 0182). Live, on
+  // 2026-11-12, the reader timed out under load and "acetylcholinesterase
+  // inhibited by donepezil in human with 50 nM enzyme" was answered as plain
+  // Michaelis-Menten: the inhibitor the user named dropped, and nothing said
+  // ("inhibited" is no keyword, and "enzyme" is one of mm's).
+  const inhibitorUnread =
+    reading === null && best?.domain === "mm" ? extractInhibitor(query) : undefined;
+  if (inhibitorUnread) {
+    best = DOMAIN_DEFAULTS.find((d) => d.domain === "mm_competitive_inhibition") ?? best;
+  }
+
   let readAsKinetics: EnzymeGuess | undefined;
   if (!best) {
     const guess = guessEnzymeNameFromQuery(query);
@@ -3203,6 +3413,14 @@ export async function resolveQuery(
           'on that substrate. Say "inhibition" or name another model to change it.',
       ]
     : [];
+  if (outcome.unavailable) flags.push(readerUnavailableFlag(outcome.unavailable));
+  if (inhibitorUnread) {
+    flags.push(
+      `read as: competitive inhibition by ${inhibitorUnread}. The query names an ` +
+        "inhibitor and no mechanism, so the model is competitive inhibition, as " +
+        "`caterva compose` builds it; name another mechanism to change it.",
+    );
+  }
   let parameterProvenance = noteStatedSources(
     buildParameterProvenance(parameters, effectiveOverrides, {}, best.domain),
     statedPhrases,
@@ -3210,7 +3428,7 @@ export async function resolveQuery(
 
   // If this looks like an enzyme query and no LLM is available, try the
   // hardcoded entity map and the science agent.
-  const fallbackEntities = extractEntitiesFromQuery(query);
+  const fallbackEntities = entitiesFromReading(reading, query) ?? extractEntitiesFromQuery(query);
   const resolvableForDomain = RESOLVABLE_FIELDS[best.domain] ?? [];
   const hasUnoverriddenKinetic = resolvableForDomain.some(
     (k) => !(k in effectiveOverrides),
