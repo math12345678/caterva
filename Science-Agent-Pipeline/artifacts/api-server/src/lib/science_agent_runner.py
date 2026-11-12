@@ -734,7 +734,7 @@ def _resolved_effectors_dict(effectors):
         return [e.model_dump() for e in effectors]
 
 
-def _row_scope(commentary):
+def _row_scope(commentary, requested_isoform=None):
     """{isoform, inhibitionMode, versus, kitzWilson} from a BRENDA row's
     commentary, or None when there is no commentary.
 
@@ -756,8 +756,23 @@ def _row_scope(commentary):
     except ImportError:
         return None
     row = read_row(commentary)
-    return {"isoform": row.isoform, "inhibitionMode": row.mode, "versus": row.versus,
-            "kitzWilson": row.kitz_wilson}
+    out = {"isoform": row.isoform, "inhibitionMode": row.mode, "versus": row.versus,
+           "kitzWilson": row.kitz_wilson}
+    # Whether the row's isoform IS the one the request names, by
+    # caterva.bind.core.same_isoform: the comparison the resolver filtered
+    # the rows by, which also asks UniProt whether two names are one protein.
+    # The TypeScript side had only a regex mirror of it, which called BRENDA's
+    # "hexokinase II" row (ref 702867) "not HK2, a different protein's
+    # constant" for the query "HK2 with glucose" (adversarial round,
+    # 2026-11-11). Absent when either side names no isoform.
+    if requested_isoform and row.isoform:
+        try:
+            from caterva.bind.core import same_isoform
+        except ImportError:
+            same_isoform = None
+        if same_isoform is not None:
+            out["sameIsoformAsRequested"] = bool(same_isoform(row.isoform, requested_isoform))
+    return out
 
 
 def _mechanism_evidence_dict(evidence):
@@ -1249,7 +1264,7 @@ def main() -> None:
                 # What that commentary says, decided HERE by the same parser
                 # `caterva bind` and `caterva compose` use, so the TypeScript
                 # side reports it rather than re-deriving it (ADR 0027).
-                "rowScope": _row_scope(getattr(result, "commentary", None)),
+                "rowScope": _row_scope(getattr(result, "commentary", None), isoform),
                 # A row that is evidence against the model's mechanism for
                 # the Ki returned: BRENDA ref 739793's "noncompetitive
                 # versus pyruvate" row, for a competitive pyruvate model

@@ -187,6 +187,13 @@ export interface ScienceAgentResult {
      * resolver ranks Ki rows by; absent from runners older than it.
      */
     kitzWilson?: boolean;
+    /**
+     * Whether `isoform` is the one the request named, by
+     * caterva.bind.core.same_isoform (UniProt's names included: BRENDA's
+     * "hexokinase II" is HK2). Absent when either names none, or from an
+     * older runner; rowScopeFlags then falls back to its own comparison.
+     */
+    sameIsoformAsRequested?: boolean;
   } | null;
   /**
    * A row that is evidence against the model's mechanism for the Ki

@@ -343,7 +343,7 @@ export function rowScopeFlags(
   if (isoform) {
     if (!scope.isoform) {
       out.push(`${name}: the source row names no isoform, so whether it measured ${isoform}, the one the query names, is unknown.`);
-    } else if (!sameIsoform(scope.isoform, isoform)) {
+    } else if (!(scope.sameIsoformAsRequested ?? sameIsoform(scope.isoform, isoform))) {
       out.push(`${name} was measured on isoform ${scope.isoform}, not ${isoform}, the one the query names: a different protein's constant.`);
     }
   } else if (scope.isoform) {
@@ -609,6 +609,7 @@ function buildUnresolvedKineticProvenance(
   ecCandidates?: string[],
   modelMode?: InhibitionMode,
   ecRefusal?: string,
+  lookedUpFor?: { name: string; named: boolean },
 ): ParameterProvenance {
   const K = key.toUpperCase();
 
@@ -840,18 +841,29 @@ function buildUnresolvedKineticProvenance(
   // This is the same courtesy the two branches above extend to organisms
   // and variants, for the field a reader is far MORE likely to get wrong:
   // an organism has one binomial name, a metabolite has a dozen aliases.
+  //
+  // The sentence names what was looked up and whether the user named it. A
+  // Ki is looked up for the INHIBITOR, so "the substrate you named" was
+  // wrong for "acetylcholinesterase inhibited by donepezil in human" (the
+  // user named an inhibitor and no substrate), and a name Caterva chose
+  // was never "named" (adversarial round, 2026-11-11).
   if (reason === "not_found" && substratesAvailable && substratesAvailable.length > 0) {
+    const role = key === "ki" ? "inhibitor" : "substrate";
+    const what = lookedUpFor?.name
+      ? `${lookedUpFor.name}, the ${role} ${lookedUpFor.named ? "you named" : "Caterva chose"}`
+      : `the ${role} you named`;
     return {
       origin: "default",
       unresolvedReason: "not_found",
       note:
-        `No ${K} was found for the substrate you named, but this enzyme ` +
-        `reports ${K} values for: ${substratesAvailable.join(", ")}. ` +
-        `Substrate names differ between databases and papers, so the one ` +
-        `you meant may be spelled differently above. Caterva does not ` +
-        `substitute one substrate for another — a similar name can be a ` +
-        `salt, a stereoisomer or an ester, which is a different molecule — ` +
-        `so re-run with the name you meant.`,
+        `No ${K} was found for ${what}, but this enzyme reports ${K} ` +
+        `values for these ${role}s: ${substratesAvailable.join(", ")}. ` +
+        `${role[0].toUpperCase()}${role.slice(1)} names differ between ` +
+        `databases and papers, so the one you meant may be spelled ` +
+        `differently above. Caterva does not substitute one ${role} for ` +
+        `another — a similar name can be a salt, a stereoisomer or an ` +
+        `ester, which is a different molecule — so re-run with the name you ` +
+        `meant.`,
     };
   }
 
@@ -1094,12 +1106,18 @@ async function applyKineticResolution(
           agentResult.ecRefusal,
         );
       } else {
+        const lookedUp = key === "ki" ? working.inhibitor : working.substrate;
+        const named = key === "ki" ? entities.inhibitor : entities.substrate;
         provenanceUpdates[key] = buildUnresolvedKineticProvenance(
           key,
           "not_found",
           undefined,
           undefined,
           agentResult.substratesAvailable,
+          undefined,
+          undefined,
+          undefined,
+          lookedUp ? { name: lookedUp, named: Boolean(named) && named === lookedUp } : undefined,
         );
       }
       // THE OFFER GOES IN THE PROVENANCE NOTE, NOT IN A FLAG.
