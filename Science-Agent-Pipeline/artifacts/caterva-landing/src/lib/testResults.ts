@@ -151,7 +151,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "188 test files -- kinetics & Michaelis-Menten correctness, " +
+          "192 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -271,10 +271,15 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-11-11 (ADR 0182) on the merged tree of the five
         // real-values branches, caterva/tests with pytest-xdist (-n 8):
         // 7433 tests, 7431 passed, 2 skipped, 0 failed, 754 s.
-        passed: 7431,
+        //
+        // Measured 2026-11-12 (ADR 0182, second round) on the merged tree of
+        // the rows, chooser, engine, names and web branches, caterva/tests
+        // with pytest-xdist (-n 8): 7738 tests, 7736 passed, 2 skipped, 0
+        // failed, 258 s.
+        passed: 7736,
         skipped: 2,
         failed: 0,
-        collected: 7433,
+        collected: 7738,
       },
     ],
   },
@@ -284,7 +289,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "97 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "98 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -381,10 +386,14 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-11-11 (ADR 0182) on the merged tree of the five
         // real-values branches, Tests/ with pytest-xdist (-n 8): 1750 tests,
         // 1750 passed, 0 skipped, 0 failed, 647 s.
-        passed: 1750,
+        //
+        // Measured 2026-11-12 (ADR 0182, second round) on the same merged
+        // tree, Tests/ with pytest-xdist (-n 8): 1832 tests, 1832 passed, 0
+        // skipped, 0 failed, 202 s.
+        passed: 1832,
         skipped: 0,
         failed: 0,
-        collected: 1750,
+        collected: 1832,
       },
     ],
   },
@@ -394,7 +403,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "83 test files -- query resolution, parameter provenance, " +
+          "86 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
@@ -478,7 +487,11 @@ export const TEST_SUITES: TestSuite[] = [
         // (6 of 6). The 14 more: automaticChoice.test.ts (6) and the
         // converted and new cases in webPathProvenance and
         // inhibitorIsTheKiCompound (8): 900.
-        passed: 900,
+        //
+        // Measured 2026-11-12 (ADR 0182, second round) on the merged tree,
+        // vitest run with the project venv on PATH: 86 files, 933 tests,
+        // 933 passed.
+        passed: 933,
         skipped: 0,
         failed: 0,
       },
@@ -526,7 +539,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "79 test files -- the `scientific` CLI end to end and its " +
+          "80 test files -- the `scientific` CLI end to end and its " +
           "refusals, the literature resolver, the Python engine bridge, " +
           "inhibition models, exports, request validation, result storage " +
           "and reproducibility checks",
@@ -548,7 +561,10 @@ export const TEST_SUITES: TestSuite[] = [
         // `catalog 1.1.1.27` (a live BRENDA fetch) exited 1 under load and
         // passed run alone (5 of 5). The three new files are chooseMissing,
         // formatNumber and chooserOnTheCommandLine: 1001.
-        passed: 1001,
+        //
+        // Measured 2026-11-12 (ADR 0182, second round) on the merged tree:
+        // jest, 80 suites, 1026 tests, 1026 passed.
+        passed: 1026,
         skipped: 0,
         failed: 0,
       },
