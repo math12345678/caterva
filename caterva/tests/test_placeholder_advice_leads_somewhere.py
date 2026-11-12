@@ -160,6 +160,64 @@ def test_an_inhibitor_measured_only_elsewhere_is_labelled_as_elsewhere(monkeypat
     assert "never substituted for yours" in said
 
 
+def test_a_substrate_offered_for_one_constant_says_whether_it_fills_the_other(monkeypatch):
+    """Renilla-type luciferase, coelenterazine: no kcat row for it; the kcat
+    rows there are "Luciferin" and others, none with a Km row there, so
+    following the advice would empty the Km in place of the kcat."""
+    monkeypatch.setattr(defaults, "table_rows", _rows({
+        ("kcat", "Renilla reniformis"): [("Luciferin", 1), ("methyl luciferin", 1)],
+        ("km", "Renilla reniformis"): [("coelenterazine", 5)],
+    }))
+    model = _Model((_Q("reaction_Km", "km"), _Q("reaction_kcat", "kcat")), substrate="coelenterazine")
+    out = cli._said_for_the_organism(
+        model, {"reaction_kcat": "nothing found" + _clause("kcat", "coelenterazine", "substrate")},
+        "1.13.12.5", "Renilla reniformis")
+    said = out["reaction_kcat"]
+    assert "Luciferin (1 row)" in said
+    assert "None of them has a Km row there, so naming one would leave the Km a placeholder" in said
+    step = _what_would_ground(SimpleNamespace(not_found=out), ["reaction_kcat"])
+    assert "--substrate set to" not in step
+
+
+def test_the_substrates_that_fill_every_constant_are_said(monkeypatch):
+    monkeypatch.setattr(defaults, "table_rows", _rows({
+        ("kcat", "Homo sapiens"): [("A", 2), ("B", 1)],
+        ("km", "Homo sapiens"): [("B", 3), ("C", 1)],
+    }))
+    model = _Model((_Q("reaction_Km", "km"), _Q("reaction_kcat", "kcat")), substrate="X")
+    out = cli._said_for_the_organism(
+        model, {"reaction_kcat": "nothing found" + _clause("kcat", "X", "substrate")}, "1.1.1.1", "Homo sapiens")
+    said = out["reaction_kcat"]
+    assert "the ones with a Km row there too, so that naming one fills this model's other constant as " \
+           "well: B (1 row)" in said
+    step = _what_would_ground(SimpleNamespace(not_found=out), ["reaction_kcat"])
+    assert "--substrate set to one the provenance table lists" in step
+
+
+def test_with_an_isoform_a_compound_whose_rows_name_another_is_not_offered(monkeypatch):
+    """The isoform rule refuses a row naming another isoform, so a compound
+    with only such rows is no way out; a row naming none is (flagged)."""
+    monkeypatch.setattr(defaults, "table_rows", lambda ec, table, organism: (
+        defaults._Row("indomethacin", organism, "isoform PGHS-1"),
+        defaults._Row("nimesulide", organism, "wild-type, cyclooxygenase inhibition"),
+    ) if table == "ki" else ())
+    model = _Model((_Q("reaction_Ki", "ki"),), inhibitor="celecoxib", isoform="PTGS2")
+    out = cli._said_for_the_organism(model, {"reaction_Ki": "x" + _clause("ki", "celecoxib", "inhibitor")},
+                                     "1.14.99.1", "Homo sapiens")
+    said = out["reaction_Ki"]
+    assert "nimesulide (1 row)" in said and "indomethacin" not in said
+
+
+def test_with_an_isoform_and_only_other_isoforms_rows_it_says_supply(monkeypatch):
+    monkeypatch.setattr(defaults, "table_rows", lambda ec, table, organism: (
+        defaults._Row("indomethacin", organism, "isoform PGHS-1"),) if table == "ki" else ())
+    model = _Model((_Q("reaction_Ki", "ki"),), inhibitor="celecoxib", isoform="PTGS2")
+    out = cli._said_for_the_organism(model, {"reaction_Ki": "x" + _clause("ki", "celecoxib", "inhibitor")},
+                                     "1.14.99.1", "Homo sapiens")
+    said = out["reaction_Ki"]
+    assert "names another isoform than PTGS2" in said and "--inhibitor set to" not in said
+
+
 def test_with_no_organism_the_resolvers_clause_stands():
     reason = "x" + _clause("ki", "donepezil", "inhibitor")
     model = _Model((_Q("reaction_Ki", "ki"),), inhibitor="donepezil")
@@ -234,6 +292,39 @@ def test_the_organisms_protein_under_another_ec_is_the_first_remedy(monkeypatch)
     assert said.index("--subject 2.7.1.1") < said.index("Zymomonas mobilis")
 
 
+def test_the_sibling_advice_says_when_no_row_there_names_the_protein(monkeypatch):
+    """"glucokinase in mouse" was sent to EC 2.7.1.1 --isoform Gck, and that
+    run came back GROUNDED with Km 0.42 mM from a mouse row naming no isozyme
+    (a low-Km hexokinase's value). The advice says no row names Gck first."""
+    def rows(ec, table, organism):
+        if ec != "2.7.1.1":
+            return ()
+        return (defaults._Row("D-glucose", organism, "pH and temperature not specified in the publication"),
+                defaults._Row("ATP", organism, "37°C, pH 7.4, wild-type enzyme"))
+    monkeypatch.setattr(defaults, "table_rows", rows)
+    said = cli._filed_under_another_ec("2.7.1.2", "Mus musculus", "glucokinase")
+    assert "'glucokinase' is the protein Gck" in said
+    assert "2 Km rows for EC 2.7.1.1 in Mus musculus, and none of them names Gck" in said
+    assert "may have measured another protein of EC 2.7.1.1" in said
+    assert said.index("none of them names Gck") < said.index("--isoform Gck")
+    assert "supply Gck's constants yourself" in said
+
+
+def test_the_sibling_advice_counts_the_rows_that_name_the_protein(monkeypatch):
+    def rows(ec, table, organism):
+        if ec != "2.7.1.1":
+            return ()
+        return (defaults._Row("D-glucose", organism, "31°C and pH 7.7, adult glucokinase"),
+                defaults._Row("D-glucose", organism, "hexokinase I, at 37°C"),
+                defaults._Row("D-glucose", organism, "mutant enzyme Y214C"))
+    monkeypatch.setattr(defaults, "table_rows", rows)
+    said = cli._filed_under_another_ec("2.7.1.2", "Homo sapiens", "glucokinase")
+    # The variant's row is not counted; of the other two, one names GCK.
+    assert "2 Km rows for EC 2.7.1.1 in Homo sapiens, 1 of which names GCK" in said
+    assert "re-run with --subject 2.7.1.1 --isoform GCK" in said
+    assert "none of them" not in said
+
+
 def test_a_word_inside_a_longer_protein_name_is_not_that_protein(monkeypatch):
     """ADPGK is "ADP-dependent glucokinase": not what "glucokinase" names."""
     monkeypatch.setattr(defaults, "table_rows",
@@ -279,6 +370,16 @@ def test_a_word_that_could_not_be_checked_is_never_replaced_by_a_choice(monkeypa
     _, refusal = cli._choose_what_was_not_named(model, args)
     assert refusal and "'mannose'" in refusal and "no other substrate is chosen" in refusal
     assert chose == []
+
+
+def test_an_isozyme_letter_alone_does_not_stop_the_search(monkeypatch):
+    """"lactate dehydrogenase A in human" with the list unread was refused
+    for "what may be the substrate ('A')": a letter of the isozyme's name."""
+    monkeypatch.setattr(cli, "brenda_km_substrates", lambda ec, org: None)
+    monkeypatch.setattr(cli, "SUBSTRATE_LIST_PAUSE", 0)
+    args = _args(description="lactate dehydrogenase A in human")
+    cli.read_description(args, err=io.StringIO())
+    assert not getattr(args, "substrate_unread", ())
 
 
 # ---------------------------------------------------------------------------
@@ -484,3 +585,31 @@ def test_an_isoform_no_compound_was_measured_on_does_not_send_to_substrate():
                            "sapiens: fenthion (4 rows). Re-run with --substrate set to one of them")
     step = _what_would_ground(SimpleNamespace(not_found={"reaction_Km": named}), ["reaction_Km"])
     assert "--substrate" in step
+
+
+def test_an_organism_list_says_when_no_organism_has_the_compound(monkeypatch):
+    """cathepsin D with hemoglobin, rabbit: the Km is hemoglobin's, no rabbit
+    kcat row at all, and no organism has a kcat row for hemoglobin: the
+    organisms offered would model another substrate, and that is said."""
+    monkeypatch.setattr(defaults, "table_rows", _rows({
+        ("km", "Oryctolagus cuniculus"): [("hemoglobin", 2)],
+        ("kcat", "Homo sapiens"): [("Abz-peptide", 87)],
+    }))
+    model = _Model((_Q("reaction_Km", "km"), _Q("reaction_kcat", "kcat")), substrate="hemoglobin")
+    out = cli._said_for_the_organism(
+        model, {"reaction_kcat": "nothing found" + _clause("kcat", "hemoglobin", "substrate")},
+        "3.4.23.5", "Oryctolagus cuniculus")
+    said = out["reaction_kcat"]
+    assert "No organism has a kcat row for hemoglobin under EC 3.4.23.5" in said
+    assert "the model would be of another substrate, not hemoglobin" in said
+    assert said.index("not hemoglobin") < said.index("Homo sapiens (87 rows)")
+
+
+def test_an_organism_caterva_chose_is_not_called_the_users_request():
+    reason = ("nothing found -- x (searched under the requirement that organism must be Bos taurus, "
+              "raised by your own request)")
+    said = cli._organism_chosen_said({"reaction_Ki": reason, "other": None})
+    assert "your own request" not in said["reaction_Ki"]
+    assert "organism must be Bos taurus, the organism Caterva chose because your description named none)" \
+        in said["reaction_Ki"]
+    assert said["other"] is None

@@ -262,7 +262,41 @@ thing actually missing (`caterva/compose/__main__.py`,
   --isoform GCK`, which runs GROUNDED (Km 6.0 mM ref 641068, kcat 37 1/s ref
   702320, the kcat from the row naming GCK; the Km row names no isozyme and
   the report says so). Only a protein whose UniProt names include the words
-  exactly counts.
+  exactly counts. That kcat row is "glucokinase with C-terminal 5 alanine
+  addition", an engineered construct the variant reader does not recognise;
+  the wild-type GCK rows (40.1 1/s ref 739603, 29 1/s ref 702320) name no
+  isozyme, so the isoform rule prefers the construct. Left to the row-reading
+  stream (see "Not done" below).
+- **The sibling advice says whether any row names the protein** (reviewer
+  of round 1). "glucokinase with glucose in mouse" was told to re-run with
+  `--subject 2.7.1.1 --isoform Gck`, and that run came back GROUNDED with Km
+  0.42 mM (ref 758915) and kcat 53.2 1/s from mouse rows naming no isozyme, a
+  low-Km hexokinase's values, not glucokinase's (S0.5 near 8 mM). The advice
+  now counts the organism's rows that name the protein; when none does
+  (mouse: 0 of 3; human: 0 of 54 Km rows), it says each may have measured
+  another protein of that EC number, to read the papers of the rows the run
+  carries, or to supply the constants.
+- **A substrate offered for one constant says whether it fills the others**
+  (reviewer). "Renilla-type luciferase with coelenterazine" had no kcat row
+  for coelenterazine and was told to re-run with `--substrate Luciferin`,
+  which has no Km row in Renilla reniformis, so the advice traded the kcat
+  placeholder for a Km one. The substrates that fill every constant looked up
+  under the substrate are named; when none does, the reason says so and
+  "Do this next" is to supply it. With an isoform asked for, a compound whose
+  rows all name another isoform is not offered, since the isoform rule
+  refuses those rows.
+- **No organism has the compound** (reviewer). "cathepsin D with hemoglobin"
+  (rabbit chosen: the only organism with hemoglobin rows) has no rabbit kcat
+  row; the organisms offered have kcat rows only for other substrates, and
+  the reason now says the model there would not be of hemoglobin.
+- **An organism Caterva chose is not "your own request"** (reviewer). The
+  scout's suffix read "organism must be Bos taurus, raised by your own
+  request" for "xanthine oxidase inhibited by febuxostat", where no organism
+  was typed; it now says Caterva chose it because none was named.
+- **An isozyme's letter is not a possible substrate** (reviewer). With the
+  substrate list unread, "lactate dehydrogenase A in human" was refused for
+  "what may be the substrate ('A')"; a lone letter, digit or Roman numeral no
+  longer stops the search.
 - **A substrate word survives a failed read.** The substrate list is read up
   to three times; if it still fails, the search refuses rather than letting
   the chooser model another substrate under "No substrate was named"
@@ -304,7 +338,13 @@ GROUNDED (Ki 3.7e-05 mM ref 749746); "pepsin with hemoglobin" is GROUNDED in Sau
 micropectoralis (ref 771228). Not done: a PubMed search returns papers for a
 made-up inhibitor name (the reason now says the papers were not checked to
 name the compound; the search itself is the literature layer's); compound
-synonyms (donepezil under its systematic name) are not mapped.
+synonyms (donepezil under its systematic name, galantamine as galanthamine,
+febuxostat under its IUPAC name) are not mapped; construct rows ("C-terminal
+5 alanine addition", "truncated enzyme with removed helix") are not read as
+variants; "Renilla luciferase" is read as firefly luciferase (EC 1.13.12.7),
+the word "Renilla" unused; glucokinase in rat gets no sibling advice (the
+enzyme index lists proteins for human, mouse, yeast and E. coli K-12 only),
+though BRENDA has rat glucokinase rows under EC 2.7.1.1.
 
 ## Consequences
 

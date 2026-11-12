@@ -615,6 +615,11 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
             need = ("isoform_unmeasured" if re.search(r"naming \S+ under EC \S+ in .+ for any "
                                                       r"(substrate|inhibitor)", reason)
                     else "isoform")
+        elif "so naming one would leave the" in low:
+            # Every substrate offered lacks a row for another constant of
+            # the model (`__main__._what_the_organism_holds`): re-running
+            # trades one placeholder for another, so the step is to supply it.
+            need = "nothing"
         elif "--inhibitor set to" in reason:
             # The inhibitor named has no Ki row; others do. It WAS looked up.
             need = "other_inhibitor"
