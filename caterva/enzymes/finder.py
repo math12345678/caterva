@@ -1044,6 +1044,19 @@ def _spacing_variant(text: str, code: Optional[str], index: EnzymeIndex) -> Opti
     key = compact_name_key(text)
     if len(re.sub(r"[^a-z]", "", key)) < SPACING_MIN_LENGTH:
         return None
+    elided = ""
+    if key not in _tables(index).compact:
+        # "acetylcholine esterase" is the listed "acetylcholinesterase" with
+        # the space written and the letter the two words share at the join
+        # written twice. Read as the listed name, not as a spelling
+        # correction (review of the names stream, 2026-11-12).
+        words = strict_key(text).split()
+        for i in range(len(words) - 1):
+            if words[i] and words[i + 1] and words[i][-1] == words[i + 1][0] and words[i][-1].isalpha():
+                joined = "".join(words[:i + 1]) + "".join(words[i + 1:])[1:]
+                if joined in _tables(index).compact:
+                    key, elided = joined, words[i][-1]
+                    break
     names = [n for n in _tables(index).compact.get(key, ()) if not n.abbreviation]
     if any(n.strict == strict_key(text) for n in names):
         # Typed exactly as listed: `_resolve` has already decided it, and a
@@ -1058,7 +1071,8 @@ def _spacing_variant(text: str, code: Optional[str], index: EnzymeIndex) -> Opti
     if head is None:
         return None
     how = (f"listed as {'the accepted name' if name.accepted else 'another name for this enzyme'}: "
-           f"'{name.text}', which is what was typed with the spacing or hyphens written differently")
+           f"'{name.text}', which is what was typed with the spacing or hyphens written differently"
+           + (f" and the '{elided}' the two words share at the join written once" if elided else ""))
     head = Candidate(**{**head.__dict__, "why": how})
     return Resolved(ec=name.ec, how=how, candidate=head, cautions=_cautions(index, head, ranked))
 

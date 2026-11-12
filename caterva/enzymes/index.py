@@ -73,8 +73,10 @@ ORGANISMS: Dict[str, Tuple[str, str, Tuple[str, ...]]] = {
     "DANRE": ("Danio rerio", "zebrafish", ("d. rerio",)),
     "XENLA": ("Xenopus laevis", "Xenopus laevis", ("xenopus", "x. laevis")),
     "MYCTU": ("Mycobacterium tuberculosis", "M. tuberculosis", ("m. tuberculosis",)),
-    "HORSE": ("Equus caballus", "horse", ("e. caballus",)),
-    "SHEEP": ("Ovis aries", "sheep", ("o. aries",)),
+    "HORSE": ("Equus caballus", "horse", ("e. caballus", "equine")),
+    # "ovine" and "equine" as "bovine" and "porcine" are: "ovine COX-2" was
+    # read with no organism and modelled in Homo sapiens (names-stream review).
+    "SHEEP": ("Ovis aries", "sheep", ("o. aries", "ovine")),
     # "guinea pig" is one species, and it is NOT a pig: without this row a
     # sentence "guinea pig trypsin" read the word "pig" as Sus scrofa, and
     # `--organism "guinea pig"` was case-fixed to "Guinea pig", which no
@@ -98,6 +100,23 @@ ORGANISMS: Dict[str, Tuple[str, str, Tuple[str, ...]]] = {
     "IPOBA": ("Ipomoea batatas", "sweet potato", ("sweet potatoes", "i. batatas")),
     # The firefly of firefly luciferase (LUCI_PHOPY, EC 1.13.12.7).
     "PHOPY": ("Photinus pyralis", "firefly", ("fireflies", "north american firefly", "p. pyralis")),
+    # More classic sources, each the one species BRENDA files the enzyme's
+    # rows under (checked on the BRENDA pages named, 2026-11-12). Unread,
+    # "beta-glucosidase from almond", "acid phosphatase from potato" and
+    # "hexokinase from wheat germ" were each modelled in Homo sapiens
+    # (names-stream review): sweet-almond beta-glucosidase (3.2.1.21),
+    # potato phosphorylase and acid phosphatase (2.4.1.1, 3.1.3.2),
+    # wheat-germ acid phosphatase (3.1.3.2), pineapple stem bromelain
+    # (3.4.22.32), papain (3.4.22.2), maize PEP carboxylase (4.1.1.31),
+    # tobacco and tomato (4.1.1.39, 3.1.3.2, 3.2.1.26).
+    "PRUDU": ("Prunus dulcis", "almond", ("almonds", "sweet almond", "sweet almonds", "p. dulcis")),
+    "SOLTU": ("Solanum tuberosum", "potato", ("potatoes", "potato tuber", "potato tubers", "s. tuberosum")),
+    "WHEAT": ("Triticum aestivum", "wheat", ("wheat germ", "wheatgerm", "t. aestivum")),
+    "ANACO": ("Ananas comosus", "pineapple", ("pineapples", "pineapple stem", "a. comosus")),
+    "CARPA": ("Carica papaya", "papaya", ("papayas", "pawpaw", "papaya latex", "c. papaya")),
+    "MAIZE": ("Zea mays", "maize", ("corn", "z. mays")),
+    "TOBAC": ("Nicotiana tabacum", "tobacco", ("n. tabacum",)),
+    "SOLLC": ("Solanum lycopersicum", "tomato", ("tomatoes", "s. lycopersicum")),
 }
 
 #: What a code covers when it is narrower than the name people type for it.

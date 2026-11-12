@@ -1201,6 +1201,8 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
                 + "; no organism was read from it, because choosing one would be a guess.")
         if reading.unread_organism is not None and not args.organism:
             out.notes.append(reading.unread_organism_note())
+            # The search must not choose an organism in its place (below).
+            args.organism_unread = reading.unread_organism[0]
         inhibitor_read = False
         if reading.inhibitor_text and not getattr(args, "inhibitor", None):
             args.inhibitor = reading.inhibitor_text
@@ -1633,6 +1635,32 @@ def _organism_has_no_rows(ec: str, organism: str) -> Optional[str]:
             f"or supply the constants yourself.")
 
 
+def _unread_organism_refusal(ec: str, typed: str) -> str:
+    """The refusal for a description that named the enzyme's source in words
+    Caterva does not read as an organism ("beta-glucosidase from almond"
+    before almond was in the table). The search used to go on and choose an
+    organism as though none had been named -- Homo sapiens, GROUNDED, for
+    sweet-almond beta-glucosidase (names-stream review, 2026-11-12). The
+    person named one, so another is never put in its place (ADR 0024); the
+    organisms with Km rows are listed for the re-run.
+    """
+    from caterva.compose.defaults import km_organisms
+
+    try:
+        by_organism = km_organisms(ec)
+    except Exception:  # noqa: BLE001
+        by_organism = {}
+    ranked = sorted(by_organism, key=lambda o: (-by_organism[o], o))
+    listed = "; ".join(f"{o} ({by_organism[o]} row{'s' if by_organism[o] != 1 else ''})"
+                       for o in ranked[:SUBSTRATES_NAMED])
+    more = f" and {len(ranked) - SUBSTRATES_NAMED} more" if len(ranked) > SUBSTRATES_NAMED else ""
+    where = (f" Organisms with Km rows for EC {ec}, most rows first: {listed}{more}." if ranked else "")
+    return (f"No search was run: your description names {typed!r} as the enzyme's source, which is not an "
+            f"organism name Caterva reads, and another organism is never put in place of the one you named "
+            f"(ADR 0024): a value measured in it would be cited for {typed!r}. Re-run with --organism and the "
+            f"binomial BRENDA files that source under.{where}")
+
+
 def _choose_what_was_not_named(model: Any, args: Any) -> Tuple[Any, Optional[str]]:
     """Choose, out loud, the organism, substrate and inhibitor the user did
     not name, before the search, so the search is run for them (ADR 0182).
@@ -1662,6 +1690,10 @@ def _choose_what_was_not_named(model: Any, args: Any) -> Tuple[Any, Optional[str
     tables, needs_substrate, needs_inhibitor = _not_named(model, args)
     choices = list(getattr(model, "choices", ()) or ())
     inhibitor = compounds_from(args).get("@inhibitor")
+
+    unread = getattr(args, "organism_unread", None)
+    if not args.organism and isinstance(unread, str) and unread:
+        return replace(model, choices=tuple(choices)), _unread_organism_refusal(ec, unread)
 
     if not args.organism and (needs_substrate or needs_inhibitor or args.substrate):
         chosen = defaults.choose_organism(

@@ -684,10 +684,12 @@ def _could_be_enzyme_words(typed: str) -> bool:
     way an enzyme's name ends (-ase, -zyme, -in)."""
     from .symbols import load_symbols
 
-    if load_symbols().knows(typed) or _could_be_a_name(typed):
+    if load_symbols().knows(typed) or _could_be_a_name(typed) or _written_as_a_mnemonic(typed):
         return True
     words = loose_key(typed).split()
     if len(words) == 1 and _near_a_one_word_name(words[0]):
+        return True
+    if _misspelt_head(words):
         return True
     if not words or not (_ENZYME_ENDING.search(words[-1]) or len(words) == 1 and _TYPO_ENDING.search(words[-1])):
         return False
@@ -761,6 +763,84 @@ def _near_a_one_word_name(word: str) -> bool:
     return bool(difflib.get_close_matches(word, _one_word_names(), n=1, cutoff=0.9))
 
 
+def _misspelt_head(words: Sequence[str]) -> bool:
+    """Several words, each but the last a word of some enzyme name, and the
+    last one letter or two from a word ending -ase that names use ("pyruvate
+    kinaze", "lactate dehydrogenaze"). Review of the names stream,
+    2026-11-12: these were passed over in silence and the report said no
+    enzyme was named; a one-word one ("hexokinaze") was already refused."""
+    if len(words) < 2:
+        return False
+    vocabulary = _tables(load_index()).vocabulary
+    last = words[-1]
+    if (not last.isalpha() or len(last) < 5 or last in vocabulary or _TYPO_ENDING.search(last) is None
+            or not all(w in vocabulary for w in words[:-1])):
+        return False
+    import difflib
+
+    heads = _ase_heads()
+    return bool(difflib.get_close_matches(last, heads, n=1, cutoff=0.8))
+
+
+_ASE_HEADS: Optional[List[str]] = None
+
+
+def _ase_heads() -> List[str]:
+    """Words of enzyme names five letters or more ending -ase."""
+    global _ASE_HEADS
+    if _ASE_HEADS is None:
+        _ASE_HEADS = sorted(w for w in _tables(load_index()).vocabulary if len(w) >= 5 and w.endswith("ase"))
+    return _ASE_HEADS
+
+
+def _written_as_a_mnemonic(typed: str) -> bool:
+    """Written as a symbol is (capitals and digits, at least three LETTERS:
+    "PLK1", "GSK3B", "NAMPT"; never "CO2") and the part before the
+    underscore of some UniProt entry name the enzyme index lists. The
+    finder offers such a word only as a reading to confirm, never resolves
+    it (finder rule b), so it reaches the reader as a refusal at most."""
+    from .symbols import human_style
+
+    letters = re.sub(r"[^A-Za-z]", "", typed)
+    return (human_style(typed) and len(letters) >= 3 and " " not in typed
+            and strict_key(typed) in _tables(load_index()).symbols)
+
+
+def _mnemonic_reading(result: object, typed: str, rank_by: Optional[str]) -> Optional[Ambiguous]:
+    """A refusal naming the enzyme(s) whose UniProt entry name `typed` is,
+    for the organism given or, with none given, for Homo sapiens when it is
+    written as a human gene symbol is; else None.
+
+    "PLK1 kinetics in human", "TPMT in human with 6-mercaptopurine" and
+    "GSK3B in human" were passed over in silence (review of the names
+    stream, 2026-11-12): the gene-symbol table holds a curated set of
+    symbols, and these are not in it, so the reader saw no enzyme and the
+    report said none was named. The entry name is not always the gene
+    symbol (SYK_HUMAN is a lysine--tRNA ligase), so it is never read as the
+    enzyme: the person confirms it with --subject and --isoform.
+    """
+    if not _written_as_a_mnemonic(typed):
+        return None
+    assumed = None
+    if isinstance(result, Ambiguous) and not result.candidates and rank_by is None:
+        assumed = "Homo sapiens"
+        result = resolve(typed, assumed)
+    if not isinstance(result, Ambiguous) or not result.candidates:
+        return None
+    if not all(c.via == "mnemonic" for c in result.candidates):
+        return None
+    where = organism_code(rank_by or assumed)
+    reason = (f"{typed!r} is not a name or symbol Caterva reads an enzyme by: it is the UniProt entry name "
+              f"{typed.upper()}_{where} of a protein the enzyme nomenclature lists under "
+              + ("this enzyme" if len(result.candidates) == 1 else f"{len(result.candidates)} enzymes")
+              + (", taking the organism as Homo sapiens because none was named and it is written as a human "
+                 "gene symbol is" if assumed else "")
+              + ". An entry name is not always the gene symbol, so it is not read as the enzyme without you; "
+              f"add --isoform {typed} to the re-run to take the constants from rows that name it")
+    return Ambiguous(query=typed, candidates=tuple(result.candidates), confirm_only=True,
+                     organism=where, release=result.release, reason=reason)
+
+
 def _two_letter_symbol(result: Resolved, typed: str) -> bool:
     """A two-capital-letter symbol the symbol table read as ONE enzyme in
     the organism ("CS" citrate synthase, "TS" thymidylate synthase), which
@@ -812,6 +892,8 @@ def _names_some_enzyme(result: Ambiguous, typed: str) -> bool:
     last = strict_key(typed).split()[-1]
     if all(c.tier == TIER_TYPO for c in result.candidates):
         if " " not in strict_key(typed) and _near_a_one_word_name(last):
+            return True
+        if _misspelt_head(loose_key(typed).split()):
             return True
         return (" " not in strict_key(typed) and len(last) >= SPELLING_MIN_LENGTH
                 and _TYPO_ENDING.search(last) is not None and last not in _tables(load_index()).vocabulary)
@@ -872,7 +954,20 @@ def _could_be_a_name(text: str) -> bool:
 
     return (strict_key(text) in _KEYS or loose_key(text) in _KEYS
             or "compact:" + compact_name_key(text) in _KEYS or load_symbols().knows(text)
-            or respelt_symbol(text) is not None)
+            or respelt_symbol(text) is not None
+            or any("compact:" + key in _KEYS for key in _joined_once(text)))
+
+
+def _joined_once(text: str) -> List[str]:
+    """The compact keys of `text` with the letter two words share at a join
+    written once: "acetylcholine esterase" -> "acetylcholinesterase", the
+    listed name (finder._spacing_variant reads it so)."""
+    words = strict_key(text).split()
+    out = []
+    for i in range(len(words) - 1):
+        if words[i] and words[i + 1] and words[i][-1] == words[i + 1][0] and words[i][-1].isalpha():
+            out.append("".join(words[:i + 1]) + "".join(words[i + 1:])[1:])
+    return out
 
 
 def _read_ec(tokens: List[_Token]) -> List[Tuple[int, int, str]]:
@@ -1057,7 +1152,12 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
         for first, last, words in _windows(tokens):
             if len(words) > 3 or any(w.used for w in words) or _is_class_window(words):
                 continue
-            if any(w.low in FILLER for w in words):
+            # A class word may END the window: it is the head of the name
+            # ("acetylcholine esterase" for acetylcholinesterase was passed
+            # over in silence because "esterase" is a class word; review of
+            # the names stream, 2026-11-12). Anywhere else it is filler.
+            if any(w.low in FILLER and not (k == len(words) - 1 and w.low in CLASS_WORDS)
+                   for k, w in enumerate(words)):
                 continue
             typed = text[words[0].start:words[-1].end]
             if spelling_match(typed) is None:
@@ -1112,6 +1212,12 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
                 # offered as a candidate (round-1 finding F12: these were
                 # passed over and the report said no enzyme was named).
                 ambiguity, ambiguity_text = result, typed
+                for k in range(first, last):
+                    tokens[k].used = True
+                break
+            mnemonic = _mnemonic_reading(result, typed, rank_by)
+            if mnemonic is not None:
+                ambiguity, ambiguity_text = mnemonic, typed
                 for k in range(first, last):
                     tokens[k].used = True
                 break
@@ -1315,6 +1421,22 @@ def _expand(typed: str, listed: Sequence[str], counts: Dict[str, int]) -> Option
     return None
 
 
+_LOCANT = ((re.compile(r"\b(?:p|para)\s?nitro"), "4 nitro"), (re.compile(r"\b(?:o|ortho)\s?nitro"), "2 nitro"),
+           (re.compile(r"\b(?:m|meta)\s?nitro"), "3 nitro"), (re.compile(r"pyranoside\b"), "side"))
+
+
+def _substrate_form(text: str) -> str:
+    """A substrate name with the spellings of one compound made equal: the
+    para/ortho/meta letter as its locant (p-nitrophenyl is 4-nitrophenyl)
+    and a pyranoside as the glycoside BRENDA often writes (beta-D-
+    glucopyranoside is beta-D-glucoside). Word breaks are kept: "2 deoxy
+    glucose" is not "2-deoxyglucose" by this rule."""
+    key = strict_key(text)
+    for pattern, replacement in _LOCANT:
+        key = pattern.sub(replacement, key)
+    return " ".join(key.split())
+
+
 def match_substrate(candidates: Sequence[str], listed: Sequence[str]) -> SubstrateMatch:
     """The one substrate BRENDA lists that the description's words name, or nothing.
 
@@ -1362,6 +1484,17 @@ def match_substrate(candidates: Sequence[str], listed: Sequence[str]) -> Substra
             found.append((typed, loose[0], True))
         elif len(loose) > 1:
             found.extend((typed, name, True) for name in loose)
+        else:
+            # The same compound written the other way chemists write it:
+            # "4-nitrophenyl beta-D-glucopyranoside" is BRENDA's
+            # "4-nitrophenyl-beta-D-glucoside" for almond beta-glucosidase
+            # (names-stream review, 2026-11-12: it matched nothing and
+            # cellobiose was modelled instead). Taken only when ONE listed
+            # name is it.
+            form = _substrate_form(typed)
+            same = sorted({name for name in listed if _substrate_form(name) == form})
+            if len(same) == 1:
+                found.append((typed, same[0], False))
     names = sorted({name for _, name, _ in found})
     if len(names) == 1:
         typed, name, prefix = next(f for f in found if f[1] == names[0])

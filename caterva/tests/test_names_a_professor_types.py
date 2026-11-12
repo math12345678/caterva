@@ -485,3 +485,127 @@ def test_a_compound_close_to_a_one_word_name_is_not_a_misspelling(text):
     reading = read_sentence(text)
     assert reading.ambiguity is None or not all(
         c.via == "typo" for c in reading.ambiguity.candidates), text
+
+
+# --- second review of the names stream (2026-11-12): still dropped or misread ---
+
+
+@pytest.mark.parametrize("text, ec", [
+    ("PLK1 kinetics in human", "2.7.11.21"),
+    ("michaelis menten for NAMPT in human", "2.4.2.12"),
+    ("TPMT in human with 6-mercaptopurine", "2.1.1.67"),
+    ("GSK3B in human", "2.7.11.26"),
+    # No organism: written as a human gene symbol is, so the human entry is named.
+    ("GSK3B kinetics", "2.7.11.26"),
+])
+def test_an_entry_name_outside_the_symbol_table_is_refused_with_its_enzyme_not_dropped(text, ec):
+    """These used to be passed over in silence ("No shape in this grammar
+    matches"): the gene-symbol table is curated, and the finder only offers
+    an entry-name mnemonic for confirmation. Never read: SYK_HUMAN is a
+    lysine--tRNA ligase, so the person confirms."""
+    reading = read_sentence(text)
+    assert reading.ec is None
+    amb = reading.ambiguity
+    assert amb is not None and amb.confirm_only, text
+    assert ec in {c.ec for c in amb.candidates}
+    assert "entry name" in amb.reason and "--isoform" in amb.reason
+
+
+@pytest.mark.parametrize("text", [
+    "michaelis menten with CO2", "lysozyme with SDS", "ATP binding to a receptor",
+])
+def test_a_formula_or_reagent_is_not_taken_for_an_entry_name(text):
+    reading = read_sentence(text)
+    assert reading.ambiguity is None or not reading.ambiguity.confirm_only, text
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("pyruvate kinaze from rabbit muscle with PEP", "2.7.1.40"),
+    ("lactate dehydrogenaze with pyruvate", "1.1.1.27"),
+    ("glucose kinaze", "2.7.1.2"),
+])
+def test_a_misspelt_head_word_of_a_longer_name_is_refused_with_the_name(text, expected):
+    reading = read_sentence(text)
+    assert reading.ec is None and reading.ambiguity is not None, text
+    assert reading.ambiguity.suggestions_only
+    assert expected in {c.ec for c in reading.ambiguity.candidates}
+
+
+@pytest.mark.parametrize("text", [
+    "two step phosphorylation cascade with a kinaze", "a kinase cascade with phosphatases",
+])
+def test_a_misspelt_class_word_alone_is_still_not_an_enzyme(text):
+    reading = read_sentence(text)
+    assert reading.ec is None and reading.ambiguity is None, text
+
+
+def test_acetylcholine_esterase_is_the_listed_name_with_its_join_written_twice():
+    result = resolve("acetylcholine esterase")
+    assert isinstance(result, Resolved) and result.ec == "3.1.1.7"
+    assert "spelling" not in result.how and "'acetylcholinesterase'" in result.how
+    reading = read_sentence("acetylcholine esterase from electric eel with acetylthiocholine")
+    assert reading.ec == "3.1.1.7" and reading.organism == "Electrophorus electricus"
+    assert reading.substrate_candidates == ("acetylthiocholine",)
+
+
+@pytest.mark.parametrize("text, organism", [
+    ("beta-glucosidase from almond", "Prunus dulcis"),
+    ("beta-glucosidase from sweet almond", "Prunus dulcis"),
+    ("acid phosphatase from potato with pNPP", "Solanum tuberosum"),
+    ("beta-amylase from sweet potato with starch", "Ipomoea batatas"),
+    ("acid phosphatase from wheat germ with pNPP", "Triticum aestivum"),
+    ("bromelain from pineapple stem", "Ananas comosus"),
+    ("papain from papaya with BAPNA", "Carica papaya"),
+    ("PEP carboxylase from maize with PEP", "Zea mays"),
+    ("ovine COX-2 with arachidonic acid", "Ovis aries"),
+    ("equine liver alcohol dehydrogenase with ethanol", "Equus caballus"),
+])
+def test_more_classic_sources_are_read_as_their_organism(text, organism):
+    reading = read_sentence(text)
+    assert reading.ec is not None and reading.organism == organism, text
+
+
+def test_cyclooxygenase_1_from_sheep_is_ovine_cox_1():
+    """Sheep (ovine seminal vesicle) is THE classic COX-1 source; the
+    curated row was read for human, mouse and rat only, so the lower-case
+    name was dropped and "COX-1" carried no isoform in sheep."""
+    for text in ("cyclooxygenase-1 from sheep with arachidonate", "COX-1 from sheep with arachidonic acid"):
+        reading = read_sentence(text)
+        assert (reading.ec, reading.organism, reading.isoform) == ("1.14.99.1", "Ovis aries", "PTGS1"), text
+
+
+def test_taq_polymerase_searches_thermus_aquaticus():
+    reading = read_sentence("Taq polymerase with dNTP")
+    assert reading.ec == "2.7.7.7" and reading.organism == "Thermus aquaticus"
+    assert reading.organism_assumed
+
+
+@pytest.mark.parametrize("typed, listed, expected", [
+    ("4-nitrophenyl beta-D-glucopyranoside", ["4-nitrophenyl-beta-D-glucoside", "4-nitrophenyl-beta-D-galactoside",
+                                              "cellobiose"], "4-nitrophenyl-beta-D-glucoside"),
+    ("p-nitrophenyl beta-D-galactopyranoside", ["4-nitrophenyl-beta-D-galactoside", "lactose"],
+     "4-nitrophenyl-beta-D-galactoside"),
+    ("4-nitrophenyl alpha-D-glucopyranoside", ["4-nitrophenyl-beta-D-glucoside"], None),
+    ("2 deoxy glucose", ["2-deoxyglucose", "D-glucose"], None),
+])
+def test_a_glycoside_written_as_its_pyranoside_or_para_form_is_brendas_name(typed, listed, expected):
+    assert match_substrate([typed], listed).name == expected
+
+
+def test_an_unread_source_is_never_replaced_by_a_chosen_organism(monkeypatch):
+    """"beta-glucosidase from almond" (before almond was read) was modelled
+    in Homo sapiens, GROUNDED: the search chose an organism as though none
+    had been named. Now the search is refused with the organisms listed."""
+    from caterva.compose import __main__ as compose_main
+    from caterva.compose import defaults
+
+    monkeypatch.setattr(defaults, "km_organisms", lambda ec: {"Homo sapiens": 59, "Zea mays": 71})
+    monkeypatch.setattr(defaults, "choose_organism", lambda *a, **k: pytest.fail("an organism was chosen"))
+    model = SimpleNamespace(ec_number="3.5.1.5", choices=())
+    args = SimpleNamespace(organism=None, organism_unread="watermelon seeds", substrate="Urea", inhibitor=None)
+    monkeypatch.setattr(compose_main, "_not_named", lambda m, a: (("km", "kcat"), False, False))
+    monkeypatch.setattr(compose_main, "replace", lambda m, **k: m)
+    _, refusal = compose_main._choose_what_was_not_named(model, args)
+    assert refusal is not None and refusal.startswith("No search was run")
+    assert "'watermelon seeds'" in refusal and "--organism" in refusal
+    assert "Zea mays (71 rows); Homo sapiens (59 rows)" in refusal
