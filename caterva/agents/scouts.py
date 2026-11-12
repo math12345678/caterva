@@ -467,7 +467,7 @@ def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
         # and says what the mode would have returned (compose --any-mode).
         asked = {
             name: getattr(request, name, None)
-            for name in ("isoform", "inhibition_mode", "model_substrate", "compare_mode")
+            for name in ("isoform", "inhibition_mode", "model_substrate", "compare_mode", "mutation")
             if getattr(request, name, None)
         }
         table = request.table or "km"

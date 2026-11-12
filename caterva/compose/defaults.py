@@ -273,14 +273,19 @@ def _number(value: object) -> Optional[float]:
 
 
 def _key(name: str) -> str:
-    """Spellings that differ only in case or spacing are one compound."""
-    return " ".join(name.split()).casefold()
+    """Spellings that differ only in case or spacing are one compound:
+    "acetyl thiocholine" and "acetylthiocholine" (human AChE's 6500 1/s row,
+    ref 649716, was counted as another compound's)."""
+    return "".join(name.split()).casefold()
+
+
+_COFACTOR_KEYS = frozenset(_key(c) for c in COFACTORS)
 
 
 def is_cofactor(name: str) -> bool:
     """True for a cosubstrate, cofactor or small ion (COFACTORS)."""
     key = _PREFIX.sub("", _key(name))
-    return key in COFACTORS or bool(_METAL_ION.match(key.replace(" ", "")))
+    return key in _COFACTOR_KEYS or bool(_METAL_ION.match(key))
 
 
 class _Counts:

@@ -70,7 +70,9 @@ def _rows(monkeypatch, tables, reaction=(frozenset(), frozenset())):
         return tuple(out)
 
     monkeypatch.setattr(defaults, "table_rows", table_rows)
-    monkeypatch.setattr(defaults, "_reaction_compounds", lambda ec: reaction)
+    # The real reader returns `_key`s; the fixtures are written as names.
+    keyed = tuple(frozenset(defaults._key(n) for n in side) for side in reaction)
+    monkeypatch.setattr(defaults, "_reaction_compounds", lambda ec: keyed)
 
 
 def _args(**fields):

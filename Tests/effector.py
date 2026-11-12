@@ -109,7 +109,14 @@ _ABSENT_LEAD = r"in\s+the\s+absence\s+of|in\s+absence\s+of|absence\s+of|without"
 #: Stops at a clause boundary -- a comma FOLLOWED BY a space and a
 #: non-digit, so "fructose 1,6-bisphosphate" survives while
 #: "NADH, pH 7" splits.
-_COMPOUND = r"[A-Za-z][A-Za-z0-9'()\[\]+-]*(?:[\s,-](?![\s]|\d+\s*[°%]|pH\b|at\b)[A-Za-z0-9'()\[\]+-]+)*"
+#:
+#: The first character may also open a stereo descriptor or a locant run:
+#: "(E)-5-(3-nitrophenyl)-2-hydroxycyclohepta-2,4,6-trienone" and
+#: "2,3-dihydroxybenzaldehyde". Until 2026-11-11 a name starting so was not
+#: read at all, so BRENDA's xanthine oxidase rows "in the presence of 0.0005
+#: mM (E)-5-..." (ref 766313) carried no effector, and an apparent Km measured
+#: with that inhibitor present was taken as the enzyme's Km.
+_COMPOUND = r"(?:[A-Za-z]|\((?=[A-Za-z0-9+,-]{1,8}\)-)|\d[\d,']*-(?=[A-Za-z(]))[A-Za-z0-9'()\[\]+-]*(?:[\s,-](?![\s]|\d+\s*[°%]|pH\b|at\b)[A-Za-z0-9'()\[\]+-]+)*"
 
 _CONCENTRATION = r"\d+(?:\.\d+)?\s*[munMUN]?M"
 

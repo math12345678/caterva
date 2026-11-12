@@ -202,6 +202,9 @@ _CYP = re.compile(
 _NOT_A_STEM = frozenset({
     "EC", "NAD", "NADH", "NADP", "FAD", "FMN", "ATP", "ADP", "AMP", "GTP", "GDP", "CTP",
     "UTP", "ITP", "DNA", "RNA", "PEG", "SDS",
+    # Viruses: "HIV-1 subtype C protease" names an organism, not an isoform
+    # (HIV-1 and HIV-2 are two viruses, each its own BRENDA organism).
+    "HIV", "SIV", "FIV", "HTLV", "HCV", "HBV", "HPV", "HSV", "EBV", "CMV",
 })
 #: Run-together forms that read like an isoform and are not one: "MAOI" is a
 #: monoamine oxidase inhibitor.
@@ -593,6 +596,13 @@ def read_mode(commentary: Optional[str]) -> tuple[str, Optional[str]]:
     else:
         mode = word
     versus = m.group(2).strip() if m.group(2) else None
+    if versus:
+        # "noncompetitive versus substrate xanthine": the molecule is
+        # xanthine. Read with the word, the row never matched the model's
+        # substrate, and xanthine oxidase's Ki versus 6-mercaptopurine was
+        # carried over the same paper's Ki versus xanthine (ref 685804).
+        versus = re.sub(r"^(?:the\s+)?(?:co-?)?substrates?\s+(?=\S)", "", versus,
+                        flags=re.I).strip() or versus
     return mode, versus
 
 

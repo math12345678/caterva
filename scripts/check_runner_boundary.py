@@ -138,6 +138,11 @@ EMITTED_AS: dict[str, str | None] = {
     # How resolve_kinetic_pair finds a paper with a Km and a kcat row; the
     # pair itself crosses as the two citations.
     "candidate_references": None,
+    # The rows resolve_kinetic_pair may pair across tables (the pair crosses
+    # as the two citations), and what the carried row is, which is also in
+    # chosen_because's sentence ("what the carried row is: a K0.5 ...").
+    "pairable": None,
+    "row_notes": None,
     "variant": "variant",
     # ADR 0092. Crosses as `preparation`, beside `variant`: the same
     # question one category over -- ADR 0029 asks whether the row measured

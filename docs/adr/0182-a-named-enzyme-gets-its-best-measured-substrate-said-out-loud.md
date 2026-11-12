@@ -188,21 +188,21 @@ literature layer's new pick (the median of the best-described rows, not the
 minimum) two more rules hold for every caller -- `caterva compose`, the
 Studio, the API's runner and the TypeScript CLI:
 
-- **A Km and a kcat of one substrate come from one paper when one holds
-  both.** `fallback_logic.resolve_kinetic_pair` resolves the two together;
-  when their papers differ but some paper holds a row of each among the rows
-  each was chosen from, both are taken from it. Compose marks the two
-  requests `paired` (`ComposedModel.parameter_requests`) and the live
-  resolver answers both from one pair; the API's runner pairs a Km or a
-  kcat unless the caller sends `needsKcat: false`. Human hexokinase and
-  D-glucose is now **Km 6.3 mM and kcat 40.1 1/s, both BRENDA ref 739603**
-  (a human glucokinase paper, pH 7.6 and 25 C for both; the Km row is a
-  K0.5 with a Hill coefficient of 1.8, which its SOURCE ROW line says), where
-  the independent picks carried HK-I's 0.06 mM (ref 640237, 37 C) beside
-  another paper's 60.4 1/s (ref 703624). The Km rows chosen from span 0.034
-  to 6.3 mM, 185-fold, and the report says so. A lookup of a Km alone
-  (`scripts/cite.py`, the Studio's constants) still takes the median,
-  0.06 mM.
+- **A Km and a kcat of one substrate come from one paper only when the two
+  rows were measured together** (revised after the adversarial round below).
+  `fallback_logic.resolve_kinetic_pair` resolves each independently, then
+  pairs a Km row and a kcat row of one paper only when they state the same
+  pH, temperature and remaining conditions, the paper's matching rows hold
+  one value each, and neither lies more than tenfold from its constant's own
+  pick; otherwise the independent picks stand and both say why. Compose
+  marks the two requests `paired` (`ComposedModel.parameter_requests`); the
+  API's runner pairs a Km or a kcat unless the caller sends `needsKcat:
+  false`. The first version paired by paper alone and carried human
+  hexokinase's Km 6.3 mM with kcat 40.1 1/s (ref 739603): the 6.3 mM row is
+  glucokinase's K0.5 with a Hill coefficient of 1.8, and the report never
+  said so. Human hexokinase and D-glucose now carries the independent picks,
+  Km 0.06 mM (HK-I, ref 640237) and kcat 60.4 1/s (ref 703624, whose UniProt
+  accession P35557 the report names as GCK), each saying it was not paired.
 - **Why each row was carried is said.** The resolver's own reason
   (`KineticResult.chosen_because`: the median of how many rows, what was set
   aside, the paired constant's paper, a spread wider than 100-fold) reaches
@@ -223,6 +223,26 @@ Studio, the API's runner and the TypeScript CLI:
   655867). A gene symbol on the TypeScript CLI's `resolve` ("CYP2B6") now
   searches the organism the symbol is a gene of, with the symbol as the
   isoform, as compose does; it chose Priestia megaterium by row count.
+
+### Which row: the second adversarial round
+
+A second round read every carried row back against BRENDA as a professor
+would, and found real rows that were still the wrong ones to carry. Each is
+now a rule in `fallback_logic._best_evidenced` (row facts read by
+`Tests/row_form.py`), pinned by `Tests/test_row_quality.py` on the real rows:
+
+| found | rule now |
+|---|---|
+| xanthine oxidase Km 0.0167 mM (ref 766313), measured "in the presence of 0.0005 mM (E)-5-(3-nitrophenyl)-..." | a row with an inhibitor or other effector in the assay (the page's Ki table lists it, the commentary calls it one, or the paper has an "in the absence of inhibitor" row) is passed over when a row without one exists: 0.01208 mM. The effector reader now reads names starting "(E)-" or "2,3-" |
+| glucokinase's K0.5 (Hill 1.8) carried as a Michaelis-Menten Km, unsaid | K0.5 / Hill rows after true Km rows; when carried, `row_notes` says what it is |
+| AChE kcat 7.18 1/s paired over the wild-type 93; fumarase Km at pH 9.0 with kcat at pH 6.5; thrombin's NaCl Km with its choline-chloride kcat; TEM-1's seven indistinguishable rows | pairing as above |
+| ACE's C-domain Ki, a chimeric ACE's kcat, a benzoate-modified glucose oxidase, trypsin in 20% methanol, an immobilised LDH | constructs and altered preparations after native rows, and named when carried |
+| pyruvate kinase's no-K+ control (3.2 1/s against 1182) | an ion is an activator, not an addition: the minus-activator control (including a cation stand-in such as choline chloride) is passed over |
+| HK2 carrying a GCK row (P35557), CYP2B6 a CYP3A5/CYP3A43 row | the isoform check reads the row's own UniProt cell through the enzyme index, so those rows are another isoform's and withheld |
+| IDH1 R132H carrying wild-type rows as GROUNDED | a mutant typed after the enzyme is sent as `mutation`; only rows naming it are used, else `mutant_not_found` |
+| hirudin's Ki 2.37e-10 mM flagged implausible | the Ki table's floor is 1e-12 mM |
+| "noncompetitive versus substrate xanthine" not read as versus xanthine | the word "substrate" is not part of the molecule |
+| "HIV-1" read as an isoform; TEM-1 given E. coli K-12's ampC and dacA as isozymes | a virus name is not an isoform; an isoform naming none of the listed proteins is said to be outside the reference proteome |
 
 ## Consequences
 

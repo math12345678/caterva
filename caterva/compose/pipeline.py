@@ -101,6 +101,9 @@ class ComposedModel:
     #: Constants are then taken from rows that measured it (isoform.py), and
     #: the report says where no row did.
     isoform: Optional[str] = None
+    #: The point mutant the model is of ("R132H"), when the description named
+    #: one: constants come only from rows measuring it.
+    mutation: Optional[str] = None
     #: Why the enzyme the DESCRIPTION names was not made the subject, when
     #: it names one and it was not ("hexokinase" in a three-step cascade:
     #: one enzyme's constants on every step would be ADR 0076's
@@ -346,6 +349,7 @@ class ComposedModel:
                 table=quantity.table,
                 expected_unit=quantity.unit,
                 isoform=self.isoform,
+                mutation=self.mutation,
                 inhibition_mode=mode_of(quantity),
                 compare_mode=compared(quantity),
                 # The model's substrate, which a Ki's mode is judged against;
@@ -536,6 +540,7 @@ def compose_and_parameterise(
     compounds: Optional[Mapping[str, str]] = None,
     isoform: Optional[str] = None,
     any_mode: bool = False,
+    mutation: Optional[str] = None,
 ) -> Tuple[ComposedModel, Any]:
     """Compose, then run the agent architecture over the result.
 
@@ -551,6 +556,8 @@ def compose_and_parameterise(
     model = compose(query, subject=subject, organism=organism, substrate=substrate, compounds=compounds)
     if isoform:
         model = replace(model, isoform=isoform)
+    if mutation:
+        model = replace(model, mutation=mutation)
     requests = model.parameter_requests(any_mode=any_mode)
     if not requests:
         return model, None
