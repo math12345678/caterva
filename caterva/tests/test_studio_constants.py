@@ -65,7 +65,7 @@ def test_the_km_is_the_resolvers_with_its_citation(hexokinase):
     (row,) = outcome.result["constants"]
     assert row["name"] == "km" and row["found"] is True and row["source"] == "brenda_exact"
     km = row["value"]
-    # A Km on its own (cite.py asks for no kcat): the median of the six
+    # A Km on its own (cite.py asks for no kcat): the median of the four
     # best-described human D-glucose rows, HK-I's 0.06 mM (ADR 0182).
     assert km["value"] == row["raw"]["value"] == 0.06 and km["unit"] == "mM"
     prov = km["provenance"]
@@ -82,27 +82,29 @@ def test_the_km_is_the_resolvers_with_its_citation(hexokinase):
 
 
 def test_the_engines_tie_explanation_reaches_the_row_and_the_ui_can_show_it(hexokinase):
-    """Human hexokinase's glucose Km is 6 equally evidenced rows, 0.034 to 6.3 mM. The engine says so, and that it
-    returned the median row; the adapter used to drop it (`scope: []`, `chosen_because: None`)."""
+    """Human hexokinase's glucose Km is 4 equally evidenced rows, 0.034 to 6 mM. The engine says so, and that it
+    returned the median row; the adapter used to drop it (`scope: []`, `chosen_because: None`). Six until ADR
+    0182's second round, which set aside HK-I's isolated carboxyl domain (0.038 mM) and glucokinase's K0.5
+    (6.3 mM, Hill coefficient 1.8) for the native enzymes' true Km rows."""
     _, _, _, outcome, _ = hexokinase
     (row,) = outcome.result["constants"]
     prov = row["value"]["provenance"]
     tie = row["raw"]["selection_tie"]
     assert prov["chosen_because"] == tie["reason"]
-    assert "6 rows were equally well evidenced" in prov["chosen_because"]
+    assert "4 rows were equally well evidenced" in prov["chosen_because"]
     assert "The value returned is the median row of those" in prov["chosen_because"]
     assert "lowest" not in prov["chosen_because"]
     spread = prov["spread"]
     assert (spread["low"], spread["high"], spread["carried"], spread["n_values"], spread["unit"]) == (
-        0.034, 6.3, 0.06, 6, "mM")
-    assert spread["references"] == ["640237", "640261", "641067", "641068", "739603"]
-    assert "spanning 0.034 to 6.3 mM (185-fold)" in spread["sentence"]
+        0.034, 6.0, 0.06, 4, "mM")
+    assert spread["references"] == ["640237", "640261", "641067", "641068"]
+    assert "spanning 0.034 to 6 mM (176-fold)" in spread["sentence"]
     # The sentence says why this row: the resolver's own reason, the spread wide.
     assert "this model carries 0.06, chosen because 0.06 mM (BRENDA ref 640237) is the lower of the two " \
-        "middle values of the 6 remaining rows" in spread["sentence"]
+        "middle values of the 4 remaining rows" in spread["sentence"]
     assert "the literature disagrees by more than 100-fold" in spread["sentence"]
     # The rows it ranked equal are the alternatives, each as measured.
-    assert sorted(a["value"] for a in row["alternatives"]) == [0.034, 0.038, 3.8, 6.0, 6.3]
+    assert sorted(a["value"] for a in row["alternatives"]) == [0.034, 3.8, 6.0]
 
 
 def test_the_engines_scope_concerns_reach_the_row(hexokinase):

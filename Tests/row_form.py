@@ -71,7 +71,10 @@ _CONSTRUCTS = (
      "an isolated domain"),
     (re.compile(r"\b[NC]-terminal\b[^,;]{0,30}\b(?:addition|extension|deletion|truncation)\b|\btruncat\w+|\bdeletion\s+(?:mutant|construct|variant)\b", re.IGNORECASE),
      "a truncated or extended construct"),
-    (re.compile(r"\bfusion\s+(?:protein|enzyme|construct)\b|\bfused\s+to\b", re.IGNORECASE),
+    # "recombinant wild-type enzyme in fusion with Aga2" (glucose oxidase,
+    # ref 743744): yeast surface display, the enzyme tethered to a protein.
+    (re.compile(r"\bfusion\s+(?:protein|enzyme|construct)\b|\bfused\s+(?:to|with)\b"
+                r"|\bin\s+fusion\s+with\b|\bfusion\s+with\b|\bsurface[- ]displayed\b", re.IGNORECASE),
      "a fusion construct"),
     (re.compile(r"\bimmobi(?:li[sz]|iz)ed\b|\bimmobili[sz]ation\b|\bcross[- ]?linked\s+"
                 r"(?:enzyme|crystal|aggregate)", re.IGNORECASE),
@@ -204,13 +207,27 @@ _TABLE_WORDS = frozenset({"km", "kcat", "value", "values", "turnover", "number",
                           "degrees", "a", "an", "with", "constant", "michaelis"})
 
 
+_HALF_SATURATION_STATEMENT = re.compile(
+    r"\b[ks]\s*\(?\s*0\.5\s*\)?(?:\s+values?)?(?![\w.])"
+    r"|\bhill\s+coefficient\s*(?:of|=|:)?\s*\d+(?:\.\d+)?|\bnh\s*[=:]?\s*\d+(?:\.\d+)?")
+#: A name and its number written apart ("Adh 1"), not a pH or a temperature.
+_NAME_NUMBER = re.compile(r"\b(?!pH\b)([A-Z][A-Za-z]+)\s+(\d+)\b(?![.\d])")
+
+
 def condition_words(conditions: Optional[str], substrate: Optional[str] = None) -> frozenset:
     """The words of a row's commentary that say what was measured, for
     comparing a Km row with a kcat row of one paper: "pH 8, 25°C, 200 mM NaCl"
     and "pH 8, 25°C, 200 mM choline chloride" differ (thrombin's fast and slow
     forms, ref 709074); "recombinant enzyme, pH 7.5" and "pH 7.5, recombinant
     enzyme" do not."""
-    text = (conditions or "").lower().replace("°", " ")
+    # "Adh 1" and "Adh1" are one name (horse liver ADH, ref 285647): a
+    # capitalised name and its number written apart.
+    text = _NAME_NUMBER.sub(r"\1\2", conditions or "")
+    text = text.lower().replace("°", " ")
+    # How the constant is reported is not what was measured: BRENDA copies
+    # "K0.5 value, Hill coefficient 1.8" onto only some of a paper's rows of
+    # one assay (glucokinase, ref 739603).
+    text = _HALF_SATURATION_STATEMENT.sub(" ", text)
     words = set(_WORD.findall(text)) - _TABLE_WORDS
     if substrate:
         words -= set(_WORD.findall(substrate.lower()))

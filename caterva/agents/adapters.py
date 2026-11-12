@@ -223,6 +223,12 @@ def to_parameter_source(
             resolver_because=(because if isinstance(
                 because := getattr(result, "chosen_because", None), str) else None),
             wide_spread=getattr(result, "wide_spread", False) is True,
+            # Only where the record has the field: a literature layer that
+            # predates it (a vendored or pinned copy) builds without it.
+            **({"row_isoform": iso} if isinstance(
+                iso := getattr(result, "row_isoform", None), str)
+               and "row_isoform" in getattr(ParameterSource, "__dataclass_fields__", {})
+               else {}),
         ),
         None,
     )

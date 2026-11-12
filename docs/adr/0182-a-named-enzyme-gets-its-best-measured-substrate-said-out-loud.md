@@ -200,9 +200,20 @@ Studio, the API's runner and the TypeScript CLI:
   false`. The first version paired by paper alone and carried human
   hexokinase's Km 6.3 mM with kcat 40.1 1/s (ref 739603): the 6.3 mM row is
   glucokinase's K0.5 with a Hill coefficient of 1.8, and the report never
-  said so. Human hexokinase and D-glucose now carries the independent picks,
-  Km 0.06 mM (HK-I, ref 640237) and kcat 60.4 1/s (ref 703624, whose UniProt
-  accession P35557 the report names as GCK), each saying it was not paired.
+  said so. The independent picks then carried HK-I's Km 0.06 mM (ref
+  640237) beside glucokinase's kcat 60.4 1/s (ref 703624, UniProt P35557):
+  two proteins in one rate law. So a pair is also kept to one isozyme: when
+  the two rows name different isozymes (by words or UniProt cell), the kcat
+  is sought among rows naming the Km's isozyme, then the Km among rows naming
+  the kcat's, and the note names the swap. Every human D-glucose kcat row is
+  glucokinase's, so human hexokinase now carries glucokinase's Km 6.3 mM and
+  kcat 40.1 1/s (ref 739603, one measurement), and the report says the Km row
+  is a K0.5 with a Hill coefficient of 1.8 and that P35557 is GCK. A pair
+  states a pH or temperature only when both picks do: mouse hexokinase
+  carries ref 758915's Km 0.42 and kcat 93.39 (Hk2), not 0.42 beside another
+  paper's 53.2. Of several matched pairs, one at 25-37 C comes first (bovine
+  trypsin and BAPNA, ref 678548: 0.26 mM and 0.94 1/s at 25 C, not the 15 C
+  pair).
 - **Why each row was carried is said.** The resolver's own reason
   (`KineticResult.chosen_because`: the median of how many rows, what was set
   aside, the paired constant's paper, a spread wider than 100-fold) reaches
@@ -243,6 +254,10 @@ now a rule in `fallback_logic._best_evidenced` (row facts read by
 | hirudin's Ki 2.37e-10 mM flagged implausible | the Ki table's floor is 1e-12 mM |
 | "noncompetitive versus substrate xanthine" not read as versus xanthine | the word "substrate" is not part of the molecule |
 | "HIV-1" read as an isoform; TEM-1 given E. coli K-12's ampC and dacA as isozymes | a virus name is not an isoform; an isoform naming none of the listed proteins is said to be outside the reference proteome |
+| a row naming IDH1 or GCK only by its UniProt cell reported as "names no isoform"; compose replacing the resolver's reason with "the resolver's row for this model" | the resolver's `row_isoform` reaches `Measurement.row_isoform` and the report's isoform checks; the resolver's own reason follows compose's |
+| HIV-1 subtype C Km and kcat beside a LAI (subtype B) Ki, each note naming only itself | the report says when the constants' rows name different subtypes (`row_scope.variant_mix`) |
+| glucose oxidase's Aga2 surface-display fusion carried over the soluble enzyme | "in fusion with" is a fusion construct |
+| carbonic anhydrase I's "25 mM hydroxyurea" row beside the plain one | a compound the Ki table lists, given bare at a concentration, is an inhibitor in the assay |
 
 ## Consequences
 

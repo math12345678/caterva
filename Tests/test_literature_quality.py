@@ -389,14 +389,14 @@ class TestAKmAndAKcatComeFromOnePaperWhenOneHasBoth:
         assert (km.value, kcat.value) == (0.3, 30)
         assert km.citation.reference_id == kcat.citation.reference_id == "700003"
 
-    def test_on_the_recorded_page_hexokinase_is_not_paired_through_a_k05(self):
-        """Pairing once carried ref 739603's Km 6.3 mM and kcat 40.1 1/s,
-        "measured together": the 6.3 mM row is glucokinase's K0.5 with a Hill
-        coefficient of 1.8, not a Michaelis-Menten Km, and its kcat row
-        states other conditions. No paper on the page holds a Km row and a
-        kcat row under one set of stated conditions, so each constant is the
-        independent pick and both say so; the kcat names its isozyme (GCK,
-        from the row's own UniProt accession) and the Km is HK-I's."""
+    def test_on_the_recorded_page_hexokinase_is_one_isozymes_and_says_its_km_is_a_k05(self):
+        """Pairing once carried ref 739603's Km 6.3 mM and kcat 40.1 1/s
+        unsaid: the 6.3 mM row is glucokinase's K0.5 with a Hill coefficient
+        of 1.8. Then the independent picks carried HK-I's Km (0.06 mM, ref
+        640237) beside glucokinase's kcat (60.4 1/s, ref 703624, P35557): two
+        proteins in one rate law. Every kcat row on the page is
+        glucokinase's, so the pair is kept to glucokinase: its Km is the
+        K0.5, said, and both name GCK."""
         html = recorded_hexokinase()
         kw = dict(html_provider=lambda ec: html, uniprot_provider=lambda ec, org: None,
                   taxon_id_provider={"Homo sapiens": "9606"}.get, search_literature=False)
@@ -407,9 +407,11 @@ class TestAKmAndAKcatComeFromOnePaperWhenOneHasBoth:
         assert (alone_kcat.value, alone_kcat.citation.reference_id) == (60.4, "703624")
         assert alone_km.wide_spread is True  # hexokinase I and IV share the pool
         km, kcat = resolve_kinetic_pair("2.7.1.1", "Homo sapiens", "D-glucose", **kw)
-        assert (km.value, kcat.value) == (0.06, 60.4)
-        assert "chosen independently, not as a measured pair" in km.chosen_because
-        assert "K0.5 / Hill" in km.chosen_because
+        assert km.row_isoform == kcat.row_isoform == "GCK"
+        assert km.value == 6.3 and km.citation.reference_id == "739603"
+        assert any("K0.5 with a Hill coefficient of 1.8" in n for n in km.row_notes)
+        assert "the Km was taken from rows naming GCK" in km.chosen_because
+        assert "(the Km chosen alone, 0.06 mM, measured HK-I)" in km.chosen_because
         assert any("(P35557) is GCK" in n for n in kcat.row_notes)
 
 

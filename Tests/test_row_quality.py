@@ -381,3 +381,183 @@ class TestLabels:
         from caterva.compose.defaults import _key, is_cofactor
         assert _key("acetyl thiocholine") == _key("Acetylthiocholine")
         assert is_cofactor("coenzyme A") and is_cofactor("Mg2+") and not is_cofactor("D-glucose")
+
+
+class TestABareCompoundAtAConcentrationIsAnAddition:
+    def test_hydroxyurea_listed_in_the_ki_table_is_an_inhibitor_in_the_assay(self):
+        """Human CA I and 4-nitrophenyl acetate, ref 650526: 15.3 mM "hCA I,
+        25 mM hydroxyurea" was carried beside the plain "hCA I" 15.4 mM."""
+        sub = "4-nitrophenyl acetate"
+        html = page({
+            "KM Values": [row(15.3, sub, "Homo sapiens", "pH 7.8, 25°C, hCA I, 25 mM hydroxyurea",
+                              "650526"),
+                          row(15.4, sub, "Homo sapiens", "pH 7.8, 25°C, hCA I", "650526"),
+                          row(3.025, sub, "Homo sapiens", "pH 7.8, 25°C, hCA I", "700009")],
+            "Ki Values": [row(0.5, "hydroxyurea", "Homo sapiens", "pH 7.8, 25°C", "650526")],
+        })
+        r = value("4.2.1.1", "Homo sapiens", sub, "km", html)
+        assert r.value == 3.025 and "hydroxyurea" in r.chosen_because
+
+
+# -- Resumed round: one isozyme per pair, pairs as described as their picks,
+#    assay temperature, fusion constructs, and what the report is told ---------------------
+
+
+class TestAPairIsOneIsozymes:
+    def test_hk1s_km_is_not_put_beside_glucokinases_kcat(self):
+        """Human hexokinase and D-glucose carried HK-I's Km (0.06 mM, ref
+        640237, "hexokinase I") with glucokinase's kcat (60.4 1/s, ref 703624,
+        UniProt P35557). Every kcat row is glucokinase's, so the Km is taken
+        from glucokinase's rows, and the K0.5 it is says so."""
+        html = page({
+            "KM Values": [
+                row(0.06, "D-glucose", "Homo sapiens", "hexokinase I, pH 7.5, 30°C", "640237"),
+                GCK_K05],
+            "Turnover Numbers": [
+                row(60.4, "D-glucose", "Homo sapiens",
+                    "wild type enzyme, in 25 mM HEPES (pH 7.4), at 37°C", "703624", "P35557"),
+                row(40.1, "D-glucose", "Homo sapiens", "wild-type, pH 7.6, 25 °C", "739603",
+                    "P35557")],
+        })
+        km, kcat = pair("2.7.1.1", "Homo sapiens", "D-glucose", html)
+        assert km.row_isoform == kcat.row_isoform == "GCK"
+        assert (km.value, kcat.value) == (6.3, 40.1)
+        assert "K0.5 with a Hill coefficient of 1.8" in km.chosen_because
+        assert "measured HK-I" in km.chosen_because
+
+
+class TestAPairIsAsDescribedAsItsLessDescribedPick:
+    def test_one_papers_undescribed_pair_beats_two_papers_when_a_pick_is_undescribed(self):
+        """Mouse hexokinase: Km 0.42 (ref 758915, Hk2, no pH or temperature)
+        was carried with another paper's kcat 53.2 (ref 674800), though ref
+        758915 gives kcat 93.39 for the same protein, stated alike."""
+        nothing = "pH and temperature not specified in the publication"
+        html = page({
+            "KM Values": [row(0.42, "D-glucose", "Mus musculus", nothing, "758915", "O08528")],
+            "Turnover Numbers": [
+                row(53.2, "D-glucose", "Mus musculus", "37°C, pH 7.4, wild-type enzyme", "674800"),
+                row(93.39, "D-glucose", "Mus musculus", nothing, "758915", "O08528")],
+        })
+        km, kcat = pair("2.7.1.1", "Mus musculus", "D-glucose", html)
+        assert (km.value, kcat.value) == (0.42, 93.39)
+        assert "one measurement" in kcat.chosen_because
+
+
+class TestATemperatureSeriesPairsAtAnAssayTemperature:
+    def test_trypsin_bapna_is_paired_at_25_not_15(self):
+        """Bovine trypsin and BAPNA, ref 678548, at 5, 15, 25 and 35 °C: the
+        medians fell on Km at 25 °C and kcat at 15 °C, and the 15 °C pair was
+        carried as the nearer."""
+        s = "benzoyl-L-arginine-p-nitroanilide"
+        km_rows = [(0.2, 5), (0.26, 25), (0.27, 15), (0.44, 35)]
+        kcat_rows = [(0.3, 5), (0.76, 15), (0.94, 25), (2.43, 35)]
+        html = page({
+            "KM Values": [row(v, s, "Bos taurus", f"at {t}°C", "678548") for v, t in km_rows],
+            "Turnover Numbers": [row(v, s, "Bos taurus", f"at {t}°C", "678548")
+                                 for v, t in kcat_rows],
+        })
+        km, kcat = pair("3.4.21.4", "Bos taurus", s, html)
+        assert (km.value, kcat.value) == (0.26, 0.94)
+
+
+class TestAFusionForSurfaceDisplayIsAConstruct:
+    def test_read(self):
+        assert row_form.construct_of(
+            "recombinant wild-type enzyme in fusion with Aga2, pH 5.5, 25°C").startswith(
+            "a fusion construct")
+
+    def test_the_native_recombinant_pair_is_carried(self):
+        """Glucose oxidase, A. niger, beta-D-glucose: the yeast-surface-displayed
+        Aga2 fusion (ref 743744) was carried over the soluble enzyme's rows."""
+        s = "beta-D-glucose"
+        aga2 = "recombinant wild-type enzyme in fusion with Aga2, pH 5.5, 25°C"
+        soluble = "recombinant wild-type enzyme expressed in Saccharomyces cerevisiae, pH 5.5, 25°C"
+        html = page({
+            "KM Values": [row(33.4, s, "Aspergillus niger", aga2, "743744"),
+                          row(22.0, s, "Aspergillus niger", soluble, "743277")],
+            "Turnover Numbers": [row(33.3, s, "Aspergillus niger", aga2, "743744"),
+                                 row(54.8, s, "Aspergillus niger", soluble, "743277")],
+        })
+        km, kcat = pair("1.1.3.4", "Aspergillus niger", s, html)
+        assert (km.value, kcat.value) == (22.0, 54.8)
+        assert "fusion construct" in km.chosen_because
+
+
+class TestTheReportIsToldWhatTheRowIs:
+    def test_a_mutant_row_carried_says_it_is_a_mutants(self):
+        r = value("1.1.1.42", "Homo sapiens", "isocitrate", "km", page({"KM Values": IDH_KM}),
+                  mutation="R132H")
+        assert r.row_isoform == "IDH1"
+        assert any("mutant enzyme ('R132H')" in n for n in r.row_notes)
+
+    def test_the_row_isoform_reaches_the_measurement(self):
+        from caterva.agents.adapters import to_parameter_source
+        r = value("1.1.1.42", "Homo sapiens", "isocitrate", "km", page({"KM Values": IDH_KM}),
+                  mutation="R132H")
+        source, _ = to_parameter_source("Km", r)
+        assert source.row_isoform == "IDH1"
+        assert any(row_dict.get("isoform") == "IDH1" for row_dict in r.pairable)
+
+    def test_a_row_naming_idh1_by_accession_is_not_said_to_name_no_isoform(self):
+        from caterva.compose.row_scope import read_scope
+        scope = read_scope("mutant enzyme R132H, at pH 7.5 and 21°C", table="km",
+                           isoform="IDH1", row_isoform="IDH1")
+        assert scope.isoform == "IDH1" and scope.concerns == ()
+        # Without an isoform asked for, the isozyme the accession names is said.
+        scope = read_scope("wild-type, pH 7.6, 25 °C", table="km", row_isoform="GCK")
+        assert "isoform GCK" in scope.concerns[0].text
+
+    def test_the_resolvers_reason_survives_being_carried(self):
+        """compose carried the resolver's row with only "the resolver's row
+        for this model": the K0.5, the Hill coefficient and GCK were lost."""
+        from caterva.compose.export import Measurement
+        from caterva.compose.narrowed import carry, evidence_view
+        answer = Measurement(6.3, "mM", "BRENDA ref 739603", organism="Homo sapiens",
+                             commentary=GCK_K05[4],
+                             resolver_because="what the carried row is: the row is a K0.5")
+        other = {"value": 0.06, "unit": "mM", "reference_id": "640237",
+                 "conditions": "hexokinase I, pH 7.5, 30°C"}
+        narrowed = evidence_view({"reaction_Km": answer}, {"reaction_Km": (other,)})
+        measured, _, _ = carry({"reaction_Km": narrowed.measured["reaction_Km"]}, {}, narrowed,
+                               {}, None)
+        assert measured["reaction_Km"].chosen_because.endswith(
+            "what the carried row is: the row is a K0.5")
+
+
+class TestConstantsOfTwoVariantsAreSaidToBe:
+    def test_hiv_subtype_c_km_beside_a_lai_ki(self):
+        from caterva.compose.row_scope import variant_mix
+        said = variant_mix({
+            "reaction_Km": "37°C, pH 4.7, HIV-1 subtype C protease",
+            "reaction_kcat": "37°C, pH 4.7, HIV-1 subtype C protease",
+            "reaction_Ki": "pH 4.7, 37°C, recombinant LAI wild-type enzyme"})
+        assert said.startswith("the constants' rows are not all of one variant")
+        assert "`reaction_Km`, `reaction_kcat` measured subtype C" in said
+        assert "`reaction_Ki` names no subtype" in said
+        assert variant_mix({"reaction_Km": "subtype C", "reaction_kcat": "HIV-1 subtype C"}) is None
+        assert variant_mix({"reaction_Km": "pH 7", "reaction_kcat": "pH 7"}) is None
+
+
+class TestTheOneProteinOfAnEcIsNotAnIsoform:
+    def test_ache_is_the_enzyme_not_an_isoform_of_it(self):
+        """Human EC 3.1.1.7 is one protein (ACHE, P22303); its row was reported
+        as "the row measured isoform ACHE; if the enzyme you mean is another
+        isoform ...". An accession names an isoform only among several."""
+        km = [row(0.086, "acetylthiocholine", "Homo sapiens", "wild-type, pH 8, 25°C", "775647",
+                  "P22303")]
+        r = value("3.1.1.7", "Homo sapiens", "acetylthiocholine", "km", page({"KM Values": km}))
+        assert r.found and r.row_isoform is None
+        assert not any("UniProt accession" in n for n in r.row_notes)
+
+
+class TestAK05IsSaidWhereverItIsCarried:
+    def test_the_rows_own_words_say_k05_in_the_report(self):
+        """`--isoform GCK` carries the glucokinase row through compose's own
+        isoform selection, whose reason replaced the resolver's: the K0.5 is
+        read off the row by row_scope, on every path."""
+        from caterva.compose.row_scope import HALF_SATURATION, read_scope
+        scope = read_scope(GCK_K05[4], table="km", isoform="GCK", row_isoform="GCK")
+        assert [c.kind for c in scope.concerns] == [HALF_SATURATION]
+        assert "a K0.5 with a Hill coefficient of 1.8" in scope.concerns[0].text
+        assert read_scope(GCK_K05[4], table="kcat") is None or not any(
+            c.kind == HALF_SATURATION for c in read_scope(GCK_K05[4], table="kcat").concerns)

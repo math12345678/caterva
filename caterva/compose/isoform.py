@@ -81,6 +81,8 @@ def _from_row(m: Any, row: Mapping[str, Any], because: str) -> Any:
         assay_buffer=row.get("buffer"),
         assay_unreported=unreported,
         chosen_because=because,
+        **({"row_isoform": row.get("isoform")}
+           if "row_isoform" in getattr(m, "__dataclass_fields__", {}) else {}),
     )
 
 
@@ -90,14 +92,18 @@ def select_isoform(measured: Mapping[str, Any], isoform: str) -> IsoformSelectio
     out = IsoformSelection(measured={})
     for identifier in sorted(measured):
         m = measured[identifier]
-        chosen = _read_isoform(getattr(m, "commentary", None))
+        # The words first, then the isoform the resolver read off the row's
+        # own UniProt cell (ADR 0182, second round): an O75874 row measured
+        # IDH1 whether or not its words say so.
+        chosen = (_read_isoform(getattr(m, "commentary", None))
+                  or getattr(m, "row_isoform", None))
         if same_isoform(chosen, isoform):
             out.measured[identifier] = m
             continue
         rows = [r for r in getattr(m, "alternatives", ()) or ()
                 if isinstance(r, dict) and r.get("value") is not None
                 and (r.get("unit") in (None, m.unit))]
-        named = [(r, _read_isoform(r.get("conditions"))) for r in rows]
+        named = [(r, _read_isoform(r.get("conditions")) or r.get("isoform")) for r in rows]
         matching = [r for r, iso in named if same_isoform(iso, isoform)]
         if matching:
             row = matching[0]

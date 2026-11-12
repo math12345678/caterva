@@ -143,20 +143,25 @@ def test_a_label_the_chooser_offers_takes_the_row_that_states_that_isozyme(compo
 
 
 @pytest.mark.parametrize("label", ["GCK", "glucokinase", "HXK4", "hexokinase IV"])
-def test_an_isozyme_no_km_row_names_visibly_says_so_and_keeps_the_notice(compose, label):
+def test_an_isozyme_named_only_by_its_rows_uniprot_cell_is_that_isozyme(compose, label):
+    """No Km row's words name glucokinase; ref 739603's row names it by its UniProt cell (P35557).
+    Until ADR 0182's second round only the words were read, and the Km was 6.0 mM (ref 641068, a row
+    naming no isozyme) under "the row names no isoform". The accession is the row's statement, so the
+    glucokinase row is carried, and what it is -- a K0.5 with a Hill coefficient of 1.8 -- is said."""
     code, out = compose("--organism", "human", "--isoform", label)
     assert code == 0
-    assert "| `reaction_Km` | 6.0 mM | literature (Homo sapiens) | BRENDA ref 641068 |" in out
-    assert f"the row names no isoform, so whether it measured **{label}**, the one asked for, is unknown" in out
-    verdict = _verdict_block(out)
-    assert f"Qualified: {label} was asked for, but" in verdict and "reaction_Km" in verdict
+    assert "| `reaction_Km` | 6.3 mM | literature (Homo sapiens) | BRENDA ref 739603 |" in out
+    assert "the row is **a K0.5 with a Hill coefficient of 1.8**, not a Michaelis-Menten Km" in out
+    assert f"`reaction_Km`: the row names no isoform, so whether it measured **{label}**" not in out
 
 
 def test_a_label_no_protein_carries_says_it_matched_nothing(compose):
     code, out = compose("--organism", "human", "--isoform", "HK9")
     assert code == 0
     assert "--isoform 'HK9' is not a gene symbol or name the enzyme nomenclature's UniProt entries give" in out
-    assert "| `reaction_Km` | 6.3 mM |" in out or "refused" in out
+    # No row names HK9; glucokinase's rows (P35557) name GCK, so a row naming none is used.
+    assert "| `reaction_Km` | 3.8 mM | literature (Homo sapiens) | BRENDA ref 641067 |" in out
+    assert "a row naming no isoform, used because none names HK9" in out
 
 
 def _model_whose_rows_say(*commentaries):

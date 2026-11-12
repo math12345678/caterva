@@ -153,6 +153,10 @@ class ParameterSource:
     #: `KineticResult.wide_spread`: the rows chosen from span more than
     #: 100-fold, so one value hides most of what is known.
     wide_spread: bool = False
+    #: `KineticResult.row_isoform`: the isoform the carried row measured, by
+    #: its commentary or its own UniProt cell ("GCK" for P35557). None when
+    #: the row names none, or for a value the resolver did not choose.
+    row_isoform: Optional[str] = None
 
     @property
     def conditions_stated(self) -> bool:

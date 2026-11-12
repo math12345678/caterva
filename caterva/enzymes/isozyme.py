@@ -314,6 +314,19 @@ def _states(commentary: Optional[str], isoform: str) -> bool:
     return same_isoform(read_isoform(commentary), isoform)
 
 
+def _states_by_accession(measurement: Any, isoform: str) -> bool:
+    """Whether the row's own UniProt cell names `isoform`, as the resolver
+    read it (`Measurement.row_isoform`): an O75874 row measured IDH1."""
+    named = getattr(measurement, "row_isoform", None)
+    if not isinstance(named, str) or not named:
+        return False
+    try:
+        from caterva.bind.core import same_isoform
+    except ImportError:  # pragma: no cover - flat layout
+        return False
+    return bool(same_isoform(named, isoform))
+
+
 def notice_for_model(model: Any) -> Optional[IsozymeNotice]:
     """The notice for a composed model whose constants came from a literature search.
 
@@ -329,7 +342,8 @@ def notice_for_model(model: Any) -> Optional[IsozymeNotice]:
     if isoform:
         unstated = [
             str(identifier) for identifier in sorted(measured)
-            if not _states(getattr(measured[identifier], "commentary", None), isoform)]
+            if not _states(getattr(measured[identifier], "commentary", None), isoform)
+            and not _states_by_accession(measured[identifier], isoform)]
     return isozyme_notice(getattr(model, "subject", None), getattr(model, "organism", None), isoform,
                           unstated=unstated)
 

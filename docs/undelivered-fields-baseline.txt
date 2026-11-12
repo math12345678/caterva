@@ -49,6 +49,9 @@ pairable                   # internal: the rows resolve_kinetic_pair may
                            # citations and chosen_because's "one measurement".
 row_notes                  # inside chosen_because: "what the carried row is:
                            # the row is a K0.5 with a Hill coefficient of 1.8".
+row_isoform                # read in-process by caterva compose's isoform
+                           # checks; across the wire it is in chosen_because
+                           # ("the row's UniProt accession (P35557) is GCK").
 
 relatedness.shared_rank    # inside RelatednessVerdict.reason, rendered by
                            # buildUnresolvedKineticProvenance on the

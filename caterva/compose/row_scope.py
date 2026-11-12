@@ -79,6 +79,16 @@ MODE_UNSTATED = "mode_unstated"
 MODE_MISMATCH = "mode_mismatch"
 VERSUS = "versus"
 PREPARATION = "preparation"
+HALF_SATURATION = "half_saturation"
+
+#: A row reporting a cooperative half-saturation constant, not a Km: "K0.5
+#: value, Hill coefficient 1.8" (human glucokinase, BRENDA ref 739603). The
+#: same reading as the literature layer's (Tests/row_form.half_saturation).
+_HALF_SATURATION = re.compile(
+    r"\b[KS]\s*\(?\s*0\.5\s*\)?(?=[\s,;:)]|$)|\b[KS]0\.5\b|\[S\]\s*0\.5|\bS50\b"
+    r"|\bHill\s+(?:coefficient|constant|value|number)\b|\bnH\s*[=:]?\s*\d"
+    r"|\bhalf[- ]saturation\b|\bsigmoid(?:al)?\s+kinetics\b", re.IGNORECASE)
+_HILL = re.compile(r"\bHill\s+coefficient\s*(?:of|=|:)?\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
 
 #: How each altered preparation is named in a sentence.
 _PREPARED = {
@@ -147,6 +157,7 @@ def read_scope(
     table: Optional[str] = None,
     substrate: Optional[str] = None,
     isoform: Optional[str] = None,
+    row_isoform: Optional[str] = None,
 ) -> Optional[RowScope]:
     """The scope of one row, judged against the model it was put in.
 
@@ -155,8 +166,13 @@ def read_scope(
     the isoform the model was asked to be about (`--isoform`), if any. None
     when the row carries no commentary: there is nothing to read, which is
     not the same as a row that was read and found consistent.
+
+    `row_isoform` is the isoform the resolver read off the row
+    (`Measurement.row_isoform`): its words, else its own UniProt cell. A row
+    whose words name none and whose accession is O75874 measured IDH1, and
+    is not said to "name no isoform" (ADR 0182, second round).
     """
-    if not commentary or not str(commentary).strip():
+    if (not commentary or not str(commentary).strip()) and not row_isoform:
         if isoform:
             # Nothing to read, and an isoform was asked for: that it could
             # not be checked is itself the finding.
@@ -165,9 +181,9 @@ def read_scope(
                 f"one asked for, is unknown")),))
         return None
     read_isoform, read_mode = _reader()
-    text = str(commentary)
+    text = str(commentary or "")
     wanted = isoform
-    isoform = read_isoform(text)
+    isoform = read_isoform(text) or row_isoform
     concerns = []
     if wanted:
         from caterva.compose.isoform import same_isoform
@@ -205,6 +221,14 @@ def read_scope(
                     f"{substrate}, the substrate in this model: a Ki is specific to the "
                     f"assay it was measured in")))
 
+    if (table or "").lower() in ("km", "km values") and _HALF_SATURATION.search(text):
+        hill = _HILL.search(text)
+        what = (f"a K0.5 with a Hill coefficient of {hill.group(1)}" if hill
+                else "a K0.5, the half-saturation constant of cooperative kinetics")
+        concerns.append(Concern(HALF_SATURATION, (
+            f"the row is **{what}**, not a Michaelis-Menten Km: a hyperbolic rate law built "
+            f"with it approximates a cooperative enzyme")))
+
     verdict = _preparation(text)
     preparation = getattr(verdict, "status", None)
     # `differs_for` honours a curator's "does not alter the Km value": the
@@ -217,8 +241,41 @@ def read_scope(
     return RowScope(isoform, mode, versus, tuple(concerns), preparation)
 
 
+#: A named natural variant of one enzyme: "HIV-1 subtype C protease",
+#: "clade B". Not an isoform (one gene, one protein) and not a mutant.
+_SUBTYPE = re.compile(r"\b(subtype|clade)\s+([A-Z][A-Z0-9]?|\d{1,2}[A-Z]?)\b", re.IGNORECASE)
+
+
+def variant_mix(commentaries: "dict[str, Optional[str]]") -> Optional[str]:
+    """A sentence when the constants' rows name different subtypes (or one
+    names a subtype and another names none), else None.
+
+    HIV-1 protease, ADR 0182 second round: the Km and kcat came from "HIV-1
+    subtype C protease" rows (ref 678346) and the Ki from "recombinant LAI
+    wild-type enzyme" (ref 664013), a subtype B strain the row does not
+    call one. Each row's own note named only itself, so one model of two
+    variants read as one enzyme's."""
+    named: dict = {}
+    for identifier, text in sorted(commentaries.items()):
+        found = sorted({f"{m.group(1).lower()} {m.group(2).upper()}"
+                        for m in _SUBTYPE.finditer(text or "")})
+        named[identifier] = " and ".join(found) if found else None
+    labels = set(named.values())
+    if len(named) < 2 or labels == {None} or len(labels) == 1:
+        return None
+    groups: dict = {}
+    for identifier, label in named.items():
+        groups.setdefault(label, []).append(f"`{identifier}`")
+    parts = [(f"{', '.join(ids)} measured {label}" if label else
+              f"{', '.join(ids)} {'names' if len(ids) == 1 else 'name'} no subtype")
+             for label, ids in sorted(groups.items(), key=lambda kv: (kv[0] is None, kv[0] or ""))]
+    return ("the constants' rows are not all of one variant of the enzyme: " + "; ".join(parts)
+            + ". The model may combine constants of different variants; a row naming no subtype "
+            "may be any (often the reference strain)")
+
+
 __all__ = [
-    "Concern", "RowScope", "read_scope", "mode_fits", "versus_is",
+    "Concern", "RowScope", "read_scope", "mode_fits", "versus_is", "variant_mix",
     "MODE_OF_MOTIF", "INHIBITION_TABLES",
-    "ISOFORM", "MODE_UNSTATED", "MODE_MISMATCH", "VERSUS", "PREPARATION",
+    "ISOFORM", "MODE_UNSTATED", "MODE_MISMATCH", "VERSUS", "PREPARATION", "HALF_SATURATION",
 ]

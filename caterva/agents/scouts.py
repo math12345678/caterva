@@ -390,6 +390,9 @@ class ParameterScout:
             # one; this re-selection's reason is `new_reason` below.
             **({"resolver_because": None}
                if "resolver_because" in getattr(source, "__dataclass_fields__", {}) else {}),
+            # The isoform is the re-selected row's own, as the resolver read it.
+            **({"row_isoform": best.get("isoform")}
+               if "row_isoform" in getattr(source, "__dataclass_fields__", {}) else {}),
         )
         row_organism = best.get("organism") or None
         if row_organism and row_organism != source.organism:

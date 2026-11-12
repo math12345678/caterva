@@ -347,6 +347,14 @@ class KineticResult(BaseModel):
     #: the row is the plain enzyme's ordinary constant as far as its words say.
     row_notes: list[str] = []
 
+    #: The isoform the carried row measured, by its commentary or, failing
+    #: that, its own UniProt cell (`_row_isoform`): "HK-I", "GCK", "IDH1".
+    #: None when the row names none. Read by `resolve_kinetic_pair`, which
+    #: keeps a Km and a kcat to one isozyme, and by `caterva compose`, whose
+    #: report would otherwise say a row naming IDH1 by accession "names no
+    #: isoform".
+    row_isoform: str | None = None
+
     #: Every row `resolve_kinetic_pair` may pair across tables: the rows left
     #: after the checks that decide what a row IS (implausible values, an
     #: inhibitor in the assay, a treated arm, a minus-activator control,
@@ -700,7 +708,19 @@ def _inhibitors_in_assay(entry, inhibitor_keys, substrate=None) -> list:
             continue
         if x.role == "inhibitor" or _compound_key(name) in inhibitor_keys:
             out.append(name)
+    # A compound listed bare at a concentration, with no "in the presence
+    # of": "hCA I, 25 mM hydroxyurea" (BRENDA ref 650526, human carbonic
+    # anhydrase I, beside the same paper's plain "hCA I" row).
+    for m in _BARE_COMPOUND.finditer(getattr(entry, "conditions", None) or ""):
+        name = m.group(1).strip()
+        if (_compound_key(name) in inhibitor_keys and name not in out
+                and not row_form.is_ion(name) and not _is_cofactor(name)
+                and not (substrate and _compound_key(name) == _compound_key(substrate))):
+            out.append(name)
     return out
+
+
+_BARE_COMPOUND = re.compile(r"\b\d+(?:\.\d+)?\s*[mµun]?M\s+([A-Za-z0-9(][^,;]*?)\s*(?=[,;]|$)")
 
 
 def substrates_present(
@@ -959,6 +979,16 @@ def _is_mutant(entry) -> bool:
                 and verdict.kind != "isozyme")
 
 
+def _variant_words(entry) -> str:
+    """The words of a mutant row that say which mutant it is."""
+    verdict = getattr(entry, "variant", None)
+    found = sorted(_mutations_of(getattr(entry, "conditions", None) or ""))
+    if found:
+        return "/".join(found)
+    return (getattr(verdict, "evidence", None) or getattr(verdict, "descriptor", None)
+            or "mutant")
+
+
 def _kitz_wilson(entry) -> bool:
     """Whether a Ki row was "determined from Kitz-Wilson plots": the K_I of
     an irreversible inactivation, which `caterva compose` ranks after every
@@ -1072,12 +1102,26 @@ def _isoform_from_accession(entry) -> str | None:
     """The protein(s) a row's OWN UniProt cell names, joined as the isoform
     reader joins two ("CYP3A5 and CYP3A43"), or None when the cell is the
     caller's fallback, absent, or names an accession the enzyme index does
-    not file under the row's EC number."""
+    not file under the row's EC number -- or when the EC is one protein in
+    the row's organism: human ACHE's P22303 under EC 3.1.1.7 is THE enzyme,
+    not an isoform of it, and the report said "the row measured isoform
+    ACHE; if the enzyme you mean is another isoform ..." of it."""
     if not getattr(entry, "uniprot_from_row", False):
         return None
-    labels = row_form.isoforms_of_accessions(getattr(entry, "ec_number", None),
-                                             getattr(entry, "uniprot", None))
-    return " and ".join(labels) if labels else None
+    ec, cell = getattr(entry, "ec_number", None), getattr(entry, "uniprot", None)
+    labels = row_form.isoforms_of_accessions(ec, cell)
+    if not labels or row_form.proteins_in_organism_of(ec, cell) < 2:
+        return None
+    return " and ".join(labels)
+
+
+def _row_isoform_or_none(entry):
+    """`_row_isoform`, or None where caterva's isoform reader is not
+    importable (then only the UniProt cell is read)."""
+    try:
+        return _row_isoform(entry)
+    except ImportError:
+        return _isoform_from_accession(entry)
 
 
 def _row_notes(entry, quantity) -> list:
@@ -1090,6 +1134,11 @@ def _row_notes(entry, quantity) -> list:
         if k05:
             notes.append(f"the row is {k05}, not a Michaelis-Menten Km: a hyperbolic rate law "
                          "built with it approximates a cooperative enzyme")
+    if _is_mutant(entry):
+        # Carried only when asked for ("IDH1 R132H") or when no wild-type
+        # row exists; either way the reader is told it is a mutant's.
+        notes.append(f"the row measured a mutant enzyme ({_variant_words(entry)!r}), not the "
+                     "wild type")
     construct = row_form.construct_of(text)
     if construct:
         notes.append(f"the row measured {construct}, not the native enzyme")
@@ -1421,6 +1470,7 @@ def _best_evidenced(
             candidate_references=sorted({str(e.reference_id) for e in kept
                                          if getattr(e, "reference_id", None)}),
             row_notes=notes,
+            row_isoform=_row_isoform_or_none(chosen),
             pairable=_score_frontier(pairable, requested_organism),
         )
 
@@ -1570,6 +1620,12 @@ def _score_frontier(
             "ph": getattr(entry, "assay_ph", None),
             "temperature_c": getattr(entry, "assay_temperature_c", None),
             "buffer": getattr(entry, "assay_buffer", None),
+            # The isoform the row measured, by its words or its own UniProt
+            # cell (`_row_isoform`): "IDH1" for an O75874 row whose words name
+            # none. Read by `caterva compose --isoform`, which otherwise
+            # judged rows by their words alone and said a row naming IDH1 by
+            # accession "names no isoform" (ADR 0182, second round).
+            "isoform": _row_isoform_or_none(entry),
             "grades": {
                 "assay_completeness": score.assay_completeness.grade,
                 "condition_proximity": score.condition_proximity.grade,
@@ -1645,7 +1701,7 @@ def _isoform_of(conditions):
     return read_isoform(conditions)
 
 
-def _row_isoform(entry):
+def _row_isoform(entry, isoform=None):
     """The isoform a row measured: what its commentary names, else what its
     OWN UniProt cell names (`_isoform_from_accession`). Raises ImportError
     where the caterva package is not importable, as `_isoform_of` does.
@@ -1654,8 +1710,22 @@ def _row_isoform(entry):
     Homo sapiens | P35557 | wild type enzyme ..." (ref 703624) named no
     isoform in words and was carried as HK2's kcat, and P35557 is
     glucokinase; "P20815, Q9HB55" (CYP3A5, CYP3A43) was carried as CYP2B6's
-    Ki (ref 764467)."""
-    return _isoform_of(getattr(entry, "conditions", None)) or _isoform_from_accession(entry)
+    Ki (ref 764467).
+
+    A cell listing SEVERAL proteins says only that the paper concerns them:
+    BRENDA gives one reference's accessions on each of its rows (human MAO,
+    "P21397,P27338", MAO-A and MAO-B). Such a row names none of them when
+    `isoform` (or, with no isoform given, any isoform) is among them, and
+    names the others -- another isoform's -- when it is not."""
+    named = _isoform_of(getattr(entry, "conditions", None))
+    if named:
+        return named
+    from_cell = _isoform_from_accession(entry)
+    if not from_cell or " and " not in from_cell:
+        return from_cell
+    if isoform is None or any(_same_isoform(part, isoform) for part in from_cell.split(" and ")):
+        return None
+    return from_cell
 
 
 def _same_isoform(a, b):
@@ -1679,7 +1749,7 @@ def _partition_isoform(entries, isoform, log, where):
     order, as `caterva compose --isoform` (caterva/compose/isoform.py).
     """
     try:
-        named = [(e, _row_isoform(e)) for e in entries]
+        named = [(e, _row_isoform(e, isoform)) for e in entries]
     except ImportError:
         log.append(f"isoform {isoform!r} asked for, but caterva's isoform reader is not "
                    f"importable here, so {where} rows were NOT filtered by isoform")
@@ -2698,21 +2768,49 @@ def _matched_pairs(km, kcat, substrate):
     conditions hold several different values, so which Km goes with which
     kcat cannot be told (TEM-1 and ampicillin, ref 734041: seven Km and seven
     kcat rows with one commentary)."""
-    def described(row, result):
-        # A pair is never less described than the constant's own pick: a row
-        # stating no pH or temperature is not carried over one stating both
-        # for the sake of pairing (xanthine oxidase, ref 644648: a Km and a
-        # kcat with an artificial electron acceptor and no conditions).
-        return any(((result.assay_ph is None or row.get("ph") is not None)
-                    and (result.assay_temperature_c is None
-                         or row.get("temperature_c") is not None),))
+    pairs, unresolvable, _ = _matched_pairs_with_undescribed(km, kcat, substrate)
+    return pairs, unresolvable
 
-    by_ref = {}
+
+def _matched_pairs_with_undescribed(km, kcat, substrate):
+    """`_matched_pairs`, and the papers whose matching Km and kcat rows were
+    not considered because they state less (no pH or temperature) than the
+    constants' own picks. Said, so "no paper holds a pair" is not claimed of
+    a paper that does.
+
+    A pair must state a pH (a temperature) only when BOTH picks state one:
+    the model's description is no better than its less-described constant.
+    Xanthine oxidase, ref 644648: a Km and a kcat with an artificial electron
+    acceptor and no conditions, against two picks stating pH and temperature,
+    are not carried. Mouse hexokinase, ref 758915: Km 0.42 and kcat 93.39
+    (Hk2, O08528), neither stating pH or temperature, ARE carried over Km
+    0.42 with another paper's kcat 53.2 (ref 674800) -- the Km pick states
+    none, so pairing loses nothing and gains one paper's protein; so are
+    horse liver ADH's Km 4.0 and kcat 123 "wild-type enzyme Adh1" (ref
+    285647), the kcat pick's own paper, over a Km from another paper."""
+    need_ph = km.assay_ph is not None and kcat.assay_ph is not None
+    need_t = km.assay_temperature_c is not None and kcat.assay_temperature_c is not None
+
+    def described(row, result):
+        return ((not need_ph or row.get("ph") is not None)
+                and (not need_t or row.get("temperature_c") is not None))
+
+    by_ref, all_by_ref = {}, {}
     for table, result in (("km", km), ("kcat", kcat)):
         for r in result.pairable or []:
             ref = r.get("reference_id")
-            if ref and r.get("value") and described(r, result):
+            if not (ref and r.get("value")):
+                continue
+            all_by_ref.setdefault(str(ref), {"km": [], "kcat": []})[table].append(r)
+            if described(r, result):
                 by_ref.setdefault(str(ref), {"km": [], "kcat": []})[table].append(r)
+    undescribed = []
+    for ref, rows in sorted(all_by_ref.items()):
+        here = by_ref.get(ref, {"km": [], "kcat": []})
+        if any(row_form.same_measurement(k, c, substrate) for k in rows["km"] for c in rows["kcat"]) \
+                and not any(row_form.same_measurement(k, c, substrate)
+                            for k in here["km"] for c in here["kcat"]):
+            undescribed.append(ref)
     pairs, unresolvable = [], []
     for ref, rows in sorted(by_ref.items()):
         if not rows["km"] or not rows["kcat"]:
@@ -2727,13 +2825,17 @@ def _matched_pairs(km, kcat, substrate):
                     unresolvable.append(ref)
                 continue
             pairs.append((ref, k, mates[0]))
-    return pairs, unresolvable
+    return pairs, unresolvable, undescribed
 
 
 def _with_clause(result, clause):
-    because = (result.chosen_because + "; " if result.chosen_because else "") + clause
-    return result.model_copy(update={"chosen_because": because,
-                                     "search_log": list(result.search_log) + [clause]})
+    if not result.chosen_because:
+        # A result that gives no reason (a stand-in) is not given one here.
+        return result
+    because = result.chosen_because + "; " + clause
+    # The reason only: the search log is the search's, and a caller's log
+    # of a found value stays the lookup it made (test_science_agent_runner).
+    return result.model_copy(update={"chosen_because": because})
 
 
 def resolve_kinetic_pair(
@@ -2761,8 +2863,9 @@ def resolve_kinetic_pair(
     member lies more than PAIR_MAX_FOLD_FROM_PICK from that constant's own
     pick is not taken.
 
-    Of the pairs left, the one nearest the two independent picks (on a log
-    scale) is carried, and each result says so; with none, the independent
+    Of the pairs left, one measured at an ordinary assay temperature
+    (25-37 C) comes first, then the one nearest the two independent picks
+    (on a log scale) is carried, and each result says so; with none, the independent
     picks stand and each result says why they were not paired.
 
     The page is fetched once: `html_provider` is wrapped in a cache for the
@@ -2786,7 +2889,23 @@ def resolve_kinetic_pair(
     if not (km.found and kcat.found):
         return km, kcat
 
-    pairs, unresolvable = _matched_pairs(km, kcat, substrate)
+    one_isozyme = None
+    if not kwargs.get("isoform"):
+        rest = {k: v for k, v in kwargs.items() if k != "isoform"}
+        km, kcat, one_isozyme = _one_isozyme(km, kcat, resolve_kinetic_value, dict(
+            enzyme_ec=enzyme_ec, organism=organism, substrate=substrate,
+            html_provider=page, **rest))
+
+    def resolve(quantity, row=None, _resolve=resolve):
+        # A pair keeps to the isozyme `_one_isozyme` settled on.
+        if one_isozyme is None:
+            return _resolve(quantity, row)
+        return resolve_kinetic_value(enzyme_ec=enzyme_ec, organism=organism,
+                                     substrate=substrate, html_provider=page,
+                                     quantity=quantity, prefer_row=row,
+                                     **{**kwargs, "isoform": one_isozyme[quantity]})
+
+    pairs, unresolvable, undescribed = _matched_pairs_with_undescribed(km, kcat, substrate)
 
     def fold(value, pick):
         return max(value / pick, pick / value) if value > 0 and pick and pick > 0 else math.inf
@@ -2795,15 +2914,26 @@ def resolve_kinetic_pair(
             if fold(k["value"], km.value) <= PAIR_MAX_FOLD_FROM_PICK
             and fold(c["value"], kcat.value) <= PAIR_MAX_FOLD_FROM_PICK]
     far = [p for p in pairs if p not in near]
+    def outside_assay_range(row):
+        # How far (degrees C) a pair's temperature lies outside the 25-37 C
+        # of an ordinary assay. One paper's temperature series (bovine
+        # trypsin and BAPNA, ref 678548: 5, 15, 25 and 35 C) is otherwise
+        # settled by which rows the medians fell on: Km 0.26 at 25 C and
+        # kcat 0.76 at 15 C made the 15 C pair the nearer.
+        t = row.get("temperature_c")
+        return 0.0 if t is None else max(0.0, 25.0 - float(t), float(t) - 37.0)
+
     if near:
         ref, k_row, c_row = min(near, key=lambda p: (
+            outside_assay_range(p[1]),
             abs(math.log10(p[1]["value"] / km.value)) + abs(math.log10(p[2]["value"] / kcat.value)),
             p[0]))
         km_p, kcat_p = resolve("km", k_row), resolve("kcat", c_row)
         if km_p.found and kcat_p.found:
             note = (f"the Km ({k_row['value']:g} mM) and kcat ({c_row['value']:g} 1/s) are one "
                     f"measurement: BRENDA ref {ref} states the same conditions for both rows")
-            return _with_clause(km_p, note), _with_clause(kcat_p, note)
+            km_p, kcat_p = _with_clause(km_p, note), _with_clause(kcat_p, note)
+            return _with_isozyme_note(km_p, kcat_p, one_isozyme)
 
     reasons = []
     if unresolvable:
@@ -2815,10 +2945,73 @@ def resolve_kinetic_pair(
         reasons.append(f"a matched pair exists ({listed}) but lies more than "
                        f"{PAIR_MAX_FOLD_FROM_PICK:g}-fold from the constants' own picks, so it was "
                        "not carried for the sake of pairing")
+    if undescribed:
+        reasons.append(f"BRENDA ref {', '.join(undescribed)} holds a Km row and a kcat row "
+                       "stated alike, but without the pH or temperature the constants' own "
+                       "picks state, so the better-described rows were kept")
     if not reasons:
         reasons.append("no paper holds a Km row and a kcat row stated under the same conditions")
     note = ("the Km and the kcat were chosen independently, not as a measured pair: "
             + "; ".join(reasons))
+    return _with_isozyme_note(_with_clause(km, note), _with_clause(kcat, note), one_isozyme)
+
+
+def _one_isozyme(km, kcat, resolve_value, call):
+    """`(km, kcat, isoforms)`: the two picks kept to one isozyme when no
+    isoform was asked for and their rows name two.
+
+    Human hexokinase and D-glucose carried HK-I's Km (0.06 mM, ref 640237,
+    "hexokinase I") with glucokinase's kcat (60.4 1/s, ref 703624, UniProt
+    P35557): two proteins' constants in one rate law. When the carried rows
+    name different isozymes (`KineticResult.row_isoform`), the kcat is
+    sought among rows naming the Km's isozyme, then the Km among rows
+    naming the kcat's; a replacement counts only when its own row names that
+    isozyme, never a row naming none (on that page the kcat rows naming no
+    isoform are glucokinase papers' too). With neither, the picks stand and
+    `isoforms` says so. `isoforms` is None when nothing needed settling,
+    else {"km": .., "kcat": .., "moved": "km" | "kcat" | None}."""
+    a, b = km.row_isoform, kcat.row_isoform
+    if not (a and b):
+        return km, kcat, None
+    try:
+        if _same_isoform(a, b):
+            return km, kcat, None
+    except ImportError:
+        if a == b:
+            return km, kcat, None
+    for moved, isoform, other in (("kcat", a, "km"), ("km", b, "kcat")):
+        alt = resolve_value(**call, quantity=moved, isoform=isoform)
+        try:
+            names_it = bool(alt.found and alt.row_isoform and _same_isoform(alt.row_isoform, isoform))
+        except ImportError:
+            names_it = bool(alt.found and alt.row_isoform == isoform)
+        if names_it and alt.source == ("brenda_exact" if km.source == "brenda_exact"
+                                       else alt.source):
+            picks = {"km": km, "kcat": kcat}
+            independent = picks[moved]
+            picks[moved] = alt
+            return picks["km"], picks["kcat"], {
+                "km": isoform, "kcat": isoform, "moved": moved, "from": independent,
+                "from_isoform": b if moved == "kcat" else a, "other": other}
+    return km, kcat, {"km": a, "kcat": b, "moved": None}
+
+
+def _with_isozyme_note(km, kcat, settled):
+    """Say what `_one_isozyme` did, on both constants."""
+    if settled is None:
+        return km, kcat
+    if settled["moved"] is None:
+        note = (f"the Km's row measured {settled['km']} and the kcat's row {settled['kcat']}: no "
+                "row of either isozyme gives the other constant, so the model combines two "
+                "isozymes' constants")
+    else:
+        moved, other = settled["moved"], settled["other"]
+        was = settled["from"]
+        label = {"km": "Km", "kcat": "kcat"}
+        note = (f"the {label[moved]} was taken from rows naming {settled[moved]}, the isozyme of "
+                f"the {label[other]}'s row, so both constants are one protein's (the "
+                f"{label[moved]} chosen alone, {was.value:g} {was.unit or ''}".rstrip()
+                + f", measured {settled['from_isoform']})")
     return _with_clause(km, note), _with_clause(kcat, note)
 
 
