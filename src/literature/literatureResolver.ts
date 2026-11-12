@@ -450,6 +450,12 @@ export interface RowScope {
    * stating no mode. Present, and true, only for such a row.
    */
   kitzWilson?: boolean;
+  /**
+   * The runner's verdict (caterva.bind.core.same_isoform, which asks UniProt)
+   * on whether `isoform` is the one --isoform asked for: "HK-II" is HK2.
+   * Absent when no isoform was asked for, or from an older runner.
+   */
+  sameIsoformAsRequested?: boolean;
 }
 
 /**
@@ -460,7 +466,12 @@ export interface RowScope {
 export function rowScopeLines(quantity: string, scope: RowScope | null | undefined): string[] {
   if (!scope) return [];
   const lines: string[] = [];
-  if (scope.isoform) {
+  if (scope.isoform && scope.sameIsoformAsRequested === true) {
+    // "HK2 with glucose" carried the HK2 row and then warned that it might
+    // be "a different protein's constant": the row's spelling (HK-II) is
+    // not the query's, and the runner knows they are one protein.
+    lines.push(`The row measured isoform ${scope.isoform}, the one asked for.`);
+  } else if (scope.isoform) {
     lines.push(
       `The row measured isoform ${scope.isoform}. If the enzyme you mean is another isoform, this is a different protein's constant.`,
     );
@@ -497,6 +508,9 @@ function parseRowScope(raw: unknown): RowScope | null {
     inhibitionMode: text(r['inhibitionMode']),
     versus: text(r['versus']),
     ...(r['kitzWilson'] === true ? { kitzWilson: true } : {}),
+    ...(typeof r['sameIsoformAsRequested'] === 'boolean'
+      ? { sameIsoformAsRequested: r['sameIsoformAsRequested'] as boolean }
+      : {}),
   };
   return scope.isoform || scope.inhibitionMode || scope.versus ? scope : null;
 }

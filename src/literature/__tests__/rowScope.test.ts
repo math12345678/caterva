@@ -144,3 +144,31 @@ describe('withheldSentence: rows found and withheld are not "nothing"', () => {
     expect(withheldSentence({ ...base, source: null })).toBeNull();
   });
 });
+
+describe('an isoform the runner says is the one asked for', () => {
+  // "HK2 with glucose", live 2026-11-11: the HK2 row (BRENDA ref 702867,
+  // "hexokinase II") was carried and then called possibly "a different
+  // protein's constant", because "HK-II" is not spelled "HK2". The runner
+  // asks UniProt (caterva.bind.core.same_isoform) and sends its verdict.
+  it('reads the verdict from the runner', () => {
+    const r = mapFoundResult(
+      { rowScope: { isoform: 'HK-II', inhibitionMode: null, versus: null, sameIsoformAsRequested: true } },
+      'km', 0.37, 'mM', []);
+    expect(r.rowScope?.sameIsoformAsRequested).toBe(true);
+  });
+
+  it('says the row measured the isoform asked for, without the other-protein warning', () => {
+    const lines = rowScopeLines('km', { isoform: 'HK-II', inhibitionMode: null, versus: null, sameIsoformAsRequested: true });
+    expect(lines).toEqual(['The row measured isoform HK-II, the one asked for.']);
+  });
+
+  it('keeps the warning when the runner says it is another isoform, or does not say', () => {
+    for (const same of [false, undefined]) {
+      const lines = rowScopeLines('km', {
+        isoform: 'HK-I', inhibitionMode: null, versus: null,
+        ...(same === undefined ? {} : { sameIsoformAsRequested: same }),
+      });
+      expect(lines[0]).toContain("a different protein's constant");
+    }
+  });
+});
