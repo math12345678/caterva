@@ -20,7 +20,8 @@
  * The chooser's CLI contract:
  *
  *   python -m caterva.compose.defaults --ec EC [--organism ORG]
- *       [--substrate S] [--role substrate|inhibitor|organism] --json
+ *       [--substrate S] [--inhibitor I] [--needs km,kcat,ki]
+ *       [--role substrate|inhibitor|organism] --json
  *   -> {"choice": <Choice json or null>, "note": "..."}
  *   exit 0 when a choice exists, 3 when BRENDA has nothing usable.
  *
