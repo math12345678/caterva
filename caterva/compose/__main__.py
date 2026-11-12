@@ -1758,7 +1758,9 @@ def _filed_under_another_ec(ec: str, organism: str, text: Optional[str]) -> Opti
             if not any(finder.strict_key(n) == key for n in protein.names):
                 continue
             try:
-                rows = defaults.table_rows(candidate.ec, "km", organism)
+                # Counted as the search would use them: a variant's row is
+                # withheld (ADR 0029), so it is no way out.
+                rows = _usable(defaults.table_rows(candidate.ec, "km", organism))
             except Exception:  # noqa: BLE001
                 return None
             if not rows:

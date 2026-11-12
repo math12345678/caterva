@@ -258,7 +258,7 @@ thing actually missing (`caterva/compose/__main__.py`,
   Km row, so following the refusal's `--subject` is not refused again.
 - **The organism's protein under another EC number.** "glucokinase in human"
   (EC 2.7.1.2, no human Km row) now gives first: human glucokinase is GCK,
-  filed under EC 2.7.1.1 (159 human Km rows), re-run with `--subject 2.7.1.1
+  filed under EC 2.7.1.1 (54 human Km rows that are not a variant's), re-run with `--subject 2.7.1.1
   --isoform GCK`, which runs GROUNDED (Km 6.0 mM ref 641068, kcat 37 1/s ref
   702320, the kcat from the row naming GCK; the Km row names no isozyme and
   the report says so). Only a protein whose UniProt names include the words
