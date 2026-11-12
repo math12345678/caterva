@@ -355,6 +355,11 @@ function rowScopeOf(result: ResolvedKinetic): string[] | undefined {
 const MEASURED_PLACEHOLDER = {
   km: '<your measured Km, e.g. in mM>',
   vmax: '<your measured Vmax, e.g. in mM/s>',
+  // "acetylcholinesterase inhibited by donepezil in human", live 2026-11-11:
+  // no Ki row, and the command printed "in full, with the example values"
+  // ended `--ki 5mM` -- a number for donepezil, whose Ki is nanomolar,
+  // that nobody measured, runnable as printed.
+  ki: '<your measured Ki, e.g. in mM>',
 } as const;
 const CITE_PLACEHOLDER = '<author year, PMID>';
 
@@ -1326,7 +1331,7 @@ export async function commandSimulateResolved(
         blockers.push({
           parameter: 'ki',
           kind: 'literature',
-          suggestion: '--ki 5mM',
+          suggestion: `--ki "${MEASURED_PLACEHOLDER.ki}"`,
           why: because
             ? because.why
             : `No inhibition constant for ${inhibitor} in the literature for this system.`,
