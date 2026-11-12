@@ -175,7 +175,7 @@ class ParameterScout:
             organism=organism,
             allow_cross_species=allow_cross_species,
         )
-        source, reason = to_parameter_source(quantity, result)
+        source, reason = to_parameter_source(quantity, result, getattr(self.request, "table", None))
 
         notes: List[str] = []
         if source is None and organism_constraint is not None:

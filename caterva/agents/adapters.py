@@ -28,6 +28,7 @@ describes, so each keeps its own sentence and its own available organisms.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Optional, Sequence, Tuple
 
 def _parameter_source_cls():
@@ -58,9 +59,15 @@ NOT_FOUND_REASONS = {
     "cross_species_too_distant": (
         "values exist only in organisms too distantly related to offer"
     ),
+    # The papers are what PubMed returned for the search's words (enzyme,
+    # organism, compound, quantity); nothing checks that one names the
+    # compound, and PubMed's term mapping returns papers for a made-up
+    # inhibitor name. So they are called candidates for the search, never
+    # papers about the compound.
     "literature_candidates": (
-        "no database value; candidate papers were found but a number was "
-        "not extracted from free text"
+        "no database value; PubMed returned candidate papers for the search's "
+        "words (not checked to name the compound), and no number is extracted "
+        "from free text"
     ),
     "not_found": "nothing found in BRENDA or the literature search",
     # The three refusals of rows that WERE found. Before 2026-09-30 the
@@ -152,9 +159,45 @@ def citation_text(citation: Any) -> Optional[str]:
     return str(citation)
 
 
+#: How many compound names a not-found reason lists before "and N more".
+NAMES_LISTED = 12
+
+
+def _table_of(quantity: str, table: Optional[str]) -> Optional[str]:
+    """The BRENDA table a quantity reads: `table` when the caller knows it,
+    else read from the model's symbol ("reaction_Ki", "Ki_glucose": a Ki)."""
+    if table:
+        return table.lower()
+    tokens = re.split(r"[^a-z0-9]+", (quantity or "").lower())
+    return "ki" if "ki" in tokens else None
+
+
+def name_miss_clause(table: Optional[str], names: Sequence[str]) -> str:
+    """The clause a not-found reason carries when BRENDA has no row for the
+    compound's name: what the compound is (a Ki is filed under the
+    INHIBITOR, so the flag that changes it is --inhibitor), and the names the
+    table lists, said to be every organism's, since the resolver lists them
+    from the whole page.
+
+    It said "no row for that substrate name here ... Re-run with --substrate"
+    for a Ki: the missing compound was the inhibitor, the list was BRENDA's
+    inhibitors, and --substrate could not change the Ki (donepezil,
+    celecoxib, round-1 review of ADR 0182). `caterva compose` replaces this
+    clause with one for the organism searched (`__main__._said_for_the_organism`).
+    """
+    role, flag = (("inhibitor", "--inhibitor") if table == "ki" else ("substrate", "--substrate"))
+    label = {"ki": "Ki ", "km": "Km ", "kcat": "kcat "}.get(table or "", "")
+    shown = list(names)[:NAMES_LISTED]
+    more = f" and {len(names) - NAMES_LISTED} more" if len(names) > NAMES_LISTED else ""
+    return (f" -- BRENDA has no {label}row for that {role} name; the {role}s it lists "
+            f"{label}rows for, in any organism: {', '.join(shown)}{more}. Re-run with {flag} "
+            f"set to the one you meant")
+
+
 def to_parameter_source(
     quantity: str,
     result: Any,
+    table: Optional[str] = None,
 ) -> Tuple[Optional[Any], Optional[str]]:
     """`(ParameterSource, None)` when found, `(None, reason)` when not.
 
@@ -179,19 +222,13 @@ def to_parameter_source(
         withheld = list(getattr(result, field_name, []) or []) if field_name else []
         if withheld:
             reason += f" -- {what}: {sep.join(withheld)}"
-        # The resolver lists the substrate labels BRENDA's table DOES carry
+        # The resolver lists the compound labels BRENDA's table DOES carry
         # when the one asked for is absent. It was computed and dropped
         # here, so "glucoze" read as "nothing found in BRENDA" -- a fact
         # about the literature, when it was a fact about spelling.
         substrates = list(getattr(result, "substrates_available", []) or [])
         if substrates:
-            shown = substrates[:12]
-            more = f" and {len(substrates) - 12} more" if len(substrates) > 12 else ""
-            reason += (
-                f" -- BRENDA has no row for that substrate name here; it "
-                f"lists: {', '.join(shown)}{more}. Re-run with --substrate "
-                f"set to the one you meant"
-            )
+            reason += name_miss_clause(_table_of(quantity, table), substrates)
         return None, reason
 
     return (
@@ -246,6 +283,7 @@ def mode_default_of(result: Any) -> Optional[dict]:
 
 __all__ = [
     "to_parameter_source",
+    "name_miss_clause",
     "mode_default_of",
     "citation_text",
     "NOT_FOUND_REASONS",
