@@ -1192,7 +1192,7 @@ ${colors.bright}Commands:${colors.reset}
                          is no trajectory to put points on.
       --json             machine-readable
 
-  resolve <enzyme> --substrate S --organism O [options]
+  resolve <enzyme> [--substrate S] [--organism O] [options]
     Look up a measured kinetic parameter in the literature and show where it
     came from.
     Resolves through BRENDA (exact, then cross-species) and then PubMed.
@@ -1668,7 +1668,10 @@ async function main() {
             process.exit(1);
           } else {
             error(
-              '--resolve needs --substrate, --organism, and either --enzyme or --ec. ' +
+              '--resolve could not settle the system: it needs an enzyme (named in ' +
+              'the question, or --enzyme / --ec), and a substrate and organism ' +
+              '(--substrate, --organism), which are chosen from BRENDA when left out ' +
+              'and shown before anything runs. ' +
               'The system is never inferred from the query text without your ' +
               'confirmation: attaching a real citation to a system you did not ' +
               'name is provenance for the wrong measurement.'
@@ -2068,8 +2071,9 @@ async function main() {
 
       if (!substrate || !organism || (!enzyme && !ec)) {
         error(
-          'resolve needs a substrate, an organism, and either an enzyme name ' +
-          'or an EC number.'
+          'resolve could not settle the system: it needs an enzyme name or an ' +
+          'EC number, and a substrate and organism (--substrate, --organism), ' +
+          'which are chosen from BRENDA when left out.'
         );
         if (nothingToChoose) {
           // What is missing, and what would fix it: the chooser's words.

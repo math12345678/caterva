@@ -154,7 +154,7 @@ describe('simulate --resolve chooses, shows the choice, and runs with it', () =>
       CATERVA_DEFAULTS_RUNNER: emptyChooser(),
     });
     expect(code).toBe(1);
-    expect(out).toContain('--resolve needs --substrate, --organism, and either --enzyme or --ec.');
+    expect(out).toContain('--resolve could not settle the system');
     expect(out).toContain('BRENDA lists no Km row for any substrate of EC 3.4.21.79 in Homo sapiens');
   });
 });

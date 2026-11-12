@@ -146,7 +146,7 @@ describe('simulate --resolve reads the question as compose does', () => {
       CATERVA_SENTENCE_READER: reader(path.join(dir, 'chymo-read.jsonl')),
       CATERVA_LITERATURE_RUNNER: literature(looked),
     });
-    expect(out).not.toContain('--resolve needs --substrate');
+    expect(out).not.toContain('could not settle the system');
     const asked = lines(looked);
     expect(asked.length).toBeGreaterThan(0);
     expect(asked.every((p) => p['ecNumber'] === '3.4.21.1')).toBe(true);
@@ -168,7 +168,7 @@ describe('simulate --resolve reads the question as compose does', () => {
     });
     expect(code).toBe(1);
     expect(out).toContain('No shape in this grammar matches.');
-    expect(out).not.toContain('--resolve needs --substrate');
+    expect(out).not.toContain('could not settle the system');
   });
 
   it('passes the flags to the reader, which lets them win', () => {
