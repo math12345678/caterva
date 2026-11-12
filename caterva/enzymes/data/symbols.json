@@ -530,6 +530,17 @@
   },
   {
    "ecs": [
+    "2.7.1.137",
+    "2.7.1.153"
+   ],
+   "meaning": "phosphatidylinositol 3-kinase and phosphatidylinositol-4,5-bisphosphate 3-kinase",
+   "source": "ENZYME lists 'PI3-kinase' as another name of EC 2.7.1.137; accepted name in ExPASy ENZYME release 02-Sep-2026: EC 2.7.1.137 phosphatidylinositol 3-kinase; EC 2.7.1.153 phosphatidylinositol-4,5-bisphosphate 3-kinase",
+   "symbols": [
+    "PI3K"
+   ]
+  },
+  {
+   "ecs": [
     "3.4.23.16"
    ],
    "meaning": "HIV-1 retropepsin",

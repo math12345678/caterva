@@ -1168,8 +1168,14 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
 
         out.enzyme_text = reading.enzyme_text
         out.name_refusal = _refuse(reading.ambiguity, _rerun_command(typed), AMBIGUOUS)
-        out.refusal_note = (f"No search was run: your description names {reading.enzyme_text!r}, "
-                            f"which is not one enzyme. {out.name_refusal}")
+        # A near spelling or a bare abbreviation is not "several enzymes":
+        # the refusal's own first line says what it is.
+        plain = (getattr(reading.ambiguity, "suggestions_only", False)
+                 or getattr(reading.ambiguity, "confirm_only", False)
+                 or not getattr(reading.ambiguity, "candidates", ()))
+        out.refusal_note = (f"No search was run: your description names {reading.enzyme_text!r}"
+                            + (". " if plain else ", which is not one enzyme. ")
+                            + f"{out.name_refusal}")
     elif reading.near is not None:
         note = reading.near_note()
         out.unapplied = note[:1].lower() + note[1:].rstrip(".")

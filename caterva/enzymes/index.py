@@ -96,6 +96,8 @@ ORGANISMS: Dict[str, Tuple[str, str, Tuple[str, ...]]] = {
     "HORVU": ("Hordeum vulgare", "barley", ("h. vulgare",)),
     "SOYBN": ("Glycine max", "soybean", ("soybeans", "soya", "soya bean", "soy bean", "g. max")),
     "IPOBA": ("Ipomoea batatas", "sweet potato", ("sweet potatoes", "i. batatas")),
+    # The firefly of firefly luciferase (LUCI_PHOPY, EC 1.13.12.7).
+    "PHOPY": ("Photinus pyralis", "firefly", ("fireflies", "north american firefly", "p. pyralis")),
 }
 
 #: What a code covers when it is narrower than the name people type for it.

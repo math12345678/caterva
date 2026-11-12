@@ -401,7 +401,37 @@ SUBSTRATE_ABBREVIATIONS: Dict[str, Tuple[Tuple[str, ...], ...]] = {
     "oxygen": (("O2",),),
     "water": (("H2O", "water"),),
     "penicilling": (("benzylpenicillin", "penicillin G"),),
+    # Chromogenic and fluorogenic substrates by their trade codes and lab
+    # abbreviations. Spellings checked against the live BRENDA pages for
+    # 3.4.21.5, 3.4.21.6, 3.4.21.1, 3.4.21.62 and 3.2.1.18 on 2026-11-11:
+    # "thrombin with S-2238" used to drop S-2238 as a strain tag.
+    "s2238": (("D-phenylalanyl-pipecolyl-L-arginine-4-nitroanilide", "D-Phe-L-pipecolyl-L-Arg-4-nitroanilide",
+               "D-Phe-Pip-Arg-4-nitroanilide", "S2238"),),
+    "s2222": (("S2222",),),
+    "s2765": (("S2765", "S-2765"),),
+    "btee": (("N-benzoyl-L-tyrosine ethyl ester",),),
+    "sucaapfpna": (("N-succinyl-Ala-Ala-Pro-Phe-4-nitroanilide", "N-succinyl-Ala-Ala-Pro-Phe-p-nitroanilide",
+                    "succinyl-L-Ala-L-Ala-L-Pro-L-Phe-4-nitroanilide", "succinyl-Ala-Ala-Pro-Phe-4-nitroanilide",
+                    "succinyl-Ala-Ala-Pro-Phe-p-nitroanilide", "N-succinyl-L-Ala-L-Ala-L-Pro-L-Phe-4-nitroanilide"),),
+    "munana": (("4-methylumbelliferyl alpha-D-N-acetylneuraminic acid",
+                "4-methylumbelliferyl-alpha-D-N-acetylneuraminic acid",
+                "2'-(4-methylumbelliferyl)-alpha-D-N-acetylneuraminic acid",
+                "4-methylumbelliferyl N-acetylneuraminic acid"),),
 }
+
+
+#: Words that say which tissue or preparation an enzyme came from ("rabbit
+#: muscle LDH", "alkaline phosphatase from calf intestine", "bovine milk
+#: xanthine oxidase"). A run of them alone is the enzyme's source, never a
+#: substrate candidate: "muscle", "liver" and "milk" used to be offered as
+#: the substrate after the one typed.
+SOURCE_TISSUES = frozenset({
+    "liver", "muscle", "skeletal", "heart", "cardiac", "pancreas", "pancreatic", "intestine", "intestinal",
+    "milk", "stomach", "gastric", "kidney", "renal", "brain", "erythrocyte", "erythrocytes", "placenta",
+    "placental", "spleen", "lung", "serum", "plasma", "blood", "tissue", "tissues", "mitochondria",
+    "mitochondrial", "cytosol", "cytosolic", "microsomes", "microsomal", "seeds", "seed", "leaf", "leaves",
+    "root", "roots", "tuber", "tubers", "venom", "recombinant", "purified", "commercial", "crude",
+})
 
 
 def _substrate_key(text: str) -> str:
@@ -599,14 +629,19 @@ def _acceptable(result: Resolved, typed: str) -> bool:
         # "PEP", "FBP", "G6P": a compound in a sentence, whatever enzyme
         # the letters are also an abbreviation of.
         return False
-    if candidate.via == "abbreviation" or (result.isoform is not None or result.notes) and candidate.via != "typo":
+    if candidate.via == "abbreviation" or (
+            result.symbol_read or result.isoform is not None or result.notes) and candidate.via != "typo":
         # A symbol, abbreviation or alias the table reads as ONE enzyme
         # (ADR 0182). Written as one: a capital letter and three
         # characters ("HK2", "CYP2B6", "AChE"), or a name in words
         # ("angiotensin-converting enzyme", "HIV-1 protease").
         if is_abbreviation(typed):
+            # "p38" is written in lower case and is no English word: a
+            # letter beside a digit marks it as a symbol as a capital does.
             letters = re.sub(r"[^0-9A-Za-z]", "", typed)
-            return len(letters) >= 3 and any(ch.isupper() for ch in typed)
+            marked = any(ch.isupper() for ch in typed) or (
+                any(ch.isdigit() for ch in letters) and any(ch.isalpha() for ch in letters))
+            return len(letters) >= 3 and marked
         return True
     if candidate.partial or candidate.via != "name":
         return False
@@ -686,6 +721,26 @@ def _long_vocabulary() -> List[str]:
 _TYPO_ENDING = re.compile(r"(?:a.e|.se|as.)$")
 
 
+def _two_letter_symbol(result: Resolved, typed: str) -> bool:
+    """A two-capital-letter symbol the symbol table read as ONE enzyme in
+    the organism ("CS" citrate synthase, "TS" thymidylate synthase), which
+    `_acceptable` does not take from a sentence."""
+    return (result.symbol_read and result.candidate is not None and len(typed) == 2
+            and typed.isalpha() and typed.isupper() and not _acceptable(result, typed))
+
+
+def _symbol_of_another_organism(typed: str) -> bool:
+    """A symbol written as one (a capital, three characters) that the symbol
+    table holds for some organism: refused, not passed over, when it is not
+    read for the organism given."""
+    from .symbols import load_symbols
+
+    letters = re.sub(r"[^0-9A-Za-z]", "", typed)
+    table = load_symbols()
+    return (len(letters) >= 3 and any(ch.isupper() for ch in typed)
+            and bool(table.organisms_for(typed) or table.alias_organisms(typed)))
+
+
 def _names_some_enzyme(result: Ambiguous, typed: str) -> bool:
     """Whether an `Ambiguous` the reader would otherwise pass over is still
     the description naming an enzyme, to be refused with its candidates:
@@ -728,8 +783,20 @@ def _names_some_enzyme(result: Ambiguous, typed: str) -> bool:
     if best > TIER_ALTERNATIVE_PHRASE or not all(c.partial and c.via == "name" for c in tied):
         return False
     tail = f" {loose_key(typed)}"
-    return any(f" {loose_key(_outside_parentheses(name))}".endswith(tail)
+    return any(_head(f" {loose_key(_outside_parentheses(name))}").endswith(tail)
                for c in tied for name in (c.name, *c.alternative_names))
+
+
+#: A designator a family name is numbered or lettered by: the "1" of
+#: calpain-1, the "B" of cathepsin B, the "II" of carbonic anhydrase II.
+_DESIGNATOR = re.compile(r" (?:\d+|[ivx]+|[a-z])$")
+
+
+def _head(key: str) -> str:
+    """A loose name key without its trailing designator: "calpain" heads
+    "calpain-1" and "calpain-2", so the word names that family, to be
+    refused with its members named (it used to be passed over in silence)."""
+    return _DESIGNATOR.sub("", key)
 
 
 def _name_keys() -> frozenset:
@@ -759,8 +826,11 @@ def _could_be_a_name(text: str) -> bool:
         _KEYS = _name_keys()
     from .symbols import load_symbols
 
+    from .finder import respelt_symbol
+
     return (strict_key(text) in _KEYS or loose_key(text) in _KEYS
-            or "compact:" + compact_name_key(text) in _KEYS or load_symbols().knows(text))
+            or "compact:" + compact_name_key(text) in _KEYS or load_symbols().knows(text)
+            or respelt_symbol(text) is not None)
 
 
 def _read_ec(tokens: List[_Token]) -> List[Tuple[int, int, str]]:
@@ -976,6 +1046,33 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
             if _substrate_key(typed) in SUBSTRATE_ABBREVIATIONS or not _could_be_enzyme_words(typed):
                 continue
             result = resolve(typed, rank_by)
+            if isinstance(result, Resolved) and _two_letter_symbol(result, typed):
+                # "CS in human", "TS kinetics": the symbol table reads them as
+                # one enzyme, but two letters in a sentence are too often
+                # something else (a transition state, caesium) to be taken.
+                # Only reached when nothing else in the description names an
+                # enzyme, so the refusal names the enzyme the letters would
+                # be instead of saying no enzyme was named; never resolved.
+                result = Ambiguous(
+                    query=typed, candidates=(result.candidate,), confirm_only=True,
+                    organism=organism_code(rank_by) if rank_by else None,
+                    reason=(f"{typed!r} is two letters, which a description is not read as naming an enzyme "
+                            f"by (they may be something else); as a symbol, {result.how}"))
+                ambiguity, ambiguity_text = result, typed
+                for k in range(first, last):
+                    tokens[k].used = True
+                break
+            if (isinstance(result, Ambiguous) and not result.candidates and rank_by
+                    and _symbol_of_another_organism(typed)):
+                # "CYP2D6 in rat", "MAO-A from E. coli": a symbol the table
+                # reads for other organisms only. Refused with the finder's
+                # reason, which says so; no other organism's enzyme is
+                # offered as a candidate (round-1 finding F12: these were
+                # passed over and the report said no enzyme was named).
+                ambiguity, ambiguity_text = result, typed
+                for k in range(first, last):
+                    tokens[k].used = True
+                break
             if isinstance(result, Ambiguous) and _names_some_enzyme(result, typed):
                 ambiguity, ambiguity_text = result, typed
                 for k in range(first, last):
@@ -1058,7 +1155,7 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
             if w is not None and w.low not in FILLER:
                 run.append(w)
                 continue
-            if run and not all(_is_tag(t.raw) for t in run):
+            if run and not all(_is_tag(t.raw) or t.low in SOURCE_TISSUES for t in run):
                 phrase = text[run[0].start:run[-1].end]
                 if phrase not in candidates:
                     candidates.append(phrase)

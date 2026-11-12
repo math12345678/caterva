@@ -203,3 +203,238 @@ def test_cdnb_is_read_from_the_sentence():
     match = match_substrate(reading.substrate_candidates,
                             {"1-chloro-2,4-dinitrobenzene": 289, "glutathione": 250})
     assert match.name == "1-chloro-2,4-dinitrobenzene"
+
+
+# --- a gene symbol is read with an organism as well as without one (F12) -----
+
+
+@pytest.mark.parametrize("text, ec, organism", [
+    ("ACE2 kinetics", "3.4.17.23", "Homo sapiens"),
+    ("Michaelis-Menten for ACE2 in human", "3.4.17.23", "Homo sapiens"),
+    ("ACE2 kinetics in mouse", "3.4.17.23", "Mus musculus"),
+])
+def test_a_gene_symbol_the_table_reads_is_kept_when_the_organism_is_named(text, ec, organism):
+    # "ACE2" alone was read (the assumed-organism note let it through) and
+    # "ACE2 in human" was dropped: naming the organism lost the enzyme.
+    reading = read_sentence(text)
+    assert (reading.ec, reading.organism) == (ec, organism), text
+
+
+@pytest.mark.parametrize("text, ec", [
+    ("DHODH with dihydroorotate in human", "1.3.5.2"),
+    ("APRT kinetics in human", "2.4.2.7"),
+    ("IMPDH with IMP in human", "1.1.1.205"),
+    ("HGPRT with hypoxanthine in human", "2.4.2.8"),
+    ("HPRT kinetics", "2.4.2.8"),
+    ("GGT kinetics in human", "2.3.2.2"),
+    ("FAAH with anandamide in rat", "3.5.1.99"),
+    ("SARS-CoV-2 Mpro kinetics", "3.4.22.69"),
+    ("3CL protease kinetics", "3.4.22.69"),
+])
+def test_curated_abbreviations_name_one_enzyme(text, ec):
+    reading = read_sentence(text)
+    assert reading.ec == ec, text
+
+
+@pytest.mark.parametrize("text, ec", [
+    ("CS kinetics in human", "2.3.3.1"),
+    ("Michaelis-Menten for TS in human", "2.1.1.45"),
+])
+def test_a_two_letter_symbol_with_an_organism_is_refused_with_its_enzyme_named(text, ec):
+    reading = read_sentence(text)
+    assert reading.ec is None
+    assert reading.ambiguity is not None and reading.ambiguity.confirm_only
+    assert [c.ec for c in reading.ambiguity.candidates] == [ec]
+
+
+@pytest.mark.parametrize("text, ec", [("TS kinetics", "2.1.1.45"), ("CS kinetics", "2.3.3.1"),
+                                      ("michaelis menten with a TS analogue", "2.1.1.45")])
+def test_two_letters_without_an_organism_are_refused_with_the_enzyme_named_never_read(text, ec):
+    # Two letters are never read as an enzyme, but a description naming no
+    # other enzyme is refused with the one they would be, not "no enzyme
+    # was named" (they may be something else: the reason says so).
+    reading = read_sentence(text)
+    assert reading.ec is None, text
+    assert reading.ambiguity is not None and reading.ambiguity.confirm_only
+    assert [c.ec for c in reading.ambiguity.candidates] == [ec]
+    assert "may be something else" in reading.ambiguity.reason
+
+
+def test_two_letters_beside_a_named_enzyme_are_left_alone():
+    reading = read_sentence("thymidylate synthase with a TS analogue")
+    assert reading.ec == "2.1.1.45" and reading.ambiguity is None
+
+
+def test_a_near_spelling_is_not_called_several_enzymes_in_the_compose_note():
+    from caterva.compose.__main__ import read_description
+
+    args = SimpleNamespace(description="hexokinaze with glucose in human", subject=None, organism=None,
+                           substrate=None, inhibitor=None, isoform=None)
+    out = read_description(args, look_up_substrate=False)
+    assert out.name_refusal is not None
+    assert "not one enzyme" not in out.refusal_note
+    assert "No enzyme is named 'hexokinaze'" in out.refusal_note and "EC 2.7.1.1" in out.refusal_note
+
+
+# --- the typo tier is fast enough for the studio's finder endpoint ----------
+
+
+def test_the_typo_tier_gives_the_same_answer_and_compares_each_word_once():
+    import time
+
+    from caterva.enzymes import finder
+
+    finder.find("pyruvate kinase")  # load the index and tables
+    calls = 0
+    real = finder._within
+
+    def counting(a, b, limit):
+        nonlocal calls
+        calls += 1
+        return real(a, b, limit)
+
+    finder._within = counting
+    try:
+        started = time.process_time()
+        found = finder.find("hexokinse", organism="human")
+        spent = time.process_time() - started
+    finally:
+        finder._within = real
+    assert [c.ec for c in found][:1] == ["2.7.1.1"] and found[0].tier == TIER_TYPO
+    # One comparison per distinct name word, not one per word of every name
+    # (the latter was ~100,000 calls and seconds of wall time on a busy machine).
+    assert calls <= len(finder._tables(load_index()).vocabulary)
+    assert spent < 2.0
+
+
+# --- a mammalian gene symbol in a mammal the table does not hold it for (F12) -
+
+
+@pytest.mark.parametrize("text, ec, organism, isoform", [
+    ("MMP-9 from bovine with gelatin", "3.4.24.35", "Bos taurus", None),
+    ("factor Xa from bovine with S-2222", "3.4.21.6", "Bos taurus", None),
+    ("HDAC1 kinetics in rat", "3.5.1.98", "Rattus norvegicus", "HDAC1"),
+    ("CA2 from bovine with 4-nitrophenyl acetate", "4.2.1.1", "Bos taurus", "CA2"),
+    ("DPP4 in rat", "3.4.14.5", "Rattus norvegicus", None),
+])
+def test_a_mammalian_symbol_is_read_as_its_ortholog_with_a_note(text, ec, organism, isoform):
+    reading = read_sentence(text)
+    assert (reading.ec, reading.organism) == (ec, organism), text
+    assert reading.isoform == isoform
+    result = resolve(reading.enzyme_text, organism)
+    assert any("mammalian orthologs carry one symbol" in n for n in result.notes)
+
+
+@pytest.mark.parametrize("text, why", [
+    ("CYP2D6 with dextromethorphan in rat", "not for rat"),   # P450 families differ between species
+    ("MAO-A with serotonin in E. coli", "not for E. coli"),
+    ("DPP4 in E. coli", "not for E. coli"),
+])
+def test_a_symbol_of_another_organism_is_refused_never_dropped(text, why):
+    # Refused with the reason, and no other organism's enzyme offered as a
+    # candidate (the hand-checked lab_names fixture forbids that).
+    reading = read_sentence(text)
+    assert reading.ec is None, text
+    assert reading.ambiguity is not None and not reading.ambiguity.candidates
+    assert why in reading.ambiguity.reason
+
+
+def test_an_abbreviation_of_several_enzymes_stays_a_choice_in_an_organism_too():
+    # ADR 0181/0182: an abbreviation is never resolved by the organism's
+    # protein list; "rabbit muscle LDH" is refused with both enzymes named.
+    reading = read_sentence("rabbit muscle LDH with pyruvate")
+    assert reading.ec is None and {"1.1.1.27", "1.1.1.28"} <= {c.ec for c in reading.ambiguity.candidates}
+
+
+# --- names written the other ways people write them (F12) --------------------
+
+
+@pytest.mark.parametrize("text, ec, isoform, organism", [
+    ("hCA II with CO2", "4.2.1.1", "CA2", "Homo sapiens"),
+    ("P450 3A4 with midazolam", "1.14.14.1", "CYP3A4", "Homo sapiens"),
+    ("cytochrome P450 3A4 with testosterone in human", "1.14.14.1", "CYP3A4", "Homo sapiens"),
+    ("p38 kinetics in human", "2.7.11.24", "MAPK14", "Homo sapiens"),
+    ("ERK2 with myelin basic protein in human", "2.7.11.24", "MAPK1", "Homo sapiens"),
+    ("iNOS with L-arginine in mouse", "1.14.13.39", "NOS2", "Mus musculus"),
+    ("SIRT1 with NAD+ in human", "2.3.1.286", "SIRT1", "Homo sapiens"),
+    ("HER2 kinetics in human", "2.7.10.1", "ERBB2", "Homo sapiens"),
+    ("KPC-2 with meropenem", "3.5.2.6", "KPC-2", None),
+    ("PP2A with phosphorylase a", "3.1.3.16", "PP2A", None),
+])
+def test_symbols_and_lab_names_are_read(text, ec, isoform, organism):
+    reading = read_sentence(text)
+    assert (reading.ec, reading.isoform, reading.organism) == (ec, isoform, organism), text
+
+
+@pytest.mark.parametrize("text, ec", [
+    ("factor VIIa kinetics", "3.4.21.21"),
+    ("uPA with plasminogen in human", "3.4.21.73"),
+    ("HPPD inhibited by mesotrione", "1.13.11.27"),
+    ("11beta-HSD1 with cortisone in human", "1.1.1.146"),
+    ("HIV-1 RT inhibited by nevirapine", "2.7.7.49"),
+    ("NS3 protease kinetics", "3.4.21.98"),
+    ("beta-gal with ONPG", "3.2.1.23"),
+    ("pig liver esterase with ethyl butyrate", "3.1.1.1"),
+    ("Renilla luciferase with coelenterazine", "1.13.12.5"),
+    ("PFK-1 with fructose 6-phosphate in rat", "2.7.1.11"),
+    ("InhA with NADH", "1.3.1.9"),
+])
+def test_curated_names_name_one_enzyme(text, ec):
+    assert read_sentence(text).ec == ec, text
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("calpain with casein", {"3.4.22.52", "3.4.22.53"}),
+    ("PI3K with PIP2 in human", {"2.7.1.137", "2.7.1.153"}),
+])
+def test_a_family_name_is_refused_with_its_members(text, expected):
+    reading = read_sentence(text)
+    assert reading.ec is None and reading.ambiguity is not None, text
+    assert expected <= {c.ec for c in reading.ambiguity.candidates}
+
+
+def test_hiv_1_reverse_transcriptase_searches_hiv_1():
+    # "HIV-1" says which virus; plain "HIV" is HIV-1 or HIV-2 and is not read as either.
+    reading = read_sentence("HIV-1 reverse transcriptase inhibited by nevirapine")
+    assert reading.ec == "2.7.7.49" and reading.organism == "Human immunodeficiency virus 1"
+
+
+# --- tissue words, trade-code substrates, firefly (F04, F13) -----------------
+
+
+@pytest.mark.parametrize("text, substrates", [
+    ("rabbit muscle LDH with pyruvate", ("pyruvate",)),
+    ("catalase from bovine liver with H2O2", ("H2O2",)),
+    ("alkaline phosphatase from calf intestine with p-nitrophenyl phosphate", ("p-nitrophenyl phosphate",)),
+    ("thrombin with S-2238", ("S-2238",)),
+    ("chymotrypsin from bovine pancreas with BTEE", ("BTEE",)),
+])
+def test_tissue_words_are_the_source_and_trade_codes_are_substrates(text, substrates):
+    assert read_sentence(text).substrate_candidates == substrates, text
+
+
+@pytest.mark.parametrize("typed, listed, expected", [
+    ("S-2238", {"D-phenylalanyl-pipecolyl-L-arginine-4-nitroanilide": 67, "S2238": 5},
+     "D-phenylalanyl-pipecolyl-L-arginine-4-nitroanilide"),
+    ("BTEE", {"N-benzoyl-L-tyrosine ethyl ester": 32}, "N-benzoyl-L-tyrosine ethyl ester"),
+    ("Suc-AAPF-pNA", {"N-succinyl-Ala-Ala-Pro-Phe-4-nitroanilide": 60}, "N-succinyl-Ala-Ala-Pro-Phe-4-nitroanilide"),
+    ("MUNANA", {"4-methylumbelliferyl alpha-D-N-acetylneuraminic acid": 109},
+     "4-methylumbelliferyl alpha-D-N-acetylneuraminic acid"),
+])
+def test_trade_codes_reach_brendas_spelling(typed, listed, expected):
+    assert match_substrate((typed,), listed).name == expected
+
+
+def test_firefly_is_photinus_pyralis():
+    reading = read_sentence("luciferase from firefly with luciferin")
+    assert reading.organism == "Photinus pyralis" and reading.unread_organism is None
+
+
+def test_a_symbol_of_another_organism_is_not_called_several_enzymes_in_the_compose_note():
+    from caterva.compose.__main__ import read_description
+
+    args = SimpleNamespace(description="CYP2D6 with dextromethorphan in rat", subject=None, organism=None,
+                           substrate=None, inhibitor=None, isoform=None)
+    out = read_description(args, look_up_substrate=False)
+    assert out.name_refusal is not None
+    assert "not one enzyme" not in out.refusal_note and "not for rat" in out.refusal_note
