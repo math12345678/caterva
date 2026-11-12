@@ -2010,6 +2010,11 @@ async function main() {
             ec = answer.reading.ec;
             resolveChoices.push(chosen);
             if (!booleans.has('json')) info(describeChoice(chosen));
+          } else if (answer.kind === 'read' && !answer.reading.ec && answer.reading.refusal) {
+            // Compose's own reason the name is not one enzyme, with the
+            // candidates, printed under the refusal below instead of a
+            // sentence that asks for "an enzyme name" the user already gave.
+            nothingToChoose = answer.reading.refusal;
           }
         }
       }
@@ -2071,8 +2076,8 @@ async function main() {
 
       if (!substrate || !organism || (!enzyme && !ec)) {
         error(
-          'resolve could not settle the system: it needs an enzyme name or an ' +
-          'EC number, and a substrate and organism (--substrate, --organism), ' +
+          'resolve could not settle the system: it needs one enzyme (a name or ' +
+          'an EC number), and a substrate and organism (--substrate, --organism), ' +
           'which are chosen from BRENDA when left out.'
         );
         if (nothingToChoose) {

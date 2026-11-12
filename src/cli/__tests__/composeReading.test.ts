@@ -193,6 +193,31 @@ describe('resolve takes the enzyme BRENDA singles out', () => {
     expect(lines(looked)[0]?.['ecNumber']).toBe('1.1.1.27');
   });
 
+  it("prints compose's reason when the name is not one enzyme and no organism settles it", () => {
+    // Live, 2026-11-11: with no organism, compose refuses "lactate
+    // dehydrogenase" (EC 1.1.1.27 and 1.1.1.28 both have rows), and resolve
+    // printed only "it needs an enzyme name or an EC number" -- to someone
+    // who had typed an enzyme name. The candidates are compose's to name.
+    const refusal =
+      "No search was run: your description names 'lactate dehydrogenase', which is not one enzyme. " +
+      '12 enzymes match; these 2 match best: EC 1.1.1.27 L-lactate dehydrogenase, EC 1.1.1.28 D-lactate dehydrogenase';
+    const refusing = script('refusing_reader', [
+      'import sys, json',
+      `print(json.dumps(json.loads(${JSON.stringify(JSON.stringify(reading({ enzyme_text: "lactate dehydrogenase", refusal })))})))`,
+      'sys.exit(3)',
+    ]);
+    const looked = path.join(dir, 'resolve-ldh-refused.jsonl');
+    const { out, code } = run(['resolve', 'lactate dehydrogenase'], {
+      CATERVA_SENTENCE_READER: refusing,
+      CATERVA_LITERATURE_RUNNER: literature(looked),
+    });
+    expect(code).toBe(1);
+    expect(out).toContain('which is not one enzyme');
+    expect(out).toContain('EC 1.1.1.28 D-lactate dehydrogenase');
+    expect(out).toContain('it needs one enzyme (a name or an EC number)');
+    expect(lines(looked)).toEqual([]);
+  });
+
   it('does not say BRENDA was searched when the lookup stopped at the name', () => {
     const { out } = run(['resolve', 'some enzyme', '--ec', '9.9.9.9', '--substrate', 'x', '--organism', 'Homo sapiens'], {
       CATERVA_LITERATURE_RUNNER: literature(path.join(dir, 'stopped.jsonl'), 'ec_ambiguous'),
