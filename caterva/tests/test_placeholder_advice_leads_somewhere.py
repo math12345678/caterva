@@ -613,3 +613,50 @@ def test_an_organism_caterva_chose_is_not_called_the_users_request():
     assert "organism must be Bos taurus, the organism Caterva chose because your description named none)" \
         in said["reaction_Ki"]
     assert said["other"] is None
+
+
+# ---------------------------------------------------------------------------
+# A typed substrate measured only in other organisms: say where
+# ---------------------------------------------------------------------------
+
+
+def _pepsin_pages(monkeypatch):
+    """Pepsin's page as BRENDA has it: hemoglobin Km rows in fish pepsins
+    only (one of them a mutant's), pig's Km rows for peptides."""
+    monkeypatch.setattr(cli, "brenda_km_substrates", lambda ec, org: (
+        {"KPIQF(NO2)RL": 7} if org == "Sus scrofa" else {"KPIQF(NO2)RL": 7, "hemoglobin": 8}))
+    def table_rows(ec, table, organism):
+        rows = [defaults._Row("hemoglobin", "Saurida micropectoralis", "pepsinogen II, pH 2.0") for _ in range(3)]
+        rows += [defaults._Row("hemoglobin", "Micropterus salmoides", "isoform PG1-1") for _ in range(2)]
+        rows += [defaults._Row("hemoglobin", "Gadus morhua", "mutant D32A")]
+        rows += [defaults._Row("KPIQF(NO2)RL", "Sus scrofa", "wild-type enzyme") for _ in range(7)]
+        return tuple(r for r in rows if table == "km" and (organism is None or r.organism == organism))
+    monkeypatch.setattr(defaults, "table_rows", table_rows)
+
+
+def test_a_substrate_measured_only_elsewhere_names_the_organisms(monkeypatch):
+    """"pepsin with hemoglobin --organism pig" said hemoglobin "is not a
+    substrate BRENDA lists for Sus scrofa" (BRENDA lists Hemoglobin + H2O as
+    pig pepsin's natural substrate) and to pass --substrate with BRENDA's own
+    name, which is the name typed. The organism is what is missing; the
+    organisms with usable rows are named, by count, a mutant's left out."""
+    _pepsin_pages(monkeypatch)
+    args = _args(description="pepsin with hemoglobin", organism="Sus scrofa")
+    read = cli.read_description(args, err=io.StringIO())
+    assert args.substrate is None
+    said = [n for n in read.notes if "'hemoglobin' in your description" in n]
+    assert len(said) == 1, read.notes
+    note = said[0]
+    assert "a substrate BRENDA lists Km rows for under EC 3.4.23.1, but in other organisms only, " \
+        "none in Sus scrofa: Saurida micropectoralis (3 rows); Micropterus salmoides (2 rows)." in note
+    assert "Gadus morhua" not in note
+    assert "--organism" in note and "the model is not of it" in note
+    assert not any("No word of your description" in n for n in read.notes)
+
+
+def test_a_word_listed_nowhere_keeps_the_plain_sentence(monkeypatch):
+    _pepsin_pages(monkeypatch)
+    args = _args(description="pepsin with myoglobin", organism="Sus scrofa")
+    read = cli.read_description(args, err=io.StringIO())
+    assert any("No word of your description ('myoglobin') is a substrate BRENDA lists" in n
+               for n in read.notes), read.notes

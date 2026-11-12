@@ -144,7 +144,7 @@ changed several values from the engine branch's). "Before" is the 2026-11-11 bas
 | `"carbonic anhydrase in human follows Michaelis-Menten"` | exit 3, placeholders | exit 0. Chose CO2 (61 Km, 59 kcat): Km 9.3 mM, kcat 1.4e6 1/s (both ref 729384). The engine branch alone carried kcat 1e-06 1/s (ref 729224); the implausible-row rule below removed it |
 | `"angiotensin-converting enzyme inhibited by captopril" --subject 3.4.15.1 --organism human` | exit 3, placeholders | exit 0. Chose angiotensin I, the natural substrate (11 Km, 3 kcat; hippuryl-His-Leu, 18 Km, listed): Km 0.052 mM and kcat 52 1/s (both ref 669424), Ki of captopril 1.6e-05 mM (ref 650001), GROUNDED. On the engine branch alone the Km was a labelled placeholder, the 0.011 mM returned being [Phe9,Arg10]angiotensin I's row |
 | `"xanthine oxidase inhibited by allopurinol"` | exit 3, placeholders; with xanthine, human Km and kcat and no Ki | exit 0, GROUNDED. Chose Bos taurus, the one organism with an allopurinol Ki row (the note says Homo sapiens does not cover it), and xanthine: Km 0.0167 mM (ref 766313), kcat 16.2 1/s (ref 393008), Ki 0.0018 mM (ref 676739) |
-| `"glucose-6-phosphate dehydrogenase Michaelis-Menten" --organism "S. cerevisiae"` | exit 3, "Re-run with --substrate NAME" | exit 3, "BRENDA holds no Km row for EC 1.1.1.49 in Saccharomyces cerevisiae ... The organism, not the substrate, is what is missing", listing Homo sapiens (57 rows), Escherichia coli (19), Trypanosoma cruzi (14), ...; the verdict's next step is the same sentence |
+| `"glucose-6-phosphate dehydrogenase Michaelis-Menten" --organism "S. cerevisiae"` | exit 3, "Re-run with --substrate NAME" | exit 3, "BRENDA holds no Km row for EC 1.1.1.49 in Saccharomyces cerevisiae ... The organism, not the substrate, is what is missing", listing Homo sapiens (30 rows), Escherichia coli (13), Rattus norvegicus (10), ... (the rows a search would use: variant rows are not counted); the verdict's next step is the same sentence |
 | `"lactate dehydrogenase with pyruvate in human"` | exit 3, name refused | exit 0. EC 1.1.1.27 chosen (the only one of 1.1.1.27 and 1.1.1.28 with human Km rows, 6), pyruvate read from the sentence: Km 0.03 mM (ref 286469); kcat a labelled placeholder (human has none; the organisms that do are named). Verdict "STRUCTURAL (partly grounded: 1 of 2 constants measured)", next step the organism |
 | `"dihydrofolate reductase with methotrexate in E. coli"` | plain Michaelis-Menten, methotrexate dropped | exit 0, competitive inhibition ("BRENDA's Ki rows for methotrexate ... state: competitive (1 row)"), 7,8-dihydrofolate chosen: Km 0.0013 mM and kcat 24.8 1/s (both ref 724416), Ki 0.0059 mM (ref 655867) |
 | `"kinetics of pepsin" --substrate hemoglobin` | uncaught `ExportRefused` traceback | exit 0. Chose Saurida micropectoralis, the organism with the most hemoglobin Km and kcat rows (no human row): Km 0.25265 mM, kcat 27.3 1/s (both ref 771228, the median of that paper's three rows each). `"pepsin with hemoglobin"` gives the same; it was built as cooperative binding before the round-1 fix below |
@@ -289,6 +289,14 @@ thing actually missing (`caterva/compose/__main__.py`,
   (rabbit chosen: the only organism with hemoglobin rows) has no rabbit kcat
   row; the organisms offered have kcat rows only for other substrates, and
   the reason now says the model there would not be of hemoglobin.
+- **A typed substrate measured only elsewhere** (second reviewer). "pepsin
+  with hemoglobin --organism pig" said hemoglobin "is not a substrate BRENDA
+  lists for Sus scrofa" and to pass --substrate with BRENDA's own name.
+  BRENDA lists Hemoglobin + H2O as pig pepsin's natural substrate, and the
+  name typed is BRENDA's own; what is missing is the organism. The note now
+  says hemoglobin has Km rows in other organisms only and names them with
+  their counts (Saurida micropectoralis, 3 rows; Micropterus salmoides, 2;
+  ...), variant rows left out, so the re-run it advises is grounded.
 - **An organism Caterva chose is not "your own request"** (reviewer). The
   scout's suffix read "organism must be Bos taurus, raised by your own
   request" for "xanthine oxidase inhibited by febuxostat", where no organism

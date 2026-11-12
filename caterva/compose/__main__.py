@@ -1480,10 +1480,21 @@ def _substrate_from(args: Any, reading: Any, out: DescriptionReading) -> bool:
         # The search then chooses the best-measured one BRENDA lists and
         # says so in its own note (ADR 0182); this says the typed word is
         # not what the model is of, so the two notes cannot be misread.
-        out.notes.append(
-            f"No word of your description ({shown}) is a substrate BRENDA lists for EC {ec}{where}, "
-            "so none was taken as the substrate, and if you typed one it was not used: the model is "
-            "not of it. Pass --substrate with BRENDA's own name for the compound you meant.")
+        elsewhere = _substrate_measured_elsewhere(ec, args.organism, reading.substrate_candidates)
+        if elsewhere is not None:
+            typed, name, counts = elsewhere
+            called = "" if strict_key_of(typed) == strict_key_of(name) else f" {name},"
+            out.notes.append(
+                f"{typed!r} in your description is{called} a substrate BRENDA lists Km rows for under "
+                f"EC {ec}, but in other organisms only, none in {args.organism}: {_counted(counts)}. "
+                f"So it was not taken as the substrate, and the model is not of it. To model it, "
+                f"re-run with --organism set to one of them (each organism's own measurement, never "
+                f"substituted for yours, ADR 0024), or supply its constants yourself.")
+        else:
+            out.notes.append(
+                f"No word of your description ({shown}) is a substrate BRENDA lists for EC {ec}{where}, "
+                "so none was taken as the substrate, and if you typed one it was not used: the model "
+                "is not of it. Pass --substrate with BRENDA's own name for the compound you meant.")
         # The choice's note must not then open "No substrate was named":
         # the user may well have named one BRENDA does not list.
         _remember(args, substrate_instead=(
@@ -1685,6 +1696,48 @@ SUBSTRATE_LIST_PAUSE = 2.0
 #: A word that is an isozyme's code, not a compound: one letter or digit,
 #: or a Roman numeral ("A", "2", "II", "IV").
 _ISOZYME_CODE = re.compile(r"[A-Za-z0-9]|[IVXivx]{1,4}")
+
+
+def _substrate_measured_elsewhere(
+    ec: str, organism: Optional[str], candidates: Sequence[str],
+) -> Optional[Tuple[str, str, Dict[str, int]]]:
+    """(the word typed, BRENDA's name for it, organism -> usable Km rows) when
+    a word of the description is a substrate BRENDA lists Km rows for under
+    `ec` in other organisms but not in `organism`; None otherwise, or when
+    that cannot be read.
+
+    "pepsin with hemoglobin --organism pig" said "No word of your
+    description ('hemoglobin') is a substrate BRENDA lists for EC 3.4.23.1
+    for Sus scrofa" and to pass --substrate with BRENDA's own name. BRENDA
+    lists "Hemoglobin + H2O" as pig pepsin's natural substrate, and its
+    hemoglobin Km rows are fish pepsins' (Saurida micropectoralis, 3 rows):
+    the word was BRENDA's own name, and what is missing is the organism
+    (review of ADR 0182's F14 fix). Variant rows are not counted
+    (`_usable`), so an organism is offered only where a re-run would use it.
+    """
+    if not organism or not candidates:
+        return None
+    from caterva.compose import defaults
+    from caterva.enzymes.sentence import match_substrate
+
+    everywhere = _read_substrates(ec, None)
+    if not everywhere:
+        return None
+    match = match_substrate(candidates, everywhere)
+    if match.name is None:
+        return None
+    key = defaults._key(match.name)
+    try:
+        rows = defaults.table_rows(ec, "km", None)
+    except Exception:  # noqa: BLE001 - the sentence then stays as it was
+        return None
+    counts: Dict[str, int] = {}
+    for row in _usable(r for r in rows if defaults._key(r.compound) == key):
+        if row.organism and row.organism != organism:
+            counts[row.organism] = counts.get(row.organism, 0) + 1
+    if not counts:
+        return None
+    return match.typed, match.name, counts
 
 
 def _read_substrates(ec: str, organism: Optional[str]) -> Optional[Dict[str, int]]:
