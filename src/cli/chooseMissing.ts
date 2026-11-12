@@ -72,6 +72,15 @@ export interface ChooserQuestion {
    * give the Ki (found 2026-11-11).
    */
   inhibitor?: string;
+  /**
+   * For an organism: the constants it must have rows for, when not the
+   * chooser's default (Km and kcat). `resolve --quantity ki` with no
+   * inhibitor asks for ["ki"]: chosen for Km and kcat, xanthine oxidase
+   * went to Homo sapiens, where BRENDA has no Ki row at all, and was then
+   * refused "no inhibitor to choose" while Bos taurus holds 29 (review of
+   * 2026-11-12).
+   */
+  needs?: Array<'km' | 'kcat' | 'ki'>;
 }
 
 /** What spawning returned; a seam so tests need no Python. */
@@ -152,6 +161,7 @@ export function askChooser(
   if (question.organism) args.push('--organism', question.organism);
   if (question.substrate) args.push('--substrate', question.substrate);
   if (question.inhibitor) args.push('--inhibitor', question.inhibitor);
+  if (question.needs?.length) args.push('--needs', question.needs.join(','));
   const proc = run(args);
   const parsed = lastJsonLine(proc.stdout);
   const note = typeof parsed?.note === 'string' ? parsed.note : '';

@@ -191,3 +191,45 @@ describe('resolve chooses too', () => {
     expect(doc.choices.map((c) => [c.role, c.chosen])).toEqual([['substrate', 'D-glucose']]);
   });
 });
+
+describe('resolve --quantity ki with no inhibitor and no organism', () => {
+  // Review, 2026-11-12: `resolve "xanthine oxidase" --quantity ki` chose
+  // Homo sapiens for its Km and kcat rows, then refused "BRENDA holds no Ki
+  // rows under EC 1.17.3.2 in Homo sapiens, so there is no inhibitor to
+  // choose", while Bos taurus holds 29. The organism is chosen for the Ki.
+  it('asks the chooser for an organism with Ki rows, then the inhibitor in it', () => {
+    const asked = path.join(dir, 'ki-asked.jsonl');
+    const looked = path.join(dir, 'ki-looked.jsonl');
+    const chooserScript = script('kichooser', [
+      'import sys, json',
+      `open(${JSON.stringify(asked)}, "a").write(json.dumps(sys.argv[1:]) + "\\n")`,
+      'role = sys.argv[sys.argv.index("--role") + 1]',
+      'choices = {',
+      '  "organism": {"role": "organism", "chosen": "Bos taurus", "why": "the most Ki rows (29 Ki)",',
+      '               "alternatives": [], "considered": 1},',
+      '  "inhibitor": {"role": "inhibitor", "chosen": "allopurinol", "why": "the most Ki rows in Bos taurus",',
+      '                "alternatives": [], "considered": 9},',
+      '}',
+      'sys.stdout.write(json.dumps({"choice": choices[role], "note": "chosen"}))',
+    ]);
+    const literatureScript = script('kiliterature', [
+      'import sys, json',
+      'p = json.loads(sys.stdin.read())',
+      `open(${JSON.stringify(looked)}, "a").write(json.dumps(p) + "\\n")`,
+      'sys.stdout.write(json.dumps({"ok": True, "found": True, "ki": 0.0018, "unit": "mM",',
+      '  "organism": "Bos taurus", "source": "brenda_exact",',
+      '  "citation": {"source": "BRENDA", "reference_id": "676739"}, "logs": []}))',
+    ]);
+    const { out, code } = run(['resolve', 'xanthine oxidase', '--ec', '1.17.3.2', '--quantity', 'ki'], {
+      CATERVA_DEFAULTS_RUNNER: chooserScript,
+      CATERVA_LITERATURE_RUNNER: literatureScript,
+    });
+    if (code !== 0) throw new Error(`expected 0, got ${code}\n${out}`);
+    expect(lines(asked)).toEqual([
+      ['--ec', '1.17.3.2', '--role', 'organism', '--json', '--needs', 'ki'],
+      ['--ec', '1.17.3.2', '--role', 'inhibitor', '--json', '--organism', 'Bos taurus'],
+    ]);
+    const first = lines(looked)[0] as { substrate?: string; organism?: string };
+    expect([first.substrate, first.organism]).toEqual(['allopurinol', 'Bos taurus']);
+  });
+});

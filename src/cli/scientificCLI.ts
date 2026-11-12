@@ -2050,6 +2050,9 @@ async function main() {
               // For a Ki, --substrate is the inhibitor: the organism is the
               // one with rows for it.
               ...(substrate && role === 'inhibitor' ? { inhibitor: substrate } : {}),
+              // A Ki with no inhibitor named: the organism with Ki rows, not
+              // the one with the most Km and kcat rows, which may have none.
+              ...(role === 'inhibitor' && !substrate ? { needs: ['ki' as const] } : {}),
             });
             if (answer.kind === 'chosen') {
               organism = answer.choice.chosen;

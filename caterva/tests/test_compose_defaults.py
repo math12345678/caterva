@@ -174,6 +174,34 @@ def test_an_organism_is_chosen_for_the_inhibitor_named(monkeypatch):
     assert choice.alternatives[0].name == "Homo sapiens"
 
 
+def test_the_command_line_chooses_the_organism_for_the_constants_asked_for(monkeypatch, capsys):
+    """`resolve "xanthine oxidase" --quantity ki` names no inhibitor and no
+    organism. Counted for Km and kcat the organism was Homo sapiens, which
+    has no Ki row at all, and the run was refused "no inhibitor to choose"
+    (review of 2026-11-12). `--needs ki` counts the Ki rows."""
+    _rows(monkeypatch, {
+        ("km", "Homo sapiens"): {"xanthine": 6}, ("kcat", "Homo sapiens"): {"xanthine": 3},
+        ("km", "Bos taurus"): {"xanthine": 4}, ("kcat", "Bos taurus"): {"xanthine": 2},
+        ("ki", "Bos taurus"): {"allopurinol": 3, "febuxostat": 2},
+    })
+    assert defaults.main(["--ec", "1.17.3.2", "--role", "organism", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["choice"]["chosen"] == "Homo sapiens"
+    assert defaults.main(["--ec", "1.17.3.2", "--role", "organism", "--needs", "ki", "--json"]) == 0
+    printed = json.loads(capsys.readouterr().out)
+    assert printed["choice"]["chosen"] == "Bos taurus"
+    assert "(Ki)" in printed["choice"]["why"] and "5 Ki" in printed["choice"]["why"]
+
+
+def test_the_command_line_refuses_a_constant_it_does_not_know(monkeypatch, capsys):
+    _rows(monkeypatch, {("ki", "Bos taurus"): {"allopurinol": 1}})
+    assert defaults.main(["--ec", "1.17.3.2", "--role", "organism", "--needs", "vmax", "--json"]) == 2
+    assert "--needs takes km, kcat and ki" in capsys.readouterr().err
+    _rows(monkeypatch, {("km", "Bos taurus"): {"xanthine": 1}})
+    assert defaults.main(["--ec", "1.17.3.2", "--role", "organism", "--needs", "ki", "--json"]) == 3
+    assert json.loads(capsys.readouterr().out)["note"] == (
+        "BRENDA holds no Ki rows under EC 1.17.3.2 (every organism), so there is no organism to choose.")
+
+
 def test_an_organism_with_a_km_for_one_substrate_and_a_kcat_for_another_covers_one(monkeypatch):
     _rows(monkeypatch, {
         ("km", "Mus musculus"): {"A": 50}, ("kcat", "Mus musculus"): {"B": 50},
