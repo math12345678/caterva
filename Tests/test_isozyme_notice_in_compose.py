@@ -113,19 +113,23 @@ def test_the_notice_does_not_change_what_was_measured(compose):
     assert "| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |" in out
 
 
-def test_typing_an_isoform_does_not_silence_the_notice_while_a_cited_row_names_no_isozyme(compose):
-    """`--isoform HK-1` takes the Km from the row that says "hexokinase I" (ref 640237). The kcat's row says
-    "wild type enzyme" and names no isozyme, so whether it measured hexokinase 1 is unknown: the notice stays,
-    names that constant, and GROUNDED stays qualified."""
+def test_typing_an_isoform_does_not_carry_another_isozymes_row(compose):
+    """`--isoform HK-1` takes the Km from the row that says "hexokinase I" (ref 640237). The kcat row
+    "wild type enzyme" of ref 703624 names no isozyme in its commentary, but its UniProt cell is P35557,
+    glucokinase: a row BRENDA itself files under another protein of the EC is that protein's, and is not
+    carried (compose/protein_rows.py; the resolver reads the row's own cell too, fallback_logic
+    `_row_isoform`). Since the merge of the rows and names rounds (2026-11-12) the resolver sets the
+    P35557 rows aside itself and carries a row naming no isoform and carrying no accession (38 1/s, ref
+    672188), under a qualified GROUNDED that says whether it measured HK-1 is unknown."""
     code, out = compose("--organism", "human", "--isoform", "HK-1")
     assert code == 0
     verdict = _verdict_block(out)
-    assert "VERDICT: GROUNDED" in verdict
     assert "Qualified: HK-1 was asked for, but the row for `reaction_kcat` does not state which isozyme" in verdict
-    assert "--isoform HK-1 was given for EC 2.7.1.1" in verdict and "`reaction_kcat` comes from a row" in verdict
-    assert "reaction_Km" not in verdict.split("[isozymes]")[1].split("\n")[0].split("but")[1]
     assert "| `reaction_Km` | 0.06 mM | literature (Homo sapiens) | BRENDA ref 640237 |" in out
-    assert "### Which isozyme" in out
+    kcat = next(line for line in out.splitlines() if line.startswith("| `reaction_kcat` |"))
+    assert "BRENDA ref 703624" not in kcat and "60.4 1/s" not in kcat
+    assert "| `reaction_kcat` | 38.0 1/s | literature (Homo sapiens) | BRENDA ref 672188 |" in out
+    assert "the row names no isoform, so whether it measured **HK-1**, the one asked for, is unknown" in out
 
 
 @pytest.mark.parametrize(

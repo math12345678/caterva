@@ -271,6 +271,17 @@ class SymbolTable:
                 found.extend(o for o in row.by_organism if o not in found)
         return tuple(found)
 
+    def alias_organisms(self, query: str) -> Tuple[str, ...]:
+        """Organism codes the curated alias rows for this name are restricted
+        to (empty when no row restricts it)."""
+        rows = [r for r in self.by_key.get(compact_key(query), ()) if r.kind == ALIAS]
+        if not rows or any(not r.organisms for r in rows):
+            return ()
+        found: List[str] = []
+        for row in rows:
+            found.extend(o for o in row.organisms if o not in found)
+        return tuple(found)
+
     def knows(self, query: str) -> bool:
         return compact_key(query) in self.by_key
 
@@ -344,6 +355,11 @@ class SymbolTable:
             for row in genes:
                 for organism, (ecs, _, _) in row.by_organism.items():
                     per_organism.setdefault(organism, set()).update(ecs)
+            if code is not None and code not in per_organism:
+                ortholog = self._ortholog(typed, rows, genes, per_organism, code)
+                if ortholog is not None:
+                    return ortholog
+        if genes and not (code is not None and code not in per_organism):
             if code is None:
                 if human_style(typed) and "HUMAN" in per_organism:
                     read_for = "HUMAN"
@@ -410,6 +426,61 @@ class SymbolTable:
             why=(f"{gene_row.label} is the {label} gene symbol of {name or 'a protein'} (UniProtKB {accession}), "
                  "which UniProt files under this EC number"),
             notes=tuple(notes))
+
+    def _ortholog(self, typed: str, rows: Sequence[_Row], genes: Sequence[_Row],
+                  per_organism: Dict[str, set], code: str) -> Optional[SymbolReading]:
+        """A mammalian gene symbol read in a mammal the table does not hold it for.
+
+        The table holds human, mouse, yeast and E. coli entries, so "MMP-9
+        from cow", "HDAC1 in rat" and "CA2 from bovine" used to be passed over
+        without a word. Mammalian orthologs carry one symbol (HGNC, MGI, RGD
+        and VGNC name them alike), so the symbol is read as its EC number in
+        the mammal given when every mammal the table holds it for agrees on
+        ONE EC number, no abbreviation row says otherwise, and the
+        nomenclature lists at least one protein of that mammal under it. A
+        cytochrome P450 is never read this way: P450 families are not
+        one-to-one between species (rat has no CYP2D6). The isoform is carried
+        when the mammal has several proteins under the EC number."""
+        from .index import load_index
+
+        if code not in MAMMALS or compact_key(typed).startswith("cyp"):
+            return None
+        if any(r.kind == ALIAS and r.organisms and code not in r.organisms for r in rows):
+            # A curated row says which organisms the name is read for
+            # (CYP2B6 is not read for mouse): no ortholog overrides it.
+            return None
+        mammal_ecs = [frozenset(v) for o, v in per_organism.items() if o in MAMMALS]
+        if not mammal_ecs or len(set(mammal_ecs)) != 1 or len(mammal_ecs[0]) != 1:
+            return None
+        ec = next(iter(mammal_ecs[0]))
+        abbreviation_ecs = {e for r in rows if r.kind == ABBREVIATION for e in r.ecs}
+        if abbreviation_ecs and abbreviation_ecs != {ec}:
+            return None
+        entry = load_index().get(ec)
+        count = int(entry.counts.get(code, 0)) if entry is not None else 0
+        if count < 1:
+            return None
+        row = next(r for r in genes if any(o in MAMMALS for o in r.by_organism))
+        held = [o for o in row.by_organism if o in MAMMALS]
+        _, accession, name = row.by_organism[held[0]]
+        label = organism_label(code)
+        held_labels = " and ".join(organism_label(o) for o in held)
+        isoform: Optional[str] = None
+        if count > 1:
+            isoform = typed if human_style(typed) else row.label
+        note = (f"The gene-symbol table holds {typed} for {held_labels}, not {label}; mammalian orthologs carry "
+                f"one symbol, so it was read as the {label} ortholog, in EC {ec}, under which the nomenclature lists "
+                f"{count} {label} protein{'s' if count != 1 else ''}.")
+        return SymbolReading(
+            ec=ec, isoform=isoform, organism=code, assumed_organism=None,
+            why=(f"{row.label} is the {held_labels} gene symbol of {name or 'a protein'} (UniProtKB {accession}), "
+                 "filed under this EC number"),
+            notes=(note,))
+
+
+#: UniProt codes of the mammals the index counts proteins for: the organisms
+#: a human or mouse gene symbol is read in as its ortholog (`_ortholog`).
+MAMMALS = frozenset({"HUMAN", "MOUSE", "RAT", "BOVIN", "PIG", "RABIT", "HORSE", "SHEEP", "CAVPO"})
 
 
 def _code_of(binomial: Optional[str]) -> Optional[str]:

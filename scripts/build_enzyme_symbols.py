@@ -169,6 +169,10 @@ ABBREVIATIONS: List[Tuple[Tuple[str, ...], Tuple[str, ...], str, str]] = [
     (("CA",), ("4.2.1.1",), "carbonic anhydrase", "name"),
     (("PDE4",), ("3.1.4.53",), "cAMP-specific 3',5'-cyclic phosphodiesterase", "name"),
     (("PDE5",), ("3.1.4.35",), "3',5'-cyclic-GMP phosphodiesterase", "name"),
+    # PI3K is both: ENZYME lists 'PI3-kinase' under EC 2.7.1.137, and the
+    # class I enzymes (PIK3CA and its kin, the drug targets) are EC 2.7.1.153.
+    (("PI3K",), ("2.7.1.137", "2.7.1.153"),
+     "phosphatidylinositol 3-kinase and phosphatidylinositol-4,5-bisphosphate 3-kinase", "alt:PI3-kinase"),
     (("HIV protease", "HIV-1 protease", "HIV PR", "HIV-1 PR", "HIV-1 retropepsin"), ("3.4.23.16",),
      "HIV-1 retropepsin", "alt:human immunodeficiency virus type 1 protease"),
     (("T4 lysozyme", "T4L", "phage T4 lysozyme"), ("3.2.1.17",), "lysozyme of bacteriophage T4", "uniprot:P00720"),
