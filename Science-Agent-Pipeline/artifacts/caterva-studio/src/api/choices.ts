@@ -60,6 +60,8 @@ export function choicesOf(result: ComposeResult): SearchChoice[] {
       why: typeof r.why === "string" ? r.why : "",
       alternatives: Array.isArray(r.alternatives) ? r.alternatives.filter(isOption) : [],
       considered: typeof r.considered === "number" ? r.considered : 0,
+      ...(r.rows && typeof r.rows === "object" ? { rows: r.rows as Record<string, number> } : {}),
+      ...(typeof r.instead === "string" || r.instead === null ? { instead: r.instead as string | null } : {}),
     });
   }
   return out;

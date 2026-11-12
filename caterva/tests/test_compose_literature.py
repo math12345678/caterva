@@ -607,10 +607,11 @@ class TestTheExitCodeWhenASearchIsRefused:
         assert found.substrate == "D-glucose"
         assert found.choices[0].note() == (
             "No substrate was named, so Caterva used D-glucose: of the 10 substrates BRENDA lists "
-            "Km rows for under EC 2.7.1.1 in Homo sapiens, it has the most Km and kcat rows (25 Km, "
-            "61 kcat; the cosubstrate ATP set aside). Others: 2-deoxy-D-glucose (5 Km, 1 kcat); "
-            "D-mannose (9 Km); D-fructose (7 Km); D-glucosamine (3 Km); 2-deoxyglucose (1 Km); and "
-            "4 more. Pass --substrate NAME to model another.")
+            "Km rows for under EC 2.7.1.1 in Homo sapiens, it has the most Km and kcat rows (13 Km, "
+            "13 kcat; the cosubstrate ATP set aside; not counted, because the search cannot use "
+            "them: 60 rows of a variant). Others: 2-deoxy-D-glucose (4 Km, 1 kcat); D-mannose "
+            "(4 Km); D-fructose (2 Km); D-glucosamine (3 Km); 2-deoxyglucose (1 Km); and 4 more. "
+            "Pass --substrate NAME to model another.")
         assert "--substrate NAME" not in (note or ""), "the search ran, for D-glucose"
 
     def test_a_named_organism_with_no_rows_is_the_blocker_and_is_never_switched(self, monkeypatch):
@@ -791,7 +792,7 @@ def test_a_chosen_substrate_names_the_others_with_their_row_counts(monkeypatch):
     assert choice.to_json() == {
         "role": "substrate", "chosen": "VEID-p-nitroanilide", "why": choice.why,
         "alternatives": [{"name": "Boc-Ala-Ala-Asp-SBzl", "rows": {"km": 3, "kcat": 0}}],
-        "considered": 2}
+        "considered": 2, "rows": {"km": 1, "kcat": 1}, "instead": None}
     assert "best-measured" not in choice.note()
 
 
