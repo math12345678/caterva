@@ -44,7 +44,7 @@ from brenda_client import (
     parse_brenda_turnover_html,
     substrate_matches,
 )
-from fallback_logic import resolve_kinetic_pair, resolve_kinetic_value
+from fallback_logic import _row_isoform, resolve_kinetic_pair, resolve_kinetic_value
 
 RECORDED_HK = Path(__file__).parent / "fixtures" / "recorded" / "brenda_2.7.1.1.html.gz"
 
@@ -343,6 +343,29 @@ class TestThePickIsTheMedianOfTheBestDescribedRows:
         assert r.value == 9.3
         assert "measured with timolol added passed over" in r.chosen_because
 
+    def test_a_plain_row_of_the_same_paper_is_its_control(self):
+        """HDAC8 and Fluor de Lys HDAC8 substrate, BRENDA ref 719061: 0.744
+        mM plainly and 0.23 mM "presence of activator ...". The median of
+        the four rows was the activated one (2026-11-12)."""
+        html = page({"KM Values": [
+            row(0.16, "S", commentary="Co2+-wild type", ref="696240"),
+            row(0.23, "S", commentary="presence of activator N-(phenylcarbamothioyl)benzamide, "
+                "pH not specified in the publication", ref="719061"),
+            row(0.744, "S", commentary="pH not specified in the publication", ref="719061"),
+            row(1.1, "S", commentary="Zn2+-wild type", ref="696240")]})
+        r = resolve(html, "S", "km")
+        assert r.value == 0.744
+        assert "measured with N-(phenylcarbamothioyl)benzamide added passed over" in r.chosen_because
+
+    def test_a_compound_every_row_of_a_paper_states_is_not_a_treatment(self):
+        html = page({"KM Values": [
+            row(0.044, "S", commentary="presence of Co(II), 25°C. pH 8.0", ref="678192"),
+            row(0.13, "S", commentary="presence of Fe(II), 25°C. pH 8.0", ref="678192"),
+            row(0.25, "S", commentary="presence of Zn(II), 25°C. pH 8.0", ref="678192")]})
+        r = resolve(html, "S", "km")
+        assert r.value == 0.13
+        assert "added passed over" not in r.chosen_because
+
     def test_a_spread_over_a_hundredfold_is_recorded_and_the_pick_stands(self):
         html = page({"Turnover Numbers": [row(v, "X", ref=f"70000{i}")
                                           for i, v in enumerate([0.43, 90.7, 273, 3660.68])]})
@@ -466,3 +489,25 @@ class TestIsozymeSpellingsAreReadWithoutMatchingAnotherIsozyme:
         r = resolve(html, "CO2", "kcat", isoform="CA II")
         assert sorted(c["value"] for c in r.ensemble_candidates) == [600000, 1400000]
         assert r.value == 600000
+
+
+class TestARowsOwnAccessionIsItsIsoform:
+    """HK2 in human carried a glucokinase kcat (60.4 1/s, ref 703624, UniProt
+    P35557) as "names no isoform"; LDH's human pyruvate rows, which carry no
+    accession, were stamped LDHC's by the parser's UniProt fallback
+    (2026-11-12)."""
+
+    def test_a_row_whose_one_accession_is_another_protein_is_that_proteins(self):
+        from types import SimpleNamespace
+
+        gck = SimpleNamespace(conditions="mutant enzyme W167F", uniprot="P35557", uniprot_guessed=False)
+        assert _row_isoform(gck, "HK2") == "GCK"
+        assert _row_isoform(gck, "GCK") is None
+
+    def test_a_guessed_or_shared_accession_says_nothing(self):
+        from types import SimpleNamespace
+
+        guessed = SimpleNamespace(conditions="", uniprot="P35557", uniprot_guessed=True)
+        shared = SimpleNamespace(conditions="", uniprot="P35557, P52789", uniprot_guessed=False)
+        assert _row_isoform(guessed, "HK2") is None
+        assert _row_isoform(shared, "HK2") is None

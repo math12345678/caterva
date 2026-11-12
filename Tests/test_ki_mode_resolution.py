@@ -394,7 +394,13 @@ class TestRowsNamingNoIsoformThroughTheResolver:
                                               ("cross-species", "brenda_cross_species")])
     def test_a_row_naming_no_isoform_is_taken_when_none_for_the_isoform_can_be(
             self, monkeypatch, tier, source):
-        _pool_of(monkeypatch, [self.row(*self.MAO_A), self.row(*self.NONCOMPETITIVE)], tier)
+        # The quinoline row is LDH's (UniProt P00338, LDHA), and the resolver
+        # reads a row's own accession as its isoform (fallback_logic
+        # `_accession_isoform`), so spliced into an MAO pool it would be
+        # LDHA's row, not one naming no isoform. Its accession is dropped:
+        # the row stands for an MAO row naming none.
+        unnamed = self.row(*self.NONCOMPETITIVE).model_copy(update={"uniprot": None})
+        _pool_of(monkeypatch, [self.row(*self.MAO_A), unnamed], tier)
         r = self.resolve(tier, *self.MAO_A[:2], inhibition_mode="noncompetitive", isoform="MAO-A")
         assert r.found and r.source == source, r.search_log
         assert r.value == 0.00252 and r.citation.reference_id == "739793"

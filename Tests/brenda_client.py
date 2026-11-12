@@ -67,6 +67,12 @@ class BRENDAKmEntry(BaseModel):
     substrate: str
     organism: str
     uniprot: str | None = None
+    #: True when `uniprot` is not the row's own cell but the caller's
+    #: `fallback_uniprot` (UniProt's accession for the EC in the organism):
+    #: a guess about the row, which says nothing about which isoform it
+    #: measured. LDH's human pyruvate rows have no accession cell and were
+    #: stamped P07864 (LDHC), and read as LDH-C rows (2026-11-12).
+    uniprot_guessed: bool = False
     #: Raw commentary cell from BRENDA, e.g. "pH 8.5, 25°C, isozyme H4".
     conditions: str | None = None
     # --- Structured assay conditions, parsed from `conditions` -------------
@@ -773,6 +779,7 @@ def parse_brenda_km_html(
             if UNIPROT_CELL_PATTERN.match(cell.strip()):
                 uniprot = cell.strip()
                 break
+        uniprot_guessed = uniprot is None and fallback_uniprot is not None
         if uniprot is None:
             uniprot = fallback_uniprot
 
@@ -890,6 +897,7 @@ def parse_brenda_km_html(
                 substrate=matched_substrate,
                 organism=row_organism,
                 uniprot=uniprot,
+                uniprot_guessed=uniprot_guessed,
                 conditions=conditions,
                 assay_ph=parsed_conditions.ph,
                 assay_temperature_c=parsed_conditions.temperature_c,

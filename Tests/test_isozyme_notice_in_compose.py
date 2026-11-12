@@ -156,7 +156,10 @@ def test_a_label_no_protein_carries_says_it_matched_nothing(compose):
     code, out = compose("--organism", "human", "--isoform", "HK9")
     assert code == 0
     assert "--isoform 'HK9' is not a gene symbol or name the enzyme nomenclature's UniProt entries give" in out
-    assert "| `reaction_Km` | 6.3 mM |" in out or "refused" in out
+    # 6.3 mM until 2026-11-12: ref 739603's wild-type K0.5, whose UniProt
+    # cell is P35557 (glucokinase), so a GCK row, not one naming no isoform.
+    # The row naming none and carrying no other protein's accession is used.
+    assert "| `reaction_Km` | 3.8 mM |" in out or "refused" in out
 
 
 def _model_whose_rows_say(*commentaries):

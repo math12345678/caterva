@@ -911,14 +911,23 @@ def _added_compounds(entry, rows) -> list:
     ref = getattr(entry, "reference_id", None)
     if not ref:
         return []
+    same_paper = [other for other in rows
+                  if other is not entry and getattr(other, "reference_id", None) == ref]
     absent = {
         _effector_key(x)
-        for other in rows if getattr(other, "reference_id", None) == ref
+        for other in same_paper
         for x in (getattr(other, "effectors", None) or []) if x.presence == "absent"
     }
+    # A row of the same paper that names no added compound at all is that
+    # paper's control as surely as one saying "in the absence of": human
+    # HDAC8 and Fluor de Lys HDAC8 substrate, BRENDA ref 719061, reports Km
+    # 0.744 mM plainly and 0.23 mM "presence of activator
+    # N-(phenylcarbamothioyl)benzamide"; the model carried the activated Km
+    # beside the same paper's plain kcat (2026-11-12).
+    plain = any(not (getattr(other, "effectors", None) or []) for other in same_paper)
     return [
         x.compound_text for x in (getattr(entry, "effectors", None) or [])
-        if x.presence == "present" and _effector_key(x) in absent
+        if x.presence == "present" and (plain or _effector_key(x) in absent)
     ]
 
 
@@ -1387,6 +1396,43 @@ def _same_isoform(a, b):
     return same_isoform(a, b)
 
 
+def _accession_isoform(entry, isoform):
+    """The protein a row's one UniProt accession is, when that is ANOTHER
+    protein than `isoform` (its gene symbol, "GCK"); None when the row has
+    no accession, several, one this build has no names for, or the
+    isoform's own.
+
+    A row whose commentary names no isoform but whose accession is
+    another protein's is that protein's row: human hexokinase's kcat rows
+    for D-glucose under P35557 are glucokinase's, and "HK2 in human"
+    carried 60.4 1/s from one as "names no isoform, so whether it measured
+    HK2 is unknown" (2026-11-12). An accession the parser filled in from
+    UniProt rather than read from the row (`uniprot_guessed`) is not the
+    row's and is not read. The substrate chooser
+    (caterva/compose/defaults.py, `_usable`) already set such rows aside;
+    the search now does too, so the rows it counts are the rows it uses.
+    """
+    accession = getattr(entry, "uniprot", None)
+    if not accession or "," in accession or getattr(entry, "uniprot_guessed", False):
+        return None
+    try:
+        from caterva.enzymes.protein_names import info
+    except ImportError:
+        return None
+    found = info(accession.strip())
+    if found is None or not found.names:
+        return None
+    if any(_same_isoform(name, isoform) for name in found.names):
+        return None
+    return found.gene or found.names[0]
+
+
+def _row_isoform(entry, isoform):
+    """The isoform a row measured: the one its commentary names, else the
+    other protein its one accession is (`_accession_isoform`)."""
+    return _isoform_of(entry.conditions) or _accession_isoform(entry, isoform)
+
+
 def _partition_isoform(entries, isoform, log, where):
     """`(rows, matched, refused_isoforms)` for a request for one isoform.
 
@@ -1397,7 +1443,7 @@ def _partition_isoform(entries, isoform, log, where):
     order, as `caterva compose --isoform` (caterva/compose/isoform.py).
     """
     try:
-        named = [(e, _isoform_of(e.conditions)) for e in entries]
+        named = [(e, _row_isoform(e, isoform)) for e in entries]
     except ImportError:
         log.append(f"isoform {isoform!r} asked for, but caterva's isoform reader is not "
                    f"importable here, so {where} rows were NOT filtered by isoform")
@@ -1461,7 +1507,7 @@ def _mode_asked(inhibition_mode, quantity, log, name="inhibition_mode"):
     return inhibition_mode
 
 
-def _naming_no_isoform(pool, isoform_matched, allow_variants):
+def _naming_no_isoform(pool, isoform_matched, allow_variants, isoform=None):
     """Rows of `pool` that name no isoform, when the isoform step kept only
     rows naming the one asked for; else none.
 
@@ -1491,7 +1537,8 @@ def _naming_no_isoform(pool, isoform_matched, allow_variants):
     if not isoform_matched:
         return []
     try:
-        unnamed = [e for e in pool if _isoform_of(e.conditions) is None]
+        unnamed = [e for e in pool if (_row_isoform(e, isoform) if isoform
+                                       else _isoform_of(e.conditions)) is None]
     except ImportError:
         return []
     if not allow_variants:
@@ -1650,7 +1697,7 @@ def _rank_by_mode(entries, pool, isoform_matched, allow_variants, mode, substrat
     `_partition_mode`'s. One function for the call asked for a mode and for
     `_mode_default`, so the row the latter names is the row the former
     returns, not a second reading of the rule."""
-    ranked = entries + _naming_no_isoform(pool, isoform_matched, allow_variants)
+    ranked = entries + _naming_no_isoform(pool, isoform_matched, allow_variants, isoform)
     kept, stated = _partition_mode(ranked, mode, substrate, isoform, isoform_matched, log, where)
     return ranked, kept, stated
 

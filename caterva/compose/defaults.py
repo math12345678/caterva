@@ -323,6 +323,14 @@ def table_rows(ec: str, table: str, organism: Optional[str]) -> Tuple[_Row, ...]
         )
         if organism is None:
             out = out + _unlabelled_rows(html, ec, table, client)
+        elif not _BINOMIAL.fullmatch(organism):
+            # A name that is no binomial is matched anywhere in the row, so
+            # "influenza A virus" also took the rows of "influenza A virus
+            # H1N1", another organism to the search: oseltamivir was chosen
+            # for influenza A virus on an H1N1 row, and the search, finding
+            # its Ki in two organisms, settled on none (2026-11-12).
+            out = tuple(r for r in out if r.organism == organism)
+        out = tuple(r for r in out if _is_compound(r.compound, r.conditions))
     if len(_PARSED) >= _PARSED_MAX:
         _PARSED.clear()
     _PARSED[key] = out
@@ -376,9 +384,45 @@ def _unlabelled_rows(html: str, ec: str, table: str, client: object) -> Tuple[_R
         reference = re.match(r"\d+", texts[5]) if len(texts) > 5 else None
         uniprot = texts[3] if len(texts) > 3 and texts[3] not in ("", "-") else None
         verdict = classify(conditions) if callable(classify) else None
-        out.append(_Row(compound, organism, conditions, float(texts[0]),
-                        reference.group(0) if reference else None, uniprot, *_variant_of(verdict)))
+        value = float(texts[0])
+        out.append(_Row(compound, organism, conditions, value,
+                        reference.group(0) if reference else None, uniprot, *_variant_of(verdict),
+                        _implausible(client, table, value, conditions)))
     return tuple(out)
+
+
+#: The parser's plausibility bounds per table (brenda_client), by name.
+_BOUNDS = {"km": ("KM_PLAUSIBLE_MIN_MM", "KM_PLAUSIBLE_MAX_MM"),
+           "ki": ("KM_PLAUSIBLE_MIN_MM", "KM_PLAUSIBLE_MAX_MM"),
+           "kcat": ("KCAT_PLAUSIBLE_MIN_PER_S", "KCAT_PLAUSIBLE_MAX_PER_S")}
+
+
+def _implausible(client: object, table: str, value: float, conditions: str) -> bool:
+    """Whether the parser would flag this row (brenda_client's checks: a
+    value outside its plausible range, a Km whose commentary names kcat),
+    so a row read cell by cell is withheld as the search withholds it. The
+    zanamivir Ki of "influenza A virus" (6e-08 mM, below the parser's floor)
+    was counted, that organism chosen for it, and the search then found no
+    usable row and left the Ki a placeholder (2026-11-12)."""
+    low, high = (getattr(client, name, None) for name in _BOUNDS.get(table, ("", "")))
+    if isinstance(low, (int, float)) and value < low:
+        return True
+    if isinstance(high, (int, float)) and value > high:
+        return True
+    return table == "km" and bool(re.search(r"\bkcat\b", conditions or "", re.IGNORECASE))
+
+
+#: A compound cell that is commentary: the parser, finding a row's compound
+#: cell empty, takes the next text, and "pH and temperature not specified in
+#: the publication" was offered as an HDAC8 inhibitor with 3 Ki rows
+#: (2026-11-12). Such a row is no compound's and is not counted.
+_COMMENTARY = re.compile(r"not specified in the publication|^(?:pH|temperature)\b", re.IGNORECASE)
+
+
+def _is_compound(name: str, conditions: str) -> bool:
+    text = " ".join((name or "").split())
+    return bool(text) and not _COMMENTARY.search(text) \
+        and text.casefold() != " ".join((conditions or "").split()).casefold()
 
 
 def _number(value: object) -> Optional[float]:
@@ -408,6 +452,12 @@ _HYPHEN_BEFORE_DESCRIPTOR = re.compile(
 #: A 3',5'-cyclic nucleotide written with or without its locants:
 #: "3',5'-cGMP" is cGMP. (2',3'-cGMP is another compound and is not this.)
 _CYCLIC_NUCLEOTIDE = re.compile(r"(?:3',5'-?)?(?:c|cyclic-?)([agcuti])mp")
+#: The same cyclic nucleotide by its nucleoside's name: "adenosine
+#: 3',5'-cyclic phosphate" is cAMP, and PDE4 in human listed it beside cAMP
+#: as another substrate with 7 Km rows of its own (2026-11-12).
+_CYCLIC_NUCLEOSIDE = re.compile(
+    r"(adenosine|guanosine|cytidine|uridine|thymidine|inosine)3',5'-?"
+    r"(?:cyclic-?(?:mono)?phosphate|cyclicmonophosphate|cyclic-?mono-?phosphate)")
 _PRIMES = str.maketrans({"’": "'", "′": "'", "‘": "'"})
 #: An ortho-, meta- or para- locant written as a letter ("p-nitrophenyl
 #: phosphate") or a number ("4-nitrophenyl phosphate"): one compound, which
@@ -436,7 +486,10 @@ def _group_key(name: str) -> str:
     key = re.sub(r"\s+", "", text).casefold()
     key = _HYPHEN_BEFORE_DESCRIPTOR.sub("", key)
     cyclic = _CYCLIC_NUCLEOTIDE.fullmatch(key)
-    return f"c{cyclic.group(1)}mp" if cyclic else key
+    if cyclic:
+        return f"c{cyclic.group(1)}mp"
+    nucleoside = _CYCLIC_NUCLEOSIDE.fullmatch(key)
+    return f"c{nucleoside.group(1)[0]}mp" if nucleoside else key
 
 
 def _matches(compound: str, target: str) -> bool:
@@ -760,16 +813,28 @@ def _tie_clause(names: Sequence[str]) -> str:
             f"(alphabetically), not by its data")
 
 
-def _ties(ranked: Sequence[str], rank, papers, name) -> Tuple[bool, str]:
+def _ties(ranked: Sequence[str], rank, papers, name, elsewhere=None,
+          where: str = "") -> Tuple[bool, str]:
     """(tied on rows, the clause saying how the tie was broken). The rank's
-    last two places are -papers and the name: rows first, then the number
-    of BRENDA references the rows come from, then the name."""
-    on_rows = _tied(ranked, rank, drop=2)
+    last places are -papers, then (with `elsewhere`) -rows under the EC in
+    every organism, then the name: rows first, then the number of BRENDA
+    references the rows come from, then how widely the compound is measured
+    under the EC, then the name."""
+    extra = 1 if elsewhere else 0
+    on_rows = _tied(ranked, rank, drop=2 + extra)
     if not on_rows:
         return False, ""
+    on_papers = _tied(ranked, rank, drop=1 + extra) if extra else []
     on_all = _tied(ranked, rank, drop=1)
     clause = _tie_clause([name(k) for k in on_all])
-    beaten = [k for k in on_rows if k not in on_all]
+    if extra:
+        wider = [k for k in on_papers if k not in on_all]
+        if wider:
+            clause = (f"; it ties on rows and references with {_shown([name(k) for k in wider])}, "
+                      f"and has more Ki rows under {where} counting every organism "
+                      f"({elsewhere(ranked[0])} against at most "
+                      f"{max(elsewhere(k) for k in wider)})") + clause
+    beaten = [k for k in on_rows if k not in on_papers and k not in on_all]
     if beaten:
         clause = (f"; it ties on rows with {_shown([name(k) for k in beaten])}, and is reported by "
                   f"more BRENDA references ({papers(ranked[0])} against at most "
@@ -955,16 +1020,30 @@ def _choose_inhibitor(ec: str, organism: Optional[str], substrate: Optional[str]
         return counts.rows(k, ["ki"])["ki"]
 
     neighbours = {k: counts.neighbours(k, ["ki"]) for k in candidates}
+    # Compounds tied on rows and references here are told apart by how
+    # widely BRENDA measured them under the EC, before their names: 23 Ki
+    # compounds of influenza A virus neuraminidase tie at one row and one
+    # paper, and the first alphabetically was a triazole analogue (Ki 0.06
+    # mM) where oseltamivir carboxylate and zanamivir stood (2026-11-12).
+    try:
+        everywhere = Counter(_group_key(r.compound) for r in table_rows(ec, "ki", None)
+                             if not r.flagged)
+    except Exception:  # noqa: BLE001 - the tie then falls to the name
+        everywhere = Counter()
+
+    def elsewhere(k: str) -> int:
+        return everywhere.get(k, 0)
 
     def rank(k: str) -> tuple:
         return (n(k) == 0, k in reaction, is_cofactor(counts.name(k)),
                 bool(isoform) and not counts.names_isoform(k, ["ki"]), bool(neighbours[k]),
-                -n(k), -counts.papers(k, ["ki"]), counts.name(k).casefold())
+                -n(k), -counts.papers(k, ["ki"]), -elsewhere(k), counts.name(k).casefold())
 
     ranked = sorted(candidates, key=rank)
     best = ranked[0]
     name = counts.name(best)
-    tied, tie_clause = _ties(ranked, rank, lambda k: counts.papers(k, ["ki"]), counts.name)
+    tied, tie_clause = _ties(ranked, rank, lambda k: counts.papers(k, ["ki"]), counts.name,
+                             elsewhere, f"EC {ec}")
     usable_for = []
     if isoform:
         usable_for.append(isoform)
@@ -1171,8 +1250,17 @@ def _choose_organism(ec: str, substrate: Optional[str], inhibitor: Optional[str]
         enzyme_side = max((len(t) for t in substrates.values()), default=0)
         return enzyme_side + (1 if "ki" in needs and per[o].get("ki", 0) else 0)
 
+    def without_named_ki(o: str) -> bool:
+        # The inhibitor the user NAMED is the point of the question: an
+        # organism with a Ki row for it ranks before every organism without
+        # one, however well measured. "neuraminidase inhibited by zanamivir"
+        # was otherwise modelled as human neuraminidase (33 Km, 1 kcat) with
+        # the zanamivir Ki a placeholder, though BRENDA holds influenza
+        # zanamivir Ki rows (2026-11-12).
+        return bool(inhibitor) and per[o].get("ki", 0) == 0
+
     def rank(o: str) -> tuple:
-        return (-covered(o), -sum(per[o].values()), o)
+        return (without_named_ki(o), -covered(o), -sum(per[o].values()), o)
 
     ranked = sorted(organisms, key=rank)
     full = len(needs)
@@ -1189,14 +1277,22 @@ def _choose_organism(ec: str, substrate: Optional[str], inhibitor: Optional[str]
                f"({what}), and it does ({counts})")
     else:
         lacking = ""
-        if PREFERRED_ORGANISM in per:
+        if best == PREFERRED_ORGANISM:
+            lacking = ""
+        elif PREFERRED_ORGANISM in per:
             lacking = f"; {PREFERRED_ORGANISM}, preferred when it covers them all, does not"
         elif PREFERRED_ORGANISM not in organisms:
             lacking = f"; {PREFERRED_ORGANISM}, preferred when it covers them all, has none"
+        named_first = ""
+        if inhibitor and not without_named_ki(best) and any(
+                without_named_ki(o) and (covered(o), sum(per[o].values()))
+                > (covered(best), sum(per[best].values())) for o in organisms):
+            named_first = (f"; organisms with no Ki row for {inhibitor}, the inhibitor named, rank "
+                           f"after those with one, however many other rows they have")
         tied = _tied(ranked, rank)
         most = "as many rows as any other" if tied else "the most rows"
         how = (f"it has rows for {covered(best)} of the {full} constant(s) this model needs "
-               f"({what}) and {most} of those that do ({counts}){lacking}"
+               f"({what}) and {most} of those that do ({counts}){lacking}{named_first}"
                f"{_tie_clause(tied)}")
     why = f"of the {_plural(len(organisms), 'organism')} with rows under EC {ec}, {how}"
     alternatives = tuple(Option(o, dict(per[o])) for o in ranked[1:1 + ALTERNATIVES_NAMED])

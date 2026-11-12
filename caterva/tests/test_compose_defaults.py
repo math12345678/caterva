@@ -597,6 +597,16 @@ def test_spacing_and_hyphen_spellings_are_one_candidate(monkeypatch):
                                                                      for o in choice.alternatives]
 
 
+def test_a_cyclic_nucleotide_by_its_nucleosides_name_is_one_candidate():
+    """PDE4 in human offered "adenosine 3',5'-cyclic phosphate (7 Km)" and
+    "guanosine 3',5'-cyclic phosphate" as other substrates beside the
+    chosen cAMP and cGMP (2026-11-12)."""
+    key = defaults._group_key
+    assert key("adenosine 3',5'-cyclic phosphate") == key("cAMP") == key("3',5'-cAMP")
+    assert key("guanosine 3',5'-cyclic monophosphate") == key("cGMP")
+    assert key("adenosine 5'-monophosphate") != key("cAMP")
+
+
 def test_a_name_whose_search_takes_a_neighbours_rows_is_passed_over(monkeypatch):
     """'luciferase Michaelis-Menten' (F02): "Luciferin" was chosen as the
     natural substrate, the search asked for it also took D-luciferin's rows,
@@ -857,3 +867,87 @@ def test_a_merged_compound_says_which_spelling_the_search_takes(monkeypatch):
     assert ("BRENDA also spells it 4-nitrophenyl phosphate, counted as the same compound; the "
             "search is asked for p-nitrophenyl phosphate and takes the rows spelled so "
             "(3 Km, 1 kcat)") in choice.why
+
+
+def test_an_organism_with_a_ki_for_the_inhibitor_named_ranks_first(monkeypatch):
+    """'neuraminidase inhibited by zanamivir' was modelled as human
+    neuraminidase (33 Km, 1 kcat) with the zanamivir Ki a placeholder, though
+    BRENDA holds influenza zanamivir Ki rows (2026-11-12)."""
+    flu = "unidentified influenza virus"
+    _given(monkeypatch, {
+        "km": [_row("MUNANA", organism="Homo sapiens") for _ in range(9)]
+        + [_row("fetuin", organism=flu, ref="171119")],
+        "kcat": [_row("MUNANA", organism="Homo sapiens")],
+        "ki": [_row("zanamivir", organism=flu, ref="700385")]})
+    choice = defaults.choose_organism("3.2.1.18", inhibitor="zanamivir", needs=("km", "kcat", "ki"))
+    assert choice.chosen == flu
+    assert "organisms with no Ki row for zanamivir, the inhibitor named, rank after" in choice.why
+    assert choice.alternatives[0].name == "Homo sapiens"
+
+
+def test_a_commentary_cell_read_as_a_compound_is_not_a_candidate():
+    """HDAC8 offered "pH and temperature not specified in the publication"
+    as an inhibitor with 3 Ki rows (2026-11-12)."""
+    assert not defaults._is_compound("pH and temperature not specified in the publication", "")
+    assert not defaults._is_compound("temperature not specified in the publication", "")
+    assert not defaults._is_compound("pH 7.5, 25 C", "pH 7.5, 25 C")
+    assert defaults._is_compound("phenyl butyric acid", "pH and temperature not specified in the publication")
+    assert defaults._is_compound("pHMB", "")
+
+
+def test_a_row_read_cell_by_cell_is_flagged_as_the_parser_would_flag_it():
+    """The zanamivir Ki of "influenza A virus" (6e-08 mM, below the parser's
+    floor) was counted for that organism, and the search then had no usable
+    row (2026-11-12)."""
+    from types import SimpleNamespace
+
+    client = SimpleNamespace(KM_PLAUSIBLE_MIN_MM=1e-7, KM_PLAUSIBLE_MAX_MM=1e4,
+                             KCAT_PLAUSIBLE_MIN_PER_S=1e-6, KCAT_PLAUSIBLE_MAX_PER_S=1e7)
+    assert defaults._implausible(client, "ki", 6e-08, "")
+    assert not defaults._implausible(client, "ki", 1e-07, "")
+    assert defaults._implausible(client, "kcat", 1e8, "")
+    assert defaults._implausible(client, "km", 0.5, "kcat 5 s-1, pH 7")
+    assert not defaults._implausible(client, "kcat", 0.5, "kcat 5 s-1, pH 7")
+
+
+def test_an_inhibitor_tie_goes_to_the_compound_measured_more_widely(monkeypatch):
+    """'neuraminidase with an inhibitor': 23 compounds of influenza A virus
+    tie at one Ki row from one paper, and the first by name was a triazole
+    analogue (Ki 0.06 mM) beside oseltamivir carboxylate (2026-11-12)."""
+    flu = "influenza A virus"
+    triazole = "(1R/S,4R,5R)-4-acetamido-5-(1-ethylpropoxy)-3-triazolyl-cyclohex-2-ene-1-carboxylic acid"
+    _given(monkeypatch, {"ki": [
+        _row(triazole, organism=flu, ref="717970"),
+        _row("oseltamivir carboxylate", organism=flu, ref="696609"),
+        _row("oseltamivir carboxylate", organism="unidentified influenza virus", ref="700385"),
+        _row("oseltamivir carboxylate", organism="influenza B virus", ref="700386")]})
+    choice = defaults.choose_inhibitor("3.2.1.18", flu)
+    assert choice.chosen == "oseltamivir carboxylate"
+    assert ("ties on rows and references with " + triazole) in choice.why
+    assert "has more Ki rows under EC 3.2.1.18 counting every organism (3 against at most 1)" \
+        in choice.why
+    assert "alphabetically" not in choice.why
+
+
+def test_an_organism_that_is_no_binomial_keeps_only_its_own_rows(monkeypatch):
+    """'neuraminidase with an inhibitor': the parse for "influenza A virus"
+    also returned "influenza A virus H1N1" rows, oseltamivir was chosen on
+    one, and the search, finding it in two organisms, settled on none
+    (2026-11-12)."""
+    from types import SimpleNamespace
+
+    def parsed(substrate, organism, value, ref):
+        return SimpleNamespace(substrate=substrate, organism=organism, conditions="",
+                               km_value=value, reference_id=ref, uniprot=None, variant=None,
+                               flagged=False)
+
+    rows = [parsed("oseltamivir", "influenza A virus H1N1", 2.4e-05, "752324"),
+            parsed("oseltamivir carboxylate", "influenza A virus", 1e-07, "696609")]
+    stub = SimpleNamespace(parse_brenda_km_html=lambda *a, **k: [],
+                           parse_brenda_turnover_html=lambda *a, **k: [],
+                           parse_brenda_ki_html=lambda *a, **k: rows,
+                           fetch_brenda_html=lambda ec: "<html></html>")
+    monkeypatch.setattr(defaults, "_client", lambda: stub)
+    monkeypatch.setattr(defaults, "_PARSED", {})
+    assert [r.compound for r in defaults.table_rows("3.2.1.18", "ki", "influenza A virus")] == [
+        "oseltamivir carboxylate"]
