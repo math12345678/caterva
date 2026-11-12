@@ -1275,6 +1275,17 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
         if inhibitor_read and rule == "michaelis_menten":
             _built_with_its_inhibitor(args, out)
     else:
+        named_inhibitor = getattr(reading, "inhibitor_text", None) if reading is not None else None
+        if named_inhibitor and not getattr(args, "inhibitor", None):
+            # "Na+/K+-ATPase inhibited by ouabain" built a pump with no word
+            # about ouabain (third round's review): an inhibitor the sentence
+            # names is said to be unused, with why, never dropped.
+            why = out.unapplied or "no enzyme was read from the description"
+            out.notes.append(
+                f"Read {named_inhibitor!r} in your description as an inhibitor; it is not in this "
+                f"model and no Ki was looked up for it, because {why}. To model it, name the enzyme "
+                "with --subject and describe a mechanism with an inhibition step (for example "
+                "'competitive inhibition'), with --inhibitor naming it.")
         unused = [f"--{flag} {getattr(args, flag)}" for flag in ("organism", "substrate", "inhibitor")
                   if getattr(args, flag, None)]
         if unused and out.name_refusal is None:
@@ -1359,18 +1370,34 @@ def _enzyme_the_data_singles_out(reading: Any, args: Any) -> Optional[Any]:
         return None
     best = min(c.tier for c in ambiguity.candidates)
     tied_candidates = [c for c in ambiguity.candidates if c.tier == best]
-    # A fragment of a longer name, a typo, an abbreviation or a class match
-    # is not a reading of the name the user typed: never settled by rows.
-    if any(getattr(c, "partial", False) or getattr(c, "abbreviation", False)
-           or getattr(c, "via", "name") not in ("name", "ec") for c in tied_candidates):
-        return None
     tied = [(c.ec, c.name) for c in tied_candidates]
     from caterva.compose.defaults import ENZYME_CANDIDATES_CONSIDERED, choose_enzyme
 
-    if len(tied) > ENZYME_CANDIDATES_CONSIDERED:
-        return None
     organism = getattr(args, "organism", None) or reading.organism
-    return choose_enzyme(reading.enzyme_text or reading.text, tied, organism)
+    plain = not any(getattr(c, "partial", False) or getattr(c, "abbreviation", False)
+                    or getattr(c, "via", "name") not in ("name", "ec") for c in tied_candidates)
+    if plain and len(tied) <= ENZYME_CANDIDATES_CONSIDERED:
+        return choose_enzyme(reading.enzyme_text or reading.text, tied, organism)
+    recommended = getattr(ambiguity, "recommended", None)
+    if (organism and recommended is not None and recommended.ec in dict(tied)
+            and getattr(recommended, "via", "name") == "name"
+            and not getattr(recommended, "abbreviation", False)
+            and not any(getattr(c, "abbreviation", False) or getattr(c, "via", "name") != "name"
+                        for c in tied_candidates)):
+        # One reading singled out twice over: the only one matched with a
+        # protein of the organism given AND the only one with Km rows there,
+        # however many readings the name has. "glyceraldehyde-3-phosphate
+        # dehydrogenase from rabbit muscle" is a phrase inside seven accepted
+        # names; EC 1.2.1.12 is both, and the run was refused although the
+        # refusal said so (third round's review).
+        chosen = choose_enzyme(reading.enzyme_text or reading.text, tied, organism, limit=None,
+                               by_protein=recommended.ec)
+        if chosen is not None:
+            return chosen
+    # A fragment of a longer name, a typo, an abbreviation or a class match
+    # is not a reading of the name the user typed: never settled by rows
+    # alone.
+    return None
 
 
 def _built_with_its_inhibitor(args: Any, out: DescriptionReading) -> None:
@@ -2187,7 +2214,7 @@ def _search_resolved(
                   if undecided else "no organism gave a value for every constant")
                + ". Re-run with --organism NAME")
         return replace(model, search_refused=why), f"No measured value was used: {why}", True
-    measured = dict(chosen.measured)
+    measured = _pairing_said_after_windows(dict(chosen.measured))
     # A value whose BRENDA row is another compound's -- the resolver finds
     # a name inside longer names -- is withheld, never carried under the
     # name the user typed or Caterva chose (`_neighbours_withheld`).
@@ -2236,8 +2263,18 @@ def _search_resolved(
         for run in getattr(record, "ran", ())
         if getattr(run, "failed", False)
     ]
+    # A constant whose own scout failed (a timeout, a 503) was not searched.
+    # Without a reason of its own the report printed "searched the km table
+    # and found nothing" and advised another organism -- a false statement
+    # of absence for rows BRENDA holds, which a plain re-run filled
+    # (round-3 review: queries 10 and 24).
+    for run in failures:
+        quantity = str(getattr(run, "agent", "")).partition("scout:")[2]
+        if quantity and quantity not in measured and quantity not in not_found:
+            not_found[quantity] = _not_searched(str(run.failure))
     sourced = model.with_measured(measured, not_found=not_found)
-    if not measured and failures and not not_found:
+    if not measured and failures and not any(
+            not str(v).startswith("not searched") for v in not_found.values()):
         # Every scout failed and none reported an absence: the search did
         # not run, whatever the HTTP layer called it. A 404 from BRENDA's
         # enzyme page means the EC number is not one BRENDA has.
@@ -2249,7 +2286,7 @@ def _search_resolved(
                 f"copy the number at the top of its page"
             )
         else:
-            why = f"the literature search could not run: {text}"
+            why = f"the literature search could not run: {_service_failed(text)}"
         return replace(model, search_refused=why), why, True
     if not measured:
         why = "; ".join(sorted({r.failure for r in failures})) if failures else (
@@ -2438,8 +2475,36 @@ def _measured_on_the_isoform(ec: str, table: str, organism: str, isoform: str, r
         if same_isoform(read_isoform(row.conditions), isoform):
             named[row.compound] = named.get(row.compound, 0) + 1
     if not named:
-        return (f". BRENDA has no {label} row naming {isoform} under EC {ec} in {organism} for any "
-                f"{role}")
+        # Where the isoform's rows of this table ARE: its orthologue in
+        # another organism, named in words (HK2's kcat: mouse Hk2, ref
+        # 758915), labelled as that organism's and never substituted.
+        # The orthologue by its UniProt cell first (the enzyme index files
+        # mouse O08528 as Hk2); words alone only when no cell names it, since
+        # "HXK2" in Entamoeba is that amoeba's second hexokinase.
+        elsewhere: Dict[str, int] = {}
+        by_words: Dict[str, int] = {}
+        try:
+            from caterva.checkout import literature_module
+
+            row_form = literature_module("row_form")
+            for row in _usable(defaults.table_rows(ec, table, None)):
+                if not row.organism or row.organism == organism:
+                    continue
+                cell = row_form.isoforms_of_accessions(ec, row.uniprot) if row.uniprot else ()
+                if any(same_isoform(label, isoform) for label in cell):
+                    elsewhere[row.organism] = elsewhere.get(row.organism, 0) + 1
+                elif same_isoform(read_isoform(row.conditions), isoform):
+                    by_words[row.organism] = by_words.get(row.organism, 0) + 1
+        except Exception:  # noqa: BLE001 - the clause stands without it
+            elsewhere, by_words = {}, {}
+        elsewhere = elsewhere or by_words
+        clause = (f". BRENDA has no {label} row naming {isoform} under EC {ec} in {organism} for any "
+                  f"{role}")
+        if elsewhere:
+            clause += (f"; rows naming it are in {_counted(elsewhere)} (another organism's "
+                       f"protein, never substituted: re-run with --organism set to one of them "
+                       f"to model it there)")
+        return clause
     return (f". The {role}s with {label} rows naming {isoform} under EC {ec} in {organism}: "
             f"{_counted(named)}. Re-run with --{role} set to one of them")
 
@@ -2694,6 +2759,60 @@ def _neighbours_withheld(model: Any, measured: Mapping[str, Any], ec: Optional[s
             f"carried under this one's (ADR 0076). Pass {flag} with that name to model it, or "
             f"supply this constant yourself")
     return out
+
+
+#: How a window re-selection's reason begins (caterva.agents.scouts).
+_WINDOW_MOVED = "it is the row nearest the assay window"
+_INDEPENDENT = "the Km and the kcat were chosen independently, not as a measured pair"
+
+
+def _pairing_said_after_windows(measured: Dict[str, Any]) -> Dict[str, Any]:
+    """A constant whose reason says the Km and kcat were "chosen
+    independently, not as a measured pair", when an assay window then moved
+    the other constant onto the same paper's row, is told so: rabbit
+    aldolase's kcat said the pair of ref 770643 "was not carried", beside a
+    Km the window had moved to ref 770643 (third round's review)."""
+    import re as _re
+    from dataclasses import replace as _replace
+
+    def ref(m: Any) -> Optional[str]:
+        found = _re.search(r"ref (\d+)", str(getattr(m, "citation", "") or ""))
+        return found.group(1) if found else None
+
+    moved = {ref(m) for m in measured.values()
+             if str(getattr(m, "resolver_because", "") or "").startswith(_WINDOW_MOVED)}
+    moved.discard(None)
+    if not moved:
+        return measured
+    out = dict(measured)
+    for name, m in measured.items():
+        because = str(getattr(m, "resolver_because", "") or "")
+        if _INDEPENDENT in because and ref(m) in moved:
+            try:
+                out[name] = _replace(m, resolver_because=(
+                    because + f"; the assay window then moved the other constant onto BRENDA ref "
+                    f"{ref(m)}'s row, so both carried rows are that paper's after all"))
+            except (TypeError, ValueError):
+                pass
+    return out
+
+
+def _service_failed(text: str) -> str:
+    """Which service failed, said for a reader, with the remedy: a network
+    failure is fixed by running again, not by another organism or name."""
+    low = text.lower()
+    service = ("UniProt" if "uniprot" in low else "NCBI taxonomy" if "ncbi" in low
+               else "BRENDA" if "brenda" in low else "a database the search reads")
+    kind = ("timed out" if "timeout" in low else
+            "answered with a server error" if any(c in low for c in ("503", "502", "504", "500"))
+            else "failed")
+    return (f"{service} {kind} ({text.strip()[:160]}). This is a network failure, not an "
+            f"absence of measurements: re-run the same command, which usually succeeds")
+
+
+def _not_searched(failure: str) -> str:
+    """The reason a constant whose scout failed carries: not searched."""
+    return f"not searched: {_service_failed(failure)}"
 
 
 def _not_looked_up(skipped: Mapping[str, str]) -> str:

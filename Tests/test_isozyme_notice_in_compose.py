@@ -119,17 +119,18 @@ def test_typing_an_isoform_does_not_carry_another_isozymes_row(compose):
     glucokinase: a row BRENDA itself files under another protein of the EC is that protein's, and is not
     carried (compose/protein_rows.py; the resolver reads the row's own cell too, fallback_logic
     `_row_isoform`). Since the merge of the rows and names rounds (2026-11-12) the resolver sets the
-    P35557 rows aside itself and carries a row naming no isoform and carrying no accession (38 1/s, ref
-    672188), under a qualified GROUNDED that says whether it measured HK-1 is unknown."""
+    P35557 rows aside itself. It then carried a row naming no isoform and carrying no accession (38 1/s,
+    ref 672188) -- a glucokinase Y214C paper's wild-type row, among human D-glucose kcat rows every one of
+    which that names a protein names GCK. Since the third round's review (fallback_logic._isoform_tiers)
+    rows naming none among more rows naming only another protein are that protein's field, and the kcat
+    is a placeholder saying so."""
     code, out = compose("--organism", "human", "--isoform", "HK-1")
     assert code == 0
-    verdict = _verdict_block(out)
-    assert "Qualified: HK-1 was asked for, but the row for `reaction_kcat` does not state which isozyme" in verdict
     assert "| `reaction_Km` | 0.06 mM | literature (Homo sapiens) | BRENDA ref 640237 |" in out
     kcat = next(line for line in out.splitlines() if line.startswith("| `reaction_kcat` |"))
     assert "BRENDA ref 703624" not in kcat and "60.4 1/s" not in kcat
-    assert "| `reaction_kcat` | 38.0 1/s | literature (Homo sapiens) | BRENDA ref 672188 |" in out
-    assert "the row names no isoform, so whether it measured **HK-1**, the one asked for, is unknown" in out
+    assert "672188" not in kcat and "**placeholder**" in kcat
+    assert "naming none sit among them" in kcat and "GCK" in kcat
 
 
 @pytest.mark.parametrize(
@@ -163,9 +164,12 @@ def test_a_label_no_protein_carries_says_it_matched_nothing(compose):
     code, out = compose("--organism", "human", "--isoform", "HK9")
     assert code == 0
     assert "--isoform 'HK9' is not a gene symbol or name the enzyme nomenclature's UniProt entries give" in out
-    # No row names HK9; glucokinase's rows (P35557) name GCK, so a row naming none is used.
-    assert "| `reaction_Km` | 3.8 mM | literature (Homo sapiens) | BRENDA ref 641067 |" in out
-    assert "a row naming no isoform, used because none names HK9" in out
+    # No row names HK9. Rows naming none were used until the third round's review; they sit among
+    # more rows naming HK-I, HK-II, HK-III and GCK, so they are those proteins' field and are not
+    # taken as HK9's (fallback_logic._isoform_tiers).
+    km = next(line for line in out.splitlines() if line.startswith("| `reaction_Km` |"))
+    assert "**placeholder**" in km and "641067" not in km
+    assert "naming none sit among them" in km
 
 
 def _model_whose_rows_say(*commentaries):

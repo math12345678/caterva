@@ -103,9 +103,11 @@ def test_a_model_without_a_kcat_ranks_by_km_alone(recorded):
     assert choice.alternatives[0].name == "D-mannose"
 
 
-def test_the_inhibitor_puts_a_product_of_the_reaction_last(recorded):
+def test_the_inhibitor_puts_a_product_of_the_reaction_last(recorded, monkeypatch):
     """D-glucose 6-phosphate is hexokinase's product: product inhibition,
-    ranked after every compound that is not part of the reaction."""
+    ranked after every compound that is not part of the reaction (all of
+    them listed, so the last place is seen)."""
+    monkeypatch.setattr(defaults, "ALTERNATIVES_NAMED", 50)
     choice = defaults.choose_inhibitor("2.7.1.1", "Homo sapiens", "D-glucose")
     assert choice.chosen == "1,5-Anhydro-D-glucitol 6-phosphate" and choice.rows == {"ki": 2}
     assert choice.alternatives[-1].name == "D-glucose 6-phosphate"
@@ -605,7 +607,13 @@ def test_two_spellings_of_cgmp_are_one_natural_substrate_counted_together(monkey
     ("4-methylumbelliferyl-alpha-D-N-acetylneuraminic acid",
      "4-methylumbelliferyl alpha-D-N-acetylneuraminic acid", True),
     ("D-luciferin", "luciferin", False), ("2-deoxy-D-glucose", "D-glucose", False),
-    ("Z-Gly-Pro", "N-benzyloxycarbonyl-Gly-Pro", False),
+    # The benzyloxycarbonyl group under its names (Tests/compound_names.py,
+    # third round's review: trypsin's Z-Gly-Pro-Arg-pNA was three compounds).
+    ("Z-Gly-Pro", "N-benzyloxycarbonyl-Gly-Pro", True),
+    ("N-carbobenzyloxy-Gly-Pro-Arg-p-nitroanilide", "Z-Gly-Pro-Arg-4-nitroanilide", True),
+    ("brequinar sodium", "brequinar", True), ("GSSG", "glutathione disulfide", True),
+    ("D-glucose", "L-glucose", False), ("N-benzoyl-DL-arginine 4-nitroanilide",
+                                        "N-benzoyl-L-arginine 4-nitroanilide", False),
     # PTP1B in human: "p-nitrophenyl phosphate" and "4-nitrophenyl phosphate"
     # were two candidates; "O-acetyl" is oxygen, not ortho.
     ("p-nitrophenyl phosphate", "4-nitrophenyl phosphate", True),
@@ -893,18 +901,19 @@ def test_an_inhibitor_tied_on_every_count_is_not_said_to_have_the_most(monkeypat
 
 def test_a_merged_compound_says_which_spelling_the_search_takes(monkeypatch):
     """PTP1B in human: "p-nitrophenyl phosphate" and "4-nitrophenyl
-    phosphate" are counted as one compound, but the search, asked for one
-    spelling, takes only that spelling's rows (brenda_client compares names
-    by case, whitespace and counter-ion). The note says so, so a count of
-    both spellings is not read as the rows the cited value was drawn from."""
+    phosphate" are counted as one compound. Until the third round's review
+    the search, asked for one spelling, took only that spelling's rows, and
+    the note said so; it then passed over the rows naming PTP1B (P18031),
+    filed under the other spelling. The search now matches every spelling
+    of the compound (brenda_client.substrate_matches, compound_names), so
+    the note says only that the spellings were merged."""
     km = ([_row("p-nitrophenyl phosphate", "pH 7.0", ref=str(680000 + i)) for i in range(3)]
           + [_row("4-nitrophenyl phosphate", "pH 7.0", ref="95007")])
     _given(monkeypatch, {"km": km, "kcat": [_row("p-nitrophenyl phosphate", "pH 7.0", ref="680000")]})
     choice = defaults.choose_substrate("3.1.3.48", "Homo sapiens")
     assert choice.chosen == "p-nitrophenyl phosphate" and choice.rows == {"km": 4, "kcat": 1}
-    assert ("BRENDA also spells it 4-nitrophenyl phosphate, counted as the same compound; the "
-            "search is asked for p-nitrophenyl phosphate and takes the rows spelled so "
-            "(3 Km, 1 kcat)") in choice.why
+    assert "BRENDA also spells it 4-nitrophenyl phosphate, counted as the same compound" in choice.why
+    assert "takes the rows spelled so" not in choice.why
 
 
 def test_an_organism_with_a_ki_for_the_inhibitor_named_ranks_first(monkeypatch):
@@ -962,7 +971,7 @@ def test_an_inhibitor_tie_goes_to_the_compound_measured_more_widely(monkeypatch)
     choice = defaults.choose_inhibitor("3.2.1.18", flu)
     assert choice.chosen == "oseltamivir carboxylate"
     assert ("ties on rows and references with " + triazole) in choice.why
-    assert "has more Ki rows under EC 3.2.1.18 counting every organism (3 against at most 1)" \
+    assert "has more Ki rows under EC 3.2.1.18 counting every organism than it does (3 against at most 1)" \
         in choice.why
     assert "alphabetically" not in choice.why
 

@@ -94,7 +94,7 @@ import re
 import sys
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 #: The roles a choice is made for, in the order compose makes them.
 ROLES = ("enzyme", "organism", "substrate", "inhibitor")
@@ -417,7 +417,8 @@ def _unlabelled_rows(html: str, ec: str, table: str, client: object) -> Tuple[_R
     out = []
     for row in cells.values():
         texts = [row.get(i, "") for i in range(max(row) + 1)]
-        if len(texts) < 3 or not re.fullmatch(r"\d+\.?\d*", texts[0]):
+        ranged = re.fullmatch(r"(\d+\.?\d*)\s*-\s*(\d+\.?\d*)", texts[0]) if texts else None
+        if len(texts) < 3 or not (re.fullmatch(r"\d+\.?\d*", texts[0]) or ranged):
             continue
         if any(pattern.fullmatch(t) for t in texts):
             continue  # the parser labelled this row itself
@@ -429,11 +430,23 @@ def _unlabelled_rows(html: str, ec: str, table: str, client: object) -> Tuple[_R
         reference = re.match(r"\d+", texts[5]) if len(texts) > 5 else None
         uniprot = texts[3] if len(texts) > 3 and texts[3] not in ("", "-") else None
         verdict = classify(conditions) if callable(classify) else None
-        value = float(texts[0])
-        out.append(_Row(compound, organism, conditions, value,
+        # A range is one paper's ("0.038 - 0.04"), carried by its lower
+        # bound as the parser carries it (brenda_client._RANGE_VALUE).
+        value = float(ranged.group(1)) if ranged else float(texts[0])
+        out.append((bool(ranged), _Row(compound, organism, conditions, value,
                         reference.group(0) if reference else None, uniprot, *_variant_of(verdict),
-                        _implausible(client, table, value, conditions), _own(table, conditions)))
-    return tuple(out)
+                        _implausible(client, table, value, conditions), _own(table, conditions))))
+    # A range only where the compound has no single value in that organism,
+    # as the parser keeps them (brenda_client._ranges_only_where_alone).
+    stereo = getattr(client, "_STEREO_PREFIX", None)
+
+    def key(row: _Row) -> Tuple[str, Optional[str]]:
+        name = _search_key(row.compound)
+        prefix = stereo.match(name) if stereo is not None else None
+        return (name[prefix.end():] if prefix else name, row.organism)
+
+    single = {key(r) for ranged, r in out if not ranged}
+    return tuple(r for ranged, r in out if not ranged or key(r) not in single)
 
 
 #: The parser's plausibility bounds per table (brenda_client), by name.
@@ -539,7 +552,22 @@ def _group_key(name: str) -> str:
     if cyclic:
         return f"c{cyclic.group(1)}mp"
     nucleoside = _CYCLIC_NUCLEOSIDE.fullmatch(key)
-    return f"c{nucleoside.group(1)[0]}mp" if nucleoside else key
+    if nucleoside:
+        return f"c{nucleoside.group(1)[0]}mp"
+    # The literature layer's key, which the search matches by too
+    # (brenda_client.substrate_matches): one compound's spellings counted
+    # together are the rows the search reaches (third round's review).
+    return _identity_key(name) or key
+
+
+@functools.lru_cache(maxsize=16384)
+def _identity_key(name: str) -> Optional[str]:
+    try:
+        from caterva.checkout import literature_module
+
+        return literature_module("compound_names").identity_key(name)
+    except Exception:  # noqa: BLE001 - no literature layer: the spelling key
+        return None
 
 
 def _matches(compound: str, target: str) -> bool:
@@ -587,13 +615,25 @@ def _accession_says(uniprot: Optional[str], isoform: str) -> Optional[bool]:
     """Whether a row's one UniProt accession is the protein `isoform` names
     (True), another protein UniProt knows (False), or cannot tell (None: no
     accession, several, or one this build has no names for)."""
-    if not uniprot or "," in uniprot:
+    if not uniprot:
         return None
     try:
         from caterva.enzymes.protein_names import info
     except ImportError:  # pragma: no cover
         return None
-    found = info(uniprot.strip())
+    cells = [c.strip() for c in uniprot.split(",") if c.strip()]
+    if len(cells) > 1:
+        # A cell listing several proteins names the paper's: none of them
+        # for a request of one of them, another protein's when every one is
+        # known and none is the one asked for (as the resolver reads it,
+        # fallback_logic._row_isoform). CYP2B6's chooser counted erdafitinib's
+        # "P20815 , Q9HB55" rows (CYP3A5, CYP3A43) as usable, and the search
+        # then withheld both (third round's review).
+        verdicts = [_accession_says(c, isoform) for c in cells]
+        if any(v is True for v in verdicts) or any(v is None for v in verdicts):
+            return None
+        return False
+    found = info(cells[0])
     if found is None or not found.names:
         return None
     return any(_same_isoform(name, isoform) for name in found.names)
@@ -612,8 +652,31 @@ class _Usable:
     set_aside: Counter = field(default_factory=Counter)
 
 
+def _papers(ec: str) -> dict:
+    """`row_form.paper_isoforms` of the page: the isoform(s) each paper's
+    other entries name, as the resolver reads a row naming none itself
+    (fallback_logic._row_isoform). {} when it cannot be read."""
+    try:
+        from caterva.checkout import literature_module
+
+        return literature_module("row_form").paper_isoforms(ec, _page(ec))
+    except Exception:  # noqa: BLE001 - no paper reading: rows by their own words
+        return {}
+
+
+def _by_paper(row: _Row, isoform: str, papers: dict) -> Optional[bool]:
+    """Whether the isoforms a row's paper names make it the isoform's (True),
+    another's (False), or say nothing (None), read as the resolver reads them."""
+    readings = papers.get(((row.organism or "").lower(), str(row.reference_id or ""))) or ()
+    if not readings:
+        return None
+    if len(readings) == 1:
+        return _same_isoform(readings[0], isoform)
+    return None if any(_same_isoform(r, isoform) for r in readings) else False
+
+
 def _usable(rows: Sequence[_Row], isoform: Optional[str] = None, mode: Optional[str] = None,
-            substrate: Optional[str] = None) -> _Usable:
+            substrate: Optional[str] = None, papers: Optional[dict] = None) -> _Usable:
     """The rows of one compound the resolver would choose among, by its own
     steps in its order (fallback_logic.resolve_kinetic_value): flagged rows
     never; with an isoform, the rows naming it, or failing those the rows
@@ -635,7 +698,20 @@ def _usable(rows: Sequence[_Row], isoform: Optional[str] = None, mode: Optional[
         mine = [r for r, iso in named if iso and _same_isoform(iso, isoform)]
         pool_unnamed = [r for r, iso in named if iso is None
                         and _accession_says(r.uniprot, isoform) is not False]
-        out.set_aside["another isoform"] += len(pool) - len(mine) - len(pool_unnamed)
+        if papers:
+            # A row naming none in its words or cell takes its paper's
+            # reading, as the resolver does.
+            silent = [r for r in pool_unnamed if _accession_says(r.uniprot, isoform) is None]
+            mine += [r for r in silent if _by_paper(r, isoform, papers) is True]
+            pool_unnamed = [r for r in pool_unnamed if r not in silent
+                            or _by_paper(r, isoform, papers) is None]
+        others = len(pool) - len(mine) - len(pool_unnamed)
+        if not mine and pool_unnamed and others >= 2 and others > len(pool_unnamed):
+            # The resolver's rule (fallback_logic._isoform_tiers): rows naming
+            # none, among more rows naming only other proteins, are theirs.
+            others += len(pool_unnamed)
+            pool_unnamed = []
+        out.set_aside["another isoform"] += others
         kept, matched = (mine, True) if mine else (pool_unnamed, False)
     else:
         kept, pool_unnamed = pool, []
@@ -676,8 +752,9 @@ class _Counts:
     search can use of them (`_usable`)."""
 
     def __init__(self, isoform: Optional[str] = None, mode: Optional[str] = None,
-                 substrate: Optional[str] = None) -> None:
+                 substrate: Optional[str] = None, papers: Optional[dict] = None) -> None:
         self.isoform, self.mode, self.substrate = isoform, mode, substrate
+        self.paper_isoforms = papers or {}
         self.by_table: Dict[str, Dict[str, List[_Row]]] = {}
         self.spellings: Dict[str, Counter] = {}
         self._usable: Dict[Tuple[str, str], _Usable] = {}
@@ -700,7 +777,7 @@ class _Counts:
             found = _Usable([])
             for rows in self._by_spelling(key, table).values():
                 part = _usable(rows, self.isoform, self.mode if table == "ki" else None,
-                               self.substrate)
+                               self.substrate, self.paper_isoforms)
                 found.rows.extend(part.rows)
                 found.set_aside.update(part.set_aside)
             self._usable[(key, table)] = found
@@ -719,9 +796,8 @@ class _Counts:
         spellings = self.spellings[key]
 
         def reach(spelling: str) -> int:
-            target = _search_key(spelling)
             return sum(1 for t in self.by_table for r in self.usable(key, t).rows
-                       if _search_key(r.compound) == target)
+                       if _matches(r.compound, spelling))
         return sorted(spellings, key=lambda s: (-reach(s), -spellings[s], s))[0]
 
     def other_spellings(self, key: str) -> List[str]:
@@ -731,8 +807,8 @@ class _Counts:
     def reached(self, key: str, tables: Sequence[str]) -> Dict[str, int]:
         """Usable rows per table under the spelling the search is asked for
         (`name`): the rows its value is taken from."""
-        target = _search_key(self.name(key))
-        return {t: sum(1 for r in self.usable(key, t).rows if _search_key(r.compound) == target)
+        name = self.name(key)
+        return {t: sum(1 for r in self.usable(key, t).rows if _matches(r.compound, name))
                 for t in tables}
 
     def spelled_clause(self, key: str, tables: Sequence[str]) -> str:
@@ -777,7 +853,8 @@ class _Counts:
         for (`name`) name the isoform."""
         spelling = _search_key(self.name(key))
         return any(_usable(self._by_spelling(key, t).get(spelling, []), self.isoform,
-                           self.mode if t == "ki" else None, self.substrate).names_isoform
+                           self.mode if t == "ki" else None, self.substrate,
+                           self.paper_isoforms).names_isoform
                    for t in tables)
 
     def keys(self, table: str) -> List[str]:
@@ -871,27 +948,37 @@ def _tie_clause(names: Sequence[str]) -> str:
 
 
 def _ties(ranked: Sequence[str], rank, papers, name, elsewhere=None,
-          where: str = "") -> Tuple[bool, str]:
+          where: str = "", stages: Sequence[Tuple[Any, Any]] = ()) -> Tuple[bool, str]:
     """(tied on rows, the clause saying how the tie was broken). The rank's
     last places are -papers, then (with `elsewhere`) -rows under the EC in
-    every organism, then the name: rows first, then the number of BRENDA
-    references the rows come from, then how widely the compound is measured
-    under the EC, then the name."""
-    extra = 1 if elsewhere else 0
+    every organism, then each of `stages` ((key, clause) pairs: the rank's
+    value and what to say when it decided), then the name: rows first, then
+    the number of BRENDA references the rows come from, then how widely the
+    compound is measured under the EC, then the stages, then the name."""
+    extra = (1 if elsewhere else 0) + len(stages)
     on_rows = _tied(ranked, rank, drop=2 + extra)
     if not on_rows:
         return False, ""
-    on_papers = _tied(ranked, rank, drop=1 + extra) if extra else []
     on_all = _tied(ranked, rank, drop=1)
     clause = _tie_clause([name(k) for k in on_all])
-    if extra:
-        wider = [k for k in on_papers if k not in on_all]
+    # Walk back from the name: each stage's tie set, and who it beat.
+    later = on_all
+    for i, (_, said) in reversed(list(enumerate(stages))):
+        before = _tied(ranked, rank, drop=len(stages) - i + 1)
+        beaten = [k for k in before if k not in later]
+        if beaten:
+            clause = said([name(k) for k in beaten]) + clause
+        later = before
+    if elsewhere:
+        on_papers = _tied(ranked, rank, drop=1 + extra)
+        wider = [k for k in on_papers if k not in later]
         if wider:
             clause = (f"; it ties on rows and references with {_shown([name(k) for k in wider])}, "
-                      f"and has more Ki rows under {where} counting every organism "
-                      f"({elsewhere(ranked[0])} against at most "
-                      f"{max(elsewhere(k) for k in wider)})") + clause
-    beaten = [k for k in on_rows if k not in on_papers and k not in on_all]
+                      f"and has more Ki rows under {where} counting every organism than "
+                      f"{'it does' if len(wider) == 1 else 'they do'} ({elsewhere(ranked[0])} "
+                      f"against at most {max(elsewhere(k) for k in wider)})") + clause
+        later = on_papers
+    beaten = [k for k in on_rows if k not in later]
     if beaten:
         clause = (f"; it ties on rows with {_shown([name(k) for k in beaten])}, and is reported by "
                   f"more BRENDA references ({papers(ranked[0])} against at most "
@@ -928,10 +1015,54 @@ def choose_substrate(ec: str, organism: Optional[str], *, needs_kcat: bool = Tru
         return None
 
 
+@functools.lru_cache(maxsize=512)
+def _enzyme_names(ec: str) -> Tuple[str, ...]:
+    """The EC's accepted and alternative names from the enzyme index."""
+    try:
+        from caterva.enzymes.index import load_index
+
+        entry = load_index().get(ec)
+    except Exception:  # noqa: BLE001 - no index: no name to read
+        return ()
+    return (entry.name, *entry.alternative_names) if entry else ()
+
+
+def _enzyme_name(ec: str, compound: Optional[str] = None) -> str:
+    """The EC's accepted name, or with `compound` the name that is named for it."""
+    names = _enzyme_names(ec)
+    if compound:
+        for name in names:
+            if _named_by_enzyme_name(name, compound):
+                return name
+    return names[0] if names else ec
+
+
+def _named_by_enzyme_name(name: str, compound: str) -> bool:
+    try:
+        from caterva.checkout import literature_module
+
+        key = literature_module("compound_names").identity_key
+    except Exception:  # noqa: BLE001
+        return False
+    mine = key(compound)
+    return len(mine) >= 3 and ((len(mine) >= 6 and mine in key(name)) or any(
+        key(word) == mine for word in re.split(r"[\s/(),]+", name) if word))
+
+
+def _named_by_enzyme(ec: str, compound: str) -> bool:
+    """Whether one of the EC's names is named for `compound`: the compound
+    whole inside a name ("butyrylcholine" in "butyrylcholine esterase"), or a
+    word of a name that is a spelling of it ("adenylate" in "adenylate
+    kinase" is AMP). Horse butyrylcholinesterase was modelled on
+    acetylthiocholine, tied with butyrylcholine and broken by the alphabet
+    (third round's review)."""
+    return any(_named_by_enzyme_name(name, compound) for name in _enzyme_names(ec))
+
+
 def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
                       among: Optional[Sequence[str]] = None,
                       isoform: Optional[str] = None) -> Optional[Choice]:
-    counts = _Counts(isoform)
+    counts = _Counts(isoform, papers=_papers(ec) if isoform else None)
     counts.add("km", table_rows(ec, "km", organism))
     tables = ["km"]
     if needs_kcat:
@@ -959,19 +1090,29 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
         return not needs_kcat or rows(k).get("kcat", 0) > 0
 
     neighbours = {k: counts.neighbours(k, tables) for k in candidates}
+    named = {k for k in candidates if _named_by_enzyme(ec, counts.name(k))}
+
+    def cofactor(k: str) -> bool:
+        # A compound the enzyme is named for is its substrate, whatever the
+        # cofactor list says: adenylate kinase's AMP (third round's review).
+        return is_cofactor(counts.name(k)) and k not in named
 
     def rank(k: str) -> tuple:
-        return (is_cofactor(counts.name(k)), rows(k)["km"] == 0,
+        return (cofactor(k), rows(k)["km"] == 0,
                 bool(isoform) and not counts.names_isoform(k, tables), bool(neighbours[k]),
                 not has_both(k), rows(k)["km"] > 0 and counts.own(k, "km") == 0,
-                k not in natural, -total(k), -counts.papers(k, tables),
+                k not in natural, -total(k), -counts.papers(k, tables), k not in named,
                 counts.name(k).casefold())
 
     ranked = sorted(candidates, key=rank)
     best = ranked[0]
     name = counts.name(best)
     r = rows(best)
-    tied, tie_clause = _ties(ranked, rank, lambda k: counts.papers(k, tables), counts.name)
+    tied, tie_clause = _ties(
+        ranked, rank, lambda k: counts.papers(k, tables), counts.name,
+        stages=[(None, lambda beaten: (f"; it ties on rows and references with "
+                                       f"{_shown(beaten)}, and the enzyme is named for it "
+                                       f"({_enzyme_name(ec, counts.name(ranked[0]))})"))])
     most = "as many as any other" if tied else "the most"
     measured = (f"{r['km']} Km, {r['kcat']} kcat" if needs_kcat else _plural(r["km"], "Km row"))
     if r["km"] == 0:
@@ -1013,8 +1154,8 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
                 + " more rows, but each measured a construct or altered preparation, an apparent "
                   "constant with an inhibitor or effector present, or a K0.5, which the search "
                   "passes over for the enzyme's own constant")
-    aside = [counts.name(k) for k in ranked if is_cofactor(counts.name(k)) and total(k) >= total(best)]
-    if is_cofactor(name):
+    aside = [counts.name(k) for k in ranked if cofactor(k) and total(k) >= total(best)]
+    if cofactor(best):
         aside = []
         how += "; only cosubstrates and cofactors have rows here, so one of them was used"
     clause = f"; the cosubstrate{'s' if len(aside) > 1 else ''} {', '.join(aside[:3])} set aside" \
@@ -1070,7 +1211,7 @@ def choose_inhibitor(ec: str, organism: Optional[str], substrate: Optional[str] 
 
 def _choose_inhibitor(ec: str, organism: Optional[str], substrate: Optional[str],
                       isoform: Optional[str] = None, mode: Optional[str] = None) -> Optional[Choice]:
-    counts = _Counts(isoform, mode, substrate)
+    counts = _Counts(isoform, mode, substrate, papers=_papers(ec) if isoform else None)
     counts.add("ki", table_rows(ec, "ki", organism))
     excluded = _group_key(substrate) if substrate else None
     candidates = [k for k in counts.keys("ki") if k != excluded]
@@ -1100,16 +1241,27 @@ def _choose_inhibitor(ec: str, organism: Optional[str], substrate: Optional[str]
     def elsewhere(k: str) -> int:
         return everywhere.get(k, 0)
 
+    def stated(k: str) -> int:
+        # Usable Ki rows stating a pH or a temperature. Granzyme B's
+        # inhibitor was a full tie broken by the alphabet, carrying a row
+        # stating no conditions over one at pH 7.5, 23 C (third round's review).
+        return sum(1 for r in counts.usable(k, "ki").rows
+                   if re.search(r"\bpH\b|°C|\d\s*C\b", r.conditions or ""))
+
     def rank(k: str) -> tuple:
         return (n(k) == 0, k in reaction, is_cofactor(counts.name(k)),
                 bool(isoform) and not counts.names_isoform(k, ["ki"]), bool(neighbours[k]),
-                -n(k), -counts.papers(k, ["ki"]), -elsewhere(k), counts.name(k).casefold())
+                -n(k), -counts.papers(k, ["ki"]), -elsewhere(k), -stated(k),
+                counts.name(k).casefold())
 
     ranked = sorted(candidates, key=rank)
     best = ranked[0]
     name = counts.name(best)
-    tied, tie_clause = _ties(ranked, rank, lambda k: counts.papers(k, ["ki"]), counts.name,
-                             elsewhere, f"EC {ec}")
+    tied, tie_clause = _ties(
+        ranked, rank, lambda k: counts.papers(k, ["ki"]), counts.name, elsewhere, f"EC {ec}",
+        stages=[(None, lambda beaten: (f"; it ties on rows, references and rows in every organism "
+                                       f"with {_shown(beaten)}, and more of its Ki rows state the "
+                                       f"assay's pH or temperature"))])
     usable_for = []
     if isoform:
         usable_for.append(isoform)
@@ -1384,7 +1536,9 @@ def _choose_organism(ec: str, substrate: Optional[str], inhibitor: Optional[str]
 
 
 def choose_enzyme(name: str, candidates: Sequence[Tuple[str, str]],
-                  organism: Optional[str] = None) -> Optional[Choice]:
+                  organism: Optional[str] = None,
+                  limit: Optional[int] = ENZYME_CANDIDATES_CONSIDERED,
+                  by_protein: Optional[str] = None) -> Optional[Choice]:
     """The EC number among `candidates` ((ec, name) pairs, at most
     ENZYME_CANDIDATES_CONSIDERED) that BRENDA's data singles out, or None.
 
@@ -1394,7 +1548,7 @@ def choose_enzyme(name: str, candidates: Sequence[Tuple[str, str]],
     the data can break a tie between readings of a name, never choose
     between two enzymes that both have measurements.
     """
-    if not candidates or len(candidates) > ENZYME_CANDIDATES_CONSIDERED:
+    if not candidates or (limit is not None and len(candidates) > limit):
         return None
     try:
         rows = {ec: len(table_rows(ec, "km", organism)) for ec, _ in candidates}
@@ -1409,6 +1563,10 @@ def choose_enzyme(name: str, candidates: Sequence[Tuple[str, str]],
             return None
         how = (f"it is the only one of the {len(candidates)} enzymes the name matches best with Km "
                f"rows in {organism} ({_plural(rows[best], 'Km row')})")
+        if by_protein:
+            if best != by_protein:
+                return None
+            how += f", and the only one matched with a protein of {organism}"
     else:
         if rows[best] == 0 or any(rows[ec] * DOMINANCE > rows[best] for ec in ranked[1:]):
             return None

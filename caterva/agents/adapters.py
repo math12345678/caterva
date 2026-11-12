@@ -227,6 +227,16 @@ def to_parameter_source(
         withheld = list(getattr(result, field_name, []) or []) if field_name else []
         if withheld:
             reason += f" -- {what}: {sep.join(withheld)}"
+        unnamed = getattr(result, "isoform_unnamed_withheld", 0) or 0
+        if source == "isoform_withheld" and isinstance(unnamed, int) and unnamed:
+            # Not every row named another isoform: some named none, and were
+            # not taken because every row naming a protein named another.
+            reason = reason.replace(
+                "every row BRENDA holds for this constant measured another isoform than the one "
+                "asked for",
+                f"every row BRENDA holds for this constant that names a protein measured another "
+                f"isoform than the one asked for, and the {unnamed} naming none sit among them "
+                f"(their papers' field), so are not taken as the one asked for")
         # The resolver lists the compound labels BRENDA's table DOES carry
         # when the one asked for is absent. It was computed and dropped
         # here, so "glucoze" read as "nothing found in BRENDA" -- a fact

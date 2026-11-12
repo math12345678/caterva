@@ -139,6 +139,11 @@ SUBSTRATE_VERBS = frozenset({
     "reduce", "converting", "converts", "convert", "turning", "turns", "acting", "acts",
     "catalysing", "catalyzing", "processing", "processes", "degrading", "degrades",
     "deaminating", "decarboxylating", "dephosphorylating", "dephosphorylates", "transferring",
+    # "catalase from bovine liver breaking down hydrogen peroxide": the
+    # verb glued "liver breaking down" onto the compound and nothing was
+    # read (third round's review). "down" is the particle, never a compound.
+    "breaking", "breaks", "break", "splitting", "splits", "digesting", "digests", "down",
+    "hydrolysing", "attacking", "reacting",
 })
 FILLER = FILLER | SUBSTRATE_VERBS
 

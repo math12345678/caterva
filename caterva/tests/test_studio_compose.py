@@ -361,12 +361,16 @@ def test_an_unrecognised_shape_is_a_refusal_with_the_clis_words_and_no_result(tm
 
 
 def test_a_search_with_no_literature_answer_is_refused_and_still_reported(tmp_path):
-    # EC 2.7.1.1 for an organism no recording covers: the search cannot run
-    # offline, the command says so, and the report is still the command's.
+    # An EC number no recording covers: BRENDA's page cannot be fetched
+    # offline, so the search cannot run, the command says so, and the report
+    # is still the command's. (This was EC 2.7.1.1 for an organism no
+    # recording covers, until the third round's review made the UniProt and
+    # NCBI lookups that failed there optional: the recorded BRENDA page is
+    # then searched, as it should be.)
     with hexokinase_offline():
         code, out, err, outcome = both(
-            {"description": "Michaelis Menten", "subject": "2.7.1.1",
-             "organism": "Thermus thermophilus", "substrate": "glucose"}, tmp_path)
+            {"description": "Michaelis Menten", "subject": "1.1.1.1",
+             "organism": "Thermus thermophilus", "substrate": "ethanol"}, tmp_path)
     assert_parity(code, out, err, outcome)
     assert code == 3 and outcome.result["search"]["refused"] is True
 

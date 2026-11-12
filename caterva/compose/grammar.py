@@ -2394,6 +2394,9 @@ def recognise(query: str, *, name: Optional[str] = None) -> Recognition:
         )
     ]
     if not candidates:
+        typo = _misspelt_enzyme(query)
+        if typo:
+            raise UnrecognisedShape(query, typo, suggestions=[])
         raise UnrecognisedShape(
             query,
             "No shape in this grammar matches. It recognises mechanisms, not "
@@ -2422,3 +2425,47 @@ __all__ = [
     "MissingMotifLibrary", "Rule", "RULES", "NAMED_PATHWAYS",
     "MAX_INFERRED_STAGES", "EXPANSION_LIBRARIES",
 ]
+
+
+def _misspelt_enzyme(query: str) -> Optional[str]:
+    """"Did you mean ..." for a description whose enzyme name is misspelt,
+    or None. "glyceraldehyde-3-phosphate dehydrogenaes from rabbit muscle"
+    got the shape refusal and the list of shapes, with no word about the
+    one letter that was wrong (third round's review; ADR 0181 lists typo
+    suggestions for names). The enzyme finder's typo tier is asked about
+    each run of up to five words; the longest run it is close to wins."""
+    try:
+        from caterva.enzymes.finder import TIER_TYPO, _outside_parentheses, find
+    except Exception:  # noqa: BLE001 - no finder: the shape refusal stands
+        return None
+    words = query.split()
+    best = None
+    for size in range(min(5, len(words)), 0, -1):
+        for start in range(len(words) - size + 1):
+            window = " ".join(words[start:start + size]).strip(",.;:")
+            if len(window) < 6:
+                continue
+            try:
+                found = [c for c in find(window, limit=None) if c.tier == TIER_TYPO]
+            except Exception:  # noqa: BLE001
+                continue
+            if found:
+                best = (start, size, window, found)
+                break
+        if best:
+            break
+    if not best:
+        return None
+    start, size, window, found = best
+    names = []
+    for c in found:
+        if c.name not in names:
+            names.append(c.name)
+    spelled = _outside_parentheses(found[0].name).strip()
+    fixed = " ".join(words[:start] + [spelled] + words[start + size:])
+    listed = "; ".join(f"EC {c.ec} {c.name}" for c in found[:4])
+    more = f"; and {len(found) - 4} more" if len(found) > 4 else ""
+    return (f"No enzyme name matches {window!r} exactly, and no shape in this grammar matches "
+            f"the rest. It is close to: {listed}{more}. Did you mean {spelled!r}? Re-run with the "
+            f"name spelled as the enzyme nomenclature spells it, for example: caterva compose "
+            f"\"{fixed}\"")

@@ -248,7 +248,18 @@ def _value_span(page: bytes, value_text: str, start: int, end: int) -> tuple[tup
                 return (match.start(1), match.end(1)), cell
         except ValueError:
             continue
+    # A value the paper gives as a range ("0.038 - 0.04"), whose lower bound
+    # the parser carries (brenda_client._RANGE_VALUE): the cell is the range.
+    for match in _RANGE_CELL.finditer(page, start, end):
+        try:
+            if float(match.group(2).decode("ascii")) == float(value_text):
+                return (match.start(1), match.end(1)), match.group(1).decode("ascii")
+        except ValueError:
+            continue
     return None
+
+
+_RANGE_CELL = re.compile(rb"<span>((\d+(?:\.\d+)?)\s*-\s*\d+(?:\.\d+)?)\n</span>")
 
 
 def _anchors(page: bytes, row: Row) -> list[int]:

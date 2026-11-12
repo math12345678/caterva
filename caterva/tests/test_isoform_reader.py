@@ -68,6 +68,10 @@ EXPECTED = {
     'hexokinase I, at 37°C, pH 8.1': 'HK-I',
     'hexokinase Ib, at 37°C, pH 7.2': 'HK-Ib',
     'hexokinase Ia, at 37°C, pH 7.2': 'HK-Ia',
+    # Rows whose value is a range ("0.046 - 0.048"), kept since the third
+    # round's review where a compound has no single value in the organism.
+    'hexokinase Ia, Ib and Ic, at 37°C, pH 7.2': 'HK-Ia',
+    'HK II, at 25°C, pH 7.4': 'HK-II',
     # Tests/fixtures/brenda_ldh_kcat_fixture.html
     'isoform LDHL2, pH 7, 40°C': 'LDHL2',
     'isoform LDHL1, pH 7, 45°C': 'LDHL1',
@@ -308,14 +312,17 @@ class TestTheWholeCorpus:
         # rows. The parser now returns no rows for a table a page's
         # navigation does not list. The 615 distinct commentaries are
         # unchanged by that: the 436 rows dropped were copies, not new rows.
-        assert len(corpus) == 2362
+        # 2372 since the third round's review: a row whose value is a range
+        # is kept where its compound has no single value in that organism.
+        assert len(corpus) == 2372
         # 615 until 2026-11-11. Rows on the hexokinase page whose BRENDA
         # reference has five digits ("94720") had no reference read, and the
         # longest cell stood in for the commentary: three rows carried
         # "Oryctolagus cuniculus" and "Eimeria tenella" -- their organism --
         # as what they measured. The reference cell is read now, and one of
         # them carries its real commentary, "41°C, pH 7.5".
-        assert len({c for _, _, c in corpus if c}) == 614
+        # 616 since the third round's review: two commentaries of range rows.
+        assert len({c for _, _, c in corpus if c}) == 616
 
     def test_every_row_reads_as_checked_by_hand(self, corpus):
         wrong = {}
@@ -373,7 +380,9 @@ class TestTheWholeCorpus:
                 kinds["respelled"] += 1
             else:
                 kinds["cut short or misread"] += 1
-        assert kinds == {"same": 1897, "missed": 192, "cut short or misread": 45,
+        # 1902 and 197 since the third round's review: ten rows whose value
+        # is a range are read now (five "missed" by the old reader).
+        assert kinds == {"same": 1902, "missed": 197, "cut short or misread": 45,
                          "respelled": 4, "not an isoform": 2}
 
 

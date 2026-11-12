@@ -414,8 +414,14 @@ class ParameterScout:
             # carried forward for it.
             explicitly_unreported=(),
             # The resolver's reason described the row it chose, not this
-            # one; this re-selection's reason is `new_reason` below.
-            **({"resolver_because": None}
+            # one. The re-selection's own reason is said in its place: with
+            # None the report printed "the resolver's pick, not a verdict"
+            # beside a row no resolver had picked (rabbit aldolase, third
+            # round's review).
+            **({"resolver_because": (
+                f"it is the row nearest the assay window ({_describe_windows(refs)}) among the "
+                f"rows the resolver returned, re-selected over the resolver's own pick "
+                f"({_row_description(source)})")}
                if "resolver_because" in getattr(source, "__dataclass_fields__", {}) else {}),
             # The isoform is the re-selected row's own, as the resolver read it.
             **({"row_isoform": best.get("isoform")}

@@ -61,8 +61,16 @@ from assay_conditions import parse_assay_conditions
 from http_retry import retry_get
 
 
+#: A value cell that is a range ("0.038 - 0.04").
+_RANGE_VALUE = re.compile(r"^(\d+\.?\d*)\s*-\s*(\d+\.?\d*)$")
+#: BRENDA's aggregate summary row: "0.0018 - 1100 | (S)-lactate | 50 entries".
+_AGGREGATE_ROW = re.compile(r"\b\d+\s+entries\b", re.IGNORECASE)
+
+
 class BRENDAKmEntry(BaseModel):
     km_value: float
+    #: (low, high) when the paper gave a range; `km_value` is then `low`.
+    value_range: tuple[float, float] | None = None
     unit: str = "mM"
     substrate: str
     organism: str
@@ -453,9 +461,22 @@ _COUNTER_ION = re.compile(
 #: Stereo and anomer descriptors that may precede a name: "(S)-", "L-",
 #: "DL-", "beta-D-", "(2R,3S)-".
 _STEREO_PREFIX = re.compile(
-    r"^(?:(?:\([0-9A-Za-z,+\-]+\)|[DL]{1,2}|alpha|beta|cis|trans|[αβ])-)+",
+    # "S-dihydroorotate" (human DHODH, beside "dihydroorotate") is the
+    # (S)-form written without parentheses: an R or S alone before a name.
+    # Not before a substituent ("S-adenosyl", "S-methyl"), where the S is a
+    # sulfur atom, not a configuration.
+    r"^(?:(?:\([0-9A-Za-z,+\-]+\)|[DL]{1,2}|[RS](?=-(?!adenosyl|methyl|ethyl|acetyl|benzyl"
+    r"|nitroso|sulfo|carbamoyl|propyl|allyl|glutathionyl)[a-z])|alpha|beta|cis|trans|[αβ])-)+",
     re.IGNORECASE,
 )
+
+
+def _same_compound(a: str, b: str) -> bool:
+    try:
+        from compound_names import same_compound
+    except ImportError:  # imported as Tests.brenda_client
+        from Tests.compound_names import same_compound
+    return same_compound(a, b)
 
 
 def _substrate_key(name: str) -> str:
@@ -481,6 +502,11 @@ def substrate_matches(compound: str, target: str) -> bool:
     if not t:
         return False
     if c == t:
+        return True
+    # One compound under another of BRENDA's spellings (compound_names):
+    # "Z-" / "N-benzyloxycarbonyl-", "p-" / "4-", a hyphen or a space,
+    # GSSG / glutathione disulfide. Asked for one, the search reaches all.
+    if _same_compound(compound, target):
         return True
     if _STEREO_PREFIX.match(t):
         return False
@@ -708,9 +734,24 @@ def parse_brenda_km_html(
                 continue
 
         km_match = re.match(r"^(\d+\.?\d*)$", cell_texts[0].strip())
+        value_range = None
         if not km_match:
-            continue
-        km_value = float(km_match.group(1))
+            # "0.038 - 0.04 | AMP | Escherichia coli | - | pH 7.4, 27°C |
+            # 642585" is one paper's measurement given as a range, not
+            # BRENDA's aggregate summary row (whose organism cell reads "N
+            # entries"). Both were dropped, and E. coli adenylate kinase lost
+            # AMP, its natural substrate (third round's review). The lower
+            # bound is carried -- a number the paper gives, never a midpoint
+            # -- and `value_range` says the paper gave a range.
+            ranged = _RANGE_VALUE.match(cell_texts[0].strip())
+            if not ranged or _AGGREGATE_ROW.search(full_text):
+                continue
+            low, high = float(ranged.group(1)), float(ranged.group(2))
+            if not 0 < low < high:
+                continue
+            km_value, value_range = low, (low, high)
+        else:
+            km_value = float(km_match.group(1))
 
         # Match the target against the row's COMPOUND cell, not the whole
         # row. The commentary names other molecules too: BRENDA's LDH Ki row
@@ -937,6 +978,7 @@ def parse_brenda_km_html(
                 effectors=extract_effectors(conditions),
                 reference_id=ref_id,
                 ec_number=ec_number,
+                value_range=value_range,
                 flagged=flagged,
                 flag_reason=flag_reason,
                 substrate_type=classify_substrate(matched_substrate),
@@ -945,7 +987,24 @@ def parse_brenda_km_html(
             )
         )
 
-    return results
+    return _ranges_only_where_alone(results)
+
+
+def _ranges_only_where_alone(results: list) -> list:
+    """A row whose value is a range ("0.057 - 0.061") is kept only for a
+    compound and organism with no single-value row: a range often spans a
+    paper's several preparations ("wild-type and nonaggregating interface
+    mutant hexokinase I"), so it is evidence of last resort, used where it is
+    the only evidence (E. coli adenylate kinase and AMP)."""
+    def key(entry):
+        # A stereo form and the bare name are one compound here: the range
+        # of "glucose 6-phosphate" is not alone beside D-glucose 6-phosphate.
+        name = _substrate_key(entry.substrate)
+        prefix = _STEREO_PREFIX.match(name)
+        return (name[prefix.end():] if prefix else name, entry.organism)
+
+    single = {key(e) for e in results if not e.value_range}
+    return [e for e in results if not e.value_range or key(e) not in single]
 
 
 def parse_brenda_turnover_html(
@@ -1105,11 +1164,14 @@ def fetch_and_parse_brenda_km(
         except Exception:
             taxon_id = None
 
-    fallback_uniprot = (
-        enzyme_lookup.fetch_uniprot_accession(ec_number, taxon_id)
-        if taxon_id
-        else None
-    )
+    # A fallback locator only (it stamps rows with no UniProt cell): a
+    # UniProt outage must not abort a search whose BRENDA page loads.
+    fallback_uniprot = None
+    if taxon_id:
+        try:
+            fallback_uniprot = enzyme_lookup.fetch_uniprot_accession(ec_number, taxon_id)
+        except Exception:
+            fallback_uniprot = None
     html = fetch_brenda_html(ec_number)
 
     entries = parse_brenda_km_html(

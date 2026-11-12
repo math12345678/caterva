@@ -381,6 +381,41 @@ def _cyp_reading(m: "re.Match") -> Optional[str]:
     return f"CYP{m.group('code')}"
 
 
+# -- Protein symbols BRENDA's commentary uses on many-protein EC numbers ------
+#
+# The third round of the real-values review (2026-11-12) found rows naming a
+# protein by a short symbol the forms above do not read, carried as rows
+# "naming no isoform" for another protein: "recombinant wild-type Csk" and
+# "GST-fusion Chk" (EC 2.7.10.2, where ABL1 was asked for), "Ki value for
+# inhibition of wild type Shp2" (counted for PTP1B), "recombinant wild-type
+# GSTk" (the kappa-class GST, carried for "GST with CDNB"), and "tACE"
+# (testis ACE). A short, curated list: these symbols are proteins wherever
+# BRENDA writes them; a general "any capitalised token" form would read
+# buffer and substrate names as proteins.
+_PROTEIN_SYMBOL = re.compile(
+    r"(?<![\w-])(?:(?P<shp>SHP|Shp)-?(?P<shpn>[12])|(?P<tyr>Csk|Chk|Lck|Fyn|Lyn|Hck|Btk|Syk"
+    r"|(?:c-|v-)?Src|(?:c-|v-)?Abl|Bcr-Abl)|GST(?P<gstc>[akmoptzAKMOPTZ])(?P<gstn>\d)?(?:-\d)?"
+    r"|(?P<ace>[ts]ACE))(?![\w-])"
+)
+_GST_CLASS = {"a": "GSTA", "k": "GSTK", "m": "GSTM", "o": "GSTO", "p": "GSTP", "t": "GSTT",
+              "z": "GSTZ"}
+
+
+def _protein_symbol_reading(m: "re.Match") -> Optional[str]:
+    if m.group("shp"):
+        return f"SHP-{m.group('shpn')}"
+    if m.group("tyr"):
+        symbol = m.group("tyr")
+        return symbol if symbol.startswith("Bcr") else re.sub(r"^[cv]-", "", symbol)
+    if m.group("gstc"):
+        return f"{_GST_CLASS[m.group('gstc').lower()]}{m.group('gstn') or '1'}"
+    if m.group("ace"):
+        return {"t": "testis ACE (tACE: the one-domain germinal form, C-domain only, not "
+                     "somatic two-domain ACE)",
+                "s": "somatic ACE (sACE, two-domain)"}[m.group("ace")[0]]
+    return None
+
+
 #: Every form a name can take, in the order tried at one position.
 _FORMS = (
     (_CA_NAME, _ca_reading),
@@ -392,6 +427,7 @@ _FORMS = (
     (_GLUCOKINASE, _glucokinase_reading),
     (_CYP, _cyp_reading),
     (_HYPHEN_CODE, _hyphen_code_reading),
+    (_PROTEIN_SYMBOL, _protein_symbol_reading),
 )
 #: "... and" before a second name: "isozymes LDH-A and LDH-B".
 _AND_ANOTHER = re.compile(r"\s+and\s+(?:(?:isozyme|isoenzyme|isoform)\s+)?")

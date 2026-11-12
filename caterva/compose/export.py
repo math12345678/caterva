@@ -325,7 +325,8 @@ class Spread:
     def what(self) -> str:
         if self.one_source:
             return f"one source (BRENDA ref {self.references[0]}) reports {self.n_values} values"
-        return (f"{len(self.references) or 'several'} sources report {self.n_values} values"
+        distinct = " distinct" if self.n_values < len(self.references) else ""
+        return (f"{len(self.references) or 'several'} sources report {self.n_values}{distinct} values"
                 + (f" (BRENDA ref {', '.join(self.references)})" if self.references else ""))
 
     @property
@@ -434,11 +435,36 @@ class Measurement:
     #: checks read this when the words are silent (ADR 0182, second round).
     row_isoform: Optional[str] = None
 
+    def _compared(self) -> Tuple[Any, ...]:
+        """The ranked rows that measured the carried row's protein: a row
+        naming another isoform is another protein's value, not a disagreement
+        about this one. Carbonic anhydrase II's kcat 1.4e6 1/s was reported as
+        a 108-fold disagreement with CA III's 13000 (third round's review)."""
+        mine = self.row_isoform
+        if not mine:
+            return tuple(self.alternatives)
+        try:
+            from caterva.bind.core import same_isoform
+        except ImportError:  # pragma: no cover - caterva is importable here
+            return tuple(self.alternatives)
+        kept = []
+        for row in self.alternatives:
+            get = row.get if isinstance(row, dict) else (lambda k, r=row: getattr(r, k, None))
+            # Only a row that names its isoform itself, in its words or its
+            # own UniProt cell, is set aside: a reading from its paper's
+            # other entries is a weaker guess than a spread can rest on.
+            own = get("isoform_own")
+            if own and own != mine and not same_isoform(own, mine):
+                continue
+            kept.append(row)
+        return tuple(kept)
+
     @property
     def disagreement(self) -> Optional[Tuple[float, float]]:
-        """`(low, high)` across every ranked row, or None when they agree."""
+        """`(low, high)` across every ranked row of the carried row's protein,
+        or None when they agree."""
         values = [float(self.value)]
-        for row in self.alternatives:
+        for row in self._compared():
             candidate = row.get("value") if isinstance(row, dict) else getattr(row, "value", None)
             if candidate is None:
                 continue
@@ -456,8 +482,9 @@ class Measurement:
         span = self.disagreement
         if span is None:
             return None
-        rows = [r for r in self.alternatives if isinstance(r, dict)]
-        values = {r.get("value") for r in rows if r.get("value") is not None}
+        rows = [r for r in self._compared() if isinstance(r, dict)]
+        values = {float(r["value"]) for r in rows if r.get("value") is not None}
+        values.add(float(self.value))
         references = tuple(sorted({str(r["reference_id"]) for r in rows if r.get("reference_id")}))
         return Spread(low=span[0], high=span[1], unit=self.unit, carried=float(self.value),
                       n_values=max(len(values), 2), references=references,

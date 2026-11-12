@@ -599,7 +599,11 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
     for name in unmeasured:
         reason = str(reasons.get(name, ""))
         low = reason.lower()
-        if "never carried under this one's" in low:
+        if low.startswith("not searched:"):
+            # The constant's own search failed on the network
+            # (`__main__._not_searched`): the remedy is to run it again.
+            need = "failed"
+        elif "never carried under this one's" in low:
             # The row the search returned was another compound's and was
             # withheld (`__main__._neighbours_withheld`): naming the compound
             # again would return it again.
@@ -612,8 +616,9 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
             # `__main__._measured_on_the_isoform` says whether any compound
             # has rows naming the isoform there; when none has, offering
             # --substrate would lead to the same placeholder.
-            need = ("isoform_unmeasured" if re.search(r"naming \S+ under EC \S+ in .+ for any "
-                                                      r"(substrate|inhibitor)", reason)
+            need = ("isoform_elsewhere" if "rows naming it are in" in reason
+                    else "isoform_unmeasured" if re.search(r"naming \S+ under EC \S+ in .+ for any "
+                                                           r"(substrate|inhibitor)", reason)
                     else "isoform")
         elif "so naming one would leave the" in low:
             # Every substrate offered lacks a row for another constant of
@@ -640,6 +645,11 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
             need = "nothing"
         by_need.setdefault(need, []).append(name)
     steps = []
+    if "failed" in by_need:
+        names = by_need["failed"]
+        steps.append(f"re-run the same command: the search for {', '.join(names)} failed on the "
+                     "network and was not run, so BRENDA was not asked; the provenance table names "
+                     "the service that failed")
     if "neighbour" in by_need:
         steps.append(f"supply {', '.join(by_need['neighbour'])} yourself, or model the compound the "
                      "provenance table names: the row the search returned is another compound's, "
@@ -663,11 +673,16 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
                      "isoform than the one asked for: re-run with --substrate set to one the provenance table "
                      "lists as measured on this isoform, or with --isoform set to the one the provenance table names to "
                      "model that protein, or supply it yourself")
+    if "isoform_elsewhere" in by_need:
+        steps.append(f"{', '.join(by_need['isoform_elsewhere'])}: no row in this organism names the "
+                     "isoform asked for: re-run with --organism set to one the provenance table lists "
+                     "as holding rows naming it (that organism's protein, labelled as such), or supply "
+                     "it yourself")
     if "isoform_unmeasured" in by_need:
         steps.append(f"{', '.join(by_need['isoform_unmeasured'])}: every row the search found measured "
                      "another isoform than the one asked for, and no row in this organism names that "
-                     "isoform for any compound: re-run with --isoform set to the one the provenance table "
-                     "names to model that protein, or supply it yourself")
+                     "isoform for any compound: supply it yourself (--isoform set to the one the "
+                     "provenance table names would model that other protein instead)")
     if "inhibitor" in by_need:
         steps.append(f"name the inhibitor with --inhibitor NAME, so {', '.join(by_need['inhibitor'])} "
                      "is looked up (BRENDA files a Ki under the inhibitor)")

@@ -66,7 +66,7 @@ _COSOLVENTS = (r"methanol|ethanol|DMSO|dimethyl\s*sulfoxide|dimethylsulfoxide|gl
 _CONSTRUCTS = (
     (re.compile(r"\bchimer(?:a|ic)\w*|\bdomain[- ]swap\w*|\b\w+dom-\w+", re.IGNORECASE),
      "a chimeric construct"),
-    (re.compile(r"\b(?:[NC]|carboxyl|amino)-?(?:terminal\s+)?(?:half|domain)\b|\b[NC]dom\b|\b(?:isolated|catalytic|single)"
+    (re.compile(r"\b(?:[NC]|carboxyl|amino)-?(?:terminal\s+)?(?:half|domain)\b|\b[NC]dom\b|\b(?:isolated|catalytic|catalyctic|single)"
                 r"\s+domain\b|\bdomain\s+(?:construct|only)\b", re.IGNORECASE),
      "an isolated domain"),
     (re.compile(r"\b[NC]-terminal\b[^,;]{0,30}\b(?:addition|extension|deletion|truncation)\b|\btruncat\w+|\bdeletion\s+(?:mutant|construct|variant)\b", re.IGNORECASE),
@@ -104,6 +104,22 @@ _CONSTRUCTS = (
                 r"|\bgrafted\s+(?:to|onto|with)\b|\bencapsulated\b|\bentrapped\b",
                 re.IGNORECASE),
      "a chemically modified enzyme"),
+    # "human serum albumin-bound enzyme, pH 5.2, 37°C" (hen lysozyme, ref
+    # 718362, beside the same paper's "free enzyme"): the enzyme bound to a
+    # carrier protein or surface (third round's review).
+    (re.compile(r"\b[\w-]*albumin[- ]bound\b|\b(?:antibody|heparin|matrix|bead|resin|support|surface"
+                r"|nanoparticle|polymer|chitosan|silica)s?-bound\b"
+                r"|\b(?:enzyme|protein)\s+(?:was\s+|is\s+)?adsorbed\s+(?:to|on|onto)\b"
+                r"|\bbound\s+to\s+(?:\w+\s+){0,2}(?:albumin|nanoparticles?"
+                r"|beads?|resin|support|matrix)\b", re.IGNORECASE),
+     "an enzyme bound to a carrier"),
+    # "uncleaved enzyme, nonsulfated" (human trypsin-2, ref 772843: four
+    # rows, cleaved or not by autolysis, sulfated or not), beside the same
+    # compound's "wild type enzyme" rows (refs 678332, 682760): a paper's
+    # series over modification states, not the enzyme as isolated.
+    (re.compile(r"\b(?:un)?cleaved\s+(?:enzyme|form|protein)\b|\b(?:non|un|de)?-?sulfated\b(?!\s+(?!enzyme\b|form\b|protein\b)[A-Za-z])"
+                r"|\bautolys(?:ed|is)\s+(?:enzyme|form)\b", re.IGNORECASE),
+     "a modification state of the enzyme"),
     (re.compile(rf"\b\d+(?:\.\d+)?\s*%\s*(?:\(?[vw]/[vw]\)?\s*)?(?:{_COSOLVENTS})\b"
                 rf"|\b\d+(?:\.\d+)?\s*M\s+(?:urea|guanidin\w*)\b", re.IGNORECASE),
      "an assay with a cosolvent or denaturant added"),
