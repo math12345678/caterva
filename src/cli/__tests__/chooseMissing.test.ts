@@ -91,6 +91,44 @@ describe('askChooser reads the three answers the chooser can give', () => {
   });
 });
 
+describe('completeByChoosing with an inhibitor named', () => {
+  // `simulate --enzyme "xanthine oxidase" --model competitive --inhibitor
+  // allopurinol` chose Homo sapiens for Km and kcat alone and then could not
+  // find the Ki, where compose chose Bos taurus, the organism with an
+  // allopurinol Ki row; and it offered allopurinol as another substrate.
+  it('asks for the organism with the inhibitor, and does not offer it as a substrate', () => {
+    const BOS: AutomaticChoice = { ...HUMAN, chosen: 'Bos taurus' };
+    const XANTHINE: AutomaticChoice = {
+      role: 'substrate',
+      chosen: 'xanthine',
+      why: 'most Km and kcat rows',
+      alternatives: [{ name: 'hypoxanthine', rows: { km: 4 } }, { name: 'Allopurinol', rows: { km: 1 } }],
+      considered: 3,
+    };
+    const { run, calls } = stub({ organism: { status: 0, choice: BOS }, substrate: { status: 0, choice: XANTHINE } });
+    const done = completeByChoosing({ enzyme: 'xanthine oxidase', ec: '1.17.3.2', inhibitor: 'allopurinol' }, run);
+    expect(calls[0]).toEqual(['--ec', '1.17.3.2', '--role', 'organism', '--json', '--inhibitor', 'allopurinol']);
+    expect(done.kind === 'complete' && done.system.organism).toBe('Bos taurus');
+    const substrate = done.kind === 'complete' ? done.system.choices[1]! : undefined;
+    expect(substrate?.alternatives.map((a) => a.name)).toEqual(['hypoxanthine']);
+  });
+});
+
+describe('describeChoice for an enzyme', () => {
+  it('does not say no enzyme was named', () => {
+    const line = describeChoice({
+      role: 'enzyme',
+      chosen: '1.1.1.27',
+      why: "your description names 'lactate dehydrogenase', which is not one enzyme; L-lactate dehydrogenase is used because ...",
+      alternatives: [{ name: 'EC 1.1.1.28 (D-lactate dehydrogenase)', rows: { km: 0 } }],
+      considered: 2,
+    });
+    expect(line).toMatch(/^Using EC 1\.1\.1\.27: your description names 'lactate dehydrogenase'/);
+    expect(line).not.toMatch(/No enzyme named/);
+    expect(line).toMatch(/Pass --ec to use another\.$/);
+  });
+});
+
 describe('completeByChoosing', () => {
   it('chooses the organism first, then the substrate in that organism', () => {
     const { run, calls } = stub({

@@ -22,6 +22,7 @@ import {
   readSystemFromQuery,
 } from './readSystem';
 import { askChooser, completeByChoosing, describeChoice, type AutomaticChoice } from './chooseMissing';
+import { contradictions, MODEL_OF_RULE, readWithCompose, SENTENCE_OF_MODEL } from './composeReading';
 import type { ParsedSystem } from './suggestResolveCommand';
 import { commandDomains } from './commandDomains';
 import { commandEnsemble } from './commandEnsemble';
@@ -1289,20 +1290,27 @@ ${colors.bright}Commands:${colors.reset}
     ${colors.dim}Write the unit onto the number. A bare value is accepted but the${colors.reset}
     ${colors.dim}assumed unit is reported -- vmax in mM/s read as uM/min is off by 60,000x.${colors.reset}
 
-  simulate <query> --resolve --enzyme E --substrate S --organism O [options]
+  simulate <query> --resolve [--enzyme E] [--substrate S] [--organism O] [options]
     Look up the kinetics from literature, run the simulation, and print
     where every number came from. Refuses to run on anything it could not
-    source -- no parameter is ever defaulted. A substrate or organism the
-    question leaves out is chosen from BRENDA (the best-measured one) and
-    shown, with the alternatives, before you confirm.
+    source -- no parameter is ever defaulted. The question is read the way
+    \`caterva compose\` reads it ("acetylcholinesterase inhibited by
+    donepezil in human"): the enzyme, its isoform, organism, substrate,
+    inhibitor and mechanism. A substrate, organism or inhibitor it leaves
+    out is chosen from BRENDA (the best-measured one) and shown, with why
+    and the alternatives, before you confirm. Flags win over the question.
     ${colors.dim}Example:${colors.reset}
       simulate mm --resolve --enzyme "lactate dehydrogenase" \\
         --substrate pyruvate --organism "Homo sapiens" \\
         --s0 10mM --enzyme-conc 0.001mM
     ${colors.dim}Options:${colors.reset}
-      --enzyme / --ec      which enzyme (never inferred from the query)
-      --substrate NAME     substrate (required)
-      --organism NAME      organism (required)
+      --enzyme / --ec      which enzyme, when the query does not name it
+      --substrate NAME     the substrate. Without it, the one the query names,
+                           or else BRENDA's best-measured one, chosen and said
+      --organism NAME      the organism. Without it, the one the query names,
+                           or else the one whose rows cover the constants the
+                           model needs (for an inhibitor's Ki too), chosen
+                           and said
       --s0 VALUE           initial substrate -- an experimental condition
                            you choose, so it cannot be looked up
       --enzyme-conc VALUE  [E]0, needed for Vmax = kcat x [E]0
@@ -1491,7 +1499,13 @@ async function main() {
         let substrate = flags['substrate'];
         let organism = flags['organism'];
         let enzyme = flags['enzyme'];
-        const ec = flags['ec'];
+        let ec = flags['ec'];
+        // What compose's reading of the question adds beyond the three
+        // names: the isoform a symbol is, the inhibitor it names, the model
+        // its mechanism is (composeReading.ts). Flags win over each.
+        let readIsoform: string | undefined;
+        let readInhibitor: string | undefined;
+        let readModel: string | undefined;
 
         if (!substrate || !organism || (!enzyme && !ec)) {
           // SIX FLAGS TO RUN ONE SIMULATION WAS THE PROBLEM.
@@ -1513,7 +1527,68 @@ async function main() {
           // gets the old refusal plus the exact command. A default-confirm
           // would be the silent inference this forbids, with a prompt in the
           // code that nobody ever sees.
-          let parsed: ParsedSystem | null = readSystemFromQuery(query);
+          // ONE READING OF A SENTENCE, COMPOSE'S (composeReading.ts). The
+          // question goes to `python -m caterva.compose.read` with the flags,
+          // which win over it as they do for compose; what it names, and
+          // what it chose for what it left out, is the system confirmed
+          // below. Only when that reader is unavailable is the question
+          // read by the older readers that follow.
+          let parsed: ParsedSystem | null = null;
+          let readRefusal: string | undefined;
+          let composeRead = false;
+          const readFlags = {
+            ...(ec ?? enzyme ? { subject: ec ?? enzyme } : {}),
+            ...(organism ? { organism } : {}),
+            ...(substrate ? { substrate } : {}),
+            ...(flags['inhibitor'] ? { inhibitor: flags['inhibitor'] } : {}),
+            ...(flags['isoform'] ? { isoform: flags['isoform'] } : {}),
+          };
+          let answer = readWithCompose(query, readFlags);
+          if (answer.kind === 'read' && !answer.reading.ec && (enzyme || ec)) {
+            // The question names no mechanism the grammar builds ("simulate
+            // competitive"); the flags name the enzyme. Read the model's own
+            // description with them, as `caterva compose` would be run.
+            const model = (flags['model'] ?? 'mm').toLowerCase();
+            const sentence = SENTENCE_OF_MODEL[model];
+            if (sentence) answer = readWithCompose(sentence, readFlags);
+          }
+          if (answer.kind === 'read') {
+            composeRead = true;
+            const r = answer.reading;
+            const clash = contradictions(r);
+            if (clash.length > 0) {
+              error(
+                'Your flags and your question name different systems, so nothing was resolved:\n' +
+                clash.map((line) => `  ${line}`).join('\n') + '\n' +
+                'Drop the flag, or reword the question, so that both name the system you mean.'
+              );
+              process.exit(1);
+            }
+            if (r.ec && r.substrate && r.organism && !r.refusal) {
+              parsed = {
+                enzyme: enzyme ?? r.enzymeText ?? `EC ${r.ec}`,
+                substrate: r.substrate,
+                organism: r.organism,
+                ...(r.organismText && r.organismText !== r.organism && r.named.organism
+                  ? { organismTyped: r.organismText }
+                  : {}),
+                ec: r.ec,
+                choices: r.choices,
+              };
+              readIsoform = r.isoform ?? undefined;
+              readInhibitor = r.inhibitor ?? undefined;
+              readModel = r.rule ? MODEL_OF_RULE[r.rule] : undefined;
+              if (!booleans.has('json')) {
+                for (const note of r.notes) info(note);
+              }
+            } else {
+              readRefusal = r.refusal ?? (r.ec
+                ? `Compose read EC ${r.ec} in your question, but could not settle its substrate and organism.`
+                : 'Compose read no enzyme in your question.');
+            }
+          } else {
+            parsed = readSystemFromQuery(query);
+          }
           // NO SUBSTRATE OR NO ORGANISM IS A CHOICE NOW, NOT A REFUSAL
           // (ADR 0182). When the sentence and the flags name the enzyme but
           // not the substrate or the organism, the engine's chooser picks
@@ -1524,7 +1599,7 @@ async function main() {
           // stands, followed by the chooser's sentence saying what is
           // missing. See chooseMissing.ts.
           let nothingToChoose: string | undefined;
-          if (!parsed) {
+          if (!parsed && !composeRead) {
             const partial = readPartialSystemFromQuery(query);
             const typedOrganism = organism ? canonicalOrganism(organism) : undefined;
             const named = {
@@ -1534,6 +1609,7 @@ async function main() {
               organism: partial?.organism ?? typedOrganism?.organism,
               organismTyped: partial?.organism !== undefined ? partial.organismTyped : typedOrganism?.typed,
               substrate,
+              ...(flags['inhibitor'] ? { inhibitor: flags['inhibitor'] } : {}),
             };
             if (!named.ec && named.enzyme) {
               Object.assign(named, enzymeIdentity(named.enzyme, named.organism));
@@ -1552,7 +1628,7 @@ async function main() {
           // so `"hexokinase glucose mouse" --organism human` cited mouse
           // BRENDA refs with --organism human silently dropped. See
           // flagsContradicting for why neither input simply wins.
-          const contradicted = parsed
+          const contradicted = parsed && !composeRead
             ? flagsContradicting(
                 parsed,
                 { enzyme, substrate, organism, ec },
@@ -1577,11 +1653,19 @@ async function main() {
             enzyme = parsed.enzyme.startsWith('EC ') && ec ? enzyme : parsed.enzyme;
             substrate = parsed.substrate;
             organism = parsed.organism;
+            // The EC number compose took the name as (a name that is a few
+            // enzymes, singled out by BRENDA's rows, is sent with it).
+            if (composeRead && parsed.ec) ec = parsed.ec;
             // Said again after the confirmation, on stderr, so a --yes run's
             // transcript and a --json run's log both carry the choice.
             for (const choice of parsed.choices ?? []) {
               if (!booleans.has('json')) info(describeChoice(choice));
             }
+          } else if (readRefusal && !parsed) {
+            // Compose read the question and said why nothing can be looked
+            // up: its words, not a claim that flags are required.
+            error(readRefusal);
+            process.exit(1);
           } else {
             error(
               '--resolve needs --substrate, --organism, and either --enzyme or --ec. ' +
@@ -1661,7 +1745,10 @@ async function main() {
           process.exit(1);
         }
 
-        const modelRaw = (flags['model'] ?? 'mm').toLowerCase();
+        const modelRaw = (flags['model'] ?? readModel ?? 'mm').toLowerCase();
+        if (flags['model'] === undefined && readModel && readModel !== 'mm' && !booleans.has('json')) {
+          info(`Your question names an inhibitor and no other mechanism, so the model is --model ${readModel}, as compose builds it. Pass --model to choose another.`);
+        }
         if (!['mm', 'competitive', 'noncompetitive', 'product'].includes(modelRaw)) {
           error(`--model must be mm, competitive, noncompetitive or product (got '${modelRaw}')`);
           process.exit(1);
@@ -1677,12 +1764,15 @@ async function main() {
         // inhibitor. With no value it is refused rather than read as absent,
         // which would send the run to the "no --inhibitor" refusal while the
         // user believes they gave one.
-        const inhibitor = flags['inhibitor'];
+        const inhibitor = flags['inhibitor'] ?? (modelRaw !== 'mm' ? readInhibitor : undefined);
+        if (flags['inhibitor'] === undefined && readInhibitor && modelRaw === 'mm' && !booleans.has('json')) {
+          info(`Your question names the inhibitor ${readInhibitor}; --model mm has no Ki, so it is not used.`);
+        }
         if (booleans.has('inhibitor')) {
           error('--inhibitor needs a value: the compound whose Ki the model uses, e.g. --inhibitor gossypol.');
           process.exit(1);
         }
-        if (inhibitor !== undefined && modelRaw === 'mm') {
+        if (flags['inhibitor'] !== undefined && modelRaw === 'mm') {
           error(
             '--inhibitor names the compound an inhibition model\'s Ki is looked up under; ' +
             'plain Michaelis-Menten has no Ki. Add --model competitive, noncompetitive or product.'
@@ -1690,7 +1780,7 @@ async function main() {
           process.exit(1);
         }
         // --isoform, as on `resolve`, for every constant the run looks up.
-        const isoform = flags['isoform'];
+        const isoform = flags['isoform'] ?? readIsoform;
         if (booleans.has('isoform')) {
           error('--isoform needs a value: the isoform every constant must have measured, e.g. --isoform LDH-A.');
           process.exit(1);
@@ -1883,7 +1973,7 @@ async function main() {
       let substrate = flags['substrate'];
       let organism = flags['organism'];
       const enzyme = flags['enzyme'] ?? rest.find(a => !a.startsWith('--'));
-      const ec = flags['ec'];
+      let ec = flags['ec'];
 
       // A missing substrate (the inhibitor, for --quantity ki) or organism
       // is CHOSEN from BRENDA by the engine's chooser and said, with why and
@@ -1898,6 +1988,28 @@ async function main() {
       // organism the symbol is a gene of, saying so -- never an organism
       // chosen by row count for a human P450 (it chose Priestia megaterium).
       let impliedIsoform: string | undefined;
+      // A NAME THAT IS A FEW ENZYMES, OF WHICH BRENDA'S ROWS SINGLE OUT ONE,
+      // IS TAKEN AS THAT ONE, AND SAID (ADR 0182). `resolve "lactate
+      // dehydrogenase" --substrate pyruvate --organism "Homo sapiens"`, the
+      // example in this command's own help, was refused ("12 enzymes
+      // match"), where compose uses EC 1.1.1.27, the one candidate with
+      // human Km rows. The choice is compose's, read by compose
+      // (composeReading.ts); a name the rows do not settle stays refused by
+      // the runner with the candidates named.
+      if (enzyme && !ec) {
+        const typed = organism ? canonicalOrganism(organism).organism : undefined;
+        if (!enzymeIdentity(enzyme, typed).ec) {
+          const answer = readWithCompose(enzyme, { ...(typed ? { organism: typed } : {}), noChoose: true });
+          const chosen = answer.kind === 'read'
+            ? answer.reading.choices.find((c) => c.role === 'enzyme')
+            : undefined;
+          if (answer.kind === 'read' && answer.reading.ec && chosen) {
+            ec = answer.reading.ec;
+            resolveChoices.push(chosen);
+            if (!booleans.has('json')) info(describeChoice(chosen));
+          }
+        }
+      }
       if ((!substrate || !organism || flags['isoform'] === undefined) && enzyme && !ec) {
         const typed = organism ? canonicalOrganism(organism).organism : undefined;
         const identity = enzymeIdentity(enzyme, typed);
@@ -1927,6 +2039,9 @@ async function main() {
               ec: identity.ec,
               role: 'organism',
               ...(substrate && role === 'substrate' ? { substrate } : {}),
+              // For a Ki, --substrate is the inhibitor: the organism is the
+              // one with rows for it.
+              ...(substrate && role === 'inhibitor' ? { inhibitor: substrate } : {}),
             });
             if (answer.kind === 'chosen') {
               organism = answer.choice.chosen;

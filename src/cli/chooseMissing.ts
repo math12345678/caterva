@@ -64,6 +64,14 @@ export interface ChooserQuestion {
   organism?: string;
   /** For an organism or an inhibitor: the substrate already named. */
   substrate?: string;
+  /**
+   * For an organism: the inhibitor already named. The organism is then
+   * counted for its Ki too, as compose counts it: "xanthine oxidase" with
+   * allopurinol is modelled in Bos taurus, the organism with an allopurinol
+   * Ki row, not in Homo sapiens, which covers Km and kcat and then cannot
+   * give the Ki (found 2026-11-11).
+   */
+  inhibitor?: string;
 }
 
 /** What spawning returned; a seam so tests need no Python. */
@@ -143,6 +151,7 @@ export function askChooser(
   const args = ['--ec', question.ec, '--role', question.role, '--json'];
   if (question.organism) args.push('--organism', question.organism);
   if (question.substrate) args.push('--substrate', question.substrate);
+  if (question.inhibitor) args.push('--inhibitor', question.inhibitor);
   const proc = run(args);
   const parsed = lastJsonLine(proc.stdout);
   const note = typeof parsed?.note === 'string' ? parsed.note : '';
@@ -190,6 +199,15 @@ const FLAG: Record<ChoiceRole | 'enzyme', string> = {
 export function describeChoice(choice: AutomaticChoice): string {
   const why = choice.why.trim().replace(/[.\s]+$/, '');
   const others = describeAlternatives(choice.alternatives);
+  if (choice.role === 'enzyme') {
+    // An enzyme was named, as a name that is a few enzymes: "No enzyme
+    // named" would be false. The why says which name and why this one.
+    return (
+      `Using EC ${choice.chosen}: ${why}. ` +
+      (others ? `Others: ${others}. ` : '') +
+      'Pass --ec to use another.'
+    );
+  }
   return (
     `No ${choice.role} named; using ${choice.chosen} (${why}). ` +
     (others ? `Others: ${others}. ` : 'No other candidate had usable rows. ') +
@@ -205,6 +223,8 @@ export interface NamedParts {
   organism?: string;
   organismTyped?: string;
   substrate?: string;
+  /** The inhibitor named (--inhibitor): the organism is chosen for its Ki too. */
+  inhibitor?: string;
 }
 
 export type Completed =
@@ -246,7 +266,12 @@ export function completeByChoosing(
   let organism = named.organism;
   if (!organism) {
     const answer = askChooser(
-      { ec: named.ec, role: 'organism', ...(named.substrate ? { substrate: named.substrate } : {}) },
+      {
+        ec: named.ec,
+        role: 'organism',
+        ...(named.substrate ? { substrate: named.substrate } : {}),
+        ...(named.inhibitor ? { inhibitor: named.inhibitor } : {}),
+      },
       run,
     );
     if (answer.kind === 'nothing') return { kind: 'nothing', role: 'organism', note: answer.note };
@@ -260,7 +285,16 @@ export function completeByChoosing(
     if (answer.kind === 'nothing') return { kind: 'nothing', role: 'substrate', note: answer.note };
     if (answer.kind === 'unavailable') return { kind: 'not-chosen', reason: answer.reason };
     substrate = answer.choice.chosen;
-    choices.push(answer.choice);
+    // The inhibitor named is not offered as another substrate to model:
+    // BRENDA may list a Km for it (allopurinol is oxidised by xanthine
+    // oxidase), but this run is about it as the inhibitor.
+    const inhibitorKey = named.inhibitor?.trim().toLowerCase();
+    choices.push(inhibitorKey
+      ? {
+          ...answer.choice,
+          alternatives: answer.choice.alternatives.filter((a) => a.name.trim().toLowerCase() !== inhibitorKey),
+        }
+      : answer.choice);
   }
   return {
     kind: 'complete',

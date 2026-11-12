@@ -93,6 +93,9 @@ export interface ResolveOptions {
  * "no network", and an exit code is the only channel that survives `--json`
  * being parsed by something else.
  */
+/** Runner sources for a lookup that stopped at the enzyme name, before any search. */
+const STOPPED_AT_THE_NAME = new Set(['ec_ambiguous', 'ec_not_resolved', 'ec_mismatch']);
+
 export async function commandResolve(options: ResolveOptions): Promise<number> {
   const { substrate, organism, quantity } = options;
 
@@ -183,6 +186,14 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
         // Rows WERE found; a policy withheld them. "Returned nothing" would
         // be false, and would hide the one change that gets a value.
         process.stdout.write(`${c(DIM, '  ' + withheld)}\n`);
+      } else if (STOPPED_AT_THE_NAME.has(result.source ?? '')) {
+        // The lookup stopped at the enzyme's NAME: nothing was searched, so
+        // "searched and returned nothing" would blame BRENDA for a question
+        // it was never asked. The search path below names the candidates.
+        process.stdout.write(
+          `${c(DIM, '  Nothing was searched: the lookup stopped at the enzyme name, before BRENDA or')}\n` +
+            `${c(DIM, '  PubMed was asked. The search path below says why, and what to pass instead.')}\n`,
+        );
       } else if (papers.length === 0) {
         process.stdout.write(
           `${c(DIM, '  BRENDA and PubMed were searched and returned nothing. This is an')}\n` +
