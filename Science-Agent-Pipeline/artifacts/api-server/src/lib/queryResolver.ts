@@ -31,7 +31,7 @@ import { verifiableMetricsCollector } from "./verifiable-metrics";
 import { validateSTREANDA } from "./strenda-validator";
 import { verifyParameterAgainstLiterature } from "./literature-verifier";
 import { getDomainCitation } from "./domain-literature";
-import { readSentence, type SentenceReading } from "./sentenceReader";
+import { readSentenceOutcome, type SentenceReading } from "./sentenceReader";
 
 /**
  * Type-safe validator for numeric assay conditions.
@@ -1563,6 +1563,14 @@ async function applyVmaxFromKcatResolution(
     `Bridged Vmax=${agentResult.vmax} mM/s from a literature kcat= ` +
       `${agentResult.kcat} 1/s and the enzyme_conc supplied in the query.`,
   );
+  // What the kcat's row measured, said as the Km's is. Live on 2026-11-12,
+  // "HK2 with glucose with 50 nM enzyme" (and "HK1 ...") bridged kcat 60.4
+  // 1/s from BRENDA ref 703624, a glucokinase paper whose row names no
+  // isoform, under a Km said to be HK2's, and nothing said so; the CLI
+  // did (rowScopeLines). The same row-scope reading as the Km's.
+  flags.push(...selectedFormFlags("kcat", agentResult.selectedForm));
+  flags.push(...preparationFlags("kcat", agentResult.preparation));
+  flags.push(...rowScopeFlags("kcat", agentResult.rowScope, entities.isoform));
 
   return { parameters, parameterProvenance, flags };
 }
@@ -2499,6 +2507,23 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
 }
 
 /**
+ * Said when compose's reader was asked for a reading and gave none.
+ *
+ * The query is then read by the API's older reader, which reads some
+ * sentences differently from `caterva compose` (the reason the reader is
+ * asked at all, sentenceReader.ts). Answering with another reader's reading
+ * and not saying so is answering another question in silence.
+ */
+export function readerUnavailableFlag(why: string): string {
+  return (
+    `read: compose's sentence reader gave no reading (${why}), so this query was ` +
+    "read by the API's older reader, which can read a sentence differently from " +
+    "`caterva compose`. Check the enzyme, organism, substrate and inhibitor below, " +
+    "or send the query again."
+  );
+}
+
+/**
  * The domain each single-enzyme grammar rule compose builds is served by.
  * A rule with no domain here leaves the keyword classification standing.
  */
@@ -3013,7 +3038,11 @@ export async function resolveQuery(
       matchOrganism(query) ?? (llmResult.entities?.organism || undefined);
     // Compose's reading wins over the model's for an enzyme query: one
     // sentence, one reading, whichever front end it was typed into.
-    const llmReading = ENZYME_DOMAINS.has(llmResult.domain) ? await readSentence(query) : null;
+    const llmOutcome = ENZYME_DOMAINS.has(llmResult.domain)
+      ? await readSentenceOutcome(query)
+      : { reading: null, unavailable: null };
+    const llmReading = llmOutcome.reading;
+    if (llmOutcome.unavailable) flags.push(readerUnavailableFlag(llmOutcome.unavailable));
     const llmEntities: EntityExtraction | undefined = entitiesFromReading(llmReading, query) ??
       (llmResult.entities
       ? {
@@ -3325,11 +3354,25 @@ export async function resolveQuery(
   // Compose's reading of the sentence (sentenceReader.ts), asked only when
   // the query may be about an enzyme: the keywords chose an enzyme domain,
   // or none.
-  const reading =
-    best === undefined || ENZYME_DOMAINS.has(best.domain) ? await readSentence(query) : null;
+  const outcome =
+    best === undefined || ENZYME_DOMAINS.has(best.domain)
+      ? await readSentenceOutcome(query)
+      : { reading: null, unavailable: null };
+  const reading = outcome.reading;
   const readDomain = domainForReading(reading, best?.domain);
   if (readDomain !== best?.domain) {
     best = DOMAIN_DEFAULTS.find((d) => d.domain === readDomain) ?? best;
+  }
+  // Without compose's reading, an inhibitor the query names still makes the
+  // model competitive inhibition, as compose builds it (ADR 0182). Live, on
+  // 2026-11-12, the reader timed out under load and "acetylcholinesterase
+  // inhibited by donepezil in human with 50 nM enzyme" was answered as plain
+  // Michaelis-Menten: the inhibitor the user named dropped, and nothing said
+  // ("inhibited" is no keyword, and "enzyme" is one of mm's).
+  const inhibitorUnread =
+    reading === null && best?.domain === "mm" ? extractInhibitor(query) : undefined;
+  if (inhibitorUnread) {
+    best = DOMAIN_DEFAULTS.find((d) => d.domain === "mm_competitive_inhibition") ?? best;
   }
 
   let readAsKinetics: EnzymeGuess | undefined;
@@ -3370,6 +3413,14 @@ export async function resolveQuery(
           'on that substrate. Say "inhibition" or name another model to change it.',
       ]
     : [];
+  if (outcome.unavailable) flags.push(readerUnavailableFlag(outcome.unavailable));
+  if (inhibitorUnread) {
+    flags.push(
+      `read as: competitive inhibition by ${inhibitorUnread}. The query names an ` +
+        "inhibitor and no mechanism, so the model is competitive inhibition, as " +
+        "`caterva compose` builds it; name another mechanism to change it.",
+    );
+  }
   let parameterProvenance = noteStatedSources(
     buildParameterProvenance(parameters, effectiveOverrides, {}, best.domain),
     statedPhrases,

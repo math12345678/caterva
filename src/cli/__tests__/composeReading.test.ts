@@ -162,6 +162,19 @@ describe('simulate --resolve reads the question as compose does', () => {
     expect(lines(looked).every((p) => p['ecNumber'] === '1.1.1.27' && p['substrate'] === 'pyruvate')).toBe(true);
   });
 
+  it('says so when the reader gives no reading, instead of reading another way in silence', () => {
+    // Live, 2026-11-12, the API's reader timed out under load and answered
+    // "acetylcholinesterase inhibited by donepezil" by the older reader, as
+    // plain Michaelis-Menten, and said nothing. With --yes nobody confirms.
+    const failing = script('failing_reader', ['import sys', 'sys.stderr.write("Traceback: boom\\n")', 'sys.exit(1)']);
+    const { out } = run(['simulate', 'acetylcholinesterase inhibited by donepezil in human', ...SIM], {
+      CATERVA_SENTENCE_READER: failing,
+      CATERVA_LITERATURE_RUNNER: literature(path.join(dir, 'failing.jsonl')),
+    });
+    expect(out).toContain("Compose's sentence reader gave no reading (Traceback: boom)");
+    expect(out).toContain('read by the older reader');
+  });
+
   it("says compose's reason when nothing can be read, not that flags are required", () => {
     const { out, code } = run(['simulate', 'the spread of measles in a school', '--resolve', '--yes'], {
       CATERVA_SENTENCE_READER: reader(path.join(dir, 'measles-read.jsonl')),

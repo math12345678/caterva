@@ -108,25 +108,84 @@ export function parseReading(stdout: string): SentenceReading | null {
   };
 }
 
+/** A key=value parameter the API reads itself ("km=2", "enzyme_conc=0.00005"). */
+const PARAMETER_TOKEN =
+  /^(?:km|ki|vmax|kcat|enzyme_conc|s0|i0|end|points|a0|b0|k|n_replicates|seed)\s*[=:]\s*\S+$/i;
+
+/**
+ * The part of `query` that is a sentence for compose to read.
+ *
+ * The API reads an enzyme concentration ("with 50 nM enzyme") and
+ * key=value parameters ("km=2") out of the query itself (statedQuantities.ts,
+ * extractParameterOverrides); compose's grammar has neither. Sent whole,
+ * every such query came back with "No word of your description ('50 nM') is
+ * a substrate BRENDA lists ..., and if you typed one it was not used",
+ * shown to the user as a reading of their question (review of 2026-11-12,
+ * live). A substrate concentration ("10 mM glucose") is left in: the word
+ * after it names the substrate.
+ */
+export function textForReader(query: string): string {
+  const unit = "(?:[pnmuµμ]?M)";
+  const number = "\\d+(?:\\.\\d+)?(?:e-?\\d+)?";
+  const enzymeWord = "(?:enzyme|catalyst)";
+  return query
+    .split(/\s+/)
+    .filter((token) => !PARAMETER_TOKEN.test(token))
+    .join(" ")
+    // "with 50 nM enzyme", "at 1 uM of the enzyme", "and 50 nM total enzyme"
+    .replace(
+      new RegExp(`\\s*(?:\\b(?:with|at|using|and)\\s+)?${number}\\s*${unit}\\s+(?:of\\s+)?(?:the\\s+)?(?:total\\s+)?${enzymeWord}\\b`, "gi"),
+      "",
+    )
+    // "with the enzyme at 50 nM", "and enzyme concentration of 50 nM"; only
+    // after "with"/"and"/"the", so "angiotensin-converting enzyme at 50 nM"
+    // keeps its name
+    .replace(
+      new RegExp(`\\s*(?:\\b(?:with|and)\\s+(?:the\\s+)?|\\bthe\\s+)${enzymeWord}\\s+(?:concentration\\s+)?(?:of|at|=|:|is)\\s*${number}\\s*${unit}(?![a-z])`, "gi"),
+      "",
+    )
+    .replace(/\s+([,.;])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** Compose's reading, or why there is none. */
+export interface ReadingOutcome {
+  reading: SentenceReading | null;
+  /**
+   * Why the reader gave no reading although it was asked (it timed out,
+   * could not be started, or printed something that is not a reading), or
+   * null when it answered or is off. The caller then reads the query the
+   * older way, and says so: a reading by another reader is another answer.
+   */
+  unavailable: string | null;
+}
+
 /**
  * Compose's reading of `query`, or null when the reader is off, could not
  * be run, or answered with something that is not a reading (said in the
  * log; the caller then reads the query the older way).
  */
 export async function readSentence(query: string): Promise<SentenceReading | null> {
+  return (await readSentenceOutcome(query)).reading;
+}
+
+/** readSentence, saying why there is no reading when the reader was asked and failed. */
+export async function readSentenceOutcome(query: string): Promise<ReadingOutcome> {
   const stand = process.env["CATERVA_SENTENCE_READER"];
-  if (stand === "off") return null;
+  if (stand === "off") return { reading: null, unavailable: null };
+  const sentence = textForReader(query) || query;
   const args = stand
-    ? [stand, query, "--json"]
-    : ["-m", "caterva.compose.read", query, "--json"];
+    ? [stand, sentence, "--json"]
+    : ["-m", "caterva.compose.read", sentence, "--json"];
   return new Promise((resolve) => {
     let stdout = "";
     let stderr = "";
     let settled = false;
-    const done = (value: SentenceReading | null) => {
+    const done = (reading: SentenceReading | null, unavailable: string | null = null) => {
       if (!settled) {
         settled = true;
-        resolve(value);
+        resolve({ reading, unavailable: reading ? null : unavailable });
       }
     };
     let proc;
@@ -142,13 +201,13 @@ export async function readSentence(query: string): Promise<SentenceReading | nul
       });
     } catch (err) {
       logger.warn({ err }, "sentence reader could not be started");
-      done(null);
+      done(null, "it could not be started");
       return;
     }
     const timer = setTimeout(() => {
       logger.warn({ query }, "sentence reader timed out");
       proc.kill();
-      done(null);
+      done(null, `it did not answer within ${READER_TIMEOUT_MS / 1000} s`);
     }, READER_TIMEOUT_MS);
     proc.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString("utf-8");
@@ -159,7 +218,7 @@ export async function readSentence(query: string): Promise<SentenceReading | nul
     proc.on("error", (err) => {
       clearTimeout(timer);
       logger.warn({ err }, "sentence reader could not be started");
-      done(null);
+      done(null, "it could not be started");
     });
     proc.on("close", (code) => {
       clearTimeout(timer);
@@ -168,7 +227,7 @@ export async function readSentence(query: string): Promise<SentenceReading | nul
       if (reading === null) {
         logger.warn({ code, stderr: stderr.slice(-500) }, "sentence reader gave no reading");
       }
-      done(reading);
+      done(reading, `it exited ${code ?? "on a signal"} without a reading`);
     });
   });
 }

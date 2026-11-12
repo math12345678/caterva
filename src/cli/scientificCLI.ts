@@ -1587,6 +1587,17 @@ async function main() {
                 : 'Compose read no enzyme in your question.');
             }
           } else {
+            // Said, not silent: the older readers read some sentences
+            // differently from compose (an inhibitor in "inhibited by X",
+            // a model word as a substrate), and with --yes nobody confirms
+            // what they read. The API says the same (readerUnavailableFlag).
+            if (answer.reason !== 'the sentence reader is off' && !booleans.has('json')) {
+              warning(
+                `Compose's sentence reader gave no reading (${answer.reason}), so your question ` +
+                'was read by the older reader, which can read it differently from `caterva compose`. ' +
+                'Check the system shown below, or run the command again.'
+              );
+            }
             parsed = readSystemFromQuery(query);
           }
           // NO SUBSTRATE OR NO ORGANISM IS A CHOICE NOW, NOT A REFUSAL
