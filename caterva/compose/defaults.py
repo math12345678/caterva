@@ -195,6 +195,10 @@ class _Row:
     #: (`neighbour_of`).
     value: Optional[float] = None
     reference_id: Optional[str] = None
+    #: The row's own UniProt accession, when BRENDA gives one (never a
+    #: fallback), so a value can be traced to the protein it measured
+    #: (`caterva.compose.protein_rows`).
+    uniprot: Optional[str] = None
 
 
 #: (client, page digest, ec, table, organism) -> rows. A page fetched again
@@ -254,7 +258,8 @@ def table_rows(ec: str, table: str, organism: Optional[str]) -> Tuple[_Row, ...]
             _Row(str(r.substrate), getattr(r, "organism", None) or organism,
                  str(getattr(r, "conditions", "") or ""),
                  _number(getattr(r, "km_value", None)),
-                 None if getattr(r, "reference_id", None) is None else str(r.reference_id))
+                 None if getattr(r, "reference_id", None) is None else str(r.reference_id),
+                 getattr(r, "uniprot", None) or None)
             for r in parsed
             if getattr(r, "table_scoped", True) and getattr(r, "substrate", None)
             and str(r.substrate) != "unknown compound"
@@ -556,6 +561,19 @@ def neighbour_of(ec: str, table: str, compound: str, organism: Optional[str],
     return tuple(sorted({r.compound for r in same}))
 
 
+def rows_of_value(ec: str, table: str, organism: Optional[str], value: float,
+                  reference_id: Optional[str]) -> Tuple[_Row, ...]:
+    """The organism's BRENDA rows of `table` whose reference and value are
+    the ones given: the row(s) a value the search returned came from, found
+    as `neighbour_of` finds them. Empty when none matches."""
+    if reference_id is None or value is None:
+        return ()
+    ref = str(reference_id)
+    return tuple(r for r in table_rows(ec, table, organism)
+                 if r.reference_id == ref and r.value is not None
+                 and abs(r.value - float(value)) <= 1e-9 * max(1.0, abs(float(value))))
+
+
 # ---------------------------------------------------------------------------
 # Organism
 # ---------------------------------------------------------------------------
@@ -798,7 +816,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 __all__ = [
     "ALTERNATIVES_NAMED", "COFACTORS", "Choice", "Option", "ROLES", "choose_enzyme",
     "choose_inhibitor", "choose_organism", "choose_substrate", "is_cofactor", "ki_compounds",
-    "ki_modes", "km_organisms", "main", "neighbour_of", "table_rows",
+    "ki_modes", "km_organisms", "main", "neighbour_of", "rows_of_value", "table_rows",
 ]
 
 

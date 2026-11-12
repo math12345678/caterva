@@ -407,7 +407,10 @@ SUBSTRATE_ABBREVIATIONS: Dict[str, Tuple[Tuple[str, ...], ...]] = {
     # "thrombin with S-2238" used to drop S-2238 as a strain tag.
     "s2238": (("D-phenylalanyl-pipecolyl-L-arginine-4-nitroanilide", "D-Phe-L-pipecolyl-L-Arg-4-nitroanilide",
                "D-Phe-Pip-Arg-4-nitroanilide", "S2238"),),
-    "s2222": (("S2222",),),
+    # S-2222 is Bz-Ile-Glu(gamma-OR)-Gly-Arg-pNA with R = H and CH3 (50:50);
+    # BRENDA writes the bovine factor Xa rows "benzoyl-Ile-Glu-(-H/OMe)-...".
+    # The piperidineamide (S-2337) is another substrate and is not listed.
+    "s2222": (("S2222", "benzoyl-Ile-Glu-(-H/OMe)-Gly-Arg-p-nitroanilide"),),
     "s2765": (("S2765", "S-2765"),),
     "btee": (("N-benzoyl-L-tyrosine ethyl ester",),),
     "sucaapfpna": (("N-succinyl-Ala-Ala-Pro-Phe-4-nitroanilide", "N-succinyl-Ala-Ala-Pro-Phe-p-nitroanilide",
@@ -684,6 +687,8 @@ def _could_be_enzyme_words(typed: str) -> bool:
     if load_symbols().knows(typed) or _could_be_a_name(typed):
         return True
     words = loose_key(typed).split()
+    if len(words) == 1 and _near_a_one_word_name(words[0]):
+        return True
     if not words or not (_ENZYME_ENDING.search(words[-1]) or len(words) == 1 and _TYPO_ENDING.search(words[-1])):
         return False
     # Several words: each one a word of some enzyme name ("DNA polymerase",
@@ -719,6 +724,41 @@ def _long_vocabulary() -> List[str]:
 
 #: A word one letter away from ending -ase ("hexokinaze", "lipasse" aside).
 _TYPO_ENDING = re.compile(r"(?:a.e|.se|as.)$")
+
+_ONE_WORD_NAMES: Optional[List[str]] = None
+
+
+def _one_word_names() -> List[str]:
+    """Enzyme names that are one word not ending -ase ("chymotrypsin",
+    "lysozyme", "papain", "thrombin"), seven letters or more, lower case."""
+    global _ONE_WORD_NAMES
+    if _ONE_WORD_NAMES is None:
+        found = set()
+        for entry in load_index().entries.values():
+            if entry.status != "active":
+                continue
+            for name in (entry.name, *entry.alternative_names):
+                word = name.strip().lower()
+                if (len(word) >= 7 and word.isalpha() and not word.endswith(("ase", "ases"))
+                        and word.endswith(("in", "ain", "zyme"))):
+                    found.add(word)
+        _ONE_WORD_NAMES = sorted(found)
+    return _ONE_WORD_NAMES
+
+
+def _near_a_one_word_name(word: str) -> bool:
+    """A misspelling of a one-word enzyme name that does not end -ase
+    ("chymotripsin", "trypsine", "lysozme"): not a word of any enzyme name,
+    seven letters or more, and within one or two letters of the name
+    (difflib ratio 0.9: "plasmid" is not "plasmin"). Review of the names
+    stream, 2026-11-12: these were dropped, and "Michaelis-Menten for
+    chymotripsin in bovine" reported that no enzyme was named."""
+    word = word.lower()
+    if len(word) < 7 or not word.isalpha() or word in _tables(load_index()).vocabulary:
+        return False
+    import difflib
+
+    return bool(difflib.get_close_matches(word, _one_word_names(), n=1, cutoff=0.9))
 
 
 def _two_letter_symbol(result: Resolved, typed: str) -> bool:
@@ -771,6 +811,8 @@ def _names_some_enzyme(result: Ambiguous, typed: str) -> bool:
         return written_as_one and (is_abbreviation(typed) or load_symbols().knows(typed))
     last = strict_key(typed).split()[-1]
     if all(c.tier == TIER_TYPO for c in result.candidates):
+        if " " not in strict_key(typed) and _near_a_one_word_name(last):
+            return True
         return (" " not in strict_key(typed) and len(last) >= SPELLING_MIN_LENGTH
                 and _TYPO_ENDING.search(last) is not None and last not in _tables(load_index()).vocabulary)
     if not _ENZYME_ENDING.search(last) or len(last) < 5:

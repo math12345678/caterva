@@ -1838,6 +1838,21 @@ def _search_resolved(
     neighbours = _neighbours_withheld(model, measured, ec)
     for identifier in neighbours:
         measured.pop(identifier, None)
+    # A value carried for a named protein (SIRT1, HER2, KPC-2) whose BRENDA
+    # row is another protein's -- by its UniProt accession, or, for a name
+    # filed under an EC number of many proteins, by not naming it -- is
+    # withheld likewise (`protein_rows`).
+    if getattr(args, "isoform", None):
+        from caterva.compose.protein_rows import other_protein_withheld
+
+        try:
+            other_protein = other_protein_withheld(model, measured, ec, args.isoform,
+                                                   getattr(args, "organism", None))
+        except Exception:  # noqa: BLE001 - unverifiable is not wrong
+            other_protein = {}
+        for identifier in other_protein:
+            measured.pop(identifier, None)
+        neighbours = {**neighbours, **other_protein}
     # Constants the search returned a value for, or found rows for, and did
     # not use. They end up placeholders like the ones the search found
     # nothing for, and must not be described as found-nothing.

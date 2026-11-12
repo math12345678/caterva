@@ -420,6 +420,11 @@ def test_tissue_words_are_the_source_and_trade_codes_are_substrates(text, substr
     ("Suc-AAPF-pNA", {"N-succinyl-Ala-Ala-Pro-Phe-4-nitroanilide": 60}, "N-succinyl-Ala-Ala-Pro-Phe-4-nitroanilide"),
     ("MUNANA", {"4-methylumbelliferyl alpha-D-N-acetylneuraminic acid": 109},
      "4-methylumbelliferyl alpha-D-N-acetylneuraminic acid"),
+    # Review, 2026-11-12: bovine factor Xa's S-2222 rows are spelled out, and
+    # "factor Xa with S-2222 in bovine" fell to S-2337 (the piperidineamide).
+    ("S-2222", {"benzoyl-Ile-Glu-(-H/OMe)-Gly-Arg-p-nitroanilide": 3,
+                "benzoyl-Ile-Glu(piperidineamide)-Gly-Arg-p-nitroanilide": 3},
+     "benzoyl-Ile-Glu-(-H/OMe)-Gly-Arg-p-nitroanilide"),
 ])
 def test_trade_codes_reach_brendas_spelling(typed, listed, expected):
     assert match_substrate((typed,), listed).name == expected
@@ -438,3 +443,45 @@ def test_a_symbol_of_another_organism_is_not_called_several_enzymes_in_the_compo
     out = read_description(args, look_up_substrate=False)
     assert out.name_refusal is not None
     assert "not one enzyme" not in out.refusal_note and "not for rat" in out.refusal_note
+
+
+@pytest.mark.parametrize("text, organism", [
+    ("pancreatic amylase kinetics from pig", "Sus scrofa"),
+    ("salivary amylase with starch in human", "Homo sapiens"),
+    ("porcine pancreatic alpha-amylase", "Sus scrofa"),
+])
+def test_pancreatic_and_salivary_amylase_are_alpha_amylase(text, organism):
+    """Review, 2026-11-12: refused as 'amylase', eight enzymes, though both are EC 3.2.1.1."""
+    reading = read_sentence(text)
+    assert (reading.ec, reading.organism) == ("3.2.1.1", organism)
+
+
+def test_amylase_alone_is_still_refused_with_its_candidates():
+    reading = read_sentence("michaelis menten for amylase with starch")
+    assert reading.ec is None and reading.ambiguity is not None
+    assert {"3.2.1.1", "3.2.1.2"} <= {c.ec for c in reading.ambiguity.candidates}
+
+
+@pytest.mark.parametrize("text, ec", [
+    ("Michaelis-Menten for chymotripsin in bovine", "3.4.21.1"),
+    ("trypsine from bovine with BAPNA", "3.4.21.4"),
+    ("lysozme from hen egg white", "3.2.1.17"),
+    ("thrombine with S-2238 in human", "3.4.21.5"),
+])
+def test_a_misspelt_one_word_name_is_refused_with_the_name_not_dropped(text, ec):
+    """Review, 2026-11-12: names ending -in or -zyme were only near-spelled when they
+    ended -ase, so "chymotripsin" was dropped and the report said no enzyme was named."""
+    reading = read_sentence(text)
+    assert reading.ec is None and reading.names_enzyme, text
+    assert reading.ambiguity is not None and ec in {c.ec for c in reading.ambiguity.candidates}
+
+
+@pytest.mark.parametrize("text", [
+    "plasmid DNA with EcoRI",
+    "Michaelis-Menten with glutamine in human",
+    "michaelis menten with heparin",
+])
+def test_a_compound_close_to_a_one_word_name_is_not_a_misspelling(text):
+    reading = read_sentence(text)
+    assert reading.ambiguity is None or not all(
+        c.via == "typo" for c in reading.ambiguity.candidates), text
