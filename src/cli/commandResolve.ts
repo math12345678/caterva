@@ -414,7 +414,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
     process.stdout.write(`\n${head}\n${c(DIM, '  ' + result.chosenBecause)}\n`);
   }
 
-  const scopeLines = rowScopeLines(String(result.quantity), result.rowScope);
+  const scopeLines = rowScopeLines(String(result.quantity), result.rowScope, options.isoform);
   if (scopeLines.length > 0) {
     process.stdout.write(`\n${c(YELLOW, '⚠')} ${c(BOLD, 'What the source row measured')}\n`);
     for (const line of scopeLines) process.stdout.write(`${c(DIM, '  ' + line)}\n`);

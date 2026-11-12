@@ -172,3 +172,36 @@ describe('an isoform the runner says is the one asked for', () => {
     }
   });
 });
+
+describe('the isoform asked for, against a row that names none or another', () => {
+  // Review, 2026-11-12: `simulate "HK2 with glucose" --resolve` carried kcat
+  // 60.4 1/s from BRENDA ref 703624 (a glucokinase tryptophan-mutant paper
+  // whose wild-type row names no isoform) and said nothing, while the API
+  // says "the source row names no isoform" for the same row.
+  it('says a row that names no isoform may not be the one asked for', () => {
+    for (const scope of [null, { isoform: null, inhibitionMode: null, versus: null }]) {
+      expect(rowScopeLines('kcat', scope, 'HK2')).toEqual([
+        'The row names no isoform, so whether it measured HK2, the one asked for, is unknown.',
+      ]);
+    }
+  });
+
+  it('says nothing about isoforms when none was asked for and the row names none', () => {
+    expect(rowScopeLines('kcat', null)).toEqual([]);
+    expect(rowScopeLines('km', { isoform: null, inhibitionMode: null, versus: null })).toEqual([]);
+  });
+
+  it('names both when the runner says the row is another isoform', () => {
+    const lines = rowScopeLines(
+      'km', { isoform: 'HK-I', inhibitionMode: null, versus: null, sameIsoformAsRequested: false }, 'HK2');
+    expect(lines).toEqual([
+      "The row measured isoform HK-I, not HK2, the one asked for: a different protein's constant.",
+    ]);
+  });
+
+  it('keeps the Ki lines alongside the isoform line', () => {
+    const lines = rowScopeLines('ki', { isoform: null, inhibitionMode: 'unstated', versus: null }, 'LDH-A');
+    expect(lines[0]).toContain('names no isoform');
+    expect(lines[1]).toContain('states no inhibition mode');
+  });
+});

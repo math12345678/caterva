@@ -270,3 +270,54 @@ describe('when the Km itself is not found', () => {
     expect(stdout.replace(ANSI, '')).not.toMatch(/Simulation complete|final value/i);
   });
 });
+
+/**
+ * --allow-cross-species is offered only where it can fill the gap.
+ *
+ * Review, 2026-11-12: `simulate "acetylcholinesterase inhibited by donepezil
+ * in human" --resolve` ended "Or widen the search ... --allow-cross-species",
+ * and BRENDA holds no donepezil Ki for any organism; following the advice
+ * returned the same refusal. The lookup says why it found nothing, and only
+ * "cross_species_withheld" is a gap another organism's row can fill.
+ */
+describe('the cross-species advice follows what the lookup said', () => {
+  function runWith(source: string, extra: string[] = []): string {
+    const file = path.join(tmpDir, `src_${source}.py`);
+    fs.writeFileSync(
+      file,
+      [
+        'import json, sys',
+        'p = json.loads(sys.stdin.read() or "{}")',
+        'if p.get("quantity") == "km":',
+        '    out = {"ok": True, "found": True, "km": 10.73, "unit": "mM",',
+        '           "organism": "Homo sapiens", "source": "brenda_exact",',
+        '           "citation": {"source": "BRENDA", "reference_id": "740253"}, "logs": []}',
+        'else:',
+        `    out = {"ok": True, "found": False, "source": ${JSON.stringify(source)}, "logs": [],`,
+        '           "crossSpeciesOrganismsAvailable": ["Oryctolagus cuniculus"]}',
+        'sys.stdout.write(json.dumps(out))',
+      ].join('\n'),
+      'utf-8',
+    );
+    const saved = stub;
+    stub = file;
+    try {
+      const { stdout } = runCli([...SYSTEM, '--enzyme-conc', '0.01mM', '--s0', '10mM', ...extra]);
+      return stdout.replace(ANSI, '').split('What to do next')[1] ?? '';
+    } finally {
+      stub = saved;
+    }
+  }
+
+  it('is not offered when the lookup found no row in any organism', () => {
+    const next = runWith('not_found');
+    expect(next).toContain('--vmax "<your measured Vmax, e.g. in mM/s>"');
+    expect(next).not.toContain('Or widen the search');
+  });
+
+  it('is offered when the lookup said other organisms hold the constant', () => {
+    const next = runWith('cross_species_withheld');
+    expect(next).toContain('withheld for the reason given above');
+    expect(next).toContain('Or widen the search');
+  });
+});
