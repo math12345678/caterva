@@ -270,10 +270,27 @@ thing actually missing (`caterva/compose/__main__.py`,
 - **"pepsin with hemoglobin"** is pepsin on hemoglobin: a compound named
   beside an enzyme is not read as a mechanism when it is the only cue for
   one (masking it must leave no recognised shape).
+- **An organism is offered only for rows the search would use.** "PTGS2 with
+  arachidonic acid" (human) was told to re-run in Mus musculus (3 kcat rows),
+  and "COX-2 inhibited by celecoxib" that arachidonate's kcat was "available
+  in: Mus musculus"; every one of those rows measured the N580A mutant, which
+  the search withholds (ADR 0029), so the advised run came back with
+  placeholders. Organisms, compounds and isoform rows listed as a way out now
+  count only rows that are not a variant's; when none is left the reason says
+  so and the step is to supply the constant. The refusal's sentence that no
+  candidate has the organism is now its own sentence ("... --subject 2.3.3.1.
+  None of ...").
 
 Live after: AChE/donepezil and COX-2/celecoxib Ki placeholders name
 `--inhibitor` and the human inhibitors; CYP3A4/midazolam's kcat names the
-organism as the blocker; "pepsin with hemoglobin" is GROUNDED in Saurida
+organism as the blocker (Bacillus licheniformis 9, Bacillus subtilis 3,
+Rhodococcus ruber 2, Priestia megaterium 1 non-variant rows; following
+`--substrate fenthion` gives Km 0.089 mM ref 706823); PTGS2/arachidonic
+acid and COX-2/celecoxib say every kcat row on EC 1.14.99.1 is a variant's
+and to supply it; "citrate synthase --organism mouse" followed with
+`--subject 2.3.3.1 --organism human` is GROUNDED (Km 0.0077 mM, kcat 260
+1/s, ref 756131); AChE/donepezil followed with `--inhibitor tacrine` is
+GROUNDED (Ki 3.7e-05 mM ref 749746); "pepsin with hemoglobin" is GROUNDED in Saurida
 micropectoralis (ref 771228). Not done: a PubMed search returns papers for a
 made-up inhibitor name (the reason now says the papers were not checked to
 name the compound; the search itself is the literature layer's); compound

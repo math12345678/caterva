@@ -89,7 +89,7 @@ import re
 import argparse
 import contextlib
 import sys
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 #: `--robustness` given with no sample count. argparse cannot use `None`
 #: for both "flag absent" and "flag present, number unstated", and the
@@ -1220,8 +1220,11 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
             from caterva.enzymes.policy import NameNotResolved
 
             r = out.name_refusal
+            # The refusal can end on its example command, with no stop.
+            said = str(r).rstrip()
+            stop = "" if said.endswith((".", "!", "?", ")")) else "."
             out.name_refusal = NameNotResolved(
-                f"{r} {blocker}", r.candidates, r.named, r.kind, recommended=r.recommended,
+                f"{said}{stop} {blocker}", r.candidates, r.named, r.kind, recommended=r.recommended,
                 rerun=r.rerun, confirm_only=r.confirm_only)
         out.refusal_note = (f"No search was run: your description names {reading.enzyme_text!r}, "
                             f"which is not one enzyme. {out.name_refusal}")
@@ -1312,7 +1315,7 @@ def _no_candidate_in_the_organism(ambiguity: Any, organism: Optional[str]) -> Op
                 + f"; the others have none there, so naming one of them would be refused for the organism.")
     first = candidates[0].ec
     try:
-        organisms = defaults.km_organisms(first)
+        organisms = _km_organisms_usable(first)
     except Exception:  # noqa: BLE001
         organisms = {}
     text = (f"None of " + ", ".join(f"EC {c.ec}" for c in candidates) + f" has a Km row in {where} in "
@@ -1769,6 +1772,19 @@ def _filed_under_another_ec(ec: str, organism: str, text: Optional[str]) -> Opti
     return None
 
 
+def _km_organisms_usable(ec: str) -> Dict[str, int]:
+    """`defaults.km_organisms(ec)` less the rows of a protein variant
+    (`_usable`): an organism offered as the way out of a refusal must hold a
+    Km row the search would use."""
+    from caterva.compose import defaults
+
+    counts = dict(defaults.km_organisms(ec))
+    for row in defaults.table_rows(ec, "km", None):
+        if row.organism in counts and _a_variant(row):
+            counts[row.organism] -= 1
+    return {o: n for o, n in counts.items() if n > 0}
+
+
 def _organism_has_no_rows(ec: str, organism: str, enzyme_text: Optional[str] = None) -> Optional[str]:
     """The refusal for an organism the user NAMED that has no Km row for
     `ec` at all, listing the organisms that do; None when it has rows, or
@@ -1780,10 +1796,10 @@ def _organism_has_no_rows(ec: str, organism: str, enzyme_text: Optional[str] = N
     Km row at all. The organism is the blocker, so the advice names it.
     Another organism is never substituted for the one named (ADR 0024).
     """
-    from caterva.compose.defaults import km_organisms, table_rows
+    from caterva.compose.defaults import table_rows
 
     try:
-        by_organism = km_organisms(ec)
+        by_organism = _km_organisms_usable(ec)
         mine = len(table_rows(ec, "km", organism))
     except Exception:  # noqa: BLE001
         return None
@@ -2206,6 +2222,14 @@ def _said_for_the_organism(model: Any, reasons: Mapping[str, str], ec: Optional[
             except Exception:  # noqa: BLE001 - the resolver's reason stands
                 pass
             continue
+        if _AVAILABLE_IN.search(reason):
+            try:
+                rewritten = _available_elsewhere(ec, q.table, model.compound_for(q), reason)
+            except Exception:  # noqa: BLE001 - the resolver's reason stands
+                rewritten = None
+            if rewritten:
+                out[name] = rewritten
+            continue
         if not _NAME_MISS.search(reason):
             continue
         try:
@@ -2228,7 +2252,7 @@ def _measured_on_the_isoform(ec: str, table: str, organism: str, isoform: str, r
 
     label = defaults.TABLE_NAMES[table]
     named: Dict[str, int] = {}
-    for row in defaults.table_rows(ec, table, organism):
+    for row in _usable(defaults.table_rows(ec, table, organism)):
         if same_isoform(read_isoform(row.conditions), isoform):
             named[row.compound] = named.get(row.compound, 0) + 1
     if not named:
@@ -2238,16 +2262,41 @@ def _measured_on_the_isoform(ec: str, table: str, organism: str, isoform: str, r
             f"{_counted(named)}. Re-run with --{role} set to one of them")
 
 
+def _a_variant(row: Any) -> bool:
+    """Whether a BRENDA row measured a sequence variant ("mutant N580A"),
+    which the search withholds (ADR 0029), by the classifier the search
+    itself uses. An isozyme is not a variant here: it is wild-type in its
+    own right, and the isoform rule decides about it."""
+    from caterva.checkout import literature_module
+
+    verdict = literature_module("protein_variant").classify(getattr(row, "conditions", "") or None)
+    return verdict.status == "variant" and verdict.kind != "isozyme"
+
+
+def _usable(rows: Iterable[Any]) -> List[Any]:
+    """The rows a search could carry: every row but a variant's.
+
+    "PTGS2 with arachidonic acid in human" had no human kcat row, and the
+    advice was "re-run with --organism set to one of them: Mus musculus (3
+    rows)". All three mouse rows measured the N580A mutant, so that run
+    came back with placeholders too. A row is only offered as a way out
+    when the search would use it (round-1 review of ADR 0182)."""
+    return [row for row in rows if not _a_variant(row)]
+
+
 def _what_the_organism_holds(ec: str, table: str, compound: Optional[str], organism: str,
                              role: str) -> str:
-    """The clause for `_said_for_the_organism`, from BRENDA's own rows."""
+    """The clause for `_said_for_the_organism`, from BRENDA's own rows.
+    Only rows the search would use are counted or offered (`_usable`)."""
     from caterva.compose import defaults
 
     label = defaults.TABLE_NAMES[table]
     flag = f"--{role}"
     key = defaults._key(compound) if compound else None
-    every = defaults.table_rows(ec, table, None)
-    here = defaults.table_rows(ec, table, organism)
+    every_row = defaults.table_rows(ec, table, None)
+    here_row = defaults.table_rows(ec, table, organism)
+    every = _usable(every_row)
+    here = _usable(here_row)
     elsewhere: Dict[str, int] = {}
     if key:
         for row in every:
@@ -2259,16 +2308,25 @@ def _what_the_organism_holds(ec: str, table: str, compound: Optional[str], organ
         for row in every:
             if row.organism:
                 organisms[row.organism] = organisms.get(row.organism, 0) + 1
-        text = (f" -- BRENDA holds no {label} row for EC {ec} in {organism} at all, so naming "
-                f"another {role} would not fill it: the organism is what is missing")
+        if not organisms:
+            if every_row:
+                return (f" -- every {label} row BRENDA holds for EC {ec}, in any organism, measured a "
+                        "protein variant, and variants are withheld (ADR 0029): neither another "
+                        f"{role} nor a different species would fill it, so supply it yourself")
+            return f" -- BRENDA holds no {label} row for EC {ec} in any organism: supply it yourself"
+        if here_row:
+            text = (f" -- BRENDA's {label} rows for EC {ec} in {organism} all measured a protein variant, "
+                    f"and variants are withheld (ADR 0029), so naming another {role} would not fill it: "
+                    "the organism is what is missing")
+        else:
+            text = (f" -- BRENDA holds no {label} row for EC {ec} in {organism} at all, so naming "
+                    f"another {role} would not fill it: the organism is what is missing")
         if elsewhere:
             text += (f". {label} rows{named} are in: {_counted(elsewhere)}, each that organism's "
                      "measurement, never substituted for yours (ADR 0024)")
-        if organisms:
-            text += (f". Organisms with {label} rows for EC {ec}: {_counted(organisms)}. Re-run with "
-                     "--organism set to one of them to model that organism, or supply it yourself")
-        else:
-            text += f". No organism has a {label} row for EC {ec} in BRENDA: supply it yourself"
+        text += (f". Organisms with {label} rows for EC {ec} that are not of a variant: "
+                 f"{_counted(organisms)}. Re-run with --organism set to one of them to model that "
+                 "organism, or supply it yourself")
         return text
     listed: Dict[str, int] = {}
     for row in here:
@@ -2284,6 +2342,46 @@ def _what_the_organism_holds(ec: str, table: str, compound: Optional[str], organ
                  "name (a compound is filed under the name its paper used, so it may be there under "
                  "another)")
     return text
+
+
+#: The clause `adapters.to_parameter_source` appends to a cross-species
+#: refusal: the organisms the resolver found rows in.
+_AVAILABLE_IN = re.compile(r" -- available in: ([^-(]+?)(?= -- | \(|$)")
+
+
+def _available_elsewhere(ec: str, table: str, compound: Optional[str], reason: str) -> Optional[str]:
+    """`reason` with its "available in" organisms cut to those holding a row
+    the search would use for `compound`; a reason with no such organism is
+    rewritten to say the rows elsewhere are variants', and to supply the
+    constant. None leaves the reason as it is (no list, no compound, or the
+    rows cannot be matched to the compound by name)."""
+    from caterva.compose import defaults
+
+    match = _AVAILABLE_IN.search(reason)
+    if not match or not compound:
+        return None
+    key = defaults._key(compound)
+    listed = [o.strip() for o in match.group(1).split(",") if o.strip()]
+    usable: Dict[str, int] = {}
+    variants: Dict[str, int] = {}
+    for organism in listed:
+        rows = [r for r in defaults.table_rows(ec, table, organism) if defaults._key(r.compound) == key]
+        good = _usable(rows)
+        if good:
+            usable[organism] = len(good)
+        elif rows:
+            variants[organism] = len(rows)
+    if not variants:
+        return None
+    if usable:
+        return _AVAILABLE_IN.sub(lambda _m: f" -- available in: {_counted(usable)} (rows of a protein "
+                                 f"variant only, withheld: {_counted(variants)})", reason, count=1)
+    label = defaults.TABLE_NAMES[table]
+    return (f"no usable value: the organism searched has no {label} row for {compound}, and the only "
+            f"rows elsewhere ({_counted(variants)}) measured a protein variant, which is withheld "
+            f"(ADR 0029), so re-running in {'that organism' if len(variants) == 1 else 'any of them'} would "
+            "not fill it either: supply it yourself"
+            + reason[match.end():])
 
 
 def _neighbours_withheld(model: Any, measured: Mapping[str, Any], ec: Optional[str]) -> Dict[str, str]:

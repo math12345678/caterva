@@ -300,3 +300,130 @@ def test_a_compound_beside_a_named_enzyme_is_not_a_mechanism(description, rule):
     assert got == rule
     if rule == "michaelis_menten":
         assert "read as a compound the enzyme acts on" in note
+
+
+# ---------------------------------------------------------------------------
+# An organism or compound is offered only when the search would use its rows
+# ---------------------------------------------------------------------------
+
+
+def _variant_rows(spec):
+    """{(table, organism): [(compound, n, conditions)]} -> a `table_rows` stand-in."""
+    def table_rows(ec, table, organism):
+        out = []
+        for (t, o), compounds in spec.items():
+            if t != table or (organism is not None and o != organism):
+                continue
+            for compound, n, conditions in compounds:
+                out.extend(defaults._Row(compound, o, conditions) for _ in range(n))
+        return tuple(out)
+    return table_rows
+
+
+def test_an_organism_whose_rows_are_all_variants_is_not_offered(monkeypatch):
+    """PTGS2, human kcat: the three mouse rows on EC 1.14.99.1 all measured
+    COX-2 N580A, and "re-run with --organism Mus musculus" came back with
+    placeholders again."""
+    monkeypatch.setattr(defaults, "table_rows", _variant_rows({
+        ("kcat", "Mus musculus"): [("arachidonate", 3, "pH 8.0, 25°C, COX-2 mutant N580A")],
+        ("km", "Homo sapiens"): [("arachidonic acid", 9, "")],
+    }))
+    model = _Model((_Q("reaction_kcat", "kcat"),), substrate="arachidonic acid")
+    reason = "nothing found in BRENDA or the literature search" + _clause("kcat", None, "substrate")
+    out = cli._said_for_the_organism(model, {"reaction_kcat": reason}, "1.14.99.1", "Homo sapiens")
+    said = out["reaction_kcat"]
+    assert "Mus musculus" not in said and "--organism" not in said
+    assert "measured a protein variant" in said and "supply it yourself" in said
+    step = _what_would_ground(SimpleNamespace(not_found=out), ["reaction_kcat"])
+    assert "--organism" not in step and "another organism" not in step
+    assert step.startswith("supply reaction_kcat yourself")
+
+
+def test_variant_rows_are_left_out_of_the_organisms_listed(monkeypatch):
+    monkeypatch.setattr(defaults, "table_rows", _variant_rows({
+        ("kcat", "Priestia megaterium"): [("linoleic acid", 19, "mutant F87A"), ("linoleic acid", 1, "")],
+        ("kcat", "Bacillus subtilis"): [("hexadecanoic acid", 3, "wild-type")],
+        ("kcat", "Streptomyces sp."): [("avermectin", 2, "mutant R73A")],
+    }))
+    model = _Model((_Q("reaction_kcat", "kcat"),), substrate="7-ethoxyresorufin")
+    reason = "x" + _clause("kcat", None, "substrate")
+    said = cli._said_for_the_organism(model, {"reaction_kcat": reason}, "1.14.14.1", "Homo sapiens")["reaction_kcat"]
+    assert "Bacillus subtilis (3 rows); Priestia megaterium (1 row)" in said
+    assert "Streptomyces" not in said
+    assert "the organism is what is missing" in said
+
+
+def test_an_organism_with_only_variant_rows_is_named_as_the_blocker_truthfully(monkeypatch):
+    monkeypatch.setattr(defaults, "table_rows", _variant_rows({
+        ("kcat", "Homo sapiens"): [("arachidonate", 2, "mutant L531A")],
+        ("kcat", "Ovis aries"): [("arachidonate", 4, "")],
+    }))
+    model = _Model((_Q("reaction_kcat", "kcat"),), substrate="arachidonate")
+    said = cli._said_for_the_organism(model, {"reaction_kcat": "x" + _clause("kcat", None, "substrate")},
+                                      "1.14.99.1", "Homo sapiens")["reaction_kcat"]
+    # Not "holds no kcat row ... at all": it holds two, of a mutant.
+    assert "at all" not in said and "all measured a protein variant" in said
+    assert "Ovis aries (4 rows)" in said
+
+
+def test_a_cross_species_list_of_variant_rows_only_is_not_advice(monkeypatch):
+    """COX-2 and celecoxib, human: the arachidonate kcat was "available in:
+    Mus musculus", whose one row is the N580A mutant's."""
+    monkeypatch.setattr(defaults, "table_rows", _variant_rows({
+        ("kcat", "Mus musculus"): [("arachidonate", 1, "COX-2 mutant N580A")],
+    }))
+    model = _Model((_Q("reaction_kcat", "kcat"),), substrate="arachidonate")
+    reason = ("no value in the organism requested; measurements exist in other organisms, and one is "
+              "never substituted for yours (ADR 0024) -- re-run with --organism set to one of them to "
+              "build the model there -- available in: Mus musculus (searched under the requirement that "
+              "organism must be Homo sapiens, raised by your own request)")
+    said = cli._said_for_the_organism(model, {"reaction_kcat": reason}, "1.14.99.1", "Homo sapiens")["reaction_kcat"]
+    assert "--organism" not in said and "measured a protein variant" in said
+    assert said.endswith("(searched under the requirement that organism must be Homo sapiens, raised by "
+                         "your own request)")
+    step = _what_would_ground(SimpleNamespace(not_found={"reaction_kcat": said}), ["reaction_kcat"])
+    assert "--organism" not in step
+
+
+def test_a_cross_species_list_keeps_only_the_organisms_with_usable_rows(monkeypatch):
+    monkeypatch.setattr(defaults, "table_rows", _variant_rows({
+        ("kcat", "Mus musculus"): [("arachidonate", 1, "mutant N580A")],
+        ("kcat", "Ovis aries"): [("arachidonate", 2, "")],
+    }))
+    model = _Model((_Q("reaction_kcat", "kcat"),), substrate="arachidonate")
+    reason = "no value in the organism requested -- available in: Mus musculus, Ovis aries"
+    said = cli._said_for_the_organism(model, {"reaction_kcat": reason}, "1.14.99.1", "Homo sapiens")["reaction_kcat"]
+    assert "available in: Ovis aries (2 rows)" in said
+    assert "withheld: Mus musculus (1 row)" in said
+
+
+def test_a_cross_species_list_with_usable_rows_everywhere_stands(monkeypatch):
+    monkeypatch.setattr(defaults, "table_rows", _variant_rows({
+        ("kcat", "Ovis aries"): [("arachidonate", 2, "")],
+    }))
+    model = _Model((_Q("reaction_kcat", "kcat"),), substrate="arachidonate")
+    reason = "no value in the organism requested -- available in: Ovis aries"
+    assert cli._said_for_the_organism(model, {"reaction_kcat": reason}, "1.14.99.1",
+                                      "Homo sapiens") == {"reaction_kcat": reason}
+
+
+def test_an_organism_refusal_lists_only_organisms_with_usable_km_rows(monkeypatch):
+    monkeypatch.setattr(defaults, "table_rows", _variant_rows({
+        ("km", "Zymomonas mobilis"): [("D-glucose", 2, "")],
+        ("km", "Escherichia coli"): [("D-glucose", 3, "mutant D72A")],
+    }))
+    monkeypatch.setattr(defaults, "km_organisms",
+                        lambda ec, substrate=None: {"Zymomonas mobilis": 2, "Escherichia coli": 3})
+    said = cli._organism_has_no_rows("2.7.1.2", "Homo sapiens")
+    assert "Zymomonas mobilis (2 rows)" in said and "Escherichia coli" not in said
+
+
+def test_the_ambiguity_refusal_and_the_organism_sentence_are_two_sentences(monkeypatch):
+    """The refusal ends on its example command; "... --subject 2.3.3.1 None of ..." ran on."""
+    monkeypatch.setattr(cli, "_no_candidate_in_the_organism", lambda *a, **k: "None of them has a row.")
+    args = _args(description="citrate synthase Michaelis-Menten", organism="mouse")
+    read = cli.read_description(args, err=io.StringIO())
+    refusal = str(getattr(read, "name_refusal", "") or "")
+    assert "None of them has a row." in refusal
+    before = refusal[:refusal.index("None of them")].rstrip()
+    assert before.endswith((".", "!", "?", ")"))
