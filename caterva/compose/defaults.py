@@ -142,7 +142,7 @@ _METAL_ION = re.compile(
 #: laccase's or a quinone reductase's own substrate.
 _QUINONE_CARRIER = re.compile(
     r"^(?:(?:decyl)?ubiquin(?:one|ol)|menaquin(?:one|ol)|plastoquin(?:one|ol)|caldariellaquinone"
-    r"|coenzyme q)(?:[- ]?\d+)?$")
+    r"|coenzyme ?q)(?:[- ]?\d+)?$")
 _PREFIX = re.compile(r"^(?:alpha|beta|α|β)-", re.IGNORECASE)
 #: The every-organism parse's own test of an organism cell
 #: (brenda_client.GENERIC_ORGANISM_PATTERN), restated so this module reads it
