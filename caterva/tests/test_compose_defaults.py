@@ -130,6 +130,14 @@ def test_the_command_line_prints_the_contract_shape_and_exits_3_on_nothing(recor
 @pytest.mark.parametrize("name, cofactor", [
     ("ATP", True), ("beta-NAD+", True), ("NADPH", True), ("Mg2+", True), ("CoA", True),
     ("H2O", True), ("D-glucose", False), ("CO2", False), ("acetyl-CoA", False), ("pyruvate", False),
+    # The respiratory quinones are succinate dehydrogenase's electron acceptor,
+    # as NAD+ is a dehydrogenase's: live, "competitive inhibition of succinate
+    # dehydrogenase by malonate" chose ubiquinone, and paired malonate's Ki
+    # (competitive versus succinate) with ubiquinone's Km (review, 2026-11-12).
+    ("ubiquinone", True), ("ubiquinone-2", True), ("ubiquinone 9", True), ("menaquinol", True),
+    ("decylubiquinone", True), ("coenzyme Q10", True), ("plastoquinone-9", True),
+    # A phenol oxidase's or quinone reductase's own substrate is not set aside.
+    ("hydroquinone", False), ("1,4-benzoquinone", False), ("succinate", False),
 ])
 def test_cofactors_are_recognised_and_substrates_are_not(name, cofactor):
     assert defaults.is_cofactor(name) is cofactor

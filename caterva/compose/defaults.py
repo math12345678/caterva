@@ -109,6 +109,16 @@ COFACTORS = frozenset({
 })
 _METAL_ION = re.compile(
     r"^(?:mg|mn|ca|zn|fe|co|ni|cu|k|na|li|cd|ba|sr|cl|hco3)(?:\d?[+-])+$", re.IGNORECASE)
+#: The respiratory quinones (and their quinols), any chain length: a
+#: quinone oxidoreductase's electron acceptor, as NAD+ is a dehydrogenase's.
+#: Live on 2026-11-12, "competitive inhibition of succinate dehydrogenase by
+#: malonate" chose ubiquinone (24 Km rows in E. coli) over succinate (8), and
+#: paired malonate's Ki, which competes with succinate, with ubiquinone's Km.
+#: Only the named carriers: "hydroquinone" or "1,4-benzoquinone" can be a
+#: laccase's or a quinone reductase's own substrate.
+_QUINONE_CARRIER = re.compile(
+    r"^(?:(?:decyl)?ubiquin(?:one|ol)|menaquin(?:one|ol)|plastoquin(?:one|ol)|caldariellaquinone"
+    r"|coenzyme q)(?:[- ]?\d+)?$")
 _PREFIX = re.compile(r"^(?:alpha|beta|α|β)-", re.IGNORECASE)
 #: The every-organism parse's own test of an organism cell
 #: (brenda_client.GENERIC_ORGANISM_PATTERN), restated so this module reads it
@@ -280,7 +290,8 @@ def _key(name: str) -> str:
 def is_cofactor(name: str) -> bool:
     """True for a cosubstrate, cofactor or small ion (COFACTORS)."""
     key = _PREFIX.sub("", _key(name))
-    return key in COFACTORS or bool(_METAL_ION.match(key.replace(" ", "")))
+    return (key in COFACTORS or bool(_METAL_ION.match(key.replace(" ", "")))
+            or bool(_QUINONE_CARRIER.match(key)))
 
 
 class _Counts:
