@@ -44,6 +44,14 @@ candidate_references       # internal: the references resolve_kinetic_pair
                            # it -- that both came from one paper -- is in
                            # chosen_because ("the paper the paired constant
                            # came from") and in the two citations.
+pairable                   # internal: the rows resolve_kinetic_pair may
+                           # pair across tables; a pair crosses as the two
+                           # citations and chosen_because's "one measurement".
+row_notes                  # inside chosen_because: "what the carried row is:
+                           # the row is a K0.5 with a Hill coefficient of 1.8".
+row_isoform                # read in-process by caterva compose's isoform
+                           # checks; across the wire it is in chosen_because
+                           # ("the row's UniProt accession (P35557) is GCK").
 
 relatedness.shared_rank    # inside RelatednessVerdict.reason, rendered by
                            # buildUnresolvedKineticProvenance on the

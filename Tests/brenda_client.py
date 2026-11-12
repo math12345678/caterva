@@ -128,6 +128,23 @@ class BRENDAKmEntry(BaseModel):
     # it's metadata for downstream filtering/ranking decisions, not a
     # parsing-stage filter.
     substrate_type: str = "classic"
+    #: True when `uniprot` is the row's own accession cell, False when it is
+    #: the caller's `fallback_uniprot` (the organism's canonical entry, which
+    #: says nothing about which isozyme the row measured). The isoform check
+    #: reads only the row's own: BRENDA's P35557 on a human hexokinase row is
+    #: glucokinase whatever the commentary says.
+    uniprot_from_row: bool = False
+    #: Compounds the row states were PRESENT in the assay that are inhibitors
+    #: of this enzyme (BRENDA lists Ki rows for them on the same page, or the
+    #: commentary calls them inhibitors): an apparent constant, not the
+    #: enzyme's own. Filled by fallback_logic._brenda_entries, which holds the
+    #: page; empty from the parser alone.
+    inhibitors_present: List[str] = Field(default_factory=list)
+    #: The one isoform the row's PAPER names in its other entries on the
+    #: page (row_form.paper_isoforms), for a row whose own words and own
+    #: UniProt cell name none. Filled by fallback_logic._brenda_entries;
+    #: None from the parser alone, and when the paper names none or several.
+    paper_isoform: str | None = None
 
 
 # Keywords that mark a substrate as an engineered/reporter construct rather
@@ -157,6 +174,14 @@ def classify_substrate(substrate_name: str) -> str:
 # not a genuine Michaelis constant. Generic heuristic, not enzyme-specific.
 KM_PLAUSIBLE_MIN_MM = 0.0000001
 KM_PLAUSIBLE_MAX_MM = 1000
+
+# A Ki has no Michaelis floor: tight-binding inhibitors reach picomolar and
+# below honestly (hirudin and thrombin, 2.37e-10 mM, BRENDA ref 652618).
+# Bounding the Ki table by KM_PLAUSIBLE_MIN_MM flagged that row, and the
+# resolver returned "not found" for one of the best-measured Ki values in
+# BRENDA while fallback_logic said "Ki is not bounded here". 1e-12 mM (1 fM)
+# is past any reversible inhibitor reported; below it is a unit slip.
+KI_PLAUSIBLE_MIN_MM = 1e-12
 
 # kcat (turnover number), s^-1. Must match caterva/core/data_structures.py
 # exactly -- ADR 0003 makes these a cross-layer contract, and
@@ -250,7 +275,7 @@ _UNIPROT_ACCESSION = (
 # A cell can carry multiple comma-separated accessions (isozyme subunits
 # sharing one BRENDA row, e.g. LDH's "P00339,P00336" or chymotrypsin's
 # "Q6GPI1,P17538") - matched and kept whole, not truncated to one.
-UNIPROT_CELL_PATTERN = re.compile(rf"^{_UNIPROT_ACCESSION}(?:,{_UNIPROT_ACCESSION})*$")
+UNIPROT_CELL_PATTERN = re.compile(rf"^{_UNIPROT_ACCESSION}(?:\s*,\s*{_UNIPROT_ACCESSION})*$")
 
 # Regex to pull a tab id (e.g. "tab12") out of a BRENDA nav link's href,
 # which looks like: javascript:showTable('tab12')
@@ -581,7 +606,7 @@ def parse_brenda_km_html(
         _min_value, _max_value = KCAT_PLAUSIBLE_MIN_PER_S, KCAT_PLAUSIBLE_MAX_PER_S
     elif table_label == KI_TABLE_LABEL:
         _quantity, _unit = "Ki", "mM"
-        _min_value, _max_value = KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM
+        _min_value, _max_value = KI_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM
     else:
         _quantity, _unit = "Km", "mM"
         _min_value, _max_value = KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM
@@ -765,13 +790,15 @@ def parse_brenda_km_html(
                 continue
 
         uniprot = None
+        uniprot_from_row = False
         for cell in cell_texts:
             # Some rows (e.g. multi-isozyme entries like LDH's sub-rows)
             # carry more than one accession in a single comma-separated
             # cell, e.g. "P00339,P00336" - both are real, keep the cell
             # as-is rather than picking just one.
             if UNIPROT_CELL_PATTERN.match(cell.strip()):
-                uniprot = cell.strip()
+                uniprot = re.sub(r"\s*,\s*", ",", cell.strip())
+                uniprot_from_row = True
                 break
         if uniprot is None:
             uniprot = fallback_uniprot
@@ -890,6 +917,7 @@ def parse_brenda_km_html(
                 substrate=matched_substrate,
                 organism=row_organism,
                 uniprot=uniprot,
+                uniprot_from_row=uniprot_from_row,
                 conditions=conditions,
                 assay_ph=parsed_conditions.ph,
                 assay_temperature_c=parsed_conditions.temperature_c,

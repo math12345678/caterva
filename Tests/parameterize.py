@@ -122,6 +122,10 @@ class ParameterRequest:
     #: (`fallback_logic.resolve_kinetic_pair`). A Km and a kcat from two
     #: papers were measured on two preparations, often at two temperatures.
     paired: bool = False
+    #: A point mutant the model is of ("R132H", "R132H/S280F"): the resolver
+    #: then takes the constant only from rows measuring it
+    #: (`resolve_kinetic_value`'s `mutation`), never from the wild type's.
+    mutation: Optional[str] = None
 
 
 @dataclass(frozen=True)

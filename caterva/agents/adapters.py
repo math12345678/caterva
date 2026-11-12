@@ -82,6 +82,10 @@ NOT_FOUND_REASONS = {
         "every row BRENDA holds for this constant measured a protein variant, "
         "and variants are withheld (ADR 0029)"
     ),
+    "mutant_not_found": (
+        "the mutant asked for has no row of its own for this constant, and "
+        "the wild-type enzyme's rows are not a mutant's constant, so none is used"
+    ),
     "implausible_withheld": (
         "every row BRENDA holds for this constant is outside the physically "
         "plausible range for it (a unit slip or a misfiled row is far likelier "
@@ -96,6 +100,7 @@ _WITHHELD_LISTS = {
     "mode_withheld": ("modes_available", "the rows state", "; "),
     "variant_withheld": ("variant_candidates_available", "the variants", ", "),
     "implausible_withheld": ("implausible_values", "the values", "; "),
+    "mutant_not_found": ("variant_candidates_available", "the mutant", ", "),
 }
 
 FOUND_SOURCES = frozenset({"brenda_exact", "brenda_cross_species"})
@@ -218,6 +223,12 @@ def to_parameter_source(
             resolver_because=(because if isinstance(
                 because := getattr(result, "chosen_because", None), str) else None),
             wide_spread=getattr(result, "wide_spread", False) is True,
+            # Only where the record has the field: a literature layer that
+            # predates it (a vendored or pinned copy) builds without it.
+            **({"row_isoform": iso} if isinstance(
+                iso := getattr(result, "row_isoform", None), str)
+               and "row_isoform" in getattr(ParameterSource, "__dataclass_fields__", {})
+               else {}),
         ),
         None,
     )

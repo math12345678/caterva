@@ -310,9 +310,14 @@ class ModelDossier:
                 table=getattr(quantity, "table", None),
                 substrate=getattr(self.model, "substrate", None),
                 isoform=getattr(self.model, "isoform", None),
+                row_isoform=getattr(measured[identifier], "row_isoform", None),
             )
             if scope is not None:
                 notes += [f"`{identifier}`: {c.text}" for c in scope.concerns]
+        from caterva.compose.row_scope import variant_mix
+        mixed = variant_mix({i: getattr(m, "commentary", None) for i, m in measured.items()})
+        if mixed:
+            notes.append(mixed)
         if not notes:
             return []
         return ["", "What each value's own row says it measured:", ""] + [f"- {n}" for n in notes]

@@ -1150,6 +1150,10 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
         # isoform is searched for unless --isoform set one.
         if getattr(reading, "isoform", None) and not getattr(args, "isoform", None):
             args.isoform = reading.isoform
+        if getattr(reading, "mutations", None):
+            # "IDH1 R132H": the constants come from the mutant's own rows,
+            # never the wild type's (resolve_kinetic_value's `mutation`).
+            args.mutation = "/".join(reading.mutations)
         elif getattr(reading, "isoform", None) and args.isoform != reading.isoform:
             # The enzyme note above says the constants come from rows naming
             # the description's isoform; the flag's isoform is the one used.
@@ -1489,6 +1493,11 @@ def read_subject(model: Any, args: Any) -> Tuple[Any, Optional[str], Optional[st
         args.isoform = resolution.isoform
     if organism_applied:
         args.organism = resolution.organism
+    from caterva.enzymes.policy import split_mutation
+    _, mutations = split_mutation(" ".join(str(subject).split()))
+    if mutations and not getattr(args, "mutation", None):
+        # The note says the constants come from the mutant's rows only.
+        args.mutation = "/".join(mutations)
     notes = resolution.notes(subject, isoform_applied=isoform_applied, organism_applied=organism_applied)
     if getattr(resolution, "isoform", None) and not isoform_applied and args.isoform != resolution.isoform:
         notes.append(f"--isoform {args.isoform} was used, because a flag wins over what {subject.strip()!r} implies.")
@@ -1780,6 +1789,7 @@ def _search_resolved(
             isoform=getattr(args, "isoform", None) or None,
             any_mode=bool(getattr(args, "any_mode", False)),
             resolve=resolve,
+            mutation=getattr(args, "mutation", None) or None,
         )
     except LiteratureLayerUnavailable as exc:
         return model, str(exc), True

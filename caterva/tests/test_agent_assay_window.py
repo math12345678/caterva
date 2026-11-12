@@ -464,6 +464,37 @@ class TestTheScoutReSelects:
         source = report.blackboard.get(param_key("kcat")).source
         assert (source.value, source.ph, source.commentary) == (21.1, 8.0, "pH 8.0, 25°C")
 
+    def test_one_of_a_measured_pair_is_not_moved_alone(self) -> None:
+        """Beta-lactamase TEM-1 with clavulanate (live, 2026-11-12): the Km
+        and kcat were ref 771150's pair (0.0504 mM, 444.18 1/s, pH 7.5,
+        25 C); a window moved the kcat alone to ref 663646's 0.37 1/s at pH
+        7, 37 C, and the Km's reason still named 444.18."""
+        from Tests.parameterize import ParameterRequest
+
+        rows = {"kcat": [row(444.18, 7.5, 25.0, unit="1/s"), row(0.37, 7.0, 37.0, unit="1/s")]}
+        base = windowed_resolver(rows)
+
+        def paired_resolver(request, **kw):
+            result = base(request, **kw)
+            result.value, result.assay_ph, result.assay_temperature_c = 444.18, 7.5, 25.0
+            result.chosen_because = ("the row of BRENDA ref 771150 ...; the Km (0.0504 mM) and "
+                                     "kcat (444.18 1/s) are one measurement: BRENDA ref 771150 "
+                                     "states the same conditions for both rows")
+            return result
+
+        window = Constraint(kind="assay_window", subject="kcat", requirement="pH 7; temperature 37",
+                           reason="test", raised_by="test")
+        scout = ParameterScout(
+            request=ParameterRequest(quantity="kcat", subject="beta-lactamase",
+                                     substrate="cefotaxime", ec_number="3.5.2.6", table="kcat",
+                                     paired=True),
+            resolve=paired_resolver)
+        from caterva.agents.scheduler import Scheduler
+        report = Scheduler([scout]).run(initial_constraints=[window])
+        assert report.blackboard.get(param_key("kcat")).source.value == 444.18
+        notes = [n for r in report.rounds for ar in r.ran for n in ar.notes]
+        assert any("one measurement with its paired constant" in n for n in notes)
+
     def test_when_no_row_satisfies_the_window_the_default_stands(self) -> None:
         # Re-selecting an outside row would manufacture a measurement the
         # literature does not support; the resolver's answer is presented

@@ -58,7 +58,7 @@ WHAT IT READS, AND WHAT IT NEVER GUESSES
   does to its substrate ("metabolising midazolam", "cleaving BAPNA"), and a
   verb is never part of a candidate. A virus or strain tag ("HIV-1",
   "K-12") or a mutation ("R132H") is never a candidate; a mutation typed
-  after the enzyme is said to be not modelled (`mutations`).
+  after the enzyme is the mutant the constants are taken for (`mutations`).
 * The SUBSTRATE candidates are whole runs of words, never one word of a
   longer compound name ("glucose" out of "glucose 6-phosphate").
 
@@ -211,7 +211,7 @@ class SentenceReading:
     #: be the inhibitor. The caller decides, against BRENDA's Ki list and
     #: the substrates BRENDA lists, never this reader.
     possible_inhibitor_text: Optional[str] = None
-    #: Point mutations typed after the enzyme ("R132H"): not modelled, said.
+    #: Point mutations typed after the enzyme ("R132H"): constants come from their rows only.
     mutations: Tuple[str, ...] = ()
 
     @property

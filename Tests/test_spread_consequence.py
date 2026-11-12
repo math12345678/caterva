@@ -345,13 +345,20 @@ def test_the_tie_this_was_built_for_is_real():
         lineage_provider=fixture_lineage_provider,
     )
 
-    tie = result.selection_tie
-    assert tie is not None and tie.is_tied
-    assert len(tie.candidates) > 1
+    # Since the second adversarial round (ADR 0182) the immobilised row is
+    # a preparation set aside for the soluble enzyme's, so the resolver no
+    # longer ties them: it carries 276.5 and says why. The two rows are
+    # still the real pair this module was built for.
+    assert result.value == 276.5
+    assert "immobilised enzyme" in result.chosen_because
+    from selection_tie import TiedCandidate
+    candidates = [TiedCandidate(value=v, unit="1/s", organism="Mus musculus",
+                                reference_id=None, conditions=None, selected=(v == 276.5))
+                  for v in (170.7, 276.5)]
 
     # And a kcat tie is exactly the case this module refuses, so the
-    # refusal is exercised on the real thing rather than only on a
+    # refusal is exercised on the real pair of rows rather than only on a
     # constructed list.
-    verdict = consequence_of(tie.candidates, parameter="kcat", vmax=1.0, s0=1.0)
+    verdict = consequence_of(candidates, parameter="kcat", vmax=1.0, s0=1.0)
     assert verdict.status == "not_assessed"
     assert "enzyme concentration" in verdict.reason

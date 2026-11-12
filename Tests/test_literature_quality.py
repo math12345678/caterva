@@ -60,7 +60,8 @@ def recorded_hexokinase() -> str:
 # div.cell markup: value | compound | organism | uniprot | commentary | ref.
 
 _TAB_IDS = {"KM Values": "tab12", "Turnover Numbers": "tab44", "kcat/KM Values": "tab305",
-            "Ki Values": "tab49", "IC50 Values": "tab54", "Inhibitors": "tab11"}
+            "Ki Values": "tab49", "IC50 Values": "tab54", "Inhibitors": "tab11",
+            "Synonyms": "tab39"}
 
 
 def page(tables: dict) -> str:
@@ -389,10 +390,14 @@ class TestAKmAndAKcatComeFromOnePaperWhenOneHasBoth:
         assert (km.value, kcat.value) == (0.3, 30)
         assert km.citation.reference_id == kcat.citation.reference_id == "700003"
 
-    def test_on_the_recorded_page_hexokinase_km_and_kcat_come_from_one_paper(self):
-        """Independently, human hexokinase and D-glucose would carry Km 0.06
-        mM (hexokinase I, ref 640237) beside kcat 60.4 1/s (ref 703624): two
-        proteins' constants. Ref 739603 measured both."""
+    def test_on_the_recorded_page_hexokinase_is_one_isozymes_and_says_its_km_is_a_k05(self):
+        """Pairing once carried ref 739603's Km 6.3 mM and kcat 40.1 1/s
+        unsaid: the 6.3 mM row is glucokinase's K0.5 with a Hill coefficient
+        of 1.8. Then the independent picks carried HK-I's Km (0.06 mM, ref
+        640237) beside glucokinase's kcat (60.4 1/s, ref 703624, P35557): two
+        proteins in one rate law. Every kcat row on the page is
+        glucokinase's, so the pair is kept to glucokinase: its Km is the
+        K0.5, said, and both name GCK."""
         html = recorded_hexokinase()
         kw = dict(html_provider=lambda ec: html, uniprot_provider=lambda ec, org: None,
                   taxon_id_provider={"Homo sapiens": "9606"}.get, search_literature=False)
@@ -403,8 +408,12 @@ class TestAKmAndAKcatComeFromOnePaperWhenOneHasBoth:
         assert (alone_kcat.value, alone_kcat.citation.reference_id) == (60.4, "703624")
         assert alone_km.wide_spread is True  # hexokinase I and IV share the pool
         km, kcat = resolve_kinetic_pair("2.7.1.1", "Homo sapiens", "D-glucose", **kw)
-        assert (km.value, kcat.value) == (6.3, 40.1)
-        assert km.citation.reference_id == kcat.citation.reference_id == "739603"
+        assert km.row_isoform == kcat.row_isoform == "GCK"
+        assert km.value == 6.3 and km.citation.reference_id == "739603"
+        assert any("K0.5 with a Hill coefficient of 1.8" in n for n in km.row_notes)
+        assert "the Km was taken from rows naming GCK" in km.chosen_because
+        assert "(the Km chosen alone, 0.06 mM, measured HK-I)" in km.chosen_because
+        assert any("(P35557) is GCK" in n for n in kcat.row_notes)
 
 
 # -- Isoforms ------------------------------------------------------------------

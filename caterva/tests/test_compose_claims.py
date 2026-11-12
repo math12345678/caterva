@@ -256,10 +256,11 @@ class TestTheBundle:
             "assay_completeness": "2", "condition_proximity": None, "organism_match": "2",
         }
         # The other rows the resolver chose among for this request: every
-        # human D-glucose Km row stating both pH and temperature.
+        # human D-glucose Km row stating both pH and temperature, less HK-I's
+        # isolated carboxyl domain (0.038 mM, ref 640261), a construct set
+        # aside since ADR 0182's second round.
         assert set(ordinals["alternatives"]) == {
-            "0.034 mM ref 640261", "0.038 mM ref 640261", "0.06 mM ref 640237",
-            "3.8 mM ref 641067", "6 mM ref 641068",
+            "0.034 mM ref 640261", "0.06 mM ref 640237", "3.8 mM ref 641067", "6 mM ref 641068",
         }
         assert "unit_factor" not in km.derivation.settings, "the row is already in the model's unit"
 

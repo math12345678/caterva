@@ -313,11 +313,15 @@ class TestRowsNamingNoIsoform:
         # naming none, one of them the mutant C374A.
         pool = rows("1.4.3.4", "D-amphetamine")
         assert _naming_no_isoform(pool, isoform_matched=False, allow_variants=False) == []
+        # The wild-type 0.0144 and the mutant 0.0115 rows carry MAO-A's own
+        # accession (P21397) in BRENDA's UniProt cell, so they name MAO-A
+        # (ADR 0182, second round); 0.015 lists both MAO-A and MAO-B and so
+        # names neither.
         back = _naming_no_isoform(pool, isoform_matched=True, allow_variants=False)
-        assert sorted(e.km_value for e in back) == [0.0144, 0.015]
+        assert sorted(e.km_value for e in back) == [0.015]
         assert all("mutant" not in (e.conditions or "") for e in back)
         with_variants = _naming_no_isoform(pool, isoform_matched=True, allow_variants=True)
-        assert sorted(e.km_value for e in with_variants) == [0.0115, 0.0144, 0.015]
+        assert sorted(e.km_value for e in with_variants) == [0.015]
 
     def test_and_are_taken_only_when_no_row_for_the_isoform_can_be(self):
         """No real pool has this shape: of the 766 Ki rows parsed from the
@@ -378,7 +382,15 @@ class TestRowsNamingNoIsoformThroughTheResolver:
 
     @staticmethod
     def row(ec, inhibitor, value):
-        return next(e for e in rows(ec, inhibitor) if e.km_value == value)
+        entry = next(e for e in rows(ec, inhibitor) if e.km_value == value)
+        if ec != "1.4.3.4":
+            # An LDH page's row served as an MAO pool: its own UniProt cell
+            # (P00338) names LDHA under its EC, which says nothing of MAO, so
+            # the stand-in is served without it and names no isoform, as the
+            # pool's premise needs (the cell is read since ADR 0182's second
+            # round).
+            entry = entry.model_copy(update={"uniprot_from_row": False})
+        return entry
 
     @staticmethod
     def resolve(tier, ec, inhibitor, **kw):

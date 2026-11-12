@@ -36,9 +36,9 @@ THE POLICY
    with the did-you-mean suggestions the nomenclature had.
 
 A trailing point-mutation tag ("IDH1 R132H") is set aside before the name is
-read, and the note says the mutant is not modelled: the constants are
-searched for the enzyme, and BRENDA's rows for that mutant are not singled
-out.
+read, and the note says the constants are taken only from BRENDA rows
+measuring that mutant (`caterva compose` sends it to the resolver as
+`mutation`), never from the wild-type enzyme's.
 
 A caller with no UniProt lookup (the installed app has no literature layer)
 gets steps 1 to 3 and a refusal for 4. An EC number is read by the same
@@ -326,9 +326,9 @@ def split_mutation(text: str) -> Tuple[str, Tuple[str, ...]]:
 
 
 def mutation_note(name: str, tags: Sequence[str]) -> str:
-    return (f"{name} {'/'.join(tags)} is a mutant, and mutants are not modelled: the constants are searched "
-            f"for {name} itself, and BRENDA's rows for {'that mutant' if len(tags) == 1 else 'those mutants'} "
-            "are not singled out. Compare against the mutant's own papers before relying on them.")
+    return (f"{name} {'/'.join(tags)} is a mutant: each constant is taken only from BRENDA rows measuring "
+            f"{'that mutant' if len(tags) == 1 else 'those mutations together'}, never from the wild-type "
+            f"enzyme's, and a constant with no such row is a placeholder that says so.")
 
 
 def _from_gene(

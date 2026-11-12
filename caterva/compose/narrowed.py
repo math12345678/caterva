@@ -106,6 +106,7 @@ def _row_of(m: Any) -> Dict[str, Any]:
         "conditions": getattr(m, "commentary", None),
         "ph": getattr(m, "assay_ph", None), "temperature_c": getattr(m, "assay_temperature_c", None),
         "buffer": getattr(m, "assay_buffer", None),
+        "isoform": getattr(m, "row_isoform", None),
     }
 
 
@@ -131,11 +132,24 @@ def same_row(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
 
 
 def _merged(*groups: Sequence[Any]) -> tuple:
+    """The rows of every group, each once (the first spelling of a row
+    wins), with what a later copy of a row adds -- its reliability grades,
+    its isoform -- kept: a Measurement's own row (`_row_of`) carries no
+    grades, and the resolver's frontier copy of that row does, which the
+    claims' dominance ordinals need (human hexokinase's glucokinase pair,
+    ADR 0182 second round)."""
     out: List[Dict[str, Any]] = []
     for group in groups:
         for row in group:
-            if isinstance(row, dict) and not any(same_row(row, seen) for seen in out):
+            if not isinstance(row, dict):
+                continue
+            seen = next((kept for kept in out if same_row(row, kept)), None)
+            if seen is None:
                 out.append(dict(row))
+                continue
+            for key, value in row.items():
+                if seen.get(key) is None and value is not None:
+                    seen[key] = value
     return tuple(out)
 
 
@@ -221,6 +235,14 @@ def carry(measured: Mapping[str, Any], refused: Mapping[str, str], narrowed: Nar
         what = _asked(isoform, modes.get(identifier))
         because = (f"the resolver's row for {what}, ranked among every row BRENDA holds "
                    f"before choosing on evidence")
+        own = getattr(answer, "chosen_because", None) or getattr(answer, "resolver_because", None)
+        if own:
+            # The resolver's own reason says what the row IS (a K0.5, a
+            # construct, another isozyme's accession, one paper's pair):
+            # without it the report said only that the resolver chose it
+            # (human hexokinase: glucokinase's K0.5 6.3 mM, ref 739603, with
+            # no word of K0.5, Hill or GCK; ADR 0182, second round).
+            because = f"{because}: {own}"
         view = narrowed.measured[identifier]
         out[identifier] = replace(answer, alternatives=getattr(view, "alternatives", ()),
                                   chosen_because=because)

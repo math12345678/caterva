@@ -456,6 +456,22 @@ class TestThePhrases:
     def test_reads_a_name_after_a_keyword_by_its_shape(self, text, reading):
         assert read_isoform(text) == reading
 
+    @pytest.mark.parametrize("text, reading", [
+        # Beta-lactamases (EC 3.5.2.6), named in BRENDA's synonyms: a family
+        # name with a hyphen of its own and three-digit alleles were not
+        # read, so ref 771150's CTX-M-15 rows were TEM-1's "naming no
+        # isoform" (review of the second adversarial round, 2026-11-12).
+        ("CTX-M-15", "CTX-M-15"), ("blaCTX-M-14", "CTX-M-14"),
+        ("100 microM nitrocefin as the reporter substrate, TEM-149 wild-type, pH 7.0", "TEM-149"),
+        ("OXA-163", "OXA-163"), ("NDM-4", "NDM-4"), ("TEM-1", "TEM-1"),
+        ("AmpC beta-lactamase", "AmpC"),
+        ("HIV-1 subtype C protease", None),
+    ])
+    def test_reads_a_beta_lactamase(self, text, reading):
+        assert read_isoform(text) == reading
+        if reading:
+            assert not same_isoform(reading, "TEM-12") or reading == "TEM-12"
+
 
 class TestTheComparison:
     @pytest.mark.parametrize("a, b", [

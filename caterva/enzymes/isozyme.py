@@ -126,6 +126,11 @@ class IsozymeNotice:
     #: Constants whose row names no isozyme although one was asked for. None when that was not
     #: checked (a caller with no cited rows to look at).
     unstated: Optional[Tuple[str, ...]] = ()
+    #: False when `isoform` names none of the listed proteins: "TEM-1" under EC 3.5.2.6 in
+    #: E. coli K-12, whose listed proteins are the chromosomal ampC and dacA. A plasmid-borne
+    #: or other strain's enzyme is not in the reference proteome, and the listed proteins are
+    #: then not its isozymes.
+    isoform_listed: bool = True
 
     @property
     def broad(self) -> bool:
@@ -184,6 +189,11 @@ class IsozymeNotice:
     def detail(self) -> str:
         """What is the case, for the verdict's concern line."""
         named = f" ({_named(self.symbols)})" if self.symbols and not self.broad else ""
+        if self.isoform and not self.isoform_listed:
+            return (f"--isoform {self.isoform} names none of the {self.count} proteins the enzyme "
+                    f"nomenclature lists for EC {self.ec} in {self.label}{named}: it is not in that reference "
+                    "proteome (a plasmid-borne enzyme or another strain's), so those proteins are not its "
+                    "isozymes, and whether a cited row measured it is known only from the row's own words")
         if self.isoform:
             if self.unstated is None:
                 return (f"--isoform {self.isoform} was given for EC {self.ec}, which is {self.count} {self.label} "
@@ -256,7 +266,23 @@ def isozyme_notice(
         return None
     return IsozymeNotice(
         ec=ec.strip(), organism=found.organism, count=found.count, symbols=found.symbols,
-        isoform=isoform or None, unstated=None if (isoform and unstated is None) else tuple(unstated or ()))
+        isoform=isoform or None, unstated=None if (isoform and unstated is None) else tuple(unstated or ()),
+        isoform_listed=not isoform or found.count > BROAD_CLASS or _listed(found, isoform) is not None)
+
+
+def _listed(found: Any, label: str) -> Optional[Tuple[Any, Tuple[str, ...]]]:
+    """(protein, its names) for the listed protein `label` names, or None."""
+    from .isoforms import keys_of, names_for
+
+    wanted = keys_of(label)
+    for protein in found.proteins:
+        names = names_for(protein.accession, protein.symbol)
+        have = set()
+        for name in names:
+            have |= keys_of(name)
+        if wanted & have:
+            return protein, tuple(names)
+    return None
 
 
 def describe_isoform(ec: Optional[str], organism: Optional[str], label: Optional[str]) -> Optional[str]:
@@ -268,18 +294,12 @@ def describe_isoform(ec: Optional[str], organism: Optional[str], label: Optional
     found = isozymes(ec.strip(), organism)
     if found.organism is None or found.count < 2:
         return None
-    from .isoforms import keys_of, names_for
-
-    wanted = keys_of(label)
-    for protein in found.proteins:
-        names = names_for(protein.accession, protein.symbol)
-        have = set()
-        for name in names:
-            have |= keys_of(name)
-        if wanted & have:
-            return (f"--isoform {label!r} was read as {protein.label}, {organism_precise(found.organism)} protein "
-                    f"{protein.entry_name} (UniProt {protein.accession}); a row is taken as measuring it when its "
-                    f"commentary names it as any of: {_named([n for n in names if len(n) <= 40][:8])}")
+    listed = _listed(found, label)
+    if listed is not None:
+        protein, names = listed
+        return (f"--isoform {label!r} was read as {protein.label}, {organism_precise(found.organism)} protein "
+                f"{protein.entry_name} (UniProt {protein.accession}); a row is taken as measuring it when its "
+                f"commentary names it as any of: {_named([n for n in names if len(n) <= 40][:8])}")
     shown = _named(found.symbols) if not found.count > BROAD_CLASS else f"{found.count} proteins"
     return (f"--isoform {label!r} is not a gene symbol or name the enzyme nomenclature's UniProt entries give "
             f"any of the {organism_precise(found.organism)} proteins of EC {ec} ({shown}), so rows are compared "
@@ -292,6 +312,19 @@ def _states(commentary: Optional[str], isoform: str) -> bool:
     except ImportError:  # pragma: no cover - flat layout
         return False
     return same_isoform(read_isoform(commentary), isoform)
+
+
+def _states_by_accession(measurement: Any, isoform: str) -> bool:
+    """Whether the row's own UniProt cell names `isoform`, as the resolver
+    read it (`Measurement.row_isoform`): an O75874 row measured IDH1."""
+    named = getattr(measurement, "row_isoform", None)
+    if not isinstance(named, str) or not named:
+        return False
+    try:
+        from caterva.bind.core import same_isoform
+    except ImportError:  # pragma: no cover - flat layout
+        return False
+    return bool(same_isoform(named, isoform))
 
 
 def notice_for_model(model: Any) -> Optional[IsozymeNotice]:
@@ -309,7 +342,8 @@ def notice_for_model(model: Any) -> Optional[IsozymeNotice]:
     if isoform:
         unstated = [
             str(identifier) for identifier in sorted(measured)
-            if not _states(getattr(measured[identifier], "commentary", None), isoform)]
+            if not _states(getattr(measured[identifier], "commentary", None), isoform)
+            and not _states_by_accession(measured[identifier], isoform)]
     return isozyme_notice(getattr(model, "subject", None), getattr(model, "organism", None), isoform,
                           unstated=unstated)
 

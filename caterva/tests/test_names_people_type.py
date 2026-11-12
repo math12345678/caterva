@@ -252,7 +252,7 @@ def test_a_point_mutation_is_set_aside_and_said_to_be_not_modelled():
     assert split_mutation("hexokinase") == ("hexokinase", ())
     result = resolve_enzyme_name("IDH1 R132H")
     assert result.ec == "1.1.1.42" and result.isoform == "IDH1"
-    assert any("R132H is a mutant, and mutants are not modelled" in n for n in result.notes("IDH1 R132H"))
+    assert any("R132H is a mutant: each constant is taken only from BRENDA rows measuring" in n for n in result.notes("IDH1 R132H"))
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +347,7 @@ def test_a_virus_strain_or_mutation_tag_is_never_a_substrate(text):
 def test_a_mutation_after_the_enzyme_is_said_to_be_not_modelled():
     reading = read_sentence("IDH1 R132H")
     assert reading.ec == "1.1.1.42" and reading.mutations == ("R132H",)
-    assert "mutants are not modelled" in reading.enzyme_note()
+    assert "never from the wild-type" in reading.enzyme_note()
 
 
 def test_a_substrate_abbreviation_is_never_read_as_an_enzyme():

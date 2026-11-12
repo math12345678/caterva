@@ -428,6 +428,11 @@ class Measurement:
     #: kcat share (ADR 0182). Not a re-selection: `chosen_because` stays
     #: None for the resolver's pick, and wins over this when set.
     resolver_because: Optional[str] = None
+    #: The isoform the row measured as the resolver read it: its commentary,
+    #: else its own UniProt cell ("IDH1" for O75874, "GCK" for P35557). A row
+    #: whose words name none can still name one by accession; the isoform
+    #: checks read this when the words are silent (ADR 0182, second round).
+    row_isoform: Optional[str] = None
 
     @property
     def disagreement(self) -> Optional[Tuple[float, float]]:
@@ -835,7 +840,8 @@ def provenance_of(
                     measurement=measurement,
                     scope=(
                         read_scope(measurement.commentary, motif=instance.motif.name,
-                                   table=parameter.table, substrate=substrate, isoform=isoform)
+                                   table=parameter.table, substrate=substrate, isoform=isoform,
+                                   row_isoform=getattr(measurement, "row_isoform", None))
                         if measurement is not None else None
                     ),
                 )
@@ -932,6 +938,7 @@ def measured_from_search(search: Any) -> Dict[str, Measurement]:
             alternatives=tuple(getattr(source, "candidates", ()) or ()),
             commentary=getattr(source, "commentary", None),
             resolver_because=getattr(source, "resolver_because", None),
+            row_isoform=getattr(source, "row_isoform", None),
         )
     return out
 
