@@ -628,7 +628,9 @@ class TestTheExitCodeWhenASearchIsRefused:
         assert note.startswith("No search was run: BRENDA holds no Km row for EC 2.7.1.1 in Danio "
                                "rerio"), note
         assert "The organism, not the substrate, is what is missing" in note
-        assert "Organisms with Km rows for EC 2.7.1.1: Homo sapiens (159 rows); Oryctolagus " \
+        # 54 of the 159 human rows are not a protein variant's: only rows the
+        # search would use are offered as the way out (ADR 0182 review).
+        assert "Organisms with Km rows for EC 2.7.1.1: Homo sapiens (54 rows); Oryctolagus " \
                "cuniculus (37 rows);" in note
         assert "--organism" in note and "Re-run with --substrate" not in note
         assert found.organism is None or found.organism != "Homo sapiens"
@@ -728,7 +730,7 @@ class TestTheExitCodeWhenASearchIsRefused:
         )
         assert "BRENDA holds no Km row for EC 2.7.1.1 in Danio rerio" in run.stdout, \
             "the reason belongs in the report"
-        assert "Organisms with Km rows for EC 2.7.1.1: Homo sapiens (159 rows);" in run.stdout, (
+        assert "Organisms with Km rows for EC 2.7.1.1: Homo sapiens (54 rows);" in run.stdout, (
             "the organisms are named, from the recorded page")
         assert "refusal(s)" in run.stderr, "and a script is told to look"
 

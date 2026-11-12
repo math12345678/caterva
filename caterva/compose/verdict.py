@@ -46,6 +46,7 @@ and burying it in a subsection would waste it.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -603,13 +604,35 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
             # withheld (`__main__._neighbours_withheld`): naming the compound
             # again would return it again.
             need = "neighbour"
+        elif "the organism is what is missing" in low:
+            # The organism has no row of this table under the EC number at
+            # all (`__main__._what_the_organism_holds`): no compound fills it.
+            need = "organism_missing"
+        elif "measured another isoform" in low:
+            # `__main__._measured_on_the_isoform` says whether any compound
+            # has rows naming the isoform there; when none has, offering
+            # --substrate would lead to the same placeholder.
+            need = ("isoform_unmeasured" if re.search(r"naming \S+ under EC \S+ in .+ for any "
+                                                      r"(substrate|inhibitor)", reason)
+                    else "isoform")
+        elif "so naming one would leave the" in low:
+            # Every substrate offered lacks a row for another constant of
+            # the model (`__main__._what_the_organism_holds`): re-running
+            # trades one placeholder for another, so the step is to supply it.
+            need = "nothing"
+        elif "--inhibitor set to" in reason:
+            # The inhibitor named has no Ki row; others do. It WAS looked up.
+            need = "other_inhibitor"
+        elif "--substrate set to" in reason:
+            need = "other_substrate"
         elif "--inhibitor" in reason:
             need = "inhibitor"
         elif "--substrate" in reason and "not looked up" in low:
             need = "substrate"
         elif "--product" in reason or "--compound" in reason:
             need = "compound"
-        elif "other organism" in low or "available in" in low or "cross-species" in low:
+        elif ("other organism" in low or "available in" in low or "cross-species" in low
+              or "no value in the organism requested" in low):
             need = "organism"
         elif "not looked up" in low:
             need = "refused"
@@ -621,6 +644,30 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
         steps.append(f"supply {', '.join(by_need['neighbour'])} yourself, or model the compound the "
                      "provenance table names: the row the search returned is another compound's, "
                      "so it was withheld")
+    if "organism_missing" in by_need:
+        names = by_need["organism_missing"]
+        steps.append(f"{', '.join(names)}: BRENDA has no row of {'its' if len(names) == 1 else 'their'} "
+                     "table in this organism at all, so no other compound would fill it: re-run with "
+                     "--organism set to one the provenance table lists to model that organism, or supply "
+                     f"{'it' if len(names) == 1 else 'them'} yourself")
+    if "other_inhibitor" in by_need:
+        steps.append(f"{', '.join(by_need['other_inhibitor'])}: BRENDA has no Ki row for the inhibitor "
+                     "named, in this organism: re-run with --inhibitor set to one the provenance table "
+                     "lists, or supply it yourself")
+    if "other_substrate" in by_need:
+        steps.append(f"{', '.join(by_need['other_substrate'])}: BRENDA has no row for the substrate "
+                     "named, in this organism: re-run with --substrate set to one the provenance table "
+                     "lists, or supply it yourself")
+    if "isoform" in by_need:
+        steps.append(f"{', '.join(by_need['isoform'])}: every row the search found measured another "
+                     "isoform than the one asked for: re-run with --substrate set to one the provenance table "
+                     "lists as measured on this isoform, or with --isoform set to the one the provenance table names to "
+                     "model that protein, or supply it yourself")
+    if "isoform_unmeasured" in by_need:
+        steps.append(f"{', '.join(by_need['isoform_unmeasured'])}: every row the search found measured "
+                     "another isoform than the one asked for, and no row in this organism names that "
+                     "isoform for any compound: re-run with --isoform set to the one the provenance table "
+                     "names to model that protein, or supply it yourself")
     if "inhibitor" in by_need:
         steps.append(f"name the inhibitor with --inhibitor NAME, so {', '.join(by_need['inhibitor'])} "
                      "is looked up (BRENDA files a Ki under the inhibitor)")
@@ -746,6 +793,12 @@ def _provenance_concerns(
             f"the search for {subject!r} found nothing it could use"
         )
         note = f"{unmeasured} constant(s) unmeasured after searching"
+        # The remedy is read from each placeholder's reason, as for a partly
+        # grounded model: "re-run with --organism" was the advice for CYP3A4
+        # (rows of another isoform) and luciferase (a neighbour's rows)
+        # alike, and neither is fixed by an organism (round-1 review).
+        names = _grounding_names(model)
+        partial_remedy = _what_would_ground(model, names[1]) if names else None
     elif not _database_could_supply(model):
         # No enzyme step: say once why an enzyme does not apply, so the
         # remedy below can be the one thing left to do.

@@ -131,24 +131,26 @@ docs/studio/CONTRACT.md). `--export` prints them to stderr as `Chose: ...`;
 
 ## Verified live, 2026-11-11
 
-BRENDA live, this branch. "Before" is the 2026-11-11 baseline on main.
+BRENDA live. The "after" column was re-run on the merged tree after the round-1
+review fixes (the literature layer's median pick and the paired Km/kcat lookup
+changed several values from the engine branch's). "Before" is the 2026-11-11 baseline on main.
 
 | description | before | after |
 |---|---|---|
 | `"Michaelis-Menten of granzyme B with a competitive inhibitor" --organism "Homo sapiens"` | exit 3, all three placeholders | exit 0, GROUNDED. Chose 2-aminobenzoyl-IEPDSSMEK-dnp (3 Km, 3 kcat; tied with Boc-Ala-Ala-Asp-SBzl, broken by name) and the inhibitor with the most human Ki rows: Km 0.0058 mM and kcat 4.4 1/s (BRENDA ref 652110), Ki 0.013 mM (ref 732601), all Homo sapiens |
-| `"hexokinase Michaelis-Menten kinetics" --organism human` | exit 3, placeholders | exit 0. Chose D-glucose (25 Km, 61 kcat; ATP set aside): Km 6.0 mM (ref 641068), kcat 40.1 1/s (ref 739603) |
-| `"acetylcholinesterase from human, Michaelis-Menten"` | exit 3, placeholders | exit 0. Chose acetylthiocholine (40 Km, 3 kcat; acetylcholine has 4 Km and no human kcat): Km 0.086 mM, kcat 93 1/s (ref 775647) |
-| `"chymotrypsin follows Michaelis-Menten kinetics"` (no organism) | exit 3, placeholders; with a substrate, Musca domestica | exit 0. Chose Homo sapiens (covers Km and kcat; Bos taurus, 136 Km and 143 kcat, listed first among the others) and L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide: kcat 22.8 1/s (ref 769319); Km a labelled placeholder, because the 0.219 mM the search returned (ref 769319) is the N-succinyl compound's row (see "A value is never carried under a neighbour's name") |
-| `"carbonic anhydrase in human follows Michaelis-Menten"` | exit 3, placeholders | exit 0. Chose CO2 (61 Km, 59 kcat): Km 9.3 mM (ref 729384), kcat 1e-06 1/s (ref 729224) -- the resolver's pick among CO2's kcat rows, physically absurd, unchanged here (Not done) |
-| `"angiotensin-converting enzyme inhibited by captopril" --subject 3.4.15.1 --organism human` | exit 3, placeholders | exit 0. Chose angiotensin I, the natural substrate (11 Km, 3 kcat; hippuryl-His-Leu, 18 Km, listed): kcat 52 1/s (ref 669424), Ki of captopril 1e-05 mM (ref 650001); Km a labelled placeholder, because the 0.011 mM the search returned (ref 669424) is [Phe9,Arg10]angiotensin I's row. STRUCTURAL, partly grounded, 2 of 3 |
-| `"xanthine oxidase inhibited by allopurinol"` | exit 3, placeholders; with xanthine, human Km and kcat and no Ki | exit 0, GROUNDED. Chose Bos taurus, the one organism with an allopurinol Ki row (the note says Homo sapiens does not cover it), and xanthine: Km 0.01208 mM (ref 766313), kcat 16.2 1/s (ref 393008), Ki 0.0018 mM (ref 676739) |
-| `"glucose-6-phosphate dehydrogenase Michaelis-Menten" --organism "S. cerevisiae"` | exit 3, "Re-run with --substrate NAME" | exit 3, "BRENDA holds no Km row for EC 1.1.1.49 in Saccharomyces cerevisiae ... The organism, not the substrate, is what is missing", listing Homo sapiens (57 rows), Escherichia coli (19), Trypanosoma cruzi (14), ...; the verdict's next step is the same sentence |
+| `"hexokinase Michaelis-Menten kinetics" --organism human` | exit 3, placeholders | exit 0. Chose D-glucose (25 Km, 61 kcat; ATP set aside): Km 6.3 mM and kcat 40.1 1/s (both ref 739603, a Km and its kcat from one paper; that paper measured glucokinase, and the isozyme concern says no --isoform was given) |
+| `"acetylcholinesterase from human, Michaelis-Menten"` | exit 3, placeholders | exit 0. Chose acetylthiocholine (40 Km, 3 kcat; acetylcholine has 4 Km and no human kcat): Km 0.11 mM, kcat 7.18 1/s (both ref 749746) |
+| `"chymotrypsin follows Michaelis-Menten kinetics"` (no organism) | exit 3, placeholders; with a substrate, Musca domestica | exit 0. Chose Homo sapiens (covers Km and kcat; Bos taurus, 136 Km and 143 kcat, listed first among the others) and L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide: Km 0.304 mM, kcat 10.9 1/s (both ref 769319). On the engine branch alone the Km was a labelled placeholder, the 0.219 mM returned being the N-succinyl compound's row (see "A value is never carried under a neighbour's name") |
+| `"carbonic anhydrase in human follows Michaelis-Menten"` | exit 3, placeholders | exit 0. Chose CO2 (61 Km, 59 kcat): Km 9.3 mM, kcat 1.4e6 1/s (both ref 729384). The engine branch alone carried kcat 1e-06 1/s (ref 729224); the implausible-row rule below removed it |
+| `"angiotensin-converting enzyme inhibited by captopril" --subject 3.4.15.1 --organism human` | exit 3, placeholders | exit 0. Chose angiotensin I, the natural substrate (11 Km, 3 kcat; hippuryl-His-Leu, 18 Km, listed): Km 0.052 mM and kcat 52 1/s (both ref 669424), Ki of captopril 1.6e-05 mM (ref 650001), GROUNDED. On the engine branch alone the Km was a labelled placeholder, the 0.011 mM returned being [Phe9,Arg10]angiotensin I's row |
+| `"xanthine oxidase inhibited by allopurinol"` | exit 3, placeholders; with xanthine, human Km and kcat and no Ki | exit 0, GROUNDED. Chose Bos taurus, the one organism with an allopurinol Ki row (the note says Homo sapiens does not cover it), and xanthine: Km 0.0167 mM (ref 766313), kcat 16.2 1/s (ref 393008), Ki 0.0018 mM (ref 676739) |
+| `"glucose-6-phosphate dehydrogenase Michaelis-Menten" --organism "S. cerevisiae"` | exit 3, "Re-run with --substrate NAME" | exit 3, "BRENDA holds no Km row for EC 1.1.1.49 in Saccharomyces cerevisiae ... The organism, not the substrate, is what is missing", listing Homo sapiens (30 rows), Escherichia coli (13), Rattus norvegicus (10), ... (the rows a search would use: variant rows are not counted); the verdict's next step is the same sentence |
 | `"lactate dehydrogenase with pyruvate in human"` | exit 3, name refused | exit 0. EC 1.1.1.27 chosen (the only one of 1.1.1.27 and 1.1.1.28 with human Km rows, 6), pyruvate read from the sentence: Km 0.03 mM (ref 286469); kcat a labelled placeholder (human has none; the organisms that do are named). Verdict "STRUCTURAL (partly grounded: 1 of 2 constants measured)", next step the organism |
-| `"dihydrofolate reductase with methotrexate in E. coli"` | plain Michaelis-Menten, methotrexate dropped | exit 0, competitive inhibition ("BRENDA's Ki rows for methotrexate ... state: competitive (1 row)"), 7,8-dihydrofolate chosen: Km 0.0007 mM (ref 747067), kcat 5.3 1/s (ref 674549), Ki 0.0059 mM (ref 655867) |
-| `"kinetics of pepsin" --substrate hemoglobin` | uncaught `ExportRefused` traceback | exit 0. Chose Saurida micropectoralis, the organism with the most hemoglobin Km and kcat rows (no human row): Km 0.10764 mM, kcat 18.3 1/s (ref 771228) |
-| `"citrate synthase Michaelis-Menten"` | exit 3, name refused | exit 0. EC 2.3.3.1 chosen (28 Km rows against 4 for 2.3.3.3), Homo sapiens, acetyl-CoA: Km 0.0077 mM, kcat 260 1/s (ref 756131). With `--organism mouse` still refused: neither EC has a mouse row |
+| `"dihydrofolate reductase with methotrexate in E. coli"` | plain Michaelis-Menten, methotrexate dropped | exit 0, competitive inhibition ("BRENDA's Ki rows for methotrexate ... state: competitive (1 row)"), 7,8-dihydrofolate chosen: Km 0.0013 mM and kcat 24.8 1/s (both ref 724416), Ki 0.0059 mM (ref 655867) |
+| `"kinetics of pepsin" --substrate hemoglobin` | uncaught `ExportRefused` traceback | exit 0. Chose Saurida micropectoralis, the organism with the most hemoglobin Km and kcat rows (no human row): Km 0.25265 mM, kcat 27.3 1/s (both ref 771228, the median of that paper's three rows each). `"pepsin with hemoglobin"` gives the same; it was built as cooperative binding before the round-1 fix below |
+| `"citrate synthase Michaelis-Menten"` | exit 3, name refused | exit 0. EC 2.3.3.1 chosen (28 Km rows against 4 for 2.3.3.3), Homo sapiens, acetyl-CoA: Km 0.0077 mM, kcat 260 1/s (ref 756131). With `--organism mouse` still refused, and the refusal now says none of the five candidates has a mouse Km row, so the organism is what is missing, naming the organisms with rows for EC 2.3.3.1 |
 | `"HIV-1 protease with a competitive inhibitor" --subject 3.4.23.16` | exit 3, placeholders | exit 0. Chose Human immunodeficiency virus 1 (not a binomial, read from the table's organism cells), Lys-Ala-Arg-Val-Nle-Phe(4-NO2)-Glu-Ala-Nle-Gly and indinavir (25 Ki rows): Km 0.017 mM, kcat 5.6 1/s (ref 678346), Ki 3.1e-06 mM (ref 664013) |
-| `"thrombin with a competitive inhibitor in human" --substrate D-Phe-Pro-Arg-4-nitroanilide --inhibitor argatroban --antimony` | kcat = 100, Km = 0.1, Ki = 0.5, no comment | kcat = 3.5, Km = 0.00033, Ki = 6.4e-06, each with its BRENDA ref in a comment |
+| `"thrombin with a competitive inhibitor in human" --substrate D-Phe-Pro-Arg-4-nitroanilide --inhibitor argatroban --antimony` | kcat = 100, Km = 0.1, Ki = 0.5, no comment | kcat = 3.5, Km = 0.00033 (both ref 709074), Ki = 6.4e-06 (ref 732938), each with its BRENDA ref in a comment |
 
 All 56 baseline descriptions re-run: 34 fully measured (was 7), 3 partly
 measured, 19 without a measured constant; HIV-1 protease with `--subject`
@@ -269,6 +271,134 @@ Review of the round, live (2026-11-12):
 | triosephosphate isomerase (T. brucei) carrying 0.31 mM and 5000 1/s, rows "in complex with monomer from Trypanosoma cruzi", over the same paper's wild-type pair | an interspecies or hybrid heterodimer is a construct (a complex with a ligand or regulatory protein is not) |
 | bovine trypsin's "enzyme with O-carboxymethyl-poly-beta-cyclodextrin attached to surface" beside its wild-type row | a polymer-conjugated, grafted, encapsulated or entrapped enzyme is a modified enzyme (a conjugated substrate is not) |
 | TEM-1 with clavulanate: a window moving the kcat of ref 771150's matched pair to another paper's row, while the Km's reason still named the pair | a constant carried as one measurement with its pair is not moved alone by an assay window; the report says so |
+
+### Round 1 of review: advice that leads to a run that succeeds
+
+An adversarial round ran the advice the reports gave. Much of it led to a
+second refusal or to nothing, and the engine now words each remedy for the
+thing actually missing (`caterva/compose/__main__.py`,
+`caterva/compose/verdict.py`, `caterva/agents/adapters.py`):
+
+- **A Ki is the inhibitor's.** A Ki placeholder said "BRENDA has no row for
+  that substrate name ... Re-run with --substrate" (donepezil on human AChE,
+  celecoxib on COX-2); the reason now names the inhibitor and `--inhibitor`,
+  and lists BRENDA's names as every organism's. Compose then replaces that
+  clause with what BRENDA holds in the organism searched: the inhibitors with
+  Ki rows there with their counts (human AChE: tacrine 3, edrophonium 2,
+  ...), and whether the one named has rows only in another organism
+  (labelled, never substituted) or none under that name ("a compound is filed
+  under the name its paper used": BRENDA has donepezil's Ki rows, mouse and
+  Tetronarce, under its systematic name, which Caterva does not map).
+- **The organism, when it is the blocker.** When the organism has no row of
+  the table under the EC number at all (human kcat for EC 1.14.14.1), the
+  placeholder says so and names the organisms that have rows, instead of
+  listing Bacillus substrates under `--substrate`.
+- **An isoform's rows.** A constant withheld because every row measured
+  another isoform names the compounds measured on the isoform asked for
+  (CYP3A4 in human: fenthion, 4 Km rows).
+- **"Do this next" is read from the reasons when nothing was measured too**,
+  not "re-run with --organism" for every all-placeholder model (CYP3A4, an
+  isoform question; luciferase, a neighbour's row).
+- **A name refused with an organism none of its enzymes has.** "citrate
+  synthase --organism mouse" now says none of the five candidates has a mouse
+  Km row, so following the refusal's `--subject` is not refused again.
+- **The organism's protein under another EC number.** "glucokinase in human"
+  (EC 2.7.1.2, no human Km row) now gives first: human glucokinase is GCK,
+  filed under EC 2.7.1.1 (54 human Km rows that are not a variant's), re-run with `--subject 2.7.1.1
+  --isoform GCK`, which runs GROUNDED (Km 6.0 mM ref 641068, kcat 37 1/s ref
+  702320, the kcat from the row naming GCK; the Km row names no isozyme and
+  the report says so). Only a protein whose UniProt names include the words
+  exactly counts. That kcat row is "glucokinase with C-terminal 5 alanine
+  addition", an engineered construct the variant reader does not recognise;
+  the wild-type GCK rows (40.1 1/s ref 739603, 29 1/s ref 702320) name no
+  isozyme, so the isoform rule prefers the construct. Left to the row-reading
+  stream (see "Not done" below).
+- **The sibling advice says whether any row names the protein** (reviewer
+  of round 1). "glucokinase with glucose in mouse" was told to re-run with
+  `--subject 2.7.1.1 --isoform Gck`, and that run came back GROUNDED with Km
+  0.42 mM (ref 758915) and kcat 53.2 1/s from mouse rows naming no isozyme, a
+  low-Km hexokinase's values, not glucokinase's (S0.5 near 8 mM). The advice
+  now counts the organism's rows that name the protein; when none does
+  (mouse: 0 of 3; human: 0 of 54 Km rows), it says each may have measured
+  another protein of that EC number, to read the papers of the rows the run
+  carries, or to supply the constants.
+- **A substrate offered for one constant says whether it fills the others**
+  (reviewer). "Renilla-type luciferase with coelenterazine" had no kcat row
+  for coelenterazine and was told to re-run with `--substrate Luciferin`,
+  which has no Km row in Renilla reniformis, so the advice traded the kcat
+  placeholder for a Km one. The substrates that fill every constant looked up
+  under the substrate are named; when none does, the reason says so and
+  "Do this next" is to supply it. With an isoform asked for, a compound whose
+  rows all name another isoform is not offered, since the isoform rule
+  refuses those rows.
+- **No organism has the compound** (reviewer). "cathepsin D with hemoglobin"
+  (rabbit chosen: the only organism with hemoglobin rows) has no rabbit kcat
+  row; the organisms offered have kcat rows only for other substrates, and
+  the reason now says the model there would not be of hemoglobin.
+- **A typed substrate measured only elsewhere** (second reviewer). "pepsin
+  with hemoglobin --organism pig" said hemoglobin "is not a substrate BRENDA
+  lists for Sus scrofa" and to pass --substrate with BRENDA's own name.
+  BRENDA lists Hemoglobin + H2O as pig pepsin's natural substrate, and the
+  name typed is BRENDA's own; what is missing is the organism. The note now
+  says hemoglobin has Km rows in other organisms only and names them with
+  their counts (Saurida micropectoralis, 3 rows; Micropterus salmoides, 2;
+  ...), variant rows left out, so the re-run it advises is grounded.
+- **An organism Caterva chose is not "your own request"** (reviewer). The
+  scout's suffix read "organism must be Bos taurus, raised by your own
+  request" for "xanthine oxidase inhibited by febuxostat", where no organism
+  was typed; it now says Caterva chose it because none was named.
+- **An isozyme's letter is not a possible substrate** (reviewer). With the
+  substrate list unread, "lactate dehydrogenase A in human" was refused for
+  "what may be the substrate ('A')"; a lone letter, digit or Roman numeral no
+  longer stops the search.
+- **A substrate word survives a failed read.** The substrate list is read up
+  to three times; if it still fails, the search refuses rather than letting
+  the chooser model another substrate under "No substrate was named"
+  ("hexokinase with mannose in human" had carried D-glucose's Km).
+- **"pepsin with hemoglobin"** is pepsin on hemoglobin: a compound named
+  beside an enzyme is not read as a mechanism when it is the only cue for
+  one (masking it must leave no recognised shape).
+- **An organism is offered only for rows the search would use.** "PTGS2 with
+  arachidonic acid" (human) was told to re-run in Mus musculus (3 kcat rows),
+  and "COX-2 inhibited by celecoxib" that arachidonate's kcat was "available
+  in: Mus musculus"; every one of those rows measured the N580A mutant, which
+  the search withholds (ADR 0029), so the advised run came back with
+  placeholders. Organisms, compounds and isoform rows listed as a way out now
+  count only rows that are not a variant's; when none is left the reason says
+  so and the step is to supply the constant. The refusal's sentence that no
+  candidate has the organism is now its own sentence ("... --subject 2.3.3.1.
+  None of ...").
+- **With an isoform asked for, an organism is offered only for rows naming
+  it.** "CYP3A4 metabolising testosterone in human" has no human kcat row on
+  EC 1.14.14.1, and the reason listed Bacillus licheniformis (9 rows) to
+  re-run in; those rows measured CYP102A7, so that run was refused again by
+  the isoform rule. The organisms listed now count only rows that name the
+  isoform, and when none does the reason says no organism's rows name it and
+  the step is to supply the constant. An isoform placeholder with no compound
+  measured on the isoform in that organism no longer advises `--substrate`.
+
+Live after: AChE/donepezil and COX-2/celecoxib Ki placeholders name
+`--inhibitor` and the human inhibitors; CYP3A4's human kcat says EC
+1.14.14.1 has no human Turnover row and no organism's rows name CYP3A4, so
+it is to be supplied (following the Km placeholder's `--substrate fenthion
+--isoform CYP3A4` gives Km 0.089 mM ref 706823); "glucokinase with glucose
+in human" followed with `--subject 2.7.1.1 --isoform GCK` is GROUNDED (Km
+6.0 mM ref 641068, kcat 37.0 1/s ref 702320); PTGS2/arachidonic
+acid and COX-2/celecoxib say every kcat row on EC 1.14.99.1 is a variant's
+and to supply it; "citrate synthase --organism mouse" followed with
+`--subject 2.3.3.1 --organism human` is GROUNDED (Km 0.0077 mM, kcat 260
+1/s, ref 756131); AChE/donepezil followed with `--inhibitor tacrine` is
+GROUNDED (Ki 3.7e-05 mM ref 749746); "pepsin with hemoglobin" is GROUNDED in Saurida
+micropectoralis (ref 771228). Not done: a PubMed search returns papers for a
+made-up inhibitor name (the reason now says the papers were not checked to
+name the compound; the search itself is the literature layer's); compound
+synonyms (donepezil under its systematic name, galantamine as galanthamine,
+febuxostat under its IUPAC name) are not mapped; construct rows ("C-terminal
+5 alanine addition", "truncated enzyme with removed helix") are not read as
+variants; "Renilla luciferase" is read as firefly luciferase (EC 1.13.12.7),
+the word "Renilla" unused; glucokinase in rat gets no sibling advice (the
+enzyme index lists proteins for human, mouse, yeast and E. coli K-12 only),
+though BRENDA has rat glucokinase rows under EC 2.7.1.1.
 
 ## Consequences
 
