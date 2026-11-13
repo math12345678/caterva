@@ -103,7 +103,7 @@ def test_the_run_wrote_its_bundle_under_its_folder_and_lists_it_as_artifacts(hex
     assert "claims.zip" in names and "claims.json" in names
     assert result["claims"]["root"] == json.loads((directory / "manifest.json").read_text())["root"]
     # The Km and the kcat come from one paper (resolve_kinetic_pair, ADR 0182).
-    assert km_claim(result)["row"]["reference"] == "640237"
+    assert km_claim(result)["row"]["reference"] == "739603"
     # The artifact routes serve both, with their recorded types.
     zipped = call(app, "GET", f"/api/runs/{record['id']}/artifacts/claims.zip")
     assert zipped.status == 200 and zipped.header("Content-Type") == "application/zip"
@@ -138,13 +138,13 @@ def test_a_changed_byte_in_the_pinned_page_fails_verify_naming_the_km_claim(hexo
     km = km_claim(result)
     blob = app.ws.claims_dir(record["id"]) / "snapshots" / f"{HEXOKINASE_SHA256}.gz"
     page = bytearray(gzip.decompress(blob.read_bytes()))
-    # The byte where the Km claim's reference id is certified: "640237" -> "640238".
+    # The byte where the Km claim's reference id is certified: "739603" -> "739604".
     listing = call(app, "GET", f"/api/runs/{record['id']}/artifacts/claims.json").json()
     stored = next(c for c in listing["claims"] if f"claim:{c['id']}" == km["id"])
-    certificate = next(c for c in stored["derivation"]["certificates"] if c["matched"] == "640237")
+    certificate = next(c for c in stored["derivation"]["certificates"] if c["matched"] == "739603")
     start, end = certificate["span"]
-    assert page[start:end] == b"640237"
-    page[end - 1] = ord("8")
+    assert page[start:end] == b"739603"
+    page[end - 1] = ord("4")
     blob.write_bytes(gzip.compress(bytes(page), mtime=0))
     try:
         response = call(app, "POST", f"/api/runs/{record['id']}/verify", {})
@@ -157,7 +157,7 @@ def test_a_changed_byte_in_the_pinned_page_fails_verify_naming_the_km_claim(hexo
         assert "reaction_Km" in failed[0]["detail"] and km["id"] in failed[0]["detail"]
         assert "not the snapshot's id" in failed[0]["detail"]
     finally:
-        page[end - 1] = ord("7")
+        page[end - 1] = ord("3")
         blob.write_bytes(gzip.compress(bytes(page), mtime=0))
     assert call(app, "POST", f"/api/runs/{record['id']}/verify", {}).json()["ok"] is True
 

@@ -54,6 +54,35 @@ def _no_subject_reason(model: Any) -> str:
     return reason() if callable(reason) else "no enzyme was named"
 
 
+#: Rows passed over for stating less are said beside a carried row with no
+#: spread when one lies further than this from it.
+PASSED_OVER_FOLD = 3.0
+_PASSED_NUMBERS = re.compile(r"passed over \(([^)]*)\)")
+
+
+def _passed_over_far(record) -> List[str]:
+    """The resolver's "passed over (values)" clauses for a carried row whose
+    values lie more than PASSED_OVER_FOLD from it, or []."""
+    because = (getattr(record, "resolver_because", None) or getattr(record, "chosen_because", None)
+               or "")
+    try:
+        carried = float(record.value)
+    except (TypeError, ValueError):
+        return []
+    if carried <= 0:
+        return []
+    out = []
+    for clause in because.split("; "):
+        m = _PASSED_NUMBERS.search(clause)
+        if not m:
+            continue
+        values = [float(v) for v in re.findall(r"(?<![\w./])\d+(?:\.\d+)?(?:e[+-]?\d+)?(?![\w/.])",
+                                                   m.group(1))]
+        if any(v > 0 and max(v / carried, carried / v) > PASSED_OVER_FOLD for v in values):
+            out.append(re.sub(r"^of the \d+ candidate rows \([^)]*\):\s*", "", clause.strip()))
+    return out
+
+
 @dataclass(frozen=True)
 class ModelDossier:
     """Everything known about one composed model."""
@@ -487,7 +516,7 @@ class ModelDossier:
             f"rate.",
         ]
 
-    def _disagreement_lines(self, measured: dict) -> List[str]:
+    def _disagreement_lines(self, measured: dict) -> List[str]:  # noqa: C901
         """The rows the resolver ranked equal and did not pick.
 
         WHY THIS IS NOT OPTIONAL
@@ -513,6 +542,19 @@ class ModelDossier:
             record = measured[identifier]
             spread = getattr(record, "spread", None)
             if spread is None:
+                passed = _passed_over_far(record)
+                if passed:
+                    # One row carried, and rows set aside for stating less lie
+                    # several-fold from it: E. coli beta-galactosidase's kcat
+                    # of 90 1/s beside native rows of 400 and 620 1/s, and
+                    # human HMG-CoA reductase's Km of 0.6 mM beside the Ki's
+                    # own paper's 0.07 mM, went unsaid (fifth round's review).
+                    disagreements.append(
+                        f"- `{identifier}`: the model carries {record.value:g} {record.unit} "
+                        f"({record.citation}), the only row left after the checks; rows "
+                        f"passed over lie more than {PASSED_OVER_FOLD:g}-fold from it: "
+                        + "; ".join(passed) + ". Which one is right is a question about the "
+                        "papers.")
                 continue
             disagreements.append(
                 f"- `{identifier}`: {spread.what}, spanning **{spread.low:g} to {spread.high:g} "

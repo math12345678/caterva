@@ -159,6 +159,10 @@ class BRENDAKmEntry(BaseModel):
     #: UniProt cell name none. Filled by fallback_logic._brenda_entries;
     #: None from the parser alone, and when the paper names none or several.
     paper_isoform: str | None = None
+    #: The row lists several proteins' accessions in its own UniProt cell,
+    #: names none in its words, and its paper's other rows name one each:
+    #: no protein can be read off it. Filled by fallback_logic._brenda_entries.
+    unattributed: bool = False
 
 
 # Keywords that mark a substrate as an engineered/reporter construct rather

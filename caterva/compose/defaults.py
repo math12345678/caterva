@@ -363,8 +363,10 @@ def table_rows(ec: str, table: str, organism: Optional[str]) -> Tuple[_Row, ...]
             # for influenza A virus on an H1N1 row, and the search, finding
             # its Ki in two organisms, settled on none (2026-11-12).
             out = tuple(r for r in out if r.organism == organism)
-        out = tuple(r for r in out if _is_compound(r.compound, r.conditions))
-        out = tuple(_sole_protein_is_no_isozyme(ec, r) for r in out)
+        out = tuple(r for r in out if _is_compound(r.compound, r.conditions)
+                    and not _predicted(r.conditions))
+        out = tuple(_other_enzyme_is_no_isozyme(ec, _sole_protein_is_no_isozyme(ec, r))
+                    for r in out)
         out = _treated_arms_not_own(out)
     if len(_PARSED) >= _PARSED_MAX:
         _PARSED.clear()
@@ -470,6 +472,38 @@ def _sole_protein_is_no_isozyme(ec: str, row: _Row) -> _Row:
     except Exception:  # noqa: BLE001 - a preference, never a requirement
         pass
     return row
+
+
+def _other_enzyme_is_no_isozyme(ec: str, row: _Row) -> _Row:
+    """A row whose own UniProt cell names a subunit of another enzyme filed
+    under the EC (row_form.other_enzyme: E. coli FrdA under succinate
+    dehydrogenase) is no row of the enzyme, as the resolver reads it
+    (fallback_logic._mark_other_enzyme): it does not count toward a
+    substrate, an inhibitor or an organism's coverage (fifth round's review:
+    one FrdA malonate Ki made E. coli "cover 3 of 3" constants)."""
+    if not row.uniprot:
+        return row
+    try:
+        from dataclasses import replace as _replace
+
+        from caterva.checkout import literature_module
+
+        if literature_module("row_form").other_enzyme(ec, row.uniprot):
+            return _replace(row, variant=True, isozyme=False)
+    except Exception:  # noqa: BLE001 - a preference, never a requirement
+        pass
+    return row
+
+
+def _predicted(conditions: str) -> bool:
+    """A computed value ("predicted Ki value"), which the resolver does not
+    take (fallback_logic `_brenda_entries`, row_form.predicted)."""
+    try:
+        from caterva.checkout import literature_module
+
+        return bool(literature_module("row_form").predicted(conditions))
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _variant_of(verdict: object) -> Tuple[bool, bool]:
@@ -689,6 +723,26 @@ _MACROMOLECULE = re.compile(
 def is_macromolecule(name: str) -> bool:
     """A protein or polydisperse polymer named as a substrate (`_MACROMOLECULE`)."""
     return bool(_MACROMOLECULE.match((name or "").strip()))
+
+
+#: An engineered reporter or construct named as a substrate: a fluorescent
+#: protein with a grafted cleavage site, a FRET pair, a fusion. BRENDA files
+#: some in its Natural Substrates table ("enhanced green fluorescent
+#: protein-T1", EC 3.4.21.4, ref 696328: "specifically cleaved ... by trypsin
+#: at the grafted cleavage site"), and with one Km and one kcat row it was
+#: chosen for human trypsin as "the natural substrate" over Z-Gly-Pro-Arg-pNA's
+#: wild-type pairs, its kcat 300-fold below trypsin's turnover (fifth round
+#: of the real-values review). It is never a natural substrate, and it ranks
+#: with proteins and polymers, after defined small molecules.
+_ENGINEERED = re.compile(
+    r"fluorescent\s+protein|\b(?:e|en|s|m)?(?:gfp|yfp|cfp|rfp|bfp)\b|\bmcherry\b|\bmvenus\b"
+    r"|\bfret\b|\bfusion\b|\breporter\b|\bconstruct\b|-tagged\b|\bchimer(?:a|ic)\b",
+    re.IGNORECASE)
+
+
+def is_engineered(name: str) -> bool:
+    """An engineered reporter, fusion or construct named as a substrate."""
+    return bool(_ENGINEERED.search(name or ""))
 
 
 def is_cofactor(name: str) -> bool:
@@ -1242,7 +1296,8 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
         natural_listed, _ = _reaction_compounds(ec)
     except Exception:  # noqa: BLE001 - natural is a preference, not a requirement
         natural_listed = frozenset()
-    natural = {k for k in candidates if _in(counts.name(k), k, natural_listed)}
+    natural = {k for k in candidates if _in(counts.name(k), k, natural_listed)
+               and not is_engineered(counts.name(k))}
 
     def rows(k: str) -> Dict[str, int]:
         return counts.rows(k, tables)
@@ -1287,7 +1342,8 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
         return (cofactor(k), rows(k)["km"] == 0,
                 bool(isoform) and not counts.names_isoform(k, tables), bool(neighbours[k]),
                 not has_both(k), rows(k)["km"] > 0 and counts.own(k, "km") == 0,
-                is_macromolecule(counts.name(k)) and k not in named,
+                (is_macromolecule(counts.name(k)) or is_engineered(counts.name(k)))
+                and k not in named,
                 k not in natural, -own_total(k), -total(k),
                 -sum(counts.raw(k, tables).values()), -counts.papers(k, tables),
                 -elsewhere(k), k not in named, counts.name(k).casefold())
@@ -1380,6 +1436,17 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
                 + " more rows, but a protein or polymer substrate's molar Km rests on an assumed "
                   "molecular weight and its rows span orders of magnitude, so defined small "
                   "molecules rank first")
+    reporters = [counts.name(k) for k in candidates if is_engineered(counts.name(k))
+                 and k not in named and has_both(k) == has_both(best) and k != best]
+    if reporters and r["km"] and not is_engineered(name):
+        one = len(reporters) == 1
+        how += ("; " + ", ".join(reporters[:3])
+                + (" is an engineered reporter or construct" if one
+                   else " are engineered reporters or constructs")
+                + ", not a substrate the enzyme meets in the cell, so "
+                + ("it ranks" if one else "they rank")
+                + " after defined substrates, though BRENDA's Natural Substrates table lists "
+                + ("it" if one else "them"))
     aside = [counts.name(k) for k in ranked if cofactor(k) and total(k) >= total(best)]
     if cofactor(best):
         aside = []

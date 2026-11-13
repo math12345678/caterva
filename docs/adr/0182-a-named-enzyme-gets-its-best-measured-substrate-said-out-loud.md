@@ -496,3 +496,67 @@ What changed, each with a regression test:
 
 A page that could not be read no longer keeps ADR 0178's "Re-run with
 --substrate NAME": that advice pointed at the wrong remedy.
+
+## Fifth round (2026-11-13): which row is carried
+
+The fifth review found rows that were real and cited but were not the
+enzyme's own measurement. The rules below decide which row a constant
+carries.
+
+- **One protein.** A Km and a kcat are always one protein's. The fourth
+  round kept HK-I's Km (0.06 mM) beside glucokinase's kcat to avoid a K0.5.
+  The model's kcat/Km was then neither enzyme's. Now Caterva first looks for
+  another isozyme with both constants. If none has both, it carries the
+  kcat's isozyme's pair and says that its Km is a K0.5. For human
+  hexokinase that is glucokinase's 6.3 mM and 40.1 1/s (ref 739603).
+- **Engineered substrates.** An engineered reporter or construct (a
+  fluorescent protein with a grafted cleavage site, FRET pairs, fusions)
+  is never a natural substrate, even when BRENDA's Natural Substrates table
+  lists it. It ranks with proteins and polymers. Human trypsin is modelled
+  on Z-Gly-Pro-Arg-pNA again (0.0298 mM and 88.2 1/s, ref 678332), not on
+  EGFP-T1.
+- **Probable errors.** A paper that has one constant more than 100-fold
+  from every other row supplies neither constant. DPP4's Km of 1.43 mM came
+  from the paper whose kcat is 279000 1/s. It now comes from ref 678195,
+  0.09 mM with that paper's 87 1/s.
+- **Outliers by pairing.** Pairing cannot carry another protein's row more
+  than 10-fold from the median of the constant's other rows (when there are
+  at least three). Tyrosinase's 26.1 mM is no longer carried. When the rows
+  stating pH and temperature lie, by their median, more than 10-fold from
+  the median over at least five papers, the rows stating less are kept too.
+  Each paper counts once, so one paper's long series does not outvote the
+  rest. Pig DAAO's kcat is now 10 1/s (ref 686277), not 440.
+- **What a row is.** These rows are read as altered preparations, not the
+  native enzyme:
+  - "addition of X during measurement" (an assay additive);
+  - "after treatment with X for 3 months" (enzyme from treated animals);
+  - Co- and Cu-substituted enzymes.
+  "10fold higher than wild-type" marks a variant's row. A "predicted" or
+  docking value is no measurement. A "heart phosphorylase" row is the heart
+  form, not muscle's. A UniProt cell listing several proteins, beside rows
+  of the same paper that name one protein each, is no single protein's. A
+  subunit of another enzyme filed under the same EC (E. coli FrdA under
+  succinate dehydrogenase) is that enzyme's, not an isoform. Such rows no
+  longer count toward an organism's coverage.
+- **One compound.** dUMP, 2'-deoxyuridylate and deoxyuridine monophosphate
+  (and the other deoxynucleotides) are one compound, so thymidylate
+  synthase's wild-type rows are counted together.
+- **Series.** A pH BRENDA printed unreadably ("pH 4.u") is treated as
+  unknown, not as different, so HIV-1 protease's 0.1 M NaCl pair is
+  carried. The note names the salt series. Two middle rows from one paper
+  that differ only in pH are read nearest pH 7.4. Bovine GDH now carries
+  1.01 mM at pH 7.4.
+- **Said, not hidden.** When no paper gives a pair, the note says so in
+  terms of the conditions compared. If the kcat's own paper gives a Km, the
+  note names it and how far it is from the Km carried (ALDH2: 0.2 mM,
+  417-fold). Rows set aside for stating less are listed with their values.
+  When they lie more than 3-fold from a carried row that has no spread, the
+  report shows them under "Where the evidence did not settle" (E. coli
+  beta-galactosidase's 400 and 620 1/s). An isoform read from the
+  description is said to be that, not "as --isoform asked".
+
+Not done here: reading "influenza" in a description as an organism hint
+and preferring "phosphorylase b" rows when the description names that form.
+Both belong to the sentence reader. Also not done: choosing between ACE's
+N- and C-domain-selective captopril Ki rows. The note already says that
+the evidence does not settle it.

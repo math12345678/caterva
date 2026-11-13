@@ -25,10 +25,12 @@ replay directory before it runs.
 
 Reference 641068 is the paper behind the cited human D-glucose Km (6 mM);
 739603 the one behind the cited kcat (40.1 1/s). Both fetched 2026-10-17
-(UTC). Since the fourth round of the real-values review (2026-11-12) the run
-cites HK-I's Km (0.06 mM, ref 640237) and glucokinase's kcat (60.4 1/s, ref
-703624) instead, not glucokinase's K0.5; those two pages were fetched
-2026-11-12 (UTC) the same way and are what the run now captures, `text/html; charset=UTF-8`. BRENDA data are CC BY 4.0; cite BRENDA
+(UTC). The fourth round of the real-values review (2026-11-12) cited HK-I's Km (0.06 mM, ref
+640237) and glucokinase's kcat (60.4 1/s, ref 703624), whose pages were fetched
+2026-11-12 (UTC) the same way. Since the fifth round (2026-11-13) a Km and a kcat
+are one protein's, and the run cites ref 739603 for both again (glucokinase's
+K0.5 of 6.3 mM, said, and its kcat of 40.1 1/s); the 640237 and 703624 pages
+stay for the tests that read them. All are `text/html; charset=UTF-8`. BRENDA data are CC BY 4.0; cite BRENDA
 (Chang et al. 2021, Nucleic Acids Res. 49:D498, doi:10.1093/nar/gkaa1025)
 with any value taken from them.
 
