@@ -661,3 +661,23 @@ followed and the run checked; each has a regression test
 
 Not done: among inhibitors tied on every count, the order is still
 alphabetical (thrombin's "Aspartame" before bivalirudin); the note says so.
+
+### Merging the fifth round (2026-11-13)
+
+Two ways of saying where an isoform came from met in the merge. The picks
+branch passed a flag (`isoform_from_words`), the advice branch a string
+(`isoform_asked`). The string is kept: notes now read "as your description
+asked" or "as --isoform asked" everywhere. The advice branch had named its
+`select_mode` parameter `asked`, which a local variable of the same name
+overwrote inside the loop; it is `isoform_asked` again.
+
+A paper whose own row is the probable error now supplies neither constant.
+Human acetyl-CoA carboxylase carried ref 676983's Km of 0.0002 mM, 170-fold
+below every other Km row, while the note said ref 676983 was not used. It
+now carries ref 702459's pair (0.048 mM, 2.9 1/s).
+
+The picks branch's matched-pair limit (a pair more than 10-fold from the
+constants' own picks is not carried) also changes a run the advice branch
+checked: "acid phosphatase" in Homo sapiens now carries Km 0.36 mM (ref
+134741) beside kcat 14.1 1/s (ref 663781), not ref 663781's pair (4.7 mM,
+26.4 1/s), and says why. It is still fully measured.
