@@ -110,9 +110,13 @@ def _outlying(matching: List[float], unnamed: List[float]) -> bool:
         return False
 
 
-def select_isoform(measured: Mapping[str, Any], isoform: str) -> IsoformSelection:
+def select_isoform(measured: Mapping[str, Any], isoform: str,
+                   asked: str = "--isoform") -> IsoformSelection:
     """Each measured constant, taken from a row that measured `isoform` where
-    the resolver ranked one. See the module docstring for the three cases."""
+    the resolver ranked one. See the module docstring for the three cases.
+    `asked` is what asked for the isoform, for the notes: "--isoform", or
+    "your description" when it was read from the sentence (DPP4, CA2, NOS2:
+    fifth round's review, V5-5)."""
     out = IsoformSelection(measured={})
     for identifier in sorted(measured):
         m = measured[identifier]
@@ -130,9 +134,13 @@ def select_isoform(measured: Mapping[str, Any], isoform: str) -> IsoformSelectio
             # and kcat, measured together, both naming no isoform, over
             # another paper's PKM row (fourth round of the real-values review).
             out.measured[identifier] = m
+            # Said of the constant it is: the kcat is the one measured with
+            # the Km (fifth round's review, V5-4).
+            this, other = (("kcat", "Km") if "kcat" in identifier.lower().split("_")[-1]
+                           else ("Km", "kcat"))
             out.notes.append(
-                f"`{identifier}`: the row names no isoform; it is the Km measured with the kcat "
-                f"the model carries (one paper, the same stated conditions), kept over a row "
+                f"`{identifier}`: the row names no isoform; it is the {this} measured with the "
+                f"{other} the model carries (one paper, the same stated conditions), kept over a row "
                 f"naming {isoform} from another paper, so whether it measured {isoform} is unknown")
             continue
         rows = [r for r in getattr(m, "alternatives", ()) or ()
@@ -159,12 +167,12 @@ def select_isoform(measured: Mapping[str, Any], isoform: str) -> IsoformSelectio
             continue
         if matching:
             row = matching[0]
-            out.measured[identifier] = _from_row(m, row, f"the row for {isoform}, as --isoform asked")
+            out.measured[identifier] = _from_row(m, row, f"the row for {isoform}, as {asked} asked")
             was = f"measured {chosen}" if chosen else "named no isoform"
             out.notes.append(
                 f"`{identifier}`: the resolver's pick ({m.value:g} {m.unit}) {was}; the row for "
                 f"{isoform} ({float(row['value']):g} {m.unit}, BRENDA ref {row.get('reference_id')}) "
-                f"is used instead, as --isoform asked")
+                f"is used instead, as {asked} asked")
             continue
         if chosen is None:
             out.measured[identifier] = m

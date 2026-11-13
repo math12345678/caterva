@@ -512,7 +512,7 @@ class _Because:
 
 
 def _because(row: _Row, want: str, substrate: Optional[str],
-             isoform: Optional[str]) -> _Because:
+             isoform: Optional[str], asked: str = "--isoform") -> _Because:
     caveat = KITZ_WILSON_MEANING if row.kitz_wilson else ""
     if row.mode == "unstated":
         head = "a row stating no inhibition mode"
@@ -530,7 +530,7 @@ def _because(row: _Row, want: str, substrate: Optional[str],
                 why += f", though not against this model's substrate ({substrate})"
     iso = ""
     if isoform:
-        iso = (f"it names {isoform}, as --isoform asked" if same_isoform(row.isoform, isoform)
+        iso = (f"it names {isoform}, as {asked} asked" if same_isoform(row.isoform, isoform)
                else f"it names no isoform, so whether it measured {isoform} is unknown")
     return _Because(head, why, iso, caveat)
 
@@ -642,6 +642,7 @@ def select_mode(
     isoform: Optional[str] = None,
     any_mode: bool = False,
     defaults: Optional[Mapping[str, Mapping[str, Any]]] = None,
+    asked: str = "--isoform",
 ) -> ModeSelection:
     """Each inhibition constant, taken from a row whose stated mode fits the
     model where the resolver ranked one. See the module docstring.
@@ -698,7 +699,7 @@ def select_mode(
                     kept += f" although it measured {pick.mode} inhibition and this model is {want}"
                 out.measured[identifier] = replace(m, chosen_because=kept)
                 if best is not None:
-                    b = _because(best, want, substrate, isoform)
+                    b = _because(best, want, substrate, isoform, asked)
                     instead = f"{b.head} ({best.label()}){b.why}, would be used{b.tail()}"
                 else:
                     instead = "the constant would be refused"
@@ -734,7 +735,7 @@ def select_mode(
             out.notes.extend(_about_the_carried_row(identifier, pick, *context, False))
             continue
         if best is not None:
-            b = _because(best, want, substrate, isoform)
+            b = _because(best, want, substrate, isoform, asked)
             out.measured[identifier] = _from_row(m, best, b.joined())
             out.notes.append(
                 f"`{identifier}`: {_carried(m)} ({pick.label()}) "

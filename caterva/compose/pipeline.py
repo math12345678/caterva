@@ -101,6 +101,9 @@ class ComposedModel:
     #: Constants are then taken from rows that measured it (isoform.py), and
     #: the report says where no row did.
     isoform: Optional[str] = None
+    #: What asked for `isoform`: "--isoform", or "your description" when it
+    #: was read from the sentence, for the notes (fifth round's review, V5-5).
+    isoform_asked: Optional[str] = None
     #: The point mutant the model is of ("R132H"), when the description named
     #: one: constants come only from rows measuring it.
     mutation: Optional[str] = None

@@ -95,6 +95,12 @@ export interface ScienceAgentResult {
    * policy this code applied. Conflating them is the same category error
    * that ADR 0012/0013 exist to prevent, one level up. */
   crossSpeciesOrganismsAvailable?: string[];
+  /** Of those, the organisms whose every row measured a protein variant:
+   *  opting into another organism would withhold them too (V7-04). */
+  crossSpeciesVariantOnly?: string[];
+  /** For a compound with no row in the organism searched: what that
+   *  organism holds, counted, in `caterva compose`'s words (V7-08). */
+  availableInTheOrganism?: string | null;
   /** Substrate labels this EC number DOES report, when the requested one
    *  matched nothing. BRENDA's label for lactate is `(S)-lactate`, so
    *  "lactate" matches by substring and "L-lactate" returns nothing —

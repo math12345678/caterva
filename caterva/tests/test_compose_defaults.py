@@ -239,8 +239,12 @@ def test_a_natural_substrate_outranks_a_better_measured_assay_substrate(monkeypa
           reaction=(frozenset({"angiotensin i"}), frozenset({"angiotensin i"})))
     choice = defaults.choose_substrate("3.4.15.1", "Homo sapiens")
     assert choice.chosen == "angiotensin I"
-    assert ("it is the natural substrate (BRENDA's Natural Substrates table) with the most rows; "
-            "better-measured assay substrates rank after it (11 Km, 3 kcat)") in choice.why
+    # The counts follow the natural substrate's own description, and the
+    # assay substrate is named with its own: "rank after it (11 Km, 3 kcat)"
+    # read as the assay substrates' counts (fifth round's review, V7-09).
+    assert ("it is the natural substrate (BRENDA's Natural Substrates table) with the most rows "
+            "(11 Km, 3 kcat); better-measured assay substrates, such as hippuryl-His-Leu "
+            "(18 Km, 9 kcat), rank after it") in choice.why
 
 
 def test_an_organism_that_is_not_a_binomial_is_still_found(monkeypatch):

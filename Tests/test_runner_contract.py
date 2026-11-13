@@ -710,7 +710,7 @@ def test_not_found_output_shape(monkeypatch):
             literature_candidates=[
                 fallback_logic.LiteratureCandidate(
                     pmid="34962677",
-                    title="Some paper",
+                    title="Some paper on lactate dehydrogenase",  # names the enzyme: offered (V7-08)
                     url="https://pubmed.ncbi.nlm.nih.gov/34962677/",
                 )
             ],
@@ -733,6 +733,8 @@ def test_not_found_output_shape(monkeypatch):
         # and so this exact-equality assertion keeps failing if the shape
         # changes again, which is how this key got noticed at all.
         "crossSpeciesOrganismsAvailable": [],
+        # Those whose every row measured a variant (fifth round, V7-04).
+        "crossSpeciesVariantOnly": [],
         # Always present on the not-found branch, empty unless the miss was
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
@@ -745,9 +747,11 @@ def test_not_found_output_shape(monkeypatch):
         # for and every row states another (source "mode_withheld").
         "modesAvailable": [],
         "substratesAvailable": [],
+        # What the organism holds, in compose's words, for a name miss (V7-08).
+        "availableInTheOrganism": None,
         "relatedness": [],
         "literatureCandidates": [
-            {"pmid": "34962677", "title": "Some paper",
+            {"pmid": "34962677", "title": "Some paper on lactate dehydrogenase",
              "url": "https://pubmed.ncbi.nlm.nih.gov/34962677/",
              "source": "pubmed", "doi": None}
         ],
@@ -770,7 +774,7 @@ def test_core_candidate_output_shape(monkeypatch):
             source="literature_candidates",
             literature_candidates=[
                 fallback_logic.LiteratureCandidate(
-                    title="An open-access CORE result",
+                    title="An open-access CORE result on lactate dehydrogenase",  # names the enzyme (V7-08)
                     url="https://core.ac.uk/download/99999999.pdf",
                     source="core",
                     doi="10.1000/core.example",
@@ -795,6 +799,8 @@ def test_core_candidate_output_shape(monkeypatch):
         # and so this exact-equality assertion keeps failing if the shape
         # changes again, which is how this key got noticed at all.
         "crossSpeciesOrganismsAvailable": [],
+        # Those whose every row measured a variant (fifth round, V7-04).
+        "crossSpeciesVariantOnly": [],
         # Always present on the not-found branch, empty unless the miss was
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
@@ -807,9 +813,11 @@ def test_core_candidate_output_shape(monkeypatch):
         # for and every row states another (source "mode_withheld").
         "modesAvailable": [],
         "substratesAvailable": [],
+        # What the organism holds, in compose's words, for a name miss (V7-08).
+        "availableInTheOrganism": None,
         "relatedness": [],
         "literatureCandidates": [
-            {"pmid": None, "title": "An open-access CORE result",
+            {"pmid": None, "title": "An open-access CORE result on lactate dehydrogenase",
              "url": "https://core.ac.uk/download/99999999.pdf",
              "source": "core", "doi": "10.1000/core.example"}
         ],
@@ -1196,6 +1204,8 @@ def test_cross_species_withheld_output_shape(monkeypatch):
         "found": False,
         "source": "cross_species_withheld",
         "crossSpeciesOrganismsAvailable": ["Oryctolagus cuniculus", "Sus scrofa"],
+        # Those whose every row measured a variant (fifth round, V7-04).
+        "crossSpeciesVariantOnly": [],
         # Always present on the not-found branch, empty unless the miss was
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
@@ -1208,6 +1218,8 @@ def test_cross_species_withheld_output_shape(monkeypatch):
         # for and every row states another (source "mode_withheld").
         "modesAvailable": [],
         "substratesAvailable": [],
+        # What the organism holds, in compose's words, for a name miss (V7-08).
+        "availableInTheOrganism": None,
         # Empty here because the opt-in was never given, so no relatedness
         # check ran. Populated on the too_distant path, where it carries the
         # reason each candidate was rejected.

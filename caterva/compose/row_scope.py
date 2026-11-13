@@ -111,6 +111,9 @@ MODE_MISMATCH = "mode_mismatch"
 VERSUS = "versus"
 PREPARATION = "preparation"
 HALF_SATURATION = "half_saturation"
+#: The inhibitor inactivates covalently or by mechanism: a Ki row is only
+#: its initial reversible complex (fifth round's review, V7-05).
+IRREVERSIBLE = "irreversible"
 
 #: A row reporting a cooperative half-saturation constant, not a Km: "K0.5
 #: value, Hill coefficient 1.8" (human glucokinase, BRENDA ref 739603). The
@@ -189,6 +192,7 @@ def read_scope(
     substrate: Optional[str] = None,
     isoform: Optional[str] = None,
     row_isoform: Optional[str] = None,
+    compound: Optional[str] = None,
 ) -> Optional[RowScope]:
     """The scope of one row, judged against the model it was put in.
 
@@ -203,7 +207,10 @@ def read_scope(
     whose words name none and whose accession is O75874 measured IDH1, and
     is not said to "name no isoform" (ADR 0182, second round).
     """
+    inactivator = _irreversible(compound) if table in INHIBITION_TABLES else None
     if (not commentary or not str(commentary).strip()) and not row_isoform:
+        if inactivator and not isoform:
+            return RowScope(None, None, None, (inactivator,))
         if isoform:
             # Nothing to read, and an isoform was asked for: that it could
             # not be checked is itself the finding.
@@ -285,7 +292,31 @@ def read_scope(
             f"the row measured **{_PREPARED[preparation]}** (\"{verdict.evidence}\"), not the "
             f"free enzyme; a real measurement of that preparation, which may not be the "
             f"protein you mean")))
+    if inactivator:
+        concerns.insert(0, inactivator)
     return RowScope(isoform, mode, versus, tuple(concerns), preparation)
+
+
+def _irreversible(compound: Optional[str]) -> Optional[Concern]:
+    """The concern for a Ki of an irreversible inactivator, else None.
+
+    The API said that selegiline inactivates MAO-B; compose, Studio and the
+    TS CLI built a plain competitive model and never said so (fifth round's
+    review, V7-05). The list is the literature layer's own
+    (`fallback_logic.IRREVERSIBLE_INHIBITOR`), so every surface reads one."""
+    if not compound:
+        return None
+    try:
+        from caterva.checkout import literature_module
+        pattern = literature_module("fallback_logic").IRREVERSIBLE_INHIBITOR
+    except Exception:  # LiteratureLayerUnavailable, or an import failure
+        return None
+    if not pattern.search(str(compound)):
+        return None
+    return Concern(IRREVERSIBLE, (
+        f"**{compound} is an irreversible (covalent or mechanism-based) inactivator**: a Ki row "
+        f"describes its initial reversible complex, and a reversible inhibition model leaves the "
+        f"inactivation out"))
 
 
 #: A named natural variant of one enzyme: "HIV-1 subtype C protease",

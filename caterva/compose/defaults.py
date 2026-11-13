@@ -1334,11 +1334,30 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
                "stays a placeholder unless the search finds one")
     else:
         how = f"it has {most} Km rows"
-    if r["km"] and best in natural and any(
-            k not in natural and total(k) > total(best) and has_both(k) == has_both(best)
-            and not is_cofactor(counts.name(k)) and not neighbours[k] for k in candidates):
-        how = ("it is the natural substrate (BRENDA's Natural Substrates table) with the most rows; "
-               "better-measured assay substrates rank after it")
+    natural_tail = ""
+    better = [k for k in ranked if k not in natural and total(k) > total(best)
+              and has_both(k) == has_both(best) and not is_cofactor(counts.name(k)) and not neighbours[k]]
+    if r["km"] and best in natural and better:
+        # The chosen substrate's counts follow its own name, and the assay
+        # substrates' follow theirs: "with the most rows; better-measured
+        # assay substrates rank after it (1 Km, 1 kcat)" read as the assay
+        # substrates' counts, and a tie with two other natural substrates
+        # went unsaid (thrombin, fifth round's review, V7-09).
+        peers = [k for k in ranked if k in natural and k != best and rows(k) == rows(best)
+                 and has_both(k) == has_both(best)]
+        how = (f"it is the natural substrate (BRENDA's Natural Substrates table) with "
+               f"{'as many rows the search can use as any other natural substrate' if peers else 'the most rows'} "
+               f"({measured})")
+        if peers and not tied:
+            raw_best = sum(counts.raw(best, tables).values())
+            raw_peer = max(sum(counts.raw(k, tables).values()) for k in peers)
+            if raw_best > raw_peer:
+                how += (f"; it ties on those rows with {_shown([counts.name(k) for k in peers])}, "
+                        f"and BRENDA holds more rows for it counting those the search cannot use "
+                        f"({raw_best} against at most {raw_peer})")
+        top = better[0]
+        natural_tail = (f"; better-measured assay substrates, such as {counts.name(top)} "
+                        f"({_described_counts(rows(top))}), rank after it")
     if isoform and r["km"] and counts.names_isoform(best, tables) and any(
             not counts.names_isoform(k, tables) and total(k) > total(best) for k in candidates):
         how += f"; substrates whose rows do not name {isoform} rank after it"
@@ -1391,9 +1410,17 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
     mutant = (f", counting only the rows of the mutant {mutation} ({_plural(left_out, 'row')} of the "
               f"wild type or other variants not counted, since the search uses only the mutant's)"
               if mutation else "")
-    why = (f"of the {_plural(len(candidates), 'substrate')}{which} BRENDA lists Km rows for under "
-           f"{_where(ec, organism)}{_isoform_clause(isoform)}{mutant}, {how} ({measured}"
-           f"{spelled_clause}{clause}{_not_counted(counts.set_aside(best, tables))}){tie_clause}")
+    detail = f"{spelled_clause}{clause}{_not_counted(counts.set_aside(best, tables))}"
+    if natural_tail:
+        # The counts are in `how`, after the substrate's own description.
+        how = how.replace(f"({measured})", f"({measured}{detail})", 1)
+        why = (f"of the {_plural(len(candidates), 'substrate')}{which} BRENDA lists Km rows for under "
+               f"{_where(ec, organism)}{_isoform_clause(isoform)}{mutant}, {how}{natural_tail}"
+               f"{tie_clause}")
+    else:
+        why = (f"of the {_plural(len(candidates), 'substrate')}{which} BRENDA lists Km rows for under "
+               f"{_where(ec, organism)}{_isoform_clause(isoform)}{mutant}, {how} ({measured}"
+               f"{detail}){tie_clause}")
     alternatives = tuple(Option(counts.name(k), rows(k), USABLE_NONE)
                          for k in ranked[1:1 + ALTERNATIVES_NAMED])
     return Choice("substrate", name, why, alternatives, len(candidates), dict(r))
@@ -1558,8 +1585,11 @@ def _choose_inhibitor(ec: str, organism: Optional[str], substrate: Optional[str]
                 and stated(k) > 0]
     if covalent:
         why += ("; " + ", ".join(counts.name(k) for k in covalent[:3])
-                + (" is" if len(covalent) == 1 else " are") + " an irreversible inactivator, whose Ki "
-                "describes only its initial complex, so reversible inhibitors rank first")
+                + (" is an irreversible inactivator, whose Ki describes only its initial complex"
+                   if len(covalent) == 1 else
+                   " are irreversible inactivators, whose Ki rows describe only their initial "
+                   "complexes")
+                + ", so reversible inhibitors rank first")
     unstated = [k for k in candidates if n(k) > n(best) and stated(k) == 0 and stated(best) > 0
                 and k not in reaction and not is_cofactor(counts.name(k))]
     if unstated:

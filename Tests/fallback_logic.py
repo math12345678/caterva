@@ -222,6 +222,14 @@ class KineticResult(BaseModel):
     #: never told existed.
     cross_species_organisms_available: list[str] = []
 
+    #: Those of `cross_species_organisms_available` whose every row measured a
+    #: protein variant, which opting into another organism would still
+    #: withhold (ADR 0029). Human COX-2's kcat was refused with "Pass
+    #: --allow-cross-species"; the only other organism, Mus musculus, held one
+    #: N580A row, and the re-run was refused again (fifth round's review,
+    #: V7-04). Empty when variants were allowed or a mutation was asked for.
+    cross_species_variant_only: list[str] = []
+
     #: Every cross-species row WITH its value, when the requested organism
     #: had none.
     #:
@@ -3032,6 +3040,11 @@ def resolve_kinetic_value(
     # way.
     if broad and not allow_cross_species:
         organisms = sorted({e.organism for e in broad if e.organism})
+        variant_only: list[str] = []
+        if not allow_variants and not mutation:
+            kept, _ = _partition_variants(broad)
+            with_usable = {e.organism for e in kept if e.organism}
+            variant_only = [o for o in organisms if o not in with_usable]
         log.append(
             f"Cross-species value(s) found in {', '.join(organisms) or 'unnamed organism(s)'} "
             f"but withheld: allow_cross_species=False"
@@ -3040,6 +3053,7 @@ def resolve_kinetic_value(
             found=False,
             source="cross_species_withheld",
             cross_species_organisms_available=organisms,
+            cross_species_variant_only=variant_only,
             # The numbers, not only the names. Every one is a real
             # measurement with a reference; none of them is a measurement
             # of the organism that was asked about, and nothing here says
