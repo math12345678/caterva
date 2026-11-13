@@ -96,6 +96,8 @@
   {"names": ["PFK-2", "PFK2"], "ec": "2.7.1.105", "source": "IUBMB: EC 2.7.1.105 6-phosphofructo-2-kinase; PFK-2 is its usual name"},
   {"names": ["telomerase", "TERT", "hTERT", "telomerase reverse transcriptase"], "ec": "2.7.7.49", "isoform": "telomerase", "rows_must_name_it": true, "accessions": ["O14746"], "source": "IUBMB: EC 2.7.7.49 RNA-directed DNA polymerase; telomerase's catalytic subunit (HGNC TERT, UniProtKB O14746) is a reverse transcriptase, one of several enzymes of that EC number, so the isoform is carried"},
   {"names": ["InhA"], "ec": "1.3.1.9", "organism": "Mycobacterium tuberculosis", "organism_rule": "always", "source": "IUBMB: EC 1.3.1.9 enoyl-[acyl-carrier-protein] reductase (NADH); InhA is the Mycobacterium tuberculosis enzyme isoniazid targets (UniProtKB P9WGR1)"},
+  {"names": ["glucose isomerase", "glucose-isomerase"], "ec": "5.3.1.5", "source": "IUBMB: EC 5.3.1.5 xylose isomerase; 'glucose isomerase' is its industrial name (it turns D-glucose into D-fructose), not EC 5.3.1.9 glucose-6-phosphate isomerase"},
+  {"names": ["penicillin G acylase", "penicillin acylase"], "ec": "3.5.1.11", "source": "IUBMB: EC 3.5.1.11 penicillin amidase (ENZYME lists 'penicillin acylase'); 'penicillin G acylase' is the name the industrial enzyme of E. coli and Kluyvera goes by"},
   {"names": ["Taq polymerase", "Taq DNA polymerase", "Taq pol", "Taq"], "ec": "2.7.7.7", "organism": "Thermus aquaticus", "organism_rule": "always", "source": "UniProtKB P19821 (DPO1_THEAQ), 'DNA polymerase I, thermostable', carries EC 2.7.7.7; BRENDA files its rows under the organism 'Thermus aquaticus' (checked on the BRENDA page for 2.7.7.7, 2026-11-12). Unread, 'Taq polymerase with dNTP' was modelled in Thermococcus thioreducens"}
  ]
 }

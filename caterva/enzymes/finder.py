@@ -296,6 +296,14 @@ class Candidate:
     superseded_by: Tuple[str, ...] = ()
     #: Edit distance, for a typo match; 0 otherwise.
     distance: int = 0
+    #: For a typo match, how many words of the matched name lie outside the
+    #: words the query was close to; 0 otherwise. "enolse" is one letter
+    #: from 'enolase' (EC 4.2.1.11's own other name, nothing left over) and
+    #: from the 'enolase' inside 'E-1 enolase-phosphatase' (EC 3.1.3.77,
+    #: two words left over); the shorter accepted name used to win the tie
+    #: and the refusal asked "Did you mean 'acireductone synthase'?" (fifth
+    #: round of the real-values review). A whole name ranks first.
+    spare: int = 0
     #: True when the query matched only a fragment of a longer name (a
     #: phrase or some words inside it) or an entry-name mnemonic. A fragment
     #: is shown but never resolved to: "LDH" is a word inside the name of an
@@ -534,6 +542,7 @@ def _candidate(
     index: EnzymeIndex, entry: EnzymeEntry, tier: int, why: str, code: Optional[str],
     matched: Sequence[str] = (), distance: int = 0, partial: bool = False,
     via: str = "name", abbreviation: bool = False, confirmed: bool = False, order: int = 0,
+    spare: int = 0,
 ) -> Candidate:
     proteins, count = index.proteins_in(entry.ec, code)
     return Candidate(
@@ -541,7 +550,7 @@ def _candidate(
         class_path=index.class_path(entry.ec), alternative_names=tuple(matched),
         organism_proteins=proteins, organism_protein_count=count, organism=code,
         status=entry.status, superseded_by=entry.superseded_by, distance=distance, partial=partial,
-        via=via, abbreviation=abbreviation, confirmed=confirmed, order=order,
+        via=via, abbreviation=abbreviation, confirmed=confirmed, order=order, spare=spare,
     )
 
 
@@ -549,6 +558,7 @@ def _order(candidate: Candidate, organism_known: bool) -> tuple:
     return (
         candidate.tier,
         candidate.distance,
+        candidate.spare,
         # Inside a tier the abbreviation table's own readings come first, in its order.
         0 if candidate.via == "abbreviation" else 1,
         candidate.order if candidate.via == "abbreviation" else 0,
@@ -835,16 +845,19 @@ def _search(query: str, code: Optional[str], index: EnzymeIndex) -> List[Candida
                 distance = d
         if distance is None:
             continue
+        spare = len(tokens) - n_words
         held_typo = typo.get(name.ec)
-        if held_typo is None or distance < held_typo[0]:
+        if held_typo is None or (distance, spare) < held_typo[:2]:
             if name.accepted:
-                typo[name.ec] = (distance, "close to the accepted name: did you mean?", [])
+                typo[name.ec] = (distance, spare, "close to the accepted name: did you mean?", [])
             else:
-                typo[name.ec] = (distance, f"close to another name for this enzyme, '{name.text}': did you mean?",
+                typo[name.ec] = (distance, spare,
+                                 f"close to another name for this enzyme, '{name.text}': did you mean?",
                                  [name.text])
     found = [
-        _candidate(index, index.entries[ec], TIER_TYPO, why, code, matched, distance=distance, via="typo")
-        for ec, (distance, why, matched) in typo.items()
+        _candidate(index, index.entries[ec], TIER_TYPO, why, code, matched, distance=distance, via="typo",
+                   spare=spare)
+        for ec, (distance, spare, why, matched) in typo.items()
     ]
     return sorted(found, key=lambda c: _order(c, organism_known))
 
@@ -1006,6 +1019,9 @@ def resolve(
             return Resolved(ec=ec, how=how, candidate=head, cautions=_cautions(index, head, ranked),
                             notes=(f"Read {text!r} as {name} (spelling); pass --subject with an EC number "
                                    "if you meant another enzyme.",))
+    gene = _mnemonic_is_the_gene(result, text, code, index)
+    if gene is not None:
+        return gene
     sibling = _qualified_sibling(result, text, code, index)
     if sibling is not None:
         return sibling
@@ -1059,6 +1075,49 @@ def _cofactor_prefixed(text: str, code: Optional[str], index: EnzymeIndex) -> Op
     head = Candidate(**{**chosen.__dict__, "why": how, "partial": False,
                         "tier": TIER_ACCEPTED_EXACT})
     return Resolved(ec=chosen.ec, how=how, candidate=head, cautions=_cautions(index, head, ranked))
+
+
+def _mnemonic_is_the_gene(result: Resolution, text: str, code: Optional[str],
+                          index: EnzymeIndex) -> Optional[Resolved]:
+    """The enzyme an entry-name mnemonic of the organism names, when UniProt
+    gives that very entry the typed word as its gene symbol and the
+    nomenclature lists the entry under one EC number only.
+
+    A mnemonic alone is not a gene symbol (ACES_HUMAN is ACHE, KSYK_HUMAN is
+    SYK), so it stays a choice. But NQO1_HUMAN's gene IS NQO1, and "NQO1 with
+    menadione in human" was refused as "not always the gene symbol" while
+    ALDH2, FAAH and CYP2D6 were read through the symbol table (fifth round of
+    the real-values review). The protein names file says which entries'
+    mnemonic and gene agree; only those are read, with the gene as the
+    isoform, and the note says so."""
+    if not isinstance(result, Ambiguous) or not code or not result.candidates:
+        return None
+    if result.candidates[0].via != "mnemonic":
+        return None
+    symbol = [c for c in result.candidates if c.via == "mnemonic"]
+    if len({c.ec for c in symbol}) != 1:
+        return None
+    if any(c.via in ("name", "abbreviation") and c.tier < TIER_SYMBOL for c in result.candidates):
+        return None
+    chosen = symbol[0]
+    entry = f"{strict_key(text).upper()}_{code}"
+    protein = next((p for p in chosen.organism_proteins if p.entry_name.upper() == entry), None)
+    if protein is None:
+        return None
+    from .protein_names import info
+
+    found = info(protein.accession)
+    if found is None or not found.gene or found.gene.casefold() != text.strip().casefold():
+        return None
+    label = organism_label(code)
+    how = (f"{text!r} is the gene symbol UniProt gives {protein.entry_name} (UniProtKB "
+           f"{protein.accession}), the {label} protein the enzyme nomenclature lists under this "
+           "enzyme and no other")
+    head = Candidate(**{**chosen.__dict__, "why": how, "partial": False})
+    return Resolved(ec=chosen.ec, how=how, candidate=head, cautions=(), isoform=found.gene,
+                    notes=(f"The constants are taken from rows that name {found.gene} where there are any; "
+                           "pass --subject with an EC number if you meant another enzyme.",),
+                    symbol_read=True)
 
 
 def _qualified_sibling(result: Resolution, text: str, code: Optional[str],
@@ -1462,8 +1521,14 @@ def _resolve(
             reason = (f"{text!r} is the entry-name mnemonic of a protein, not an enzyme name and not "
                       "necessarily a gene symbol, and a symbol can mean a different enzyme in each organism")
         else:
+            # One enzyme matches best, others less well: "thioredoxin
+            # reductase" is a phrase inside eight names, and "matches only
+            # part of one enzyme's name" was said above a list of eight
+            # (fifth round of the real-values review).
             reason = (f"{text!r} matches only part of one enzyme's name, which is not enough to say it is "
-                      "that enzyme")
+                      "that enzyme" if len(ranked) == 1 else
+                      f"{text!r} is only part of an enzyme's name: it is a phrase inside, or some words of, "
+                      f"the names of {len(ranked)} enzymes, which is not enough to say it is any one of them")
         return Ambiguous(
             query=text, candidates=tuple(ranked), suggestions_only=True, organism=code, release=release,
             reason=reason)

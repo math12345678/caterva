@@ -201,8 +201,11 @@ def test_a_failure_with_suggestions_in_hand_still_shows_them():
 
 
 def test_a_fragment_of_a_longer_name_is_a_suggestion_even_when_it_is_the_only_match():
+    # Not "glucose isomerase" since the fifth round of the real-values
+    # review: that is xylose isomerase's industrial name (EC 5.3.1.5, the
+    # alias table).
     with pytest.raises(NameNotResolved) as raised:
-        resolve_enzyme_name("glucose isomerase", "human")
+        resolve_enzyme_name("glucose phosphate isomerase", "human")
     assert raised.value.kind == SUGGESTIONS
     assert "EC 5.3.1.9 glucose-6-phosphate isomerase" in str(raised.value)
     assert str(raised.value).endswith("--subject <its EC number>")

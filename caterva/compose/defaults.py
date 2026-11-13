@@ -1344,9 +1344,9 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
                 not has_both(k), rows(k)["km"] > 0 and counts.own(k, "km") == 0,
                 (is_macromolecule(counts.name(k)) or is_engineered(counts.name(k)))
                 and k not in named,
-                k not in natural, -own_total(k), -total(k),
-                -sum(counts.raw(k, tables).values()), -counts.papers(k, tables),
-                -elsewhere(k), k not in named, counts.name(k).casefold())
+                k not in natural, -own_total(k), -total(k), -counts.papers(k, tables),
+                -elsewhere(k), -sum(counts.raw(k, tables).values()), k not in named,
+                counts.name(k).casefold())
 
     ranked = sorted(candidates, key=rank)
     if all(rows(k)["km"] == 0 for k in candidates):
@@ -1361,10 +1361,17 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
     tied, tie_clause = _ties(
         ranked, rank, lambda k: counts.papers(k, tables), counts.name, elsewhere, f"EC {ec}",
         elsewhere_what="Km and kcat rows",
-        stages=[(None, lambda beaten: (f"; it ties on rows and references with "
+        stages=[(None, lambda beaten: (
+                    f"; it ties on the rows the search can use, their references and how widely "
+                    f"each is measured with {_shown(beaten)}, and has more rows in all here, "
+                    f"counting those the search cannot use ("
+                    f"{sum(counts.raw(ranked[0], tables).values())} against at most "
+                    f"{max(sum(counts.raw(k, tables).values()) for k in candidates if counts.name(k) in beaten)})")),
+                (None, lambda beaten: (f"; it ties on rows and references with "
                                        f"{_shown(beaten)}, and the enzyme is named for it "
                                        f"({_enzyme_name(ec, counts.name(ranked[0]))})"))])
-    most = "as many as any other" if tied else "the most"
+    def most(what: str) -> str:
+        return f"as many {what} as any other" if tied else f"the most {what}"
     measured = (f"{r['km']} Km, {r['kcat']} kcat" if needs_kcat else _plural(r["km"], "Km row"))
     if r["km"] == 0:
         raw = counts.raw(best, tables)
@@ -1381,15 +1388,15 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
                     f"name{'s' if len(listing) == 1 else ''} no protein in the commentary, so those "
                     f"rows may be {isoform}'s, unconfirmed")
     elif needs_kcat and has_both(best):
-        how = f"it has {most} Km and kcat rows"
+        how = f"it has {most('Km and kcat rows')}"
         if any(not has_both(k) and total(k) > total(best) and not is_cofactor(counts.name(k))
                for k in candidates):
-            how = f"it has {most} rows of those with both a Km and a kcat row"
+            how = f"it has {most('rows')} of those with both a Km and a kcat row"
     elif needs_kcat:
-        how = (f"none has both a Km and a kcat row there, and it has {most} Km rows, so its kcat "
+        how = (f"none has both a Km and a kcat row there, and it has {most('Km rows')}, so its kcat "
                "stays a placeholder unless the search finds one")
     else:
-        how = f"it has {most} Km rows"
+        how = f"it has {most('Km rows')}"
     if r["km"] and best in natural and any(
             k not in natural and total(k) > total(best) and has_both(k) == has_both(best)
             and not is_cofactor(counts.name(k)) and not neighbours[k] for k in candidates):

@@ -494,6 +494,19 @@ def test_a_compound_close_to_a_one_word_name_is_not_a_misspelling(text):
     ("PLK1 kinetics in human", "2.7.11.21"),
     ("michaelis menten for NAMPT in human", "2.4.2.12"),
     ("TPMT in human with 6-mercaptopurine", "2.1.1.67"),
+])
+def test_an_entry_name_that_is_its_gene_symbol_is_read_in_the_organism_named(text, ec):
+    """Changed in the fifth round of the real-values review: these were
+    refused like any mnemonic, while ALDH2 and FAAH were read. UniProt gives
+    PLK1_HUMAN, NAMPT_HUMAN and TPMT_HUMAN the gene symbols PLK1, NAMPT and
+    TPMT, and the nomenclature lists each under one EC number, so with the
+    organism named the symbol is read as the gene (finder._mnemonic_is_the_gene)."""
+    reading = read_sentence(text)
+    assert reading.ec == ec and reading.isoform == text.split()[0 if text[0].isupper() else 3]
+
+
+@pytest.mark.parametrize("text, ec", [
+    # GSK3B_HUMAN is filed under more than one EC number: still a choice.
     ("GSK3B in human", "2.7.11.26"),
     # No organism: written as a human gene symbol is, so the human entry is named.
     ("GSK3B kinetics", "2.7.11.26"),
@@ -586,7 +599,11 @@ def test_taq_polymerase_searches_thermus_aquaticus():
     ("p-nitrophenyl beta-D-galactopyranoside", ["4-nitrophenyl-beta-D-galactoside", "lactose"],
      "4-nitrophenyl-beta-D-galactoside"),
     ("4-nitrophenyl alpha-D-glucopyranoside", ["4-nitrophenyl-beta-D-glucoside"], None),
-    ("2 deoxy glucose", ["2-deoxyglucose", "D-glucose"], None),
+    # Never D-glucose. Since the fifth round of the real-values review the
+    # literature layer's identity key reads the typed words as the listed
+    # 2-deoxyglucose, the same compound (it was None: no word matched).
+    ("2 deoxy glucose", ["2-deoxyglucose", "D-glucose"], "2-deoxyglucose"),
+    ("2 deoxy glucose", ["D-glucose"], None),
 ])
 def test_a_glycoside_written_as_its_pyranoside_or_para_form_is_brendas_name(typed, listed, expected):
     assert match_substrate([typed], listed).name == expected

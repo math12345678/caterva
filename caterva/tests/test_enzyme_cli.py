@@ -149,12 +149,16 @@ def test_the_compose_line_quotes_an_organism_with_spaces():
 
 
 def test_fragments_of_longer_names_are_listed_with_exit_zero_and_called_partial(capsys):
-    code, out = run(capsys, "glucose isomerase", "--organism", "human", "--json")
+    # "glucose isomerase" was the example until the fifth round of the
+    # real-values review: it is xylose isomerase's industrial name, and the
+    # alias table now reads it as EC 5.3.1.5. "glucose phosphate isomerase"
+    # is still only a fragment of EC 5.3.1.9's name.
+    code, out = run(capsys, "glucose phosphate isomerase", "--organism", "human", "--json")
     data = json.loads(out)
     assert data["outcome"] == "partial" and code == 0
     assert [c["ec"] for c in data["candidates"]] == ["5.3.1.9"]
     assert all(c["partial_match"] for c in data["candidates"])
-    code, text = run(capsys, "glucose isomerase", "--organism", "human")
+    code, text = run(capsys, "glucose phosphate isomerase", "--organism", "human")
     assert code == 0 and "Did you mean one of these?" in text and "only part of one enzyme's name" in text
 
 

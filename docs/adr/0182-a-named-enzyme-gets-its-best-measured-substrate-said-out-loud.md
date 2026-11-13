@@ -560,3 +560,57 @@ and preferring "phosphorylase b" rows when the description names that form.
 Both belong to the sentence reader. Also not done: choosing between ACE's
 N- and C-domain-selective captopril Ki rows. The note already says that
 the evidence does not settle it.
+
+## Fifth round (2026-11-13): reading the enzyme's name
+
+The names half of the fifth adversarial round. Each change has a regression
+test in `caterva/tests/test_fifth_round_review_names.py` or
+`Tests/test_fifth_round_review_names.py`.
+
+- **The organism settles a name several enzymes match.** When an organism is
+  named and exactly one candidate both lists a protein of it in the enzyme
+  nomenclature and has Km rows for it in BRENDA, and no other candidate read
+  has a Km row there, that candidate is used and the note says why and names
+  the others. "soybean lipoxygenase" is EC 1.13.11.12 (two candidates list a
+  soybean protein; only it has soybean rows); "thioredoxin reductase in rat"
+  is EC 1.8.1.9 (only it lists rat proteins, TRXR1 and TRXR2). A class word,
+  a typo, an abbreviation, a symbol or a mnemonic is never settled this way.
+  A phrase inside many names is no longer said to be "part of one enzyme's
+  name".
+- **A protein filed under another EC number.** When the name's own EC number
+  lists no protein of the organism and has no Km row there, and the words
+  name a protein of the organism filed under another EC number whose rows
+  name it, that EC number and protein are used: rat glucokinase is HXK4 of EC
+  2.7.1.1 (rows "adult glucokinase", "hexokinase IV"), human glucokinase is
+  GCK of EC 2.7.1.1. A row names the protein in its words or by its own
+  UniProt accession; the refusal for a run where none does (mouse) now
+  counts both, and no longer says no row names GCK when the K0.5 row of ref
+  739603 names it by P35557.
+- **Spelling.** A typo ranks the whole name it is close to before a name that
+  only contains it, and the refusal suggests the name people use: "enolse"
+  is enolase (EC 4.2.1.11), not acireductone synthase.
+- **Industrial names and gene symbols.** "glucose isomerase" is xylose
+  isomerase (EC 5.3.1.5) and "penicillin G acylase" penicillin amidase (EC
+  3.5.1.11), in the curated alias table. An entry-name mnemonic is read as
+  the gene when UniProt gives that very entry the typed word as its gene
+  symbol and the entry is under one EC number (NQO1 in human); ACES, HXK4
+  and KSYK, whose genes are ACHE, GCK and SYK, stay choices. When no shape
+  matches and the words are part of enzyme names, those names are listed
+  instead of the mechanisms.
+- **Saying what was matched.** A substrate typed in peptide codes is read as
+  the name BRENDA prints when the literature layer's identity key says they
+  are one compound, and the note says so ("Suc-Ala-Ala-Ala-pNA" as
+  succinyl-L-Ala-L-Ala-L-Ala-4-nitroanilide). A carried value whose row
+  BRENDA files under another name of the compound says so in the search
+  note (donepezil's Ki row is filed as racemic donepezil hydrochloride's
+  systematic name). The enzyme's words are echoed with their closing
+  bracket.
+- **One compound, one alternative.** `identity_key` reads hippuryl as an acyl
+  group (hippuryl-L-Phe is hippuryl-L-phenylalanine), the keto group of a
+  2-oxo acid as oxo and butyrate, propionate and valerate as their
+  systematic names (2-ketobutyrate is 2-oxobutanoate), and dihydroxyacetone
+  3-phosphate as dihydroxyacetone phosphate. A tie on usable rows goes to
+  more references, then to the compound measured more widely under the EC
+  number, and only then to rows the search cannot use; each break is said
+  (chymotrypsin in human: Suc-Ala-Ala-Pro-Phe-pNA, 62 rows in every organism
+  against 8).

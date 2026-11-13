@@ -728,7 +728,9 @@ def test_a_tie_broken_by_name_is_said_to_be_one(monkeypatch):
                          "kcat": two("SEVNLDAEFR", "1") + two("EEISEVNLDAEFRG", "2")})
     choice = defaults.choose_substrate("3.4.23.46", "Homo sapiens")
     assert choice.chosen == "EEISEVNLDAEFRG"
-    assert "it has as many as any other Km and kcat rows" in choice.why
+    # "as many Km and kcat rows as any other" since the fifth round (it read
+    # "as many as any other Km and kcat rows").
+    assert "it has as many Km and kcat rows as any other" in choice.why
     assert ("it is tied on every count with SEVNLDAEFR, and was taken first by name (alphabetically), "
             "not by its data") in choice.why
     assert "the most" not in choice.why

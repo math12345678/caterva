@@ -113,6 +113,14 @@ SYNONYMS = {
     "cytidylate": "cmp",
     "uridylate": "ump",
     "thymidylate": "dtmp",
+    # Dihydroxyacetone is symmetric, so its 1- and 3-phosphate are one
+    # molecule, which IUPAC calls glycerone phosphate (triose-phosphate
+    # isomerase listed "dihydroxyacetone phosphate" and "dihydroxyacetone
+    # 3-phosphate" as two substrates, fifth round of the review).
+    "dihydroxyacetone3-phosphate": "dihydroxyacetonephosphate",
+    "dihydroxyacetone1-phosphate": "dihydroxyacetonephosphate",
+    "glyceronephosphate": "dihydroxyacetonephosphate",
+    "dhap": "dihydroxyacetonephosphate",
 }
 
 
@@ -142,6 +150,10 @@ _ONE_LETTER_RUN = re.compile(r"[ACDEFGHIKLMNPQRSTVWY]{2,8}")
 _ACYL = {"ac": "acetyl", "acetyl": "acetyl", "suc": "succinyl", "succinyl": "succinyl",
          "bz": "benzoyl", "benzoyl": "benzoyl", "glt": "glutaryl", "glutaryl": "glutaryl",
          "tos": "tosyl", "tosyl": "tosyl", "z": "z", "boc": "boc", "meosuc": "methoxysuccinyl",
+         # Hippuryl (benzoylglycyl): "hippuryl-L-Phe" and
+         # "hippuryl-L-phenylalanine" are one carboxypeptidase A substrate,
+         # listed apart with split row counts (fifth round's review).
+         "hippuryl": "hippuryl", "hip": "hippuryl",
          "methoxysuccinyl": "methoxysuccinyl", "abz": "abz", "dabcyl": "dabcyl", "fmoc": "fmoc"}
 #: A leaving group or C-terminal group on a peptide substrate.
 _TERMINAL = {"pna", "amc", "nh2", "ome", "oet", "sbzl", "ester", "amide", "afc", "betana"}
@@ -209,7 +221,22 @@ def _free_amino_acid(text: str) -> str:
 _ACID = re.compile(r"^(.*[a-z])ic-?acid$")
 #: Whole-word renamings inside a key: one molecule's two trivial names.
 _RENAMED = ((re.compile(r"(nor)?adrenaline"), r"\1epinephrine"),
-            (re.compile(r"galanthamine"), "galantamine"))
+            (re.compile(r"galanthamine"), "galantamine"),
+            # A 2-oxo acid by its older names: "2-ketobutyrate",
+            # "alpha-ketobutyrate" and "2-oxobutanoate" are one molecule
+            # (pyruvate decarboxylase listed "2-Ketobutyrate" and
+            # "2-ketobutanoic acid" apart, fifth round's review). The keto
+            # group of a locant-numbered or alpha-keto acid is the oxo group;
+            # the trivial acid names propionate and butyrate are the
+            # propanoate and butanoate of the systematic ones.
+            (re.compile(r"^(?:alpha|α)-keto"), "2-oxo"),
+            (re.compile(r"(?<=\d)-keto"), "-oxo"),
+            (re.compile(r"(?<![a-z])butyrate$"), "butanoate"),
+            (re.compile(r"(?<=oxo)butyrate$"), "butanoate"),
+            (re.compile(r"(?<![a-z])propionate$"), "propanoate"),
+            (re.compile(r"(?<=oxo)propionate$"), "propanoate"),
+            (re.compile(r"(?<![a-z])valerate$"), "pentanoate"),
+            (re.compile(r"(?<=oxo)valerate$"), "pentanoate"))
 
 
 def _base(name: str) -> str:
