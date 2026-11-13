@@ -62,6 +62,13 @@ COMMON_NAMES = {
     "hiv-1": "Human immunodeficiency virus 1",
     "hiv 1": "Human immunodeficiency virus 1",
     "hiv1": "Human immunodeficiency virus 1",
+    # BRENDA's organism for herpes thymidine kinase rows (EC 2.7.1.21):
+    # "herpes simplex virus thymidine kinase with ganciclovir" was told no
+    # organism was named (fourth round of the real-values review).
+    "herpes simplex virus": "Herpes simplex virus",
+    "hsv": "Herpes simplex virus",
+    "hsv-1": "Herpes simplex virus",
+    "hsv1": "Herpes simplex virus",
 }
 
 

@@ -436,3 +436,63 @@ though BRENDA has rat glucokinase rows under EC 2.7.1.1.
   spread, the carbonic anhydrase kcat of 1e-6 1/s) was not addressed on the
   engine branch; the literature layer's median pick and the integration
   above address it.
+
+## Fourth round (2026-11-12): what a careful enzymologist would pick
+
+An adversarial round of 59 findings, read as a professor reads the output.
+What changed, each with a regression test:
+
+- **Spellings.** `compound_names.identity_key` reads a peptide in one-letter,
+  three-letter or full residue names as one compound (Ac-DEVD-pNA is
+  acetyl-L-Asp-L-Glu-L-Val-L-Asp-4-nitroanilide; benzoyl-DL-Arg-pNA is
+  N-benzoyl-DL-arginine 4-nitroanilide), an acid as its anion, a free amino
+  acid by its code (D-Ala), and a short list of names a reader types for what
+  a paper prints (L-NMMA, DFMO, galantamine, donepezil, O2.-, HMG-CoA). The
+  racemate stays distinct from the L form.
+- **Effector-present rows.** "activation by X" is an activator present, and a
+  compound the page's Activating Compounds table lists is an effector when a
+  row says it is present (PKM2's FBP-activated Km), as is "0.008 mM
+  inhibitor X" written bare (bovine GDH). The chooser ranks substrates by the
+  rows of the enzyme's own constant, a paper's treated arm not counted
+  (pig elastase's spermidine series).
+- **Rows that are probable errors.** A row more than 100-fold from every
+  other row is set aside before choosing among the rows naming an isoform
+  (DPP4's kcat 279000 1/s); two middle rows a power of a thousand apart are
+  told apart by the rest of the candidates (Candida rugosa lipase).
+- **One protein.** A Ki follows the protein the model's Km and kcat rows
+  measured (CA II's acetazolamide Ki, not CA IX's); a native Michaelis-Menten
+  Km is not traded for another isozyme's K0.5 (human hexokinase is HK-I's Km
+  beside glucokinase's kcat, said as two isozymes' constants); an organism
+  is chosen only among those with the named isoform's ortholog (CA I is not
+  modelled in a bacterium); the only protein an EC holds in an organism is
+  the enzyme, not "a named isozyme" (pig CELA1).
+- **Series and pairs.** A paper's salt series is read nearest 0.15 M NaCl;
+  a paper's row labelled wild-type beats its unlabelled row; a kcat taken
+  from the rows naming no isoform takes its own paper's Km as its pair.
+- **Inhibitors.** Ranked by papers, not rows of one paper's series; rows
+  stating no pH or temperature rank after rows that do; irreversible
+  inactivators (chloromethyl ketones, serpins, selegiline, DFMO) rank after
+  reversible ones and are said to be irreversible when named; a name of
+  its own beats a screening compound's systematic name in a tie; a Ki
+  measured on another assay substrate is said, in the row note and the
+  verdict (ACE and Abz-SDK(Dnp)P, an N-domain substrate).
+- **Names.** A name several enzymes go by is settled by the one with Ki rows
+  for the inhibitor named (HMG-CoA reductase and atorvastatin); a name with
+  its cofactor written first is read (NADP-isocitrate dehydrogenase); the
+  organism named singles out the qualified sibling EC (bovine GDH is EC
+  1.4.1.3); an enzyme and its inhibitor named build inhibition, not the
+  enzyme's transport shape.
+- **Words.** A page that could not be read is an outage ("re-run"), not
+  advice to pass --substrate; the next step for a missing Ki names
+  --inhibitor; the isozyme remedy offers an isozyme a cited row measured,
+  and never a placeholder name; an inhibitor with no Ki row anywhere is said
+  to be what is missing; a spread made of two forms of an enzyme
+  (membrane-bound and soluble COMT) says so; condition lines carry salts.
+- **Surfaces.** The API never resolves values with its older reader when
+  compose's reader gave no reading, and passes compose's refusal of an
+  enzyme name through; the reader and the TypeScript CLI wait 600 s for
+  BRENDA under load; every constant's provenance note carries its row's
+  isoform.
+
+A page that could not be read no longer keeps ADR 0178's "Re-run with
+--substrate NAME": that advice pointed at the wrong remedy.

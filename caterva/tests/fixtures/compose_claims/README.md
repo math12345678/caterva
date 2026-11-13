@@ -20,10 +20,15 @@ replay directory before it runs.
 |---|---|---|
 | 11561a53bfa9cac5a9b098d212382114146e3f4116ce4bf32fe8d235f218bdc8.json.gz | https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=641068 | 200 |
 | 3aa4b36c3cb88132b26a80e335692301e8d1f91b9fb138d65510803301b629ec.json.gz | https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=739603 | 200 |
+| 63a3db14747c6a3964c3586473250a176b8033d9ca06b8f3c5b09a649388b8d3.json.gz | https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=640237 | 200 |
+| f8466f21fbf80231343f6cc869fab7ecd0794f5851c96bfa96a88b682e205ec6.json.gz | https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=703624 | 200 |
 
 Reference 641068 is the paper behind the cited human D-glucose Km (6 mM);
 739603 the one behind the cited kcat (40.1 1/s). Both fetched 2026-10-17
-(UTC), `text/html; charset=UTF-8`. BRENDA data are CC BY 4.0; cite BRENDA
+(UTC). Since the fourth round of the real-values review (2026-11-12) the run
+cites HK-I's Km (0.06 mM, ref 640237) and glucokinase's kcat (60.4 1/s, ref
+703624) instead, not glucokinase's K0.5; those two pages were fetched
+2026-11-12 (UTC) the same way and are what the run now captures, `text/html; charset=UTF-8`. BRENDA data are CC BY 4.0; cite BRENDA
 (Chang et al. 2021, Nucleic Acids Res. 49:D498, doi:10.1093/nar/gkaa1025)
 with any value taken from them.
 

@@ -100,8 +100,8 @@ export const spawnChooser: ChooserRunner = (args) => {
   const proc = spawnSync(resolvePythonExecutable(REPO_ROOT), argv, {
     cwd: REPO_ROOT,
     encoding: 'utf-8',
-    // BRENDA is fetched live: 5-30 s is usual.
-    timeout: 120_000,
+    // BRENDA is fetched live: 5-30 s is usual, minutes under load.
+    timeout: 600_000,
     env: {
       ...process.env,
       PYTHONPATH: [process.env['PYTHONPATH'], REPO_ROOT].filter(Boolean).join(path.delimiter),

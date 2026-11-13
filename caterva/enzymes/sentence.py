@@ -516,6 +516,13 @@ def _organism_key(words: Sequence[_Token]) -> str:
 # ---------------------------------------------------------------------------
 
 
+#: Viruses BRENDA names as organisms, by the names a sentence uses for them
+#: (caterva.compose.organisms.COMMON_NAMES). HIV-1 is left out: it is part
+#: of "HIV-1 protease", an enzyme name.
+_VIRUS_NAMES = {"herpes simplex virus": "Herpes simplex virus", "hsv-1": "Herpes simplex virus",
+                "hsv": "Herpes simplex virus", "hsv1": "Herpes simplex virus"}
+
+
 def _read_organism(tokens: List[_Token]) -> List[Tuple[int, int, str, str]]:
     """(first, last+1, typed, binomial) for every organism named, longest first."""
     found: List[Tuple[int, int, str, str]] = []
@@ -530,6 +537,14 @@ def _read_organism(tokens: List[_Token]) -> List[Tuple[int, int, str, str]]:
                 continue
             code = organism_code(key)
             if code is None:
+                virus = _VIRUS_NAMES.get(" ".join(w.low for w in words))
+                if virus is None:
+                    continue
+                # "herpes simplex virus thymidine kinase": a virus BRENDA
+                # files rows under, read where the index has no entry.
+                found.append((i, i + size, " ".join(w.raw for w in words), virus))
+                for k in range(i, i + size):
+                    taken[k] = True
                 continue
             found.append((i, i + size, " ".join(w.raw for w in words), ORGANISMS[code][0]))
             for k in range(i, i + size):
@@ -957,10 +972,23 @@ def _could_be_a_name(text: str) -> bool:
 
     from .finder import respelt_symbol
 
-    return (strict_key(text) in _KEYS or loose_key(text) in _KEYS
+    if (strict_key(text) in _KEYS or loose_key(text) in _KEYS
             or "compact:" + compact_name_key(text) in _KEYS or load_symbols().knows(text)
             or respelt_symbol(text) is not None
-            or any("compact:" + key in _KEYS for key in _joined_once(text)))
+            or any("compact:" + key in _KEYS for key in _joined_once(text))):
+        return True
+    # A name with its cofactor written first: "NADP-isocitrate dehydrogenase"
+    # (finder._cofactor_prefixed reads it as EC 1.1.1.42; fourth round).
+    if not _COFACTOR_FIRST.match(text):
+        return False
+    from .finder import Resolved as _Resolved
+    from .finder import resolve as _resolve_name
+
+    return isinstance(_resolve_name(text, None), _Resolved)
+
+
+_COFACTOR_FIRST = re.compile(r"^(?:NADP|NAD|NADPH|NADH|NAD\(P\))\+?[- ](?:dependent[- ]|specific[- ]|"
+                             r"linked[- ])?(.+)$", re.IGNORECASE)
 
 
 def _joined_once(text: str) -> List[str]:

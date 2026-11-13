@@ -508,8 +508,11 @@ class TestAPairIsOneIsozymes:
     def test_hk1s_km_is_not_put_beside_glucokinases_kcat(self):
         """Human hexokinase and D-glucose carried HK-I's Km (0.06 mM, ref
         640237, "hexokinase I") with glucokinase's kcat (60.4 1/s, ref 703624,
-        UniProt P35557). Every kcat row is glucokinase's, so the Km is taken
-        from glucokinase's rows, and the K0.5 it is says so."""
+        UniProt P35557). Every kcat row is glucokinase's; the third round
+        moved the Km to glucokinase's K0.5 (6.3 mM), which made "hexokinase"
+        a model of glucokinase ~100-fold off. Since the fourth round a native
+        Michaelis-Menten Km is not traded for another isozyme's K0.5: both
+        picks stand, and the note says the model combines two isozymes."""
         html = page({
             "KM Values": [
                 row(0.06, "D-glucose", "Homo sapiens", "hexokinase I, pH 7.5, 30°C", "640237"),
@@ -521,10 +524,9 @@ class TestAPairIsOneIsozymes:
                     "P35557")],
         })
         km, kcat = pair("2.7.1.1", "Homo sapiens", "D-glucose", html)
-        assert km.row_isoform == kcat.row_isoform == "GCK"
-        assert (km.value, kcat.value) == (6.3, 40.1)
-        assert "K0.5 with a Hill coefficient of 1.8" in km.chosen_because
-        assert "measured HK-I" in km.chosen_because
+        assert (km.row_isoform, kcat.row_isoform) == ("HK-I", "GCK")
+        assert km.value == 0.06
+        assert "the model combines two isozymes' constants" in km.chosen_because
 
 
 class TestAPairIsAsDescribedAsItsLessDescribedPick:

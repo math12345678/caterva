@@ -602,7 +602,7 @@ class TestTheExitCodeWhenASearchIsRefused:
         assert attempts == [], f"the choice went to the network: {attempts}"
         assert refused is False, note
         assert asked["substrate"] == "D-glucose" and asked["organism"] == "Homo sapiens"
-        assert asked["compounds"] == {"@inhibitor": "1,5-Anhydro-D-glucitol 6-phosphate"}
+        assert asked["compounds"] == {"@inhibitor": "D-glucose 1,6-diphosphate"}
         assert [c.role for c in found.choices] == ["substrate", "inhibitor"]
         assert found.substrate == "D-glucose"
         assert found.choices[0].note() == (
@@ -610,7 +610,7 @@ class TestTheExitCodeWhenASearchIsRefused:
             "Km rows for under EC 2.7.1.1 in Homo sapiens, it has the most Km and kcat rows (13 Km, "
             "13 kcat; the cosubstrate ATP set aside; not counted, because the search cannot use "
             "them: 60 rows of a variant). Others: 2-deoxy-D-glucose (4 Km, 1 kcat); D-mannose "
-            "(4 Km); D-fructose (2 Km); D-glucosamine (3 Km); 2-deoxyglucose (1 Km); and 4 more. "
+            "(4 Km); D-fructose (2 Km); D-glucosamine (3 Km); ITP (1 Km); and 4 more. "
             "Pass --substrate NAME to model another.")
         assert "--substrate NAME" not in (note or ""), "the search ran, for D-glucose"
 
@@ -819,7 +819,7 @@ def test_missing_substrate_list_failure_does_not_replace_refusal(monkeypatch):
 
     found, note = _missing_substrate_note(monkeypatch, boom)
     assert note.startswith("No search was run"), note
-    assert "Re-run with --substrate NAME." in note
-    assert "could not be read to choose one" in note
+    # An outage, not an absence: the remedy is a re-run (fourth round).
+    assert "could not be read just now" in note and "re-run when BRENDA answers" in note
     assert "BRENDA holds" not in note and "offline" not in note
     assert found.choices == ()

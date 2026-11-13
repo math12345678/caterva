@@ -109,8 +109,12 @@ def test_the_inhibitor_puts_a_product_of_the_reaction_last(recorded, monkeypatch
     them listed, so the last place is seen)."""
     monkeypatch.setattr(defaults, "ALTERNATIVES_NAMED", 50)
     choice = defaults.choose_inhibitor("2.7.1.1", "Homo sapiens", "D-glucose")
-    assert choice.chosen == "1,5-Anhydro-D-glucitol 6-phosphate" and choice.rows == {"ki": 2}
-    assert choice.alternatives[-1].name == "D-glucose 6-phosphate"
+    # Since the fourth round every Substrates/Products cell is read (the
+    # span-wrapped ones were missed): 1,5-anhydro-D-glucitol 6-phosphate is
+    # also a product of the enzyme's, and ranks last with D-glucose 6-phosphate.
+    assert choice.chosen == "D-glucose 1,6-diphosphate" and choice.rows == {"ki": 2}
+    assert {o.name for o in choice.alternatives[-2:]} == {
+        "D-glucose 6-phosphate", "1,5-Anhydro-D-glucitol 6-phosphate"}
 
 
 def test_no_organism_prefers_human_when_it_covers_every_constant(recorded):
@@ -894,7 +898,7 @@ def test_an_inhibitor_tied_on_every_count_is_not_said_to_have_the_most(monkeypat
                                 _row("A-inhibitor", "competitive", ref="1")]})
     choice = defaults.choose_inhibitor("3.4.21.79", "Homo sapiens", mode="competitive")
     assert choice.chosen == "A-inhibitor"
-    assert "it has as many as any other (1 Ki row)" in choice.why
+    assert "it is reported by as many papers as any other (1 BRENDA reference, 1 Ki row)" in choice.why
     assert "the most" not in choice.why
     assert "taken first by name (alphabetically)" in choice.why
 
@@ -971,7 +975,7 @@ def test_an_inhibitor_tie_goes_to_the_compound_measured_more_widely(monkeypatch)
     choice = defaults.choose_inhibitor("3.2.1.18", flu)
     assert choice.chosen == "oseltamivir carboxylate"
     assert ("ties on rows and references with " + triazole) in choice.why
-    assert "has more Ki rows under EC 3.2.1.18 counting every organism than it does (3 against at most 1)" \
+    assert "is reported more widely under EC 3.2.1.18, counting every organism, than it does (3 against at most 1)" \
         in choice.why
     assert "alphabetically" not in choice.why
 

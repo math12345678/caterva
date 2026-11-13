@@ -680,7 +680,7 @@ def _brenda_entries(
     # they're data-quality problems, not answers.
     entries = [e for e in entries if not e.flagged]
     if table_label != KI_TABLE_LABEL and entries:
-        inhibitors = _inhibitor_keys(ec_number, html)
+        inhibitors = _inhibitor_keys(ec_number, html) | _activator_keys(ec_number, html)
         for e in entries:
             e.inhibitors_present = _inhibitors_in_assay(e, inhibitors, substrate)
     if entries:
@@ -765,7 +765,18 @@ _INHIBITOR_KEYS: dict = {}
 
 
 def _compound_key(name) -> str:
-    return "".join((name or "").lower().split())
+    """One compound's key for "is this compound present in the assay":
+    its spellings one (compound_names.identity_key), and a leading stereo
+    descriptor aside, since an Activating Compounds table writes
+    "fructose 1,6-bisphosphate" where a row writes "D-fructose
+    1,6-bisphosphate"."""
+    text = " ".join((name or "").split())
+    try:
+        from compound_names import identity_key
+    except ImportError:  # pragma: no cover - the package layout
+        from Tests.compound_names import identity_key
+    text = re.sub(r"^(?:[DL]{1,2}|alpha|beta|\([RS+-]\))-(?=\w)", "", text)
+    return identity_key(text) or "".join(text.lower().split())
 
 
 def _inhibitor_keys(ec_number: str, html: str) -> frozenset:
@@ -781,6 +792,41 @@ def _inhibitor_keys(ec_number: str, html: str) -> frozenset:
             rows = []
         _INHIBITOR_KEYS[key] = frozenset(_compound_key(e.substrate) for e in rows)
     return _INHIBITOR_KEYS[key]
+
+
+#: (EC, page digest) -> the compound keys BRENDA's Activating Compounds table lists.
+_ACTIVATOR_KEYS: dict = {}
+#: Compounds an Activating Compounds table lists that are an assay's
+#: ordinary stabilisers, reducing agents or detergents, not an allosteric
+#: effector a Km is measured "in the presence of" to change it.
+_ASSAY_ADDITIVES = frozenset(_compound_key(n) for n in (
+    "dithiothreitol", "DTT", "2-mercaptoethanol", "beta-mercaptoethanol", "mercaptoethanol",
+    "bovine serum albumin", "BSA", "albumin", "glycerol", "EDTA", "Triton X-100", "Tween 20",
+    "Tween 80", "polyethylene glycol", "PEG", "sucrose", "glutathione", "cysteine", "L-cysteine",
+    "ethanol", "dimethyl sulfoxide", "DMSO", "Brij 35", "CHAPS", "sodium dodecyl sulfate", "SDS",
+    "additional information"))
+
+
+def _activator_keys(ec_number: str, html: str) -> frozenset:
+    """Every compound the page's Activating Compounds table lists, any
+    organism, ions and assay additives aside: the enzyme's known
+    activators. A Km "in the presence of D-fructose 1,6-bisphosphate" for
+    pyruvate kinase (ref 709464), whose commentary does not call FBP an
+    activator, is as apparent a constant as one "activation by" it (fourth
+    round of the real-values review). Read by a regular expression over the
+    table's compound cells, once per page."""
+    import hashlib
+    key = (ec_number, hashlib.sha1(html.encode("utf-8", "replace")).hexdigest())
+    if key not in _ACTIVATOR_KEYS:
+        found = set()
+        table = re.search(r"showTable\('(tab\d+)'\)\">Activating Compounds<", html)
+        if table:
+            for cell in re.findall(r'id="' + table.group(1) + r'r\d+(?:sr\d+)?c0"[^>]*>([^<]*)<', html):
+                name = " ".join(cell.split())
+                if name and not row_form.is_ion(name) and _compound_key(name) not in _ASSAY_ADDITIVES:
+                    found.add(_compound_key(name))
+        _ACTIVATOR_KEYS[key] = frozenset(found)
+    return _ACTIVATOR_KEYS[key]
 
 
 def _is_cofactor(name: str) -> bool:
@@ -807,13 +853,23 @@ def _inhibitors_in_assay(entry, inhibitor_keys, substrate=None) -> list:
             continue
         if substrate and _compound_key(name) == _compound_key(substrate):
             continue
-        if x.role == "inhibitor" or _compound_key(name) in inhibitor_keys:
+        if x.role in ("inhibitor", "activator") or _compound_key(name) in inhibitor_keys:
             out.append(name)
     # A compound listed bare at a concentration, with no "in the presence
     # of": "hCA I, 25 mM hydroxyurea" (BRENDA ref 650526, human carbonic
     # anhydrase I, beside the same paper's plain "hCA I" row).
+    for m in _BARE_ROLE_COMPOUND.finditer(getattr(entry, "conditions", None) or ""):
+        # "0.008 mM inhibitor 3-(3,5-dibromo)-4-hydroxybenzylidine-..."
+        # (bovine glutamate dehydrogenase, ref 698927): the commentary calls
+        # it an inhibitor, with no "in the presence of". A comma inside a
+        # name ("3,5-") is the name's; one followed by a space ends it.
+        name = m.group(1).strip()
+        if name and name not in out:
+            out.append(name)
     for m in _BARE_COMPOUND.finditer(getattr(entry, "conditions", None) or ""):
         name = m.group(1).strip()
+        if _BARE_ROLE.match(name):
+            continue
         if (_compound_key(name) in inhibitor_keys and name not in out
                 and not row_form.is_ion(name) and not _is_cofactor(name)
                 and not (substrate and _compound_key(name) == _compound_key(substrate))):
@@ -822,6 +878,10 @@ def _inhibitors_in_assay(entry, inhibitor_keys, substrate=None) -> list:
 
 
 _BARE_COMPOUND = re.compile(r"\b\d+(?:\.\d+)?\s*[mµun]?M\s+([A-Za-z0-9(][^,;]*?)\s*(?=[,;]|$)")
+_BARE_ROLE = re.compile(r"(?:allosteric\s+)?(?:inhibitor|activator|effector)s?\s+", re.IGNORECASE)
+_BARE_ROLE_COMPOUND = re.compile(
+    r"\b\d+(?:\.\d+)?\s*[mµun]?M\s+(?:allosteric\s+)?(?:inhibitor|activator|effector)s?\s+"
+    r"(\S.*?)\s*(?=,\s|;|$)", re.IGNORECASE)
 
 
 def substrates_present(
@@ -1310,6 +1370,21 @@ def _row_notes(entry, quantity) -> list:
     if inhibitors:
         notes.append(f"the row was measured with {', '.join(inhibitors)} present, an inhibitor or effector: an "
                      "apparent constant")
+    if quantity == "ki" and IRREVERSIBLE_INHIBITOR.search(str(getattr(entry, "substrate", "") or "")):
+        notes.append(f"{entry.substrate} is an irreversible (covalent or mechanism-based) "
+                     "inactivator: a Ki row describes its initial reversible complex, and a "
+                     "reversible inhibition model leaves the inactivation out")
+    if quantity == "ki" and _NO_PREINCUBATION.search(text or ""):
+        # Thrombin's DV24K10RY rows say "after no preincubation time": the
+        # apparent Ki of a slow-binding inhibitor before equilibrium (fourth
+        # round of the real-values review).
+        notes.append("the row was measured without preincubating enzyme and inhibitor: for a "
+                     "slow-binding inhibitor that is an apparent, not the equilibrium, Ki")
+    elif quantity == "ki" and _PREINCUBATED.search(text or ""):
+        notes.append("the row was measured after preincubating enzyme and inhibitor")
+    assayed = _assay_substrate(text) if quantity == "ki" else None
+    if assayed:
+        notes.append(f"the Ki was measured on the hydrolysis of {assayed}")
     try:
         commentary_isoform = _isoform_of(text)
     except ImportError:
@@ -1324,6 +1399,27 @@ def _row_notes(entry, quantity) -> list:
                      f"names only {paper} in its other entries on BRENDA's page")
     return notes
 
+
+#: Inhibitors that inactivate covalently or by mechanism: a Ki row of one
+#: describes its initial reversible complex, and a competitive model leaves
+#: the inactivation out. Thrombin's automatic inhibitor was a chloromethyl
+#: ketone; MAO-B and selegiline was modelled as a reversible competitor with
+#: no word of it (fourth round of the real-values review).
+IRREVERSIBLE_INHIBITOR = re.compile(
+    r"chloromethyl[- ]?ketone|fluoromethyl[- ]?ketone|\b(?:CMK|FMK)\b|diisopropyl ?fluorophosphate"
+    r"|phenylmethyl(?:sulfonyl|sulphonyl) fluoride|\bPMSF\b|\bDFP\b|selegiline|deprenyl|rasagiline"
+    r"|clorgyline|pargyline|tranylcypromine|phenelzine|\baspirin\b|acetylsalicylic|clavulan"
+    r"|sulbactam|tazobactam|difluoromethylornithine|\bDFMO\b|eflornithine|vigabatrin"
+    r"|iodoacetamide|iodoacetate|N-ethylmaleimide|\bTLCK\b|\bTPCK\b|tosyl-L-(?:lysine|phenylalanine) "
+    r"chloromethyl"
+    # Serpins trap their protease in a covalent complex (suicide substrates).
+    r"|antithrombin|\bserpin|antitrypsin|antichymotrypsin|antiplasmin|plasminogen activator inhibitor",
+    re.IGNORECASE)
+
+_NO_PREINCUBATION = re.compile(r"\b(?:no|without)\s+preincubation\b|\bnot\s+preincubated\b",
+                               re.IGNORECASE)
+_PREINCUBATED = re.compile(r"\bafter\s+(?:\d+\s*\w+\s+)?preincubation\b|\bpreincubated\b",
+                           re.IGNORECASE)
 
 #: A reaction named with its product in a commentary: "desulfuration ... to
 #: fenthion-oxon", "N-demethylation to norketamine".
@@ -1380,6 +1476,71 @@ def _outside(few, many) -> bool:
     if not values or not isinstance(v, (int, float)) or v <= 0:
         return False
     return v > values[-1] * OUTSIDE_FOLD or v < values[0] / OUTSIDE_FOLD
+
+
+_ASSAYED = re.compile(r"\b(?:hydrolysis|cleavage) of\s+([^,;]+?)\s*(?=[,;]|$)"
+                     r"|\b(?:with|using)\s+([^,;]+?)\s+as (?:the )?substrate\b", re.IGNORECASE)
+
+
+def _assay_substrate(conditions) -> "str | None":
+    m = _ASSAYED.search(conditions or "")
+    return " ".join((m.group(1) or m.group(2)).split()) if m else None
+
+
+_WILD_LABEL = re.compile(r"\bwild[- ]?type(?:\s+enzyme)?\b,?\s*", re.IGNORECASE)
+
+
+def _bare(conditions) -> str:
+    return re.sub(r"[\s,;]+", " ", _WILD_LABEL.sub("", conditions or "")).strip().lower()
+
+
+def _unlabelled_beside_wild_type(entry, rows) -> bool:
+    """Whether `entry` states no wild-type label while a row of its own paper
+    (same compound) states one and otherwise the same conditions."""
+    text = getattr(entry, "conditions", None) or ""
+    ref = getattr(entry, "reference_id", None)
+    if not ref or _WILD_LABEL.search(text):
+        return False
+    mine = _bare(text)
+    return any(other is not entry and getattr(other, "reference_id", None) == ref
+               and getattr(other, "substrate", None) == getattr(entry, "substrate", None)
+               and _WILD_LABEL.search(getattr(other, "conditions", None) or "")
+               and _bare(other.conditions) == mine
+               for other in rows)
+
+
+def _unit_slip(middle_pool, every_row):
+    """`(kept, slipped, fold, reference median)` when the two middle rows of
+    an even pool differ by a power of a thousand (within a factor of 2) --
+    the signature of an mM/µM (or per-minute/per-second) slip -- and the
+    rest of the candidate rows, before the narrowing, side with one of them;
+    else None.
+
+    Candida rugosa lipase and 4-nitrophenyl palmitate: the free enzyme's Km
+    is 0.17 mM (ref 678010) and 0.00017 mM (ref 714870), both "pH 7.0,
+    37 C"; the immobilised preparations of both papers lie at 0.089-0.274
+    mM. "The lower of the two middle values" carried 0.00017, the
+    sub-micromolar row (fourth round of the real-values review)."""
+    import math
+    ordered = sorted(middle_pool, key=lambda e: e.km_value)
+    a, b = ordered[(len(ordered) - 1) // 2], ordered[len(ordered) // 2]
+    if not (a.km_value and b.km_value and a.km_value > 0):
+        return None
+    fold = b.km_value / a.km_value
+    power = round(math.log10(fold) / 3)
+    if power < 1 or abs(math.log10(fold) - 3 * power) > math.log10(2):
+        return None
+    rest = [e.km_value for e in every_row if e is not a and e is not b
+            and isinstance(e.km_value, (int, float)) and e.km_value > 0]
+    if not rest:
+        return None
+    reference = sorted(rest)[len(rest) // 2]
+    def distance(e):
+        return abs(math.log10(e.km_value / reference))
+    if abs(distance(a) - distance(b)) < 1:
+        return None
+    kept, slipped = (a, b) if distance(a) < distance(b) else (b, a)
+    return kept, slipped, fold, reference
 
 
 def _median_row(rows):
@@ -1530,6 +1691,16 @@ def _best_evidenced(
         log.append(f"{tier}: kept the {len(wild)} of {len(rows)} row(s) not measuring a mutant")
         rows = wild
 
+    # A paper's row labelled wild-type over its unlabelled row stating the
+    # same conditions otherwise: human chymotrypsin, ref 769319, holds
+    # "wild-type, pH 8" (0.575 mM / 22.8 1/s), mutants D236R and S242T, and
+    # a bare "pH 8" row (0.304 / 10.9) of a construct the commentary does
+    # not name; the bare row was carried (fourth round's review).
+    prefer(lambda e: not _unlabelled_beside_wild_type(e, rows),
+           lambda n, out: (f"{n} unlabelled row(s) passed over for the same paper's row labelled "
+                           "wild-type under otherwise the same stated conditions"),
+           "labelled wild-type where the same paper labels one")
+
     # Constructs (an isolated domain, a chimera, a modified or immobilised
     # enzyme, a cosolvent, another subtype) after native rows.
     prefer(lambda e: not row_form.construct_of(getattr(e, "conditions", None)),
@@ -1570,8 +1741,14 @@ def _best_evidenced(
                    "temperature: the few stating both lie outside the rest")
         rows = partial
     elif complete and len(complete) < len(rows):
+        # Their values are said: mouse AChE's other wild-type kcat rows
+        # (2330 and 2333 1/s, ref 652016, no conditions) are 9-fold above
+        # the carried 250 1/s, and nothing said so (fourth round's review).
+        dropped = sorted({float(e.km_value) for e in rows if e not in complete})
+        shown = ", ".join(f"{v:g}" for v in dropped[:4]) + (" ..." if len(dropped) > 4 else "")
         passed_over.append(f"{len(rows) - len(complete)} row(s) not stating both pH and "
-                           "temperature passed over")
+                           f"temperature passed over ({shown} {getattr(rows[0], 'unit', '') or ''})"
+                           .replace(" )", ")"))
         log.append(f"{tier}: kept the {len(complete)} of {len(rows)} row(s) stating both pH "
                    "and temperature")
         rows = complete
@@ -1633,6 +1810,11 @@ def _best_evidenced(
                        "paired constant's paper; the two constants come from different papers")
 
     chosen, even = _median_row(pick_from)
+    unit_slip = None
+    if even and matched is None and len(pick_from) >= 2:
+        unit_slip = _unit_slip(pick_from, entries)
+        if unit_slip is not None:
+            chosen = unit_slip[0]
     values = [e.km_value for e in kept]
     lo, hi = min(values), max(values)
     fold = (hi / lo) if lo > 0 and hi != lo else None
@@ -1648,11 +1830,28 @@ def _best_evidenced(
         how = f"the one remaining row from BRENDA ref {paired}, the paper the paired constant came from"
     elif n == 1:
         how = "the only row remaining"
+    elif unit_slip is not None:
+        slipped = unit_slip[1]
+        how = (f"one of the two middle values of the {n} remaining rows, which differ "
+               f"{unit_slip[2]:.3g}-fold ({slipped.km_value:g} {getattr(slipped, 'unit', '') or ''}, "
+               f"BRENDA ref {_ref(slipped)}): a factor of a thousand between rows stating the same "
+               "conditions is the signature of a unit slip (mM written for µM, or per minute for "
+               "per second), so the one lying with the other rows measured on this compound "
+               f"(median {unit_slip[3]:g}) was taken and the other is a probable error")
     elif even:
         how = (f"the lower of the two middle values of the {n} remaining rows"
                + (f" from BRENDA ref {paired}, the paper the paired constant came from"
                   if paired else "")
                + " (a median row, so the value is one real measurement, not an average)")
+        ordered = sorted(pick_from, key=lambda e: e.km_value)
+        upper = ordered[len(ordered) // 2]
+        mine, theirs = _assay_substrate(chosen.conditions), _assay_substrate(upper.conditions)
+        if mine and theirs and mine != theirs:
+            # ACE and captopril, ref 650001: 1e-05 mM on Abz-SDK(Dnp)P-OH and
+            # 4.6e-05 mM on Abz-FRK(Dnp)P-OH, wild-type both (fourth round).
+            how += (f"; the two middle rows differ in the assay substrate ({mine} against "
+                    f"{theirs}, {upper.km_value:g} {getattr(upper, 'unit', '') or ''}), which is what "
+                    "separates them, so the choice between them is not one the evidence makes")
     else:
         how = (f"the median of the {n} remaining rows"
                + (f" from BRENDA ref {paired}, the paper the paired constant came from"
@@ -1661,7 +1860,7 @@ def _best_evidenced(
     because = f"{chosen.km_value:g} {unit} (BRENDA ref {_ref(chosen)}) is {how}"
     if fold is not None:
         because += f"; the {len(kept)} remaining rows span {lo:g} to {hi:g} {unit}"
-        if wide:
+        if wide and unit_slip is None:
             because += (f", a {fold:.3g}-fold spread: the literature disagrees by more than "
                         f"{WIDE_SPREAD_FOLD:g}-fold, so this one value hides most of what is known")
     if passed_over:
@@ -2036,9 +2235,69 @@ class _Refused(list):
 UNNAMED_AMONG_OTHERS_MIN = 2
 
 
+#: Rows naming the isoform asked for are set aside for the rows naming none
+#: when every one lies further than this outside the span of at least
+#: `ISOFORM_OUTLIER_MIN_UNNAMED` rows naming none: a name is evidence of the
+#: protein, not of the number.
+ISOFORM_OUTLIER_FOLD = 100.0
+ISOFORM_OUTLIER_MIN_UNNAMED = 2
+
+
+def isoform_rows_outlying(matching_values, unnamed_values, fold=ISOFORM_OUTLIER_FOLD):
+    """Whether every value of the rows naming the isoform lies more than
+    `fold` outside the span of the rows naming none. "DPP4 inhibited by
+    sitagliptin": the gene symbol was read as --isoform DPP4, and the one
+    paper whose rows name P27487 (ref 665551) gave kcat 279000 1/s against
+    20-87 1/s for every wild-type row naming no isoform; it was carried with
+    "scale: all numbers possible" (fourth round of the real-values review)."""
+    low = [v for v in unnamed_values if v and v > 0]
+    high = [v for v in matching_values if v and v > 0]
+    if len(low) < ISOFORM_OUTLIER_MIN_UNNAMED or not high:
+        return False
+    lo, hi = min(low), max(low)
+    return all(v > hi * fold or v < lo / fold for v in high)
+
+
+def isolated(values, fold=ISOFORM_OUTLIER_FOLD) -> list:
+    """The indexes of `values` lying more than `fold` from every other value,
+    among at least three: a row no other row comes near. DPP4's kcat rows for
+    Gly-Pro-4-nitroanilide in human are 20, 24, 87 and 279000 1/s; the last
+    (ref 665551, naming P27487) was the one an isoform request could reach
+    first, and pairing carried it."""
+    vals = [float(v) if v is not None else 0.0 for v in values]
+    if sum(1 for v in vals if v > 0) < 3:
+        return []
+    out = []
+    for i, v in enumerate(vals):
+        if v <= 0:
+            continue
+        others = [w for j, w in enumerate(vals) if j != i and w > 0]
+        if others and all(max(v / w, w / v) > fold for w in others):
+            out.append(i)
+    return out
+
+
 def _isoform_tiers(named, isoform, total, log, where):
+    lone = isolated([e.km_value for e, _ in named])
+    if lone:
+        listed = ", ".join(f"{named[i][0].km_value:g} (BRENDA ref "
+                           f"{getattr(named[i][0], 'reference_id', None) or '?'})" for i in lone)
+        log.append(f"Set aside {len(lone)} {where} row(s) lying more than "
+                   f"{ISOFORM_OUTLIER_FOLD:g}-fold from every other row ({listed}) before choosing "
+                   f"among the rows naming {isoform}: a probable error, which a name must not carry")
+        named = [x for i, x in enumerate(named) if i not in lone]
     matching = [e for e, iso in named if _same_isoform(iso, isoform)]
     unnamed = [e for e, iso in named if iso is None]
+    if matching and isoform_rows_outlying([e.km_value for e in matching],
+                                          [e.km_value for e in unnamed]):
+        listed = ", ".join(f"{e.km_value:g} (BRENDA ref {getattr(e, 'reference_id', None) or '?'})"
+                           for e in matching)
+        log.append(f"The {len(matching)} {where} row(s) naming {isoform} ({listed}) lie more than "
+                   f"{ISOFORM_OUTLIER_FOLD:g}-fold outside every one of the {len(unnamed)} naming "
+                   f"none ({min(e.km_value for e in unnamed):g} to "
+                   f"{max(e.km_value for e in unnamed):g}): set aside as a probable error, and the "
+                   f"rows naming none kept")
+        return unnamed, False, []
     if matching:
         log.append(f"Kept the {len(matching)} of {total} {where} row(s) measuring {isoform}")
         return matching, True, []
@@ -2448,6 +2707,12 @@ def _partition_variants(entries, keep_isozymes=False):
     usable, withheld = [], []
     for entry in entries:
         verdict = getattr(entry, "variant", None)
+        if (verdict is not None and verdict.status == "variant" and verdict.kind == "isozyme"
+                and _names_the_sole_protein(entry)):
+            # "isoform CELA1" for pig pancreatic elastase: the only protein
+            # the EC holds in the organism is the enzyme itself.
+            usable.append(entry)
+            continue
         if (verdict is not None and verdict.status == "variant"
                 and not (keep_isozymes and verdict.kind == "isozyme")):
             # An isozyme row is kept when it is the isozyme that was asked
@@ -2456,6 +2721,15 @@ def _partition_variants(entries, keep_isozymes=False):
         else:
             usable.append(entry)
     return usable, withheld
+
+
+def _names_the_sole_protein(entry) -> bool:
+    try:
+        reading = _isoform_of(getattr(entry, "conditions", None))
+    except ImportError:
+        return False
+    return row_form.is_sole_protein(getattr(entry, "ec_number", None),
+                                    getattr(entry, "organism", None), reading)
 
 
 def _mutations_of(text) -> set:
@@ -3080,6 +3354,20 @@ PAIR_MAX_FOLD_FROM_PICK = 10.0
 
 #: The pH a paper's pH series is read at when it measured several pairs.
 PHYSIOLOGICAL_PH = 7.4
+#: The salt concentration (M) a paper's salt series is read at.
+PHYSIOLOGICAL_SALT_M = 0.15
+
+_SALT_IN = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)\s*(m?M)\s+(?:NaCl|KCl|LiCl|Na2SO4|NaClO4|K2SO4)\b")
+
+
+def _salt_molar(conditions) -> "float | None":
+    """The molar concentration of the monovalent salt a row's commentary
+    states ("pH 5.0, 2.0 M NaCl" is 2.0), or None when it states none."""
+    m = _SALT_IN.search(conditions or "")
+    if not m:
+        return None
+    value = float(m.group(1))
+    return value / 1000.0 if m.group(2) == "mM" else value
 
 
 def _matched_pairs(km, kcat, substrate):
@@ -3259,6 +3547,14 @@ def resolve_kinetic_pair(
         t = row.get("temperature_c")
         return 0.0 if t is None else max(0.0, 25.0 - float(t), float(t) - 37.0)
 
+    def from_physiological_salt(row):
+        # One paper's salt series is read as a series too, nearest the
+        # ionic strength of a cell: HIV-1 protease, ref 648156, measured at
+        # 0.1, 1.0 and 2.0 M NaCl; the 2.0 M pair was carried for being 0.1
+        # pH unit nearer 7.4 than the 1.0 M one (fourth round's review).
+        molar = _salt_molar(row.get("conditions"))
+        return 0.0 if molar is None else abs(math.log10(max(molar, 1e-3) / PHYSIOLOGICAL_SALT_M))
+
     def from_physiological_ph(row):
         ph = row.get("ph")
         return abs(float(ph) - PHYSIOLOGICAL_PH) if ph is not None else 0.0
@@ -3279,6 +3575,7 @@ def resolve_kinetic_pair(
             protein(p[1]), protein(k_row) or protein(c_row))]
         ref, k_row, c_row = min(series, key=lambda p: (
             outside_assay_range(p[1]),
+            from_physiological_salt(p[1]),
             from_physiological_ph(p[1]),
             abs(math.log10(p[1]["value"] / km.value)) + abs(math.log10(p[2]["value"] / kcat.value)),
             p[0]))
@@ -3288,6 +3585,11 @@ def resolve_kinetic_pair(
                     f"measurement: BRENDA ref {ref} states the same conditions for both rows")
             km_p, kcat_p = _with_clause(km_p, note), _with_clause(kcat_p, note)
             return _with_isozyme_note(km_p, kcat_p, one_isozyme)
+
+    crossed = _pair_across_isoform_tiers(enzyme_ec, organism, substrate, page, kwargs, km, kcat,
+                                         protein)
+    if crossed is not None:
+        return _with_isozyme_note(*crossed, one_isozyme)
 
     reasons = []
     if unresolvable:
@@ -3314,6 +3616,53 @@ def resolve_kinetic_pair(
     note = ("the Km and the kcat were chosen independently, not as a measured pair: "
             + "; ".join(reasons))
     return _with_isozyme_note(_with_clause(km, note), _with_clause(kcat, note), one_isozyme)
+
+
+def _pair_across_isoform_tiers(enzyme_ec, organism, substrate, page, kwargs, km, kcat, protein):
+    """`(km, kcat)` of one paper when an isoform was asked for, the kcat's
+    carried row names none (so it was taken from the rows naming none), the
+    Km's names the isoform, and no pair was found -- else None.
+
+    Human pyruvate kinase, "muscle" read as PKM: the kcat (1182 1/s, ref
+    674499, "wild type enzyme, in the presence of K+", naming no isoform)
+    and a Km from another paper naming P14618 were carried with "no paper
+    holds a pair", while ref 674499 holds the Km measured with that kcat
+    (0.13 mM, identical commentary). A kcat already accepted from the rows
+    naming no isoform makes its own paper's Km, measured with it and naming
+    no OTHER protein, a better partner than another paper's row: the two are
+    then one measurement of one preparation (the fourth round of the
+    real-values review)."""
+    asked = kwargs.get("isoform")
+    if not (asked and km.found and kcat.found and km.row_isoform and not kcat.row_isoform):
+        return None
+    cited = getattr(kcat.citation, "reference_id", None)
+    if not cited:
+        return None
+    loose = resolve_kinetic_value(enzyme_ec=enzyme_ec, organism=organism, substrate=substrate,
+                                  html_provider=page, quantity="km", **{**kwargs, "isoform": None})
+    if not loose.found:
+        return None
+    crossed, _, _ = _matched_pairs_with_undescribed(loose, kcat, substrate)
+    crossed = [(ref, k, c) for ref, k, c in crossed
+               if ref == str(cited) and c.get("value") == kcat.value
+               and not _other_protein(protein(k), asked) and not k.get("isoform")]
+    if not crossed:
+        return None
+    ref, k_row, c_row = crossed[0]
+    km_p = resolve_kinetic_value(enzyme_ec=enzyme_ec, organism=organism, substrate=substrate,
+                                 html_provider=page, quantity="km", prefer_row=k_row,
+                                 **{**kwargs, "isoform": None})
+    kcat_p = resolve_kinetic_value(enzyme_ec=enzyme_ec, organism=organism, substrate=substrate,
+                                   html_provider=page, quantity="kcat", prefer_row=c_row, **kwargs)
+    if not (km_p.found and kcat_p.found and km_p.value == k_row["value"]):
+        return None
+    note = (f"the Km ({k_row['value']:g} mM) and kcat ({c_row['value']:g} 1/s) are one "
+            f"measurement: BRENDA ref {ref} states the same conditions for both rows. The kcat "
+            f"row names no isoform, so its paper's Km row, which names none either, is carried "
+            f"as its pair over the row naming {asked} ({km.value:g} mM, BRENDA ref "
+            f"{getattr(km.citation, 'reference_id', None) or '?'}): one preparation's two "
+            f"constants rather than two papers'")
+    return _with_clause(km_p, note), _with_clause(kcat_p, note)
 
 
 def _one_isozyme(km, kcat, resolve_value, call):
@@ -3345,6 +3694,15 @@ def _one_isozyme(km, kcat, resolve_value, call):
             names_it = bool(alt.found and alt.row_isoform and _same_isoform(alt.row_isoform, isoform))
         except ImportError:
             names_it = bool(alt.found and alt.row_isoform == isoform)
+        if names_it and moved == "km" and _is_half_saturation(alt) and not _is_half_saturation(km):
+            # Human hexokinase, no isozyme named: the evidence's Km was
+            # HK-I's Michaelis-Menten 0.06 mM, and only glucokinase has kcat
+            # rows; moving the Km to GCK's K0.5 (6.3 mM, Hill 1.8) made the
+            # model glucokinase's, ~100-fold off for "hexokinase" (fourth
+            # round of the real-values review). A native Km is not traded
+            # for another isozyme's K0.5: the two isozymes' constants are
+            # combined and said so.
+            continue
         if names_it and alt.source == ("brenda_exact" if km.source == "brenda_exact"
                                        else alt.source):
             picks = {"km": km, "kcat": kcat}
@@ -3354,6 +3712,11 @@ def _one_isozyme(km, kcat, resolve_value, call):
                 "km": isoform, "kcat": isoform, "moved": moved, "from": independent,
                 "from_isoform": b if moved == "kcat" else a, "other": other}
     return km, kcat, {"km": a, "kcat": b, "moved": None}
+
+
+def _is_half_saturation(result) -> bool:
+    """Whether a found Km's carried row is a K0.5 / Hill row (row_form)."""
+    return bool(row_form.half_saturation(getattr(result, "commentary", None)))
 
 
 def _with_isozyme_note(km, kcat, settled):

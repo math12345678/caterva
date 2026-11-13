@@ -20,9 +20,30 @@ should still not be misled.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, Sequence, Tuple
 
+
+#: A salt written with its concentration: "2.0 M NaCl", "0.1 M Na2SO4",
+#: "20 mM CaCl2", "0.1 M NaClO4".
+_SALT = re.compile(
+    r"(?<![\w.])(\d+(?:\.\d+)?\s*[mµun]?M)\s+((?:Na|K|Li|Ca|Mg|Mn|Zn|Cs|Rb|NH4|Ba|Sr)\d?"
+    r"(?:Cl\d?|ClO4|SO4|NO3|Br|F|I|HCO3|OAc)\d?)\b")
+#: An ion said to be present: "in the presence of K+".
+_ION_PRESENT = re.compile(r"\b(?:in the presence of|with)\s+((?:\d+(?:\.\d+)?\s*[mµun]?M\s+)?"
+                          r"(?:Na|K|Li|Ca|Mg|Mn|Zn|Cs|Rb|NH4|Co|Ni|Cu|Fe)\d?\+)")
+
+
+def _additives(commentary: Optional[str]) -> List[str]:
+    """The salts and ions the row's commentary says the assay held, for the
+    condition line: HIV-1 protease's pair "pH 5.0, 2.0 M NaCl" (ref 648156)
+    was printed "measured at pH 5", the 2 M salt left to the evidence
+    paragraph (fourth round of the real-values review)."""
+    text = commentary or ""
+    out = [f"with {m.group(1)} {m.group(2)}" for m in _SALT.finditer(text)]
+    out += [f"with {' '.join(m.group(1).split())}" for m in _ION_PRESENT.finditer(text)]
+    return list(dict.fromkeys(out))
 
 def _no_subject_reason(model: Any) -> str:
     """`ComposedModel.no_subject_reason`, for any model this is handed.
@@ -374,6 +395,7 @@ class ModelDossier:
                 parts.append(f"{record.assay_temperature_c:g} °C")
             if record.assay_buffer:
                 parts.append(f"in {record.assay_buffer}")
+            parts.extend(_additives(getattr(record, "commentary", None)))
             unreported = getattr(record, "assay_unreported", ()) or ()
             suffix = (
                 f" The source states it did not report: {', '.join(unreported)}."

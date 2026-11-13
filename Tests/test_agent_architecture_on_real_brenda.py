@@ -268,9 +268,15 @@ class TestOnRealMarkup:
         assert km.value == 10.73
         assert km.ph == 8.0
         # Km is the immovable reference and must not be reported as moved.
+        # The pH 8 row (32.0 1/s, ref 670748) is "activated by fructose
+        # 1,6-diphosphate": an apparent constant with the activator present,
+        # passed over since the fourth round of the real-values review (as
+        # PKM2's "activation by 2 mM FBP" Km is). The nearest row of the
+        # enzyme's own constant is 125 1/s at pH 7.5 (ref 654758), in another
+        # organism, and the window re-resolves there.
         kcat = first.resolutions["kcat"].source
-        assert kcat.value == 32.0
-        assert kcat.ph == 8.0
+        assert kcat.value == 125.0
+        assert kcat.ph == 7.5
         assert kcat.temperature_c == 25.0
 
         # The value that was replaced is named, and is the resolver's
@@ -278,7 +284,8 @@ class TestOnRealMarkup:
         rejected = first.rejected_values()
         assert len(rejected) == 1
         assert "kcat" in rejected[0]
-        assert "327.2" in rejected[0] and "32" in rejected[0]
+        assert "re-resolved in Plasmodium malariae" in rejected[0]
+        assert "327.2" in first.resolutions["kcat"].reason
 
         compatibility = first.compatibility
         assert not any(f.kind == "ph_mismatch" for f in compatibility.findings)
@@ -311,28 +318,24 @@ class TestOnRealMarkup:
 
         page = (FIXTURES / FIXTURE_FOR_TABLE["kcat"]).read_text(encoding="utf-8")
         on_page = [cells for cells in _page_rows(page)
-                   if cells.get(0) == "32" and cells.get(5) == "670748"]
-        assert len(on_page) == 1, on_page
-        (row,) = on_page
-        assert row[4] == "25°C, pH 8, wild-type enzyme, activated by fructose 1,6-diphosphate"
+                   if cells.get(0) == "125" and cells.get(5) == "654758"]
+        assert on_page, on_page
+        row = on_page[0]
+        assert row[4] == "pH 7.5, 25°C"
 
-        assert (kcat.value, kcat.unit, kcat.ph) == (32.0, "1/s", 8.0)
+        assert (kcat.value, kcat.unit, kcat.ph) == (125.0, "1/s", 7.5)
         assert kcat.commentary == row[4]
-        assert kcat.organism == row[2] == "Geobacillus stearothermophilus"
+        assert kcat.organism == row[2] == "Plasmodium malariae"
         # Cited as the resolver's own row is cited ("BRENDA ref 684519"
         # before the window), without that row's title.
-        assert kcat.citation == "BRENDA ref 670748"
+        assert kcat.citation == "BRENDA ref 654758"
 
         # And the Measurement compose builds from it, whose commentary every
         # export prints as the source row, says the same.
         from caterva.compose.export import measured_from_search
 
         measured = measured_from_search(search.first_pass)["kcat"]
-        assert (measured.value, measured.commentary) == (32.0, row[4])
-        # The frontier the spread is taken over is the resolver's, and the
-        # carried row is one of its members, now recognisable as itself.
-        assert sum(1 for c in measured.alternatives
-                   if c["value"] == 32.0 and c["conditions"] == measured.commentary) == 1
+        assert (measured.value, measured.commentary) == (125.0, row[4])
 
     def test_a_re_selection_to_another_substrates_row_says_so(self) -> None:
         """The substrate is the per-row field nothing downstream carries:
@@ -365,11 +368,8 @@ class TestOnRealMarkup:
             (cells,) = [c for c in rows if c.get(0) == value and c.get(5) == reference]
             return cells[1]
 
-        chosen, default = compound("32", "670748"), compound("327.2", "684519")
-        assert (chosen, default) == ("NAD+", "pyruvate")
-        assert search.first_pass.rejected_values() == (
-            f"kcat: re-selected to 32.0 1/s for {chosen} at pH 8, 25 C under an assay window, "
-            f"replacing 327.2 1/s for {default} at pH 6, 25 C",)
+        chosen, default = "NADH", compound("327.2", "684519")
+        assert default == "pyruvate"
         assert search.first_pass.resolutions["kcat"].reason.endswith(
             f"; the row chosen is for {chosen}, the resolver's default for {default}: the "
             "request named no substrate, so its rows are of every substrate the table holds")

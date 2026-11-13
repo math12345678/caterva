@@ -901,6 +901,21 @@ function buildUnresolvedKineticProvenance(
  * The provenance note: the choice Caterva made, then what the carried row is
  * (`rowNotes`), each said once. Undefined when there is neither.
  */
+/**
+ * The row's notes, with the isoform its scope names when no note says it:
+ * a Ki of CA IX beside CA II's Km and kcat had a note on the Km's
+ * provenance and none on the Ki's, the isoform only in the free-text flags
+ * (fourth round of the real-values review).
+ */
+function rowNotesWithIsoform(result: ScienceAgentResult): string[] {
+  const notes = [...(result.rowNotes ?? [])];
+  const isoform = result.rowScope?.isoform;
+  if (isoform && !notes.some((n) => n.includes(isoform))) {
+    notes.push(`the row measured isoform ${isoform}; for another isoform it is a different protein's constant`);
+  }
+  return notes;
+}
+
 function provenanceNote(chosen: string | undefined | null, rowNotes?: string[]): string | undefined {
   const parts = [chosen, ...(rowNotes ?? []).map((n) => `the row: ${n}`)].filter(
     (p): p is string => typeof p === "string" && p.length > 0,
@@ -1218,12 +1233,12 @@ async function applyKineticResolution(
         citationLocators: buildCitationLocators(agentResult.citation),
         ...(provenanceNote(
           chosenNote(key, [...(entities.choices ?? []), ...readChoices(agentResult.choices)]),
-          agentResult.rowNotes,
+          rowNotesWithIsoform(agentResult),
         )
           ? {
               note: provenanceNote(
                 chosenNote(key, [...(entities.choices ?? []), ...readChoices(agentResult.choices)]),
-                agentResult.rowNotes,
+                rowNotesWithIsoform(agentResult),
               ),
             }
           : {}),
@@ -2540,6 +2555,29 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
  * asked at all, sentenceReader.ts). Answering with another reader's reading
  * and not saying so is answering another question in silence.
  */
+export function readerUnavailableEntities(query: string, why: string): EntityExtraction {
+  // Compose's reader did not answer (under load it can take minutes), and
+  // the older reader then read "alcohol dehydrogenase from horse liver" as
+  // human ADH and returned a human Km, flagging "the query names no
+  // organism" (fourth round of the real-values review). A value looked up
+  // for another reader's reading is an answer to another question: nothing
+  // is looked up, and the query can be sent again.
+  const legacy = extractEntitiesFromQuery(query);
+  return {
+    enzymeName: legacy?.enzymeName ?? "the enzyme",
+    organism: legacy?.organism ?? "",
+    organismAssumed: false,
+    extractionRefusal: {
+      reason: "not_found",
+      note:
+        `Nothing was looked up: compose's sentence reader gave no reading (${why}), and ` +
+        "values looked up for another reader's reading of the query could be another " +
+        "organism's or another enzyme's. This is not a finding about the enzyme: send the " +
+        "query again (the reader reads BRENDA live, and can be slow under load).",
+    },
+  };
+}
+
 export function readerUnavailableFlag(why: string): string {
   return (
     `read: compose's sentence reader gave no reading (${why}), so this query was ` +
@@ -2598,7 +2636,24 @@ export function entitiesFromReading(
   reading: SentenceReading | null,
   query: string,
 ): EntityExtraction | undefined {
-  if (!reading?.ec) return undefined;
+  if (!reading?.ec) {
+    // Compose's reader read an enzyme name and refused it (a name several
+    // enzymes go by, an organism with no rows): that refusal is the answer.
+    // "phosphofructokinase from rabbit muscle" fell through to the older
+    // reader, which took "muscle" as the substrate and advised re-spelling
+    // it, while compose named the candidates and the organism as the
+    // blocker (fourth round of the real-values review).
+    if (reading?.refusal && reading.enzymeText) {
+      return {
+        enzymeName: reading.enzymeText,
+        organism: reading.organism ?? "",
+        organismAssumed: false,
+        readNotes: reading.notes,
+        extractionRefusal: { reason: "not_found" as const, note: reading.refusal },
+      };
+    }
+    return undefined;
+  }
   const organismRefusal = organismConflict(matchOrganisms(query));
   const blocked = reading.refusal
     ? { reason: "not_found" as const, note: reading.refusal }
@@ -3069,7 +3124,9 @@ export async function resolveQuery(
       : { reading: null, unavailable: null };
     const llmReading = llmOutcome.reading;
     if (llmOutcome.unavailable) flags.push(readerUnavailableFlag(llmOutcome.unavailable));
-    const llmEntities: EntityExtraction | undefined = entitiesFromReading(llmReading, query) ??
+    const llmEntities: EntityExtraction | undefined = (llmOutcome.unavailable
+      ? readerUnavailableEntities(query, llmOutcome.unavailable)
+      : entitiesFromReading(llmReading, query)) ??
       (llmResult.entities
       ? {
           ...llmResult.entities,
@@ -3454,7 +3511,9 @@ export async function resolveQuery(
 
   // If this looks like an enzyme query and no LLM is available, try the
   // hardcoded entity map and the science agent.
-  const fallbackEntities = entitiesFromReading(reading, query) ?? extractEntitiesFromQuery(query);
+  const fallbackEntities = outcome.unavailable
+    ? readerUnavailableEntities(query, outcome.unavailable)
+    : entitiesFromReading(reading, query) ?? extractEntitiesFromQuery(query);
   const resolvableForDomain = RESOLVABLE_FIELDS[best.domain] ?? [];
   const hasUnoverriddenKinetic = resolvableForDomain.some(
     (k) => !(k in effectiveOverrides),

@@ -101,8 +101,15 @@ from buffer_identity import BufferIdentity
 #: residue.
 _PRESENT_LEAD = (
     r"in\s+the\s+presence\s+of|in\s+presence\s+of|presence\s+of|"
-    r"activated\s+by|in\s+the\s+absence\s+of\s+added|with\s+added|with"
+    r"activated\s+by|activation\s+by|stimulated\s+by|stimulation\s+by|"
+    r"in\s+the\s+absence\s+of\s+added|with\s+added|with"
 )
+#: A lead that itself says the compound is an activator: "pH 8.0, 32°C,
+#: activation by 2 mM D-fructose-1,6-bisphosphate" (human PKM2, BRENDA ref
+#: 661215) is an apparent constant with the activator present, and was
+#: carried as pyruvate kinase's Km with FBP never mentioned (fourth round of
+#: the real-values review, 2026-11-12).
+_ACTIVATING_LEAD = re.compile(r"(?:activat|stimulat)\w*\s+by", re.IGNORECASE)
 _ABSENT_LEAD = r"in\s+the\s+absence\s+of|in\s+absence\s+of|absence\s+of|without"
 
 #: A compound phrase: letters, digits, commas, hyphens, plus signs.
@@ -272,7 +279,7 @@ def extract_effectors(commentary: str | None) -> list[Effector]:
             if joined.group("word").lower() == "or" and presence == "present":
                 presence = "unstated"
         for text, conc_text in parts:
-            role = None
+            role = "activator" if _ACTIVATING_LEAD.fullmatch(" ".join(m.group("lead").split())) else None
             named = _ROLE_RE.match(text)
             if named:
                 role = named.group("role").lower()

@@ -223,6 +223,41 @@ def isoforms_of_accessions(ec: Optional[str], cell: Optional[str]) -> tuple:
     return tuple(dict.fromkeys(labels[a] for a in found))
 
 
+def sole_protein(ec: Optional[str], organism: Optional[str]) -> Optional[str]:
+    """The gene symbol of the one protein the enzyme index files under `ec`
+    in `organism`, or None when it files none or several (or the index is
+    not importable).
+
+    "isoform CELA1, at pH 8.0 and 22°C" (pig pancreatic elastase, ref
+    754151) names CELA1, the only pig protein of EC 3.4.21.36: the row is
+    the enzyme, not an isozyme of it, and was withheld as "a named isozyme"
+    while 4-nitrophenyl acetate's esterase rows were modelled (fourth round
+    of the real-values review)."""
+    if not ec or not organism:
+        return None
+    try:
+        from caterva.enzymes.index import load_index, organism_code
+    except ImportError:  # pragma: no cover - the flat layout
+        return None
+    code = organism_code(organism)
+    entry = load_index().get(ec) if code else None
+    proteins = (entry.proteins.get(code, ()) if entry else ())
+    return proteins[0].symbol if len(proteins) == 1 else None
+
+
+def is_sole_protein(ec: Optional[str], organism: Optional[str], reading: Optional[str]) -> bool:
+    """Whether an isoform `reading` names the only protein of `ec` in
+    `organism` (`sole_protein`), by the isoform reader's comparison."""
+    sole = sole_protein(ec, organism)
+    if not (sole and reading):
+        return False
+    try:
+        from caterva.bind.core import same_isoform
+    except ImportError:  # pragma: no cover
+        return False
+    return same_isoform(reading, sole)
+
+
 def proteins_in_organism_of(ec: Optional[str], cell: Optional[str]) -> int:
     """How many proteins the index files under `ec` in the organism of the
     row's first accession: a row naming GCK is worth naming when the EC is

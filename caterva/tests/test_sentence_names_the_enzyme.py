@@ -31,10 +31,11 @@ from studio_kinetics_offline import context, hexokinase_offline, run_cli
 
 FLAGS = ["--no-simulate", "--no-analysis", "--no-ranking"]
 #: The flags' answer on the recorded page: a Km and a kcat from one paper,
-#: ref 739603, the one paper holding a row of each among the rows chosen
+#: HK-I's Km (ref 640237) and glucokinase's kcat (ref 703624) since the fourth
+#: round of the real-values review; before, ref 739603, the one paper holding a row of each among the rows chosen
 #: from (fallback_logic.resolve_kinetic_pair, ADR 0182).
-KM_ROW = "| `reaction_Km` | 6.3 mM | literature (Homo sapiens) | BRENDA ref 739603 |"
-KCAT_ROW = "| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |"
+KM_ROW = "| `reaction_Km` | 0.06 mM | literature (Homo sapiens) | BRENDA ref 640237 |"
+KCAT_ROW = "| `reaction_kcat` | 60.4 1/s | literature (Homo sapiens) | BRENDA ref 703624 |"
 
 
 def _main(argv):
@@ -344,14 +345,14 @@ def test_the_studio_reads_the_sentence_the_way_the_terminal_does(tmp_path):
     assert outcome.exit_code == 0
     assert KM_ROW in outcome.result["report_markdown"]
     km = next(p for p in outcome.result["model"]["parameters"] if p["id"] == "reaction_Km")
-    assert km["value"] == 6.3 and km["provenance"]["citation"]["reference_id"] == "739603"
+    assert km["value"] == 0.06 and km["provenance"]["citation"]["reference_id"] == "640237"
 
 
 def test_the_export_carries_the_values_the_report_carries():
     with hexokinase_offline():
         code, out, err = _main(["hexokinase glucose human", "--export", "csv"])
     assert code == 0, err
-    assert "reaction_Km" in out and "739603" in out
+    assert "reaction_Km" in out and "640237" in out
 
 
 def test_antimony_compiles_the_shape_the_report_shows_with_the_values_it_carries():
@@ -361,9 +362,9 @@ def test_antimony_compiles_the_shape_the_report_shows_with_the_values_it_carries
     with hexokinase_offline():
         code, out, _ = _main(["hexokinase glucose human", "--antimony"])
     assert code == 0 and "reaction_Km" in out
-    assert "#   reaction_Km = 6.3 mM: BRENDA ref 739603 (Homo sapiens)" in out
-    assert "#   reaction_kcat = 40.1 1/s: BRENDA ref 739603 (Homo sapiens)" in out
-    assert "  reaction_Km = 6.3;" in out and "  reaction_kcat = 40.1;" in out, \
+    assert "#   reaction_Km = 0.06 mM: BRENDA ref 640237 (Homo sapiens)" in out
+    assert "#   reaction_kcat = 60.4 1/s: BRENDA ref 703624 (Homo sapiens)" in out
+    assert "  reaction_Km = 0.06;" in out and "  reaction_kcat = 60.4;" in out, \
         "the compiled source carries the measured values, not the library's 0.1 and 100"
 
 

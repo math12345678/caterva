@@ -3447,6 +3447,46 @@
   {
    "organisms": {
     "HUMAN": {
+     "accession": "P20839",
+     "ecs": [
+      "1.1.1.205"
+     ],
+     "name": "Inosine-5'-monophosphate dehydrogenase 1"
+    },
+    "MOUSE": {
+     "accession": "P50096",
+     "ecs": [
+      "1.1.1.205"
+     ],
+     "name": "Inosine-5'-monophosphate dehydrogenase 1"
+    }
+   },
+   "source": "UniProtKB P20839 (IMDH1_HUMAN), P50096 (IMDH1_MOUSE)",
+   "symbol": "IMPDH1"
+  },
+  {
+   "organisms": {
+    "HUMAN": {
+     "accession": "P12268",
+     "ecs": [
+      "1.1.1.205"
+     ],
+     "name": "Inosine-5'-monophosphate dehydrogenase 2"
+    },
+    "MOUSE": {
+     "accession": "P24547",
+     "ecs": [
+      "1.1.1.205"
+     ],
+     "name": "Inosine-5'-monophosphate dehydrogenase 2"
+    }
+   },
+   "source": "UniProtKB P12268 (IMDH2_HUMAN), P24547 (IMDH2_MOUSE)",
+   "symbol": "IMPDH2"
+  },
+  {
+   "organisms": {
+    "HUMAN": {
      "accession": "O60674",
      "ecs": [
       "2.7.10.2"

@@ -157,7 +157,7 @@ import csv
 import io
 import re
 from dataclasses import dataclass, replace
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from xml.sax.saxutils import escape
 
 try:
@@ -298,6 +298,11 @@ class Spread:
     chosen_because: Optional[str] = None
     #: The resolver's own reason for the row (`Measurement.resolver_because`).
     resolver_because: Optional[str] = None
+    #: When the rows split into two forms of the enzyme their commentary
+    #: names ("membrane-bound form" and "soluble enzyme" for rat COMT), the
+    #: two labels and each form's span: the spread is the two forms, not
+    #: papers disagreeing about one (fourth round of the review).
+    forms: Optional[Tuple[Tuple[str, float, float], ...]] = None
 
     @property
     def carried_as(self) -> str:
@@ -327,10 +332,18 @@ class Spread:
             return f"one source (BRENDA ref {self.references[0]}) reports {self.n_values} values"
         distinct = " distinct" if self.n_values < len(self.references) else ""
         return (f"{len(self.references) or 'several'} sources report {self.n_values}{distinct} values"
-                + (f" (BRENDA ref {', '.join(self.references)})" if self.references else ""))
+                + (f" (BRENDA ref {', '.join(self.references)})" if self.references else "")
+                + " among the rows the resolver ranked for this protein (rows naming another "
+                  "isoform left out)")
 
     @property
     def why(self) -> str:
+        if self.forms:
+            parts = "; ".join(f"{label}: {lo:g} to {hi:g} {self.unit}" if lo != hi
+                              else f"{label}: {lo:g} {self.unit}" for label, lo, hi in self.forms)
+            return (f"the rows measured two forms of the enzyme ({parts}), so the spread is the "
+                    "difference between the forms, not papers disagreeing about one; read which "
+                    "form the carried row is before relying on it")
         if self.one_source:
             return ("two rows from one publication usually differ in the conditions or the "
                     "exact substrate, so read that paper before choosing")
@@ -341,6 +354,36 @@ class Spread:
                 f"({self.fold:.3g}-fold); this model carries {self.carried:g}, "
                 f"{self.carried_as}; {self.why}. The range is not an uncertainty estimate: "
                 f"it is bounded by which rows are in the database")
+
+
+#: Two forms of one enzyme a commentary names, as (label, pattern).
+_FORMS = (("membrane-bound form", re.compile(r"\bmembrane[- ]bound\b|\bMB-\w+", re.IGNORECASE)),
+          ("soluble form", re.compile(r"\bsoluble (?:form|enzyme)\b|\bS-COMT\b", re.IGNORECASE)))
+
+
+def _two_forms(rows: Sequence[Any]) -> Optional[Tuple[Tuple[str, float, float], ...]]:
+    """Each form's (label, low, high) when the rows name both forms and
+    their values do not overlap; None otherwise."""
+    spans = []
+    for label, pattern in _FORMS:
+        values = []
+        for row in rows:
+            get = row.get if isinstance(row, dict) else (lambda k, r=row: getattr(r, k, None))
+            text, value = get("conditions") or "", get("value")
+            if value is not None and pattern.search(text) and not any(
+                    p.search(text) for other, p in _FORMS if other != label):
+                values.append(float(value))
+        if not values:
+            return None
+        spans.append((label, min(values), max(values)))
+    (_, a_lo, a_hi), (_, b_lo, b_hi) = spans
+    return tuple(spans) if a_hi < b_lo or b_hi < a_lo else None
+
+
+def _mutations(text: Optional[str]) -> frozenset:
+    """The point substitutions a commentary names ("mutant enzyme R132H")."""
+    return frozenset(m.upper() for m in re.findall(
+        r"(?<![A-Za-z0-9])[A-Z]\d{1,4}[A-Z](?![A-Za-z0-9])", text or ""))
 
 
 @dataclass(frozen=True)
@@ -440,21 +483,43 @@ class Measurement:
         naming another isoform is another protein's value, not a disagreement
         about this one. Carbonic anhydrase II's kcat 1.4e6 1/s was reported as
         a 108-fold disagreement with CA III's 13000 (third round's review)."""
+        rows = tuple(self.alternatives)
+        # A mutant's constant is compared with that mutant's rows only:
+        # "IDH1 R132H" printed a 400-fold spread built from wild-type and
+        # other mutants' rows as a question about the papers (fourth round).
+        variant = _mutations(self.commentary)
+        if variant:
+            rows = tuple(r for r in rows if _mutations(
+                r.get("conditions") if isinstance(r, dict) else getattr(r, "conditions", None))
+                == variant)
         mine = self.row_isoform
         if not mine:
-            return tuple(self.alternatives)
+            return rows
         try:
             from caterva.bind.core import same_isoform
         except ImportError:  # pragma: no cover - caterva is importable here
             return tuple(self.alternatives)
+        try:
+            from caterva.bind.core import read_isoform
+            named_itself = bool(read_isoform(self.commentary or ""))
+        except ImportError:  # pragma: no cover
+            named_itself = False
         kept = []
-        for row in self.alternatives:
+        for row in rows:
             get = row.get if isinstance(row, dict) else (lambda k, r=row: getattr(r, k, None))
             # Only a row that names its isoform itself, in its words or its
             # own UniProt cell, is set aside: a reading from its paper's
             # other entries is a weaker guess than a spread can rest on.
             own = get("isoform_own")
             if own and own != mine and not same_isoform(own, mine):
+                continue
+            # A row naming none whose paper's other entries name only another
+            # protein is that protein's too: human HK2's Km spread was built
+            # from refs 641067 and 641068, glucokinase papers (3.8 and 6 mM),
+            # and called a disagreement about HK2 (fourth round's review).
+            paper = get("isoform")
+            if not own and paper and paper != mine and " and " not in paper and named_itself \
+                    and not same_isoform(paper, mine):
                 continue
             kept.append(row)
         return tuple(kept)
@@ -489,7 +554,8 @@ class Measurement:
         return Spread(low=span[0], high=span[1], unit=self.unit, carried=float(self.value),
                       n_values=max(len(values), 2), references=references,
                       chosen_because=self.chosen_because,
-                      resolver_because=self.resolver_because)
+                      resolver_because=self.resolver_because,
+                      forms=_two_forms(rows))
 
     def __post_init__(self) -> None:
         if not str(self.citation).strip():

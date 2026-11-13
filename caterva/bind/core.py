@@ -308,7 +308,7 @@ def _hyphen_code_reading(m: "re.Match") -> Optional[str]:
 #   isoforms; a request "2B6" is CYP2B6.
 _CA_NUMERAL = r"(?:XVI|XV|XIV|XIII|XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)"
 _CA_NAME = re.compile(
-    r"(?<![\w-])[hb]?(?:CA|[Cc]arbonic anhydrase)"
+    r"(?<![\w-])[hbH]?(?:CA|[Cc]arbonic anhydrase)"
     rf"(?:[ -]?(?P<roman>{_CA_NUMERAL})(?P<sub>[a-c])?|[ -]?(?P<num>\d{{1,2}})(?P<nsub>[a-c])?)"
     r"(?![\w-])"
 )
@@ -395,8 +395,19 @@ def _cyp_reading(m: "re.Match") -> Optional[str]:
 _PROTEIN_SYMBOL = re.compile(
     r"(?<![\w-])(?:(?P<shp>SHP|Shp)-?(?P<shpn>[12])|(?P<tyr>Csk|Chk|Lck|Fyn|Lyn|Hck|Btk|Syk"
     r"|(?:c-|v-)?Src|(?:c-|v-)?Abl|Bcr-Abl)|GST(?P<gstc>[akmoptzAKMOPTZ])(?P<gstn>\d)?(?:-\d)?"
-    r"|(?P<ace>[ts]ACE))(?![\w-])"
+    r"|(?P<ace>[ts]ACE)"
+    # The receptor and non-receptor PTPs BRENDA's EC 3.1.3.48 commentary
+    # names by Greek letter or trivial name: "wild-type PTPalpha" (ref
+    # 665502) was counted among PTP1B's rows (fourth round's review).
+    r"|R?PTP[- ]?(?P<ptpgreek>alpha|beta|gamma|delta|epsilon|zeta|kappa|mu|rho|sigma|α|β|γ|δ|ε|ζ|κ|μ|ρ|σ)"
+    r"|(?P<ptpname>TC-?PTP|LAR|CD45|HePTP|PTP-?PEST|PTP1B))(?![\w-])"
 )
+_PTP_GREEK = {"alpha": "PTPRA", "α": "PTPRA", "beta": "PTPRB", "β": "PTPRB", "gamma": "PTPRG",
+              "γ": "PTPRG", "delta": "PTPRD", "δ": "PTPRD", "epsilon": "PTPRE", "ε": "PTPRE",
+              "zeta": "PTPRZ1", "ζ": "PTPRZ1", "kappa": "PTPRK", "κ": "PTPRK", "mu": "PTPRM",
+              "μ": "PTPRM", "rho": "PTPRT", "ρ": "PTPRT", "sigma": "PTPRS", "σ": "PTPRS"}
+_PTP_NAME = {"TCPTP": "PTPN2", "TC-PTP": "PTPN2", "LAR": "PTPRF", "CD45": "PTPRC",
+             "HePTP": "PTPN7", "PTPPEST": "PTPN12", "PTP-PEST": "PTPN12", "PTP1B": "PTPN1"}
 _GST_CLASS = {"a": "GSTA", "k": "GSTK", "m": "GSTM", "o": "GSTO", "p": "GSTP", "t": "GSTT",
               "z": "GSTZ"}
 
@@ -409,10 +420,55 @@ def _protein_symbol_reading(m: "re.Match") -> Optional[str]:
         return symbol if symbol.startswith("Bcr") else re.sub(r"^[cv]-", "", symbol)
     if m.group("gstc"):
         return f"{_GST_CLASS[m.group('gstc').lower()]}{m.group('gstn') or '1'}"
+    if m.group("ptpgreek"):
+        return _PTP_GREEK[m.group("ptpgreek")]
+    if m.group("ptpname"):
+        return _PTP_NAME.get(m.group("ptpname"), m.group("ptpname"))
     if m.group("ace"):
         return {"t": "testis ACE (tACE: the one-domain germinal form, C-domain only, not "
                      "somatic two-domain ACE)",
                 "s": "somatic ACE (sACE, two-domain)"}[m.group("ace")[0]]
+    return None
+
+
+# -- An isoform named by what distinguishes it (fourth round, 2026-11-12) ----
+#
+# Mouse NOS's L-NMMA Ki rows say "inducible isoform from macrophage", and the
+# nitro-arginine row "inducible macrophage isoform": NOS2, by the one word
+# that tells it from NOS1 and NOS3. Read as "inducible isoform", and that
+# reading is the same isoform as a request only for the proteins the word
+# distinguishes (`_DESCRIBED_AS`): "inducible" is NOS2, COX-2 (PTGS2) and
+# HO-1 (HMOX1), each the inducible member of its family, and never NOS1 or
+# PTGS1. iNOS, nNOS and eNOS are read as the gene symbols they abbreviate.
+_DESCRIBED = re.compile(
+    r"(?<![\w-])(?P<word>inducible|neuronal|endothelial)\s+(?:(?:macrophage|brain|cytokine-induced)\s+)?"
+    r"(?:isoform|isozyme|isoenzyme|NOS\b|nitric oxide synthase)",
+    re.IGNORECASE)
+_NOS_ABBREVIATION = re.compile(r"(?<![\w-])(?P<kind>[ine])NOS(?![\w-])")
+_DESCRIBED_AS = {"inducible": ("NOS2", "PTGS2", "HMOX1"), "neuronal": ("NOS1",),
+                 "endothelial": ("NOS3",)}
+
+
+def _described_reading(m: "re.Match") -> Optional[str]:
+    return f"{m.group('word').lower()} isoform"
+
+
+def _nos_reading(m: "re.Match") -> Optional[str]:
+    return {"i": "NOS2", "n": "NOS1", "e": "NOS3"}[m.group("kind")]
+
+
+#: Carbonic anhydrase I and II by their old names: "low activity carbonic
+#: anhydrase" (CA I, the B form) and "high activity" (CA II, the C form).
+#: Human CA II's Km spread for CO2 held ref 33547's two "low activity
+#: carbonic anhydrase" rows as rows naming no isoform (fourth round).
+_CA_ACTIVITY = re.compile(
+    r"(?<![\w-])(?P<level>low|high)[- ]activity (?:carbonic anhydrase|isozyme|isoenzyme|form)",
+    re.IGNORECASE)
+
+
+def _ca_activity_reading(m: "re.Match") -> Optional[str]:
+    if m.group(0).lower().endswith("carbonic anhydrase") or "anhydrase" in m.string.lower():
+        return "CA-I" if m.group("level").lower() == "low" else "CA-II"
     return None
 
 
@@ -428,6 +484,9 @@ _FORMS = (
     (_CYP, _cyp_reading),
     (_HYPHEN_CODE, _hyphen_code_reading),
     (_PROTEIN_SYMBOL, _protein_symbol_reading),
+    (_NOS_ABBREVIATION, _nos_reading),
+    (_CA_ACTIVITY, _ca_activity_reading),
+    (_DESCRIBED, _described_reading),
 )
 #: "... and" before a second name: "isozymes LDH-A and LDH-B".
 _AND_ANOTHER = re.compile(r"\s+and\s+(?:(?:isozyme|isoenzyme|isoform)\s+)?")
@@ -587,6 +646,12 @@ def same_isoform(a: Optional[str], b: Optional[str]) -> bool:
     server's rowScopeFlags mirrors."""
     if not a or not b:
         return False
+    described = [x for x in (a, b) if re.fullmatch(r"(inducible|neuronal|endothelial) isoform", x.strip())]
+    if described:
+        if len(described) == 2:
+            return a.strip() == b.strip()
+        other = b if described[0] is a else a
+        return any(same_isoform(name, other) for name in _DESCRIBED_AS[described[0].split()[0]])
     left, right = _compared_as(a.strip()), _compared_as(b.strip())
     return any(_one(x, y) for x in left for y in right)
 

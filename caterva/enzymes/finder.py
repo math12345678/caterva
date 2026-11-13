@@ -1006,7 +1006,101 @@ def resolve(
             return Resolved(ec=ec, how=how, candidate=head, cautions=_cautions(index, head, ranked),
                             notes=(f"Read {text!r} as {name} (spelling); pass --subject with an EC number "
                                    "if you meant another enzyme.",))
+    sibling = _qualified_sibling(result, text, code, index)
+    if sibling is not None:
+        return sibling
+    if isinstance(result, Ambiguous):
+        prefixed = _cofactor_prefixed(text, code, index)
+        if prefixed is not None:
+            return prefixed
     return result
+
+
+def _unqualified(name: str) -> str:
+    """A name with a trailing cofactor qualifier set aside: "isocitrate
+    dehydrogenase (NADP(+))" is "isocitrate dehydrogenase"."""
+    return strict_key(re.sub(r"\s*(?:\[[^\]]*\]|\((?:[^()]|\([^()]*\))*\))\s*$", "", name))
+
+
+_COFACTOR_FIRST = re.compile(r"^(NADP|NAD|NADPH|NADH|NAD\(P\))\+?[- ](?:dependent[- ]|specific[- ]|linked[- ])?(.+)$",
+                             re.IGNORECASE)
+
+
+def _cofactor_prefixed(text: str, code: Optional[str], index: EnzymeIndex) -> Optional[Resolved]:
+    """"NADP-isocitrate dehydrogenase" as the one enzyme of that name whose
+    qualifier is that cofactor: EC 1.1.1.42 (isocitrate dehydrogenase
+    (NADP(+))). The cofactor was read as part of a substrate and the
+    sentence refused as naming no enzyme (fourth round of the review)."""
+    m = _COFACTOR_FIRST.match(text)
+    if not m:
+        return None
+    cofactor = m.group(1).upper().replace("H", "")
+    base = strict_key(m.group(2))
+    ranked = _search(m.group(2), code, index)
+
+    def qualified_by(name: str) -> bool:
+        tail = name[len(re.sub(r"\s*(?:\[[^\]]*\]|\((?:[^()]|\([^()]*\))*\))\s*$", "", name)):]
+        low = tail.upper()
+        if cofactor == "NAD(P)":
+            return "NAD(P)" in low
+        if cofactor == "NADP":
+            return "NADP" in low and "NAD(P)" not in low
+        return "NAD" in low and "NADP" not in low and "NAD(P)" not in low
+
+    matching = [c for c in ranked if _unqualified(c.name) == base and qualified_by(c.name)
+                and c.status == ACTIVE]
+    if len(matching) != 1:
+        return None
+    chosen = matching[0]
+    how = (f"{text!r} names the cofactor first: EC {chosen.ec} ({chosen.name}) is the one enzyme of "
+           f"that name whose stated cofactor it is")
+    # The accepted name with its qualifier written as a prefix: read as
+    # that name, tolerantly (not a phrase inside a longer name).
+    head = Candidate(**{**chosen.__dict__, "why": how, "partial": False,
+                        "tier": TIER_ACCEPTED_EXACT})
+    return Resolved(ec=chosen.ec, how=how, candidate=head, cautions=_cautions(index, head, ranked))
+
+
+def _qualified_sibling(result: Resolution, text: str, code: Optional[str],
+                       index: EnzymeIndex) -> Optional[Resolved]:
+    """The enzyme a name read as one EC number with no protein in the
+    organism means, when exactly one other EC number of the same name with a
+    cofactor qualifier ("glutamate dehydrogenase [NAD(P)(+)]") has one.
+
+    "glutamate dehydrogenase from bovine liver" was read as EC 1.4.1.2,
+    NAD-specific and with no cow protein, beside a caution naming EC
+    1.4.1.3, bovine liver GDH (DHE3); the typed 2-oxoglutarate was then
+    dropped (fourth round of the real-values review)."""
+    if not isinstance(result, Resolved) or not code or read_ec(text) is not None:
+        return None
+    chosen = result.candidate
+    if chosen is None or chosen.has_organism_protein:
+        return None
+    base = strict_key(chosen.name)
+
+    def unqualified(name: str) -> str:
+        return strict_key(re.sub(r"\s*(?:\[[^\]]*\]|\((?:[^()]|\([^()]*\))*\))\s*$", "", name))
+
+    ranked = _search(text, code, index)
+    # A cofactor qualifier only ("[NAD(P)(+)]", "(NADP(+))"): "L-lactate
+    # dehydrogenase (cytochrome)" is another enzyme with another acceptor.
+    siblings = [c for c in ranked if c.ec != chosen.ec and unqualified(c.name) == base
+                and c.via == "name" and c.tier != TIER_TYPO
+                and re.search(r"NAD", c.name[len(base):] if c.name.lower().startswith(base) else c.name)]
+    with_protein = [c for c in siblings if c.has_organism_protein]
+    if len(with_protein) != 1:
+        return None
+    other = with_protein[0]
+    label = organism_label(code)
+    proteins = ", ".join(p.label for p in other.organism_proteins[:4])
+    how = (f"{text!r} is the name of EC {chosen.ec} ({chosen.name}), which lists no {label} protein in "
+           f"the nomenclature; EC {other.ec} ({other.name}), the same name with its cofactor stated, "
+           f"lists {label} {proteins}, so it is the enzyme of the organism named")
+    head = Candidate(**{**other.__dict__, "why": how})
+    return Resolved(ec=other.ec, how=how, candidate=head, cautions=(),
+                    notes=(f"Read {text!r} as EC {other.ec} ({other.name}), not EC {chosen.ec}: only "
+                           f"the former lists a {label} protein ({proteins}); pass --subject {chosen.ec} "
+                           "to model the other.",))
 
 
 def _closest_listed_name(text: str, ec: str, index: EnzymeIndex) -> Optional[str]:
@@ -1357,8 +1451,11 @@ def _resolve(
         many = len(tied) > 1
         return Ambiguous(
             query=text, candidates=tuple(ranked), recommended=None, confirm_only=True,
-            reason=(f"{text!r} is an abbreviation or symbol, not an enzyme name, and Caterva does not resolve "
-                    "one by itself" + (f"; {len(tied)} enzymes go by it" if many else "")),
+            reason=((f"{text!r} is a name {len(tied)} enzymes go by (a short form of each one's name), "
+                     "and Caterva does not choose between them by itself"
+                     if many and " " in text else
+                     f"{text!r} is an abbreviation or symbol, not an enzyme name, and Caterva does not "
+                     "resolve one by itself" + (f"; {len(tied)} enzymes go by it" if many else ""))),
             organism=code, release=release)
     if only is not None and only.partial:
         if only.tier == TIER_SYMBOL:

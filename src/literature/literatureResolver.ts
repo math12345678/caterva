@@ -922,8 +922,14 @@ function scriptPath(): string {
   return process.env['CATERVA_LITERATURE_RUNNER'] || DEFAULT_SCRIPT_PATH;
 }
 
-/** BRENDA and PubMed are network calls; this is generous but finite. */
-const RESOLVER_TIMEOUT_MS = 120_000;
+/**
+ * BRENDA and PubMed are network calls; this is generous but finite. A cold
+ * BRENDA page under load took 170-970 s in the fourth round of the
+ * real-values review, and with compose, Studio and the API running at once
+ * 10 of 12 CLI runs ended at the old 120 s with nothing learned, while
+ * compose resolved the same queries.
+ */
+const RESOLVER_TIMEOUT_MS = 600_000;
 
 /** Raised when the resolver could not be run at all. Deliberately distinct
  *  from `found: false`: "the registry says no" and "we never asked" are
@@ -1136,7 +1142,8 @@ export async function resolveKinetic(
       finish(() =>
         reject(
           new ResolverUnavailableError(
-            `Literature resolver exceeded ${RESOLVER_TIMEOUT_MS}ms`
+            `Literature resolver exceeded ${RESOLVER_TIMEOUT_MS / 1000} s (BRENDA did not ` +
+              `answer in time; this is not a finding about the enzyme, and a retry may succeed)`
           )
         )
       );

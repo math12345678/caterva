@@ -434,11 +434,11 @@ class TestAKmAndAKcatComeFromOnePaperWhenOneHasBoth:
         assert (alone_kcat.value, alone_kcat.citation.reference_id) == (60.4, "703624")
         assert alone_km.wide_spread is True  # hexokinase I and IV share the pool
         km, kcat = resolve_kinetic_pair("2.7.1.1", "Homo sapiens", "D-glucose", **kw)
-        assert km.row_isoform == kcat.row_isoform == "GCK"
-        assert km.value == 6.3 and km.citation.reference_id == "739603"
-        assert any("K0.5 with a Hill coefficient of 1.8" in n for n in km.row_notes)
-        assert "the Km was taken from rows naming GCK" in km.chosen_because
-        assert "(the Km chosen alone, 0.06 mM, measured HK-I)" in km.chosen_because
+        # Fourth round: HK-I's Michaelis-Menten Km is not traded for
+        # glucokinase's K0.5; the two isozymes' constants are combined, said.
+        assert (km.row_isoform, kcat.row_isoform) == ("HK-I", "GCK")
+        assert km.value == 0.06 and km.citation.reference_id == "640237"
+        assert "the Km's row measured HK-I and the kcat's row GCK" in km.chosen_because
         assert any("(P35557) is GCK" in n for n in kcat.row_notes)
 
 

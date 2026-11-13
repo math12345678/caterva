@@ -137,6 +137,11 @@ class IsozymeNotice:
     #: belong to any of them" (third round's review: human hexokinase's rows
     #: all named GCK).
     measured_as: Optional[str] = None
+    #: An isozyme a cited row names, offered as the example in the remedy
+    #: before the first listed symbol: "for example --isoform HKDC1" led to a
+    #: D-mannose model with a placeholder kcat, while the Km's row measured
+    #: HK-I (fourth round of the real-values review).
+    suggest: Optional[str] = None
 
     @property
     def broad(self) -> bool:
@@ -243,8 +248,22 @@ class IsozymeNotice:
 
     @property
     def remedy(self) -> str:
-        """What to do, for the verdict's next step."""
-        first = self.symbols[0] if self.symbols else "its name"
+        """What to do, for the verdict's next step. The example is an
+        isozyme a cited row names, else the first listed name; with no name
+        to give, the remedy says so rather than printing a placeholder
+        ("for example --isoform its name", horse liver ADH)."""
+        first = self.suggest or (self.symbols[0] if self.symbols else None)
+        if self.measured_as and not self.isoform:
+            # Neprilysin: every cited row names MME, and "Do this next" offered
+            # --isoform MMEL1, another protein (fourth round's review).
+            return (f"the model is of {self.measured_as}, the protein every cited row names: pass "
+                    f"--isoform {self.measured_as} to keep each constant to rows naming it, or another "
+                    "protein's name only to model that protein instead")
+        if first is None and not self.isoform:
+            return ("pass --isoform with the name the rows' own commentary gives the isozyme you mean "
+                    f"(the enzyme nomenclature gives these {self.count} proteins no names --isoform can "
+                    "match here), or --subject with another EC number; a constant whose rows name none "
+                    "is kept and flagged")
         if self.isoform:
             return ("look for a measurement that states the isozyme, or treat that constant as possibly "
                     "another isozyme's: --isoform takes a constant from a row that names the isozyme, and "
@@ -316,9 +335,37 @@ def describe_isoform(ec: Optional[str], organism: Optional[str], label: Optional
                 f"{protein.entry_name} (UniProt {protein.accession}); a row is taken as measuring it when its "
                 f"commentary names it as any of: {_named([n for n in names if len(n) <= 40][:8])}")
     shown = _named(found.symbols) if not found.count > BROAD_CLASS else f"{found.count} proteins"
+    elsewhere = _symbol_elsewhere(label)
+    if elsewhere:
+        # CYP2B6 (P20813) is a human gene symbol the enzyme nomenclature
+        # files under another EC number than the one BRENDA keeps its
+        # kinetics under: the report read it as P20813 and then said it is
+        # "not a gene symbol" (fourth round of the real-values review).
+        return (f"--isoform {label!r} is the gene symbol of UniProtKB {elsewhere}, which the enzyme "
+                f"nomenclature files under another EC number than {ec}, so it is not among the "
+                f"{organism_precise(found.organism)} proteins listed for EC {ec} ({shown}); rows are "
+                "compared with it by name and by their own UniProt cell, and a row that states it in "
+                "other words will not match")
     return (f"--isoform {label!r} is not a gene symbol or name the enzyme nomenclature's UniProt entries give "
             f"any of the {organism_precise(found.organism)} proteins of EC {ec} ({shown}), so rows are compared "
             "with it as spelled and a row that states the isozyme in other words will not match")
+
+
+def _symbol_elsewhere(label: str) -> Optional[str]:
+    """The UniProt accession the gene-symbol table gives `label`, or None."""
+    try:
+        from caterva.enzymes.symbols import load_symbols
+
+        hits = load_symbols().lookup(label, "HUMAN")
+    except Exception:  # noqa: BLE001
+        return None
+    for hit in hits:
+        if getattr(hit, "accession", None):
+            return hit.accession
+        found = re.search(r"UniProtKB ([A-Z0-9]{6,10})", getattr(hit, "source", "") or "")
+        if found:
+            return found.group(1)
+    return None
 
 
 def _states(commentary: Optional[str], isoform: str) -> bool:
@@ -340,6 +387,18 @@ def _states_by_accession(measurement: Any, isoform: str) -> bool:
     except ImportError:  # pragma: no cover - flat layout
         return False
     return bool(same_isoform(named, isoform))
+
+
+def _listable(notice: IsozymeNotice, reading: str) -> Optional[str]:
+    """The listed symbol a row's reading names (so it can be offered to
+    --isoform), the reading itself when there is no list, or None."""
+    if not notice.symbols:
+        return reading
+    try:
+        from caterva.bind.core import same_isoform
+    except ImportError:  # pragma: no cover
+        return None
+    return next((symbol for symbol in notice.symbols if same_isoform(reading, symbol)), None)
 
 
 def notice_for_model(model: Any) -> Optional[IsozymeNotice]:
@@ -364,6 +423,13 @@ def notice_for_model(model: Any) -> Optional[IsozymeNotice]:
     if notice is None or isoform:
         return notice
     readings = [getattr(m, "row_isoform", None) for m in measured.values()]
+    ordered = [getattr(measured[k], "row_isoform", None) for k in sorted(
+        measured, key=lambda k: (0 if "Km" in str(k) else 1 if "kcat" in str(k) else 2, str(k)))]
+    suggest = next((found for r in ordered if isinstance(r, str) and r
+                    for found in [_listable(notice, r)] if found), None)
+    if suggest:
+        from dataclasses import replace as _replace
+        notice = _replace(notice, suggest=suggest)
     if readings and all(isinstance(r, str) and r for r in readings):
         try:
             from caterva.bind.core import same_isoform

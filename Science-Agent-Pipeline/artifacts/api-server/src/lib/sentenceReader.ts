@@ -66,8 +66,13 @@ export interface SentenceReading {
 const _dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = findRepositoryRoot(_dirname);
 
-/** BRENDA is read live for the choices: 5-30 s is usual. */
-const READER_TIMEOUT_MS = 120_000;
+/**
+ * BRENDA is read live for the choices: 5-30 s is usual, and minutes under
+ * load (170-970 s were seen with compose, Studio and the API running at
+ * once). A reading that times out is refused, never replaced by the older
+ * reader's (readerUnavailableEntities), so the wait is long.
+ */
+const READER_TIMEOUT_MS = 600_000;
 
 const text = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value : null;

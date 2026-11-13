@@ -26,7 +26,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { matchEnzyme } from "../lib/enzymes";
-import { resolveQuery } from "../lib/queryResolver";
+import { entitiesFromReading, readerUnavailableEntities, resolveQuery } from "../lib/queryResolver";
 import { resolveKineticValue } from "../lib/scienceAgent";
 import { parseReading } from "../lib/sentenceReader";
 
@@ -176,6 +176,35 @@ describe("the older reader, used when compose's is unavailable", () => {
     await flagsOf("acetylcholinesterase inhibited by donepezil in human");
     const km2 = sent().filter((c) => c.quantity === "km").pop();
     expect(km2!.substrate ?? "").not.toMatch(/donepezil|inhibited/i);
+  });
+});
+
+describe("a reading compose gave as a refusal, or did not give", () => {
+  // Fourth round of the real-values review: under load compose's reader
+  // timed out, and the older reader answered "alcohol dehydrogenase from
+  // horse liver" with a HUMAN Km, saying the query named no organism; and
+  // compose's refusal of "phosphofructokinase from rabbit muscle" was
+  // replaced by the older reader's "No KM was found for muscle".
+  it("refuses, naming the reader's silence, instead of reading the query another way", () => {
+    const e = readerUnavailableEntities(
+      "alcohol dehydrogenase from horse liver with ethanol",
+      "it did not answer within 600 s",
+    );
+    expect(e.extractionRefusal?.reason).toBe("not_found");
+    expect(e.extractionRefusal?.note).toMatch(/Nothing was looked up/);
+    expect(e.extractionRefusal?.note).toMatch(/send the query again/);
+  });
+
+  it("carries compose's refusal of an enzyme name it read", () => {
+    const reading = parseReading(JSON.stringify({
+      enzyme_text: "phosphofructokinase", ec: null, organism: "Oryctolagus cuniculus",
+      refusal: "None of EC 2.7.1.11 ... has a Km row in Oryctolagus cuniculus in BRENDA",
+      named: {}, choices: [], notes: [],
+    }));
+    const e = entitiesFromReading(reading, "phosphofructokinase from rabbit muscle");
+    expect(e?.enzymeName).toBe("phosphofructokinase");
+    expect(e?.substrate).toBeUndefined();
+    expect(e?.extractionRefusal?.note).toMatch(/Oryctolagus cuniculus/);
   });
 });
 

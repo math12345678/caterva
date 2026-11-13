@@ -86,6 +86,30 @@ def _from_row(m: Any, row: Mapping[str, Any], because: str) -> Any:
     )
 
 
+#: The resolver's words for a Km carried as the pair of a kcat that names
+#: no isoform (fallback_logic `_pair_across_isoform_tiers`): one paper's
+#: measurement, kept over another paper's row naming the isoform.
+PAIRED_ACROSS_TIERS = "is carried as its pair over the row naming"
+
+
+def _isolated(values: List[float]) -> List[int]:
+    try:
+        from caterva.checkout import literature_module
+
+        return list(literature_module("fallback_logic").isolated(values))
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _outlying(matching: List[float], unnamed: List[float]) -> bool:
+    try:
+        from caterva.checkout import literature_module
+
+        return bool(literature_module("fallback_logic").isoform_rows_outlying(matching, unnamed))
+    except Exception:  # noqa: BLE001 - without the literature layer, no such check
+        return False
+
+
 def select_isoform(measured: Mapping[str, Any], isoform: str) -> IsoformSelection:
     """Each measured constant, taken from a row that measured `isoform` where
     the resolver ranked one. See the module docstring for the three cases."""
@@ -100,11 +124,39 @@ def select_isoform(measured: Mapping[str, Any], isoform: str) -> IsoformSelectio
         if same_isoform(chosen, isoform):
             out.measured[identifier] = m
             continue
+        because = (getattr(m, "chosen_because", None) or "") + (getattr(m, "resolver_because", None) or "")
+        if chosen is None and PAIRED_ACROSS_TIERS in because:
+            # Human pyruvate kinase, "muscle" read as PKM: ref 674499's Km
+            # and kcat, measured together, both naming no isoform, over
+            # another paper's PKM row (fourth round of the real-values review).
+            out.measured[identifier] = m
+            out.notes.append(
+                f"`{identifier}`: the row names no isoform; it is the Km measured with the kcat "
+                f"the model carries (one paper, the same stated conditions), kept over a row "
+                f"naming {isoform} from another paper, so whether it measured {isoform} is unknown")
+            continue
         rows = [r for r in getattr(m, "alternatives", ()) or ()
                 if isinstance(r, dict) and r.get("value") is not None
                 and (r.get("unit") in (None, m.unit))]
         named = [(r, _read_isoform(r.get("conditions")) or r.get("isoform")) for r in rows]
+        lone = _isolated([float(r["value"]) for r, _ in named])
+        named = [x for i, x in enumerate(named) if i not in lone]
         matching = [r for r, iso in named if same_isoform(iso, isoform)]
+        unnamed_values = [float(r["value"]) for r, iso in named if iso is None]
+        if chosen is None:
+            unnamed_values.append(float(m.value))
+        if matching and _outlying([float(r["value"]) for r in matching], unnamed_values):
+            # The resolver's rule (fallback_logic.isoform_rows_outlying): DPP4's
+            # one paper naming P27487 gave kcat 279000 1/s against 20-87 1/s.
+            out.measured[identifier] = m
+            out.notes.append(
+                f"`{identifier}`: the rows naming {isoform} ("
+                + ", ".join(f"{float(r['value']):g} {m.unit}, BRENDA ref {r.get('reference_id')}"
+                            for r in matching)
+                + f") lie more than 100-fold outside every row naming no isoform, so they were set "
+                  f"aside as a probable error; the row used names no isoform, so whether it "
+                  f"measured {isoform} is unknown")
+            continue
         if matching:
             row = matching[0]
             out.measured[identifier] = _from_row(m, row, f"the row for {isoform}, as --isoform asked")

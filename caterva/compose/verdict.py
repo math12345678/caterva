@@ -611,6 +611,35 @@ def _row_kind_concerns(model: Any) -> List[Concern]:
                     "or read conclusions near half-saturation as approximate"),
             qualifier=(f"{name} is {what}{of}, not a Michaelis-Menten Km, so this hyperbolic model "
                        "approximates a cooperative enzyme")))
+    for name, sentence in getattr(model, "cautions", ()) or ():
+        if name in measured:
+            out.append(Concern(
+                source="row_scope", severity=GROUNDED,
+                detail=f"`{name}`: {sentence}",
+                remedy="read the cited paper before relying on the value, or pass the constant "
+                       "yourself",
+                qualifier=f"{name} lies far from every other organism's rows for its compound"))
+    try:
+        from caterva.compose.row_scope import ASSAY_SUBSTRATE, read_scope
+    except ImportError:  # pragma: no cover
+        read_scope = None
+    if read_scope is not None:
+        for name in sorted(measured):
+            q = by_id.get(name)
+            if getattr(q, "table", None) != "ki":
+                continue
+            substrate = getattr(model, "substrate", None)
+            scope = read_scope(getattr(measured[name], "commentary", None),
+                               motif=getattr(getattr(q, "motif", None), "name", None)
+                               or getattr(q, "motif_name", None), table="ki", substrate=substrate)
+            for c in getattr(scope, "concerns", ()) or ():
+                if c.kind == ASSAY_SUBSTRATE:
+                    out.append(Concern(
+                        source="row_scope", severity=GROUNDED,
+                        detail=f"`{name}`: {c.plain}",
+                        remedy=(f"look for a Ki row measured on {substrate}, or read the value as "
+                                "the inhibitor's constant in another assay"),
+                        qualifier=f"{name} was measured in an assay on another substrate"))
     isoforms = {name: getattr(m, "row_isoform", None) for name, m in measured.items()}
     named = {iso for iso in isoforms.values() if isinstance(iso, str) and iso}
     if len(named) > 1:
@@ -785,10 +814,16 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
                      "named, in this organism: re-run with --substrate set to one the provenance table "
                      "lists, or supply it yourself")
     if "isoform" in by_need:
-        steps.append(f"{', '.join(by_need['isoform'])}: every row the search found measured another "
-                     "isoform than the one asked for: re-run with --substrate set to one the provenance table "
-                     "lists as measured on this isoform, or supply it yourself (--isoform set to the one the "
-                     "provenance table names would model that other protein instead)")
+        # The flag that would fill it is the compound the constant is
+        # FOR: --inhibitor for a Ki, --substrate for a Km or kcat. ALDH2's
+        # missing Ki was advised "--substrate" (fourth round's review).
+        names = by_need["isoform"]
+        flags = sorted({"--inhibitor" if "Ki" in n.split("_")[-1] else "--substrate" for n in names})
+        steps.append(f"{', '.join(names)}: every row the search found measured another "
+                     f"isoform than the one asked for: re-run with {' or '.join(flags)} set to one the "
+                     "provenance table lists as measured on this isoform, or supply it yourself "
+                     "(--isoform set to the one the provenance table names would model that other "
+                     "protein instead)")
     if "isoform_elsewhere" in by_need:
         steps.append(f"{', '.join(by_need['isoform_elsewhere'])}: no row in this organism names the "
                      "isoform asked for: re-run with --organism set to one the provenance table lists "

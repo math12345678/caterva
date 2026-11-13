@@ -28,6 +28,25 @@ the molecule:
   (`SYNONYMS`): GSSG and glutathione disulfide, phosphocreatine and creatine
   phosphate, L-Glu and L-glutamate, (S)-malate and L-malate.
 
+* a peptide written in one-letter, three-letter or full residue names, the
+  L- of each residue being the convention a code leaves unwritten:
+  "Ac-DEVD-pNA", "acetyl-DEVD-4-nitroanilide" and
+  "acetyl-L-Asp-L-Glu-L-Val-L-Asp-4-nitroanilide" are one compound (the
+  fourth round's caspase-3 pair was under the last spelling, the search
+  asked for the second), and so are "benzoyl-DL-Arg-p-nitroanilide" and
+  "N-benzoyl-DL-arginine 4-nitroanilide" (human trypsin's BAPNA pair). A
+  D- or DL- before a residue is kept; AMC, MCA and 7-amido-4-methylcoumarin
+  are one leaving group. A one-letter run is read as residues only beside
+  an acyl group or a leaving group, so "L-NMMA" and "L-NAME" are not
+  peptides;
+* a free amino acid by its three-letter code ("D-Ala" is D-alanine, "L-Orn"
+  L-ornithine), stereo descriptor kept;
+* an acid and its anion ("arachidonic acid" is arachidonate);
+* drug and radical names a reader types for what a paper prints (`ALIASES`):
+  L-NMMA and Ngamma-monomethyl-L-arginine, DFMO and
+  alpha-difluoromethylornithine, galantamine and galanthamine, donepezil and
+  its systematic name, adrenaline and epinephrine, O2.- and superoxide.
+
 Never folded: a stereo descriptor that is not a synonym of another (D- and
 L-glucose are two molecules; DL-BAPNA, a racemate, is not L-BAPNA), and any
 change of a locant number.
@@ -62,7 +81,7 @@ _Z_GROUP = re.compile(
     re.IGNORECASE)
 #: An N-alpha locant before an acyl group, written several ways.
 _N_ALPHA_ACYL = re.compile(
-    r"^n(?:-?alpha|\(alpha\))?-(?=(?:benzoyl|acetyl|succinyl|tosyl|glutaryl)-)", re.IGNORECASE)
+    r"^n(?:-?alpha|\(alpha\))?-(?=(?:benzoyl|acetyl|succinyl|tosyl|glutaryl|hippuryl)-)", re.IGNORECASE)
 #: "pNA" (4-nitroanilide) and "AMC" spelled as a word at the end.
 _PNA = re.compile(r"(?:-|\s)(?:pna|p-nitroanilide|4-nitroanilide)$", re.IGNORECASE)
 
@@ -97,18 +116,177 @@ SYNONYMS = {
 }
 
 
-def _folded(name: str) -> str:
+#: Residues by three-letter code, with the names a paper writes them by
+#: (free acid, residue "-yl" form). The code is the key inside a peptide; a
+#: free amino acid keeps its full name (`_FREE_NAME`).
+_RESIDUES = {
+    "ala": ("alanine", "alanyl"), "arg": ("arginine", "arginyl"), "asn": ("asparagine", "asparaginyl"),
+    "asp": ("aspartate", "aspartyl", "alpha-aspartyl", "aspartic acid"),
+    "cys": ("cysteine", "cysteinyl"), "gln": ("glutamine", "glutaminyl"),
+    "glu": ("glutamate", "glutamyl", "alpha-glutamyl", "glutamic acid"), "gly": ("glycine", "glycyl"),
+    "his": ("histidine", "histidyl"), "ile": ("isoleucine", "isoleucyl"), "leu": ("leucine", "leucyl"),
+    "lys": ("lysine", "lysyl"), "met": ("methionine", "methionyl"),
+    "phe": ("phenylalanine", "phenylalanyl"), "pro": ("proline", "prolyl"), "ser": ("serine", "seryl"),
+    "thr": ("threonine", "threonyl"), "trp": ("tryptophan", "tryptophyl", "tryptophanyl"),
+    "tyr": ("tyrosine", "tyrosyl"), "val": ("valine", "valyl"), "orn": ("ornithine", "ornithyl"),
+    "nle": ("norleucine", "norleucyl"), "nva": ("norvaline", "norvalyl"), "cit": ("citrulline", "citrullyl"),
+}
+_RESIDUE_OF = {code: code for code in _RESIDUES}
+_RESIDUE_OF.update({n.replace(" ", "-"): code for code, names in _RESIDUES.items() for n in names})
+_FREE_NAME = {code: names[0] for code, names in _RESIDUES.items()}
+_ONE_LETTER = {"A": "ala", "R": "arg", "N": "asn", "D": "asp", "C": "cys", "Q": "gln", "E": "glu",
+               "G": "gly", "H": "his", "I": "ile", "L": "leu", "K": "lys", "M": "met", "F": "phe",
+               "P": "pro", "S": "ser", "T": "thr", "W": "trp", "Y": "tyr", "V": "val"}
+_ONE_LETTER_RUN = re.compile(r"[ACDEFGHIKLMNPQRSTVWY]{2,8}")
+#: An acyl group on a peptide's N-terminus, by abbreviation and name.
+_ACYL = {"ac": "acetyl", "acetyl": "acetyl", "suc": "succinyl", "succinyl": "succinyl",
+         "bz": "benzoyl", "benzoyl": "benzoyl", "glt": "glutaryl", "glutaryl": "glutaryl",
+         "tos": "tosyl", "tosyl": "tosyl", "z": "z", "boc": "boc", "meosuc": "methoxysuccinyl",
+         "methoxysuccinyl": "methoxysuccinyl", "abz": "abz", "dabcyl": "dabcyl", "fmoc": "fmoc"}
+#: A leaving group or C-terminal group on a peptide substrate.
+_TERMINAL = {"pna", "amc", "nh2", "ome", "oet", "sbzl", "ester", "amide", "afc", "betana"}
+_AMC = re.compile(
+    r"(?:-|\s)(?:7-amido-4-methylcoumarin|7-amino-4-methylcoumarin|4-methylcoumaryl-7-amide"
+    r"|4-methyl-coumaryl-7-amide|4-methylcoumarin-7-amide|methylcoumarylamide|amc|mca)$",
+    re.IGNORECASE)
+_STEREO_TOKEN = {"l": "", "d": "d", "dl": "dl"}
+
+
+def _peptide(text: str) -> str:
+    """A peptide (or acyl amino acid) written with its residues as codes and
+    the L- of each left unwritten; any other name unchanged (module
+    docstring). `text` has its case: a one-letter run is upper case."""
+    body = _AMC.sub("-amc", text)
+    body = re.sub(r"-4-nitroanilide$", "-pna", body)
+    tokens = [t for t in re.split(r"[-\s]+", body) if t]
+    if len(tokens) > 2 and tokens[0] == "H" and (tokens[1].casefold() in _RESIDUE_OF
+                                                 or tokens[1].casefold() in _STEREO_TOKEN):
+        tokens = tokens[1:]  # "H-D-Phe-..." writes the free amine
+    if len(tokens) < 2:
+        return text
+    acyl = any(t.casefold() in _ACYL for t in tokens[:2])
+    terminal = tokens[-1].casefold() in _TERMINAL or (
+        len(tokens) >= 2 and tokens[-2].casefold() in ("ethyl", "methyl") and tokens[-1].casefold() == "ester")
+    # A one-letter run needs an acyl group or a leaving group beside it:
+    # "NG-nitro-L-arginine methyl ester" is no Asn-Gly peptide.
+    leaving = tokens[-1].casefold() in ("pna", "amc", "afc", "betana", "sbzl")
+    out: list = []
+    residues = 0
+    i = 0
+    while i < len(tokens):
+        tok, low = tokens[i], tokens[i].casefold()
+        nxt = tokens[i + 1].casefold() if i + 1 < len(tokens) else ""
+        if low in _STEREO_TOKEN and nxt in _RESIDUE_OF:
+            if _STEREO_TOKEN[low]:
+                out.append(_STEREO_TOKEN[low])
+            i += 1
+            continue
+        if low in _RESIDUE_OF:
+            out.append(_RESIDUE_OF[low])
+            residues += 1
+        elif (acyl or leaving) and _ONE_LETTER_RUN.fullmatch(tok):
+            out.extend(_ONE_LETTER[ch] for ch in tok)
+            residues += len(tok)
+        elif low in _ACYL and i < 2:
+            out.append(_ACYL[low])
+        else:
+            out.append(tok)
+        i += 1
+    if residues >= 2 or (residues >= 1 and (acyl or terminal)):
+        return "-".join(out)
+    return text
+
+
+def _free_amino_acid(text: str) -> str:
+    """"D-Ala" as D-alanine: a free amino acid by its code, stereo kept."""
+    match = re.fullmatch(r"((?:[DL]{1,2}|\([RS]\))-)?([A-Za-z]{3})", text)
+    if match and match.group(2).casefold() in _FREE_NAME:
+        return (match.group(1) or "") + _FREE_NAME[match.group(2).casefold()]
+    return text
+
+
+#: An acid and its anion are one compound to a kinetic table.
+_ACID = re.compile(r"^(.*[a-z])ic-?acid$")
+#: Whole-word renamings inside a key: one molecule's two trivial names.
+_RENAMED = ((re.compile(r"(nor)?adrenaline"), r"\1epinephrine"),
+            (re.compile(r"galanthamine"), "galantamine"))
+
+
+def _base(name: str) -> str:
     text = _COUNTER_ION.sub("", " ".join((name or "").translate(_PRIMES).split()))
     text = _SALT_FORM.sub("", text)
     text = _LETTER_LOCANT.sub(lambda m: _LOCANT_NUMBER[m.group(1)] + "-", text)
     text = _PNA.sub("-4-nitroanilide", text)
     text = _Z_GROUP.sub("z-", text)
-    text = _N_ALPHA_ACYL.sub("", text)
-    return re.sub(r"\s+", "", text).casefold()
+    return _N_ALPHA_ACYL.sub("", text)
+
+
+def _folded(name: str) -> str:
+    text = _base(name)
+    plain = re.sub(r"\s+", "", text).casefold()
+    if plain in SYNONYMS or plain.replace("-", "") in _ALIAS_KEYS:
+        return plain
+    text = _free_amino_acid(_peptide(text))
+    key = re.sub(r"\s+", "", text).casefold()
+    key = _ACID.sub(r"\1ate", key)
+    for pattern, replacement in _RENAMED:
+        key = pattern.sub(replacement, key)
+    return key
+
+
+#: Names a reader types for a compound a paper prints otherwise: (name,
+#: the name it is). Keyed by `_base` with hyphens removed (`_ALIAS_KEYS`).
+ALIASES = (
+    ("L-NMMA", "NG-monomethyl-L-arginine"), ("NMMA", "NG-monomethyl-L-arginine"),
+    ("Ngamma-monomethyl-L-arginine", "NG-monomethyl-L-arginine"),
+    ("N(G)-monomethyl-L-arginine", "NG-monomethyl-L-arginine"),
+    ("Nomega-monomethyl-L-arginine", "NG-monomethyl-L-arginine"),
+    ("N-omega-monomethyl-L-arginine", "NG-monomethyl-L-arginine"),
+    ("NG-methyl-L-arginine", "NG-monomethyl-L-arginine"),
+    ("Ngamma-methyl-L-arginine", "NG-monomethyl-L-arginine"),
+    ("Nomega-methyl-L-arginine", "NG-monomethyl-L-arginine"),
+    ("L-NAME", "NG-nitro-L-arginine methyl ester"),
+    ("Nomega-nitro-L-arginine methyl ester", "NG-nitro-L-arginine methyl ester"),
+    ("Ngamma-nitro-L-arginine methyl ester", "NG-nitro-L-arginine methyl ester"),
+    ("N(G)-nitro-L-arginine methyl ester", "NG-nitro-L-arginine methyl ester"),
+    ("L-NNA", "NG-nitro-L-arginine"), ("L-NOARG", "NG-nitro-L-arginine"),
+    ("Nomega-nitro-L-arginine", "NG-nitro-L-arginine"), ("Ngamma-nitro-L-arginine", "NG-nitro-L-arginine"),
+    ("DFMO", "alpha-difluoromethylornithine"), ("eflornithine", "alpha-difluoromethylornithine"),
+    ("DL-alpha-difluoromethylornithine", "alpha-difluoromethylornithine"),
+    ("alpha-DL-difluoromethylornithine", "alpha-difluoromethylornithine"),
+    ("difluoromethylornithine", "alpha-difluoromethylornithine"),
+    ("2-difluoromethylornithine", "alpha-difluoromethylornithine"),
+    ("DL-2-difluoromethylornithine", "alpha-difluoromethylornithine"),
+    ("alpha-difluoromethyl-DL-ornithine", "alpha-difluoromethylornithine"),
+    ("galanthamine", "galantamine"),
+    ("E2020", "donepezil"),
+    ("(R,S)-1-benzyl-4-[(5,6-dimethoxy-1-indanon)-2-yl]methylpiperidine", "donepezil"),
+    ("1-benzyl-4-[(5,6-dimethoxy-1-indanon)-2-yl]methylpiperidine", "donepezil"),
+    ("1-benzyl-4-[(5,6-dimethoxy-1-oxoindan-2-yl)methyl]piperidine", "donepezil"),
+    ("O2-", "superoxide"), ("O2.-", "superoxide"), ("O2•-", "superoxide"), ("O2·-", "superoxide"),
+    ("superoxide anion", "superoxide"), ("superoxide radical", "superoxide"),
+    ("superoxide anion radical", "superoxide"), ("superoxide radical anion", "superoxide"),
+    ("HMG-CoA", "3-hydroxy-3-methylglutaryl-CoA"),
+    ("hydroxymethylglutaryl-CoA", "3-hydroxy-3-methylglutaryl-CoA"),
+    ("3-hydroxy-3-methylglutaryl-coenzyme A", "3-hydroxy-3-methylglutaryl-CoA"),
+    ("BAPNA", "N-benzoyl-DL-arginine 4-nitroanilide"),
+    ("DL-BAPNA", "N-benzoyl-DL-arginine 4-nitroanilide"),
+    ("L-BAPNA", "N-benzoyl-L-arginine 4-nitroanilide"),
+)
+
+
+def _alias_key(name: str) -> str:
+    return re.sub(r"\s+", "", _base(name)).casefold().replace("-", "")
+
+
+_ALIAS_KEYS = {_alias_key(a): b for a, b in ALIASES}
 
 
 def identity_key(name: str) -> str:
     """The key every spelling of one compound shares (module docstring)."""
+    alias = _ALIAS_KEYS.get(_alias_key(name))
+    if alias is not None:
+        name = alias
     folded = _folded(name)
     folded = SYNONYMS.get(folded, folded)
     return folded.replace("-", "")

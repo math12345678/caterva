@@ -125,17 +125,17 @@ def test_measured_conditions_carry_their_citation(tmp_path, monkeypatch):
                                        "substrate": "glucose"})
     assert got.exit_code == code == 0
     t, ph = got.result["temperature"], got.result["ph"]
-    # The Km's own row: the Km and the kcat come from one paper, ref 739603
-    # (resolve_kinetic_pair, ADR 0182), measured at 25 C and pH 7.6.
-    assert t["value"] == pytest.approx(298.15) and t["provenance"]["kind"] == "measured"
-    assert t["provenance"]["citation"]["text"] == "BRENDA ref 739603"
+    # The Km's own row: HK-I's Km, ref 640237, measured at 37 C and pH 8.1
+    # (fourth round of the real-values review).
+    assert t["value"] == pytest.approx(310.15) and t["provenance"]["kind"] == "measured"
+    assert t["provenance"]["citation"]["text"] == "BRENDA ref 640237"
     # The Measurement says it came through the literature layer, not which
     # registry: no link is guessed from the citation's text.
     assert t["provenance"]["citation"]["via"] == "literature" and "url" not in t["provenance"]["citation"]
-    assert t["provenance"]["commentary"] == "wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C"
-    assert t["provenance"]["conditions"]["temperature_c"] == 25.0
-    assert ph["value"] == 7.6 and ph["provenance"]["kind"] == "measured"
-    assert got.result["note"] == "conditions from BRENDA ref 739603, the assay behind Km = 6.3 mM (Homo sapiens)"
+    assert t["provenance"]["commentary"] == "hexokinase I, at 37°C, pH 8.1"
+    assert t["provenance"]["conditions"]["temperature_c"] == 37.0
+    assert ph["value"] == 8.1 and ph["provenance"]["kind"] == "measured"
+    assert got.result["note"] == "conditions from BRENDA ref 640237, the assay behind Km = 0.06 mM (Homo sapiens)"
 
 
 def test_the_default_folder_is_inside_the_run(tmp_path):

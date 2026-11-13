@@ -68,11 +68,16 @@ describe("a reader that gave no reading", () => {
     expect(said).toMatch(/older reader/);
   });
 
-  it("keeps the inhibitor the query names: competitive inhibition, with its Ki looked up", async () => {
+  it("keeps the inhibitor's shape, and looks nothing up for another reader's reading", async () => {
+    // Fourth round of the real-values review: the older reader answered
+    // "alcohol dehydrogenase from horse liver" with a human Km. A reading
+    // compose did not give is now a refusal to look values up, said on each
+    // constant; the shape still keeps the inhibitor the query names.
     const { flags } = await outcome("acetylcholinesterase inhibited by tacrine in human with 50 nM enzyme");
     expect(flags.some((f) => f.startsWith("read as: competitive inhibition by tacrine"))).toBe(true);
-    const ki = mocked.mock.calls.map(([a]) => a as { quantity: string; inhibitor?: string }).find((a) => a.quantity === "ki");
-    expect(ki?.inhibitor).toBe("tacrine");
+    expect(mocked.mock.calls.length).toBe(0);
+    await expect(resolveQuery("acetylcholinesterase inhibited by tacrine in human with 50 nM enzyme"))
+      .rejects.toThrow(/ki: Nothing was looked up: compose's sentence reader gave no reading/);
   });
 
   it("is silent when the reader is off (the test configuration's older reader)", async () => {

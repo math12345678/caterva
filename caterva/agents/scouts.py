@@ -459,6 +459,22 @@ class ParameterScout:
         return chosen, new_reason, new_reason
 
 
+def _one_protein_of(km: Any, kcat: Any) -> Optional[str]:
+    """The isoform a found Km and kcat both measured, by their rows'
+    readings (`KineticResult.row_isoform`), or None when either names none
+    or they name two."""
+    if not (getattr(km, "found", False) and getattr(kcat, "found", False)):
+        return None
+    a, b = getattr(km, "row_isoform", None), getattr(kcat, "row_isoform", None)
+    if not (isinstance(a, str) and isinstance(b, str) and a and b):
+        return None
+    try:
+        from caterva.bind.core import same_isoform
+    except ImportError:  # pragma: no cover
+        return a if a == b else None
+    return a if same_isoform(a, b) else None
+
+
 def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
     """The live resolver, adapted to the scout's calling convention.
 
@@ -507,9 +523,10 @@ def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
             if getattr(request, name, None)
         }
         table = request.table or "km"
-        if getattr(request, "paired", False) is True and table in ("km", "kcat") and request.substrate:
-            key = (request.ec_number, organism or "", request.substrate, request.subject,
-                   bool(allow_cross_species), tuple(sorted(asked.items())))
+
+        def pair_of(substrate: str, pair_asked: Dict[str, Any]):
+            key = (request.ec_number, organism or "", substrate, request.subject,
+                   bool(allow_cross_species), tuple(sorted(pair_asked.items())))
             with guard:
                 lock = locks.setdefault(key, threading.Lock())
             with lock:
@@ -517,13 +534,49 @@ def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
                     pairs[key] = resolve_kinetic_pair(
                         request.ec_number,
                         organism or "",
-                        request.substrate,
+                        substrate,
                         enzyme_name=request.subject,
                         allow_cross_species=allow_cross_species,
-                        **{**asked, **resolver_kwargs},
+                        **{**pair_asked, **resolver_kwargs},
                     )
-            km, kcat = pairs[key]
+            return pairs[key]
+
+        if getattr(request, "paired", False) is True and table in ("km", "kcat") and request.substrate:
+            km, kcat = pair_of(request.substrate, asked)
             return km if table == "km" else kcat
+        if (table == "ki" and not asked.get("isoform") and asked.get("model_substrate")
+                and asked.get("inhibition_mode")):
+            # A Ki follows the protein the model's Km and kcat measured:
+            # human carbonic anhydrase and acetazolamide carried CA II's Km
+            # and kcat (ref 729384) with CA IX's Ki (2.5e-05 mM, ref 652546)
+            # while BRENDA holds CA II's acetazolamide Ki (1.2e-05 mM) from
+            # that same paper (fourth round of the real-values review).
+            pair_asked = {k: v for k, v in asked.items()
+                          if k in ("isoform", "mutation")}
+            try:
+                km, kcat = pair_of(asked["model_substrate"], pair_asked)
+            except Exception:  # noqa: BLE001 - the Ki is then chosen on its own
+                km = kcat = None
+            protein = _one_protein_of(km, kcat)
+            if protein:
+                followed = resolve_kinetic_value(
+                    enzyme_ec=request.ec_number,
+                    organism=organism or "",
+                    substrate=request.substrate or "",
+                    enzyme_name=request.subject,
+                    quantity=table,
+                    allow_cross_species=allow_cross_species,
+                    **{**asked, "isoform": protein, **resolver_kwargs},
+                )
+                if getattr(followed, "found", False):
+                    because = getattr(followed, "chosen_because", None)
+                    note = (f"the Ki is taken from the rows of {protein}, the protein the model's "
+                            f"Km and kcat rows measured (or rows naming no isoform), so the model "
+                            f"is of one protein")
+                    if isinstance(because, str):
+                        followed = followed.model_copy(update={
+                            "chosen_because": f"{because}; {note}"})
+                    return followed
         return resolve_kinetic_value(
             enzyme_ec=request.ec_number,
             organism=organism or "",

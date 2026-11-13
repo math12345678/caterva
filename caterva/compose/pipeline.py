@@ -118,6 +118,11 @@ class ComposedModel:
     #: choice is never made without the reader being told, with the
     #: alternatives and their row counts, how to overturn it.
     choices: Tuple[Any, ...] = ()
+    #: Cautions about a cited value the verdict must carry as concerns, as
+    #: (parameter id, sentence): a Ki lying 1e4-fold from every other
+    #: organism's rows for the compound (E. coli DHFR and methotrexate),
+    #: said only in the body until the fourth round of the review.
+    cautions: Tuple[Tuple[str, str], ...] = ()
 
     def no_subject_reason(self) -> str:
         """Why nothing was searched for, in words that are true of the query.

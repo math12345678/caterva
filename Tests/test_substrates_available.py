@@ -291,7 +291,14 @@ def test_the_log_names_the_labels_and_refuses_to_substitute():
     assert "does not substitute one substrate for another" in joined
 
 
-@pytest.mark.parametrize("substrate", ["lactic acid", "L-lactic acid"])
+def test_an_acid_named_with_its_stereo_form_is_its_anion():
+    """"L-lactic acid" is (S)-lactate: an acid and its anion are one compound
+    (compound_names, fourth round of the real-values review), so the search
+    finds the rows rather than advising a respelling."""
+    assert ask("L-lactic acid").found
+
+
+@pytest.mark.parametrize("substrate", ["lactic acid"])
 def test_the_aliases_a_student_would_plausibly_type_all_get_help(substrate):
     """Three spellings of the same compound, none of which BRENDA uses.
 

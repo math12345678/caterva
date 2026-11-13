@@ -73,8 +73,39 @@ def versus_is(versus: Optional[str], substrate: Optional[str]) -> bool:
     return bool(versus and substrate and versus.strip().lower() == substrate.strip().lower())
 
 
+#: The assay substrate a Ki row's commentary names: "hydrolysis of
+#: o-aminobenzoyl-SDK-(dinitrophenyl)-P-OH", "with X as substrate".
+_ASSAY_SUBSTRATE = re.compile(
+    r"\b(?:hydrolysis|cleavage|oxidation|reduction|phosphorylation) of\s+(?P<h>[^,;]+?)\s*(?=[,;]|$)"
+    r"|\b(?:with|using)\s+(?P<s>[^,;]+?)\s+as (?:the )?substrate\b", re.IGNORECASE)
+#: What an ACE FRET substrate reports on (Araujo et al. 2000; Bersanetti 2004).
+_ACE_DOMAIN = ((re.compile(r"SDK", re.IGNORECASE), "an N-domain-selective substrate, so the constant "
+                "reports on ACE's N-domain"),
+               (re.compile(r"LFK", re.IGNORECASE), "a C-domain-selective substrate, so the constant "
+                "reports on ACE's C-domain"),
+               (re.compile(r"FRK", re.IGNORECASE), "a substrate both of ACE's domains hydrolyse"))
+
+
+def assay_substrate(text: Optional[str]) -> Optional[str]:
+    """The substrate a Ki row says its assay used, or None."""
+    m = _ASSAY_SUBSTRATE.search(text or "")
+    if not m:
+        return None
+    return " ".join((m.group("h") or m.group("s") or "").split()) or None
+
+
+def _same_compound(a: str, b: str) -> bool:
+    try:
+        from caterva.checkout import literature_module
+
+        return bool(literature_module("compound_names").same_compound(a, b))
+    except Exception:  # noqa: BLE001
+        return a.strip().lower() == b.strip().lower()
+
+
 #: Concern kinds, in the order a reader should meet them.
 ISOFORM = "isoform"
+ASSAY_SUBSTRATE = "assay_substrate"
 MODE_UNSTATED = "mode_unstated"
 MODE_MISMATCH = "mode_mismatch"
 VERSUS = "versus"
@@ -215,6 +246,22 @@ def read_scope(
                     f"the row measured **{mode}** inhibition"
                     + (f" (versus {versus})" if versus else "")
                     + f"; this model is {want}, so the value belongs to a different mechanism")))
+            assayed = assay_substrate(text)
+            if assayed and substrate and not _same_compound(assayed, substrate) and not versus:
+                # ACE and captopril: the Ki row is "hydrolysis of
+                # o-aminobenzoyl-SDK-(dinitrophenyl)-P-OH", an N-domain FRET
+                # substrate; the model's substrate is angiotensin I, and the
+                # same paper's row on another substrate is 4.6-fold different
+                # (fourth round of the real-values review).
+                domain = next((said for pattern, said in _ACE_DOMAIN if pattern.search(assayed)
+                               and "dinitrophenyl" in assayed.lower() or pattern.search(assayed)
+                               and "dnp" in assayed.lower()), None)
+                concerns.append(Concern(ASSAY_SUBSTRATE, (
+                    f"the Ki was measured on the hydrolysis of **{assayed}**"
+                    + (f" ({domain})" if domain else "")
+                    + f", not of {substrate}, this model's substrate: a Ki is specific to the "
+                      f"assay it was measured in, and the same inhibitor's Ki on another substrate "
+                      f"can differ")))
             if versus and substrate and not versus_is(versus, substrate):
                 concerns.append(Concern(VERSUS, (
                     f"the row measured inhibition **versus {versus}**, not versus "
