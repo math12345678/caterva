@@ -112,6 +112,27 @@ def test_dpp4s_km_does_not_come_from_the_paper_of_the_279000_kcat():
     assert (km.value, kcat.value) == (0.09, 87.0)
 
 
+# Constructed from the shape of human acetyl-CoA carboxylase's rows (merge
+# review of the fifth round): one paper's Km is 170-fold below every other
+# Km row and is the only row stating pH and temperature. The rule set the
+# paper's kcat aside as "a paper with a probable error supplies neither
+# constant", yet carried that same paper's Km.
+ACC_KM = [row(0.0002, "acetyl-CoA", "Homo sapiens", "pH 7.5, 37°C", "676983"),
+          row(0.034, "acetyl-CoA", "Homo sapiens", "", "702459"),
+          row(0.048, "acetyl-CoA", "Homo sapiens", "", "676971"),
+          row(0.058, "acetyl-CoA", "Homo sapiens", "", "676972")]
+ACC_KCAT = [row(0.192, "acetyl-CoA", "Homo sapiens", "pH 7.5, 37°C", "676983"),
+            row(10.1, "acetyl-CoA", "Homo sapiens", "", "676971"),
+            row(2.9, "acetyl-CoA", "Homo sapiens", "", "702459")]
+
+
+def test_a_paper_whose_own_row_is_the_probable_error_supplies_neither_constant():
+    html = page({"KM Values": ACC_KM, "Turnover Numbers": ACC_KCAT})
+    km, kcat = resolve_kinetic_pair("6.4.1.2", "Homo sapiens", "acetyl-CoA", **kw(html, "Homo sapiens"))
+    assert km.citation.reference_id != "676983" and kcat.citation.reference_id != "676983"
+    assert "its Km (0.0002) lies more than 100-fold from every other row" in km.chosen_because
+
+
 # -- Another enzyme filed under the EC is not an isoform -------------------------------------
 
 def test_frda_under_succinate_dehydrogenase_is_another_enzyme():

@@ -3735,23 +3735,33 @@ def resolve_kinetic_pair(
 
     # A paper with a probable error in one constant supplies neither.
     discredited, said = {}, {}
+    errors_of = {q: probable_error_papers(enzyme_ec, organism, substrate, page, q, kwargs)
+                 for q in ("km", "kcat")}
     for quantity, other in (("km", "kcat"), ("kcat", "km")):
         result = km if quantity == "km" else kcat
         cited = str(getattr(result.citation, "reference_id", None) or "")
         if not cited:
             continue
-        errors = probable_error_papers(enzyme_ec, organism, substrate, page, other, kwargs)
+        # The paper's other constant is the probable error, or this one's own
+        # row is: human acetyl-CoA carboxylase's Km of 0.0002 mM (ref 676983),
+        # 170-fold below every other Km row, set aside the same paper's kcat
+        # but was itself carried, the note saying that paper "supplies
+        # neither constant" (merge review of the fifth round).
+        own = cited in errors_of[quantity] and cited not in errors_of[other]
+        errors = errors_of[quantity] if own else errors_of[other]
         if cited in errors:
             again = resolve_kinetic_value(enzyme_ec=enzyme_ec, organism=organism,
                                           substrate=substrate, html_provider=page,
                                           quantity=quantity,
                                           **{**kwargs, "exclude_references": (cited,)})
             if again.found:
-                note = (f"BRENDA ref {cited}'s row was not used: the same paper's "
-                        f"{'kcat' if other == 'kcat' else 'Km'} ({errors[cited]:g}) lies more "
+                which = quantity if own else other
+                note = (f"BRENDA ref {cited}'s row was not used: "
+                        + ("its " if own else "the same paper's ")
+                        + f"{'kcat' if which == 'kcat' else 'Km'} ({errors[cited]:g}) lies more "
                         f"than {ISOFORM_OUTLIER_FOLD:g}-fold from every other row, a probable "
-                        f"error, so that paper supplies neither constant (it gave "
-                        f"{result.value:g} {result.unit or ''}".rstrip() + ")")
+                        f"error, so that paper supplies neither constant"
+                        + ("" if own else f" (it gave {result.value:g} {result.unit or ''}".rstrip() + ")"))
                 discredited[cited] = errors[cited]
                 said[quantity] = note
                 again = _with_clause(again, note)
