@@ -221,7 +221,15 @@ def read_scope(
     read_isoform, read_mode = _reader()
     text = str(commentary or "")
     wanted = isoform
-    isoform = read_isoform(text) or row_isoform
+    in_words = read_isoform(text)
+    isoform = in_words or row_isoform
+    # Whose words name the isoform. A row whose own words name none, tied to
+    # one by its UniProt cell or its paper's other entries, was said to have
+    # "measured isoform PRSS3" here while the spread note said "the row
+    # names no isoform itself; its paper names only PRSS3" (sixth round,
+    # XS5R2-08; rat nNOS, VR2-05). One wording for both.
+    measured = ("the row measured isoform {}" if in_words else
+                "the row names no isoform itself; its UniProt cell or its paper ties it to isoform {}")
     concerns = []
     if wanted:
         from caterva.compose.isoform import same_isoform
@@ -231,11 +239,11 @@ def read_scope(
                 f"asked for, is unknown")))
         elif not same_isoform(isoform, wanted):
             concerns.append(Concern(ISOFORM, (
-                f"the row measured isoform **{isoform}**, not {wanted}, the one asked for: "
+                measured.format(f"**{isoform}**") + f", not {wanted}, the one asked for: "
                 f"a different protein's constant")))
     elif isoform:
         concerns.append(Concern(ISOFORM, (
-            f"the row measured isoform {isoform}; if the enzyme you mean is another "
+            measured.format(isoform) + "; if the enzyme you mean is another "
             f"isoform, this is a different protein's constant")))
 
     mode: Optional[str] = None

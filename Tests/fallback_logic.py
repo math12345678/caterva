@@ -230,6 +230,13 @@ class KineticResult(BaseModel):
     #: V7-04). Empty when variants were allowed or a mutation was asked for.
     cross_species_variant_only: list[str] = []
 
+    #: Those of `cross_species_variant_only` whose withheld rows all name an
+    #: isozyme ("isoenzyme A"): wild-type proteins in their own right, taken
+    #: only when the isoform is asked for. Said apart, so no surface calls
+    #: them variants (Vibrio tyrosinaticus's tyrosinase, sixth round,
+    #: XS5R2-03).
+    cross_species_isozyme_only: list[str] = []
+
     #: Every cross-species row WITH its value, when the requested organism
     #: had none.
     #:
@@ -3374,10 +3381,14 @@ def resolve_kinetic_value(
     if broad and not allow_cross_species:
         organisms = sorted({e.organism for e in broad if e.organism})
         variant_only: list[str] = []
+        isozyme_only: list[str] = []
         if not allow_variants and not mutation:
-            kept, _ = _partition_variants(broad)
+            kept, withheld_rows = _partition_variants(broad)
             with_usable = {e.organism for e in kept if e.organism}
             variant_only = [o for o in organisms if o not in with_usable]
+            isozyme_only = [o for o in variant_only
+                            if all(getattr(getattr(e, "variant", None), "kind", None) == "isozyme"
+                                   for e in withheld_rows if e.organism == o)]
         log.append(
             f"Cross-species value(s) found in {', '.join(organisms) or 'unnamed organism(s)'} "
             f"but withheld: allow_cross_species=False"
@@ -3387,6 +3398,7 @@ def resolve_kinetic_value(
             source="cross_species_withheld",
             cross_species_organisms_available=organisms,
             cross_species_variant_only=variant_only,
+            cross_species_isozyme_only=isozyme_only,
             # The numbers, not only the names. Every one is a real
             # measurement with a reference; none of them is a measurement
             # of the organism that was asked about, and nothing here says

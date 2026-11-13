@@ -598,6 +598,82 @@ def choose_missing(
     return filled
 
 
+#: The kcat half of the last Km pair resolved (`resolve_kinetic_value`
+#: with paired=True). The Km call already computes it; /api/resolve's Vmax
+#: advice reads it so it can say, before any enzyme concentration is
+#: stated, whether a kcat exists to multiply one by (sixth round, XS5R2-05).
+_LAST_PAIRED_KCAT: dict = {}
+
+
+def _paired_kcat_summary(kcat: Any) -> Optional[dict]:
+    """What the kcat half of a Km pair came to, in the not-found fields'
+    names, so the TypeScript side reads it as it reads a kcat lookup."""
+    if kcat is None:
+        return None
+    found = bool(getattr(kcat, "found", False)) and getattr(kcat, "value", None) is not None
+    out = {
+        "found": found,
+        "source": getattr(kcat, "source", None),
+    }
+    if found:
+        out["kcat"] = kcat.value
+        out["citation"] = _citation_to_dict(getattr(kcat, "citation", None))
+        return out
+    out.update({
+        "crossSpeciesOrganismsAvailable": getattr(kcat, "cross_species_organisms_available", None),
+        "crossSpeciesVariantOnly": list(getattr(kcat, "cross_species_variant_only", []) or []),
+        "crossSpeciesIsozymeOnly": list(getattr(kcat, "cross_species_isozyme_only", []) or []),
+        "variantCandidatesAvailable": getattr(kcat, "variant_candidates_available", None),
+        "implausibleValues": getattr(kcat, "implausible_values", None),
+        "isoformsAvailable": getattr(kcat, "isoforms_available", None),
+    })
+    return out
+
+
+def _isozyme_notice(ec_number: Optional[str], organism: Optional[str],
+                    isoform: Optional[str], substrate: Optional[str],
+                    km: Any, kcat: Any) -> Optional[dict]:
+    """Which protein of a multi-protein EC the model's constants are, in
+    `caterva compose`'s words (caterva.enzymes.isozyme.notice_for_model).
+
+    Compose and the Studio said "EC 2.7.1.1 is 5 human proteins ... the model
+    is of GCK"; the API and the TypeScript CLI said only "the row's UniProt
+    accession (P35557) is GCK", so a reader got glucokinase's 6.3 mM for
+    "hexokinase" with no word that HK1 and HK2 were not modelled (sixth
+    round, XS5R2-04). The same function decides it here, from the same rows.
+    None when there is nothing to say, or it cannot be said."""
+    if km is None or not getattr(km, "found", False):
+        return None
+    try:
+        from types import SimpleNamespace
+
+        from caterva.enzymes.isozyme import notice_for_model
+    except Exception:  # noqa: BLE001 - a checkout without the module says nothing
+        return None
+
+    def measured(result: Any) -> Any:
+        return SimpleNamespace(
+            commentary=getattr(result, "commentary", None),
+            row_isoform=getattr(result, "row_isoform", None),
+            resolver_because=getattr(result, "chosen_because", None),
+            citation=None,
+        )
+
+    rows = {"reaction_Km": measured(km)}
+    if kcat is not None and getattr(kcat, "found", False):
+        rows["reaction_kcat"] = measured(kcat)
+    model = SimpleNamespace(subject=ec_number, organism=organism, isoform=isoform or None,
+                            substrate=substrate, measured=rows)
+    try:
+        notice = notice_for_model(model)
+    except Exception:  # noqa: BLE001
+        return None
+    if notice is None:
+        return None
+    return {"headline": notice.headline, "detail": notice.detail,
+            "remedy": notice.remedy, "summary": notice.summary}
+
+
 def resolve_kinetic_value(
     enzyme_name: str,
     substrate: str,
@@ -639,6 +715,7 @@ def resolve_kinetic_value(
     owns nothing. Defaulting it True here would silently re-enable the
     behaviour ADR 0024 disabled, in a file nobody would think to check.
     """
+    _LAST_PAIRED_KCAT.clear()
     if paired and quantity in ("km", "kcat") and substrate:
         km, kcat = fallback_logic.resolve_kinetic_pair(
             ec_number,
@@ -651,6 +728,8 @@ def resolve_kinetic_value(
             inhibition_mode=inhibition_mode,
             model_substrate=model_substrate,
         )
+        if quantity == "km":
+            _LAST_PAIRED_KCAT["result"] = kcat
         return km if quantity == "km" else kcat
     return fallback_logic.resolve_kinetic_value(
         enzyme_ec=ec_number,
@@ -1403,6 +1482,13 @@ def main() -> None:
                 # and the Studio said these; the API and the TypeScript CLI
                 # printed a plain Km (third round's review).
                 "rowNotes": list(getattr(result, "row_notes", None) or []),
+                # Which protein of a multi-protein EC this is (XS5R2-04).
+                "isozymeNotice": (_isozyme_notice(
+                    ec_number, organism, isoform, substrate, result,
+                    _LAST_PAIRED_KCAT.get("result")) if quantity == "km" else None),
+                # The kcat half of the pair, for the Vmax advice (XS5R2-05).
+                "pairedKcat": (_paired_kcat_summary(_LAST_PAIRED_KCAT.get("result"))
+                               if quantity == "km" else None),
                 "selectionTie": (
                     result.selection_tie.model_dump()
                     if result.selection_tie else None
@@ -1527,6 +1613,10 @@ def main() -> None:
                         # constant there either (fifth round's review, V7-04).
                         "crossSpeciesVariantOnly": list(
                             getattr(result, "cross_species_variant_only", []) or []),
+                        # Of those, the ones whose rows each name an isozyme
+                        # (XS5R2-03): said as isozymes, not variants.
+                        "crossSpeciesIsozymeOnly": list(
+                            getattr(result, "cross_species_isozyme_only", []) or []),
                         # Which variants were found and withheld. A refusal
                         # that cannot name what it refused leaves the opt-in
                         # it demands unexercisable.
@@ -1564,6 +1654,8 @@ def main() -> None:
                         # A refusal for a chosen name is a refusal of THAT
                         # name, and the client has to be able to say so.
                         "choices": filled.choices,
+                        "pairedKcat": (_paired_kcat_summary(_LAST_PAIRED_KCAT.get("result"))
+                                       if quantity == "km" else None),
                     }
                 )
             )

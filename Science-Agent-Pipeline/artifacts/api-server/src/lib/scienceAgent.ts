@@ -98,6 +98,8 @@ export interface ScienceAgentResult {
   /** Of those, the organisms whose every row measured a protein variant:
    *  opting into another organism would withhold them too (V7-04). */
   crossSpeciesVariantOnly?: string[];
+  /** Of those, the organisms whose rows each name an isozyme (XS5R2-03). */
+  crossSpeciesIsozymeOnly?: string[];
   /** For a compound with no row in the organism searched: what that
    *  organism holds, counted, in `caterva compose`'s words (V7-08). */
   availableInTheOrganism?: string | null;
@@ -118,6 +120,11 @@ export interface ScienceAgentResult {
    *  "organism_not_chosen"): the runner's sentence saying what is missing
    *  and what would fix it. Shown to the person as written. */
   choiceRefusal?: string;
+  /** For a Km resolved as one half of a Km/kcat pair: what the kcat half
+   *  came to. The Km call computes the pair anyway; /api/resolve reads this
+   *  to say, before an enzyme concentration is stated, whether a kcat
+   *  exists to multiply it by (sixth round, XS5R2-05). */
+  pairedKcat?: Partial<ScienceAgentResult> | null;
   /** EC numbers UniProt indexed under the enzyme NAME, when it matched more
    *  than one. An EC number is the identity of the protein every citation
    *  refers to, so the runner refuses to pick and names them (ADR 0127).
@@ -297,6 +304,19 @@ export interface ScienceAgentResult {
    * Absent from runners older than the third real-values round.
    */
   rowNotes?: string[];
+  /**
+   * For a Km: which protein of a multi-protein EC the model's constants
+   * are, in `caterva compose`'s words (caterva.enzymes.isozyme): the
+   * headline, the concern and what to do. Absent when the EC is one protein
+   * in the organism, or from runners older than the sixth real-values round
+   * (XS5R2-04).
+   */
+  isozymeNotice?: {
+    headline: string;
+    detail: string;
+    remedy: string;
+    summary?: string;
+  } | null;
   /**
    * Every row on the non-dominated frontier, with the reliability grades
    * that weight it — Bakker's three axes, scored per candidate rather than

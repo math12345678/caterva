@@ -162,17 +162,40 @@ describe('simulate --resolve reads the question as compose does', () => {
     expect(lines(looked).every((p) => p['ecNumber'] === '1.1.1.27' && p['substrate'] === 'pyruvate')).toBe(true);
   });
 
-  it('says so when the reader gives no reading, instead of reading another way in silence', () => {
+  it('stops when the reader gives no reading twice, instead of reading another way', () => {
     // Live, 2026-11-12, the API's reader timed out under load and answered
     // "acetylcholinesterase inhibited by donepezil" by the older reader, as
-    // plain Michaelis-Menten, and said nothing. With --yes nobody confirms.
+    // plain Michaelis-Menten, and said nothing. Then the older reader was
+    // said and used, and for "DPP4" carried another pair than every other
+    // surface (sixth round, XS5R2-09): it now tries again, and stops.
     const failing = script('failing_reader', ['import sys', 'sys.stderr.write("Traceback: boom\\n")', 'sys.exit(1)']);
-    const { out } = run(['simulate', 'acetylcholinesterase inhibited by donepezil in human', ...SIM], {
+    const looked = path.join(dir, 'failing.jsonl');
+    const { out, code } = run(['simulate', 'acetylcholinesterase inhibited by donepezil in human', ...SIM], {
       CATERVA_SENTENCE_READER: failing,
-      CATERVA_LITERATURE_RUNNER: literature(path.join(dir, 'failing.jsonl')),
+      CATERVA_LITERATURE_RUNNER: literature(looked),
     });
-    expect(out).toContain("Compose's sentence reader gave no reading (Traceback: boom)");
-    expect(out).toContain('read by the older reader');
+    expect(code).toBe(1);
+    expect(out).toContain("Compose's sentence reader gave no reading, twice (Traceback: boom; then Traceback: boom)");
+    expect(out).toContain('Nothing was resolved');
+    expect(lines(looked)).toEqual([]);
+  });
+
+  it('reads on the second try when the first reader dies', () => {
+    const flag = path.join(dir, 'died-once');
+    const once = script('once_reader', [
+      'import json, os, sys',
+      `flag = ${JSON.stringify(flag)}`,
+      'if not os.path.exists(flag):',
+      '    open(flag, "w").close()',
+      '    sys.exit(-15)',
+      `print(json.dumps(json.loads(${JSON.stringify(JSON.stringify(READINGS['acetylcholinesterase inhibited by donepezil in human']))})))`,
+    ]);
+    const { out } = run(['simulate', 'acetylcholinesterase inhibited by donepezil in human', ...SIM], {
+      CATERVA_SENTENCE_READER: once,
+      CATERVA_LITERATURE_RUNNER: literature(path.join(dir, 'once.jsonl')),
+    });
+    expect(out).toContain('a second try read it');
+    expect(out).not.toContain('older reader');
   });
 
   it('says the reader ran out of time, and does not fall back to the older reader', () => {

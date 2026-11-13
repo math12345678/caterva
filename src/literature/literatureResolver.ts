@@ -347,6 +347,13 @@ export interface ResolvedKinetic {
    * Km"). Empty when the row is the plain enzyme's ordinary constant.
    */
   rowNotes?: string[];
+  /**
+   * For a Km: which protein of a multi-protein EC the constants are, in
+   * `caterva compose`'s words ("EC 2.7.1.1 is 5 proteins in human ... these
+   * are GCK's constants"). Compose and the Studio said it; this CLI said
+   * only the row's accession (sixth round, XS5R2-04).
+   */
+  isozymeNotice?: { headline: string; detail: string; remedy: string };
   rowScope?: RowScope | null;
   /**
    * A row that is evidence against the model's mechanism (runner key
@@ -642,6 +649,9 @@ export interface UnresolvedKinetic {
    * (fifth round's review, V7-04). Optional: a runner that predates it sends
    * none, and every organism is then taken as usable, as before. */
   crossSpeciesVariantOnly?: string[];
+  /** Of those, the organisms whose rows each name an isozyme: wild-type
+   *  proteins, taken only when --isoform names one (XS5R2-03). */
+  crossSpeciesIsozymeOnly?: string[];
   /** For a compound with no row in the organism searched: what that
    * organism's rows are for, counted, in `caterva compose`'s words, so the
    * CLI, the API and compose offer the same alternatives (fifth round's
@@ -770,16 +780,29 @@ export function withheldSentence(
       // whose rows all measured a variant is refused again after the opt-in
       // (human COX-2's kcat, Mus musculus N580A; fifth round's review, V7-04).
       const variantOnly = new Set(result.crossSpeciesVariantOnly ?? []);
+      // Isozyme rows ("isoenzyme A") are wild-type proteins, not variants,
+      // and are said as such (sixth round, XS5R2-03: Vibrio tyrosinaticus).
+      const isozymeOnly = new Set(result.crossSpeciesIsozymeOnly ?? []);
       const usable = result.crossSpeciesOrganismsAvailable.filter((o) => !variantOnly.has(o));
-      const variants = result.crossSpeciesOrganismsAvailable.filter((o) => variantOnly.has(o));
-      if (usable.length === 0 && variants.length > 0) {
+      const variants = result.crossSpeciesOrganismsAvailable.filter(
+        (o) => variantOnly.has(o) && !isozymeOnly.has(o),
+      );
+      const isozymes = result.crossSpeciesOrganismsAvailable.filter((o) => isozymeOnly.has(o));
+      const isozymeClause = isozymes.length
+        ? `; rows of a named isozyme only, taken only with --isoform naming it: ${isozymes.join(', ')}`
+        : '';
+      if (usable.length === 0 && (variants.length > 0 || isozymes.length > 0)) {
         return `BRENDA has no row for this ${result.quantity} in the organism asked for, and its ` +
-          `only rows elsewhere (${variants.join(', ')}) measured a protein variant, which is ` +
-          `withheld, so --allow-cross-species would not fill it either: supply it yourself.`;
+          `only rows elsewhere (${[...variants, ...isozymes].join(', ')}) ` +
+          (variants.length > 0
+            ? `measured a protein variant, which is withheld${isozymeClause}`
+            : `each name an isozyme, taken only with --isoform naming it`) +
+          `, so --allow-cross-species would not fill it either: supply it yourself.`;
       }
       return `BRENDA holds this ${result.quantity} only for other organisms ` +
         `(${list(usable, 'unnamed')}` +
         (variants.length ? `; rows of a protein variant only, withheld: ${variants.join(', ')}` : '') +
+        isozymeClause +
         `). Pass --allow-cross-species to use one from a related organism, flagged as such.`;
     }
     default:
@@ -1055,6 +1078,16 @@ export function mapFoundResult(
     selectionTie: parseSelectionTie(parsed['selectionTie']),
     ...(typeof parsed['chosenBecause'] === 'string' ? { chosenBecause: parsed['chosenBecause'] as string } : {}),
     ...(parsed['wideSpread'] === true ? { wideSpread: true } : {}),
+    ...(parsed['isozymeNotice'] && typeof parsed['isozymeNotice'] === 'object'
+      && typeof (parsed['isozymeNotice'] as Record<string, unknown>)['headline'] === 'string'
+      ? {
+          isozymeNotice: {
+            headline: String((parsed['isozymeNotice'] as Record<string, unknown>)['headline']),
+            detail: String((parsed['isozymeNotice'] as Record<string, unknown>)['detail'] ?? ''),
+            remedy: String((parsed['isozymeNotice'] as Record<string, unknown>)['remedy'] ?? ''),
+          },
+        }
+      : {}),
     ...(Array.isArray(parsed['rowNotes'])
       ? { rowNotes: (parsed['rowNotes'] as unknown[]).filter((n): n is string => typeof n === 'string') }
       : {}),
@@ -1275,6 +1308,7 @@ export async function resolveKinetic(
       variantCandidatesAvailable: names(parsed['variantCandidatesAvailable']),
       crossSpeciesOrganismsAvailable: names(parsed['crossSpeciesOrganismsAvailable']),
       crossSpeciesVariantOnly: names(parsed['crossSpeciesVariantOnly']),
+      crossSpeciesIsozymeOnly: names(parsed['crossSpeciesIsozymeOnly']),
       availableInTheOrganism:
         typeof parsed['availableInTheOrganism'] === 'string' && parsed['availableInTheOrganism'] !== ''
           ? (parsed['availableInTheOrganism'] as string)

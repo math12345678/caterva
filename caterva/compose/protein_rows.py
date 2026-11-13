@@ -119,10 +119,31 @@ def _where_rows_are(ec: str, table: str, accessions: Set[str]) -> str:
     except Exception:  # noqa: BLE001
         return ""
     mine = [r for r in rows if set(_accessions(r)) & accessions]
-    where = Counter(r.organism or "an organism BRENDA names otherwise" for r in mine)
-    if not where:
+    if not mine:
         return (f"; BRENDA's {table} rows under EC {ec} carry no row with UniProt "
                 f"{', '.join(sorted(accessions))}")
+    # The search's own rule: a row listing several proteins' accessions and
+    # naming none of them in its words is not taken as any one protein's.
+    # TEM-1's nitrocefin rows (ref 696728, "P13661, P62593") were offered as
+    # the way to model TEM-1, and the run they led to withheld them (sixth
+    # round, VR2-02; fifth round, R5B-01).
+    try:
+        from caterva.bind.core import read_isoform
+    except ImportError:  # pragma: no cover - flat layout
+        def read_isoform(_text: Any) -> Any:
+            return None
+    shared = [r for r in mine if len(set(_accessions(r))) > 1 and not read_isoform(r.conditions)]
+    mine = [r for r in mine if r not in shared]
+    if not mine:
+        refs = sorted({str(r.reference_id) for r in shared if getattr(r, "reference_id", None)})
+        compounds = sorted({r.compound for r in shared if getattr(r, "compound", None)})
+        return ("; BRENDA's only rows with UniProt " + ", ".join(sorted(accessions))
+                + (f" (BRENDA ref {', '.join(refs[:3])}" if refs else " (")
+                + (f": {', '.join(compounds[:3])}" if compounds else "") + ")"
+                + " list it among other proteins' accessions and name none of them, so the search "
+                  "takes none of them as this protein's, and no re-run fills it; supply it yourself, "
+                  "reading " + ("that paper" if len(refs) == 1 else "those papers"))
+    where = Counter(r.organism or "an organism BRENDA names otherwise" for r in mine)
     # Which compounds those rows measured: TEM-1's four E. coli P62593 rows
     # are cephalothin and nitrocefin, not ampicillin, and "the search did not
     # rank one of them" read as if ampicillin rows for TEM-1 existed (third

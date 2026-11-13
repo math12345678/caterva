@@ -2903,8 +2903,12 @@ _NAME_MISS = re.compile(r" -- BRENDA has no (?:Ki |Km |kcat )?row for that (?:su
 NAMES_LISTED = 8
 
 
-def _counted(counts: Mapping[str, int], shown: int = NAMES_LISTED) -> str:
-    ranked = sorted(counts, key=lambda k: (-counts[k], k))
+def _counted(counts: Mapping[str, int], shown: int = NAMES_LISTED,
+             first: Optional[Iterable[str]] = None) -> str:
+    """"A (3 rows); B (1 row) and 2 more", by rows; the names in `first`
+    (organisms of the asked one's class) before the rest."""
+    near = set(first or ())
+    ranked = sorted(counts, key=lambda k: (k not in near, -counts[k], k))
     text = "; ".join(f"{k} ({counts[k]} row{'s' if counts[k] != 1 else ''})" for k in ranked[:shown])
     return text + (f" and {len(ranked) - shown} more" if len(ranked) > shown else "")
 
@@ -2954,7 +2958,7 @@ def _said_for_the_organism(model: Any, reasons: Mapping[str, str], ec: Optional[
         if _AVAILABLE_IN.search(reason):
             try:
                 rewritten = _available_elsewhere(ec, q.table, model.compound_for(q), reason,
-                                                 isoform=isoform)
+                                                 isoform=isoform, asked=where)
             except Exception:  # noqa: BLE001 - the resolver's reason stands
                 rewritten = None
             if rewritten:
@@ -3399,8 +3403,24 @@ def _what_the_organism_holds(ec: str, table: str, compound: Optional[str], organ
 _AVAILABLE_IN = re.compile(r" -- available in: ([^-(]+?)(?= -- | \(|$)")
 
 
+def _same_class(asked: Optional[str], organisms: Iterable[str]) -> List[str]:
+    """Those of `organisms` in the asked organism's class, as far as the
+    enzyme index's organism codes tell: a mammal for a mammal. Mouse
+    tyrosinase's kcat advice led with Streptomyces and hid human's native
+    L-Dopa kcat in "and 15 more" (sixth round, NEW-17). [] when it cannot
+    be told."""
+    try:
+        from caterva.enzymes.symbols import MAMMALS, _code_of
+    except ImportError:  # pragma: no cover
+        return []
+    if _code_of(asked) not in MAMMALS:
+        return []
+    return [o for o in organisms if _code_of(o) in MAMMALS]
+
+
 def _available_elsewhere(ec: str, table: str, compound: Optional[str], reason: str,
-                         isoform: Optional[str] = None) -> Optional[str]:
+                         isoform: Optional[str] = None,
+                         asked: Optional[str] = None) -> Optional[str]:
     """`reason` with its "available in" organisms cut to those holding a row
     the search would use for `compound`; a reason with no such organism is
     rewritten to say the rows elsewhere are variants', and to supply the
@@ -3415,13 +3435,34 @@ def _available_elsewhere(ec: str, table: str, compound: Optional[str], reason: s
     listed = [o.strip() for o in match.group(1).split(",") if o.strip()]
     usable: Dict[str, int] = {}
     variants: Dict[str, int] = {}
+    isozymes: Dict[str, int] = {}
     for organism in listed:
         rows = [r for r in defaults.table_rows(ec, table, organism) if defaults._search_key(r.compound) == key]
         good = _usable(rows)
+        if not isoform:
+            # With no --isoform, the search sets a named isozyme's row aside
+            # (defaults._usable: "taken only when --isoform asks for it").
+            # Vibrio tyrosinaticus's kcat rows are "isoenzyme A" and
+            # "isoenzyme B"; offered as a re-run, that run withheld both
+            # (sixth round, XS5R2-03).
+            named = [r for r in good if getattr(r, "isozyme", False)]
+            good = [r for r in good if not getattr(r, "isozyme", False)]
+            if named and not good:
+                isozymes[organism] = len(named)
+                continue
         if good:
             usable[organism] = len(good)
         elif rows:
             variants[organism] = len(rows)
+    near = _same_class(asked, usable)
+    if isozymes:
+        # Said as isozymes, not variants: wild-type proteins in their own
+        # right, which a re-run takes only when --isoform names one.
+        aside = (f" (rows of a named isozyme only, which a re-run takes only with --isoform naming "
+                 f"it: {_counted(isozymes)})")
+        if usable and not variants:
+            return _AVAILABLE_IN.sub(lambda _m: f" -- available in: {_counted(usable, first=near)}{aside}",
+                                     reason, count=1)
     if isoform and usable:
         # With an isoform carried, an organism whose rows name another
         # isoform is not where to find this one's: human LDHA's kcat
@@ -3467,17 +3508,27 @@ def _available_elsewhere(ec: str, table: str, compound: Optional[str], reason: s
         # Counted, so the advice can name where the measurements are and how
         # many: "available in: Mus musculus, Tetronarce californica" gave no
         # sense of which to pick (fifth round's review, A4-08).
-        if not usable:
+        if not usable and not isozymes:
             return None
-        return _AVAILABLE_IN.sub(lambda _m: f" -- available in: {_counted(usable)}", reason, count=1)
+        if usable:
+            return _AVAILABLE_IN.sub(lambda _m: f" -- available in: {_counted(usable, first=near)}", reason,
+                                     count=1)
     if usable:
-        return _AVAILABLE_IN.sub(lambda _m: f" -- available in: {_counted(usable)} (rows of a protein "
-                                 f"variant only, withheld: {_counted(variants)})", reason, count=1)
+        return _AVAILABLE_IN.sub(lambda _m: f" -- available in: {_counted(usable, first=near)} (rows of a "
+                                 f"protein variant only, withheld: {_counted(variants)})"
+                                 + (f"{aside}" if isozymes else ""), reason, count=1)
     label = defaults.TABLE_NAMES[table]
+    if isozymes and not variants:
+        return (f"no usable value: the organism searched has no {label} row for {compound}, and the only "
+                f"rows elsewhere ({_counted(isozymes)}) each name an isozyme, which a re-run takes only "
+                "with --isoform naming it, so re-running with --organism alone would not fill it: pass "
+                "--isoform with the isozyme a row names, or supply it yourself"
+                + reason[match.end():])
     return (f"no usable value: the organism searched has no {label} row for {compound}, and the only "
             f"rows elsewhere ({_counted(variants)}) measured a protein variant, which is withheld "
             f"(ADR 0029), so re-running in {'that organism' if len(variants) == 1 else 'any of them'} would "
             "not fill it either: supply it yourself"
+            + (f"{aside}" if isozymes else "")
             + reason[match.end():])
 
 

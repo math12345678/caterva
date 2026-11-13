@@ -253,6 +253,19 @@ def carry(measured: Mapping[str, Any], refused: Mapping[str, str], narrowed: Nar
     out = dict(measured)
     still_refused = dict(refused)
     notes: List[str] = []
+    # When the evidence-only picks are set aside because one of them is
+    # another protein's row, the note says only what is carried and that one
+    # reason. Naming the set-aside values as well read as two answers
+    # (human hexokinase: "arrives at 60.4 1/s ... 0.06 mM, HK-I" before the
+    # resolver's GCK pair; sixth round, R5A2-05).
+    other_protein = ""
+    for identifier, row in narrowed.chosen.items():
+        carried = out.get(identifier)
+        if carried is not None and not same_row(_row_of(carried), row):
+            found = _what_it_was(_row_of(carried), row)
+            if "another protein" in found:
+                other_protein = found.strip(" ()")
+                break
     for identifier, row in narrowed.chosen.items():
         answer = narrowed.answers[identifier]
         carried = out.get(identifier)
@@ -279,6 +292,16 @@ def carry(measured: Mapping[str, Any], refused: Mapping[str, str], narrowed: Nar
             notes.append(
                 f"`{identifier}`: the selections here refused it ({why}); the resolver, asked "
                 f"for {what}, returns {_label(row, answer.unit)}, which is used")
+            continue
+        if other_protein:
+            own = _what_it_was(_row_of(carried), row).strip(" ()") if carried is not None else ""
+            notes.append(
+                f"`{identifier}`: carries {_label(row, answer.unit)}, the resolver's row for "
+                f"{what}, as the API and the TypeScript CLI do; "
+                + (f"the evidence alone would take {own}, so it was set aside"
+                   if "another protein" in own else
+                   f"kept with the other constant's row, because the evidence alone would take "
+                   f"{other_protein} for that one"))
             continue
         notes.append(
             f"`{identifier}`: choosing among the rows the evidence alone returned arrives at "
