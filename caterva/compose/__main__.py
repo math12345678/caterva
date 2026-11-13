@@ -1203,23 +1203,28 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
     elif reading.ec:
         args.subject = reading.ec
         _remember(args, enzyme_text=reading.enzyme_text)
-        out.notes.append(reading.enzyme_note())
+        # "glucokinase from rat liver": the name's EC number has no rat
+        # protein and no rat row, and rat glucokinase is HXK4 of EC 2.7.1.1,
+        # whose rows name it (fifth round's review). Sets --subject and
+        # --isoform when it applies.
+        elsewhere = _read_as_the_protein_filed_elsewhere(reading, args)
+        out.notes.append(elsewhere or reading.enzyme_note())
         # ADR 0182: a symbol is one protein of its EC number ("HK2"); the
         # enzyme note says the constants come from rows that name it, so the
         # isoform is searched for unless --isoform set one.
         if getattr(reading, "isoform", None) and not getattr(args, "isoform", None):
             args.isoform = reading.isoform
-        tissue = _tissue_isoform(reading.ec, typed)
+        tissue = _tissue_isoform(args.subject, typed)
         if tissue and not getattr(args, "isoform", None):
             word, isoform, said = tissue
             args.isoform = isoform
-            out.notes.append(f"Read {word!r} with EC {reading.ec} as its {word} isoform {isoform}"
+            out.notes.append(f"Read {word!r} with EC {args.subject} as its {word} isoform {isoform}"
                              f"{said}; the constants are taken from rows naming it where there are any "
                              "(pass --isoform to change it).")
         elif tissue is None and _TISSUE_WORD.search(typed) and not getattr(args, "isoform", None):
             word = _TISSUE_WORD.search(typed).group(0)
             out.notes.append(f"The word {word!r} in your description was not used: Caterva has no "
-                             f"tissue isoform of EC {reading.ec} for it, so the constants may be any "
+                             f"tissue isoform of EC {args.subject} for it, so the constants may be any "
                              "tissue's; pass --isoform to choose one.")
         if getattr(reading, "mutations", None):
             # "IDH1 R132H": the constants come from the mutant's own rows,
@@ -1231,7 +1236,8 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
             out.notes.append(f"Your description names the isoform {reading.isoform}; --isoform {args.isoform} "
                              "was used instead, because a flag wins over the description.")
     elif reading.ambiguity is not None and (
-            chosen := _enzyme_the_data_singles_out(reading, args)) is not None:
+            chosen := (_enzyme_the_data_singles_out(reading, args)
+                       or _enzyme_the_organism_singles_out(reading, args))) is not None:
         # A name that is a few specific enzymes ("citrate synthase": the Si-
         # and Re- enzymes), of which BRENDA has measurements for one only
         # (ADR 0182). Taken, and said with the others named; a class word, a
@@ -1533,6 +1539,75 @@ def _enzyme_the_data_singles_out(reading: Any, args: Any) -> Optional[Any]:
     # is not a reading of the name the user typed: never settled by rows
     # alone.
     return None
+
+
+#: At most this many candidates listing a protein of the organism are read
+#: for an enzyme the organism singles out; more is a family, not a few readings.
+ORGANISM_PROTEIN_CANDIDATES = 4
+
+
+def _enzyme_the_organism_singles_out(reading: Any, args: Any) -> Optional[Any]:
+    """The `Choice` of one EC number for a name several enzymes match, when
+    the organism named settles it twice over: exactly one candidate both
+    lists a protein of that organism in the enzyme nomenclature and has Km
+    rows for it in BRENDA, and no other candidate read has any Km row there.
+
+    "soybean lipoxygenase with linoleic acid" listed 13 enzymes; two list a
+    soybean protein and only EC 1.13.11.12 has soybean Km rows (10), and the
+    refusal said exactly that before refusing. "thioredoxin reductase
+    inhibited by auranofin in rat" is a phrase inside eight enzymes' names;
+    only EC 1.8.1.9 lists rat proteins (TRXR1, TRXR2) and has rat Km rows
+    (fifth round of the real-values review). Both were placeholders. A
+    class word, a typo, an abbreviation, a symbol or a mnemonic is never
+    settled this way: those are questions about what was meant, which no
+    row answers. The note names the choice, the reason and the others.
+    """
+    ambiguity = getattr(reading, "ambiguity", None)
+    organism = getattr(args, "organism", None) or getattr(reading, "organism", None)
+    if not organism or ambiguity is None or getattr(ambiguity, "class_word", False) \
+            or getattr(ambiguity, "confirm_only", False):
+        return None
+    from caterva.enzymes.finder import TIER_TYPO
+
+    candidates = [c for c in getattr(ambiguity, "candidates", ()) or ()
+                  if getattr(c, "via", "name") in ("name", "ec") and not getattr(c, "abbreviation", False)
+                  and c.tier != TIER_TYPO]
+    if len(candidates) < 2:
+        return None
+    with_protein = [c for c in candidates if c.has_organism_protein]
+    if not with_protein or len(with_protein) > ORGANISM_PROTEIN_CANDIDATES:
+        return None
+    from caterva.compose import defaults
+    from caterva.compose.organisms import normalise_organism
+
+    where = normalise_organism(organism)[0] or organism
+    others = [c for c in candidates if c not in with_protein][:CANDIDATES_READ_FOR_THE_ORGANISM]
+    read = with_protein + others
+    try:
+        rows = {c.ec: len(_usable(defaults.table_rows(c.ec, "km", where))) for c in read}
+    except Exception:  # noqa: BLE001 - one unreadable page and nothing is singled out
+        return None
+    with_rows = [c for c in read if rows[c.ec]]
+    if len(with_rows) != 1 or with_rows[0] not in with_protein:
+        return None
+    best = with_rows[0]
+    proteins = ", ".join(p.label for p in best.organism_proteins[:4]) or \
+        f"{best.organism_protein_count} UniProt entries"
+    listing = "; ".join(f"EC {c.ec}" for c in with_protein)
+    unread = len(candidates) - len(read)
+    how = (f"of the {len(candidates)} enzymes the name matches, "
+           + (f"only it lists a protein of {where} in the enzyme nomenclature ({proteins})"
+              if len(with_protein) == 1 else
+              f"{len(with_protein)} list a protein of {where} in the enzyme nomenclature ({listing}), "
+              f"and it is the only one of them with Km rows there")
+           + f"; BRENDA holds {defaults._plural(rows[best.ec], 'Km row')} for it in {where}, and none for "
+           + (f"the {len(read) - 1} other{'s' if len(read) != 2 else ''} read"
+              + (f" ({unread} more, which list no {where} protein, were not read)" if unread else "")))
+    text = reading.enzyme_text or reading.text
+    why = (f"your description names {text!r}, which is not one enzyme; {best.name} is used because {how}")
+    alternatives = tuple(defaults.Option(f"EC {c.ec} ({c.name})", {"km": rows[c.ec]})
+                         for c in read if c is not best)[:defaults.ALTERNATIVES_NAMED]
+    return defaults.Choice("enzyme", best.ec, why, alternatives, len(candidates), {"km": rows[best.ec]})
 
 
 def _built_with_its_inhibitor(args: Any, out: DescriptionReading) -> None:
@@ -1999,6 +2074,61 @@ def _not_named(model: Any, args: Any) -> Tuple[List[str], bool, bool]:
     return tables, substrate, inhibitor
 
 
+def _protein_under_another_ec(ec: str, organism: str, text: Optional[str]) -> Optional[Tuple[Any, Any, list, list]]:
+    """(candidate, protein, usable Km rows, rows naming the protein) for the
+    enzyme words `text` when they name a protein of `organism` that the
+    nomenclature files under ANOTHER EC number than `ec`; None otherwise,
+    or when that EC number's page cannot be read.
+
+    The words name the protein when UniProt gives it them as a name
+    ("Glucokinase" for human GCK), or when they are the isozyme's name in
+    the words papers use ("glucokinase" is HXK4, hexokinase IV, in rat,
+    whose UniProt names this build does not hold). A word inside a longer
+    name ("ADP-dependent glucokinase") does not count. A row names the
+    protein by its commentary's words or by its own UniProt accession: human
+    GCK's wild-type K0.5 row (ref 739603) names it only by P35557, and the
+    refusal said none of the 54 rows named GCK (fifth round's review).
+    """
+    if not text:
+        return None
+    from caterva.enzymes import finder
+    from caterva.enzymes.index import load_index
+    from caterva.compose import defaults
+    from caterva.bind.core import read_isoform, same_isoform
+
+    key = finder.strict_key(text)
+    try:
+        ranked = finder._search(text, finder.organism_code(organism), load_index())
+    except Exception:  # noqa: BLE001
+        return None
+    for candidate in ranked:
+        if candidate.ec == ec or candidate.via != "name" or candidate.tier == finder.TIER_TYPO:
+            continue
+        for protein in candidate.organism_proteins:
+            if not (any(finder.strict_key(n) == key for n in protein.names)
+                    or same_isoform(protein.label, text)):
+                continue
+            try:
+                # Counted as the search would use them: a variant's row is
+                # withheld (ADR 0029), so it is no way out.
+                rows = _usable(defaults.table_rows(candidate.ec, "km", organism))
+            except Exception:  # noqa: BLE001
+                return None
+            accession = getattr(protein, "accession", None)
+
+            def names_it(row: Any) -> bool:
+                said = read_isoform(row.conditions or "")
+                if said and (same_isoform(said, protein.label) or same_isoform(said, text)):
+                    return True
+                cells = [c.strip() for c in (row.uniprot or "").split(",") if c.strip()]
+                if len(cells) != 1:
+                    return False
+                return cells[0] == accession or defaults._accession_says(cells[0], protein.label) is True
+
+            return candidate, protein, rows, [r for r in rows if names_it(r)]
+    return None
+
+
 def _filed_under_another_ec(ec: str, organism: str, text: Optional[str]) -> Optional[str]:
     """When the enzyme words name a protein of `organism` that the
     nomenclature files under ANOTHER EC number, the sentence that says so and
@@ -2009,56 +2139,89 @@ def _filed_under_another_ec(ec: str, organism: str, text: Optional[str]) -> Opti
     listed under EC 2.7.1.1 (hexokinase), whose human rows include GCK's own.
     Only a protein whose UniProt names include the words exactly counts (GCK
     is "Glucokinase"); a word inside a longer name ("ADP-dependent
-    glucokinase") does not.
+    glucokinase") does not. When rows do name it, compose reads that EC
+    number itself (`_read_as_the_protein_filed_elsewhere`); this sentence is
+    for a run that did not.
     """
-    if not text:
+    found = _protein_under_another_ec(ec, organism, text)
+    if found is None:
         return None
-    from caterva.enzymes import finder
-    from caterva.enzymes.index import load_index
+    candidate, protein, rows, naming = found
+    if not rows:
+        return None
+    said = (f"In {organism}, {text!r} is the protein {protein.label}, which the nomenclature files "
+            f"under EC {candidate.ec} ({candidate.name}); BRENDA has {len(rows)} Km "
+            f"row{'s' if len(rows) != 1 else ''} for EC {candidate.ec} in {organism}")
+    if naming:
+        return (said + f", {len(naming)} of which name{'s' if len(naming) == 1 else ''} {protein.label} "
+                f"(in their words or by UniProt accession). To model it, re-run with --subject "
+                f"{candidate.ec} --isoform {protein.label} (the constants are then taken from rows that "
+                f"name {protein.label} where there are any, and the report says which rows name no "
+                "isozyme).")
+    # No row names the protein: the run the advice leads to carries a
+    # row of whichever protein of that EC number it measured.
+    # "glucokinase in mouse" was sent to EC 2.7.1.1 --isoform Gck and
+    # came back GROUNDED with Km 0.42 mM from a mouse row naming no
+    # isozyme: a low-Km hexokinase's value, not glucokinase's (S0.5
+    # near 8 mM). Said before the command, not left to a flag after it.
+    return (said + f", and none of them names {protein.label}, in its words or by UniProt accession, so "
+            f"each may have measured another protein of EC {candidate.ec}. To model it from those rows, "
+            f"re-run with --subject {candidate.ec} --isoform {protein.label} and read the papers of the "
+            "rows it carries (the report flags each row that names no isozyme; it cannot say whose it "
+            f"is), or supply {protein.label}'s constants yourself.")
+
+
+def _read_as_the_protein_filed_elsewhere(reading: Any, args: Any) -> Optional[str]:
+    """For an enzyme name read as an EC number that lists no protein of the
+    organism and has no Km row there, while the words name a protein of that
+    organism filed under another EC number whose BRENDA rows name it: that
+    EC number and protein are used (`args.subject`, `args.isoform`), and
+    the sentence saying so is returned; None otherwise.
+
+    "glucokinase from rat liver" was read as EC 2.7.1.2, the bacterial
+    glucokinase, which lists no rat protein, and refused with advice to
+    model Zymomonas mobilis, while BRENDA's rat rows for hexokinase IV
+    (glucokinase, HXK4) are under EC 2.7.1.1: 7.7 mM for D-glucose (ref
+    641070, "adult glucokinase"). The cofactor-sibling rule for glutamate
+    dehydrogenase (EC 1.4.1.2 to 1.4.1.3, fourth round) is the same idea;
+    this one rests on rows that name the protein (fifth round's review).
+    """
+    ec = reading.ec
+    organism = getattr(args, "organism", None) or reading.organism
+    if not ec or not organism or getattr(args, "isoform", None) or getattr(reading, "isoform", None):
+        return None
     from caterva.compose import defaults
+    from caterva.compose.organisms import normalise_organism
 
-    key = finder.strict_key(text)
+    where = normalise_organism(organism)[0] or organism
     try:
-        ranked = finder._search(text, finder.organism_code(organism), load_index())
-    except Exception:  # noqa: BLE001
-        return None
-    for candidate in ranked:
-        if candidate.ec == ec:
-            continue
-        for protein in candidate.organism_proteins:
-            if not any(finder.strict_key(n) == key for n in protein.names):
-                continue
-            try:
-                # Counted as the search would use them: a variant's row is
-                # withheld (ADR 0029), so it is no way out.
-                rows = _usable(defaults.table_rows(candidate.ec, "km", organism))
-            except Exception:  # noqa: BLE001
-                return None
-            if not rows:
-                return None
-            from caterva.bind.core import read_isoform, same_isoform
+        from caterva.enzymes import finder
+        from caterva.enzymes.index import load_index
 
-            naming = sum(1 for row in rows if same_isoform(read_isoform(row.conditions), protein.label))
-            said = (f"In {organism}, {text!r} is the protein {protein.label}, which the nomenclature files "
-                    f"under EC {candidate.ec} ({candidate.name}); BRENDA has {len(rows)} Km "
-                    f"row{'s' if len(rows) != 1 else ''} for EC {candidate.ec} in {organism}")
-            if naming:
-                return (said + f", {naming} of which name{'s' if naming == 1 else ''} {protein.label}. To "
-                        f"model it, re-run with --subject {candidate.ec} --isoform {protein.label} (the "
-                        f"constants are then taken from rows that name {protein.label} where there are any, "
-                        "and the report says which rows name no isozyme).")
-            # No row names the protein: the run the advice leads to carries a
-            # row of whichever protein of that EC number it measured.
-            # "glucokinase in mouse" was sent to EC 2.7.1.1 --isoform Gck and
-            # came back GROUNDED with Km 0.42 mM from a mouse row naming no
-            # isozyme: a low-Km hexokinase's value, not glucokinase's (S0.5
-            # near 8 mM). Said before the command, not left to a flag after it.
-            return (said + f", and none of them names {protein.label}, so each may have measured another "
-                    f"protein of EC {candidate.ec}. To model it from those rows, re-run with --subject "
-                    f"{candidate.ec} --isoform {protein.label} and read the papers of the rows it carries "
-                    "(the report flags each row that names no isozyme; it cannot say whose it is), or "
-                    f"supply {protein.label}'s constants yourself.")
-    return None
+        code = finder.organism_code(where)
+        _, count = load_index().proteins_in(ec, code)
+        if code is None or count:
+            return None
+        if _usable(defaults.table_rows(ec, "km", where)):
+            return None
+    except Exception:  # noqa: BLE001 - unreadable: the reading stands
+        return None
+    found = _protein_under_another_ec(ec, where, reading.enzyme_text)
+    if found is None:
+        return None
+    other, protein, rows, naming = found
+    if not naming:
+        return None
+    args.subject = other.ec
+    args.isoform = protein.label
+    name = reading.enzyme_name or ec
+    return (f"Read {reading.enzyme_text!r} in your description as EC {other.ec} ({other.name}), the "
+            f"{where} protein {protein.label}: EC {ec} ({name}), whose name it is, lists no {where} "
+            f"protein in the enzyme nomenclature and BRENDA holds no Km row for it there, while the "
+            f"nomenclature files {where} {protein.label} under EC {other.ec}, where "
+            f"{defaults._plural(len(naming), 'Km row')} of {len(rows)} name it. The constants are taken "
+            f"from rows that name {protein.label} where there are any; pass --subject {ec} to model "
+            f"EC {ec} instead.")
 
 
 def _km_organisms_usable(ec: str) -> Dict[str, int]:
@@ -2428,7 +2591,7 @@ def _search_resolved(
         said = {k: not_found[k] for k in said}
     withheld.update({k: said[k] for k in withheld if k in said})
     far = _far_from_other_organisms(model, measured, ec, args.organism)
-    selection_notes = list(chosen.notes) + far
+    selection_notes = list(chosen.notes) + far + _filed_under_other_names(model, measured, ec)
     cautions = tuple((note[1:note.index("`", 1)], note.split(": ", 1)[1]) for note in far
                      if note.startswith("`") and ": " in note)
     if getattr(args, "isoform", None):
@@ -3052,6 +3215,54 @@ def _neighbours_withheld(model: Any, measured: Mapping[str, Any], ec: Optional[s
             f"search matches a name inside longer names, and another compound's value is never "
             f"carried under this one's (ADR 0076). Pass {flag} with that name to model it, or "
             f"supply this constant yourself")
+    return out
+
+
+def _filed_under_other_names(model: Any, measured: Mapping[str, Any], ec: Optional[str]) -> List[str]:
+    """One sentence per carried value whose BRENDA row files its compound
+    under another name than the one the model uses, saying both.
+
+    "acetylcholinesterase inhibited by donepezil" carried Ki 2.2e-06 mM
+    (ref 651163) from a row BRENDA files as "(R,S)-1-benzyl-4-[(5,6-
+    dimethoxy-1-indanon)-2-yl]methylpiperidine hydrochloride", racemic
+    donepezil hydrochloride, which Caterva's compound names read as
+    donepezil; no surface said so (fifth round of the real-values review).
+    A spelling that differs only in case, spacing or a counter-ion is not
+    another name and is not said. A page that cannot be read says nothing.
+    """
+    if not ec or not measured:
+        return []
+    from caterva.compose import defaults
+
+    out: List[str] = []
+    for q in getattr(model, "resolvable", ()) or ():
+        m = measured.get(q.parameter_id)
+        if m is None or q.table not in ("km", "kcat", "ki"):
+            continue
+        compound = model.compound_for(q)
+        if not compound:
+            continue
+        ref = getattr(m, "reference_id", None)
+        if ref is None:
+            cited = re.search(r"BRENDA ref (\d+)", str(getattr(m, "citation", "") or ""))
+            ref = cited.group(1) if cited else None
+        try:
+            rows = defaults.rows_of_value(
+                ec, q.table, getattr(m, "organism", None) or getattr(model, "organism", None), m.value, ref)
+        except Exception:  # noqa: BLE001 - unverifiable: nothing said
+            continue
+        # Only the rows the search takes for the compound: another compound
+        # of the same paper can share the value (CPA's 6.08 1/s, ref 650016).
+        cells = sorted({r.compound for r in rows if defaults._matches(r.compound, compound)})
+        if not cells or any(defaults._search_key(c) == defaults._search_key(compound) for c in cells):
+            continue
+        shown = " / ".join(repr(c) for c in cells[:2])
+        same = all(defaults._group_key(c) == defaults._group_key(compound) for c in cells)
+        out.append(f"`{q.parameter_id}`: BRENDA files the row it came from (ref {ref}) as {shown}, "
+                   + (f"which Caterva reads as {compound}, the compound the model names: the same "
+                      "compound under another name" if same else
+                      f"which the search took for {compound}, the compound the model names, because "
+                      "BRENDA's name holds it; read the row to check it is the compound you mean"))
     return out
 
 

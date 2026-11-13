@@ -497,10 +497,21 @@ def test_an_unreadable_substrate_list_takes_nothing_and_says_so(monkeypatch):
 #: glucose and "glucose analogues"; D-fructose's 11.4 mM (ref 640237) for
 #: fructose 1,6-bisphosphate; D-glucosamine's 0.5 mM (ref 640230) for
 #: N-acetyl glucosamine.
+#: "2 deoxy glucose" was one of them until the fifth round of the real-values
+#: review: the literature layer's identity key now reads it as the
+#: 2-deoxyglucose BRENDA lists (the same compound, never D-glucose), so it
+#: is a named substrate, tested on its own below.
 COMPOUND_NAMES = [
-    "glucose 6-phosphate", "2 deoxy glucose", "glucose analogues", "fructose 1,6-bisphosphate",
+    "glucose 6-phosphate", "glucose analogues", "fructose 1,6-bisphosphate",
     "N-acetyl glucosamine",
 ]
+
+
+def test_two_deoxy_glucose_typed_in_words_is_the_listed_compound_never_d_glucose():
+    reading = read_sentence("Michaelis-Menten kinetics of human hexokinase on 2 deoxy glucose")
+    assert reading.substrate_candidates == ("2 deoxy glucose",)
+    assert match_substrate(reading.substrate_candidates, HUMAN_HK).name == "2-deoxyglucose"
+    assert match_substrate(reading.substrate_candidates, ["D-glucose", "ATP"]).name is None
 
 
 @pytest.mark.parametrize("compound", COMPOUND_NAMES)

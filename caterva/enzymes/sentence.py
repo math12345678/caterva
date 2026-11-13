@@ -483,6 +483,23 @@ def _tokens(text: str) -> List[_Token]:
 _PAIRS = {"(": ")", "[": "]", "{": "}"}
 
 
+def _closed(text: str, typed: str) -> str:
+    """`typed` with the closing brackets that follow it in `text` when it
+    opens more than it closes: the tokeniser drops a trailing bracket that
+    is unmatched within its word, so "isocitrate dehydrogenase (NADP)" was
+    echoed as 'isocitrate dehydrogenase (NADP' (fifth round's review)."""
+    at = text.find(typed)
+    if at < 0:
+        return typed
+    end = at + len(typed)
+    out = typed
+    for opening, closing in _PAIRS.items():
+        while out.count(opening) > out.count(closing) and end < len(text) and text[end] == closing:
+            out += closing
+            end += 1
+    return out
+
+
 def _balanced_open(raw: str) -> bool:
     """A leading bracket closed inside the word ("(-)-huperzine")."""
     close = _PAIRS.get(raw[0])
@@ -1157,7 +1174,12 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
         if _is_class_window(words):
             continue
         typed = text[words[0].start:words[-1].end]
-        if not _could_be_a_name(typed):
+        # An entry-name mnemonic whose UniProt gene symbol it also is, in the
+        # organism named ("NQO1" in human), is read as that gene by the
+        # finder (`finder._mnemonic_is_the_gene`); any other mnemonic is
+        # still only offered, in the passes below (fifth round's review).
+        if not _could_be_a_name(typed) and not (
+                rank_by and len(words) == 1 and _written_as_a_mnemonic(typed)):
             continue
         result = resolve(typed, rank_by)
         if isinstance(result, Resolved) and _acceptable(result, typed):
@@ -1371,7 +1393,7 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
     if enzyme is not None:
         typed, result = enzyme
         return SentenceReading(
-            text=text, enzyme_text=typed, ec=result.ec,
+            text=text, enzyme_text=_closed(text, typed), ec=result.ec,
             enzyme_name=result.candidate.name if result.candidate else None,
             how=result.how, cautions=tuple(result.cautions),
             substrate_text=candidates[0] if candidates else None,
@@ -1382,7 +1404,7 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
             mutations=tuple(mutations),
             **_assumed_organism(read_organism, organism, assumed, organisms))
     return SentenceReading(possible_inhibitor_text=possible_inhibitor, near=near if ambiguity is None and not others else None,
-        text=text, enzyme_text=ambiguity_text if ambiguity is not None else None,
+        text=text, enzyme_text=_closed(text, ambiguity_text) if ambiguity is not None else None,
         organism=read_organism[1] if read_organism else None,
         organism_text=read_organism[0] if read_organism else None,
         substrate_text=candidates[0] if candidates else None,
@@ -1470,6 +1492,21 @@ def _substrate_form(text: str) -> str:
     return " ".join(key.split())
 
 
+def _same_compound_listed(typed: str, listed: Sequence[str]) -> List[str]:
+    """The listed names that are `typed` by the literature layer's compound
+    identity key (`compound_names.identity_key`); empty without that layer."""
+    try:
+        from caterva.checkout import literature_module
+
+        key = literature_module("compound_names").identity_key
+    except Exception:  # noqa: BLE001 - no literature layer: spellings only
+        return []
+    want = key(typed)
+    if not want or len(want) < 3:
+        return []
+    return sorted({name for name in listed if key(name) == want})
+
+
 def match_substrate(candidates: Sequence[str], listed: Sequence[str]) -> SubstrateMatch:
     """The one substrate BRENDA lists that the description's words name, or nothing.
 
@@ -1528,6 +1565,21 @@ def match_substrate(candidates: Sequence[str], listed: Sequence[str]) -> Substra
             same = sorted({name for name in listed if _substrate_form(name) == form})
             if len(same) == 1:
                 found.append((typed, same[0], False))
+            else:
+                # The same compound under the name its paper printed: a
+                # peptide's codes ("Suc-Ala-Ala-Ala-pNA" is BRENDA's
+                # "succinyl-L-Ala-L-Ala-L-Ala-4-nitroanilide"), a drug's
+                # systematic name. The literature layer's identity key is
+                # the one the search matches by, so a name read here is the
+                # name the search takes rows for. Porcine elastase's report
+                # said the typed substrate "was not used" and then modelled
+                # exactly it under BRENDA's spelling (fifth round's review).
+                # Spellings of one compound are one: the best-measured is
+                # taken, as for an abbreviation.
+                same = _same_compound_listed(typed, listed)
+                if same:
+                    best = max(same, key=lambda n: (counts.get(n, 0), n))
+                    found.append((typed, best, False))
     names = sorted({name for _, name, _ in found})
     if len(names) == 1:
         typed, name, prefix = next(f for f in found if f[1] == names[0])

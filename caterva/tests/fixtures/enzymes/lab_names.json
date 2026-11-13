@@ -1173,7 +1173,8 @@
    "verified": [
     "5.3.1.5"
    ],
-   "expect": "suggestions-only"
+   "expect": "resolved",
+   "ec": "5.3.1.5"
   },
   {
    "query": "chitinase",
