@@ -652,6 +652,8 @@ export interface UnresolvedKinetic {
   /** Of those, the organisms whose rows each name an isozyme: wild-type
    *  proteins, taken only when --isoform names one (XS5R2-03). */
   crossSpeciesIsozymeOnly?: string[];
+  /** For variant_withheld: every withheld row names an isozyme (XS5R2-03). */
+  variantIsozymesOnly?: boolean;
   /** For a compound with no row in the organism searched: what that
    * organism's rows are for, counted, in `caterva compose`'s words, so the
    * CLI, the API and compose offer the same alternatives (fifth round's
@@ -768,6 +770,13 @@ export function withheldSentence(
         `(${list(result.isoformsAvailable, 'unnamed')}). An isoform is a different gene product; ` +
         `pass --isoform with one of those to use it.`;
     case 'variant_withheld':
+      if (result.variantIsozymesOnly) {
+        // Isozymes are wild-type proteins, and --isoform takes their rows
+        // (Vibrio tyrosinaticus, "isoenzyme A": sixth round, XS5R2-03).
+        return `BRENDA's rows for this ${result.quantity} each name an isozyme ` +
+          `(${list(result.variantCandidatesAvailable, 'unnamed')}), taken only when --isoform names it: ` +
+          `re-run with --isoform set to one of them to model that isozyme.`;
+      }
       return `BRENDA's rows for this ${result.quantity} were all measured on protein variants ` +
         `(${list(result.variantCandidatesAvailable, 'unnamed')}), which describe the variant, not the enzyme.`;
     case 'implausible_withheld':
@@ -1309,6 +1318,7 @@ export async function resolveKinetic(
       crossSpeciesOrganismsAvailable: names(parsed['crossSpeciesOrganismsAvailable']),
       crossSpeciesVariantOnly: names(parsed['crossSpeciesVariantOnly']),
       crossSpeciesIsozymeOnly: names(parsed['crossSpeciesIsozymeOnly']),
+      ...(parsed['variantIsozymesOnly'] === true ? { variantIsozymesOnly: true } : {}),
       availableInTheOrganism:
         typeof parsed['availableInTheOrganism'] === 'string' && parsed['availableInTheOrganism'] !== ''
           ? (parsed['availableInTheOrganism'] as string)

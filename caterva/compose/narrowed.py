@@ -272,7 +272,7 @@ def carry(measured: Mapping[str, Any], refused: Mapping[str, str], narrowed: Nar
         if carried is not None and same_row(_row_of(carried), row):
             continue
         what = _asked(isoform, modes.get(identifier))
-        because = (f"the resolver's row for {what}, ranked among every row BRENDA holds "
+        because = (f"the row the resolver returns when asked for {what}, ranked among every row BRENDA holds "
                    f"before choosing on evidence")
         own = getattr(answer, "chosen_because", None) or getattr(answer, "resolver_because", None)
         if own:
@@ -296,7 +296,7 @@ def carry(measured: Mapping[str, Any], refused: Mapping[str, str], narrowed: Nar
         if other_protein:
             own = _what_it_was(_row_of(carried), row).strip(" ()") if carried is not None else ""
             notes.append(
-                f"`{identifier}`: carries {_label(row, answer.unit)}, the resolver's row for "
+                f"`{identifier}`: carries {_label(row, answer.unit)}, the row the resolver returns when asked for "
                 f"{what}, as the API and the TypeScript CLI do; "
                 + (f"the evidence alone would take {own}, so it was set aside"
                    if "another protein" in own else

@@ -281,6 +281,11 @@ class KineticResult(BaseModel):
     #: opt-in it just demanded of them.
     variant_candidates_available: list[str] = []
 
+    #: True when every row behind a variant_withheld names an isozyme
+    #: ("isoenzyme A"): wild-type proteins, taken when the isoform is asked
+    #: for, and said as isozymes, not variants (sixth round, XS5R2-03).
+    variant_isozymes_only: bool = False
+
     #: The isoforms BRENDA's rows measured, when an isoform was asked for
     #: and no row measured it or named none. Populated only for
     #: source="isoform_withheld". A constant of another isoform is another
@@ -1814,7 +1819,20 @@ def _best_evidenced(
         nonlocal rows
         kept_rows = [e for e in rows if keep(e)]
         if kept_rows and len(kept_rows) < len(rows):
-            passed_over.append(clause(len(rows) - len(kept_rows), [e for e in rows if not keep(e)]))
+            out = [e for e in rows if not keep(e)]
+            text = clause(len(rows) - len(kept_rows), out)
+            # The values are said, as for the rows not stating pH and
+            # temperature: ACE's recombinant 408 1/s row (ref 81212) was
+            # passed over for its paper's native row and named nowhere, and
+            # rat nNOS's 4.8 mM row likewise (sixth round, R5B2-02, VR2-05).
+            values = sorted({float(e.km_value) for e in out
+                             if isinstance(getattr(e, "km_value", None), (int, float))})
+            if values and " passed over" in text:
+                shown = ", ".join(f"{v:g}" for v in values[:4]) + (" ..." if len(values) > 4 else "")
+                unit = getattr(out[0], "unit", "") or ""
+                at = text.index(" passed over") + len(" passed over")
+                text = f"{text[:at]} ({shown}{' ' + unit if unit else ''}){text[at:]}"
+            passed_over.append(text)
             log.append(f"{tier}: kept the {len(kept_rows)} of {len(rows)} row(s) {line}")
             rows = kept_rows
 
@@ -2106,7 +2124,11 @@ def _best_evidenced(
                + " (an actual row, so the value is one real measurement, not an average)")
     because = f"{chosen.km_value:g} {unit} (BRENDA ref {_ref(chosen)}) is {how}"
     if fold is not None:
-        because += f"; the {len(kept)} remaining rows span {lo:g} to {hi:g} {unit}"
+        # The carried row is one of them, and is said to be: "the 6
+        # remaining rows" read as six rows besides it, after a header that
+        # counted three (sixth round, R5B2-01).
+        because += (f"; the {len(kept)} rows left after the checks, this one among them, span "
+                    f"{lo:g} to {hi:g} {unit}")
         if wide and unit_slip is None:
             because += (f", a {fold:.3g}-fold spread: the literature disagrees by more than "
                         f"{WIDE_SPREAD_FOLD:g}-fold, so this one value hides most of what is known")
@@ -3117,6 +3139,8 @@ def _variant_withheld_result(withheld, log):
         found=False,
         source="variant_withheld",
         variant_candidates_available=described,
+        variant_isozymes_only=bool(withheld) and all(
+            e.variant is not None and e.variant.kind == "isozyme" for e in withheld),
         search_log=log,
     )
 

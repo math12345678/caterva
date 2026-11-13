@@ -100,6 +100,8 @@ export interface ScienceAgentResult {
   crossSpeciesVariantOnly?: string[];
   /** Of those, the organisms whose rows each name an isozyme (XS5R2-03). */
   crossSpeciesIsozymeOnly?: string[];
+  /** For variant_withheld: every withheld row names an isozyme (XS5R2-03). */
+  variantIsozymesOnly?: boolean;
   /** For a compound with no row in the organism searched: what that
    *  organism holds, counted, in `caterva compose`'s words (V7-08). */
   availableInTheOrganism?: string | null;

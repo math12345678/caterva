@@ -60,6 +60,23 @@ PASSED_OVER_FOLD = 3.0
 _PASSED_NUMBERS = re.compile(r"passed over \(([^)]*)\)")
 
 
+def _clauses(text: str) -> List[str]:
+    """`text` split at "; " outside parentheses: "construct or altered
+    preparation (an isolated domain ('N-domain'); a chimera)" is one clause,
+    and was cut in two (sixth round)."""
+    out, depth, start = [], 0, 0
+    for i, ch in enumerate(text):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        elif ch == ";" and depth == 0 and text[i + 1:i + 2] == " ":
+            out.append(text[start:i])
+            start = i + 2
+    out.append(text[start:])
+    return out
+
+
 def _passed_over_far(record) -> List[str]:
     """The resolver's "passed over (values)" clauses for a carried row whose
     values lie more than PASSED_OVER_FOLD from it, or []."""
@@ -72,13 +89,20 @@ def _passed_over_far(record) -> List[str]:
     if carried <= 0:
         return []
     out = []
-    for clause in because.split("; "):
+    for clause in _clauses(because):
         m = _PASSED_NUMBERS.search(clause)
         if not m:
             continue
-        found = re.findall(r"(?<![\w./])\d+(?:\.\d+)?(?:e[+-]?\d+)?(?![\w/.])", m.group(1))
-        unit = m.group(1).split()[-1] if m.group(1).split() and not re.fullmatch(
-            r"[\d.e+-]+,?|\.\.\.", m.group(1).split()[-1]) else ""
+        inside = m.group(1)
+        # The values are the numbers before the first word: "(0.07 mM, and
+        # no row states both)" printed as "(0.07 both)", the last word taken
+        # for the unit (sixth round, NEW-17).
+        numbers = re.match(r"\s*((?:\d+(?:\.\d+)?(?:e[+-]?\d+)?(?:,\s*|\s+))*(?:\.\.\.\s*)?)"
+                           r"(?P<unit>1/[^\s,]+|[^\s,\d][^\s,]*)?", inside + " ")
+        found = re.findall(r"(?<![\w./])\d+(?:\.\d+)?(?:e[+-]?\d+)?(?![\w/.])",
+                           numbers.group(1) if numbers else inside)
+        unit = (numbers.group("unit") or "") if numbers else ""
+        rest = clause[m.end():].strip()
         far = [v for v in found
                if float(v) > 0 and max(float(v) / carried, carried / float(v)) > PASSED_OVER_FOLD]
         if far:
@@ -86,13 +110,71 @@ def _passed_over_far(record) -> List[str]:
             # passed over lay more than 3-fold away and then listed rows
             # 1.2-fold away, and one equal to the value carried (fifth
             # round, R5V1-2).
-            head = clause[:m.start()].rstrip() + " passed over"
+            # What the rows were passed over FOR is part of the reason
+            # ("for the same paper's row of the enzyme from its own source").
+            head = clause[:m.start()].rstrip() + " passed over" + (f" {rest}" if rest else "")
             head = re.sub(r"^of the \d+ candidate rows \([^)]*\):\s*", "", head.strip())
             near = len(found) - len(far)
             out.append(f"{head}, {'all' if not near else f'{len(far)} of them'} more than "
                        f"{PASSED_OVER_FOLD:g}-fold from it ({', '.join(far)}"
                        + (f" {unit}" if unit else "") + ")")
     return out
+
+
+def _ref_of(record) -> Optional[str]:
+    m = re.search(r"BRENDA ref (\w+)", str(getattr(record, "citation", None) or ""))
+    return m.group(1) if m else None
+
+
+def _other_papers(identifier: str, record, measured, model: Any = None) -> str:
+    """" The model's Ki comes from another paper (BRENDA ref X), whose own Km
+    row (0.07 mM) was passed over", when the other constants carried come
+    from another paper than this one, or "". Human HMG-CoA reductase carried
+    a Km of 0.6 mM (ref 712198) beside atorvastatin's Ki from ref 667627,
+    whose own Km is 0.07 mM, and nothing said the two came from different
+    papers (sixth round, VR2-06)."""
+    mine = _ref_of(record)
+    if not mine:
+        return ""
+    others = {}
+    for other_id, other in measured.items():
+        ref = _ref_of(other)
+        if other_id != identifier and ref and ref != mine:
+            others.setdefault(ref, []).append(other_id)
+    if not others:
+        return ""
+    alternatives = [a for a in (getattr(record, "alternatives", None) or ()) if isinstance(a, dict)]
+    parts = []
+    table_rows = _same_compound_rows(identifier, model)
+    for ref, ids in sorted(others.items()):
+        own = sorted({float(a["value"]) for a in alternatives
+                      if str(a.get("reference_id") or "") == ref and a.get("value") is not None}
+                     | {float(r.value) for r in table_rows
+                        if str(r.reference_id or "") == ref and r.value is not None})
+        parts.append(f"{', '.join(f'`{i}`' for i in sorted(ids))} {'comes' if len(ids) == 1 else 'come'} "
+                     f"from another paper (BRENDA ref {ref})"
+                     + (f", whose own row for this constant ({', '.join(f'{v:g}' for v in own)} "
+                        f"{record.unit}) was passed over" if own else ""))
+    return " The constants are not one paper's: " + "; ".join(parts) + "."
+
+
+def _same_compound_rows(identifier: str, model: Any) -> list:
+    """BRENDA's rows of the constant's own table for the compound it
+    measured, in the model's organism; [] when they cannot be read."""
+    if model is None:
+        return []
+    try:
+        from caterva.compose import defaults
+
+        q = next(q for q in getattr(model, "resolvable", ()) if q.parameter_id == identifier)
+        compound = model.compound_for(q)
+        ec, organism = getattr(model, "subject", None), getattr(model, "organism", None)
+        if not (compound and ec and organism and q.table in ("km", "kcat", "ki")):
+            return []
+        return [r for r in defaults.table_rows(ec, q.table, organism)
+                if defaults._matches(r.compound, compound)]
+    except Exception:  # noqa: BLE001 - the clause says less
+        return []
 
 
 @dataclass(frozen=True)
@@ -572,6 +654,28 @@ class ModelDossier:
             f"rate.",
         ]
 
+    def _end_set_aside(self, identifier: str, spread: Any) -> str:
+        """For an end of the spread the reason never mentions: why that row
+        was set aside, from the selection's own note, or "". Rat nNOS's Km
+        spread ran to 4.8 mM (ref 659257), the one row stating pH and
+        temperature, and the line never said why it was not carried; the
+        note above did (sixth round, VR2-05)."""
+        reason = str(spread.carried_as or "")
+        try:
+            notes = " ".join(str(n) for n in self.recognition.composition.notes)
+        except AttributeError:
+            return ""
+        out = []
+        for end in sorted({spread.low, spread.high}):
+            label = f"{end:g} {spread.unit}"
+            if f"{end:g}" in reason:
+                continue
+            m = re.search(rf"`{re.escape(identifier)}`: ([^`]*?\({re.escape(label)}, BRENDA ref \w+\)"
+                          r"[^:`]*)", notes)
+            if m:
+                out.append(f"the {label} row is not carried: {m.group(1).strip().rstrip(',;')}; ")
+        return "".join(out)
+
     def _disagreement_lines(self, measured: dict) -> List[str]:  # noqa: C901
         """The rows the resolver ranked equal and did not pick.
 
@@ -607,16 +711,18 @@ class ModelDossier:
                     # own paper's 0.07 mM, went unsaid (fifth round's review).
                     disagreements.append(
                         f"- `{identifier}`: the model carries {record.value:g} {record.unit} "
-                        f"({record.citation}), the only row left after the checks; some rows "
+                        f"({record.citation}), the row the checks kept; some rows "
                         f"passed over lie more than {PASSED_OVER_FOLD:g}-fold from it: "
-                        + "; ".join(passed) + ". Which one is right is a question about the "
-                        "papers.")
+                        + "; ".join(passed) + "."
+                        + _other_papers(identifier, record, measured, self.model)
+                        + " Which one is right is a question about the papers.")
                 continue
             disagreements.append(
                 f"- `{identifier}`: {spread.what}, spanning **{spread.low:g} to {spread.high:g} "
                 f"{spread.unit}** ({spread.fold:.3g}-fold). The model carries "
                 f"{record.value:g} — {spread.carried_as}; "
-                f"{spread.why}."
+                + self._end_set_aside(identifier, spread)
+                + f"{spread.why}."
             )
         if not disagreements:
             return []

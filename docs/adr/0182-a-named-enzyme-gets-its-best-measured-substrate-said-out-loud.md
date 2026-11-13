@@ -681,3 +681,67 @@ constants' own picks is not carried) also changes a run the advice branch
 checked: "acid phosphatase" in Homo sapiens now carries Km 0.36 mM (ref
 134741) beside kcat 14.1 1/s (ref 663781), not ref 663781's pair (4.7 mM,
 26.4 1/s), and says why. It is still fully measured.
+
+## Sixth round (2026-11-13): surfaces that agree, and advice that works
+
+The sixth adversarial round's surface and advice findings. Each fix has a
+regression test (`caterva/tests/test_sixth_round_review_surfaces.py`, the
+API server's `sixthRoundSurfaces.test.ts` and `sixthRoundAdvice.test.ts`,
+and the CLI's `src/literature/__tests__/sixthRoundSurfaces.test.ts`).
+
+- **A replay is this build's answer or none.** `/api/simulate` cached by
+  query text alone, so the stream replayed an older engine's numbers
+  (donepezil's Km 0.04 mM, ref 666973, where every other surface carried
+  0.054 mM, ref 652194). Each stored result now records the engine build, a
+  hash of the sources under `caterva/` and the API server's `src/`
+  (`CATERVA_ENGINE_BUILD` overrides it). Only the same build replays it; an
+  entry with no build is never replayed. The replay notice names the build.
+- **A finished job's stream ends.** A cache hit's SSE stream sent its
+  completed event and stayed open. It now closes after the event.
+- **Which protein, on every surface.** The runner sends compose's isozyme
+  notice with a Km. The API adds it as an `isozymes:` flag and to the Km's
+  note. The TypeScript CLI prints it above the parameter table ("EC 2.7.1.1
+  is 5 human proteins ... the model is of GCK").
+- **Vmax advice for this query.** The Km lookup already computes the kcat
+  half of its pair. When that came back empty, the 422's Vmax detail says
+  why (none in Mus musculus, only a variant, only isozymes) and that an
+  enzyme concentration alone will not give a Vmax.
+- **The CLI does not swap readers in silence.** When compose's reader dies,
+  the CLI tries it once more. If it dies again and the flags do not state
+  the whole system, the CLI stops instead of using the older reader.
+- **Isozymes are isozymes.** Rows naming an isozyme ("isoenzyme A") are
+  wild-type proteins, not variants. They are said as isozymes on every
+  surface, never offered as an organism to re-run in, and in their own
+  organism the advice is `--isoform 'isoenzyme A'`. That run carries Km 36
+  mM and kcat 75 1/s (ref 636408).
+- **Advice the search would follow.** TEM-1's rows that list several
+  proteins' accessions and name none are not counted for TEM-1, in the
+  substrate choice or in the advice. The advice says to read ref 696728
+  instead of re-running with nitrocefin. A mammal is named first for a
+  mammal (human tyrosinase before Streptomyces for mouse). A constant whose
+  every row in the organism is a variant names where the enzyme as found is
+  measured (E. coli thymidylate synthase's kcat: Homo sapiens).
+- **The isozyme example.** The example in "--isoform X (or another of the
+  rest)" is the best-measured other protein, never the one modelled (PRSS1
+  for trypsin, not PRSS58 or PRSS3). The sentence says the kcat may stay a
+  placeholder.
+- **Notes that do not contradict themselves.** When the resolver's pair
+  replaces both evidence-only picks for an isozyme reason, the note states
+  only the carried pair. A row whose own words name no isoform is "tied to"
+  one by its cell or paper, not "measured" on it. The resolver's row is "the
+  row the resolver returns when asked for NOS1", not "the row for NOS1".
+  The span clause says the carried row is among the rows it counts. Rows
+  passed over for any reason have their values said, so ACE's recombinant
+  408 1/s row is named. An end of a spread the reason never mentions gets
+  the selection note's reason (rat nNOS's 4.8 mM row). When the carried
+  constants come from different papers, the report says so and names the
+  other paper's own row (HMG-CoA reductase: the Ki's paper, ref 667627, has
+  a Km of 0.07 mM).
+- **Words.** "(0.07 mM)", not "(0.07 both)". "papyriferic acid", not
+  "papyriferic acid 0". A label the user did not type is said with the
+  words they did type ("'glucokinase' in your description was read as the
+  isoform HXK4"). "Your description names 'influenza' but no organism
+  Caterva can search by", not "No organism was named".
+
+Not done here (other themes): lysozyme still defaults to a non-hen enzyme;
+"4-Aminobenzoate" and "p-Aminobenzoate" are still counted as two compounds.

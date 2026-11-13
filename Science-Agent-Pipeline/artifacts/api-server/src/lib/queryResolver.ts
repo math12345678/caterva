@@ -612,6 +612,15 @@ function kcatWithheldReason(
   }
   if (agentResult.source === "variant_withheld") {
     const variants = agentResult.variantCandidatesAvailable ?? [];
+    if (agentResult.variantIsozymesOnly) {
+      // Isozymes are wild-type proteins; --isoform takes their rows (XS5R2-03).
+      return (
+        "Every kcat BRENDA holds for this enzyme" +
+        (variants.length > 0 ? ` (${variants.join(", ")})` : "") +
+        " names an isozyme, taken only when the isoform is named, so Vmax was " +
+        "not bridged from it; name one of them as the isoform to model that isozyme."
+      );
+    }
     return (
       "Every kcat BRENDA holds for this enzyme" +
       (variants.length > 0 ? ` (${variants.join(", ")})` : "") +

@@ -243,3 +243,186 @@ def test_the_paired_kcat_summary_carries_the_withheld_reason(runner):
                                                         citation=None))
     assert found == {"found": True, "source": "brenda_exact", "kcat": 40.1, "citation": None}
     assert runner._paired_kcat_summary(None) is None
+
+
+# ---------------------------------------------------------------------------
+# XS5R2-03: a run in the isozymes' own organism says isozymes, and --isoform
+# ---------------------------------------------------------------------------
+
+
+def test_variant_withheld_of_isozymes_only_says_isozyme_and_isoform():
+    from caterva.agents.adapters import to_parameter_source
+
+    result = SimpleNamespace(found=False, source="variant_withheld",
+                             variant_candidates_available=["isoenzyme A", "isoenzyme B"],
+                             variant_isozymes_only=True)
+    _, reason = to_parameter_source("kcat", result)
+    assert "names an isozyme" in reason and "--isoform" in reason
+    assert "variant" not in reason.split(" -- ")[0]
+    assert "the isozymes: isoenzyme A, isoenzyme B" in reason
+
+
+def test_the_step_for_isozyme_rows_is_isoform_naming_one():
+    from caterva.compose import verdict
+
+    reason = ("every row BRENDA holds for this constant names an isozyme, a wild-type protein in its "
+              "own right, and a named isozyme's row is taken only when --isoform names it -- the "
+              "isozymes: isoenzyme A, isoenzyme B (searched under the requirement that organism must "
+              "be Vibrio tyrosinaticus, raised by your own request)")
+    model = SimpleNamespace(not_found={"reaction_kcat": reason, "reaction_Km": reason})
+    step = verdict._what_would_ground(model, ["reaction_Km", "reaction_kcat"])
+    assert "--isoform set to one of 'isoenzyme A', 'isoenzyme B'" in step
+
+
+def test_the_resolver_marks_a_withheld_set_of_isozymes():
+    import fallback_logic
+
+    iso = SimpleNamespace(variant=SimpleNamespace(kind="isozyme", evidence="isoenzyme A"))
+    mut = SimpleNamespace(variant=SimpleNamespace(kind="point_mutation", evidence="K48Q"))
+    assert fallback_logic._variant_withheld_result([iso], []).variant_isozymes_only is True
+    assert fallback_logic._variant_withheld_result([iso, mut], []).variant_isozymes_only is False
+
+
+# ---------------------------------------------------------------------------
+# NEW-17: a variant-only constant names where the enzyme as found is measured
+# ---------------------------------------------------------------------------
+
+#: EC 2.1.1.45 kcat for dUMP: E. coli has only K48Q; human wild type has rows.
+TS_KCAT = (
+    _Row("dUMP", "Escherichia coli", "mutant K48Q, pH 7.5", 0.01, "1", None, True),
+    _Row("dUMP", "Homo sapiens", "wild type, pH 7.4, 25°C", 3.11, "706625"),
+    _Row("dUMP", "Homo sapiens", "wild type", 48.0, "720965"),
+)
+
+
+def test_a_variant_only_constant_names_the_wild_type_elsewhere(monkeypatch):
+    from caterva.compose.__main__ import _wild_type_elsewhere
+
+    monkeypatch.setattr(defaults, "table_rows", lambda ec, table, organism=None: TS_KCAT)
+    said = _wild_type_elsewhere("2.1.1.45", "kcat", "dUMP", "Escherichia coli")
+    assert "available in: Homo sapiens (2 rows)" in said
+    assert "Escherichia coli" not in said
+
+
+# ---------------------------------------------------------------------------
+# NEW-17, R5B2-02, VR2-05, VR2-06: the report's passed-over and spread notes
+# ---------------------------------------------------------------------------
+
+
+def test_passed_over_values_keep_their_unit_not_the_last_word():
+    from caterva.compose.report import _passed_over_far
+
+    record = SimpleNamespace(value=0.6, chosen_because=None, resolver_because=(
+        "0.6 mM (BRENDA ref 712198) is the only row remaining; of the 2 candidate rows (after the "
+        "organism, substrate, isoform and variant checks): 1 row(s) stating neither pH nor "
+        "temperature passed over (0.07 mM, and no row states both)"))
+    (said,) = _passed_over_far(record)
+    assert said.endswith("(0.07 mM)")
+    assert "both)" not in said
+
+
+def test_a_row_passed_over_for_another_reason_is_named_with_that_reason():
+    from caterva.compose.report import _passed_over_far
+
+    record = SimpleNamespace(value=24.5, chosen_because=None, resolver_because=(
+        "x; of the 6 candidate rows (after the checks): 1 row(s) of a recombinant or transgenic "
+        "preparation passed over (408 1/s) for the same paper's row of the enzyme from its own "
+        "source; 3 row(s) not stating both pH and temperature passed over (196, 414, 545 1/s)"))
+    said = _passed_over_far(record)
+    assert any("recombinant" in s and "(408 1/s)" in s and "its own source" in s for s in said)
+    assert any("(196, 414, 545 1/s)" in s for s in said)
+
+
+def test_the_resolver_says_the_values_of_rows_it_prefers_against():
+    import fallback_logic
+
+    src = Path(fallback_logic.__file__).read_text()
+    # The values go in after "passed over", where the report reads them.
+    assert 'text = f"{text[:at]} ({shown}' in src
+    assert "rows left after the checks, this one among them, span" in src
+
+
+def test_different_papers_are_said_with_the_other_paper_s_own_row():
+    from caterva.compose.report import _other_papers
+
+    km = SimpleNamespace(citation="BRENDA ref 712198", unit="mM", alternatives=(
+        {"value": 0.07, "reference_id": "667627"}, {"value": 0.6, "reference_id": "712198"}))
+    ki = SimpleNamespace(citation="BRENDA ref 667627", unit="mM", alternatives=())
+    said = _other_papers("reaction_Km", km, {"reaction_Km": km, "reaction_Ki": ki})
+    assert "`reaction_Ki` comes from another paper (BRENDA ref 667627)" in said
+    assert "(0.07 mM) was passed over" in said
+    assert _other_papers("reaction_Km", km, {"reaction_Km": km}) == ""
+
+
+def test_the_carried_row_is_not_said_to_be_the_only_one_left_when_rows_were_passed_over():
+    src = (REPO / "caterva" / "compose" / "report.py").read_text()
+    assert "the only row left after the checks; some rows" not in src
+
+
+def test_the_resolver_s_row_is_not_said_to_be_for_an_isoform_it_does_not_name():
+    src = (REPO / "caterva" / "compose" / "narrowed.py").read_text()
+    assert "the resolver's row for {what}" not in src
+    assert "the row the resolver returns when asked for {what}" in src
+
+
+# ---------------------------------------------------------------------------
+# NEW-17: names typed and names read
+# ---------------------------------------------------------------------------
+
+
+def test_a_trailing_concentration_is_not_part_of_the_compound():
+    import effector
+
+    (found,) = effector.extract_effectors("succinate with papyriferic acid 0.04 mM, pH 7.4, 25°C")
+    assert found.compound_text == "papyriferic acid"
+    assert found.concentration_text == "0.04 mM"
+    (found,) = effector.extract_effectors("with NADH 1 mM")
+    assert (found.compound_text, found.concentration_text) == ("NADH", "1 mM")
+
+
+def test_an_isoform_label_not_typed_is_said_as_read_from_the_words_typed():
+    src = (REPO / "caterva" / "compose" / "__main__.py").read_text()
+    assert "was read as the \"" in src and "isoform\", 1)" in src
+
+
+def test_a_construct_list_inside_parentheses_is_one_clause():
+    from caterva.compose.report import _passed_over_far
+
+    # ACE, live: "an isolated domain ('N-domain')) passed over" was printed,
+    # the clause cut at a "; " inside its own parentheses.
+    record = SimpleNamespace(value=24.5, chosen_because=None, resolver_because=(
+        "x; of the 6 candidate rows (after the checks): 1 row(s) measuring a construct or altered "
+        "preparation (an isolated domain ('N-domain'); a chimera) passed over (262.5 1/s) for rows "
+        "of the native enzyme"))
+    (said,) = _passed_over_far(record)
+    assert said.startswith("1 row(s) measuring a construct or altered preparation (an isolated domain")
+    assert "(262.5 1/s)" in said
+
+
+def test_the_other_paper_s_own_row_is_read_from_the_table(monkeypatch):
+    from caterva.compose.report import _other_papers
+
+    rows = (_Row("(R,S)-mevalonate", "Homo sapiens", "", 0.07, "667627", "P04035"),
+            _Row("(R,S)-mevalonate", "Homo sapiens", "pH 7.5", 0.6, "712198"))
+    monkeypatch.setattr(defaults, "table_rows", lambda ec, table, organism=None: rows)
+    q = SimpleNamespace(parameter_id="reaction_Km", table="km")
+    model = SimpleNamespace(resolvable=(q,), subject="1.1.1.34", organism="Homo sapiens",
+                            compound_for=lambda _q: "(R,S)-mevalonate")
+    km = SimpleNamespace(citation="BRENDA ref 712198", unit="mM", alternatives=())
+    ki = SimpleNamespace(citation="BRENDA ref 667627", unit="mM", alternatives=())
+    said = _other_papers("reaction_Km", km, {"reaction_Km": km, "reaction_Ki": ki}, model)
+    assert "whose own row for this constant (0.07 mM) was passed over" in said
+
+
+def test_an_end_of_the_spread_the_reason_does_not_mention_is_explained():
+    from caterva.compose.report import ModelDossier
+
+    notes = ("`reaction_Km`: a row naming NOS1 exists (4.8 mM, BRENDA ref 659257), but no row "
+             "naming NOS1 gives the kcat, so the resolver's pick, which names no isoform, is kept "
+             "beside it: one evidence rule for both constants",)
+    me = SimpleNamespace(recognition=SimpleNamespace(composition=SimpleNamespace(notes=notes)))
+    spread = SimpleNamespace(low=0.0022, high=4.8, unit="mM",
+                             carried_as="0.0022 mM (BRENDA ref 658119) is the only row remaining")
+    said = ModelDossier._end_set_aside(me, "reaction_Km", spread)
+    assert said.startswith("the 4.8 mM row is not carried: a row naming NOS1 exists (4.8 mM, BRENDA ref 659257)")
+    assert "0.0022 mM row" not in said

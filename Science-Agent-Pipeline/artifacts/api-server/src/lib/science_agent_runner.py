@@ -624,6 +624,7 @@ def _paired_kcat_summary(kcat: Any) -> Optional[dict]:
         "crossSpeciesVariantOnly": list(getattr(kcat, "cross_species_variant_only", []) or []),
         "crossSpeciesIsozymeOnly": list(getattr(kcat, "cross_species_isozyme_only", []) or []),
         "variantCandidatesAvailable": getattr(kcat, "variant_candidates_available", None),
+        "variantIsozymesOnly": bool(getattr(kcat, "variant_isozymes_only", False)),
         "implausibleValues": getattr(kcat, "implausible_values", None),
         "isoformsAvailable": getattr(kcat, "isoforms_available", None),
     })
@@ -1621,6 +1622,8 @@ def main() -> None:
                         # that cannot name what it refused leaves the opt-in
                         # it demands unexercisable.
                         "variantCandidatesAvailable": result.variant_candidates_available,
+                        # Every withheld row names an isozyme (XS5R2-03).
+                        "variantIsozymesOnly": bool(getattr(result, "variant_isozymes_only", False)),
                         # Every row's value, when each is outside the
                         # physically plausible range (source
                         # "implausible_withheld"): named, never used.

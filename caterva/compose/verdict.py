@@ -776,7 +776,7 @@ def _offered(reasons: Mapping[str, Any], names: Sequence[str], what: str) -> Opt
         match = _OFFERED[what].search(str(reasons.get(name, "")))
         if not match:
             continue
-        text = re.sub(r" \(rows of a protein variant only, withheld: .*\)$", "", match.group(1).strip())
+        text = re.sub(r" \(rows of a (?:protein variant|named isozyme) only, .*\)$", "", match.group(1).strip())
         more = re.search(r" and (\d+) more$", text)
         extra = int(more.group(1)) if more else 0
         text = text[:more.start()] if more else text
@@ -823,6 +823,12 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
             # The organism has no row of this table under the EC number at
             # all (`__main__._what_the_organism_holds`): no compound fills it.
             need = "organism_missing"
+        elif "names an isozyme" in low:
+            # Every row names an isozyme ("isoenzyme A"): a wild-type
+            # protein, taken when --isoform names it. Vibrio tyrosinaticus's
+            # tyrosinase was told "supply it yourself" though --isoform
+            # "isoenzyme A" gives a measured pair (sixth round, XS5R2-03).
+            need = "isozyme_named"
         elif "measured another isoform" in low:
             # `__main__._measured_on_the_isoform` says whether any compound
             # has rows naming the isoform there; when none has, offering
@@ -904,6 +910,20 @@ def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
                      "provenance table lists as measured on this isoform, or supply it yourself "
                      "(--isoform set to the one the provenance table names would model that other "
                      "protein instead)")
+    if "isozyme_named" in by_need:
+        names = by_need["isozyme_named"]
+        named = None
+        for name in names:
+            found = re.search(r" -- the isozymes: (.+?)(?= \(searched| -- |$)", str(reasons.get(name, "")))
+            if found:
+                named = [n.strip() for n in found.group(1).split(", ") if n.strip()]
+                break
+        steps.append(f"{', '.join(names)}: every row BRENDA holds names an isozyme, taken only when "
+                     "--isoform names it: re-run with --isoform set to "
+                     + (f"one of {', '.join(repr(n) for n in named[:OFFERED_SHOWN])}" if named
+                        else "the isozyme the provenance table names")
+                     + " to model that isozyme, or supply "
+                     + ("it" if len(names) == 1 else "them") + " yourself")
     if "isoform_elsewhere" in by_need:
         steps.append(f"{', '.join(by_need['isoform_elsewhere'])}: no row in this organism names the "
                      "isoform asked for: re-run with --organism set to one the provenance table lists "
