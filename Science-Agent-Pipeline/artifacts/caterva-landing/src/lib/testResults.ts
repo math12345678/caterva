@@ -151,7 +151,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "194 test files -- kinetics & Michaelis-Menten correctness, " +
+          "197 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -284,10 +284,14 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-11-12 (ADR 0182, fourth round's fixes) on
         // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
         // 7783 tests, 7781 passed, 2 skipped, 0 failed, 297 s.
-        passed: 7781,
-        skipped: 2,
+        //
+        // Measured 2026-11-13 (ADR 0182, fifth round's fixes) on
+        // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
+        // 7830 tests, 7829 passed, 1 skipped, 0 failed, 339 s.
+        passed: 7829,
+        skipped: 1,
         failed: 0,
-        collected: 7783,
+        collected: 7830,
       },
     ],
   },
@@ -297,7 +301,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "100 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "103 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -406,10 +410,14 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-11-12 (ADR 0182, fourth round's fixes) on
         // fix/studio-real-values, Tests/ with pytest-xdist (-n 8): 1906
         // tests, 1906 passed, 0 skipped, 0 failed, 188 s.
-        passed: 1906,
+        //
+        // Measured 2026-11-13 (ADR 0182, fifth round's fixes) on
+        // fix/studio-real-values, Tests/ with pytest-xdist (-n 8): 1948
+        // tests, 1948 passed, 0 skipped, 0 failed, 172 s.
+        passed: 1948,
         skipped: 0,
         failed: 0,
-        collected: 1906,
+        collected: 1948,
       },
     ],
   },
@@ -419,7 +427,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "86 test files -- query resolution, parameter provenance, " +
+          "87 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
@@ -507,7 +515,11 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-11-12 (ADR 0182, second round) on the merged tree,
         // vitest run with the project venv on PATH: 86 files, 933 tests,
         // 933 passed.
-        passed: 933,
+        //
+        // Measured 2026-11-13 (ADR 0182, fifth round's fixes) on
+        // fix/studio-real-values, vitest run with the project venv on PATH:
+        // 87 files, 938 tests, 938 passed.
+        passed: 938,
         skipped: 0,
         failed: 0,
       },
@@ -555,7 +567,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "80 test files -- the `scientific` CLI end to end and its " +
+          "81 test files -- the `scientific` CLI end to end and its " +
           "refusals, the literature resolver, the Python engine bridge, " +
           "inhibition models, exports, request validation, result storage " +
           "and reproducibility checks",
@@ -580,7 +592,10 @@ export const TEST_SUITES: TestSuite[] = [
         //
         // Measured 2026-11-12 (ADR 0182, second round) on the merged tree:
         // jest, 80 suites, 1026 tests, 1026 passed.
-        passed: 1026,
+        //
+        // Measured 2026-11-13 (ADR 0182, fifth round's fixes) on
+        // fix/studio-real-values: jest, 81 suites, 1029 tests, 1029 passed.
+        passed: 1029,
         skipped: 0,
         failed: 0,
       },
