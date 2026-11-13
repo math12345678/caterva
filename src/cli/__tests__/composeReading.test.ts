@@ -24,7 +24,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-import { contradictions, parseComposeReading } from '../composeReading';
+import { contradictions, parseComposeReading, readerTimeoutMs } from '../composeReading';
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 const CLI = path.join(REPO_ROOT, 'src', 'cli', 'scientificCLI.ts');
@@ -175,6 +175,23 @@ describe('simulate --resolve reads the question as compose does', () => {
     expect(out).toContain('read by the older reader');
   });
 
+  it('says the reader ran out of time, and does not fall back to the older reader', () => {
+    // Fifth round, XS5-01: the reader took five minutes for this sentence
+    // under load, the CLI cut it off at 180 s, and the older reader then
+    // said the question "needs an enzyme", though it named one.
+    const slow = script('slow_reader', ['import time', 'time.sleep(30)']);
+    const { out, code } = run(['simulate', 'acetylcholinesterase inhibited by donepezil', ...SIM], {
+      CATERVA_SENTENCE_READER: slow,
+      CATERVA_COMPOSE_READ_TIMEOUT_MS: '2000',
+      CATERVA_LITERATURE_RUNNER: literature(path.join(dir, 'slow.jsonl')),
+    });
+    expect(code).toBe(1);
+    expect(out).toContain("Compose's sentence reader ran out of time (it did not finish within 2 s");
+    expect(out).toContain('CATERVA_COMPOSE_READ_TIMEOUT_MS');
+    expect(out).not.toContain('needs an enzyme');
+    expect(out).not.toContain('read by the older reader');
+  });
+
   it("says compose's reason when nothing can be read, not that flags are required", () => {
     const { out, code } = run(['simulate', 'the spread of measles in a school', '--resolve', '--yes'], {
       CATERVA_SENTENCE_READER: reader(path.join(dir, 'measles-read.jsonl')),
@@ -237,6 +254,14 @@ describe('resolve takes the enzyme BRENDA singles out', () => {
     });
     expect(out).toContain('Nothing was searched: the lookup stopped at the enzyme name');
     expect(out).not.toContain('were searched and returned nothing');
+  });
+});
+
+describe('readerTimeoutMs', () => {
+  it('waits ten minutes by default, and as long as the environment says', () => {
+    expect(readerTimeoutMs({})).toBe(600_000);
+    expect(readerTimeoutMs({ CATERVA_COMPOSE_READ_TIMEOUT_MS: '5000' })).toBe(5000);
+    expect(readerTimeoutMs({ CATERVA_COMPOSE_READ_TIMEOUT_MS: 'soon' })).toBe(600_000);
   });
 });
 

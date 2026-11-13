@@ -958,10 +958,13 @@ def test_a_row_read_cell_by_cell_is_flagged_as_the_parser_would_flag_it():
     row (2026-11-12)."""
     from types import SimpleNamespace
 
-    client = SimpleNamespace(KM_PLAUSIBLE_MIN_MM=1e-7, KM_PLAUSIBLE_MAX_MM=1e4,
+    client = SimpleNamespace(KM_PLAUSIBLE_MIN_MM=1e-7, KM_PLAUSIBLE_MAX_MM=1e4, KI_PLAUSIBLE_MIN_MM=1e-12,
                              KCAT_PLAUSIBLE_MIN_PER_S=1e-6, KCAT_PLAUSIBLE_MAX_PER_S=1e7)
-    assert defaults._implausible(client, "ki", 6e-08, "")
-    assert not defaults._implausible(client, "ki", 1e-07, "")
+    # A Ki is held to the parser's Ki floor, not the Km's: the influenza A
+    # zanamivir Ki (6e-08 mM) is a row the search uses (fifth round, R5V1-07).
+    assert not defaults._implausible(client, "ki", 6e-08, "")
+    assert defaults._implausible(client, "ki", 1e-13, "")
+    assert defaults._implausible(client, "km", 6e-08, "")
     assert defaults._implausible(client, "kcat", 1e8, "")
     assert defaults._implausible(client, "km", 0.5, "kcat 5 s-1, pH 7")
     assert not defaults._implausible(client, "kcat", 0.5, "kcat 5 s-1, pH 7")

@@ -39,6 +39,7 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -126,6 +127,12 @@ def _skip_key(reason: str) -> str:
     return location.split(":", 1)[0].strip()
 
 
+
+#: How long one suite may run. The engine suite run serially takes about
+#: 30 minutes on an idle machine and timed out at the former 1800 s under
+#: load (fifth round, ENV-01); CATERVA_SKIP_GUARD_TIMEOUT_S overrides it.
+SUITE_TIMEOUT_S = int(os.environ.get("CATERVA_SKIP_GUARD_TIMEOUT_S", "3600"))
+
 def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
     """Run one suite. Returns (passed, skipped, skip_reasons) or None.
 
@@ -157,7 +164,7 @@ def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
                  "-p", "no:randomly", f"--junitxml={report}"],
                 capture_output=True,
                 text=True,
-                timeout=1800,
+                timeout=SUITE_TIMEOUT_S,
                 cwd=str(REPO_ROOT),
             )
         except (subprocess.TimeoutExpired, OSError) as exc:

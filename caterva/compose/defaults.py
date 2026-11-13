@@ -369,7 +369,14 @@ def table_rows(ec: str, table: str, organism: Optional[str]) -> Tuple[_Row, ...]
                     for r in out)
         out = _treated_arms_not_own(out)
     if len(_PARSED) >= _PARSED_MAX:
-        _PARSED.clear()
+        # Keep the every-organism parses: an organism's rows are filtered
+        # from them, and clearing them made each of the 63 organisms of the
+        # acetylcholinesterase page a parse of its own (133 calls, 295 s of
+        # parsing for one sentence; fifth round, XS5-01).
+        for stale in [k for k in _PARSED if k[4] is not None]:
+            del _PARSED[stale]
+        if len(_PARSED) >= _PARSED_MAX:
+            _PARSED.clear()
     _PARSED[key] = out
     return out
 
@@ -575,7 +582,10 @@ def _unlabelled_rows(html: str, ec: str, table: str, client: object) -> Tuple[_R
 
 #: The parser's plausibility bounds per table (brenda_client), by name.
 _BOUNDS = {"km": ("KM_PLAUSIBLE_MIN_MM", "KM_PLAUSIBLE_MAX_MM"),
-           "ki": ("KM_PLAUSIBLE_MIN_MM", "KM_PLAUSIBLE_MAX_MM"),
+           # A Ki has no Michaelis floor (brenda_client.KI_PLAUSIBLE_MIN_MM):
+           # zanamivir's influenza A Ki of 6e-08 mM was flagged here while the
+           # search, reading the same row, uses it (fifth round, R5V1-07).
+           "ki": ("KI_PLAUSIBLE_MIN_MM", "KM_PLAUSIBLE_MAX_MM"),
            "kcat": ("KCAT_PLAUSIBLE_MIN_PER_S", "KCAT_PLAUSIBLE_MAX_PER_S")}
 
 
@@ -745,6 +755,23 @@ def is_engineered(name: str) -> bool:
     return bool(_ENGINEERED.search(name or ""))
 
 
+#: A synthetic chromogenic or fluorogenic assay substrate: a peptide or
+#: ester carrying a 4-nitroanilide, nitrophenyl, coumarin or thiobenzyl
+#: leaving group. BRENDA's Natural Substrates table lists some
+#: (methoxysuccinyl-Ala-Ala-Pro-Val-4-nitroanilide for human neutrophil
+#: elastase), and the note called it "the natural substrate" (fifth round,
+#: R5V1-30). It may still be chosen for its rows; it is never called natural.
+_CHROMOGENIC = re.compile(
+    r"nitroanilide|\bpna\b|-pna\b|nitrophenyl|methylcoumarin|-amc\b|\bamc\b|amido-4-methyl"
+    r"|coumarin-?\d*-?yl|thiobenzyl|-sbzl\b|\bmca\b|\bdnp\b|dinitrophenyl|\babz\b|aminobenzoyl",
+    re.IGNORECASE)
+
+
+def is_chromogenic(name: str) -> bool:
+    """A synthetic chromogenic or fluorogenic assay substrate (`_CHROMOGENIC`)."""
+    return bool(_CHROMOGENIC.search(name or ""))
+
+
 def is_cofactor(name: str) -> bool:
     """True for a cosubstrate, cofactor or small ion (COFACTORS)."""
     key = _PREFIX.sub("", _key(name))
@@ -871,7 +898,9 @@ def _usable(rows: Sequence[_Row], isoform: Optional[str] = None, mode: Optional[
         if not mine and pool_unnamed and others >= 2 and others > len(pool_unnamed):
             # The resolver's rule (fallback_logic._isoform_tiers): rows naming
             # none, among more rows naming only other proteins, are theirs.
-            others += len(pool_unnamed)
+            # Counted apart: they name none, and "rows of another isoform"
+            # said they named one (CYP2B6 and fenthion, fifth round, R5B-03).
+            out.set_aside["a paper naming no isoform, among rows naming only other isoforms"] += len(pool_unnamed)
             pool_unnamed = []
         out.set_aside["another isoform"] += others
         kept, matched = (mine, True) if mine else (pool_unnamed, False)
@@ -1408,8 +1437,11 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
         # went unsaid (thrombin, fifth round's review, V7-09).
         peers = [k for k in ranked if k in natural and k != best and rows(k) == rows(best)
                  and has_both(k) == has_both(best)]
-        how = (f"it is the natural substrate (BRENDA's Natural Substrates table) with "
-               f"{'as many rows the search can use as any other natural substrate' if peers else 'the most rows'} "
+        how = ((f"BRENDA's Natural Substrates table lists it, though it is a synthetic chromogenic or "
+                f"fluorogenic assay substrate, not one the enzyme meets in the cell, and it has "
+                if is_chromogenic(name) else
+                f"it is the natural substrate (BRENDA's Natural Substrates table) with ")
+               + f"{'as many rows the search can use as any other natural substrate' if peers else 'the most rows'} "
                f"({measured})")
         if peers and not tied:
             raw_best = sum(counts.raw(best, tables).values())
@@ -1492,9 +1524,12 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
                f"{_where(ec, organism)}{_isoform_clause(isoform)}{mutant}, {how}{natural_tail}"
                f"{tie_clause}")
     else:
+        # The counts follow the clause they count: after the reporters'
+        # clause they read as the reporters' (trypsin, fifth round, R5V1-4).
+        first, _, rest = how.partition("; ")
         why = (f"of the {_plural(len(candidates), 'substrate')}{which} BRENDA lists Km rows for under "
-               f"{_where(ec, organism)}{_isoform_clause(isoform)}{mutant}, {how} ({measured}"
-               f"{detail}){tie_clause}")
+               f"{_where(ec, organism)}{_isoform_clause(isoform)}{mutant}, {first} ({measured}"
+               f"{detail}){'; ' + rest if rest else ''}{tie_clause}")
     alternatives = tuple(Option(counts.name(k), rows(k), USABLE_NONE)
                          for k in ranked[1:1 + ALTERNATIVES_NAMED])
     return Choice("substrate", name, why, alternatives, len(candidates), dict(r))

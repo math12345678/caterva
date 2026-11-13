@@ -104,6 +104,9 @@ SYNONYMS = {
     "s-lactate": "l-lactate",
     "(s)-dihydroorotate": "l-dihydroorotate",
     "s-dihydroorotate": "l-dihydroorotate",
+    # The stereo-unspecified name is the natural (S) form: human DHODH's
+    # rows were counted as two substrates (fifth round, R5V1-28).
+    "dihydroorotate": "l-dihydroorotate",
     "pep": "phosphoenolpyruvate",
     "h2o2": "hydrogenperoxide",
     "co2": "carbondioxide",
@@ -236,7 +239,12 @@ _RENAMED = ((re.compile(r"(nor)?adrenaline"), r"\1epinephrine"),
             (re.compile(r"(?<![a-z])propionate$"), "propanoate"),
             (re.compile(r"(?<=oxo)propionate$"), "propanoate"),
             (re.compile(r"(?<![a-z])valerate$"), "pentanoate"),
-            (re.compile(r"(?<=oxo)valerate$"), "pentanoate"))
+            (re.compile(r"(?<=oxo)valerate$"), "pentanoate"),
+            # A pyranoside by its shorter name: E. coli beta-galactosidase's
+            # ONPG rows are filed as "2-nitrophenyl beta-D-galactopyranoside"
+            # and as "o-nitrophenyl-beta-D-galactoside", and the organism
+            # chooser counted them apart (fifth round, XS5-02).
+            (re.compile(r"(?<=-d-)(galacto|gluco|manno|xylo|fuco)side$"), r"\1pyranoside"))
 
 
 def _base(name: str) -> str:
@@ -296,6 +304,23 @@ ALIASES = (
     ("HMG-CoA", "3-hydroxy-3-methylglutaryl-CoA"),
     ("hydroxymethylglutaryl-CoA", "3-hydroxy-3-methylglutaryl-CoA"),
     ("3-hydroxy-3-methylglutaryl-coenzyme A", "3-hydroxy-3-methylglutaryl-CoA"),
+    # Drugs BRENDA files under a development code or a full chemical name
+    # (fifth round, R5V1-03, R5V1-08, R5V1-09, R5V1-30): each was a
+    # placeholder Ki though BRENDA holds the row under the other name.
+    ("sitagliptin", "MK-0431"), ("sitagliptin phosphate", "MK-0431"),
+    ("vildagliptin", "LAF237"), ("LAF-237", "LAF237"),
+    ("saxagliptin", "BMS-477118"),
+    ("SAHA", "suberoylanilide hydroxamic acid"), ("vorinostat", "suberoylanilide hydroxamic acid"),
+    ("teriflunomide", "2-hydroxyethylidene-cyanoacetic acid 4-trifluoromethyl anilide"),
+    ("A77 1726", "2-hydroxyethylidene-cyanoacetic acid 4-trifluoromethyl anilide"),
+    ("A771726", "2-hydroxyethylidene-cyanoacetic acid 4-trifluoromethyl anilide"),
+    ("A77-1726", "2-hydroxyethylidene-cyanoacetic acid 4-trifluoromethyl anilide"),
+    ("sivelestat", "ONO-5046"),
+    ("ONPG", "2-nitrophenyl beta-D-galactopyranoside"),
+    # The lipid by its usual abbreviation (PTEN with PIP3, R5V1-15).
+    ("PIP3", "phosphatidylinositol 3,4,5-trisphosphate"),
+    ("PtdIns(3,4,5)P3", "phosphatidylinositol 3,4,5-trisphosphate"),
+    ("PI(3,4,5)P3", "phosphatidylinositol 3,4,5-trisphosphate"),
     ("BAPNA", "N-benzoyl-DL-arginine 4-nitroanilide"),
     ("DL-BAPNA", "N-benzoyl-DL-arginine 4-nitroanilide"),
     ("L-BAPNA", "N-benzoyl-L-arginine 4-nitroanilide"),

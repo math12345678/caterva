@@ -69,7 +69,19 @@ export interface ReadFlags {
 export type ReadAnswer =
   | { kind: 'read'; reading: ComposeReading }
   /** The reader is off, absent, crashed or timed out. */
-  | { kind: 'unavailable'; reason: string };
+  | { kind: 'unavailable'; reason: string; timedOut?: boolean };
+
+/**
+ * How long the reader may take. Choosing an organism reads every organism's
+ * rows on the page: acetylcholinesterase has 63, and a reader that took five
+ * minutes under load was cut off at 180 s, after which the older reader said
+ * the question "needs an enzyme" (fifth round, XS5-01). Set
+ * CATERVA_COMPOSE_READ_TIMEOUT_MS to change it.
+ */
+export function readerTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = Number(env['CATERVA_COMPOSE_READ_TIMEOUT_MS']);
+  return Number.isFinite(raw) && raw > 0 ? raw : 600_000;
+}
 
 const text = (value: unknown): string | null =>
   typeof value === 'string' && value.trim() ? value : null;
@@ -135,8 +147,8 @@ export function readWithCompose(sentence: string, flags: ReadFlags = {}): ReadAn
   const proc = spawnSync(resolvePythonExecutable(REPO_ROOT), argv, {
     cwd: REPO_ROOT,
     encoding: 'utf-8',
-    // BRENDA is fetched live for the choices: 5-30 s is usual.
-    timeout: 180_000,
+    // BRENDA is fetched live for the choices: 5-60 s is usual.
+    timeout: readerTimeoutMs(),
     env: {
       ...process.env,
       PYTHONPATH: [process.env['PYTHONPATH'], REPO_ROOT, path.join(REPO_ROOT, 'Tests')]
@@ -147,6 +159,15 @@ export function readWithCompose(sentence: string, flags: ReadFlags = {}): ReadAn
   // Exit 3 is a reading too: no enzyme, or a refusal it states.
   const reading = proc.status === 0 || proc.status === 3 ? parseComposeReading(proc.stdout ?? '') : null;
   if (reading) return { kind: 'read', reading };
+  const code = (proc.error as NodeJS.ErrnoException | undefined)?.code;
+  if (code === 'ETIMEDOUT') {
+    const seconds = Math.round(readerTimeoutMs() / 1000);
+    return {
+      kind: 'unavailable',
+      timedOut: true,
+      reason: `it did not finish within ${seconds} s; set CATERVA_COMPOSE_READ_TIMEOUT_MS to wait longer`,
+    };
+  }
   const why = ((proc.stderr || proc.stdout || '') + (proc.error ? String(proc.error) : '')).trim().split('\n').pop();
   return { kind: 'unavailable', reason: why || `the reader exited ${proc.status}` };
 }

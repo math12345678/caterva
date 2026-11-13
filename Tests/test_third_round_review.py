@@ -184,7 +184,10 @@ def test_hk2s_kcat_is_not_a_glucokinase_papers_row_naming_none():
     r = resolve_kinetic_value("2.7.1.1", "Homo sapiens", "D-glucose", quantity="kcat",
                               isoform="HK2", **kw(html, "Homo sapiens"))
     assert not r.found and r.source == "isoform_withheld"
-    assert r.isoform_unnamed_withheld > 0
+    # Since the fifth round's polish the paper's Y214C row marks ref 672188
+    # as glucokinase's (row_form.ISOFORM_MUTATIONS), so its row is GCK's,
+    # not a row naming none among GCK's.
+    assert r.isoform_unnamed_withheld > 0 or any("GCK" in iso for iso in r.isoforms_available)
 
 
 # -- One compound, several spellings -----------------------------------------------------
@@ -290,5 +293,10 @@ def test_a_single_row_far_from_every_other_papers_rows_is_said_to_be_an_outlier(
     html = page({"KM Values": DHODH_KM})
     r = resolve_kinetic_value("1.3.5.2", "Homo sapiens", "dihydroorotate", quantity="km",
                               **kw(html, "Homo sapiens"))
-    assert r.value == 0.29
-    assert any("outside the 3 other papers' rows" in note for note in r.row_notes)
+    # Since the fifth round's polish (R5V1-17) the one row stating pH and
+    # temperature, more than tenfold from every one of three others, no
+    # longer outranks them: the others are kept and their median carried,
+    # and the outlier is said.
+    assert r.value == 0.009
+    assert ("the one row stating both pH and temperature (0.29 mM, BRENDA ref 762769) lies more "
+            "than 10-fold from every one of the 3 other rows" in r.chosen_because)

@@ -208,7 +208,8 @@ def test_a_fragment_of_a_longer_name_is_a_suggestion_even_when_it_is_the_only_ma
         resolve_enzyme_name("glucose phosphate isomerase", "human")
     assert raised.value.kind == SUGGESTIONS
     assert "EC 5.3.1.9 glucose-6-phosphate isomerase" in str(raised.value)
-    assert str(raised.value).endswith("--subject <its EC number>")
+    # A command that runs, for the first suggestion (fifth round, R5V1-25).
+    assert str(raised.value).endswith("--subject 5.3.1.9")
 
 
 def test_an_abbreviation_is_a_refusal_naming_what_it_can_mean_and_uniprot_is_not_asked():

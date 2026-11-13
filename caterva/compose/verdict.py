@@ -648,11 +648,20 @@ def _row_kind_concerns(model: Any) -> List[Concern]:
                                 "inactivation (kinact, KI) yourself"),
                         qualifier=f"{name} is the Ki of an irreversible inactivator, {compound}"))
                 if c.kind == ASSAY_SUBSTRATE:
+                    remedy = (f"look for a Ki row measured on {substrate}, or read the value as "
+                              "the inhibitor's constant in another assay")
+                    if _no_ki_on(model, compound, substrate):
+                        # ACE and captopril: no human captopril Ki row was
+                        # measured on angiotensin I, and the advice sent the
+                        # reader to look for one (fifth round, R5V1-21).
+                        remedy = (f"BRENDA has no Ki row for {compound} measured on {substrate} in "
+                                  f"{getattr(model, 'organism', None) or 'this organism'}: read the "
+                                  "value as the inhibitor's constant in another assay, or supply one "
+                                  f"measured on {substrate} yourself")
                     out.append(Concern(
                         source="row_scope", severity=GROUNDED,
                         detail=f"`{name}`: {c.plain}",
-                        remedy=(f"look for a Ki row measured on {substrate}, or read the value as "
-                                "the inhibitor's constant in another assay"),
+                        remedy=remedy,
                         qualifier=f"{name} was measured in an assay on another substrate"))
     isoforms = {name: getattr(m, "row_isoform", None) for name, m in measured.items()}
     named = {iso for iso in isoforms.values() if isinstance(iso, str) and iso}
@@ -1431,3 +1440,23 @@ __all__ = [
     "BROKEN", "STRUCTURAL", "GROUNDED", "ROBUST", "VERDICTS", "LICENCE",
     "Concern", "Verdict", "VerdictError", "form", "behaviour_of",
 ]
+
+
+def _no_ki_on(model: Any, compound: Any, substrate: Any) -> bool:
+    """Whether BRENDA holds no Ki row for `compound` in the model's organism
+    whose commentary names `substrate` as the assay's. False when unknown."""
+    ec = getattr(model, "subject", None) or getattr(model, "ec_number", None)
+    organism = getattr(model, "organism", None)
+    if not (isinstance(compound, str) and isinstance(substrate, str) and ec and organism):
+        return False
+    try:
+        from caterva.compose import defaults
+
+        rows = [r for r in defaults.table_rows(str(ec), "ki", organism)
+                if defaults._matches(r.compound, compound)]
+    except Exception:  # noqa: BLE001
+        return False
+    if not rows:
+        return False
+    key = defaults._search_key(substrate)
+    return not any(key and key in defaults._search_key(r.conditions or "") for r in rows)

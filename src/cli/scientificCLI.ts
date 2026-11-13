@@ -1591,6 +1591,17 @@ async function main() {
             // differently from compose (an inhibitor in "inhibited by X",
             // a model word as a substrate), and with --yes nobody confirms
             // what they read. The API says the same (readerUnavailableFlag).
+            if (answer.timedOut) {
+              // A reader cut off by the clock read nothing wrong: the older
+              // reader then said the question "needs an enzyme" when it named
+              // one (fifth round, XS5-01). Say what happened instead.
+              error(
+                `Compose's sentence reader ran out of time (${answer.reason}). ` +
+                'Nothing was resolved. Run the command again with a longer limit, or name the ' +
+                'substrate and organism with --substrate and --organism, which makes the reading quick.'
+              );
+              process.exit(1);
+            }
             if (answer.reason !== 'the sentence reader is off' && !booleans.has('json')) {
               warning(
                 `Compose's sentence reader gave no reading (${answer.reason}), so your question ` +

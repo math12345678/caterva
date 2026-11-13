@@ -421,6 +421,11 @@ class Ambiguous:
     #: `resolve`): the refusal gives no example EC number, because the first
     #: candidate is the misreading the rule exists to refuse.
     class_word: bool = False
+    #: True for rule f: an exact other name of one enzyme that is also the
+    #: family word of others' accepted names ("dihydroorotate
+    #: dehydrogenase"). Unlike a bare class word, the organism can settle it
+    #: when only one of the family lists its protein and has its rows.
+    family: bool = False
 
 
 Resolution = (Resolved, Ambiguous)
@@ -1573,7 +1578,7 @@ def _resolve(
             if len(family) >= 2:
                 return Ambiguous(
                     query=text, candidates=tuple(ranked), recommended=None, organism=code, release=release,
-                    class_word=True,
+                    class_word=True, family=True,
                     reason=(f"{text!r} is listed as another name of EC {only.ec} ({only.name}), and is also "
                             f"the family name inside the accepted names of {len(family)} other enzymes, such as "
                             + ", ".join(f"EC {c.ec} ({c.name})" for c in family[:2])
@@ -1650,8 +1655,13 @@ def refusal_text(ambiguous: Ambiguous, rerun: str = "--subject {ec}", shown: int
             "wrong value. If " + ("this is" if len(candidates) == 1 else "one of these is")
             + " the enzyme you mean, re-run with " + rerun.format(ec=pick.ec))
     elif ambiguous.suggestions_only:
-        lines.append("Check the spelling; if one of these is the enzyme, re-run with "
-                     + rerun.format(ec="<its EC number>"))
+        # A command that runs: "urokinse" was answered with a command that
+        # kept the misspelling and a "<its EC number>" to fill in, while
+        # "enolse" got one ready to run (fifth round, R5V1-25).
+        spelled = _outside_parentheses(
+            (pick.alternative_names[0] if pick.alternative_names and not pick.spare else pick.name)).strip()
+        lines.append(f"Check the spelling; if you meant {spelled!r} (EC {pick.ec}), re-run with "
+                     + rerun.format(ec=pick.ec))
     elif ambiguous.class_word:
         lines.append("Name the enzyme itself: a wrong EC number is a citation for the wrong enzyme, not merely "
                      "a wrong value. Re-run with " + rerun.format(ec="<its EC number>"))

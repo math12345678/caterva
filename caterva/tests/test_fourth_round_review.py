@@ -64,7 +64,10 @@ def test_a_virus_is_read_as_the_organism():
 
 def test_a_gene_symbol_filed_under_another_ec_is_said_to_be_one():
     said = describe_isoform("1.14.14.1", "Homo sapiens", "CYP2B6")
-    assert said.startswith("--isoform 'CYP2B6' is the gene symbol of UniProtKB P20813")
+    # Not "filed under another EC number": BRENDA lists P20813 under this
+    # one; only Caterva's copy of the list leaves it out (R5B-02).
+    assert said.startswith("--isoform 'CYP2B6' names UniProtKB P20813, which is not among")
+    assert "another EC number" not in said
     assert "is not a gene symbol" not in said
 
 

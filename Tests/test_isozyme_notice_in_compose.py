@@ -140,7 +140,9 @@ def test_typing_an_isoform_does_not_carry_another_isozymes_row(compose):
     kcat = next(line for line in out.splitlines() if line.startswith("| `reaction_kcat` |"))
     assert "BRENDA ref 703624" not in kcat and "60.4 1/s" not in kcat
     assert "672188" not in kcat and "**placeholder**" in kcat
-    assert "naming none sit among them" in kcat and "GCK" in kcat
+    # The rows naming none sit among GCK's, or (since the fifth round's
+    # polish) are GCK's by their paper's Y214C row.
+    assert ("naming none sit among them" in kcat or "measured another isoform" in kcat) and "GCK" in kcat
 
 
 @pytest.mark.parametrize(

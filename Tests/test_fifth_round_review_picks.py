@@ -130,7 +130,13 @@ def test_a_paper_whose_own_row_is_the_probable_error_supplies_neither_constant()
     html = page({"KM Values": ACC_KM, "Turnover Numbers": ACC_KCAT})
     km, kcat = resolve_kinetic_pair("6.4.1.2", "Homo sapiens", "acetyl-CoA", **kw(html, "Homo sapiens"))
     assert km.citation.reference_id != "676983" and kcat.citation.reference_id != "676983"
-    assert "its Km (0.0002) lies more than 100-fold from every other row" in km.chosen_because
+    # Said either way: as the paper's probable error, or (since the fifth
+    # round's polish, R5V1-17) as the one row stating pH and temperature
+    # lying more than tenfold from every other, so the rest are kept.
+    said = km.chosen_because + " ".join(getattr(km, "search_log", None) or ())
+    assert ("its Km (0.0002) lies more than 100-fold from every other row" in said
+            or "BRENDA ref 676983: a row of that paper for the paired constant lies more than "
+               "100-fold from every other row, a probable error" in said)
 
 
 # -- Another enzyme filed under the EC is not an isoform -------------------------------------

@@ -145,6 +145,18 @@ class IsozymeNotice:
     #: D-mannose model with a placeholder kcat, while the Km's row measured
     #: HK-I (fourth round of the real-values review).
     suggest: Optional[str] = None
+    #: (the Km row's protein, the kcat row's protein) when the cited rows
+    #: name two different proteins by isoform or UniProt entry: mushroom
+    #: tyrosinase's Km row names C7FF04 and its kcat row C7FF05, and only the
+    #: generic "may belong to any of them" was said (fifth round, R5V1-05).
+    two_proteins: Optional[Tuple[str, str]] = None
+    #: The listed proteins with both a Km and a kcat row naming them for the
+    #: model's substrate in the organism, when that was counted (None when
+    #: not). Human hexokinase's advice offered "another protein's name" to
+    #: --isoform; HK1 then paired HK1's Km with a glucokinase paper's kcat,
+    #: since no human kcat row names HK1 (fifth round, R5V1-3).
+    measured_pairs: Optional[Tuple[str, ...]] = None
+    substrate: Optional[str] = None
 
     @property
     def broad(self) -> bool:
@@ -179,8 +191,16 @@ class IsozymeNotice:
         return f"EC {self.ec} is {self.count} proteins in {self.label}, none chosen"
 
     @property
+    def _two(self) -> str:
+        km, kcat = self.two_proteins or ("", "")
+        return (f"the Km's row names {km} and the kcat's row names {kcat}: two different proteins, "
+                "so the model combines two proteins' constants")
+
+    @property
     def headline(self) -> str:
         """One sentence for the top of the verdict."""
+        if self.two_proteins and not self.isoform:
+            return f"EC {self.ec} is {self.count} proteins in {self.label}; {self._two}"
         if self.isoform:
             return (f"{self.isoform} was asked for, but {self._which()} not state which "
                     f"isozyme of EC {self.ec} it measured")
@@ -228,6 +248,9 @@ class IsozymeNotice:
                     f"proteins{named}, but {names} {'comes' if len(self.unstated) == 1 else 'come'} from a row "
                     f"that does not say which isozyme it measured, so whether it measured {self.isoform} is "
                     "unknown; isozymes of one enzyme can differ many-fold in Km and kcat")
+        if self.two_proteins:
+            return (f"EC {self.ec} is {self.count} {self.label} proteins{named} and no --isoform was given; "
+                    f"{self._two}, whose Km and kcat can differ many-fold")
         if self.measured_as:
             return (f"EC {self.ec} is {self.count} {self.label} proteins{named} and no --isoform was given; "
                     f"every cited row names {self.measured_as} (in its words, its UniProt cell or its "
@@ -262,13 +285,34 @@ class IsozymeNotice:
         isozyme a cited row names, else the first listed name; with no name
         to give, the remedy says so rather than printing a placeholder
         ("for example --isoform its name", horse liver ADH)."""
-        first = self.suggest or (self.symbols[0] if self.symbols else None)
+        # With no row to go by, the lowest-numbered name: "--isoform PRSS58"
+        # was offered for human trypsin, an obscure protein with no rows,
+        # before PRSS1, cationic trypsin (fifth round, R5V1-7).
+        first = self.suggest or (min(self.symbols, key=_natural_order) if self.symbols else None)
+        if self.two_proteins and not self.isoform:
+            km, kcat = self.two_proteins
+            return (f"read the two papers before relying on the pair; to keep to one protein, supply "
+                    f"{km}'s kcat or {kcat}'s Km yourself, or pass --substrate with a compound whose "
+                    "Km and kcat one paper measured together")
         if self.measured_as and not self.isoform:
             # Neprilysin: every cited row names MME, and "Do this next" offered
             # --isoform MMEL1, another protein (fourth round's review).
-            return (f"the model is of {self.measured_as}, the protein every cited row names: pass "
+            text = (f"the model is of {self.measured_as}, the protein every cited row names: pass "
                     f"--isoform {self.measured_as} to keep each constant to rows naming it, or another "
                     "protein's name only to model that protein instead")
+            if self.measured_pairs is not None:
+                others = [p for p in self.symbols if p not in self.measured_pairs]
+                if others:
+                    have = (f"only {_named(list(self.measured_pairs))} {'has' if len(self.measured_pairs) == 1 else 'have'}"
+                            if self.measured_pairs else "none has")
+                    text += (f"; of the proteins listed, {have} both a Km and a kcat row naming "
+                             f"{'it' if len(self.measured_pairs) == 1 else 'them'}"
+                             + (f" for {self.substrate}" if self.substrate else "")
+                             + f" in {self.label}, so --isoform {others[0]}"
+                             + (" (or another of the rest)" if len(others) > 1 else "")
+                             + " gives no measured pair: its kcat would come from a row naming no "
+                               "isozyme, which may be another protein's")
+            return text
         if first is None and not self.isoform:
             return ("pass --isoform with the name the rows' own commentary gives the isozyme you mean "
                     f"(the enzyme nomenclature gives these {self.count} proteins no names --isoform can "
@@ -308,10 +352,34 @@ def isozyme_notice(
     found = isozymes(ec.strip(), organism)
     if found.organism is None or found.count < 2:
         return None
+    if _subunits_of_one_complex(found.symbols):
+        return None
     return IsozymeNotice(
         ec=ec.strip(), organism=found.organism, count=found.count, symbols=found.symbols,
         isoform=isoform or None, unstated=None if (isoform and unstated is None) else tuple(unstated or ()),
         isoform_listed=not isoform or found.count > BROAD_CLASS or _listed(found, isoform) is not None)
+
+
+#: Gene symbols of the subunits of one enzyme complex: one enzyme, not
+#: isozymes. Succinate dehydrogenase in cow listed SDHA and SDHB as "2 cow
+#: isozymes" and advised --isoform SDHA (fifth round, S5-02).
+SUBUNIT_SETS = (
+    frozenset({"SDHA", "SDHB", "SDHC", "SDHD"}),
+    frozenset({"PCCA", "PCCB"}),
+    frozenset({"BCKDHA", "BCKDHB"}),
+    frozenset({"ETFA", "ETFB"}),
+    frozenset({"MCCC1", "MCCC2"}),
+    frozenset({"HADHA", "HADHB"}),
+    frozenset({"PDHA1", "PDHB"}),
+    frozenset({"SUCLG1", "SUCLG2"}),
+    frozenset({"SUCLG1", "SUCLA2"}),
+)
+
+
+def _subunits_of_one_complex(symbols: Sequence[str]) -> bool:
+    """Whether every listed protein is a subunit of one complex (`SUBUNIT_SETS`)."""
+    wanted = {str(s).upper() for s in symbols or ()}
+    return len(wanted) >= 2 and any(wanted <= group for group in SUBUNIT_SETS)
 
 
 def _listed(found: Any, label: str) -> Optional[Tuple[Any, Tuple[str, ...]]]:
@@ -351,14 +419,25 @@ def describe_isoform(ec: Optional[str], organism: Optional[str], label: Optional
         # files under another EC number than the one BRENDA keeps its
         # kinetics under: the report read it as P20813 and then said it is
         # "not a gene symbol" (fourth round of the real-values review).
-        return (f"--isoform {label!r} is the gene symbol of UniProtKB {elsewhere}, which the enzyme "
-                f"nomenclature files under another EC number than {ec}, so it is not among the "
-                f"{organism_precise(found.organism)} proteins listed for EC {ec} ({shown}); rows are "
-                "compared with it by name and by their own UniProt cell, and a row that states it in "
-                "other words will not match")
+        # Not "filed under another EC number": BRENDA lists CYP2B6 (P20813)
+        # under EC 1.14.14.1 and TEM-1 (P62593) under 3.5.2.6; only the
+        # list Caterva holds leaves them out, and TEM-1 is a protein name,
+        # not a gene symbol (fifth round, R5B-02).
+        return (f"--isoform {label!r} names UniProtKB {elsewhere}, which is not among the "
+                f"{organism_precise(found.organism)} proteins the enzyme nomenclature list Caterva holds "
+                f"gives for EC {ec} ({shown}); rows are compared with it by name and by their own "
+                "UniProt cell, and a row that states it in other words will not match")
     return (f"--isoform {label!r} is not a gene symbol or name the enzyme nomenclature's UniProt entries give "
             f"any of the {organism_precise(found.organism)} proteins of EC {ec} ({shown}), so rows are compared "
             "with it as spelled and a row that states the isozyme in other words will not match")
+
+
+def _natural_order(symbol: str) -> Tuple[Any, ...]:
+    """A gene symbol's place as an example: the lowest-numbered first
+    (PRSS1 before PRSS3P2 and PRSS58), then the shorter name (HK1 before
+    HKDC1), then the name; a name with no number last."""
+    number = re.search(r"\d+", symbol or "")
+    return (int(number.group(0)) if number else float("inf"), len(symbol or ""), symbol or "")
 
 
 def _symbol_elsewhere(label: str) -> Optional[str]:
@@ -411,6 +490,11 @@ def _listable(notice: IsozymeNotice, reading: str) -> Optional[str]:
     return next((symbol for symbol in notice.symbols if same_isoform(reading, symbol)), None)
 
 
+#: The resolver's sentence for a Km and a kcat of two proteins
+#: (fallback_logic.resolve_kinetic_pair).
+_TWO_PROTEINS = re.compile(r"the Km's row names (\S+) and the kcat's row (\S+): different proteins")
+
+
 def notice_for_model(model: Any) -> Optional[IsozymeNotice]:
     """The notice for a composed model whose constants came from a literature search.
 
@@ -436,6 +520,11 @@ def notice_for_model(model: Any) -> Optional[IsozymeNotice]:
         notice = _replace(notice, asked=asked)
     if notice is None or isoform:
         return notice
+    for m in measured.values():
+        found = _TWO_PROTEINS.search(getattr(m, "resolver_because", None) or "")
+        if found:
+            from dataclasses import replace as _replace
+            return _replace(notice, two_proteins=(found.group(1), found.group(2)))
     readings = [getattr(m, "row_isoform", None) for m in measured.values()]
     ordered = [getattr(measured[k], "row_isoform", None) for k in sorted(
         measured, key=lambda k: (0 if "Km" in str(k) else 1 if "kcat" in str(k) else 2, str(k)))]
@@ -452,8 +541,34 @@ def notice_for_model(model: Any) -> Optional[IsozymeNotice]:
         first = readings[0]
         if all(r == first or same_isoform(r, first) for r in readings[1:]):
             from dataclasses import replace as _replace
-            return _replace(notice, measured_as=first)
+            return _replace(notice, measured_as=first, substrate=getattr(model, "substrate", None),
+                            measured_pairs=_measured_pairs(notice, model))
     return notice
+
+
+def _measured_pairs(notice: IsozymeNotice, model: Any) -> Optional[Tuple[str, ...]]:
+    """The listed proteins with both a Km and a kcat row naming them for the
+    model's substrate in its organism (`IsozymeNotice.measured_pairs`), or
+    None when that cannot be counted."""
+    substrate = getattr(model, "substrate", None)
+    organism = getattr(model, "organism", None)
+    if not substrate or not organism or not notice.symbols or notice.broad:
+        return None
+    try:
+        from caterva.compose import defaults
+
+        tables = {t: [r for r in defaults.table_rows(notice.ec, t, organism)
+                      if defaults._matches(r.compound, substrate)] for t in ("km", "kcat")}
+        out = []
+        for symbol in notice.symbols:
+            if all(any(defaults._isoform_read(r.conditions) and defaults._same_isoform(
+                    defaults._isoform_read(r.conditions), symbol)
+                    or defaults._accession_says(r.uniprot, symbol) is True for r in rows)
+                   for rows in tables.values()):
+                out.append(symbol)
+        return tuple(out)
+    except Exception:  # noqa: BLE001 - uncounted: the remedy says less
+        return None
 
 
 __all__ = ["BROAD_CLASS", "IsozymeNotice", "describe_isoform", "isozyme_notice", "notice_for_model", "organism_precise"]

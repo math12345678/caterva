@@ -143,6 +143,13 @@ _CONSTRUCTS = (
                 r"with\s+[^,;]{1,60}?\s+for\s+\d+\s*(?:days?|weeks?|months?)\b"
                 r"|\b(?:animals|mice|rats)\s+(?:were\s+)?treated\s+with\b", re.IGNORECASE),
      "the enzyme of animals treated in vivo"),
+    # "recombinant His12-tagged wild type enzyme" (Streptomyces xylose
+    # isomerase, ref 728730) beside the same paper's "native wild type
+    # enzyme", whose kcat is 7-fold higher: a tagged construct (fifth
+    # round, R5V1-12).
+    (re.compile(r"\b(?:His|histidine|hexahistidine|GST|MBP|FLAG|Strep|SUMO)\d*[- ]?(?:tag(?:ged)?)\b"
+                r"|\b(?:N|C)-terminal(?:ly)?\s+(?:His|histidine)\d*[- ]?tag", re.IGNORECASE),
+     "a tagged construct"),
     (re.compile(r"\bsubtype\s+[A-Z0-9]{1,3}\b|\bclade\s+[A-Z]\b|\bdrug[- ]resistant\b"
                 r"|\bmultidrug[- ]resistant\b", re.IGNORECASE),
      "a named subtype or variant of the enzyme"),
@@ -418,6 +425,19 @@ _REFERENCES = re.compile(r"^\d{1,7}(?:\s*,\s*\d{1,7})*$")
 _BINOMIAL = re.compile(r"[A-Z][a-z]+ [a-z][a-z.-]+(?: [a-z.-]+)?")
 
 
+#: Mutations that mark a paper as one isoform's, per EC number: a paper
+#: whose rows study them measured that protein. Human trypsin refs 678332
+#: and 682760 hold the R193G/A/F/Y series, Arg193 being what sets
+#: mesotrypsin (PRSS3) apart (cationic trypsin has Gly193), and their
+#: wild-type row was carried under --isoform PRSS1 (fifth round, S5-01).
+#: Ref 672188's "mutant enzyme Y214C" is a glucokinase (GCK) mutation, and
+#: its wild-type kcat was paired with HK1's Km (R5V1-3).
+ISOFORM_MUTATIONS = {
+    "3.4.21.4": ((re.compile(r"\bR193[A-Z]\b"), "PRSS3"),),
+    "2.7.1.1": ((re.compile(r"\b(?:Y214C|T228M|V455M|A456V|G261R|E300K|R186X|W99R)\b"), "GCK"),),
+}
+
+
 def paper_isoforms(ec: Optional[str], html: str) -> dict:
     """{(organism, reference): (isoform, ...)}: the isoforms each reference's
     rows name anywhere among `_PAPER_TABLES` of the page, by their words
@@ -471,6 +491,9 @@ def paper_isoforms(ec: Optional[str], html: str) -> dict:
                     reading = None
                 if reading:
                     readings.append(reading)
+                for marker, isoform in ISOFORM_MUTATIONS.get(ec or "", ()):
+                    if marker.search(text or "") and isoform not in readings:
+                        readings.append(isoform)
             for ref in refs:
                 kept = found.setdefault((organism.lower(), ref), [])
                 for reading in readings:

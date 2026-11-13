@@ -151,7 +151,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "197 test files -- kinetics & Michaelis-Menten correctness, " +
+          "198 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -288,10 +288,14 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-11-13 (ADR 0182, fifth round's fixes) on
         // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
         // 7830 tests, 7829 passed, 1 skipped, 0 failed, 339 s.
-        passed: 7829,
-        skipped: 1,
+        //
+        // Measured 2026-11-13 (ADR 0182, the fifth round's polish) on
+        // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
+        // 7848 tests, 7846 passed, 2 skipped, 0 failed, 367 s.
+        passed: 7846,
+        skipped: 2,
         failed: 0,
-        collected: 7830,
+        collected: 7848,
       },
     ],
   },
@@ -301,7 +305,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "103 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "104 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -414,10 +418,14 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-11-13 (ADR 0182, fifth round's fixes) on
         // fix/studio-real-values, Tests/ with pytest-xdist (-n 8): 1948
         // tests, 1948 passed, 0 skipped, 0 failed, 172 s.
-        passed: 1948,
+        //
+        // Measured 2026-11-13 (ADR 0182, the fifth round's polish) on
+        // fix/studio-real-values, Tests/ with pytest-xdist (-n 8): 1961
+        // tests, 1961 passed, 0 skipped, 0 failed, 317 s.
+        passed: 1961,
         skipped: 0,
         failed: 0,
-        collected: 1948,
+        collected: 1961,
       },
     ],
   },
@@ -595,7 +603,10 @@ export const TEST_SUITES: TestSuite[] = [
         //
         // Measured 2026-11-13 (ADR 0182, fifth round's fixes) on
         // fix/studio-real-values: jest, 81 suites, 1029 tests, 1029 passed.
-        passed: 1029,
+        //
+        // Measured 2026-11-13 (ADR 0182, the fifth round's polish) on
+        // fix/studio-real-values: jest, 81 suites, 1031 tests, 1031 passed.
+        passed: 1031,
         skipped: 0,
         failed: 0,
       },

@@ -522,6 +522,21 @@ class Measurement:
                     and not same_isoform(paper, mine):
                 continue
             kept.append(row)
+        if named_itself:
+            # The carried row names its protein, and others do too: those
+            # are the comparison. Rat glucokinase's spread counted a 0.05 mM
+            # row naming no isozyme, a hexokinase-range value, as a 154-fold
+            # disagreement about HXK4 (fifth round, S5-05).
+            def names_mine(row: Any) -> bool:
+                get = row.get if isinstance(row, dict) else (lambda k, r=row: getattr(r, k, None))
+                own = get("isoform_own") or read_isoform(
+                    (get("conditions") or "") if isinstance(get("conditions"), str) else "")
+                return bool(own) and (own == mine or same_isoform(own, mine))
+            # Rows naming none are not counted against it either: human
+            # HK2's Km spread counted two glucokinase-range rows naming no
+            # isozyme (refs 641067, 641068) as a disagreement about HK2
+            # (fifth round, R5B-05).
+            return tuple(row for row in kept if names_mine(row))
         return tuple(kept)
 
     @property
@@ -550,7 +565,16 @@ class Measurement:
         rows = [r for r in self._compared() if isinstance(r, dict)]
         values = {float(r["value"]) for r in rows if r.get("value") is not None}
         values.add(float(self.value))
-        references = tuple(sorted({str(r["reference_id"]) for r in rows if r.get("reference_id")}))
+        refs = {str(r["reference_id"]) for r in rows if r.get("reference_id")}
+        # The carried row's own paper is one of the sources: succinate
+        # dehydrogenase carried 0.1 mM from ref 2877 under "one source
+        # (BRENDA ref 699137) reports 2 values, spanning 0.1 to 0.303 mM"
+        # (fifth round, S5-03).
+        mine = re.search(r"BRENDA ref (\d+)", str(self.citation or ""))
+        if mine and not any(r.get("value") is not None and float(r["value"]) == float(self.value)
+                            for r in rows):
+            refs.add(mine.group(1))
+        references = tuple(sorted(refs))
         return Spread(low=span[0], high=span[1], unit=self.unit, carried=float(self.value),
                       n_values=max(len(values), 2), references=references,
                       chosen_because=self.chosen_because,

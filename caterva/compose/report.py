@@ -76,10 +76,22 @@ def _passed_over_far(record) -> List[str]:
         m = _PASSED_NUMBERS.search(clause)
         if not m:
             continue
-        values = [float(v) for v in re.findall(r"(?<![\w./])\d+(?:\.\d+)?(?:e[+-]?\d+)?(?![\w/.])",
-                                                   m.group(1))]
-        if any(v > 0 and max(v / carried, carried / v) > PASSED_OVER_FOLD for v in values):
-            out.append(re.sub(r"^of the \d+ candidate rows \([^)]*\):\s*", "", clause.strip()))
+        found = re.findall(r"(?<![\w./])\d+(?:\.\d+)?(?:e[+-]?\d+)?(?![\w/.])", m.group(1))
+        unit = m.group(1).split()[-1] if m.group(1).split() and not re.fullmatch(
+            r"[\d.e+-]+,?|\.\.\.", m.group(1).split()[-1]) else ""
+        far = [v for v in found
+               if float(v) > 0 and max(float(v) / carried, carried / float(v)) > PASSED_OVER_FOLD]
+        if far:
+            # Only the far rows are listed as far: the note said every row
+            # passed over lay more than 3-fold away and then listed rows
+            # 1.2-fold away, and one equal to the value carried (fifth
+            # round, R5V1-2).
+            head = clause[:m.start()].rstrip() + " passed over"
+            head = re.sub(r"^of the \d+ candidate rows \([^)]*\):\s*", "", head.strip())
+            near = len(found) - len(far)
+            out.append(f"{head}, {'all' if not near else f'{len(far)} of them'} more than "
+                       f"{PASSED_OVER_FOLD:g}-fold from it ({', '.join(far)}"
+                       + (f" {unit}" if unit else "") + ")")
     return out
 
 
@@ -369,6 +381,14 @@ class ModelDossier:
             note = _wild_type_label_note(measured[identifier])
             if note:
                 notes.append(f"`{identifier}`: {note}")
+            reaction = _reaction_of(measured[identifier]) or _reaction_on_the_page(
+                self.model, measured[identifier], getattr(by_id.get(identifier), "table", None))
+            if reaction:
+                # CYP3A4 and fenthion, ref 706823: 0.089 mM is the
+                # desulfuration's Km and 0.131 mM the sulfoxidation's; the
+                # report did not say which (fifth round, R5B-08).
+                notes.append(f"`{identifier}`: its row measured one reaction of the substrate: "
+                             f"\"{' '.join(reaction.group(0).split())}\"")
         from caterva.compose.row_scope import variant_mix
         mixed = variant_mix({i: getattr(m, "commentary", None) for i, m in measured.items()})
         if mixed:
@@ -420,10 +440,22 @@ class ModelDossier:
             return []
 
         lines = ["", "### The conditions these were measured under", ""]
+        read_ph = _readable_ph(stated)
         for identifier in sorted(stated):
             record = stated[identifier]
             parts = []
-            if record.assay_ph is not None:
+            garbled = _GARBLED_PH.search(getattr(record, "commentary", None) or "")
+            if garbled:
+                # "pH 4.u" is no pH 4: the decimal is lost, and the
+                # pairing reads it as the same paper's kcat row's pH 4.8.
+                # Printed as 4, it raised a 1 pH unit mismatch with a pH 5
+                # Ki that is 0.2 units away (fifth round, R5V1-1).
+                partner = read_ph.get(identifier)
+                parts.append(
+                    f"a pH BRENDA prints unreadably ('{garbled.group(0)}')"
+                    + (f", read as pH {partner[1]:g} from the same paper's `{partner[0]}` row"
+                       if partner else ""))
+            elif record.assay_ph is not None:
                 parts.append(f"pH {record.assay_ph:g}")
             if record.assay_temperature_c is not None:
                 parts.append(f"{record.assay_temperature_c:g} °C")
@@ -455,10 +487,10 @@ class ModelDossier:
                 f"rows above."
             )
 
-        lines += self._mixing_lines(stated)
+        lines += self._mixing_lines(stated, read_ph)
         return lines
 
-    def _mixing_lines(self, stated: dict) -> List[str]:
+    def _mixing_lines(self, stated: dict, read_ph: Optional[dict] = None) -> List[str]:
         """Whether the measured constants describe one experiment or several."""
         try:
             from caterva.checkout import literature_module
@@ -468,6 +500,15 @@ class ModelDossier:
             temperature_serious = compatibility.TEMPERATURE_C_SERIOUS
         except Exception:  # noqa: BLE001 - a missing layer is not a wrong answer
             return []
+
+        read_ph = read_ph or {}
+
+        def ph(name: str) -> Optional[float]:
+            # An unreadable pH is compared as the pH it is read as, or not
+            # at all; never as its units digit.
+            if _GARBLED_PH.search(getattr(stated[name], "commentary", None) or ""):
+                return read_ph[name][1] if name in read_ph else None
+            return stated[name].assay_ph
 
         names = sorted(stated)
         if len(names) < 2:
@@ -481,12 +522,13 @@ class ModelDossier:
         for i, first in enumerate(names):
             for second in names[i + 1:]:
                 a, b = stated[first], stated[second]
-                if a.assay_ph is not None and b.assay_ph is not None:
-                    gap = abs(a.assay_ph - b.assay_ph)
+                ph_a, ph_b = ph(first), ph(second)
+                if ph_a is not None and ph_b is not None:
+                    gap = round(abs(ph_a - ph_b), 6)
                     if gap >= ph_serious:
                         clashes.append(
                             f"`{first}` and `{second}` differ by {gap:g} pH "
-                            f"unit(s) ({a.assay_ph:g} against {b.assay_ph:g})"
+                            f"unit(s) ({ph_a:g} against {ph_b:g})"
                         )
                 if (a.assay_temperature_c is not None
                         and b.assay_temperature_c is not None):
@@ -499,7 +541,7 @@ class ModelDossier:
                         )
         comparable = sum(
             1 for name in names
-            if stated[name].assay_ph is not None
+            if ph(name) is not None
             or stated[name].assay_temperature_c is not None
         )
         if not clashes:
@@ -565,7 +607,7 @@ class ModelDossier:
                     # own paper's 0.07 mM, went unsaid (fifth round's review).
                     disagreements.append(
                         f"- `{identifier}`: the model carries {record.value:g} {record.unit} "
-                        f"({record.citation}), the only row left after the checks; rows "
+                        f"({record.citation}), the only row left after the checks; some rows "
                         f"passed over lie more than {PASSED_OVER_FOLD:g}-fold from it: "
                         + "; ".join(passed) + ". Which one is right is a question about the "
                         "papers.")
@@ -1209,6 +1251,85 @@ def _compound_for(model: Any, quantity: Any) -> Optional[str]:
         return model.compound_for(quantity) if quantity is not None else None
     except Exception:  # noqa: BLE001 - a stand-in model without compounds
         return None
+
+
+#: A pH whose decimal BRENDA printed unreadably ("pH 4.u"), as
+#: `row_form.garbled_ph` reads it in the literature layer.
+_GARBLED_PH = re.compile(r"\bpH\s*(\d{1,2})\.(?![\d\s])[^\s,;]*", re.IGNORECASE)
+
+
+def _readable_ph(stated: dict) -> dict:
+    """identifier -> (partner identifier, pH) for each record whose pH is
+    printed unreadably, read as the pH of another record of the same paper
+    whose stated pH has the same units digit (the pairing's reading)."""
+    out = {}
+    for name, record in stated.items():
+        garbled = _GARBLED_PH.search(getattr(record, "commentary", None) or "")
+        if not garbled:
+            continue
+        digit = int(garbled.group(1))
+        for other, partner in sorted(stated.items()):
+            if (other != name and partner.citation == record.citation
+                    and partner.assay_ph is not None
+                    and not _GARBLED_PH.search(getattr(partner, "commentary", None) or "")
+                    and int(partner.assay_ph) == digit):
+                out[name] = (other, float(partner.assay_ph))
+                break
+    return out
+
+
+#: A row's commentary naming which of a substrate's reactions it measured
+#: ("desulfuration by recombinant human CYPs to fenthion-oxon").
+_REACTION_OF_ROW = re.compile(
+    r"\b(?:\d'?-|[NOS]-)?(?:de)?(?:sulfur|sulfoxid|sulphoxid|hydroxyl|methyl|ethyl|alkyl|epoxid|"
+    r"glucuronid|sulfon)ation\b(?:[^,;]{0,60}?\bto\s+[^,;]+)?", re.IGNORECASE)
+
+
+def _reaction_of(record: Any) -> Optional[Any]:
+    """The reaction a carried row measured (`_REACTION_OF_ROW`), from its own
+    commentary or from the same paper's row of the same value: BRENDA prints
+    CYP3A4's fenthion Km 0.089 mM twice, "CYP3A4, at pH 7.4 and 37°C" and
+    "CYP3A4, desulfuration ... to fenthion-oxon" (ref 706823)."""
+    found = _REACTION_OF_ROW.search(getattr(record, "commentary", None) or "")
+    if found:
+        return found
+    mine = re.search(r"BRENDA ref (\d+)", str(getattr(record, "citation", "") or ""))
+    try:
+        value = float(record.value)
+    except (TypeError, ValueError, AttributeError):
+        return None
+    for row in getattr(record, "alternatives", ()) or ():
+        if not isinstance(row, dict) or row.get("value") is None:
+            continue
+        if mine and str(row.get("reference_id")) == mine.group(1) and float(row["value"]) == value:
+            found = _REACTION_OF_ROW.search(str(row.get("conditions") or ""))
+            if found:
+                return found
+    return None
+
+
+def _reaction_on_the_page(model: Any, record: Any, table: Optional[str]) -> Optional[Any]:
+    """`_reaction_of`, read from BRENDA's page itself: the parser keeps one
+    commentary per entry, so ref 706823's "desulfuration ... to fenthion-oxon"
+    reaches no ranked row, while the page holds it beside the same value."""
+    ec = getattr(model, "subject", None) or getattr(model, "ec_number", None)
+    organism = getattr(model, "organism", None)
+    mine = re.search(r"BRENDA ref (\d+)", str(getattr(record, "citation", "") or ""))
+    if not (ec and organism and mine and table in ("km", "kcat", "ki")):
+        return None
+    try:
+        from caterva.compose import defaults
+
+        value = float(record.value)
+        for row in defaults.table_rows(str(ec), table, organism):
+            if str(row.reference_id) == mine.group(1) and row.value is not None \
+                    and float(row.value) == value:
+                found = _REACTION_OF_ROW.search(row.conditions or "")
+                if found:
+                    return found
+    except Exception:  # noqa: BLE001 - the note is a courtesy
+        return None
+    return None
 
 
 def _other_conditions(commentary: Optional[str]) -> Optional[str]:

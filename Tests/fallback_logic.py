@@ -1536,6 +1536,11 @@ def _paper_median(rows):
     return medians[(len(medians) - 1) // 2], len(medians)
 
 
+#: At least this many other rows before the one row stating both pH and
+#: temperature is judged against them all (`_best_evidenced`): two rows
+#: stating less are no bulk, three are (soybean lipoxygenase, R5V1-17).
+LONE_ROW_OTHERS_MIN = 3
+
 #: At least this many papers before the rows stating both pH and
 #: temperature are judged against the rest (`_median_far`).
 BULK_PAPERS_MIN = 5
@@ -1592,6 +1597,58 @@ def _unlabelled_beside_wild_type(entry, rows) -> bool:
                and getattr(other, "substrate", None) == getattr(entry, "substrate", None)
                and _WILD_LABEL.search(getattr(other, "conditions", None) or "")
                and _bare(other.conditions) == mine
+               for other in rows)
+
+
+_EXPRESSED = re.compile(r"\b(?:recombinant|transgenic|heterologously\s+expressed|expressed\s+in)\b",
+                        re.IGNORECASE)
+_NATIVE = re.compile(r"\bnative\b|\bnatural\b|\bpurified\s+from\b|\bisolated\s+from\b",
+                     re.IGNORECASE)
+
+
+def _expressed_beside_native(entry, rows) -> bool:
+    """Whether `entry` measured a recombinant or transgenic preparation
+    while a row of its own paper (same compound) measured the enzyme from
+    its own source: one naming it "native", or naming neither form while
+    the paper names the expressed one elsewhere. "chymosin from calf" carried
+    ref 667763's "transgenic chymosin" pair (kcat 0.16 1/s) over the same
+    paper's "calf chymosin" (kcat 1.6 1/s) (fifth round, R5V1-10)."""
+    text = getattr(entry, "conditions", None) or ""
+    ref = getattr(entry, "reference_id", None)
+    if not ref or not _EXPRESSED.search(text) or _NATIVE.search(text):
+        return False
+    for other in rows:
+        if other is entry or getattr(other, "reference_id", None) != ref \
+                or getattr(other, "substrate", None) != getattr(entry, "substrate", None):
+            continue
+        words = getattr(other, "conditions", None) or ""
+        if _EXPRESSED.search(words) and not _NATIVE.search(words):
+            continue
+        if _is_mutant(other) or row_form.construct_of(words):
+            continue
+        return True
+    return False
+
+
+_DEVELOPING = re.compile(r"\b(?:fetal|foetal|f(?:o)?etus|neonatal|embryonic|larval|newborn)\b",
+                         re.IGNORECASE)
+_ADULT = re.compile(r"\badult\b", re.IGNORECASE)
+
+
+def _developing_beside_adult(entry, rows) -> bool:
+    """Whether `entry` measured a fetal, neonatal or embryonic form while a
+    row of its own paper (same compound) measured the adult's. Rat liver
+    glucokinase, ref 641070: "fetal glucokinase" 7.4 mM was carried over
+    "adult glucokinase" 7.7 mM as the lower middle value (fifth round,
+    R5V1-06)."""
+    text = getattr(entry, "conditions", None) or ""
+    ref = getattr(entry, "reference_id", None)
+    if not ref or not _DEVELOPING.search(text):
+        return False
+    return any(other is not entry and getattr(other, "reference_id", None) == ref
+               and getattr(other, "substrate", None) == getattr(entry, "substrate", None)
+               and _ADULT.search(getattr(other, "conditions", None) or "")
+               and not _DEVELOPING.search(getattr(other, "conditions", None) or "")
                for other in rows)
 
 
@@ -1812,6 +1869,18 @@ def _best_evidenced(
                            "wild-type under otherwise the same stated conditions"),
            "labelled wild-type where the same paper labels one")
 
+    prefer(lambda e: not _developing_beside_adult(e, rows),
+           lambda n, out: (f"{n} row(s) of a fetal, neonatal or embryonic form passed over for the "
+                           "same paper's row of the adult's"),
+           "of the adult form where the same paper also measured a developing one")
+
+    # The enzyme from its own source before the same paper's recombinant or
+    # transgenic preparation of it (R5V1-10).
+    prefer(lambda e: not _expressed_beside_native(e, rows),
+           lambda n, out: (f"{n} row(s) of a recombinant or transgenic preparation passed over for "
+                           "the same paper's row of the enzyme from its own source"),
+           "of the enzyme from its own source where the same paper also measured it")
+
     # Constructs (an isolated domain, a chimera, a modified or immobilised
     # enzyme, a cosolvent, another subtype) after native rows.
     prefer(lambda e: not row_form.construct_of(getattr(e, "conditions", None)),
@@ -1865,6 +1934,27 @@ def _best_evidenced(
                            "stating less were kept too")
         log.append(f"{tier}: kept all {len(rows)} row(s): the rows stating both pH and "
                    "temperature lie far from the rest")
+    elif (len(complete) == 1 and len(rows) - 1 >= LONE_ROW_OTHERS_MIN and complete[0].km_value
+          # One organism's rows: across organisms the closer relative is
+          # ranked first by the frontier, and a lone row of another
+          # organism's is no bulk to judge it by (golden G3).
+          and len({getattr(e, "organism", None) for e in rows}) == 1
+          and complete[0].km_value > 0
+          and all(isinstance(e.km_value, (int, float)) and e.km_value > 0
+                  and max(e.km_value / complete[0].km_value, complete[0].km_value / e.km_value)
+                  > PAIR_MAX_FOLD_FROM_PICK for e in rows if e is not complete[0])):
+        # One row states both and lies more than tenfold from every other:
+        # soybean lipoxygenase carried linoleic acid Km 0.636 mM (ref
+        # 764604, pH 9.5, 40 C) over 0.012-0.028 mM from two papers stating
+        # less, the textbook 10-30 µM (fifth round, R5V1-17). Too few papers
+        # for the median test above; one row against all is enough.
+        lone = complete[0]
+        passed_over.append(f"the one row stating both pH and temperature "
+                           f"({lone.km_value:g} {getattr(lone, 'unit', '') or ''}, BRENDA ref "
+                           f"{_ref(lone)}) lies more than {PAIR_MAX_FOLD_FROM_PICK:g}-fold from "
+                           f"every one of the {len(rows) - 1} other rows, so those were kept too")
+        log.append(f"{tier}: kept all {len(rows)} row(s): the one row stating both pH and "
+                   "temperature lies far from every other")
     elif complete and len(complete) < len(rows):
         # Their values are said: mouse AChE's other wild-type kcat rows
         # (2330 and 2333 1/s, ref 652016, no conditions) are 9-fold above
@@ -1927,6 +2017,13 @@ def _best_evidenced(
             pick_from = [matched]
             log.append(f"{tier}: took the row of BRENDA ref {_ref(matched)} measured under the "
                        "same stated conditions as the paired constant's row")
+            if not any(e is matched for e in rows):
+                # Bovine carboxypeptidase A carried 0.7 mM while the note
+                # listed 0.7 among the rows passed over (fifth round, R5V1-24).
+                passed_over.append(f"the carried row ({matched.km_value:g} "
+                                   f"{getattr(matched, 'unit', '') or ''}, BRENDA ref "
+                                   f"{_ref(matched)}) is one of those passed over, taken back "
+                                   "because it was measured with the paired constant's row")
         else:
             log.append(f"{tier}: the paired row asked for is not among the candidate rows; "
                        "choosing independently")
@@ -2086,11 +2183,40 @@ def _state_the_form(chosen: dict, best, asked: str | None, log, tier) -> None:
     if measured.strip().lower() == asked.strip().lower() or not substrate_matches(measured, asked):
         return
     if substrate_matches(asked, measured):  # the same compound, spelled otherwise
+        _state_the_other_name(chosen, measured, asked, log, tier)
         return
     clause = (f"BRENDA names this row's compound {measured!r}, a stated form of the "
               f"{asked!r} asked for")
     if chosen.get("chosen_because"):
         chosen["chosen_because"] += f"; {clause}"
+    log.append(f"{tier}: {clause}")
+
+
+def _state_the_other_name(chosen: dict, measured: str, asked: str, log, tier) -> None:
+    """Say so when the row carried files the compound under another NAME
+    (a code or a full chemical name), not another spelling: the donepezil Ki
+    (ref 651163) is filed as "(R,S)-1-benzyl-4-[(5,6-dimethoxy-1-indanon)-
+    2-yl]methylpiperidine hydrochloride"; compose said so and the API did
+    not (fifth round, XS5-03)."""
+    try:
+        import compound_names
+    except ImportError:  # pragma: no cover - package layout
+        try:
+            from Tests import compound_names
+        except ImportError:
+            return
+    alias = compound_names._ALIAS_KEYS
+    if not (compound_names._alias_key(measured) in alias or compound_names._alias_key(asked) in alias):
+        return
+    if compound_names._alias_key(measured) == compound_names._alias_key(asked):
+        return
+    clause = (f"BRENDA files the row it came from as {measured!r}, which Caterva reads as "
+              f"{asked}: the same compound under another name")
+    if chosen.get("chosen_because"):
+        chosen["chosen_because"] += f"; {clause}"
+    notes = chosen.get("row_notes")
+    if isinstance(notes, list) and clause not in notes:
+        notes.append(clause)
     log.append(f"{tier}: {clause}")
 
 
@@ -2475,6 +2601,24 @@ def _isoform_tiers(named, isoform, total, log, where):
                    f"{max(e.km_value for e in unnamed):g}): set aside as a probable error, and the "
                    f"rows naming none kept")
         return unnamed, False, []
+    by_paper_only = matching and not any(
+        _isoform_of(getattr(e, "conditions", None)) or _isoform_from_accession(e) for e in matching)
+    if by_paper_only and len(unnamed) >= ISOFORM_OUTLIER_MIN_UNNAMED and isoform_rows_outlying(
+            [e.km_value for e in matching], [e.km_value for e in unnamed], PAIR_MAX_FOLD_FROM_PICK):
+        # Rows tied to the isoform only by what their paper's OTHER rows
+        # name, lying far from the many papers naming no isoform: rat nNOS
+        # carried L-arginine Km 4.8 mM (ref 659257, its paper naming NOS1
+        # elsewhere) beside rows of 0.0022-0.11 mM from many papers, the
+        # textbook 2 µM -- a probable mM-for-µM slip (fifth round, R5V1-01).
+        listed = ", ".join(f"{e.km_value:g} (BRENDA ref {getattr(e, 'reference_id', None) or '?'})"
+                           for e in matching)
+        log.append(f"The {len(matching)} {where} row(s) taken as {isoform}'s only because their "
+                   f"paper names {isoform} elsewhere ({listed}) lie more than "
+                   f"{PAIR_MAX_FOLD_FROM_PICK:g}-fold outside every one of the {len(unnamed)} rows "
+                   f"naming no isoform ({min(e.km_value for e in unnamed):g} to "
+                   f"{max(e.km_value for e in unnamed):g}): set aside as a probable error, and the "
+                   f"rows naming none kept")
+        return unnamed, False, []
     if matching:
         log.append(f"Kept the {len(matching)} of {total} {where} row(s) measuring {isoform}")
         return matching, True, []
@@ -2511,7 +2655,13 @@ def _isoform_tiers(named, isoform, total, log, where):
         log.append(f"No {where} row names {isoform}; kept the {len(unnamed)} naming no isoform, "
                    f"which may or may not have measured it")
         return unnamed, False, []
-    return [], False, sorted({iso for _, iso in named if iso})
+    refused = _Refused(sorted({iso for _, iso in named if iso}))
+    # The rows set aside above for listing the isoform among several
+    # proteins name none: said as such, not as another isoform's. CYP2B6's
+    # Km said every fenthion row measured another isoform, though 4 of ref
+    # 706823's name no CYP (fifth round, R5B-03).
+    refused.unnamed = len(listing)
+    return [], False, refused
 
 
 def _isoform_withheld_result(isoform, available, log):
@@ -3627,12 +3777,22 @@ def _matched_pairs_with_undescribed(km, kcat, substrate):
             mates = [c for c in rows["kcat"] if row_form.same_measurement(k, c, substrate)]
             if not mates:
                 continue
-            if len(row_form.distinct_values(twins)) > 1 or len(row_form.distinct_values(mates)) > 1:
+            if not _one_value(twins) or not _one_value(mates):
                 if ref not in unresolvable:
                     unresolvable.append(ref)
                 continue
-            pairs.append((ref, k, mates[0]))
+            # Values within 1% are one measurement printed twice: mouse
+            # AChE, ref 652194, holds one wild-type Km (0.054 mM) and kcat
+            # rows of 2667 and 2670 1/s, and the pairing was said to be
+            # impossible to tell (fifth round, XS5-06).
+            pairs.append((ref, k, sorted(mates, key=lambda c: c["value"])[(len(mates) - 1) // 2]))
     return pairs, unresolvable, undescribed
+
+
+def _one_value(rows) -> bool:
+    """Whether `rows` hold one value, values within 1% of each other being one."""
+    values = sorted(row_form.distinct_values(rows))
+    return not values or values[-1] <= values[0] * 1.01
 
 
 def probable_error_papers(enzyme_ec, organism, substrate, html_provider, quantity, kwargs) -> dict:
@@ -3862,6 +4022,82 @@ def resolve_kinetic_pair(
         ph = row.get("ph")
         return abs(float(ph) - PHYSIOLOGICAL_PH) if ph is not None else 0.0
 
+    slip_note = ""
+    if not near and far:
+        # The kcat pick's own paper measured a Km far from the Km carried,
+        # while another paper's pair agrees with the Km: that paper's kcat,
+        # not the outlier paper's, goes with the Km. Human DHODH carried
+        # kcat 0.78 1/s (ref 762769, measured with coenzyme Q0, its own Km
+        # 0.29 mM) beside Km 0.009 mM, while ref 390924 gives Km 0.01 mM with
+        # kcat 75 1/s (fifth round's follow-up of R5V1-03).
+        kcat_paper = str(getattr(kcat.citation, "reference_id", None) or "")
+        own_km = [r["value"] for r in (km.pairable or []) if str(r.get("reference_id")) == kcat_paper
+                  and isinstance(r.get("value"), (int, float)) and r["value"] > 0]
+        if kcat_paper and own_km and km.value and all(
+                fold(v, km.value) > PAIR_MAX_FOLD_FROM_PICK for v in own_km):
+            agreeing = [p for p in far if p[0] != kcat_paper and close(p[1], km, km_protein)]
+            if agreeing:
+                near = agreeing
+                far = [p for p in far if p not in agreeing]
+                slip_note = (f"; the kcat's own pick ({kcat.value:g} 1/s, BRENDA ref {kcat_paper}) "
+                             f"comes from a paper whose own Km ({min(own_km, key=lambda v: fold(v, km.value)):g} mM) "
+                             f"lies more than {PAIR_MAX_FOLD_FROM_PICK:g}-fold from the Km the rows "
+                             "agree on, so this pair, whose Km agrees with them, is carried instead")
+
+    def km_slip(a, b):
+        # A factor of a thousand (within 2-fold): mM written for µM.
+        f = fold(a, b)
+        if not math.isfinite(f):
+            return False
+        power = round(math.log10(f) / 3)
+        return power >= 1 and abs(math.log10(f) - 3 * power) <= math.log10(2)
+
+    def accessioned(p):
+        return bool(p[1].get("uniprot")) and bool(p[2].get("uniprot"))
+
+    if near and not all(accessioned(p) for p in near):
+        # Two papers' pairs agree on the kcat and differ a thousandfold in
+        # the Km: one Km is a unit slip. E. coli penicillin acylase carried
+        # ref 650570's Km 19 mM with kcat 50 1/s beside ref 668439's 0.013 mM
+        # with 39 1/s, whose rows name P06875 (fifth round, R5V1-02). The
+        # pair whose rows name their protein is carried.
+        bare = [n for n in near if not accessioned(n)]
+        partners = [p for p in pairs if accessioned(p) and any(
+            fold(p[2]["value"], n[2]["value"]) <= 2 and km_slip(p[1]["value"], n[1]["value"])
+            for n in bare)]
+        if partners:
+            slipped = [n for n in bare if any(
+                fold(p[2]["value"], n[2]["value"]) <= 2 and km_slip(p[1]["value"], n[1]["value"])
+                for p in partners)]
+            n0, p0 = slipped[0], partners[0]
+            slip_note = (f"; BRENDA ref {n0[0]}'s pair (Km {n0[1]['value']:g} mM, kcat "
+                         f"{n0[2]['value']:g} 1/s) was not carried: its kcat agrees with this "
+                         f"pair's within 2-fold while its Km differs "
+                         f"{fold(n0[1]['value'], p0[1]['value']):.3g}-fold, a factor of a thousand "
+                         "that is the signature of a unit slip (mM written for µM); this pair's "
+                         f"rows name their protein (UniProt {p0[1].get('uniprot')}), so it is "
+                         "carried, and the other Km is a probable error")
+            near = partners + [n for n in near if n not in slipped and n not in partners
+                               and not any(km_slip(n[1]["value"], p[1]["value"]) for p in partners)]
+            far = [p for p in far if p not in partners]
+    if near and far and all(outside_assay_range(p[1]) > 0 for p in near):
+        # Every pair near the picks was measured outside an ordinary assay
+        # temperature, and another paper's pair was measured inside it:
+        # Aspergillus niger glucoamylase carried ref 654806's pair at 8 C
+        # (kcat 0.46 1/s) over ref 682864's at 35 C (kcat 7.55 1/s), "far"
+        # only from a kcat pick that was itself the 8 C row (fifth round,
+        # R5V1-11).
+        warm = [p for p in far if outside_assay_range(p[1]) == 0
+                and fold(p[1]["value"], km.value) <= ISOFORM_OUTLIER_FOLD
+                and fold(p[2]["value"], kcat.value) <= ISOFORM_OUTLIER_FOLD]
+        if warm:
+            cold = min(near, key=lambda p: outside_assay_range(p[1]))
+            t = cold[1].get("temperature_c")
+            slip_note = (f"; BRENDA ref {cold[0]}'s pair (Km {cold[1]['value']:g} mM, kcat "
+                         f"{cold[2]['value']:g} 1/s) was measured at {float(t):g}°C, outside the "
+                         "25-37°C of an ordinary assay, so this pair, measured inside it, is carried")
+            near = warm
+            far = [p for p in far if p not in warm]
     if near:
         ref, k_row, c_row = min(near, key=lambda p: (
             outside_assay_range(p[1]),
@@ -3898,6 +4134,7 @@ def resolve_kinetic_pair(
             if row_form.garbled_ph(k_row.get("conditions")) is not None:
                 note += (f"; the Km row's pH is printed unreadably on BRENDA "
                          f"({k_row.get('conditions')!r}) and is read as the kcat row's")
+            note += slip_note
             km_p, kcat_p = _with_clause(km_p, note), _with_clause(kcat_p, note)
             return _with_isozyme_note(km_p, kcat_p, one_isozyme)
 
