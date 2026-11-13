@@ -17,10 +17,10 @@ raises, and the test that expects that says so.
 WHAT IS HELD
 ------------
 The report ends with a `## Claims` section naming the root claim, the
-counts and the re-check line; the bundle's Km claim is cited from HK-I's
-row (reference 640237, value "0.06") and its kcat from glucokinase's
-(703624, "40.1" before the fourth round of the real-values review, which
-stopped trading HK-I's native Km for glucokinase's K0.5 6.3 mM), each with certificates in
+counts and the re-check line; the bundle's Km claim is cited from the row
+with reference 739603 and value "6.3", its kcat from the same paper's row
+"40.1" (a Km and a kcat are taken from one paper when one holds both:
+`fallback_logic.resolve_kinetic_pair`, ADR 0182), each with certificates in
 the pinned page; the independent checker
 (caterva/check/verify.py) passes every check; a second run into another
 directory gives the same root id; the CSV export of that second run carries
@@ -188,14 +188,14 @@ class TestTheReport:
     def test_the_section_lists_every_quantity_with_its_kind_and_ref(self, showcase):
         section = showcase.report.out.split("\n## Claims\n", 1)[1]
         by = claims_by_identifier(read_bundle(showcase.first))
-        assert f"- `reaction_Km`: cited, 0.06 mM -- `{by['reaction_Km'].ref}`" in section
-        assert f"- `reaction_kcat`: cited, 60.4 1/s -- `{by['reaction_kcat'].ref}`" in section
+        assert f"- `reaction_Km`: cited, 6.3 mM -- `{by['reaction_Km'].ref}`" in section
+        assert f"- `reaction_kcat`: cited, 40.1 1/s -- `{by['reaction_kcat'].ref}`" in section
         assert f"- `reaction_S`: chosen, 1 mM -- `{by['reaction_S'].ref}`" in section
 
     def test_the_measured_values_in_the_report_are_the_cited_ones(self, showcase):
         out = showcase.report.out
-        assert "| `reaction_Km` | 0.06 mM | literature (Homo sapiens) | BRENDA ref 640237 |" in out
-        assert "| `reaction_kcat` | 60.4 1/s | literature (Homo sapiens) | BRENDA ref 703624 |" in out
+        assert "| `reaction_Km` | 6.3 mM | literature (Homo sapiens) | BRENDA ref 739603 |" in out
+        assert "| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |" in out
 
     def test_the_studio_record_carries_the_claim_set(self, showcase):
         composed = showcase.report.composed
@@ -208,38 +208,38 @@ class TestTheReport:
 
 
 class TestTheBundle:
-    def test_the_km_claim_is_cited_from_the_640237_row_with_value_0_06(self, showcase):
-        # HK-I's Michaelis-Menten Km, not glucokinase's K0.5 (fourth round of
-        # the real-values review); the kcat is glucokinase's, and the report
-        # says the model combines the two isozymes' constants.
+    def test_the_km_claim_is_cited_from_the_739603_row_with_value_6_3(self, showcase):
+        # The paper the kcat comes from holds a Km row too, so the pair is
+        # taken from it (resolve_kinetic_pair): one preparation, one assay,
+        # pH 7.6 and 25 C for both.
         bundle = read_bundle(showcase.first)
         km = claims_by_identifier(bundle)["reaction_Km"]
         assert km.kind == "cited"
-        assert km.value_text == "0.06" and km.unit == "mM"
+        assert km.value_text == "6.3" and km.unit == "mM"
         assert km.subject == "reaction_Km = Km(2.7.1.1, D-glucose, Homo sapiens)"
         assert km.derivation.rule.rule_id == "select.resolver"
         assert km.derivation.rule.version == 1 and km.derivation.rule.adr == "ADR 0047"
         (row_ref,) = km.derivation.inputs
         row = bundle.get(row_ref)
-        assert row.reference == "640237" and row.value_text == "0.06" and row.unit == "mM"
-        assert row.commentary == "hexokinase I, at 37°C, pH 8.1"
-        assert row.locator == "brenda:2.7.1.1:km:Homo sapiens:D-glucose:640237:0.06:0"
+        assert row.reference == "739603" and row.value_text == "6.3" and row.unit == "mM"
+        assert row.commentary == "wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C"
+        assert row.locator == "brenda:2.7.1.1:km:Homo sapiens:D-glucose:739603:6.3:0"
         assert row.snapshot == f"snapshot:sha256:{HEXOKINASE_SHA256}"
 
-    def test_the_kcat_claim_is_cited_from_the_703624_row_with_value_60_4(self, showcase):
+    def test_the_kcat_claim_is_cited_from_the_739603_row_with_value_40_1(self, showcase):
         bundle = read_bundle(showcase.first)
         kcat = claims_by_identifier(bundle)["reaction_kcat"]
-        assert kcat.kind == "cited" and kcat.value_text == "60.4" and kcat.unit == "1/s"
+        assert kcat.kind == "cited" and kcat.value_text == "40.1" and kcat.unit == "1/s"
         row = bundle.get(kcat.derivation.inputs[0])
-        assert row.reference == "703624" and row.quantity == "kcat"
-        assert row.commentary == "wild type enzyme, in 25 mM HEPES (pH 7.4), at 37°C"
+        assert row.reference == "739603" and row.quantity == "kcat"
+        assert row.commentary == "wild-type, pH 7.6, 25 °C"
 
     def test_each_cited_claim_certifies_its_reference_value_and_commentary_in_the_page(self, showcase):
         bundle = read_bundle(showcase.first)
         page = bundle.snapshot_bytes(f"snapshot:sha256:{HEXOKINASE_SHA256}")
         for identifier, texts in (
-            ("reaction_Km", {"640237", "0.06", "hexokinase I, at 37°C, pH 8.1"}),
-            ("reaction_kcat", {"703624", "60.4", "wild type enzyme, in 25 mM HEPES (pH 7.4), at 37°C"}),
+            ("reaction_Km", {"739603", "6.3", "wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C"}),
+            ("reaction_kcat", {"739603", "40.1", "wild-type, pH 7.6, 25 °C"}),
         ):
             claim = claims_by_identifier(bundle)[identifier]
             matched = {c.matched for c in claim.derivation.certificates}
@@ -260,7 +260,7 @@ class TestTheBundle:
         # isolated carboxyl domain (0.038 mM, ref 640261), a construct set
         # aside since ADR 0182's second round.
         assert set(ordinals["alternatives"]) == {
-            "0.034 mM ref 640261", "3.8 mM ref 641067", "6 mM ref 641068",
+            "0.034 mM ref 640261", "0.06 mM ref 640237", "3.8 mM ref 641067", "6 mM ref 641068",
         }
         assert "unit_factor" not in km.derivation.settings, "the row is already in the model's unit"
 
@@ -283,8 +283,8 @@ class TestTheBundle:
         model = compose("Michaelis Menten", subject="2.7.1.1", organism="Homo sapiens",
                         substrate="glucose")
         provenanced = provenance_of(model, measured={
-            "reaction_Km": Measurement(0.06, "mM", "BRENDA ref 640237"),
-            "reaction_kcat": Measurement(60.4, "1/s", "BRENDA ref 703624"),
+            "reaction_Km": Measurement(6.3, "mM", "BRENDA ref 739603"),
+            "reaction_kcat": Measurement(40.1, "1/s", "BRENDA ref 739603"),
         })
         bundle = read_bundle(showcase.first)
         root = bundle.get(bundle.root)
@@ -301,26 +301,25 @@ class TestTheBundle:
     def test_both_cited_references_literature_pages_are_captured_from_the_recordings(self, showcase):
         bundle = read_bundle(showcase.first)
         papers = {s.locator: s for s in bundle.snapshots.values() if s.source == "brenda_reference"}
-        # Two papers: HK-I's Km and glucokinase's kcat.
+        # One paper: the Km and the kcat are both its rows.
         assert set(papers) == {
-            "https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=640237",
-            "https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=703624",
+            "https://www.brenda-enzymes.org/literature.php?e=2.7.1.1&r=739603",
         }
         recordings = {p.name for p in LITERATURE_HTTP.glob("*.json.gz")}
         for snapshot in papers.values():
             assert Path(snapshot.served_from).name in recordings
             assert Path(snapshot.served_from).parent == showcase.replay
 
-    def test_the_captured_page_for_640237_names_the_hexokinase_i_paper(self, showcase):
+    def test_the_captured_page_for_739603_names_the_glucokinase_paper(self, showcase):
         from caterva.evidence.references import parse_reference_page
 
         bundle = read_bundle(showcase.first)
         (paper,) = [s for s in bundle.snapshots.values()
-                    if s.locator.endswith("r=640237")]
+                    if s.locator.endswith("r=739603")]
         page = parse_reference_page(bundle.snapshot_bytes(paper.ref).decode("utf-8"))
-        assert page.pmid == "3341751"
-        assert page.title.startswith("Purification, properties, and evidence for two subtypes of "
-                                     "human placenta hexokinase type I")
+        assert page.pmid == "24723372"
+        assert page.title.startswith("Role of connecting loop I in catalysis and allosteric "
+                                     "regulation of human glucokinase")
 
 
 class TestTheIndependentChecker:
@@ -474,8 +473,7 @@ class TestAReferencePageNoRecordingAnswers:
         notes = [line for line in section.splitlines()
                  if line.startswith("- reference page not captured for BRENDA ref ")]
         assert sorted(n.split(" of EC ", 1)[0] for n in notes) == [
-            "- reference page not captured for BRENDA ref 640237",
-            "- reference page not captured for BRENDA ref 703624",
+            "- reference page not captured for BRENDA ref 739603",
         ]
         for note in notes:
             assert "no recording answers" in note
@@ -501,8 +499,7 @@ class TestAReferencePageNoRecordingAnswers:
             refused = [c for c in store.claims(kind="refused")
                        if c.refusal.kind == compose_claims.REFERENCE_NOT_CAPTURED]
             assert {c.subject for c in refused} == {
-                "reference 640237 = paper(2.7.1.1, 640237)",
-                "reference 703624 = paper(2.7.1.1, 703624)",
+                "reference 739603 = paper(2.7.1.1, 739603)",
             }
             assert all("no recording answers" in c.derivation.settings["why"] for c in refused)
             assert {c.ref for c in refused}.isdisjoint(bundle.claims)

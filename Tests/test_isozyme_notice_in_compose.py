@@ -81,16 +81,17 @@ def test_the_notice_names_the_isozymes_and_qualifies_the_verdict(compose):
     # Still GROUNDED: every constant is measured and cited.
     assert "VERDICT: GROUNDED" in verdict
     assert "What this supports: Questions about the system whose constants these are" in verdict
-    # And no longer unqualified. Since the fourth round's review the Km is
-    # HK-I's own Michaelis-Menten constant (not glucokinase's K0.5), the
-    # kcat glucokinase's, and the verdict says the model combines them; the
-    # example it offers is the isozyme the Km's row measured.
+    # And no longer unqualified. Since the fifth round's review the model is
+    # one protein's: HK-I has no kcat row, so glucokinase's measured pair
+    # (ref 739603) is carried, its K0.5 said, and the verdict names GCK as
+    # the protein every cited row names (the fourth round combined HK-I's Km
+    # with GCK's kcat, a kcat/Km neither enzyme has).
     assert "Qualified: EC 2.7.1.1 is 5 proteins in human and no --isoform was given" in verdict
+    assert "every cited row names GCK" in verdict
     assert "2 concern(s), worst first:" in verdict
-    assert "[isozymes] EC 2.7.1.1 has 5 human isozymes" in verdict
-    assert ("[row_scope] the cited rows name different proteins (`reaction_Km`: HK-I; "
-            "`reaction_kcat`: GCK)") in verdict
-    assert "(for example --isoform HK1)" in verdict
+    assert "[isozymes] EC 2.7.1.1 is 5 human proteins" in verdict
+    assert "[row_scope] `reaction_Km` carries a K0.5" in verdict
+    assert "(for example --isoform HK1)" not in verdict
     # By gene symbol, which is what a paper and a person write, not by UniProt entry-name mnemonic.
     for symbol in ("HKDC1", "HK1", "HK2", "HK3", "GCK"):
         assert symbol in verdict
@@ -101,8 +102,9 @@ def test_the_notice_names_the_isozymes_and_qualifies_the_verdict(compose):
 def test_the_notice_is_also_beside_the_constants(compose):
     _, out = compose("--organism", "human")
     section = out.split("### Which isozyme")[1].split("###")[0]
-    assert "5 human isozymes" in section and "HK1" in section
-    assert "Pass --isoform" in section
+    # Fifth round: every cited row names GCK, and the section says so.
+    assert "5 human proteins" in section and "HK1" in section
+    assert "--isoform GCK" in section
     assert out.index("### Which isozyme") > out.index("## Where the numbers come from")
 
 
@@ -113,11 +115,12 @@ def test_the_notice_does_not_change_what_was_measured(compose):
     6.3 mM and kcat 40.1 1/s. Picked apart they were HK-I's 0.06 mM beside
     another paper's 60.4 1/s, and before the median 6.0 mM and 40.1 1/s.
     That the pick moves from one isozyme to another is the notice's whole
-    point. Since the fourth round's review the Km is HK-I's native constant
-    again, not glucokinase's K0.5, and the kcat glucokinase's (said)."""
+    point. The fourth round carried HK-I's native Km beside glucokinase's
+    kcat; since the fifth round a Km and a kcat are one protein's, and with
+    no HK-I kcat the pair is glucokinase's, its K0.5 said."""
     _, out = compose("--organism", "human")
-    assert "| `reaction_Km` | 0.06 mM | literature (Homo sapiens) | BRENDA ref 640237 |" in out
-    assert "| `reaction_kcat` | 60.4 1/s | literature (Homo sapiens) | BRENDA ref 703624 |" in out
+    assert "| `reaction_Km` | 6.3 mM | literature (Homo sapiens) | BRENDA ref 739603 |" in out
+    assert "| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |" in out
 
 
 def test_typing_an_isoform_does_not_carry_another_isozymes_row(compose):
@@ -250,4 +253,4 @@ def test_a_name_read_as_an_ec_number_gets_the_notice_too(compose, monkeypatch, c
     out = capsys.readouterr().out
     assert code == 0
     assert "Read 'hexokinase' as EC 2.7.1.1 (hexokinase): accepted name matches exactly." in out
-    assert "[isozymes] EC 2.7.1.1 has 5 human isozymes" in out
+    assert "[isozymes] EC 2.7.1.1 is 5 human proteins" in out

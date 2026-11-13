@@ -1209,10 +1209,12 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
         # isoform is searched for unless --isoform set one.
         if getattr(reading, "isoform", None) and not getattr(args, "isoform", None):
             args.isoform = reading.isoform
+            args.isoform_from_words = True
         tissue = _tissue_isoform(reading.ec, typed)
         if tissue and not getattr(args, "isoform", None):
             word, isoform, said = tissue
             args.isoform = isoform
+            args.isoform_from_words = True
             out.notes.append(f"Read {word!r} with EC {reading.ec} as its {word} isoform {isoform}"
                              f"{said}; the constants are taken from rows naming it where there are any "
                              "(pass --isoform to change it).")
@@ -2378,6 +2380,7 @@ def _search_resolved(
             substrate=getattr(model, "substrate", None) or getattr(args, "substrate", None),
             isoform=getattr(args, "isoform", None) or None,
             any_mode=bool(getattr(args, "any_mode", False)),
+            isoform_from_words=bool(getattr(args, "isoform_from_words", False)),
         )
     except ExportRefused as exc:
         # The search ran over every organism and settled on none (several
@@ -2435,6 +2438,10 @@ def _search_resolved(
         from caterva.enzymes.isozyme import describe_isoform
 
         reading = describe_isoform(ec, args.organism, args.isoform)
+        if reading and getattr(args, "isoform_from_words", False):
+            reading = reading.replace(f"--isoform {args.isoform!r} was read as",
+                                      f"The isoform {args.isoform!r} read from your description "
+                                      "was read as", 1)
         if reading:
             selection_notes = [reading, *selection_notes]
     failures = [
@@ -3145,18 +3152,18 @@ def _far_from_other_organisms(model: Any, measured: Mapping[str, Any], ec: Optio
 #: Tissue words that name a mammalian isoform for these EC numbers.
 #: "pyruvate kinase muscle human PEP" dropped "muscle" without a word
 #: (third round's review); the muscle and liver forms differ many-fold.
-_TISSUE_ISOFORMS: Dict[str, Dict[str, Tuple[str, str]]] = {
-    "2.7.1.40": {"muscle": ("PKM", " (PKM1 and PKM2 are its splice forms)"),
-                 "liver": ("PKLR", " (the L form)"), "erythrocyte": ("PKLR", " (the R form)"),
-                 "red cell": ("PKLR", " (the R form)")},
-    "4.1.2.13": {"muscle": ("ALDOA", " (aldolase A)"), "liver": ("ALDOB", " (aldolase B)"),
-                 "brain": ("ALDOC", " (aldolase C)")},
-    "1.1.1.27": {"muscle": ("LDHA", " (the M subunit, LDH-5 as the tetramer)"),
-                 "heart": ("LDHB", " (the H subunit, LDH-1 as the tetramer)")},
-    "2.7.3.2": {"muscle": ("CKM", " (CK-M)"), "brain": ("CKB", " (CK-B)")},
-    "2.4.1.1": {"muscle": ("PYGM", ""), "liver": ("PYGL", ""), "brain": ("PYGB", "")},
-    "2.7.1.11": {"muscle": ("PFKM", ""), "liver": ("PFKL", ""), "platelet": ("PFKP", "")},
-}
+def _tissue_isoforms() -> Dict[str, Dict[str, Tuple[str, str]]]:
+    # One table, the literature layer's (row_form.TISSUE_ISOFORMS): the
+    # resolver reads a row's tissue by it ("heart phosphorylase"), so the
+    # description's word and the row's cannot disagree.
+    try:
+        from caterva.checkout import literature_module
+
+        return literature_module("row_form").TISSUE_ISOFORMS
+    except Exception:  # noqa: BLE001 - without the literature layer, no table
+        return {}
+
+
 _TISSUE_WORD = re.compile(r"\b(?:muscle|liver|heart|brain|erythrocyte|red cell|platelet|kidney)\b",
                           re.IGNORECASE)
 
@@ -3165,7 +3172,7 @@ def _tissue_isoform(ec: Optional[str], typed: str) -> Optional[Tuple[str, str, s
     """(word, isoform, what it is) for a tissue word naming one of the EC's
     isoforms; None when the EC has no tissue isoforms listed or no word
     names one; "" (falsy, not None) is never returned."""
-    table = _TISSUE_ISOFORMS.get(ec or "")
+    table = _tissue_isoforms().get(ec or "")
     if not table:
         return None
     for word, (isoform, said) in table.items():

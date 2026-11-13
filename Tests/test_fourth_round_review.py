@@ -15,7 +15,8 @@ professor would have found wrong:
   row taken as "the lower of the two middle values";
 - HIV-1 protease's 2.0 M NaCl pair carried over the same paper's 1.0 M one;
 - chymotrypsin's unlabelled row carried over the same paper's wild-type row;
-- human hexokinase's HK-I Km traded for glucokinase's K0.5;
+- human hexokinase's HK-I Km traded for glucokinase's K0.5 (reversed in the
+  fifth round: one protein's K0.5 pair over two proteins' constants);
 - NOS2's L-NMMA rows ("inducible isoform from macrophage") withheld as
   another isozyme's; PTPalpha rows counted as PTP1B's; CA I's "low activity
   carbonic anhydrase" rows counted as CA II's.
@@ -177,11 +178,16 @@ HK_KM = [row(0.06, "D-glucose", "Homo sapiens", "hexokinase I, at 37°C, pH 8.1"
 HK_KCAT = [row(40.1, "D-glucose", "Homo sapiens", "wild-type, pH 7.6, 25 °C", "739603", "P35557")]
 
 
-def test_a_native_km_is_not_traded_for_another_isozymes_k05():
+def test_a_native_km_is_not_mixed_with_another_isozymes_kcat():
+    # Changed in the fifth round of the real-values review. The fourth round
+    # kept HK-I's Km (0.06 mM) beside glucokinase's kcat rather than take
+    # GCK's K0.5; the model's kcat/Km was then neither enzyme's. A Km and a
+    # kcat are one protein's: with no HK-I kcat and no other isozyme having
+    # both, the model is glucokinase's measured pair, its K0.5 said.
     html = page({"KM Values": HK_KM, "Turnover Numbers": HK_KCAT})
     km, kcat = resolve_kinetic_pair("2.7.1.1", "Homo sapiens", "D-glucose", **kw(html, "Homo sapiens"))
-    assert km.value == 0.06 and km.row_isoform == "HK-I"
-    assert "combines two isozymes' constants" in km.chosen_because
+    assert (km.value, kcat.value) == (6.3, 40.1) and km.row_isoform == "GCK"
+    assert "K0.5" in km.chosen_because and "combines two isozymes" not in km.chosen_because
 
 
 def test_a_ki_measured_on_another_assay_substrate_is_said():

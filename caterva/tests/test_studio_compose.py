@@ -403,10 +403,10 @@ def test_a_name_goes_through_the_one_policy_not_a_copy_in_the_adapter():
 # ---------------------------------------------------------------------------
 
 
-def test_human_hexokinase_carries_brenda_ref_640237(tmp_path):
-    # HK-I's Michaelis-Menten Km (ref 640237) beside glucokinase's kcat (ref
-    # 703624), said as two isozymes' constants: since the fourth round of the
-    # real-values review a native Km is not traded for glucokinase's K0.5.
+def test_human_hexokinase_carries_brenda_ref_739603(tmp_path):
+    # The Km and the kcat are taken from one paper, ref 739603, the one
+    # paper holding a row of each among the rows chosen from
+    # (fallback_logic.resolve_kinetic_pair, ADR 0182).
     progress = Recorder()
     with hexokinase_offline():
         code, out, err, outcome = both(
@@ -415,13 +415,13 @@ def test_human_hexokinase_carries_brenda_ref_640237(tmp_path):
     assert_parity(code, out, err, outcome)
     assert code == 0
     km = parameter(outcome.result, "reaction_Km")
-    assert km["value"] == 0.06 and km["unit"] == "mM"
+    assert km["value"] == 6.3 and km["unit"] == "mM"
     cite = km["provenance"]["citation"]
-    assert cite == {"text": "BRENDA ref 640237", "registry": "BRENDA", "reference_id": "640237",
+    assert cite == {"text": "BRENDA ref 739603", "registry": "BRENDA", "reference_id": "739603",
                     "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1", "via": "literature"}
     assert km["provenance"]["organism"] == "Homo sapiens"
-    assert "| `reaction_Km` | 0.06 mM | literature (Homo sapiens) | BRENDA ref 640237 |" in out
-    assert "| `reaction_kcat` | 60.4 1/s | literature (Homo sapiens) | BRENDA ref 703624 |" in out
+    assert "| `reaction_Km` | 6.3 mM | literature (Homo sapiens) | BRENDA ref 739603 |" in out
+    assert "| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |" in out
     looked_up = [c[2] for c in progress.calls if c[0] == "stage" and c[1] == "search"]
     assert "Looking up reaction_Km in BRENDA's km table for EC 2.7.1.1" in looked_up
 
@@ -436,34 +436,34 @@ def hexokinase_claims(tmp_path_factory):
         return (*both(request, tmp), tmp)
 
 
-def test_the_km_claim_is_the_640237_row_its_page_its_paper_and_its_certificates(hexokinase_claims):
+def test_the_km_claim_is_the_739603_row_its_page_its_paper_and_its_certificates(hexokinase_claims):
     code, out, err, outcome, _ = hexokinase_claims
     assert_parity(code, out, err, outcome)
     assert code == 0
     claim = parameter(outcome.result, "reaction_Km")["provenance"]["claim"]
     assert claim["kind"] == "cited" and claim["id"].startswith("claim:sha256:")
     assert claim["rule"] == {"rule_id": "select.resolver", "version": 1, "adr": "ADR 0047"}
-    assert claim["row"]["reference"] == "640237"
+    assert claim["row"]["reference"] == "739603"
     assert claim["row"] == {
-        "locator": "brenda:2.7.1.1:km:Homo sapiens:D-glucose:640237:0.06:0", "value_text": "0.06", "unit": "mM",
+        "locator": "brenda:2.7.1.1:km:Homo sapiens:D-glucose:739603:6.3:0", "value_text": "6.3", "unit": "mM",
         "substrate": "D-glucose", "organism": "Homo sapiens",
-        "commentary": "hexokinase I, at 37°C, pH 8.1",
-        "reference": "640237"}
+        "commentary": "wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C",
+        "reference": "739603"}
     snapshot = claim["snapshot"]
     assert snapshot["id"] == f"sha256:{HEXOKINASE_SHA256}"
     assert snapshot["locator"] == "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1"
     assert snapshot["licence"] == "CC BY 4.0" and snapshot["retrieved_at"].endswith("Z")
     assert snapshot["served_from"].endswith("brenda_2.7.1.1.html.gz")
     assert {c["matched"] for c in claim["certificates"]} >= {
-        "640237", "0.06", "hexokinase I, at 37°C, pH 8.1"}
+        "739603", "6.3", "wild-type, K0.5 value, Hill coefficient 1.8, pH 7.6, 25 °C"}
     assert claim["refusal"] is None
     paper = claim["reference"]
-    assert paper["pmid"] == "3341751" and paper["url"] == "https://pubmed.ncbi.nlm.nih.gov/3341751/"
-    assert paper["title"].startswith("Purification, properties, and evidence for two subtypes of "
-                                     "human placenta hexokinase type I")
+    assert paper["pmid"] == "24723372" and paper["url"] == "https://pubmed.ncbi.nlm.nih.gov/24723372/"
+    assert paper["title"].startswith("Role of connecting loop I in catalysis and allosteric regulation "
+                                     "of human glucokinase")
     assert paper["journal"]
     kcat = parameter(outcome.result, "reaction_kcat")["provenance"]["claim"]
-    assert kcat["kind"] == "cited" and kcat["row"]["reference"] == "703624" and kcat["row"]["value_text"] == "60.4"
+    assert kcat["kind"] == "cited" and kcat["row"]["reference"] == "739603" and kcat["row"]["value_text"] == "40.1"
 
 
 def test_the_claim_on_a_number_is_the_claim_in_the_bundle_and_the_export(hexokinase_claims):
@@ -477,7 +477,7 @@ def test_the_claim_on_a_number_is_the_claim_in_the_bundle_and_the_export(hexokin
         assert param["provenance"]["claim"]["id"] == by_identifier[param["id"]].ref
     assert result["claims"]["root"] == bundle.root
     assert result["claims"]["counts"] == {"cited": 2, "chosen": 3, "placeholder": 0, "refused": 0, "computed": 1}
-    assert result["claims"]["snapshots"] == 3, "the enzyme page and the two papers the values come from"
+    assert result["claims"]["snapshots"] == 2, "the enzyme page and the one paper both values come from"
     assert result["claims"]["notes"] == []
     csv_text = next(a for a in outcome.artifacts if a.name == "parameters.csv").content.decode("utf-8")
     rows = {r["identifier"]: r for r in csv.DictReader(io.StringIO(csv_text))}
@@ -492,10 +492,10 @@ def test_without_the_literature_pages_the_paper_is_null_and_the_section_says_so(
         code, out, err, outcome = both(request, tmp_path)
     assert_parity(code, out, err, outcome)
     km = parameter(outcome.result, "reaction_Km")["provenance"]["claim"]
-    assert km["kind"] == "cited" and km["row"]["reference"] == "640237"
+    assert km["kind"] == "cited" and km["row"]["reference"] == "739603"
     assert km["reference"] is None
     notes = outcome.result["claims"]["notes"]
-    assert len(notes) == 2 and all(n.startswith("reference page not captured for BRENDA ref ") for n in notes)
+    assert len(notes) == 1 and all(n.startswith("reference page not captured for BRENDA ref ") for n in notes)
     assert outcome.result["claims"]["counts"]["cited"] == 2
 
 

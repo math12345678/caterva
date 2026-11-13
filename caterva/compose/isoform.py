@@ -110,10 +110,66 @@ def _outlying(matching: List[float], unnamed: List[float]) -> bool:
         return False
 
 
-def select_isoform(measured: Mapping[str, Any], isoform: str) -> IsoformSelection:
+#: How the notes say why a row naming the isoform was taken: the flag's
+#: words when --isoform was typed, else the description's.
+ASKED_BY_FLAG = "as --isoform asked"
+ASKED_BY_WORDS = "as the isoform read from your description"
+
+
+def _discredited_papers(measured: Mapping[str, Any]) -> set:
+    """The papers one of whose rows, of any constant, lies more than 100-fold
+    from every other row of that constant (`_isolated`): a probable error.
+    DPP4 and Gly-Pro-4-nitroanilide, ref 665551: kcat 279000 1/s against
+    20-87 1/s for every other row; its Km of 1.43 mM, ~10-fold above every
+    other wild-type human row, was then carried as "the row for DPP4" (fifth
+    round of the real-values review). A paper whose paired constant is a
+    probable error does not supply the other one."""
+    out = set()
+    for m in measured.values():
+        # In the constant's own unit: a row written in uM is not an outlier
+        # of rows in mM.
+        rows = [r for r in getattr(m, "alternatives", ()) or ()
+                if isinstance(r, dict) and r.get("value") is not None
+                and r.get("unit") in (None, getattr(m, "unit", None))]
+        for i in _isolated([float(r["value"]) for r in rows]):
+            if rows[i].get("reference_id"):
+                out.add(str(rows[i]["reference_id"]))
+    return out
+
+
+def _same_paper_partner(rows: List[Mapping[str, Any]], partner: Mapping[str, Any]):
+    """The row of `rows` measured with `partner` (one paper, the same stated
+    conditions), or None."""
+    try:
+        from caterva.checkout import literature_module
+
+        same = literature_module("row_form").same_measurement
+    except Exception:  # noqa: BLE001 - without the literature layer, by paper alone
+        def same(a, b, substrate=None):
+            return a.get("conditions") == b.get("conditions")
+    ref = str(partner.get("reference_id") or "")
+    for r in rows:
+        if ref and str(r.get("reference_id") or "") == ref and same(r, partner):
+            return r
+    return None
+
+
+def select_isoform(measured: Mapping[str, Any], isoform: str,
+                   asked: str = ASKED_BY_FLAG) -> IsoformSelection:
     """Each measured constant, taken from a row that measured `isoform` where
-    the resolver ranked one. See the module docstring for the three cases."""
+    the resolver ranked one. See the module docstring for the three cases.
+
+    A Km and a kcat are taken from one paper's matched rows when it holds
+    both, and a paper one of whose rows is a probable error
+    (`_discredited_papers`) supplies neither (fifth round's review: DPP4's
+    Km of 1.43 mM came from the paper of the 279000 1/s kcat).
+    `asked` says how the isoform was asked for."""
     out = IsoformSelection(measured={})
+    discredited = _discredited_papers(measured)
+    taken: Dict[str, Mapping[str, Any]] = {}
+    matching_of: Dict[str, List[Mapping[str, Any]]] = {}
+    moved_from_unnamed: Dict[str, Any] = {}
+    unnamed_kept: set = set()
     for identifier in sorted(measured):
         m = measured[identifier]
         # The words first, then the isoform the resolver read off the row's
@@ -142,6 +198,15 @@ def select_isoform(measured: Mapping[str, Any], isoform: str) -> IsoformSelectio
         lone = _isolated([float(r["value"]) for r, _ in named])
         named = [x for i, x in enumerate(named) if i not in lone]
         matching = [r for r, iso in named if same_isoform(iso, isoform)]
+        set_aside = [r for r in matching if str(r.get("reference_id") or "") in discredited]
+        matching = [r for r in matching if r not in set_aside]
+        if set_aside and not matching:
+            out.notes.append(
+                f"`{identifier}`: the rows naming {isoform} ("
+                + ", ".join(f"{float(r['value']):g} {m.unit}, BRENDA ref {r.get('reference_id')}"
+                            for r in set_aside)
+                + ") come from a paper whose other constant lies more than 100-fold from every "
+                  "other row, a probable error, so they were not used")
         unnamed_values = [float(r["value"]) for r, iso in named if iso is None]
         if chosen is None:
             unnamed_values.append(float(m.value))
@@ -158,34 +223,120 @@ def select_isoform(measured: Mapping[str, Any], isoform: str) -> IsoformSelectio
                   f"measured {isoform} is unknown")
             continue
         if matching:
+            # The resolver ranked the rows; its first row naming the isoform
+            # is the one it would carry asked for it (`carry` keeps them one).
             row = matching[0]
-            out.measured[identifier] = _from_row(m, row, f"the row for {isoform}, as --isoform asked")
+            out.measured[identifier] = _from_row(m, row, f"the row for {isoform}, {asked}")
+            taken[identifier] = row
+            matching_of[identifier] = matching
+            if chosen is None:
+                moved_from_unnamed[identifier] = m
             was = f"measured {chosen}" if chosen else "named no isoform"
             out.notes.append(
                 f"`{identifier}`: the resolver's pick ({m.value:g} {m.unit}) {was}; the row for "
                 f"{isoform} ({float(row['value']):g} {m.unit}, BRENDA ref {row.get('reference_id')}) "
-                f"is used instead, as --isoform asked")
+                f"is used instead, {asked}")
             continue
         if chosen is None:
             out.measured[identifier] = m
+            unnamed_kept.add(identifier)
             out.notes.append(
                 f"`{identifier}`: no ranked row names {isoform}; the one used names no isoform, "
                 f"so whether it measured {isoform} is unknown")
             continue
-        unnamed = [r for r, iso in named if iso is None]
+        # A row listing several proteins' accessions beside its paper's rows
+        # naming one each is no protein's (fallback_logic _mark_unattributed):
+        # CYP2D6's fenthion Km was such a row (fifth round's review).
+        unattributed = [r for r, iso in named if iso is None and r.get("unattributed")]
+        unnamed = [r for r, iso in named if iso is None and not r.get("unattributed")]
+        if not unnamed and unattributed:
+            refs = sorted({str(r.get("reference_id")) for r in unattributed})
+            out.refused[identifier] = (
+                f"no row for {isoform}: the rows BRENDA holds measured {chosen}, or list several "
+                f"proteins' accessions and name none in their words (BRENDA ref {', '.join(refs)}, "
+                f"whose other rows name other isoforms), so they cannot be taken as {isoform}'s "
+                f"(--isoform {isoform})")
+            continue
         if unnamed:
+            row = unnamed[0]
             out.measured[identifier] = _from_row(
-                m, unnamed[0], f"a row naming no isoform, used because none names {isoform}")
+                m, row, f"a row naming no isoform, used because none names {isoform}")
             out.notes.append(
                 f"`{identifier}`: the resolver's pick measured {chosen}, not {isoform}; a row naming "
-                f"no isoform ({float(unnamed[0]['value']):g} {m.unit}) is used instead, and whether it "
+                f"no isoform ({float(row['value']):g} {m.unit}) is used instead, and whether it "
                 f"measured {isoform} is unknown")
             continue
         seen = sorted({iso for _, iso in named if iso} | {chosen})
         out.refused[identifier] = (
             f"no row for {isoform}: the rows BRENDA holds measured {', '.join(seen)}, and a constant "
             f"of another isoform is a different protein's (--isoform {isoform})")
+    _pair_within_isoform(measured, out, taken, matching_of, isoform, asked)
+    _move_both_or_neither(out, taken, moved_from_unnamed, unnamed_kept, isoform)
     return out
 
 
-__all__ = ["IsoformSelection", "select_isoform", "same_isoform"]
+def _move_both_or_neither(out, taken, moved_from_unnamed, unnamed_kept, isoform) -> None:
+    """A Km and a kcat move to rows naming the isoform together or not at
+    all. When rows naming it give only one constant, and both of the
+    resolver's picks named no isoform, moving that one alone sets one paper's
+    named row beside another paper's unnamed row: no more the isoform's
+    model than the resolver's two picks, and a mix of two preparations.
+    DPP4: with ref 665551 set aside, only the kcat had a row naming DPP4
+    (87 1/s, "dimeric rDPP-IV"), 4-fold above the wild-type rows the Km
+    (0.165 mM) sat among (fifth round of the real-values review)."""
+    ids = sorted(set(moved_from_unnamed) | unnamed_kept)
+    km_id = next((i for i in ids if i.endswith("_Km")), None)
+    kcat_id = next((i for i in ids if i.endswith("_kcat")), None)
+    if not (km_id and kcat_id):
+        return
+    for moved, kept in ((km_id, kcat_id), (kcat_id, km_id)):
+        if moved in moved_from_unnamed and kept in unnamed_kept:
+            original = moved_from_unnamed[moved]
+            row = taken[moved]
+            out.measured[moved] = original
+            prefix = f"`{moved}`: "
+            out.notes[:] = [n for n in out.notes if not n.startswith(prefix)]
+            out.notes.append(
+                f"`{moved}`: a row naming {isoform} exists ({float(row['value']):g} "
+                f"{original.unit}, BRENDA ref {row.get('reference_id')}), but no row naming "
+                f"{isoform} gives the {kept.split('_')[-1]}, so the resolver's pick, which names "
+                f"no isoform, is kept beside it: one evidence rule for both constants rather than "
+                f"one paper's named row beside another's unnamed one; whether either measured "
+                f"{isoform} is unknown")
+            return
+
+
+def _pair_within_isoform(measured, out, taken, matching_of, isoform, asked) -> None:
+    """A Km and a kcat both re-taken from rows naming the isoform come from
+    one paper's matched rows when the kcat's paper (else the Km's) holds
+    them: the resolver's rule that a kcat's paper gives its Km pair, kept
+    here (fifth round's review: DPP4's Km from ref 665551 beside a kcat from
+    ref 678195, which holds the Km measured with it, 0.09 mM)."""
+    km_id = next((i for i in taken if i.endswith("_Km")), None)
+    kcat_id = next((i for i in taken if i.endswith("_kcat")), None)
+    if not (km_id and kcat_id):
+        return
+    km_row, kcat_row = taken[km_id], taken[kcat_id]
+    if str(km_row.get("reference_id")) == str(kcat_row.get("reference_id")):
+        return
+    for moved, partner_id in ((km_id, kcat_id), (kcat_id, km_id)):
+        row = _same_paper_partner(matching_of[moved], taken[partner_id])
+        if row is None:
+            continue
+        ref = row.get("reference_id")
+        out.measured[moved] = _from_row(
+            measured[moved], row,
+            f"the row for {isoform}, {asked}, measured with the {partner_id.split('_')[-1]} "
+            f"carried (BRENDA ref {ref}, the same stated conditions)")
+        prefix = f"`{moved}`: "
+        out.notes[:] = [n for n in out.notes if not n.startswith(prefix)]
+        m = measured[moved]
+        out.notes.append(
+            f"`{moved}`: the resolver's pick ({m.value:g} {m.unit}) named no isoform or another; "
+            f"the row for {isoform} measured with the carried {partner_id.split('_')[-1]} "
+            f"({float(row['value']):g} {m.unit}, BRENDA ref {ref}, one paper and the same stated "
+            f"conditions) is used instead, {asked}")
+        return
+
+
+__all__ = ["ASKED_BY_FLAG", "ASKED_BY_WORDS", "IsoformSelection", "select_isoform", "same_isoform"]

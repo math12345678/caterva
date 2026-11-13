@@ -272,6 +272,21 @@ ALIASES = (
     ("BAPNA", "N-benzoyl-DL-arginine 4-nitroanilide"),
     ("DL-BAPNA", "N-benzoyl-DL-arginine 4-nitroanilide"),
     ("L-BAPNA", "N-benzoyl-L-arginine 4-nitroanilide"),
+) + tuple(
+    # A deoxynucleotide by its abbreviation, its "-ylate" name and its full
+    # name: E. coli thymidylate synthase filed one K48Q mutant's Km under
+    # "dUMP" and every wild-type row (0.0011-0.004 mM) under
+    # "2'-deoxyuridylate", and the substrate chooser, counting them apart,
+    # carried the mutant's 0.05 mM (fifth round of the real-values review).
+    (spelling.format(n=nucleoside, y=ylate), abbreviation)
+    for abbreviation, nucleoside, ylate in (
+        ("dUMP", "uridine", "uridylate"), ("dTMP", "thymidine", "thymidylate"),
+        ("dAMP", "adenosine", "adenylate"), ("dGMP", "guanosine", "guanylate"),
+        ("dCMP", "cytidine", "cytidylate"))
+    for spelling in ("2'-deoxy{y}", "deoxy{y}", "2'-deoxy{n} 5'-monophosphate",
+                     "2'-deoxy{n} 5'-phosphate", "2'-deoxy{n} monophosphate",
+                     "deoxy{n} monophosphate", "deoxy{n} 5'-monophosphate",
+                     "2'-deoxy{n}-5'-monophosphate", "2'-deoxy{n}-5'-phosphate")
 )
 
 

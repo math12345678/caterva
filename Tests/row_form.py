@@ -123,6 +123,26 @@ _CONSTRUCTS = (
     (re.compile(rf"\b\d+(?:\.\d+)?\s*%\s*(?:\(?[vw]/[vw]\)?\s*)?(?:{_COSOLVENTS})\b"
                 rf"|\b\d+(?:\.\d+)?\s*M\s+(?:urea|guanidin\w*)\b", re.IGNORECASE),
      "an assay with a cosolvent or denaturant added"),
+    # "addition of aluminium lactate during measurement of activity" (mouse
+    # AChE, ref 650742, beside plain native rows): a compound added to the
+    # assay, an apparent constant (fifth round of the real-values review).
+    (re.compile(r"\b(?:addition|presence)\s+of\s+[^,;]{1,60}?\s+(?:during|in)\s+(?:the\s+)?"
+                r"(?:measurement|assay|activity\s+(?:measurement|assay)|reaction\s+mixture)\b"
+                r"|\b[^,;\s]+\s+added\s+(?:during|to)\s+(?:the\s+)?(?:measurement|assay)\b",
+                re.IGNORECASE),
+     "an assay with a compound added"),
+    # "Co-ADH", "Cu-ADH" (yeast ADH, ref 655741): the zinc enzyme with its
+    # metal replaced, counted among native rows (fifth round's review).
+    (re.compile(r"\b(?:Co|Cu|Cd|Ni|Hg)(?:\(II\)|2\+)?-(?:substituted\s+)?(?:ADH|[A-Z]{2,6}|enzyme)\b"
+                r"|\b(?:metal|cobalt|copper|cadmium|nickel|apo)[- ]substituted\b"
+                r"|\b(?:cobalt|copper|cadmium|nickel)[- ](?:enzyme|reconstituted)\b", 0),
+     "a metal-substituted enzyme"),
+    # "after treatment with NaCl for 3 months" (the same paper): the enzyme
+    # of animals treated in vivo, not the native enzyme.
+    (re.compile(r"\bafter\s+(?:in\s+vivo\s+)?treatment\s+(?:of\s+(?:the\s+)?(?:animals|mice|rats)\s+)?"
+                r"with\s+[^,;]{1,60}?\s+for\s+\d+\s*(?:days?|weeks?|months?)\b"
+                r"|\b(?:animals|mice|rats)\s+(?:were\s+)?treated\s+with\b", re.IGNORECASE),
+     "the enzyme of animals treated in vivo"),
     (re.compile(r"\bsubtype\s+[A-Z0-9]{1,3}\b|\bclade\s+[A-Z]\b|\bdrug[- ]resistant\b"
                 r"|\bmultidrug[- ]resistant\b", re.IGNORECASE),
      "a named subtype or variant of the enzyme"),
@@ -141,6 +161,23 @@ def construct_of(commentary: Optional[str]) -> Optional[str]:
                 continue
             return f"{what} ({m.group(0).strip()!r})"
     return None
+
+
+#: A value computed, not measured: "predicted Ki value" (zanamivir and
+#: influenza neuraminidase, ref 699433, 0.000133 mM beside measured rows
+#: 1000-fold lower, counted as a literature value; fifth round's review).
+_PREDICTED = re.compile(
+    r"\b(?:predicted|(?:calculated|computed|estimated)\s+(?:by|from|with)\s+(?:molecular\s+)?"
+    r"(?:docking|modell?ing|simulations?)|in\s+silico|docking|molecular\s+dynamics|QSAR)\b",
+    re.IGNORECASE)
+
+
+def predicted(commentary: Optional[str]) -> Optional[str]:
+    """The words saying a row's value was computed rather than measured
+    ("predicted Ki value", "docking"), or None. A kcat "calculated" from a
+    measured Vmax is a measurement, and is not read as one."""
+    m = _PREDICTED.search(commentary or "")
+    return m.group(0) if m else None
 
 
 # -- Ions --------------------------------------------------------------------------
@@ -270,6 +307,106 @@ def proteins_in_organism_of(ec: Optional[str], cell: Optional[str]) -> int:
     return sum(1 for _, _, c in entries if c == code) if code else 0
 
 
+#: A subunit gene symbol: a family and one subunit letter ("frdA", "sdhB",
+#: "SDHA").
+_SUBUNIT_SYMBOL = re.compile(r"^([A-Za-z]{3})([A-Z])$")
+
+
+@functools.lru_cache(maxsize=512)
+def _enzyme_name_of(ec: str) -> str:
+    try:
+        from caterva.enzymes.index import load_index
+        entry = load_index().get(ec)
+    except Exception:  # noqa: BLE001 - no index, no name
+        return ""
+    return (getattr(entry, "name", None) or "") if entry else ""
+
+
+def other_enzyme(ec: Optional[str], cell: Optional[str]) -> Optional[str]:
+    """The gene symbol of the protein a row's own UniProt cell names when it
+    is a subunit of ANOTHER enzyme filed under `ec`, else None.
+
+    EC 1.3.5.1 holds four E. coli entries, frdA and frdB (fumarate
+    reductase) and sdhA and sdhB (succinate dehydrogenase). A malonate Ki
+    row naming P00363 (FrdA, ref 674532) was carried beside succinate:quinone
+    reductase's Km and kcat as "the row measured isoform frdA", and made E.
+    coli the organism that "covers 3 of 3" constants (fifth round of the
+    real-values review). Read only where the organism's entries under the EC
+    are two or more subunit families ("frd", "sdh") and exactly one family's
+    letters begin the initials of the EC's name ("succinate dehydrogenase":
+    "sd"); a row of another family is another enzyme's, not an isoform."""
+    found = accessions(cell)
+    if not ec or not found:
+        return None
+    entries = _labels_of_ec(ec)
+    labels = {acc: (label, code) for acc, label, code in entries}
+    if not all(a in labels for a in found):
+        return None
+    code = labels[found[0]][1]
+    families = {}
+    for _, label, c in entries:
+        m = _SUBUNIT_SYMBOL.match(label or "")
+        if c == code and m:
+            families.setdefault(m.group(1).lower(), []).append(label)
+    if len(families) < 2:
+        return None
+    words = re.findall(r"[a-z]+", _enzyme_name_of(ec).lower())
+    initials = "".join(w[0] for w in words)
+    own = [f for f in families if initials and (f.startswith(initials) or initials.startswith(f))]
+    if len(own) != 1:
+        return None
+    mine = {(_SUBUNIT_SYMBOL.match(labels[a][0]) or [None, None])[1] for a in found}
+    mine = {f.lower() for f in mine if f}
+    if mine and own[0] not in mine:
+        return " and ".join(dict.fromkeys(labels[a][0] for a in found))
+    return None
+
+
+#: The isoforms of an EC that a tissue names: "muscle" pyruvate kinase is
+#: PKM. `caterva compose` reads a description's tissue word by this table,
+#: and the resolver a row's ("heart phosphorylase").
+TISSUE_ISOFORMS = {
+    "2.7.1.40": {"muscle": ("PKM", " (PKM1 and PKM2 are its splice forms)"),
+                 "liver": ("PKLR", " (the L form)"), "erythrocyte": ("PKLR", " (the R form)"),
+                 "red cell": ("PKLR", " (the R form)")},
+    "4.1.2.13": {"muscle": ("ALDOA", " (aldolase A)"), "liver": ("ALDOB", " (aldolase B)"),
+                 "brain": ("ALDOC", " (aldolase C)")},
+    "1.1.1.27": {"muscle": ("LDHA", " (the M subunit, LDH-5 as the tetramer)"),
+                 "heart": ("LDHB", " (the H subunit, LDH-1 as the tetramer)")},
+    "2.7.3.2": {"muscle": ("CKM", " (CK-M)"), "brain": ("CKB", " (CK-B)")},
+    "2.4.1.1": {"muscle": ("PYGM", ""), "liver": ("PYGL", ""), "brain": ("PYGB", "")},
+    "2.7.1.11": {"muscle": ("PFKM", ""), "liver": ("PFKL", ""), "platelet": ("PFKP", "")},
+}
+
+_ROW_TISSUE = re.compile(
+    r"\b(skeletal\s+muscle|muscle|liver|heart|cardiac|brain|erythrocyte|red\s+cell|platelet|kidney)"
+    r"\s+(?:\w+\s+){0,1}?(?:enzyme|isozymes?|isoenzymes?|isoforms?|form|phosphorylases?|kinases?"
+    r"|aldolases?|dehydrogenases?)\b", re.IGNORECASE)
+
+
+def tissue_isoform_of_row(ec: Optional[str], commentary: Optional[str]) -> Optional[str]:
+    """The isoform a row's commentary names by its tissue ("heart
+    phosphorylase I and III", "liver enzyme"), for an EC whose tissue
+    isoforms are listed: the listed isoform, or "the <tissue> form" for a
+    tissue the table does not list. None for a row naming no tissue's
+    enzyme, or an EC with no listed tissue isoforms.
+
+    Rabbit glycogen phosphorylase, asked for as "from rabbit muscle" (PYGM):
+    the Km carried was 6.0 mM, "heart phosphorylase I and III" (ref 488283),
+    said to name no isoform (fifth round of the real-values review)."""
+    table = TISSUE_ISOFORMS.get(ec or "")
+    if not table:
+        return None
+    m = _ROW_TISSUE.search(commentary or "")
+    if not m:
+        return None
+    tissue = " ".join(m.group(1).lower().split())
+    tissue = {"skeletal muscle": "muscle", "cardiac": "heart"}.get(tissue, tissue)
+    if tissue in table:
+        return table[tissue][0]
+    return f"the {tissue} form"
+
+
 # -- Isoform from the paper's other entries -------------------------------------------
 
 #: The tables of a BRENDA page whose rows say which protein one reference
@@ -365,7 +502,10 @@ _WORD = re.compile(r"[a-z0-9]+(?:\.[0-9]+)?")
 #: Words that say which table a row is in, not what was measured.
 _TABLE_WORDS = frozenset({"km", "kcat", "value", "values", "turnover", "number", "numbers",
                           "s", "mm", "min", "sec", "the", "for", "of", "and", "at", "in", "c",
-                          "degrees", "a", "an", "with", "constant", "michaelis"})
+                          "degrees", "a", "an", "with", "constant", "michaelis",
+                          # "enzyme ALDH-2, pH 9.5" and "enzyme form ALDH-2, pH
+                          # 9.5" (ref 348688) are one assay (fifth round).
+                          "form"})
 
 
 _HALF_SATURATION_STATEMENT = re.compile(
@@ -395,18 +535,49 @@ def condition_words(conditions: Optional[str], substrate: Optional[str] = None) 
     return frozenset(words)
 
 
+#: A pH BRENDA printed with a typo in its decimal ("pH 4.u", HIV-1 protease,
+#: ref 648156): the units digit is read, the decimal is not.
+_GARBLED_PH = re.compile(r"\bpH\s*(\d{1,2})\.(?![\d\s])[^\s,;]*", re.IGNORECASE)
+_STATED_PH = re.compile(r"\bpH\s*\d{1,2}(?:\.\d+)?", re.IGNORECASE)
+
+
+def garbled_ph(conditions: Optional[str]) -> Optional[int]:
+    """The units digit of a pH whose decimal is unreadable ("pH 4.u" is 4),
+    or None when the commentary states none so garbled."""
+    m = _GARBLED_PH.search(conditions or "")
+    return int(m.group(1)) if m else None
+
+
 def same_measurement(a: dict, b: dict, substrate: Optional[str] = None) -> bool:
     """Whether two rows (dicts with conditions, ph, temperature_c) were
     measured under one set of stated conditions: the same pH and temperature
-    (both stated alike, or both unstated) and the same remaining words."""
+    (both stated alike, or both unstated) and the same remaining words.
+
+    A pH whose decimal BRENDA printed unreadably ("pH 4.u") is unknown, not
+    different: it matches a stated pH with the same units digit when the
+    remaining words agree. HIV-1 protease, ref 648156: Km 0.0152 mM "pH 4.u,
+    0.1 M NaCl" and kcat 5.8 1/s "pH 4.8, 0.1 M NaCl" were never paired, and
+    the 1.0 M NaCl pair was carried (fifth round of the real-values review)."""
     def close(x, y, tol):
         if x is None or y is None:
             return x is None and y is None
         return abs(float(x) - float(y)) <= tol
-    return (close(a.get("ph"), b.get("ph"), 0.05)
+    ph_a, ph_b = a.get("ph"), b.get("ph")
+    words_a, words_b = a.get("conditions"), b.get("conditions")
+    for theirs, text, other in ((ph_b, words_a, words_b), (ph_a, words_b, words_a)):
+        # The parser may read "pH 4.u" as 4.0 or as nothing: either way the
+        # garbled row's own pH is not compared.
+        digit = garbled_ph(text)
+        if (digit is not None and theirs is not None and garbled_ph(other) is None
+                and int(float(theirs)) == digit):
+            ph_a = ph_b = theirs
+            words_a = _STATED_PH.sub("pH", _GARBLED_PH.sub("pH", words_a or ""))
+            words_b = _STATED_PH.sub("pH", _GARBLED_PH.sub("pH", words_b or ""))
+            break
+    return (close(ph_a, ph_b, 0.05)
             and close(a.get("temperature_c"), b.get("temperature_c"), 0.5)
-            and condition_words(a.get("conditions"), substrate)
-            == condition_words(b.get("conditions"), substrate))
+            and condition_words(words_a, substrate)
+            == condition_words(words_b, substrate))
 
 
 def distinct_values(rows: Iterable[dict]) -> set:
