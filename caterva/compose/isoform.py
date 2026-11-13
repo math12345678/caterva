@@ -110,10 +110,10 @@ def _outlying(matching: List[float], unnamed: List[float]) -> bool:
         return False
 
 
-#: How the notes say why a row naming the isoform was taken: the flag's
-#: words when --isoform was typed, else the description's.
-ASKED_BY_FLAG = "as --isoform asked"
-ASKED_BY_WORDS = "as the isoform read from your description"
+#: What asked for the isoform, for the notes ("as --isoform asked", "as your
+#: description asked"); compose's DESCRIPTION_ASKED is the second.
+ASKED_BY_FLAG = "--isoform"
+ASKED_BY_WORDS = "your description"
 
 
 def _discredited_papers(measured: Mapping[str, Any]) -> set:
@@ -163,7 +163,9 @@ def select_isoform(measured: Mapping[str, Any], isoform: str,
     both, and a paper one of whose rows is a probable error
     (`_discredited_papers`) supplies neither (fifth round's review: DPP4's
     Km of 1.43 mM came from the paper of the 279000 1/s kcat).
-    `asked` says how the isoform was asked for."""
+    `asked` is what asked for the isoform, for the notes: "--isoform", or
+    "your description" when it was read from the sentence (DPP4, CA2, NOS2:
+    fifth round's review, V5-5)."""
     out = IsoformSelection(measured={})
     discredited = _discredited_papers(measured)
     taken: Dict[str, Mapping[str, Any]] = {}
@@ -186,9 +188,13 @@ def select_isoform(measured: Mapping[str, Any], isoform: str,
             # and kcat, measured together, both naming no isoform, over
             # another paper's PKM row (fourth round of the real-values review).
             out.measured[identifier] = m
+            # Said of the constant it is: the kcat is the one measured with
+            # the Km (fifth round's review, V5-4).
+            this, other = (("kcat", "Km") if "kcat" in identifier.lower().split("_")[-1]
+                           else ("Km", "kcat"))
             out.notes.append(
-                f"`{identifier}`: the row names no isoform; it is the Km measured with the kcat "
-                f"the model carries (one paper, the same stated conditions), kept over a row "
+                f"`{identifier}`: the row names no isoform; it is the {this} measured with the "
+                f"{other} the model carries (one paper, the same stated conditions), kept over a row "
                 f"naming {isoform} from another paper, so whether it measured {isoform} is unknown")
             continue
         rows = [r for r in getattr(m, "alternatives", ()) or ()
@@ -226,7 +232,7 @@ def select_isoform(measured: Mapping[str, Any], isoform: str,
             # The resolver ranked the rows; its first row naming the isoform
             # is the one it would carry asked for it (`carry` keeps them one).
             row = matching[0]
-            out.measured[identifier] = _from_row(m, row, f"the row for {isoform}, {asked}")
+            out.measured[identifier] = _from_row(m, row, f"the row for {isoform}, as {asked} asked")
             taken[identifier] = row
             matching_of[identifier] = matching
             if chosen is None:
@@ -235,7 +241,7 @@ def select_isoform(measured: Mapping[str, Any], isoform: str,
             out.notes.append(
                 f"`{identifier}`: the resolver's pick ({m.value:g} {m.unit}) {was}; the row for "
                 f"{isoform} ({float(row['value']):g} {m.unit}, BRENDA ref {row.get('reference_id')}) "
-                f"is used instead, {asked}")
+                f"is used instead, as {asked} asked")
             continue
         if chosen is None:
             out.measured[identifier] = m
@@ -326,7 +332,7 @@ def _pair_within_isoform(measured, out, taken, matching_of, isoform, asked) -> N
         ref = row.get("reference_id")
         out.measured[moved] = _from_row(
             measured[moved], row,
-            f"the row for {isoform}, {asked}, measured with the {partner_id.split('_')[-1]} "
+            f"the row for {isoform}, as {asked} asked, measured with the {partner_id.split('_')[-1]} "
             f"carried (BRENDA ref {ref}, the same stated conditions)")
         prefix = f"`{moved}`: "
         out.notes[:] = [n for n in out.notes if not n.startswith(prefix)]
@@ -335,7 +341,7 @@ def _pair_within_isoform(measured, out, taken, matching_of, isoform, asked) -> N
             f"`{moved}`: the resolver's pick ({m.value:g} {m.unit}) named no isoform or another; "
             f"the row for {isoform} measured with the carried {partner_id.split('_')[-1]} "
             f"({float(row['value']):g} {m.unit}, BRENDA ref {ref}, one paper and the same stated "
-            f"conditions) is used instead, {asked}")
+            f"conditions) is used instead, as {asked} asked")
         return
 
 

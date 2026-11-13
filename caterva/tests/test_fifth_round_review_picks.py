@@ -84,7 +84,7 @@ def test_a_paper_whose_other_constant_is_a_probable_error_supplies_neither():
     assert km.value == 0.09 and kcat.value == 87.0
     assert "665551" not in km.citation
     assert all("as --isoform asked" not in n for n in out.notes)
-    assert any("read from your description" in n for n in out.notes)
+    assert any("as your description asked" in n for n in out.notes)
 
 
 # -- Rows passed over are said when no spread is ----------------------------------------------

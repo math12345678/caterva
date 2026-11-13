@@ -637,6 +637,16 @@ export interface UnresolvedKinetic {
   isoformsAvailable: string[];
   variantCandidatesAvailable: string[];
   crossSpeciesOrganismsAvailable: string[];
+  /** Those of `crossSpeciesOrganismsAvailable` whose every row measured a
+   * protein variant: --allow-cross-species would withhold those rows too
+   * (fifth round's review, V7-04). Optional: a runner that predates it sends
+   * none, and every organism is then taken as usable, as before. */
+  crossSpeciesVariantOnly?: string[];
+  /** For a compound with no row in the organism searched: what that
+   * organism's rows are for, counted, in `caterva compose`'s words, so the
+   * CLI, the API and compose offer the same alternatives (fifth round's
+   * review, V7-08). Null when the runner could not say it. */
+  availableInTheOrganism?: string | null;
   /** Every row's value, "1e-06 1/s (BRENDA ref 729224)", when each is outside
    * the physically plausible range for the constant. Empty (or absent)
    * unless `source` is "implausible_withheld". */
@@ -755,10 +765,23 @@ export function withheldSentence(
         `(${list(result.implausibleValues ?? [], 'unnamed')}) is outside the physically plausible ` +
         `range for it. A value like that is a unit slip or a misfiled row far more often than a ` +
         `measurement, so none was used.`;
-    case 'cross_species_withheld':
+    case 'cross_species_withheld': {
+      // Only organisms with a row the search would use are offered: one
+      // whose rows all measured a variant is refused again after the opt-in
+      // (human COX-2's kcat, Mus musculus N580A; fifth round's review, V7-04).
+      const variantOnly = new Set(result.crossSpeciesVariantOnly ?? []);
+      const usable = result.crossSpeciesOrganismsAvailable.filter((o) => !variantOnly.has(o));
+      const variants = result.crossSpeciesOrganismsAvailable.filter((o) => variantOnly.has(o));
+      if (usable.length === 0 && variants.length > 0) {
+        return `BRENDA has no row for this ${result.quantity} in the organism asked for, and its ` +
+          `only rows elsewhere (${variants.join(', ')}) measured a protein variant, which is ` +
+          `withheld, so --allow-cross-species would not fill it either: supply it yourself.`;
+      }
       return `BRENDA holds this ${result.quantity} only for other organisms ` +
-        `(${list(result.crossSpeciesOrganismsAvailable, 'unnamed')}). Pass --allow-cross-species ` +
-        `to use one from a related organism, flagged as such.`;
+        `(${list(usable, 'unnamed')}` +
+        (variants.length ? `; rows of a protein variant only, withheld: ${variants.join(', ')}` : '') +
+        `). Pass --allow-cross-species to use one from a related organism, flagged as such.`;
+    }
     default:
       return null;
   }
@@ -1251,6 +1274,11 @@ export async function resolveKinetic(
       isoformsAvailable: names(parsed['isoformsAvailable']),
       variantCandidatesAvailable: names(parsed['variantCandidatesAvailable']),
       crossSpeciesOrganismsAvailable: names(parsed['crossSpeciesOrganismsAvailable']),
+      crossSpeciesVariantOnly: names(parsed['crossSpeciesVariantOnly']),
+      availableInTheOrganism:
+        typeof parsed['availableInTheOrganism'] === 'string' && parsed['availableInTheOrganism'] !== ''
+          ? (parsed['availableInTheOrganism'] as string)
+          : null,
       modesAvailable: names(parsed['modesAvailable']),
       implausibleValues: names(parsed['implausibleValues']),
     };

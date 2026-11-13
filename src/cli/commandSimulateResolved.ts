@@ -283,6 +283,17 @@ function notFoundBecause(
 ): { sentence: string; why: string } | null {
   const withheld = withheldSentence(result, advice);
   if (withheld) return { sentence: withheld, why: WITHHELD_WHY };
+  if (result.availableInTheOrganism) {
+    // What the organism DOES hold, counted, as compose and the API say it
+    // (fifth round's review, V7-08).
+    return {
+      sentence: result.availableInTheOrganism,
+      why:
+        'BRENDA has no row for the compound named in this organism; the line above lists the ' +
+        'ones it has rows for. Re-run naming one of them, or supply the value from a source ' +
+        'you can cite.',
+    };
+  }
   if (
     result.source === 'ec_ambiguous' ||
     result.source === 'ec_not_resolved' ||
@@ -391,10 +402,20 @@ interface Blocker {
 }
 
 /** `crossSpecies` for a lookup that found nothing (see Blocker). */
-function crossSpeciesCouldFill(result: { found: boolean; source?: string | null }): boolean | undefined {
+function crossSpeciesCouldFill(result: {
+  found: boolean;
+  source?: string | null;
+  crossSpeciesOrganismsAvailable?: string[];
+  crossSpeciesVariantOnly?: string[];
+}): boolean | undefined {
   if (result.found) return false;
   if (!result.source) return undefined;
-  return result.source === 'cross_species_withheld';
+  if (result.source !== 'cross_species_withheld') return false;
+  // Every other organism's rows measured a variant: the opt-in would be
+  // refused again (fifth round's review, V7-04).
+  const variantOnly = new Set(result.crossSpeciesVariantOnly ?? []);
+  const others = result.crossSpeciesOrganismsAvailable ?? [];
+  return others.length === 0 || others.some((o) => !variantOnly.has(o));
 }
 
 /**

@@ -361,9 +361,14 @@ class ModelDossier:
                 substrate=getattr(self.model, "substrate", None),
                 isoform=getattr(self.model, "isoform", None),
                 row_isoform=getattr(measured[identifier], "row_isoform", None),
+                compound=_compound_for(self.model, quantity),
             )
             if scope is not None:
                 notes += [f"`{identifier}`: {c.text}" for c in scope.concerns]
+        for identifier in sorted(measured):
+            note = _wild_type_label_note(measured[identifier])
+            if note:
+                notes.append(f"`{identifier}`: {note}")
         from caterva.compose.row_scope import variant_mix
         mixed = variant_mix({i: getattr(m, "commentary", None) for i, m in measured.items()})
         if mixed:
@@ -433,6 +438,15 @@ class ModelDossier:
             lines.append(f"- `{identifier}` — measured at {', '.join(parts)}.{suffix}")
 
         silent = sorted(set(measured) - set(stated))
+        # A row that states no pH, temperature or buffer may still state
+        # other conditions: bovine glutamate dehydrogenase's kcat row reads
+        # "cofactor NAD+", and the report said the source stated none
+        # (fifth round's review, N19). Its words are quoted instead.
+        said = {name: _other_conditions(getattr(measured[name], "commentary", None)) for name in silent}
+        for name in [n for n in silent if said[n]]:
+            lines.append(f"- `{name}` — the source states no pH, temperature or buffer; its row "
+                         f"says: \"{said[name]}\".")
+        silent = [n for n in silent if not said[n]]
         if silent:
             lines.append(
                 f"- {', '.join(f'`{name}`' for name in silent)} — the source "
@@ -1186,3 +1200,59 @@ def _default_target(model: Any) -> Optional[str]:
 
 
 __all__ = ["ModelDossier", "dossier"]
+
+
+def _compound_for(model: Any, quantity: Any) -> Optional[str]:
+    """The compound a constant is measured for (an inhibition constant's
+    inhibitor), or None when the model cannot say."""
+    try:
+        return model.compound_for(quantity) if quantity is not None else None
+    except Exception:  # noqa: BLE001 - a stand-in model without compounds
+        return None
+
+
+def _other_conditions(commentary: Optional[str]) -> Optional[str]:
+    """A row's commentary when it states something (a cofactor, an assay
+    detail), else None: an empty cell, "-", or BRENDA's "pH and temperature
+    not specified in the publication" says nothing more than the silence."""
+    text = " ".join(str(commentary or "").split())
+    if not text or text == "-":
+        return None
+    if re.fullmatch(r"(?i)(?:pH and )?temperature not specified in the publication\.?|"
+                    r"pH not specified in the publication\.?", text):
+        return None
+    return text
+
+
+#: The resolver's clause for a paper's unlabelled row passed over for its row
+#: labelled wild-type (fallback_logic `_unlabelled_beside_wild_type`).
+_WILD_LABEL_PASSED = re.compile(
+    r"(\d+) unlabelled row\(s\) passed over for the same paper's row labelled wild-type under "
+    r"otherwise the same stated conditions")
+
+
+def _wild_type_label_note(record: Any) -> Optional[str]:
+    """A sentence when the carried row was taken over its own paper's row
+    that states no wild-type label, and no spread section says so (the
+    spread's own sentence carries the resolver's reason). Human
+    chymotrypsin, ref 769319: "wild-type, pH 8" (0.575 mM) was carried over
+    a bare "pH 8" row (0.304 mM), and the report said nothing of it (fifth
+    round's review, A4-04)."""
+    if getattr(record, "spread", None) is not None:
+        return None
+    found = _WILD_LABEL_PASSED.search(str(getattr(record, "resolver_because", "") or ""))
+    if not found:
+        return None
+    n = int(found.group(1))
+    ref = getattr(record, "reference_id", None) or _reference_of(record)
+    paper = f"BRENDA ref {ref}" if ref else "the same paper"
+    return (f"the row carried is labelled wild-type; {paper} also gives "
+            f"{'a row' if n == 1 else f'{n} rows'} under otherwise the same stated conditions that "
+            f"{'states' if n == 1 else 'state'} no wild-type label (possibly a construct or variant "
+            f"the commentary does not name), passed over for the labelled one")
+
+
+def _reference_of(record: Any) -> Optional[str]:
+    """The BRENDA reference in a measurement's citation text, else None."""
+    found = re.search(r"\bref (\d+)", str(getattr(record, "citation", "") or ""))
+    return found.group(1) if found else None

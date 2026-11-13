@@ -578,10 +578,19 @@ def _compound_cell(cell_texts: list, target_organism: str | None) -> str | None:
     """The compound named by a data row: the first cell after the value that
     is not an organism, an accession, a placeholder or a bare number. None
     when the row has no such cell before its commentary would begin."""
-    for cell in cell_texts[1:3]:
-        c = cell.strip()
+    cells = [c.strip() for c in cell_texts]
+    for index, c in enumerate(cells[1:3], start=1):
         if not c or c == "-":
             continue
+        # Cell 1 is the compound when cell 2 holds the row's organism, even
+        # when the compound's name has a binomial's shape: "Phenolphthalein
+        # diphosphate | Homo sapiens" on EC 3.1.3.2 was read as a row with no
+        # compound cell, and the whole row then matched "diphosphate" (fifth
+        # round's review, N10).
+        if (index == 1 and target_organism and len(cells) > 2
+                and " ".join(cells[2].split()) == " ".join(target_organism.split())
+                and " ".join(c.split()) != " ".join(target_organism.split())):
+            return c
         if GENERIC_ORGANISM_PATTERN.fullmatch(c) or (target_organism and c == target_organism):
             return None
         if UNIPROT_CELL_PATTERN.match(c) or re.match(r"^\d+\.?\d*$", c):
@@ -728,12 +737,19 @@ def parse_brenda_km_html(
             if row_organism is None:
                 continue
         else:
+            # By the layout, as `_row_organism_cell` reads it: cell 2, else
+            # cell 1 when cell 2 is not organism-shaped. This took the first
+            # binomial-shaped cell, so a compound named like one
+            # ("Phenolphthalein diphosphate", "Sodium diphosphate") became
+            # the row's organism, and potato acid phosphatase's advice
+            # listed them as the organisms to re-run in (fifth round's
+            # review, N10).
             row_organism = None
-            for cell in cell_texts:
-                cell_clean = cell.strip()
-                if GENERIC_ORGANISM_PATTERN.fullmatch(cell_clean):
-                    row_organism = cell_clean
-                    break
+            stripped = [c.strip() for c in cell_texts]
+            if len(stripped) > 2 and GENERIC_ORGANISM_PATTERN.fullmatch(stripped[2]):
+                row_organism = stripped[2]
+            elif len(stripped) > 1 and GENERIC_ORGANISM_PATTERN.fullmatch(stripped[1]):
+                row_organism = stripped[1]
             if row_organism is None:
                 continue
 

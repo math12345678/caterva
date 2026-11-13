@@ -612,6 +612,12 @@ function buildUnresolvedKineticProvenance(
   lookedUpFor?: { name: string; named: boolean },
   /** The organism Caterva chose because none was named, when it did. */
   organismChosen?: string,
+  /** `caterva compose`'s list of what the organism searched holds, with
+   *  counts, when the runner could say it (V7-08). */
+  availableInTheOrganism?: string,
+  /** Of `organismsAvailable`, those whose every row measured a protein
+   *  variant, which allowCrossSpecies would still withhold (V7-04). */
+  variantOnly?: string[],
 ): ParameterProvenance {
   const K = key.toUpperCase();
 
@@ -740,9 +746,26 @@ function buildUnresolvedKineticProvenance(
   }
 
   if (reason === "cross_species_withheld") {
+    // Only organisms with a row the search would use are offered: one whose
+    // rows all measured a variant is refused again after the opt-in (human
+    // COX-2's kcat, Mus musculus N580A; fifth round's review, V7-04).
+    const skip = new Set(variantOnly ?? []);
+    const usable = (organismsAvailable ?? []).filter((o) => !skip.has(o));
+    const variants = (organismsAvailable ?? []).filter((o) => skip.has(o));
+    if (usable.length === 0 && variants.length > 0) {
+      return {
+        origin: "default",
+        unresolvedReason: "cross_species_withheld",
+        note:
+          `No ${K} was measured in ${organismChosen ?? "the requested organism"}, and BRENDA's ` +
+          `only rows elsewhere (${variants.join(", ")}) measured a protein variant, which is ` +
+          `withheld, so allowCrossSpecies would not fill it either: supply ${key}= yourself.`,
+      };
+    }
     const named =
-      organismsAvailable && organismsAvailable.length > 0
-        ? organismsAvailable.join(", ")
+      usable.length > 0
+        ? usable.join(", ") +
+          (variants.length > 0 ? ` (rows of a protein variant only, withheld: ${variants.join(", ")})` : "")
         : "another organism";
     return {
       origin: "default",
@@ -864,6 +887,21 @@ function buildUnresolvedKineticProvenance(
     const what = lookedUpFor?.name
       ? `${lookedUpFor.name}, the ${role} ${lookedUpFor.named ? "you named" : "Caterva chose"}`
       : `the ${role} you named`;
+    if (availableInTheOrganism) {
+      // Said for the organism searched, in compose's words, so the two
+      // surfaces offer the same alternatives with the same counts (fifth
+      // round's review, V7-08).
+      return {
+        origin: "default",
+        unresolvedReason: "not_found",
+        note:
+          `No ${K} was found for ${what}: ` +
+          // compose's flag words, said in this interface's: a query names
+          // the compound in its text.
+          `${availableInTheOrganism.replace(/Re-run with --(?:inhibitor|substrate) set to one of them/g, "Name one of them in your query instead")}. Caterva does not ` +
+          `substitute one ${role} for another.`,
+      };
+    }
     return {
       origin: "default",
       unresolvedReason: "not_found",
@@ -1127,6 +1165,8 @@ async function applyKineticResolution(
           undefined,
           undefined,
           organismChoice?.chosen,
+          undefined,
+          agentResult.crossSpeciesVariantOnly,
         );
       } else if (agentResult.source === "cross_species_too_distant") {
         // The user DID opt in, and the check still refused. Reporting this
@@ -1167,6 +1207,8 @@ async function applyKineticResolution(
           undefined,
           undefined,
           lookedUp ? { name: lookedUp, named: Boolean(named) && named === lookedUp } : undefined,
+          undefined,
+          agentResult.availableInTheOrganism ?? undefined,
         );
       }
       // THE OFFER GOES IN THE PROVENANCE NOTE, NOT IN A FLAG.
@@ -1464,7 +1506,15 @@ async function applyVmaxFromKcatResolution(
   const withheldKcat = (): string | undefined => {
     const asked = entities.organism ? ` measured in ${entities.organism}` : "";
     if (agentResult.source === "cross_species_withheld") {
-      const others = agentResult.crossSpeciesOrganismsAvailable ?? [];
+      const variantOnly = new Set(agentResult.crossSpeciesVariantOnly ?? []);
+      const all = agentResult.crossSpeciesOrganismsAvailable ?? [];
+      const others = all.filter((o) => !variantOnly.has(o));
+      if (others.length === 0 && all.length > 0 && variantOnly.size > 0) {
+        return (
+          `BRENDA's only kcat rows for this enzyme outside ${entities.organism ?? "the organism asked for"} ` +
+          `(${all.join(", ")}) measured a protein variant, so Vmax was not bridged from them.`
+        );
+      }
       return (
         `BRENDA holds a kcat for this enzyme` +
         (others.length > 0 ? ` from ${others.join(", ")}` : " from another organism") +

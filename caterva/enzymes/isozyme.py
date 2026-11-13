@@ -123,6 +123,9 @@ class IsozymeNotice:
     symbols: Tuple[str, ...]
     #: The isoform that was asked for, when one was.
     isoform: Optional[str] = None
+    #: What asked for it: "--isoform", or "your description" when it was
+    #: read from the sentence (fifth round's review, V5-5).
+    asked: str = "--isoform"
     #: Constants whose row names no isozyme although one was asked for. None when that was not
     #: checked (a caller with no cited rows to look at).
     unstated: Optional[Tuple[str, ...]] = ()
@@ -201,6 +204,13 @@ class IsozymeNotice:
                 else f"the rows for {names} do")
 
     @property
+    def _given(self) -> str:
+        """How the isoform was given: by the flag, or read from the sentence."""
+        if self.asked == "--isoform":
+            return f"--isoform {self.isoform} was given"
+        return f"{self.isoform} was read from {self.asked}"
+
+    @property
     def detail(self) -> str:
         """What is the case, for the verdict's concern line."""
         named = f" ({_named(self.symbols)})" if self.symbols and not self.broad else ""
@@ -211,10 +221,10 @@ class IsozymeNotice:
                     "isozymes, and whether a cited row measured it is known only from the row's own words")
         if self.isoform:
             if self.unstated is None:
-                return (f"--isoform {self.isoform} was given for EC {self.ec}, which is {self.count} {self.label} "
+                return (f"{self._given} for EC {self.ec}, which is {self.count} {self.label} "
                         f"proteins{named}, but whether the cited rows state that isozyme was not checked")
             names = ", ".join(f"`{n}`" for n in self.unstated)
-            return (f"--isoform {self.isoform} was given for EC {self.ec}, which is {self.count} {self.label} "
+            return (f"{self._given} for EC {self.ec}, which is {self.count} {self.label} "
                     f"proteins{named}, but {names} {'comes' if len(self.unstated) == 1 else 'come'} from a row "
                     f"that does not say which isozyme it measured, so whether it measured {self.isoform} is "
                     "unknown; isozymes of one enzyme can differ many-fold in Km and kcat")
@@ -420,6 +430,10 @@ def notice_for_model(model: Any) -> Optional[IsozymeNotice]:
             and not _states_by_accession(measured[identifier], isoform)]
     notice = isozyme_notice(getattr(model, "subject", None), getattr(model, "organism", None), isoform,
                             unstated=unstated)
+    asked = getattr(model, "isoform_asked", None)
+    if notice is not None and isoform and isinstance(asked, str) and asked and asked != "--isoform":
+        from dataclasses import replace as _replace
+        notice = _replace(notice, asked=asked)
     if notice is None or isoform:
         return notice
     readings = [getattr(m, "row_isoform", None) for m in measured.values()]

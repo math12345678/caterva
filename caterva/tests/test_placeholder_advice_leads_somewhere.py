@@ -142,7 +142,9 @@ def test_a_ki_for_an_inhibitor_without_a_row_lists_the_inhibitors_there(monkeypa
     assert "--substrate" not in said
     assert "in any organism under that name" in said
     step = _what_would_ground(SimpleNamespace(not_found=out), ["reaction_Ki"])
-    assert "--inhibitor set to one the provenance table lists" in step
+    # The step names them itself, so it can be followed as read (fifth
+    # round's review, A4-08 and V7-08).
+    assert "--inhibitor set to one of tacrine (3 rows); edrophonium (2 rows)" in step
     # It WAS looked up; the old step said "so reaction_Ki is looked up".
     assert "is looked up" not in step
 
@@ -191,7 +193,9 @@ def test_the_substrates_that_fill_every_constant_are_said(monkeypatch):
     assert "the ones with a Km row there too, so that naming one fills this model's other constant as " \
            "well: B (1 row)" in said
     step = _what_would_ground(SimpleNamespace(not_found=out), ["reaction_kcat"])
-    assert "--substrate set to one the provenance table lists" in step
+    # Only the substrate that fills every constant is offered (fifth round's
+    # review: the step names what it offers).
+    assert "--substrate set to one of B (1 row)," in step
 
 
 def test_with_an_isoform_a_compound_whose_rows_name_another_is_not_offered(monkeypatch):
@@ -504,8 +508,11 @@ def test_a_cross_species_list_with_usable_rows_everywhere_stands(monkeypatch):
     }))
     model = _Model((_Q("reaction_kcat", "kcat"),), substrate="arachidonate")
     reason = "no value in the organism requested -- available in: Ovis aries"
+    # The list stands, now with its rows counted, so the advice can name
+    # where the measurements are and how many (fifth round's review, A4-08).
     assert cli._said_for_the_organism(model, {"reaction_kcat": reason}, "1.14.99.1",
-                                      "Homo sapiens") == {"reaction_kcat": reason}
+                                      "Homo sapiens") == {
+        "reaction_kcat": "no value in the organism requested -- available in: Ovis aries (2 rows)"}
 
 
 def test_an_organism_refusal_lists_only_organisms_with_usable_km_rows(monkeypatch):

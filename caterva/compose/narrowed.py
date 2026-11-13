@@ -296,7 +296,7 @@ class Selection:
 
 def select_for_model(search: Any, constants: Mapping[str, tuple], *,
                      substrate: Optional[str], isoform: Optional[str],
-                     any_mode: bool, isoform_from_words: bool = False) -> Selection:
+                     any_mode: bool, isoform_asked: str = "--isoform") -> Selection:
     """The row each constant carries, from a search whose requests carried
     the model's isoform and modes (`ComposedModel.parameter_requests`).
 
@@ -347,28 +347,14 @@ def select_for_model(search: Any, constants: Mapping[str, tuple], *,
             from caterva.compose.isoform import select_isoform
         except ImportError:  # pragma: no cover - flat layout
             from compose.isoform import select_isoform  # type: ignore[no-redef]
-        try:
-            from caterva.compose.isoform import ASKED_BY_FLAG, ASKED_BY_WORDS
-        except ImportError:  # pragma: no cover - flat layout
-            from compose.isoform import ASKED_BY_FLAG, ASKED_BY_WORDS  # type: ignore[no-redef]
-        # "as --isoform asked" only when --isoform was typed: "MAO-B" and
-        # "DPP4" in a description set the isoform, and the note said a flag
-        # nobody passed had asked (fifth round's review).
-        by_isoform = select_isoform(measured, isoform,
-                                    ASKED_BY_WORDS if isoform_from_words else ASKED_BY_FLAG)
+        by_isoform = select_isoform(measured, isoform, asked=isoform_asked)
         measured = by_isoform.measured
         refused.update(by_isoform.refused)
         out.notes.extend(by_isoform.notes)
     # The isoform first, then the mode, over the same ranked rows; ki_mode's
     # docstring says why in that order.
-    asked_by = "as --isoform asked"
-    if isoform and isoform_from_words:
-        try:
-            from caterva.compose.isoform import ASKED_BY_WORDS as asked_by
-        except ImportError:  # pragma: no cover - flat layout
-            from compose.isoform import ASKED_BY_WORDS as asked_by  # type: ignore[no-redef]
     by_mode = select_mode(measured, constants, substrate=substrate, isoform=isoform,
-                          any_mode=any_mode, defaults=defaults, isoform_asked=asked_by)
+                          any_mode=any_mode, defaults=defaults, isoform_asked=isoform_asked)
     refused.update(by_mode.refused)
     out.notes.extend(by_mode.notes)
     asked_modes = {

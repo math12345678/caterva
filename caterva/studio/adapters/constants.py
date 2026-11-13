@@ -272,13 +272,14 @@ def isozyme_view(payload: Mapping[str, Any], args: Any) -> Optional[Dict[str, An
     }
 
 
-def scope_concerns(commentary: Optional[str], quantity: Optional[str], substrate: Optional[str]) -> List[str]:
+def scope_concerns(commentary: Optional[str], quantity: Optional[str], substrate: Optional[str],
+                   compound: Optional[str] = None) -> List[str]:
     """What the row's own commentary says that could make it the wrong number: another isoform
     named, an inhibition mode, none stated. `caterva compose` prints the same sentences under
     "What each value's own row says it measured", read by the same function."""
     from caterva.compose.row_scope import read_scope
 
-    scope = read_scope(commentary, table=quantity, substrate=substrate)
+    scope = read_scope(commentary, table=quantity, substrate=substrate, compound=compound)
     return [getattr(c, "plain", str(c)) for c in (scope.concerns if scope is not None else ())]
 
 
@@ -353,7 +354,11 @@ def measured(raw: Mapping[str, Any], *, ident: str, label: str, quantity: Option
                        "unreported": [str(x) for x in raw.get("assay_unreported") or []]},
         "commentary": raw.get("commentary"),
         "scope": scope_concerns(raw.get("commentary"), quantity, substrate)
-        + [str(m["reason"]) for m in raw.get("form_mixtures") or [] if m.get("reason")],
+        + [str(m["reason"]) for m in raw.get("form_mixtures") or [] if m.get("reason")]
+        # The resolver's note that the inhibitor is an irreversible
+        # inactivator (fifth round's review, V7-05): the row's commentary
+        # does not say it, the compound's name does.
+        + [str(n) for n in raw.get("row_notes") or [] if "irreversible" in str(n)],
         **tie_provenance(raw),  # type: ignore[typeddict-item]
     }
     return contract.sourced(raw["value"], str(raw.get("unit") or ""), provenance, ident=ident, label=label)

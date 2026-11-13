@@ -960,6 +960,72 @@ def _candidates_to_dict(candidates) -> list:
     ]
 
 
+def _available_in_the_organism(result, ec: str, quantity: str, compound: str,
+                               organism: str, isoform) -> str | None:
+    """`caterva compose`'s clause for a constant whose compound has no row in
+    the organism searched: the compounds that DO have rows there, counted,
+    and where the compound's own rows are. The API listed "indomethacin,
+    nimesulide" for human COX-2 with no organism or count, where compose said
+    that in Homo sapiens only nimesulide (1 row) has Ki rows (fifth round's
+    review, V7-08). None when there is no list, no organism, or the page
+    cannot be read."""
+    if (getattr(result, "source", None) not in ("not_found", "literature_candidates")
+            or not result.substrates_available
+            or not ec or not organism or quantity not in ("km", "kcat", "ki")):
+        return None
+    try:
+        from caterva.compose.__main__ import _what_the_organism_holds  # noqa: PLC0415
+
+        clause = _what_the_organism_holds(
+            ec, quantity, compound or None, organism,
+            "inhibitor" if quantity == "ki" else "substrate", isoform=isoform)
+    except Exception:  # noqa: BLE001 - the resolver's whole-page list stands
+        return None
+    return clause.lstrip(" -").strip() or None
+
+
+def _naming_the_enzyme(candidates, enzyme_name: str, ec: str, isoform,
+                       organism: str = "") -> list:
+    """The candidate papers whose title names the enzyme: by the name the
+    caller gave, the isoform, or the EC number's accepted or other names.
+
+    PubMed is searched on the compound's and the enzyme's words, and returns
+    papers on either: human COX-2's missing celecoxib Ki was offered
+    "Celecoxib is an inhibitor of enzyme acetylcholinesterase" as a paper
+    that may report it (fifth round's review, V7-08). A title that does not
+    name the enzyme is not offered. Every candidate is kept when no name can
+    be read for the enzyme."""
+    import re  # noqa: PLC0415
+
+    def norm(text: str) -> str:
+        return " " + re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).strip() + " "
+
+    names = {enzyme_name, isoform}
+    try:
+        from caterva.enzymes.index import load_index  # noqa: PLC0415
+
+        index = load_index()
+        entry = index.get(ec) if ec else None
+        if entry is not None:
+            names |= {entry.name, *entry.alternative_names}
+        if entry is not None and organism:
+            from caterva.enzymes.index import organism_code  # noqa: PLC0415
+
+            # UniProt's names for the organism's protein(s): "Cyclooxygenase-2"
+            # and "COX-2" are PTGS2's, not the EC number's.
+            proteins, _ = index.proteins_in(ec, organism_code(organism))
+            for protein in proteins:
+                if not isoform or isoform in (protein.gene, protein.symbol) or isoform in protein.names:
+                    names |= set(protein.names)
+    except Exception:  # noqa: BLE001 - the caller's own name still filters
+        pass
+    keys = {norm(n) for n in names if isinstance(n, str) and len(n.strip()) >= 3}
+    keys.discard("  ")
+    if not keys:
+        return list(candidates or [])
+    return [c for c in candidates or [] if any(k in norm(getattr(c, "title", "")) for k in keys)]
+
+
 def _canonical_organism(organism: str, log: list[str]) -> str:
     """The organism as BRENDA indexes it: "humans" -> "Homo sapiens".
 
@@ -1456,6 +1522,11 @@ def main() -> None:
                         # get them -- the miss becomes unactionable at the
                         # API boundary even though the resolver knew.
                         "crossSpeciesOrganismsAvailable": result.cross_species_organisms_available,
+                        # Those whose every row measured a protein variant:
+                        # opting into another organism would not fill the
+                        # constant there either (fifth round's review, V7-04).
+                        "crossSpeciesVariantOnly": list(
+                            getattr(result, "cross_species_variant_only", []) or []),
                         # Which variants were found and withheld. A refusal
                         # that cannot name what it refused leaves the opt-in
                         # it demands unexercisable.
@@ -1479,8 +1550,16 @@ def main() -> None:
                         # so "lactate" matches by substring and "L-lactate"
                         # returns nothing at all.
                         "substratesAvailable": result.substrates_available,
+                        # The same list said for the organism searched, with
+                        # row counts, in `caterva compose`'s words, so the
+                        # API's advice and compose's agree (fifth round's
+                        # review, V7-08). None when it cannot be said.
+                        "availableInTheOrganism": _available_in_the_organism(
+                            result, ec_number, quantity, substrate, organism, isoform),
                         "relatedness": [v.model_dump() for v in result.relatedness],
-                        "literatureCandidates": _candidates_to_dict(result.literature_candidates),
+                        "literatureCandidates": _candidates_to_dict(_naming_the_enzyme(
+                            result.literature_candidates, enzyme_name, ec_number, isoform,
+                            organism)),
                         "logs": result.search_log,
                         # A refusal for a chosen name is a refusal of THAT
                         # name, and the client has to be able to say so.

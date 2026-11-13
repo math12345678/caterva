@@ -614,3 +614,50 @@ test in `caterva/tests/test_fifth_round_review_names.py` or
   number, and only then to rows the search cannot use; each break is said
   (chymotrypsin in human: Suc-Ala-Ala-Pro-Phe-pNA, 62 rows in every organism
   against 8).
+
+## Fifth round (2026-11-13): advice, notes and surfaces that agree
+
+The fifth adversarial round's advice findings. Each piece of advice was
+followed and the run checked; each has a regression test
+(`caterva/tests/test_fifth_round_review_advice.py`,
+`Tests/test_fifth_round_review_advice.py` and the two TypeScript
+`fifthRoundAdvice.test.ts`).
+
+- **Organisms are organisms.** In every-organism mode the parser took the
+  first binomial-shaped cell as the row's organism, so "Phenolphthalein
+  diphosphate" and "Sodium diphosphate" were offered as organisms for potato
+  acid phosphatase's kcat, and both matched "diphosphate" through the whole
+  row. The organism is now read by the layout (cell 2, else cell 1), and a
+  compound in cell 1 beside the organism in cell 2 is the compound cell.
+- **Advice names what it offers.** The verdict's next step names the
+  organisms (with row counts) where a constant is measured, and for a Ki,
+  the inhibitors the organism searched has rows for, counted the way the
+  inhibitor choice counts them (human AChE and donepezil: Mus musculus and
+  Tetronarce californica, or tacrine, edrophonium, ...). A Ki with no
+  inhibitor named, in an organism with no Ki row at all (rat acetyl-CoA
+  carboxylase), says the organism is what is missing, not "name it with
+  --inhibitor", and lists first the organisms where the whole model is
+  measured.
+- **No opt-in that would be refused again.** The resolver says which other
+  organisms hold only a variant's rows (`cross_species_variant_only`); the
+  TypeScript CLI and the API offer --allow-cross-species only for the rest
+  (human COX-2's kcat: Mus musculus held one N580A row).
+- **One list on every surface.** For a compound with no row in the organism,
+  the runner sends compose's clause (`availableInTheOrganism`), so the API
+  and the CLI offer the same inhibitors with the same counts as compose.
+  Papers offered for a missing constant must name the enzyme in their title.
+- **Irreversible inactivators everywhere.** A Ki of an irreversible
+  inactivator (selegiline) is said in compose's row notes and the verdict's
+  qualifications, and in Studio's constants, as the API already did.
+- **Words.** A row stating a cofactor and no pH stated conditions, and is
+  quoted; a labelled wild-type row carried over its paper's unlabelled one
+  is said; the robustness line points to the spread section only when the
+  page has one; the paired-across-tiers note says "the kcat measured with
+  the Km" for a kcat; "as --isoform asked" only when the flag was passed
+  (otherwise "as your description asked"); the natural substrate's counts
+  follow its own name, its tie with other natural substrates is said, and
+  the assay substrate ranked after it is named with its counts;
+  "irreversible inactivators" agrees in number.
+
+Not done: among inhibitors tied on every count, the order is still
+alphabetical (thrombin's "Aspartame" before bivalirudin); the note says so.

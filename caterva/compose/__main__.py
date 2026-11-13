@@ -1214,12 +1214,12 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
         # isoform is searched for unless --isoform set one.
         if getattr(reading, "isoform", None) and not getattr(args, "isoform", None):
             args.isoform = reading.isoform
-            args.isoform_from_words = True
+            args.isoform_asked = DESCRIPTION_ASKED
         tissue = _tissue_isoform(args.subject, typed)
         if tissue and not getattr(args, "isoform", None):
             word, isoform, said = tissue
             args.isoform = isoform
-            args.isoform_from_words = True
+            args.isoform_asked = DESCRIPTION_ASKED
             out.notes.append(f"Read {word!r} with EC {args.subject} as its {word} isoform {isoform}"
                              f"{said}; the constants are taken from rows naming it where there are any "
                              "(pass --isoform to change it).")
@@ -1899,6 +1899,8 @@ def read_subject(model: Any, args: Any) -> Tuple[Any, Optional[str], Optional[st
     organism_applied = bool(getattr(resolution, "organism", None) and not getattr(args, "organism", None))
     if isoform_applied:
         args.isoform = resolution.isoform
+        if getattr(args, "isoform_asked", None) is None:
+            args.isoform_asked = NAME_ASKED
     if organism_applied:
         args.organism = resolution.organism
     from caterva.enzymes.policy import split_mutation
@@ -2216,7 +2218,7 @@ def _read_as_the_protein_filed_elsewhere(reading: Any, args: Any) -> Optional[st
         return None
     args.subject = other.ec
     args.isoform = protein.label
-    args.isoform_from_words = True
+    args.isoform_asked = DESCRIPTION_ASKED
     name = reading.enzyme_name or ec
     return (f"Read {reading.enzyme_text!r} in your description as EC {other.ec} ({other.name}), the "
             f"{where} protein {protein.label}: EC {ec} ({name}), whose name it is, lists no {where} "
@@ -2496,7 +2498,7 @@ def _search_resolved(
     from caterva.checkout import LiteratureLayerUnavailable
 
     if getattr(args, "isoform", None):
-        model = replace(model, isoform=args.isoform)
+        model = replace(model, isoform=args.isoform, isoform_asked=_isoform_asked(args))
     ec = model.ec_number
     model, blocked = _choose_what_was_not_named(model, args)
     if blocked is not None:
@@ -2544,7 +2546,7 @@ def _search_resolved(
             substrate=getattr(model, "substrate", None) or getattr(args, "substrate", None),
             isoform=getattr(args, "isoform", None) or None,
             any_mode=bool(getattr(args, "any_mode", False)),
-            isoform_from_words=bool(getattr(args, "isoform_from_words", False)),
+            isoform_asked=_isoform_asked(args),
         )
     except ExportRefused as exc:
         # The search ran over every organism and settled on none (several
@@ -2590,6 +2592,7 @@ def _search_resolved(
         replace(model, organism=args.organism, compounds=compounds_from(args)),
         {k: v for k, v in not_found.items() if k not in skipped}, ec, args.organism)
     not_found.update(said)
+    not_found.update(_no_inhibitor_would_fill(model, skipped, ec, args.organism))
     if getattr(args, "organism_chosen", False) is True:
         not_found.update(_organism_chosen_said(not_found))
         said = {k: not_found[k] for k in said}
@@ -2602,10 +2605,11 @@ def _search_resolved(
         from caterva.enzymes.isozyme import describe_isoform
 
         reading = describe_isoform(ec, args.organism, args.isoform)
-        if reading and getattr(args, "isoform_from_words", False):
-            reading = reading.replace(f"--isoform {args.isoform!r} was read as",
-                                      f"The isoform {args.isoform!r} read from your description "
-                                      "was read as", 1)
+        if reading and _isoform_asked(args) != "--isoform":
+            # The flag was not passed: say where the label came from (fifth
+            # round's review, V5-5).
+            reading = reading.replace(f"--isoform {args.isoform!r}",
+                                      f"{args.isoform!r} in {_isoform_asked(args)}", 1)
         if reading:
             selection_notes = [reading, *selection_notes]
     failures = [
@@ -2795,6 +2799,13 @@ def _said_for_the_organism(model: Any, reasons: Mapping[str, str], ec: Optional[
                 rewritten = None
             if rewritten:
                 out[name] = rewritten
+            if q.table == "ki":
+                try:
+                    here = _inhibitors_here(ec, where, model, model.compound_for(q))
+                except Exception:  # noqa: BLE001 - the reason stands
+                    here = ""
+                if here:
+                    out[name] = out.get(name, reason) + here
             if q.table == "kcat":
                 under = _kcat_under_a_cosubstrate(ec, where, model.compound_for(q))
                 if under:
@@ -2815,6 +2826,89 @@ def _said_for_the_organism(model: Any, reasons: Mapping[str, str], ec: Optional[
         except Exception:  # noqa: BLE001 - the resolver's clause stands
             continue
         out[name] = _NAME_MISS.sub(lambda _m: clause, reason, count=1)
+    return out
+
+
+def _inhibitors_here(ec: str, organism: str, model: Any, compound: Optional[str]) -> str:
+    """For a Ki whose inhibitor has rows only in other organisms: the
+    inhibitors the organism searched DOES have Ki rows for, counted the way
+    the inhibitor choice counts them (rows the search can use for this
+    model's mode and isoform), so naming one leads to a run that fills it.
+    Human AChE with donepezil sent the reader to Mus musculus only, though
+    human Ki rows exist for other inhibitors (fifth round's review, A4-08).
+    "" when the organism has none."""
+    from caterva.compose import defaults
+    from caterva.compose.row_scope import INHIBITION_TABLES, MODE_OF_MOTIF
+
+    mode = next((MODE_OF_MOTIF[q.motif_name] for q in getattr(model, "resolvable", ()) or ()
+                 if q.table in INHIBITION_TABLES and MODE_OF_MOTIF.get(q.motif_name)), None)
+    choice = defaults.choose_inhibitor(ec, organism, getattr(model, "substrate", None),
+                                       isoform=getattr(model, "isoform", None), mode=mode)
+    if choice is None:
+        return ""
+    counted: Dict[str, int] = {}
+    if choice.rows.get("ki"):
+        counted[choice.chosen] = choice.rows["ki"]
+    for option in choice.alternatives:
+        if option.rows.get("ki"):
+            counted[option.name] = option.rows["ki"]
+    if compound:
+        counted = {k: v for k, v in counted.items()
+                   if defaults._search_key(k) != defaults._search_key(compound)}
+    if not counted:
+        return ""
+    return (f". In {organism}, the inhibitors with Ki rows the search can use"
+            + (f" for a {mode} model" if mode else "") + ", best measured first: "
+            + "; ".join(f"{k} ({v} row{'s' if v != 1 else ''})" for k, v in counted.items())
+            + "; re-run with "
+            "--inhibitor set to one of them to model that inhibitor in this organism instead")
+
+
+#: What asked for the isoform when no --isoform flag was passed, for the
+#: notes that said "as --isoform asked" of an isoform read from the sentence
+#: (DPP4, CA2, IMPDH2, NOS2: fifth round's review, V5-5).
+DESCRIPTION_ASKED = "your description"
+NAME_ASKED = "the enzyme name"
+
+
+def _isoform_asked(args: Any) -> str:
+    """"--isoform" when the flag set the isoform, else what did."""
+    asked = getattr(args, "isoform_asked", None)
+    return asked if isinstance(asked, str) and asked else "--isoform"
+
+
+def _no_inhibitor_would_fill(model: Any, skipped: Mapping[str, str], ec: Optional[str],
+                             organism: Optional[str]) -> Dict[str, str]:
+    """For a Ki left unlooked-up because no inhibitor was named, in an
+    organism with no Ki row the search can use under the EC number: the
+    reason says the organism is what is missing and lists the organisms that
+    do have Ki rows. It said "Name it with --inhibitor NAME", and no name
+    could fill it: rat acetyl-CoA carboxylase has no Ki row for any inhibitor
+    (fifth round's review, N11). {} otherwise, and when a page cannot be read.
+    """
+    if not ec or not organism or not skipped:
+        return {}
+    from caterva.compose.organisms import normalise_organism
+
+    where = normalise_organism(organism)[0] or organism
+    by_id = {q.parameter_id: q for q in getattr(model, "resolvable", ())}
+    out: Dict[str, str] = {}
+    for name, reason in skipped.items():
+        q = by_id.get(name)
+        if q is None or q.table != "ki" or "--inhibitor" not in reason:
+            continue
+        try:
+            from caterva.compose import defaults
+
+            if _usable(defaults.table_rows(ec, "ki", where)):
+                continue
+            whole = tuple(t for t in ("km", "kcat") if any(o.table == t for o in by_id.values()))
+            clause = _what_the_organism_holds(ec, "ki", None, where, "inhibitor",
+                                              isoform=getattr(model, "isoform", None), whole=whole)
+        except Exception:  # noqa: BLE001 - the reason stands as it was
+            continue
+        out[name] = ("not looked up: no inhibitor was named"
+                     + clause.replace("naming another inhibitor", "naming an inhibitor"))
     return out
 
 
@@ -2959,7 +3053,7 @@ def _rows_for_the_compound_here(ec: str, table: str, key: str, organism: str) ->
 
 def _what_the_organism_holds(ec: str, table: str, compound: Optional[str], organism: str,
                              role: str, isoform: Optional[str] = None,
-                             also: Sequence[str] = ()) -> str:
+                             also: Sequence[str] = (), whole: Sequence[str] = ()) -> str:
     """The clause for `_said_for_the_organism`, from BRENDA's own rows.
     Only rows the search would use are counted or offered (`_usable`).
 
@@ -3046,8 +3140,29 @@ def _what_the_organism_holds(ec: str, table: str, compound: Optional[str], organ
             text += (f". No organism has a {label} row for {compound} under EC {ec}, so in any organism "
                      f"listed next the model would be of another {role}, not {compound}")
         which = f"naming {isoform}" if isoform else "that are not of a variant"
+        listed = _counted(organisms)
+        if whole:
+            # The organisms where the model's other tables have rows too come
+            # first: rat acetyl-CoA carboxylase's Ki sent the reader to E.
+            # coli, which has no kcat row, ahead of Homo sapiens, which has
+            # all three (fifth round's review, N11).
+            # One compound with a row in every one of those tables, as the
+            # substrate choice needs: yeast has Km rows and kcat rows under
+            # EC 6.4.1.2, for different compounds, and its kcat stayed a
+            # placeholder. A cosubstrate (ATP) is set aside by the choice,
+            # so it does not count.
+            have = [{(r.organism, defaults._search_key(r.compound))
+                     for r in _usable(defaults.table_rows(ec, t, None))
+                     if r.organism and not defaults.is_cofactor(r.compound)} for t in whole]
+            pairs = set.intersection(*have) if have else set()
+            full = {o: n for o, n in organisms.items() if any(org == o for org, _ in pairs)}
+            rest = {o: n for o, n in organisms.items() if o not in full}
+            if full and rest:
+                tables = " and ".join(defaults.TABLE_NAMES[t] for t in whole)
+                listed = (f"{_counted(full)} (with {tables} rows there too, so the whole model is "
+                          f"measured); then {_counted(rest)}")
         text += (f". Organisms with {label} rows for EC {ec} {which}: "
-                 f"{_counted(organisms)}. Re-run with --organism set to one of them to model that "
+                 f"{listed}. Re-run with --organism set to one of them to model that "
                  "organism, or supply it yourself")
         return text
     if isoform:
@@ -3166,7 +3281,12 @@ def _available_elsewhere(ec: str, table: str, compound: Optional[str], reason: s
             parts.append(f"rows of a protein variant only, withheld: {_counted(variants)}")
         return _AVAILABLE_IN.sub(lambda _m: " -- available in: " + "; ".join(parts), reason, count=1)
     if not variants:
-        return None
+        # Counted, so the advice can name where the measurements are and how
+        # many: "available in: Mus musculus, Tetronarce californica" gave no
+        # sense of which to pick (fifth round's review, A4-08).
+        if not usable:
+            return None
+        return _AVAILABLE_IN.sub(lambda _m: f" -- available in: {_counted(usable)}", reason, count=1)
     if usable:
         return _AVAILABLE_IN.sub(lambda _m: f" -- available in: {_counted(usable)} (rows of a protein "
                                  f"variant only, withheld: {_counted(variants)})", reason, count=1)
@@ -3416,7 +3536,8 @@ def _not_looked_up(skipped: Mapping[str, str]) -> str:
     if not skipped:
         return ""
     return (f". {len(skipped)} not looked up ({', '.join(sorted(skipped))}): "
-            "the provenance table says which compound would let it be")
+            "the provenance table says what would let "
+            + ("it" if len(skipped) == 1 else "them") + " be looked up")
 
 
 _search_the_literature = search_the_literature
