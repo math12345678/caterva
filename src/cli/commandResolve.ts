@@ -414,7 +414,17 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
     process.stdout.write(`\n${head}\n${c(DIM, '  ' + result.chosenBecause)}\n`);
   }
 
-  const scopeLines = rowScopeLines(String(result.quantity), result.rowScope, options.isoform);
+  // The kcat half of a Km's pair: found, or not, said beside the Km.
+  if (String(result.quantity).toLowerCase() === 'km' && result.pairedKcat) {
+    const paired = result.pairedKcat;
+    const line =
+      paired.found && typeof paired.kcat === 'number'
+        ? `The kcat search for this query found ${paired.kcat} 1/s, so Vmax = kcat x [E]0 needs only an enzyme concentration.`
+        : 'The kcat search for this query came back empty, so an enzyme concentration alone will not give a Vmax: supply kcat or Vmax yourself.';
+    process.stdout.write(`\n${c(BOLD, 'The turnover number that goes with it')}\n${c(DIM, '  ' + line)}\n`);
+  }
+
+  const scopeLines = rowScopeLines(String(result.quantity), result.rowScope, options.isoform, result.rowNotes);
   if (scopeLines.length > 0) {
     process.stdout.write(`\n${c(YELLOW, '⚠')} ${c(BOLD, 'What the source row measured')}\n`);
     for (const line of scopeLines) process.stdout.write(`${c(DIM, '  ' + line)}\n`);

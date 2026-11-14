@@ -131,6 +131,8 @@ COFACTORS = frozenset({
     # it is carbonic anhydrase's substrate.
     "s-adenosyl-l-homocysteine", "o2",
 })
+#: What stays a cosubstrate for a hydrolase.
+_WATER_KEYS = frozenset({"h2o", "water", "h+", "proton"})
 _METAL_ION = re.compile(
     r"^(?:mg|mn|ca|zn|fe|co|ni|cu|k|na|li|cd|ba|sr|cl|hco3)(?:\d?[+-])+$", re.IGNORECASE)
 #: The respiratory quinones (and their quinols), any chain length: a
@@ -266,6 +268,10 @@ class _Row:
     #: `_best_evidenced`, row_form.py, ADR 0182's second round), so a
     #: compound with none ranks after one with some (`_own`).
     own: bool = True
+    #: The isoform the row names by a tissue or a form written in words the
+    #: isoform reader does not read ("hexosaminidase A", "liver enzyme"), as
+    #: the resolver reads it (row_form.tissue_isoform_of_row); None otherwise.
+    named_form: Optional[str] = None
 
 
 #: (client, page digest, ec, table, organism) -> rows. A page fetched again
@@ -369,6 +375,7 @@ def table_rows(ec: str, table: str, organism: Optional[str]) -> Tuple[_Row, ...]
                     for r in out)
         out = _treated_arms_not_own(out)
         out = _mutant_twins_are_variants(out, client)
+        out = _named_forms_read(ec, out)
     if len(_PARSED) >= _PARSED_MAX:
         # Keep the every-organism parses: an organism's rows are filtered
         # from them, and clearing them made each of the 63 organisms of the
@@ -380,6 +387,27 @@ def table_rows(ec: str, table: str, organism: Optional[str]) -> Tuple[_Row, ...]
             _PARSED.clear()
     _PARSED[key] = out
     return out
+
+
+def _named_forms_read(ec: str, rows: Tuple[_Row, ...]) -> Tuple[_Row, ...]:
+    """`rows` with `named_form` set where the resolver reads an isoform from
+    a tissue or a form named in words, so the chooser counts the rows the
+    search will take for an isoform ("beta-hexosaminidase A" chose a
+    substrate by rows naming none while "hexosaminidase A" rows existed)."""
+    try:
+        from caterva.checkout import literature_module
+
+        read = literature_module("row_form").tissue_isoform_of_row
+    except Exception:  # noqa: BLE001 - no literature layer: rows by their own words
+        return rows
+    out = []
+    for r in rows:
+        try:
+            form = read(ec, r.conditions)
+        except Exception:  # noqa: BLE001
+            form = None
+        out.append(replace(r, named_form=form) if form else r)
+    return tuple(out)
 
 
 def _assay_effector_keys(ec: str, html: str) -> frozenset:
@@ -452,13 +480,37 @@ def _treated_arms_not_own(rows: Tuple[_Row, ...]) -> Tuple[_Row, ...]:
             if x.presence == "absent" and x.named:
                 absent.setdefault((r.reference_id or "", _key(r.compound), r.organism),
                                   set()).add(_key(x.compound_text))
-    if not absent:
+    # A dosed addition ("gallic 0.02 g/l") beside the same paper's control
+    # ("without gallic", "ethanol 0%"), as the resolver reads it
+    # (row_form.dosed_additives; bromelain, ref 717695).
+    try:
+        from caterva.checkout import literature_module as _lm
+
+        dosed_of = _lm("row_form").dosed_additives
+    except Exception:  # noqa: BLE001
+        def dosed_of(_text: Any) -> dict:
+            return {}
+    doses = {id(r): dosed_of(r.conditions) for r in rows}
+    controls: Dict[Tuple[str, str, Optional[str]], set] = {}
+    for r, effectors in said:
+        where = (r.reference_id or "", _key(r.compound), r.organism)
+        for x in effectors:
+            if x.presence == "absent" and x.named:
+                controls.setdefault(where, set()).add(str(x.compound_text or "").strip().lower())
+        for name, dose in doses[id(r)].items():
+            if dose == 0:
+                controls.setdefault(where, set()).add(name)
+    if not absent and not controls:
         return rows
     out = []
     for r, effectors in said:
-        gone = absent.get((r.reference_id or "", _key(r.compound), r.organism), set())
+        where = (r.reference_id or "", _key(r.compound), r.organism)
+        gone = absent.get(where, set())
         treated = r.own and any(x.presence == "present" and _key(x.compound_text) in gone
                                 for x in effectors)
+        if r.own and not treated:
+            treated = any(dose > 0 and name in controls.get(where, set())
+                          for name, dose in doses[id(r)].items())
         out.append(replace(r, own=False) if treated else r)
     return tuple(out)
 
@@ -1045,7 +1097,7 @@ def _usable(rows: Sequence[_Row], isoform: Optional[str] = None, mode: Optional[
     pool = [r for r in rows if not r.flagged]
     matched = False
     if isoform:
-        named = [(r, _isoform_read(r.conditions)) for r in pool]
+        named = [(r, _isoform_read(r.conditions) or r.named_form) for r in pool]
         mine = [r for r, iso in named if iso and _same_isoform(iso, isoform)]
         pool_unnamed = [r for r, iso in named if iso is None
                         and _accession_says(r.uniprot, isoform) is not False]
@@ -1065,7 +1117,7 @@ def _usable(rows: Sequence[_Row], isoform: Optional[str] = None, mode: Optional[
             # VR2-04).
             # A row its paper's other entries tie to the protein is not one
             # the search takes either: the row itself must name it.
-            by_words = [r for r in mine if _same_isoform(_isoform_read(r.conditions), isoform)
+            by_words = [r for r in mine if _same_isoform(_isoform_read(r.conditions) or r.named_form, isoform)
                         or _strict_names(r, strict)]
             silent_mine = len(mine) - len(by_words)
             mine = by_words
@@ -1499,8 +1551,38 @@ def _of_mutant(rows: Sequence[_Row], mutation: Optional[str]) -> Tuple[List[_Row
     wanted = {m.strip().upper() for m in re.split(r"[/,+\s]+", mutation) if m.strip()}
     kept = [replace(r, variant=False, isozyme=False) for r in rows
             if wanted <= {m.upper() for m in re.findall(
-                r"(?<![A-Za-z0-9])[A-Z]\d{1,4}[A-Z](?![A-Za-z0-9])", r.conditions or "")}]
+                r"(?<![A-Za-z0-9])[A-Z]\d{1,4}[A-Z](?![A-Za-z0-9])", r.conditions or "")}
+            and not _mixed_with_wild_type(r.conditions)]
     return kept, len(rows) - len(kept)
+
+
+def _mixed_with_wild_type(conditions: Optional[str]) -> bool:
+    """The search's own test (fallback_logic.mixed_with_wild_type): the row
+    measured the mutant together with the wild type, not the mutant alone."""
+    try:
+        from caterva.checkout import literature_module
+
+        return bool(literature_module("fallback_logic").mixed_with_wild_type(conditions))
+    except Exception:  # noqa: BLE001 - no literature layer: nothing is searched either
+        return False
+
+
+def mixed_rows_of_mutant(ec: str, organism: Optional[str], mutation: Optional[str],
+                         tables: Sequence[str] = ("km", "kcat")) -> List[_Row]:
+    """The rows naming `mutation` only in a mixture with the wild type
+    ("allelic combination wild-type/mutant R408W"), for the note that says
+    they exist and were not taken as the mutant's."""
+    if not mutation:
+        return []
+    token = re.compile(rf"(?<![A-Za-z0-9]){re.escape(str(mutation))}(?![A-Za-z0-9])")
+    out: List[_Row] = []
+    for table in tables:
+        try:
+            rows = table_rows(ec, table, organism)
+        except Exception:  # noqa: BLE001
+            continue
+        out += [r for r in rows if token.search(r.conditions or "") and _mixed_with_wild_type(r.conditions)]
+    return out
 
 
 def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
@@ -1571,6 +1653,13 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
     def cofactor(k: str) -> bool:
         # A compound the enzyme is named for is its substrate, whatever the
         # cofactor list says: adenylate kinase's AMP (third round's review).
+        # A hydrolase's cosubstrate is water: a nucleotide or diphosphate
+        # with rows under EC 3.-.-.- is what it hydrolyses. Human alkaline
+        # phosphatase's diphosphate (4 Km rows, in BRENDA's Natural
+        # Substrates table) was set aside as a "cosubstrate" (sixth round's
+        # polish, V6R1-05).
+        if str(ec).startswith("3.") and _key(counts.name(k)) not in _WATER_KEYS:
+            return False
         return is_cofactor(counts.name(k)) and k not in named
 
     # A synthetic analogue of a natural substrate with Km rows ranks after

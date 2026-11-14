@@ -459,7 +459,14 @@ def _rows(m: Any) -> Tuple[List[_Row], List[_Row]]:
     """The pick and every other ranked row in its unit, in the resolver's
     order; and, apart, the rows skipped for being in another unit."""
     read = read_row(getattr(m, "commentary", None))
-    pick = _Row(read.mode, read.versus, read.isoform, read.conditions,
+    # A row naming no isoform in its words names the one its own UniProt cell
+    # is, as the resolver read it (`row_isoform`, a ranked row's "isoform"),
+    # the rule the Km and kcat rows are read by. Selegiline's MAO-B Ki of
+    # 0.00035 mM (ref 742064, cell P27338 alone) was set aside as naming "no
+    # isoform" beside a Km accepted as MAO-B's on that very cell (sixth
+    # round's polish, R6B-02).
+    pick = _Row(read.mode, read.versus, read.isoform or getattr(m, "row_isoform", None) or None,
+                read.conditions,
                 value=float(m.value), unit=m.unit, reference=_reference(m), source=None, order=0)
     rows, other_unit = [pick], []
     for r in getattr(m, "alternatives", ()) or ():
@@ -472,7 +479,7 @@ def _rows(m: Any) -> Tuple[List[_Row], List[_Row]]:
         read = read_row(r.get("conditions"))
         ref = r.get("reference_id")
         elsewhere = r.get("unit") not in (None, m.unit)
-        row = _Row(read.mode, read.versus, read.isoform, read.conditions,
+        row = _Row(read.mode, read.versus, read.isoform or r.get("isoform") or None, read.conditions,
                    value=value, unit=str(r.get("unit")) if elsewhere else m.unit,
                    reference=str(ref) if ref else None, source=r,
                    order=len(other_unit) if elsewhere else len(rows))

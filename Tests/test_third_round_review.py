@@ -238,7 +238,9 @@ def test_the_search_takes_every_spelling_and_the_native_row():
     ("reaction catalyzed by the catalyctic domain of the enzyme", "an isolated domain"),
     # "uncleaved enzyme, nonsulfated" is the intact enzyme since the sixth
     # round (R5A2-04); sulfation is still a modification of it.
-    ("pH 8.0, 37°C, uncleaved enzyme, sulfated", "a modification state of the enzyme"),
+    # Not "a modification state": human trypsin is secreted sulfated, so the
+    # label says which form the row is and not which is native (R6A1-02).
+    ("pH 8.0, 37°C, uncleaved enzyme, sulfated", "the sulfated form of the enzyme"),
     ("pH 8.0, 37°C, cleaved enzyme, nonsulfated", "a modification state of the enzyme"),
 ])
 def test_an_altered_preparation_is_read(commentary, what):

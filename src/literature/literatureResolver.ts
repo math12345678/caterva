@@ -354,6 +354,13 @@ export interface ResolvedKinetic {
    * only the row's accession (sixth round, XS5R2-04).
    */
   isozymeNotice?: { headline: string; detail: string; remedy: string };
+  /**
+   * For a Km: what the kcat half of the pair came to (runner key
+   * `pairedKcat`). The API uses it for its Vmax advice; this CLI printed
+   * nothing, so a reader of the Km could not tell whether the turnover
+   * number that goes with it exists (sixth round's polish, V6R1-01).
+   */
+  pairedKcat?: { found: boolean; kcat?: number; source?: string | null };
   rowScope?: RowScope | null;
   /**
    * A row that is evidence against the model's mechanism (runner key
@@ -476,12 +483,33 @@ export interface RowScope {
  * never told it "states no inhibition mode": that is true of every Km and
  * says nothing. Empty when the scope has nothing to say.
  */
+/** Whether a row note says the row's UniProt cell is the isoform asked for
+ *  ("the row's UniProt accession (P27338) is MAOB"). */
+export function accessionNamesIsoform(rowNotes: string[] | undefined, isoform?: string): boolean {
+  if (!isoform) return false;
+  const want = isoform.replace(/[^0-9a-z]+/gi, '').toLowerCase();
+  return (rowNotes ?? []).some((n) => {
+    const m = /UniProt accession \([^)]*\) is ([A-Za-z0-9-]+)/.exec(n);
+    return !!m && m[1]!.replace(/[^0-9a-z]+/gi, '').toLowerCase() === want;
+  });
+}
+
 export function rowScopeLines(
   quantity: string,
   scope: RowScope | null | undefined,
   requestedIsoform?: string,
+  rowNotes?: string[],
 ): string[] {
   const lines: string[] = [];
+  // The row's UniProt cell names the protein asked for: "names no isoform,
+  // so whether it measured DPP4 is unknown" was printed above "the row's
+  // UniProt accession (P27487) is DPP4" (sixth round's polish, XS6V1-04).
+  if (requestedIsoform && !scope?.isoform && accessionNamesIsoform(rowNotes, requestedIsoform)) {
+    return [
+      `The row's UniProt cell names ${requestedIsoform}, the one asked for.`,
+      ...rowScopeLines(quantity, scope, undefined, rowNotes),
+    ];
+  }
   // A row that names no isoform, for a question that names one, is said too:
   // the API says it (rowScopeFlags), and compose keeps such a constant
   // flagged. Live, `simulate "HK2 with glucose" --resolve` carried kcat 60.4
@@ -1097,6 +1125,20 @@ export function mapFoundResult(
           },
         }
       : {}),
+    ...(parsed['pairedKcat'] && typeof parsed['pairedKcat'] === 'object'
+      ? {
+          pairedKcat: {
+            found: (parsed['pairedKcat'] as Record<string, unknown>)['found'] === true,
+            ...(typeof (parsed['pairedKcat'] as Record<string, unknown>)['kcat'] === 'number'
+              ? { kcat: (parsed['pairedKcat'] as Record<string, unknown>)['kcat'] as number }
+              : {}),
+            source:
+              typeof (parsed['pairedKcat'] as Record<string, unknown>)['source'] === 'string'
+                ? ((parsed['pairedKcat'] as Record<string, unknown>)['source'] as string)
+                : null,
+          },
+        }
+      : {}),
     ...(Array.isArray(parsed['rowNotes'])
       ? { rowNotes: (parsed['rowNotes'] as unknown[]).filter((n): n is string => typeof n === 'string') }
       : {}),
@@ -1301,7 +1343,9 @@ export async function resolveKinetic(
 
   if (parsed['found'] !== true) {
     const candidates = parseCandidatePapers(parsed['literatureCandidates']);
-    logger.info(
+    // debug, not info: the CLI prints what was not found in its own words,
+    // and this JSON line landed in the middle of its report (XS6V1-08).
+    logger.debug(
       { query, quantity, candidateCount: candidates.length },
       'Literature resolver found no value; reporting absence rather than a default'
     );

@@ -229,6 +229,12 @@ _FUNCTION_WORDS = frozenset({
 })
 
 
+#: A subunit named by a Greek letter and maybe a number ("beta1", "gamma2"),
+#: and a second one after a comma: BRENDA's way of writing a dimer.
+_SUBUNIT = re.compile(r"(?:alpha|beta|gamma|delta|chi|pi|sigma|mu)\d?", re.IGNORECASE)
+_SUBUNIT_PAIR = re.compile(r",\s?((?:alpha|beta|gamma|delta|chi|pi|sigma|mu)\d?)(?![A-Za-z0-9])", re.IGNORECASE)
+
+
 def _is_a_name(token: Optional[str]) -> bool:
     """Whether the token after "isoform", "isozyme" or "isoenzyme" names one.
 
@@ -524,6 +530,15 @@ def _candidates(text: str):
             continue
         t = _KEYWORD_TOKEN.match(text, k.end())
         if t and _is_a_name(t.group("token")):
+            # "isoenzyme alpha,gamma1": a dimer of two different subunits is
+            # neither subunit's homodimer, and is read as its own name, so a
+            # request for one subunit's enzyme never takes it. "isoenzyme
+            # beta1,beta1" names the one subunit twice and reads "beta1".
+            pair = _SUBUNIT_PAIR.match(text, t.end("token"))
+            if pair and t.group("token2") is None and _SUBUNIT.fullmatch(t.group("token")) \
+                    and pair.group(1).lower() != t.group("token").lower():
+                yield k.start(), f"{t.group('token')},{pair.group(1)}"
+                continue
             second = t.group("token2")
             yield k.start(), _joined(t.group("token"), second if _is_a_name(second) else None)
     for pattern, reading_of in _FORMS:

@@ -268,12 +268,44 @@ function ensembleCandidateFlags(
   ];
 }
 
-function selectionTieFlags(
+/** Two printed values are one number (to four significant figures). */
+function sameValue(a: number, b: number): boolean {
+  return Number(a).toPrecision(4) === Number(b).toPrecision(4);
+}
+
+export function selectionTieFlags(
   key: string,
   tie: ScienceAgentResult["selectionTie"],
+  returned?: { value?: number; chosenBecause?: string | null },
 ): string[] {
   if (!tie || (tie.candidates?.length ?? 0) < 2) return [];
   const K = key.toUpperCase();
+  // The tie's sentence says the value returned is the median row of the tied
+  // rows. A later step can replace that pick (the Km taken from the kcat's
+  // paper, so the pair is one measurement), and the sentence then described a
+  // choice that was not made: mouse acetylcholinesterase returned 0.054 mM
+  // under "the median row of" 0.04 and 0.046 (sixth round's polish, XS6V1-01).
+  const picked = tie.candidates.find((c) => c.selected);
+  const value = returned?.value;
+  if (typeof value === "number" && (!picked || !sameValue(Number(picked.value), value))) {
+    const listedAll = tie.candidates
+      .slice(0, 4)
+      .map((c) => {
+        const ref = c.reference_id ? ` [ref ${c.reference_id}]` : "";
+        const mark = sameValue(Number(c.value), value) ? " (returned)" : "";
+        return `${c.value}${c.unit ? " " + c.unit : ""}${ref}${mark}`;
+      })
+      .join("; ");
+    const moreAll =
+      tie.candidates.length > 4 ? ` and ${tie.candidates.length - 4} more` : "";
+    const reason = tie.reason
+      .replace(/ The value returned is the median row of those[^.]*\./, "")
+      .trim();
+    const why = returned?.chosenBecause
+      ? ` The value returned (${value}) was not chosen as the median of those rows: ${returned.chosenBecause}.`
+      : ` The value returned (${value}) is not the median of those rows; a later step chose it.`;
+    return [`${K} — the evidence did not choose: ${reason}${why} Candidates: ${listedAll}${moreAll}.`];
+  }
 
   const shown = tie.candidates.slice(0, 4);
   const listed = shown
@@ -324,12 +356,31 @@ function selectionTieFlags(
  * Found on human LDH: gossypol's Ki resolved to 0.0014 mM, which is its
  * LDH-B value (0.0019 for LDH-A, 0.0042 for LDH-C), and no row states a mode.
  */
+/** Whether a row note says the row's UniProt cell is the isoform asked for
+ *  ("the row's UniProt accession (P27338) is MAOB"). */
+export function accessionNamesIsoform(rowNotes: string[] | undefined, isoform?: string): boolean {
+  if (!isoform) return false;
+  const want = isoform.replace(/[^0-9a-z]+/gi, "").toLowerCase();
+  return (rowNotes ?? []).some((n) => {
+    const m = /UniProt accession \([^)]*\) is ([A-Za-z0-9-]+)/.exec(n);
+    return !!m && m[1]!.replace(/[^0-9a-z]+/gi, "").toLowerCase() === want;
+  });
+}
+
 export function rowScopeFlags(
   key: string,
   scope: ScienceAgentResult["rowScope"],
   isoform?: string,
+  rowNotes?: string[],
 ): string[] {
   const name = key.toUpperCase();
+  // The row's UniProt cell names the protein asked for: "names no isoform,
+  // so whether it measured MAOB is unknown" beside "the row's UniProt
+  // accession (P27338) is MAOB" said two things about one row (XS6V1-04).
+  if (isoform && !scope?.isoform && accessionNamesIsoform(rowNotes, isoform)) {
+    const rest = rowScopeFlags(key, scope, undefined, rowNotes);
+    return [`${name}: the source row's UniProt cell names ${isoform}, the one the query names.`, ...rest];
+  }
   // With an isoform named, the runner already chose among rows for it
   // (fallback_logic, isoform=...). What is left to say is whether the chosen
   // row confirms it, names none, or (where the runner could not filter)
@@ -1436,7 +1487,12 @@ async function applyKineticResolution(
       // of it. The value WAS resolved and IS cited; what these add is that
       // the pool it came from held something the reader should look at.
       flags.push(...poolFindingFlags(key, agentResult.poolFindings));
-      flags.push(...selectionTieFlags(key, agentResult.selectionTie));
+      flags.push(
+        ...selectionTieFlags(key, agentResult.selectionTie, {
+          value: (agentResult as unknown as Record<string, unknown>)[key] as number | undefined,
+          chosenBecause: agentResult.chosenBecause,
+        }),
+      );
       // Why this row (ADR 0182): the median of how many rows, what was set
       // aside as implausible, the paired constant's paper. Flagged when the
       // rows chosen from span more than 100-fold, when one value hides most
@@ -1460,7 +1516,7 @@ async function applyKineticResolution(
       );
       flags.push(...selectedFormFlags(key, agentResult.selectedForm));
       flags.push(...preparationFlags(key, agentResult.preparation));
-      flags.push(...rowScopeFlags(key, agentResult.rowScope, entities.isoform));
+      flags.push(...rowScopeFlags(key, agentResult.rowScope, entities.isoform, agentResult.rowNotes));
       // After what the row measured, because it qualifies it: another row,
       // which the runner set aside for stating another mode, says the
       // mechanism this model gives the row is not the inhibitor's against
@@ -1573,7 +1629,12 @@ async function applyVmaxFromKcatResolution(
             " So stating an enzyme concentration alone will not give a Vmax. " +
             "Supply kcat=<value> (in 1/s) with the enzyme concentration, or " +
             "vmax=<value> you measured yourself, and attach the paper with " +
-            "--cite; or name another organism or substrate that has kcat rows.",
+            "--cite" +
+            // Not offered when the search has just said the only rows
+            // elsewhere are unusable (COX-2: a mouse variant, XS6V1-07).
+            (reason && /only kcat rows|measured a protein variant/i.test(reason)
+              ? "."
+              : "; or name another organism or substrate that has kcat rows."),
         },
       };
       return { parameters, parameterProvenance, flags };
@@ -1759,7 +1820,7 @@ async function applyVmaxFromKcatResolution(
   // did (rowScopeLines). The same row-scope reading as the Km's.
   flags.push(...selectedFormFlags("kcat", agentResult.selectedForm));
   flags.push(...preparationFlags("kcat", agentResult.preparation));
-  flags.push(...rowScopeFlags("kcat", agentResult.rowScope, entities.isoform));
+  flags.push(...rowScopeFlags("kcat", agentResult.rowScope, entities.isoform, agentResult.rowNotes));
 
   return { parameters, parameterProvenance, flags };
 }

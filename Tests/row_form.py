@@ -72,6 +72,10 @@ _SURFACTANTS = (r"cetyltrimethylammonium\w*|CTAB\b|CTAC\b|sodium\s+dodecyl\s+sul
                 + _IONIC_LIQUIDS)
 
 #: (pattern, what the row measured). First match decides.
+#: The label of a row measured on the sulfated form of an enzyme whose paper
+#: also measured the nonsulfated form.
+SULFATED_FORM = "the sulfated form of the enzyme"
+
 _CONSTRUCTS = (
     (re.compile(r"\bchimer(?:a|ic)\w*|\bdomain[- ]swap\w*|\b\w+dom-\w+", re.IGNORECASE),
      "a chimeric construct"),
@@ -131,9 +135,16 @@ _CONSTRUCTS = (
     # (0.0361 mM / 154 1/s) is the native enzyme's, and plain "trypsin" was
     # modelled on the mesotrypsin paper instead (sixth round, R5A2-04).
     (re.compile(r"\bcleaved\s+(?:enzyme|form|protein)\b"
-                r"|(?<!non-)(?<!un-)\b(?:de-?)?sulfated\b(?!\s+(?!enzyme\b|form\b|protein\b)[A-Za-z])"
                 r"|\bautolys(?:ed|is)\s+(?:enzyme|form)\b", re.IGNORECASE),
      "a modification state of the enzyme"),
+    # The sulfated row is passed over for the same paper's nonsulfated row,
+    # and is NOT called an alteration of a "native" enzyme: human trypsin as
+    # the pancreas secretes it is sulfated on Tyr154, and the nonsulfated
+    # form is the recombinant one. The label says which form the row is and
+    # nothing about which is native (sixth round's polish, R6A1-02).
+    (re.compile(r"(?<!non-)(?<!un-)\b(?:de-?)?sulfated\b(?!\s+(?!enzyme\b|form\b|protein\b)[A-Za-z])",
+                re.IGNORECASE),
+     SULFATED_FORM),
     (re.compile(rf"\b\d+(?:\.\d+)?\s*%\s*(?:\(?[vw]/[vw]\)?\s*)?(?:{_COSOLVENTS})\b"
                 rf"|\b\d+(?:\.\d+)?\s*M\s+(?:urea|guanidin\w*)\b", re.IGNORECASE),
      "an assay with a cosolvent or denaturant added"),
@@ -142,7 +153,12 @@ _CONSTRUCTS = (
     # assay, an apparent constant (fifth round of the real-values review).
     (re.compile(r"\b(?:addition|presence)\s+of\s+[^,;]{1,60}?\s+(?:during|in)\s+(?:the\s+)?"
                 r"(?:measurement|assay|activity\s+(?:measurement|assay)|reaction\s+mixture)\b"
-                r"|\b[^,;\s]+\s+added\s+(?:during|to)\s+(?:the\s+)?(?:measurement|assay)\b",
+                r"|\b[^,;\s]+\s+added\s+(?:during|to)\s+(?:the\s+)?(?:measurement|assay)\b"
+                # "post-translational activation of human cDNA-expressed PAH,
+                # activator: H2O2 (0.1 mM)" (human phenylalanine hydroxylase,
+                # ref 713593: twelve rows, one per activator). An ion named as
+                # the activator is the assay's cofactor, not a treatment.
+                r"|\bactivator:\s+(?!(?:Mg|Mn|Ca|Zn|Co|Fe|Ni|Cu|K|Na)(?:\d?[+-]|\(II\))?(?![A-Za-z]))[A-Za-z0-9(][^,;]{0,40}",
                 re.IGNORECASE),
      "an assay with a compound added"),
     # "Co-ADH", "Cu-ADH" (yeast ADH, ref 655741): the zinc enzyme with its
@@ -191,6 +207,55 @@ _CONSTRUCTS = (
                 r"|\bmultidrug[- ]resistant\b", re.IGNORECASE),
      "a named subtype or variant of the enzyme"),
 )
+
+
+#: "gallic 0.02 g/l", "free SO2 25 mg/l", "ethanol 12%": a named addition and
+#: its dose, as one clause of a commentary.
+_DOSED = re.compile(
+    r"(?:^|[,;]\s*)(?P<name>[A-Za-z][A-Za-z0-9 ()+-]{1,30}?)\s+(?P<dose>\d+(?:\.\d+)?)\s*"
+    r"(?P<unit>g/l|mg/l|mg/ml|µg/ml|ug/ml|%|mM|µM|uM|nM)(?=\s*(?:,|;|$))", re.IGNORECASE)
+_NOT_AN_ADDITIVE = re.compile(r"^(?:at|ph|and|with|in|of|to|approx\w*|about)$", re.IGNORECASE)
+
+
+def dosed_additives(commentary: Optional[str]) -> dict:
+    """{name (lower case): dose} for each clause of a commentary that is a
+    named addition and its amount ("gallic 0.02 g/l", "ethanol 0%").
+
+    Pineapple stem bromelain, BRENDA ref 717695: a study of wine components
+    as inhibitors, with rows "gallic 0.02 g/l", "free SO2 25 mg/l", "skin
+    0.99 g/l" beside its controls "without gallic", "without free SO2",
+    "ethanol 0%". The dosed rows were counted as the enzyme's own, and the
+    pair carried was the one with gallic acid added (sixth round's polish,
+    R6V1-08). A dose alone decides nothing: `fallback_logic._added_compounds`
+    reads a dosed row as a treated arm only when the same paper has the
+    control without that addition."""
+    out = {}
+    for m in _DOSED.finditer(commentary or ""):
+        name = " ".join(m.group("name").split())
+        if _NOT_AN_ADDITIVE.match(name):
+            continue
+        out[name.lower()] = float(m.group("dose"))
+    return out
+
+
+#: "8-HETE formation", "formation of 5-HPETE": the row followed one product.
+_ONE_PRODUCT = re.compile(
+    r"(?<![A-Za-z0-9])(?P<a>[A-Za-z0-9][A-Za-z0-9(),'-]{2,40})\s+formation\b"
+    r"|\bformation\s+of\s+(?P<b>[A-Za-z0-9][A-Za-z0-9(),'-]{2,40})")
+_NOT_A_PRODUCT = re.compile(r"^(?:product|products|complex|the|for|during|by|and|of|rate|bond|dimer"
+                            r"|aggregate|intermediate|adduct)$", re.IGNORECASE)
+
+
+def one_product_formed(commentary: Optional[str]) -> Optional[str]:
+    """The one product a row says it followed ("8-HETE" for "HPLC analysis,
+    8-HETE formation"), or None. An enzyme that makes several products has a
+    turnover into each, and none of them is its kcat."""
+    for m in _ONE_PRODUCT.finditer(commentary or ""):
+        name = m.group("a") or m.group("b")
+        name = (name or "").rstrip(",'(")
+        if name and not _NOT_A_PRODUCT.match(name):
+            return name
+    return None
 
 
 def construct_of(commentary: Optional[str]) -> Optional[str]:
@@ -425,7 +490,33 @@ TISSUE_ISOFORMS = {
     # was carried as "the row measured isoform FBP1" (sixth round, NEW-07).
     "3.1.3.11": {"muscle": ("FBP2", " (muscle FBPase)"), "liver": ("FBP1", " (liver FBPase)"),
                  "kidney": ("FBP1", " (liver FBPase, also the kidney's)")},
+    # "placental alkaline phosphatase with p-nitrophenyl phosphate": the
+    # word was not read, and the advice offered the germ-cell enzyme (sixth
+    # round's polish, R6V1-09). Liver, bone and kidney share one gene.
+    "3.1.3.1": {"placental": ("ALPP", " (placental alkaline phosphatase)"),
+                "placenta": ("ALPP", " (placental alkaline phosphatase)"),
+                "intestinal": ("ALPI", " (intestinal alkaline phosphatase)"),
+                "intestine": ("ALPI", " (intestinal alkaline phosphatase)"),
+                "liver": ("ALPL", " (the tissue-nonspecific enzyme of liver, bone and kidney)"),
+                "bone": ("ALPL", " (the tissue-nonspecific enzyme of liver, bone and kidney)"),
+                "kidney": ("ALPL", " (the tissue-nonspecific enzyme of liver, bone and kidney)")},
 }
+
+#: The forms of an EC that a row names in words the isoform reader does not
+#: read, and the isoform each is. Checked first, most specific first.
+#: Human hexosaminidase rows read "hexosaminidase A" and "form A"; creatine
+#: kinase rows read "muscle-type cytosolic isozyme" and "wild-type hMMCK",
+#: and the MB hybrid ("hybrid form consisting of muscle and brain creatine
+#: kinase isoforms", ref 722398) was read as the brain enzyme by its last
+#: tissue word (sixth round's polish, R6V1-09).
+NAMED_FORMS = {
+    "3.2.1.52": (("hexosaminidase A", "HEXA"), ("Hex A", "HEXA"), ("form A", "HEXA"),
+                 ("hexosaminidase B", "HEXB"), ("Hex B", "HEXB"), ("form B", "HEXB")),
+    "2.7.3.2": (("hybrid form consisting of muscle and brain", "CK-MB"), ("CK-MB", "CK-MB"),
+                ("hMBCK", "CK-MB"), ("muscle-type", "CKM"), ("hMMCK", "CKM"),
+                ("brain-type", "CKB"), ("hBBCK", "CKB")),
+}
+
 
 def _isoform_aliases(ec: Optional[str]) -> dict:
     """{alias: isoform} for the short names `TISSUE_ISOFORMS` gives an EC's
@@ -433,7 +524,7 @@ def _isoform_aliases(ec: Optional[str]) -> dict:
     naming one names that isoform, before its UniProt cell is read: human
     "aldolase B" (ref 4945) was read as naming no isoform beside ALDOB's own
     rows (sixth round, NEW-03)."""
-    out = {}
+    out = dict(NAMED_FORMS.get(ec or "") or ())
     for isoform, note in (TISSUE_ISOFORMS.get(ec or "") or {}).values():
         found = re.fullmatch(r"\s*\(([A-Za-z]+[ -][A-Z0-9]{1,2})\)\s*", note or "")
         if found:
@@ -442,7 +533,8 @@ def _isoform_aliases(ec: Optional[str]) -> dict:
 
 
 _ROW_TISSUE = re.compile(
-    r"\b(skeletal\s+muscle|muscle|liver|heart|cardiac|brain|erythrocyte|red\s+cell|platelet|kidney)"
+    r"\b(skeletal\s+muscle|muscle|liver|heart|cardiac|brain|erythrocyte|red\s+cell|platelet|kidney"
+    r"|placental|placenta|intestinal|intestine|bone)"
     r"\s+(?:\w+\s+){0,1}?(?:enzyme|isozymes?|isoenzymes?|isoforms?|form|phosphorylases?|kinases?"
     r"|aldolases?|dehydrogenases?)\b", re.IGNORECASE)
 
@@ -460,6 +552,8 @@ def tissue_isoform_of_row(ec: Optional[str], commentary: Optional[str]) -> Optio
     for alias, isoform in _isoform_aliases(ec).items():
         if re.search(rf"(?<![A-Za-z0-9-]){re.escape(alias)}(?![A-Za-z0-9])", commentary or ""):
             return isoform
+    if not commentary:
+        return None
     table = TISSUE_ISOFORMS.get(ec or "")
     if not table:
         return None

@@ -902,3 +902,85 @@ The build hash also covers `Tests/`, where the resolver the runner imports
 lives (`fallback_logic.py`); its `test_*.py` files are left out.
 
 Not done here (another theme): lysozyme still defaults to a non-hen enzyme.
+
+## Sixth round's polish (2026-11-14)
+
+A second review of the sixth round found four blockers and a list of wrong
+or contradictory sentences. What changed, and what was decided.
+
+**Numbers that were on the wrong thing.**
+
+- **A mutant mixed with the wild type is not the mutant.** "phenylalanine
+  hydroxylase R408W" carried Km 3 mM (ref 712843) as the mutant's. The row
+  is the "allelic combination wild-type/mutant R408W". A row whose
+  commentary says allelic combination, heterozygous, or wild-type/mutant is
+  never taken for the mutant, and the report says what it measured. The
+  advice for a mutant's missing constant now counts only that mutant's
+  rows, so it no longer offers an organism or substrate the next run
+  refuses.
+- **ADH1B is alcohol dehydrogenase.** UniProt files ADH1B under EC
+  1.1.1.105, and the model was built on androsterone. BRENDA files its
+  ethanol rows under EC 1.1.1.1 as "isoenzyme beta1,beta1". A curated row
+  reads ADH1B as EC 1.1.1.1, and "beta1" as ADH1B. The rows beta2 and beta3
+  are allelic variants and are not taken. A dimer of two different subunits
+  ("alpha,gamma1") is read as its own name. There is no ADH1B kcat row, so
+  the kcat is a placeholder that says so.
+- **An organism under its current name.** "Salmonella typhimurium" has no
+  row; BRENDA files it as "Salmonella enterica subsp. enterica serovar
+  Typhimurium". When the name typed has no row and exactly one organism
+  with rows has the same genus and carries every other word typed, it is
+  used, and the note says how it was read.
+- **One product is not the reaction.** Human 5-lipoxygenase carried the
+  "8-HETE formation" pair over the same paper's overall assay. A row that
+  followed one product ranks after the same paper's row for the reaction.
+- **A dose is an addition.** Bromelain carried a row "gallic 0.02 g/l"
+  beside the paper's "without gallic". A dosed row is a treated arm when
+  the same paper has the control ("without X", or "X 0%").
+
+**Names.** "carboxylesterase 1", "beta-hexosaminidase A", "placental
+alkaline phosphatase", "creatine kinase MB", "nattokinase" and "alcalase"
+are curated rows. "hexosaminidase A", "form A", "muscle-type" and the MB
+hybrid of creatine kinase are read off a row's words. A gene written as one
+organism writes it ("MurA") is read without the organism when only one
+covered organism has it. "glucokinase" with no organism is read as human
+GCK under EC 2.7.1.1, and the sentence names EC 2.7.1.2 as the other
+reading. Bare "AKR1C3" ties two EC numbers on Km and kcat rows; the tie is
+broken by all rows naming the protein, Ki included, and said. A flag for
+the EC number keeps the gene the description named as the isoform.
+
+**Sentences that were false.** The spread line no longer says the carried
+row "is not carried". "This one among them" is said only when it is.
+E. coli catalase's kcat is no longer called a possible unit slip: the
+median is taken over papers, rows measured "in presence of" a second
+substrate are left out, and two agreeing papers end the concern. A sulfated
+trypsin row is called "the sulfated form", and the nonsulfated row is not
+called native. A hydrolase's nucleotide or diphosphate is its substrate,
+not a cosubstrate. A Ki row is read as its UniProt cell names it, as Km and
+kcat rows are. The API's "median row" flag gives the real reason when a
+later step chose another row, and the API and the CLI no longer say "names
+no isoform" of a row whose UniProt cell names it. The CLI reads
+`pairedKcat`.
+
+**Decided, not changed.**
+
+- **"amylase with starch" stays refused.** Both alpha- and beta-amylase
+  have rows for starch, and the rule above ("two candidates that both have
+  rows stay refused") stands. The refusal names both with their row counts
+  and the command for each.
+- **Trypsin carries the nonsulfated pair of ref 772843 on purpose.** It is
+  the form the other wild-type rows (recombinant, refs 678332 and 682760)
+  measured. The sulfated pair (0.0111 mM, 88.5 1/s) is named beside it.
+- **DPP4 still carries ref 678195 ("dimeric rDPP-IV").** The review took
+  DPP4 for the only human protein under EC 3.4.14.5. The nomenclature lists
+  four (DPP4, DPP8, DPP9, FAP), so a row that names DPP4 still outranks
+  rows that name none. A rule that skipped the isoform step for a "sole"
+  protein was tried and removed: the index lists one rabbit glycogen
+  phosphorylase, and the rule carried a heart row for muscle.
+
+Not done here: the ACE "membrane-bound system" row is still not named in
+the spread note; the PTP1B spread still counts values in one place and rows
+in another; fructose-1,6-bisphosphatase with no isoform still carries the
+muscle pair; lysozyme still defaults to a non-hen enzyme; the example
+isozyme in the advice is still the lowest-numbered name (LDHAL6A for
+lactate dehydrogenase, PRSS1 for trypsin), because changing it rewrites the
+recorded Studio and assistant fixtures, which is a change of its own.

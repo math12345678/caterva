@@ -77,6 +77,14 @@ def _clauses(text: str) -> List[str]:
     return out
 
 
+def _same_number(a: float, b: float) -> bool:
+    """Whether two printed values are one number (to four significant figures)."""
+    try:
+        return f"{float(a):.4g}" == f"{float(b):.4g}"
+    except (TypeError, ValueError):
+        return False
+
+
 def _passed_over_far(record) -> List[str]:
     """The resolver's "passed over (values)" clauses for a carried row whose
     values lie more than PASSED_OVER_FOLD from it, or []."""
@@ -115,10 +123,53 @@ def _passed_over_far(record) -> List[str]:
             head = clause[:m.start()].rstrip() + " passed over" + (f" {rest}" if rest else "")
             head = re.sub(r"^of the \d+ candidate rows \([^)]*\):\s*", "", head.strip())
             near = len(found) - len(far)
+            listed = f"({', '.join(far)}" + (f" {unit}" if unit else "") + ")"
+            if not near and head.endswith(listed):
+                # The clause already ends with the same values: say them once
+                # (sixth round's polish, R6A1-05: "(0.0204 mM), all more than
+                # 3-fold from it (0.0204 mM)").
+                out.append(f"{head[:-1]}, {'all ' if len(far) > 1 else ''}more than "
+                           f"{PASSED_OVER_FOLD:g}-fold from it)")
+                continue
             out.append(f"{head}, {'all' if not near else f'{len(far)} of them'} more than "
                        f"{PASSED_OVER_FOLD:g}-fold from it ({', '.join(far)}"
                        + (f" {unit}" if unit else "") + ")")
     return out
+
+
+def _stands_apart(record, passed: Sequence[str]) -> str:
+    """" Every one of those rows is higher than the carried value ...", when
+    two or more rows passed over lie more than PASSED_OVER_FOLD from the
+    carried value and all on one side of it; "" otherwise.
+
+    E. coli beta-galactosidase and 2-nitrophenyl galactoside: the carried
+    pair (0.04 mM, 90 1/s, ref 706624) is the lowest row on both constants,
+    beside 0.12 to 0.16 mM and 400 to 620 1/s from other papers, and the
+    note listed the far rows without saying which side stood alone (sixth
+    round's polish, R6A1-03)."""
+    try:
+        carried = float(record.value)
+    except (TypeError, ValueError):
+        return ""
+    far: List[float] = []
+    for clause in passed:
+        for group in re.findall(r"from it \(([^)]*)\)|\(([^()]*), (?:all )?more than [\d.]+-fold from it\)",
+                                clause):
+            for text in group:
+                far += [float(v) for v in re.findall(r"(?<![\w./])\d+(?:\.\d+)?(?:e[+-]?\d+)?(?![\w/.])",
+                                                     text)]
+    far = [v for v in far if v > 0 and max(v / carried, carried / v) > PASSED_OVER_FOLD]
+    if len(far) < 2:
+        return ""
+    if all(v > carried for v in far):
+        side = "higher"
+    elif all(v < carried for v in far):
+        side = "lower"
+    else:
+        return ""
+    return (f" Every one of those {len(far)} rows is {side} than the carried value, so the carried "
+            "row is the one that stands apart: read its paper, and BRENDA's entry for it, before "
+            "relying on it.")
 
 
 def _ref_of(record) -> Optional[str]:
@@ -443,7 +494,7 @@ class ModelDossier:
 
         The judgement is `row_scope.read_scope`, shared with the exports.
         """
-        from caterva.compose.row_scope import read_scope
+        from caterva.compose.row_scope import read_scope, row_isoform_of
 
         notes: List[str] = []
         for identifier in sorted(measured):
@@ -454,7 +505,7 @@ class ModelDossier:
                 table=getattr(quantity, "table", None),
                 substrate=getattr(self.model, "substrate", None),
                 isoform=getattr(self.model, "isoform", None),
-                row_isoform=getattr(measured[identifier], "row_isoform", None),
+                row_isoform=row_isoform_of(measured[identifier], getattr(self.model, "isoform", None)),
                 compound=_compound_for(self.model, quantity),
             )
             if scope is not None:
@@ -466,6 +517,8 @@ class ModelDossier:
             construct = _construct_note(measured[identifier])
             if construct:
                 notes.append(f"`{identifier}`: {construct}")
+            for what in _named_variant_notes(measured[identifier]):
+                notes.append(f"`{identifier}`: {what}")
             reaction = _reaction_of(measured[identifier]) or _reaction_on_the_page(
                 self.model, measured[identifier], getattr(by_id.get(identifier), "table", None))
             if reaction:
@@ -657,26 +710,45 @@ class ModelDossier:
             f"rate.",
         ]
 
-    def _end_set_aside(self, identifier: str, spread: Any) -> str:
+    def _end_set_aside(self, identifier: str, spread: Any, carried: Optional[float] = None) -> str:
         """For an end of the spread the reason never mentions: why that row
         was set aside, from the selection's own note, or "". Rat nNOS's Km
         spread ran to 4.8 mM (ref 659257), the one row stating pH and
         temperature, and the line never said why it was not carried; the
-        note above did (sixth round, VR2-05)."""
+        note above did (sixth round, VR2-05).
+
+        An end that IS the carried value is never explained this way. The
+        note about an isoform step reads "the row for X (VALUE, BRENDA ref N)
+        is used instead", which names the carried row; matching it printed
+        "the 3.7 mM row is not carried" beside "The model carries 3.7"
+        (sixth round's polish, R6B-01). Each clause is printed once."""
         reason = str(spread.carried_as or "")
         try:
             notes = " ".join(str(n) for n in self.model.recognition.composition.notes)
         except AttributeError:
             return ""
-        out = []
+        out: List[str] = []
+        said: set = set()
         for end in sorted({spread.low, spread.high}):
             label = f"{end:g} {spread.unit}"
             if f"{end:g}" in reason:
                 continue
+            if carried is not None and _same_number(end, carried):
+                continue
             m = re.search(rf"`{re.escape(identifier)}`: ([^`]*?\({re.escape(label)}, BRENDA ref \w+\)"
                           r"[^:`]*)", notes)
-            if m:
-                out.append(f"the {label} row is not carried: {m.group(1).strip().rstrip(',;')}; ")
+            if not m:
+                continue
+            clause = m.group(1).strip().rstrip(',;')
+            # The clause must be about the row set aside, not the one taken:
+            # "... (LABEL, BRENDA ref N) is used instead" names the carried row.
+            after = clause[clause.index(f"({label}, BRENDA ref"):]
+            if re.match(r"\([^)]*\)\s+is used instead", after):
+                continue
+            if clause in said:
+                continue
+            said.add(clause)
+            out.append(f"the {label} row is not carried: {clause}; ")
         return "".join(out)
 
     def _disagreement_lines(self, measured: dict) -> List[str]:  # noqa: C901
@@ -717,6 +789,7 @@ class ModelDossier:
                         f"({record.citation}), the row the checks kept; some rows "
                         f"passed over lie more than {PASSED_OVER_FOLD:g}-fold from it: "
                         + "; ".join(passed) + "."
+                        + _stands_apart(record, passed)
                         + _other_papers(identifier, record, measured, self.model)
                         + " Which one is right is a question about the papers.")
                 continue
@@ -724,7 +797,7 @@ class ModelDossier:
                 f"- `{identifier}`: {spread.what}, spanning **{spread.low:g} to {spread.high:g} "
                 f"{spread.unit}** ({spread.fold:.3g}-fold). The model carries "
                 f"{record.value:g} — {spread.carried_as}; "
-                + self._end_set_aside(identifier, spread)
+                + self._end_set_aside(identifier, spread, record.value)
                 + f"{spread.why}."
             )
         if not disagreements:
@@ -1480,6 +1553,33 @@ def _construct_note(record: Any) -> Optional[str]:
         return None
     return (f"the row measured {construct}, not the native enzyme: read the value as that "
             "preparation's")
+
+
+_ALLOZYME = re.compile(r"\ballozyme\s+([A-Z][A-Za-z0-9]{0,7})(?![A-Za-z0-9])")
+
+
+def _named_variant_notes(record: Any) -> List[str]:
+    """What a carried row says of the form it measured that is neither a
+    construct nor an isoform: a named allozyme, or one product's formation.
+    Human alkaline phosphatase's pair is "allozyme D" of the placental
+    enzyme (ref 651458), and the report never used the word (sixth round's
+    polish, V6R1-05)."""
+    text = str(getattr(record, "commentary", None) or "")
+    out: List[str] = []
+    found = _ALLOZYME.search(text)
+    if found:
+        out.append(f"the row measured allozyme {found.group(1)}, one named genetic variant of the "
+                   "enzyme; other allozymes can differ")
+    try:
+        from caterva.checkout import literature_module
+
+        product = literature_module("row_form").one_product_formed(text)
+    except Exception:  # noqa: BLE001 - without the literature layer, no such note
+        product = None
+    if product:
+        out.append(f"the row measured the formation of one product ({product}), which is not the "
+                   "turnover of the reaction as a whole when the enzyme makes several")
+    return out
 
 
 def _wild_type_label_note(record: Any) -> Optional[str]:

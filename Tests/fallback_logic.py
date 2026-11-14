@@ -1313,6 +1313,21 @@ def _added_compounds(entry, rows) -> list:
     if (row_form.construct_of(getattr(entry, "conditions", None)) or "").startswith(
             "a chimeric construct"):
         return []
+    # "gallic 0.02 g/l" beside the same paper's "without gallic", "ethanol
+    # 12%" beside "ethanol 0%": a dosed addition whose control the paper
+    # also reports (bromelain, ref 717695; sixth round's polish, R6V1-08).
+    dosed = {name: dose for name, dose in row_form.dosed_additives(
+        getattr(entry, "conditions", None)).items() if dose > 0}
+    if dosed:
+        controls = set()
+        for other in same_paper:
+            controls |= {str(x.compound_text or "").strip().lower()
+                         for x in (getattr(other, "effectors", None) or []) if x.presence == "absent"}
+            controls |= {name for name, dose in row_form.dosed_additives(
+                getattr(other, "conditions", None)).items() if dose == 0}
+        treated = [name for name in dosed if name in controls]
+        if treated:
+            return treated
     return [
         x.compound_text for x in (getattr(entry, "effectors", None) or [])
         if x.presence == "present" and (plain or _effector_key(x) in absent)
@@ -1482,6 +1497,17 @@ def _row_notes(entry, quantity) -> list:
     construct = row_form.construct_of(text)
     if construct:
         notes.append(f"the row measured {construct}, not the native enzyme")
+    product = row_form.one_product_formed(text)
+    if product:
+        notes.append(f"the row measured the formation of one product ({product}), which is not "
+                     "the turnover of the reaction as a whole when the enzyme makes several")
+    allozyme = re.search(r"\ballozyme\s+([A-Z][A-Za-z0-9]{0,7})(?![A-Za-z0-9])", text or "")
+    if allozyme:
+        # "allozyme D, pH 7.5, 37°C" (human placental alkaline phosphatase,
+        # ref 651458): one named genetic variant of the enzyme, carried
+        # without a word (sixth round's polish, V6R1-05).
+        notes.append(f"the row measured allozyme {allozyme.group(1)}, one named genetic variant of "
+                     "the enzyme; other allozymes can differ")
     reaction = _REACTION_NAMED.search(text or "")
     if reaction:
         # "CYP3A4, desulfuration ... to fenthion-oxon" (ref 706823) beside the
@@ -1560,6 +1586,18 @@ _PREINCUBATED = re.compile(r"\bafter\s+(?:\d+\s*\w+\s+)?preincubation\b|\bpreinc
 #: fenthion-oxon", "N-demethylation to norketamine".
 _REACTION_NAMED = re.compile(
     r"\b((?:[A-Za-z]-)?[a-z]+(?:ation|oxidation|ylation|lysis))\b[^,;]{0,40}?\bto\s+([^,;]{3,60})")
+
+
+def _one_product_beside_overall(entry, rows) -> bool:
+    """Whether `entry` measured one product's formation ("8-HETE formation")
+    while a row of the same paper in `rows` names no single product."""
+    if not row_form.one_product_formed(getattr(entry, "conditions", None)):
+        return False
+    ref = getattr(entry, "reference_id", None)
+    return bool(ref) and any(
+        other is not entry and getattr(other, "reference_id", None) == ref
+        and not row_form.one_product_formed(getattr(other, "conditions", None))
+        for other in rows)
 
 
 def _treated_arm(entry, rows) -> bool:
@@ -1981,12 +2019,32 @@ def _best_evidenced(
                            "the same paper's row of the enzyme from its own source"),
            "of the enzyme from its own source where the same paper also measured it")
 
+    # One product's formation after the same paper's row for the reaction as
+    # a whole: human 5-lipoxygenase, ref 742078, "HPLC analysis, 8-HETE
+    # formation" (0.0285 mM / 0.004 1/s) was carried over the paper's
+    # overall assay (0.0223 mM / 0.06 1/s), a kcat 15 times lower, the
+    # turnover into a side product (sixth round's polish, R6V1-07).
+    prefer(lambda e: not _one_product_beside_overall(e, rows),
+           lambda n, out: (f"{n} row(s) measuring the formation of one product ("
+                           + ", ".join(sorted({row_form.one_product_formed(e.conditions) or "?"
+                                               for e in out}))
+                           + ") passed over for the same paper's row of the reaction as a whole"),
+           "of the reaction as a whole where the same paper also measured one product's formation")
+
     # Constructs (an isolated domain, a chimera, a modified or immobilised
     # enzyme, a cosolvent, another subtype) after native rows.
     prefer(lambda e: not row_form.construct_of(getattr(e, "conditions", None)),
            lambda n, out: (f"{n} row(s) measuring a construct or altered preparation ("
                            + "; ".join(sorted({row_form.construct_of(e.conditions) for e in out}))
-                           + ") passed over for rows of the native enzyme"),
+                           # A sulfated row beside its nonsulfated one: neither
+                           # is called native (human trypsin is secreted
+                           # sulfated; sixth round's polish, R6A1-02).
+                           + (") passed over for rows without that alteration or modification "
+                              "(which of the sulfated and nonsulfated forms is the native one is "
+                              "not judged here)"
+                              if any((row_form.construct_of(e.conditions) or "").startswith(
+                                  row_form.SULFATED_FORM) for e in out)
+                              else ") passed over for rows of the native enzyme")),
            "of the native enzyme (no construct, modification or cosolvent named)")
 
     if q == "km":
@@ -2202,7 +2260,13 @@ def _best_evidenced(
         # The carried row is one of them, and is said to be: "the 6
         # remaining rows" read as six rows besides it, after a header that
         # counted three (sixth round, R5B2-01).
-        because += (f"; the {len(kept)} rows left after the checks, this one among them, span "
+        # Only when it is: a row taken back from those passed over, because
+        # it was measured with the paired constant, is not among the rows
+        # left (mouse AChE's 0.054 mM beside "span 0.04 to 0.046 mM, this one
+        # among them"; sixth round's polish, XS6V1-06).
+        among = (", this one among them," if any(e is chosen for e in kept)
+                 else ", which the carried row is not among,")
+        because += (f"; the {len(kept)} rows left after the checks{among} span "
                     f"{lo:g} to {hi:g} {unit}")
         if wide and unit_slip is None:
             because += (f", a {fold:.3g}-fold spread: the literature disagrees by more than "
@@ -3163,6 +3227,27 @@ def _names_the_sole_protein(entry) -> bool:
                                     getattr(entry, "organism", None), reading)
 
 
+#: Words saying a row measured the mutant TOGETHER WITH the wild type (or
+#: another allele): a mixed preparation, not the mutant alone.
+_MIXED_WITH_WILD_TYPE = re.compile(
+    r"allelic combination|heteroallelic|heterozygo|hetero-?(?:tetra|di|oligo)mer"
+    r"|wild[- ]?type\s*/\s*(?:mutant|[A-Z]\d{1,4}[A-Z]\b)"
+    r"|(?:mutant|\b[A-Z]\d{1,4}[A-Z])\s*/\s*wild[- ]?type"
+    r"|co-?express(?:ed|ion)\s+(?:of\s+)?(?:with\s+)?(?:the\s+)?wild[- ]?type",
+    re.IGNORECASE)
+
+
+def mixed_with_wild_type(text) -> bool:
+    """Whether a commentary says the row measured a mixture of the mutant
+    and the wild type ("allelic combination wild-type/mutant R408W"), which
+    is not the mutant's own constant.
+
+    "phenylalanine hydroxylase R408W" carried Km 3 mM (BRENDA ref 712843) as
+    the mutant's: the row is the wild-type/R408W allelic combination, the
+    enzyme of a heterozygous carrier (sixth round's polish, R6V1-01)."""
+    return bool(_MIXED_WITH_WILD_TYPE.search(text or ""))
+
+
 def _mutations_of(text) -> set:
     """The point mutations a commentary names, one per substitution:
     "mutant enzyme R132H" gives {"R132H"}, "R132H/S280F" both."""
@@ -3178,7 +3263,11 @@ def _partition_mutant(entries, mutation, log, where):
     "IDH1 R132H" carried wild-type isocitrate rows (ref 760535) as GROUNDED
     while BRENDA holds the R132H rows of that same paper."""
     wanted = {m.strip().upper() for m in re.split(r"[/,+\s]+", mutation) if m.strip()}
-    kept = [e for e in entries if wanted <= _mutations_of(getattr(e, "conditions", None))]
+    named = [e for e in entries if wanted <= _mutations_of(getattr(e, "conditions", None))]
+    kept = [e for e in named if not mixed_with_wild_type(getattr(e, "conditions", None))]
+    if len(kept) < len(named):
+        log.append(f"Left out {len(named) - len(kept)} {where} row(s) naming {mutation} in a mixture "
+                   "with the wild type (an allelic combination): not the mutant alone")
     if kept:
         log.append(f"Kept the {len(kept)} of {len(entries)} {where} row(s) measuring the mutant "
                    f"{mutation}")

@@ -887,9 +887,9 @@ def provenance_of(
     substrate = getattr(source, "substrate", None)
     isoform = getattr(source, "isoform", None)
     try:
-        from caterva.compose.row_scope import read_scope
+        from caterva.compose.row_scope import read_scope, row_isoform_of
     except ImportError:  # pragma: no cover - flat layout
-        from compose.row_scope import read_scope  # type: ignore[no-redef]
+        from compose.row_scope import read_scope, row_isoform_of  # type: ignore[no-redef]
 
     for species_id in composition.species_ids:
         if species_id in supplied:
@@ -958,7 +958,7 @@ def provenance_of(
                     scope=(
                         read_scope(measurement.commentary, motif=instance.motif.name,
                                    table=parameter.table, substrate=substrate, isoform=isoform,
-                                   row_isoform=getattr(measurement, "row_isoform", None))
+                                   row_isoform=row_isoform_of(measurement, isoform))
                         if measurement is not None else None
                     ),
                 )

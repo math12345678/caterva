@@ -69,6 +69,12 @@ COMMON_NAMES = {
     "hsv": "Herpes simplex virus",
     "hsv-1": "Herpes simplex virus",
     "hsv1": "Herpes simplex virus",
+    # The name every textbook uses for the source of tryptophan synthase;
+    # BRENDA files it under the serovar name (EC 4.2.1.20, 31 Km rows, read
+    # 2026-11-14). The abbreviations are read here; the name written out is
+    # read against the page's own organisms in caterva.compose.__main__.
+    "s. typhimurium": "Salmonella enterica subsp. enterica serovar Typhimurium",
+    "s typhimurium": "Salmonella enterica subsp. enterica serovar Typhimurium",
 }
 
 

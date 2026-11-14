@@ -339,7 +339,7 @@ def test_the_resolver_says_the_values_of_rows_it_prefers_against():
     src = Path(fallback_logic.__file__).read_text()
     # The values go in after "passed over", where the report reads them.
     assert 'text = f"{text[:at]} ({shown}' in src
-    assert "rows left after the checks, this one among them, span" in src
+    assert "rows left after the checks{among} span" in src and "this one among them" in src
 
 
 def test_different_papers_are_said_with_the_other_paper_s_own_row():

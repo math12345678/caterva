@@ -320,7 +320,7 @@ function notFoundBecause(
  * `rowScope` (parsed in Python by caterva.bind.core), never re-derived.
  */
 function rowScopeOf(result: ResolvedKinetic, isoform?: string): string[] | undefined {
-  const lines = rowScopeLines(result.quantity, result.rowScope, isoform);
+  const lines = rowScopeLines(result.quantity, result.rowScope, isoform, result.rowNotes);
   return lines.length > 0 ? lines : undefined;
 }
 

@@ -398,11 +398,39 @@ ALIASES = (
 )
 
 
+#: One compound that BRENDA files with and without the descriptor of its
+#: natural form, or with and without a locant that has one possible value:
+#: (the name as filed, the name it is). Folded into `SYNONYMS` below.
+#:
+#: * HMG-CoA reductase's substrate is the (S) form; rat rows are filed as
+#:   "(S)-3-hydroxy-3-methylglutaryl-CoA" (Km) and "hydroxymethylglutaryl-CoA"
+#:   (kcat), so the advised rat run kept its kcat a placeholder (sixth
+#:   round's polish, R6V1-11).
+#: * "fructose 1-phosphate" and "D-Fructose 1-phosphate" gave human aldolase
+#:   B two answers 1,700-fold apart, the second from a paper the first run
+#:   set aside as a probable database error (R6V1-13).
+#: * "pyridoxal phosphate" is pyridoxal 5'-phosphate (V6R1-05), and
+#:   "phenylalanine" in an enzyme's substrate table is L-phenylalanine
+#:   (R6V1-15).
+_NATURAL_FORMS = (
+    ("(S)-3-hydroxy-3-methylglutaryl-CoA", "3-hydroxy-3-methylglutaryl-CoA"),
+    ("D-fructose 1-phosphate", "fructose 1-phosphate"),
+    ("D-fructose-1-phosphate", "fructose 1-phosphate"),
+    ("fructose-1-phosphate", "fructose 1-phosphate"),
+    ("pyridoxal phosphate", "pyridoxal 5'-phosphate"),
+    ("phenylalanine", "L-phenylalanine"),
+)
+
 def _alias_key(name: str) -> str:
     return re.sub(r"\s+", "", _base(name)).casefold().replace("-", "")
 
 
 _ALIAS_KEYS = {_alias_key(a): b for a, b in ALIASES}
+
+for _filed, _is in _NATURAL_FORMS:
+    _target = _folded(_is)
+    SYNONYMS.setdefault(_folded(_filed), SYNONYMS.get(_target, _target))
+del _filed, _is, _target
 
 
 def identity_key(name: str) -> str:

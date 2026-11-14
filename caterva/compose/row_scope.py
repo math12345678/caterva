@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 #: The inhibition mode each inhibition motif's Ki belongs to. Product
 #: inhibition in these motifs is the product competing for the active site.
@@ -181,6 +181,25 @@ def _preparation(text: str):
         from caterva.checkout import literature_module
         return literature_module("enzyme_preparation").classify(text)
     except Exception:  # LiteratureLayerUnavailable, or an import failure
+        return None
+
+
+def row_isoform_of(measurement: Any, isoform: Optional[str]) -> Optional[str]:
+    """The isoform the resolver read off the row, or `isoform` itself when
+    the row's own UniProt cell is that protein (`isoform._own_accession_of`).
+
+    AKR1C3's rows under EC 1.1.1.188 carry the cell P42330 and no words; the
+    note said "the row's UniProt accession (P42330) is AKR1C3" and the list
+    below it "whether it measured AKR1C3 ... is unknown" (sixth round's
+    polish, V6R1-06)."""
+    read = getattr(measurement, "row_isoform", None)
+    if read or not isoform or measurement is None:
+        return read
+    try:
+        from caterva.compose.isoform import _own_accession_of
+
+        return isoform if _own_accession_of(measurement, isoform) else None
+    except Exception:  # noqa: BLE001 - unknown: as before
         return None
 
 

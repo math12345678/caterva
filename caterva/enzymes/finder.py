@@ -1237,9 +1237,21 @@ def _gene_symbol(result: Resolution, text: str, code: Optional[str],
     if code is None:
         from .symbols import human_style
 
-        if not human_style(text):
-            return None
-        code, assumed = "HUMAN", "Homo sapiens"
+        if human_style(text):
+            code, assumed = "HUMAN", "Homo sapiens"
+        else:
+            # Not written as a human symbol is ("MurA"): read when exactly
+            # one of the organisms the names file covers has a gene written
+            # that way, and say which. "MurA inhibited by fosfomycin" named
+            # no enzyme without "in E. coli" (sixth round's polish, V6R1-04).
+            from .index import ORGANISMS
+
+            holders = [c for c, held_there in _genes(index).get(text.strip().casefold(), {}).items()
+                       if any(_written_as_the_gene(text.strip(), item[0].gene or "")
+                              for item in held_there.values())]
+            if len(holders) != 1 or holders[0] not in ORGANISMS:
+                return None
+            code, assumed = holders[0], ORGANISMS[holders[0]][0]
     typed = text.strip()
     held = {acc: item for acc, item in _genes(index).get(typed.casefold(), {}).get(code, {}).items()
             if _written_as_the_gene(typed, item[0].gene or "")}
@@ -1259,7 +1271,10 @@ def _gene_symbol(result: Resolution, text: str, code: Optional[str],
     label = organism_label(code)
     entries = ", ".join(f"{p.entry_name} (UniProtKB {p.accession})" for p in proteins)
     assumed_note = ((f"No organism was given; {text} is written as a human gene symbol, so Homo sapiens "
-                     "was searched (pass --organism to change it).",) if assumed else ())
+                     "was searched (pass --organism to change it).",) if assumed == "Homo sapiens" else
+                    (f"No organism was given; {text} is a gene symbol of {assumed} and of no other organism "
+                     f"Caterva's protein names cover, so {assumed} was searched (pass --organism to change "
+                     "it).",) if assumed else ())
     if len(ecs) == 1:
         ec = ecs[0]
         how = (f"{text!r} is the gene symbol UniProt gives {entries}, the {label} protein the enzyme "
@@ -1288,7 +1303,9 @@ def _gene_symbol(result: Resolution, text: str, code: Optional[str],
               + ", ".join(f"EC {ec} {index.entries[ec].name}" for ec in ecs)
               + "): it is one protein, with several reactions"
               + ("; the organism was taken as Homo sapiens because none was given and it is written as a "
-                 "human gene symbol is" if assumed else ""))
+                 "human gene symbol is" if assumed == "Homo sapiens" else
+                 f"; the organism was taken as {assumed} because none was given and no other organism "
+                 "Caterva's protein names cover has a gene written that way" if assumed else ""))
     return Ambiguous(query=text, candidates=candidates, confirm_only=True, organism=code,
                      release=index.release, reason=reason, gene=gene)
 
