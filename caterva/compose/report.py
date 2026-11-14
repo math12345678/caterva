@@ -161,6 +161,20 @@ def _stands_apart(record, passed: Sequence[str]) -> str:
     far = [v for v in far if v > 0 and max(v / carried, carried / v) > PASSED_OVER_FOLD]
     if len(far) < 2:
         return ""
+    # Rows passed over that AGREE with the carried value speak for it. Human
+    # carbonic anhydrase II's kcat of 1.4e6 1/s (ref 696613) was said to
+    # "stand apart" from two rows of one paper (15200, 16700 1/s) while two
+    # more passed-over rows lay within 3-fold of it: the note told the reader
+    # to distrust the textbook value (sixth round's second review, R6B2-01).
+    near = 0
+    for clause in passed:
+        m = re.search(r"(\d+) row\(s\).*?(\d+) of them more than", clause)
+        if m:
+            near += max(0, int(m.group(1)) - int(m.group(2)))
+    if near:
+        return (f" The other {near} row{'s' if near != 1 else ''} passed over "
+                f"{'lie' if near != 1 else 'lies'} within {PASSED_OVER_FOLD:g}-fold of the carried "
+                "value, so the far rows are the ones that differ.")
     if all(v > carried for v in far):
         side = "higher"
     elif all(v < carried for v in far):

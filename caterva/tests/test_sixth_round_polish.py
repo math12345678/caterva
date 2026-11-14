@@ -75,9 +75,15 @@ def test_passed_over_values_are_said_once_when_every_one_is_far():
 
 def test_a_carried_row_below_every_far_row_is_said_to_stand_apart():
     record = SimpleNamespace(value=90.0, unit="1/s")
-    said = _stands_apart(record, ["3 row(s) not stating both pH and temperature passed over, 2 of "
-                                 "them more than 3-fold from it (400, 620 1/s)"])
+    said = _stands_apart(record, ["2 row(s) not stating both pH and temperature passed over, all "
+                                 "more than 3-fold from it (400, 620 1/s)"])
     assert "higher than the carried value" in said and "stands apart" in said
+    # A passed-over row that agrees with the carried value speaks for it:
+    # carbonic anhydrase II's 1.4e6 1/s beside two agreeing rows (R6B2-01).
+    ca2 = SimpleNamespace(value=1.4e6, unit="1/s")
+    said = _stands_apart(ca2, ["4 row(s) not stating both pH and temperature passed over, 2 of "
+                              "them more than 3-fold from it (15200, 16700 1/s)"])
+    assert "stands apart" not in said and "other 2 rows passed over lie within" in said
     assert _stands_apart(record, ["2 row(s) passed over, all more than 3-fold from it (12, 620 1/s)"]) == ""
     assert _stands_apart(record, ["1 row(s) passed over, all more than 3-fold from it (620 1/s)"]) == ""
 
