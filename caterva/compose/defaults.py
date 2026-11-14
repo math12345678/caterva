@@ -861,7 +861,15 @@ def is_chromogenic(name: str) -> bool:
 #: 14 Km rows (sixth round, NEW-12).
 _ANALOGUE_MARK = re.compile(
     r"phosphono|(?:\d+'?,?)*-?(?:di|tri)?deoxy-?|\d+'?-(?:fluoro|chloro|bromo|iodo)-?|\d+-?(?:deaza|aza)-?"
-    r"|\d*a?-?carba-?|methylene(?=phosphon)", re.IGNORECASE)
+    r"|\d+a?-carba-?|(?<![a-z])carba-(?=[a-z])|methylene(?=phosphon)", re.IGNORECASE)
+
+#: A deoxy form the cell makes itself: a deoxynucleoside or deoxynucleotide,
+#: deoxyribose. "2'-deoxycytidine" is deoxycytidine kinase's own substrate,
+#: not a synthetic copy of cytidine, and "deoxy" on such a name is no mark of
+#: an analogue (review of the sixth round's merge).
+_NATURAL_DEOXY = re.compile(
+    r"deoxy-?(?:D-)?(?:ribo|adenosine|guanosine|cytidine|uridine|thymidine|inosine|xanthosine"
+    r"|adenylate|guanylate|cytidylate|uridylate|thymidylate|nucleo|[ACGUTI][MDT]P\b)", re.IGNORECASE)
 
 
 def _skeleton(name: str) -> str:
@@ -876,6 +884,9 @@ def analogue_of(name: str, parents: Iterable[str]) -> Optional[str]:
     reads as that compound (four in five letters alike). None when it
     carries no mark or imitates none of them."""
     if not _ANALOGUE_MARK.search(name or ""):
+        return None
+    marks = {m.group(0).lower().strip("-,'0123456789") for m in _ANALOGUE_MARK.finditer(name)}
+    if marks <= {"deoxy", "dideoxy", "trideoxy"} and _NATURAL_DEOXY.search(name):
         return None
     undone = _skeleton(_ANALOGUE_MARK.sub(lambda m: "phospho" if m.group(0).lower() == "phosphono"
                                           else "", name))
@@ -1387,6 +1398,26 @@ def choose_substrate(ec: str, organism: Optional[str], *, needs_kcat: bool = Tru
 
 
 @functools.lru_cache(maxsize=512)
+def _own_reaction_compounds(ec: str) -> frozenset:
+    """The compounds of the EC's own reaction as the nomenclature writes it
+    ("phosphoenolpyruvate = 3-phosphonopyruvate"), as `_group_key`s; empty
+    when the index or the reaction cannot be read."""
+    try:
+        from caterva.enzymes.index import load_index
+
+        entry = load_index().get(ec)
+        text = (entry.reaction or "") if entry else ""
+    except Exception:  # noqa: BLE001 - no index: nothing is exempt
+        return frozenset()
+    out = set()
+    for part in re.split(r"\s+\+\s+|\s+<?=>?\s+", text):
+        part = re.sub(r"^(?:\d+|n)\s+", "", part.strip().rstrip("."))
+        if part:
+            out.add(_group_key(part))
+    return frozenset(out)
+
+
+@functools.lru_cache(maxsize=512)
 def _enzyme_names(ec: str) -> Tuple[str, ...]:
     """The EC's accepted and alternative names from the enzyme index."""
     try:
@@ -1546,7 +1577,11 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
     # it, whichever has the kcat row (NEW-12).
     parents = [counts.name(k) for k in candidates if k in natural and rows(k)["km"] > 0
                and not cofactor(k)]
-    imitates = {k: analogue_of(counts.name(k), [p for p in parents if p != counts.name(k)])
+    # A compound of the enzyme's own reaction is no copy of another:
+    # phosphonopyruvate is what phosphoenolpyruvate mutase makes.
+    own = _own_reaction_compounds(ec)
+    imitates = {k: (None if _group_key(counts.name(k)) in own else
+                    analogue_of(counts.name(k), [p for p in parents if p != counts.name(k)]))
                 for k in candidates}
     # A glycoprotein or glycoconjugate ranks after a defined natural
     # substrate with Km rows likewise (NEW-11).
@@ -1652,8 +1687,8 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
         said = []
         if analogues:
             said.append(("a synthetic analogue" if len(analogues) == 1 else "synthetic analogues")
-                        + " of a natural substrate (a phosphonate, deoxy, halo, aza or carba form), "
-                          "not a compound the enzyme meets in the cell"
+                        + " of a natural substrate by its name (a phosphonate, deoxy, halo, aza "
+                          "or carba form)"
                         if not glyco else
                         ", ".join(analogues[:3]) + (" is a synthetic analogue" if len(analogues) == 1
                                                      else " are synthetic analogues")

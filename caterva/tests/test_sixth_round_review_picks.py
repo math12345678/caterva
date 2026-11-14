@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from caterva.compose import defaults
 from caterva.compose.export import Measurement
 from caterva.compose.isoform import ASKED_BY_WORDS, select_isoform
@@ -293,3 +295,34 @@ def test_a_range_of_any_paper_the_spread_counts_is_quoted(monkeypatch):
     (note,) = cli._ranges_left_out(model, {"reaction_kcat": m}, "3.4.21.4", "Homo sapiens")
     assert "BRENDA ref 678332, one of the papers whose values are counted above" in note
     assert "20 - 50 1/s" in note
+
+
+# -- Review of the merge: what the analogue rule must not catch ---------------------------------
+
+@pytest.mark.parametrize("name, parent", [
+    ("2'-deoxycytidine", "cytidine"),          # deoxycytidine kinase's own substrate
+    ("deoxythymidine", "thymidine"),
+    ("2'-deoxyguanosine 5'-triphosphate", "guanosine 5'-triphosphate"),
+    ("2-deoxy-D-ribose 5-phosphate", "D-ribose 5-phosphate"),
+    ("carbamoyl phosphate", "acetyl phosphate"),  # "carba" inside a word is no carba analogue
+])
+def test_a_natural_deoxy_compound_is_no_synthetic_analogue(name, parent):
+    assert defaults.analogue_of(name, [parent]) is None
+
+
+@pytest.mark.parametrize("name, parent", [
+    ("2-deoxy-D-glucose", "D-glucose"),
+    ("6-phosphono-D-gluconate", "6-phospho-D-gluconate"),
+    ("5a-carba-D-glucose", "D-glucose"),
+    ("3'-fluoro-2'-deoxythymidine", "thymidine"),
+])
+def test_a_synthetic_analogue_is_still_read(name, parent):
+    assert defaults.analogue_of(name, [parent]) == parent
+
+
+def test_a_compound_of_the_enzymes_own_reaction_is_exempt():
+    # Phosphoenolpyruvate mutase makes 3-phosphonopyruvate: by its name a
+    # phosphonate copy of phosphoenolpyruvate, and the enzyme's own compound.
+    own = defaults._own_reaction_compounds("5.4.2.9")
+    assert defaults._group_key("3-phosphonopyruvate") in own
+    assert defaults._group_key("6-phosphono-D-gluconate") not in defaults._own_reaction_compounds("1.1.1.44")

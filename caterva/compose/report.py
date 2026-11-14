@@ -1478,8 +1478,8 @@ def _construct_note(record: Any) -> Optional[str]:
         return None
     if not construct:
         return None
-    return (f"the row measured {construct}, not the native enzyme; it is carried because no row of "
-            "the native enzyme was left for this constant")
+    return (f"the row measured {construct}, not the native enzyme: read the value as that "
+            "preparation's")
 
 
 def _wild_type_label_note(record: Any) -> Optional[str]:
