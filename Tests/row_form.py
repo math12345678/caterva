@@ -34,11 +34,11 @@ from typing import Iterable, Optional
 
 _HALF_SATURATION = re.compile(
     r"\b[KS]\s*\(?\s*0\.5\s*\)?(?=[\s,;:)]|$)|\b[KS]0\.5\b|\[S\]\s*0\.5|\bS50\b"
-    r"|\bHill\s+(?:coefficient|constant|value|number)\b|\bnH\s*[=:]?\s*\d"
+    r"|\bHill[\s-]+(?:coefficient|constant|value|number)\b|\bnH\s*[=:]?\s*\d"
     r"|\bhalf[- ]saturation\b|\bsigmoid(?:al)?\s+kinetics\b",
     re.IGNORECASE,
 )
-_HILL_VALUE = re.compile(r"\bHill\s+coefficient\s*(?:of|=|:)?\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
+_HILL_VALUE = re.compile(r"\bHill[\s-]+coefficient\s*(?:of|=|:)?\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
 
 
 def half_saturation(commentary: Optional[str]) -> Optional[str]:
@@ -61,6 +61,15 @@ _NEGATED = re.compile(r"\b(?:without|absence\s+of|no)\b[^,;]*$", re.IGNORECASE)
 _COSOLVENTS = (r"methanol|ethanol|DMSO|dimethyl\s*sulfoxide|dimethylsulfoxide|glycerol|acetonitrile"
                r"|(?:iso)?propanol|dioxane|acetone|trifluoroethanol|dimethylformamide|DMF|formamide"
                r"|ethylene\s+glycol|sucrose|trehalose|urea|guanidin\w*")
+
+#: Ionic-liquid cations (imidazolium, pyridinium, pyrrolidinium, ...).
+_IONIC_LIQUIDS = (r"[\w,()-]*(?:imidazolium|pyridinium|pyrrolidinium|piperidinium|phosphonium"
+                  r"|morpholinium)[\w-]*")
+#: Surfactants and detergents, and the ionic liquids, named as present.
+_SURFACTANTS = (r"cetyltrimethylammonium\w*|CTAB\b|CTAC\b|sodium\s+dodecyl\s+sulfate|SDS\b"
+                r"|dodecyltrimethylammonium\w*|DTAB\b|AOT\b|Aerosol[- ]OT|Triton\s*X-?\d+|Tween[- ]?\d+"
+                r"|Brij[- ]?\d+|CHAPSO?\b|n-?dodecyl[- ](?:sulfate|maltoside|beta-D-maltoside)|"
+                + _IONIC_LIQUIDS)
 
 #: (pattern, what the row measured). First match decides.
 _CONSTRUCTS = (
@@ -117,7 +126,12 @@ _CONSTRUCTS = (
     # rows, cleaved or not by autolysis, sulfated or not), beside the same
     # compound's "wild type enzyme" rows (refs 678332, 682760): a paper's
     # series over modification states, not the enzyme as isolated.
-    (re.compile(r"\b(?:un)?cleaved\s+(?:enzyme|form|protein)\b|\b(?:non|un|de)?-?sulfated\b(?!\s+(?!enzyme\b|form\b|protein\b)[A-Za-z])"
+    # "Uncleaved" and "nonsulfated" are the intact, unmodified enzyme, not a
+    # modification of it: ref 772843's "uncleaved enzyme, nonsulfated" pair
+    # (0.0361 mM / 154 1/s) is the native enzyme's, and plain "trypsin" was
+    # modelled on the mesotrypsin paper instead (sixth round, R5A2-04).
+    (re.compile(r"\bcleaved\s+(?:enzyme|form|protein)\b"
+                r"|(?<!non-)(?<!un-)\b(?:de-?)?sulfated\b(?!\s+(?!enzyme\b|form\b|protein\b)[A-Za-z])"
                 r"|\bautolys(?:ed|is)\s+(?:enzyme|form)\b", re.IGNORECASE),
      "a modification state of the enzyme"),
     (re.compile(rf"\b\d+(?:\.\d+)?\s*%\s*(?:\(?[vw]/[vw]\)?\s*)?(?:{_COSOLVENTS})\b"
@@ -147,9 +161,32 @@ _CONSTRUCTS = (
     # isomerase, ref 728730) beside the same paper's "native wild type
     # enzyme", whose kcat is 7-fold higher: a tagged construct (fifth
     # round, R5V1-12).
-    (re.compile(r"\b(?:His|histidine|hexahistidine|GST|MBP|FLAG|Strep|SUMO)\d*[- ]?(?:tag(?:ged)?)\b"
+    # "His-taggged" (sic; human CES1, ref 752090) is a tag too: BRENDA's
+    # typos are read, not trusted to miss (sixth round, NEW-08).
+    (re.compile(r"\b(?:His|histidine|hexahistidine|GST|MBP|FLAG|Strep|SUMO)\d*[- ]?(?:tag+(?:g*ed)?)\b"
                 r"|\b(?:N|C)-terminal(?:ly)?\s+(?:His|histidine)\d*[- ]?tag", re.IGNORECASE),
      "a tagged construct"),
+    # "recombinant refolded His-taggged wild-type enzyme" (CES1, ref 752090):
+    # an enzyme refolded from inclusion bodies is a preparation of its own,
+    # beside a paper's native or untagged rows (sixth round, NEW-08).
+    (re.compile(r"\b(?:re-?folded|renatured)\b", re.IGNORECASE),
+     "a refolded preparation"),
+    # "in D2O, 24 mM imidazole buffer" (Streptomyces xylose isomerase, ref
+    # 726953): a solvent-isotope experiment, carried over the native H2O
+    # row of ref 728730 and never named (sixth round, NEW-10).
+    (re.compile(r"\b(?:in|with)\s+(?:\d+(?:\.\d+)?\s*%\s*)?D2O\b|\bD2O[- ](?:buffer|solution)\b"
+                r"|\bdeuterium\s+oxide\b|\bheavy\s+water\b|\bdeuterated\s+(?:buffer|solvent|water)\b",
+                re.IGNORECASE),
+     "a solvent-isotope assay (in D2O)"),
+    # "presence of 2 mM cetyltrimethylammonium bromide, 0.1 M
+    # 1-butyl-4-methylpyridinium chloride" (bovine chymotrypsin, ref 731678):
+    # a surfactant and an ionic liquid in the assay, every row of the paper,
+    # carried as chymotrypsin's own Km (sixth round, VR2-01).
+    (re.compile(r"\b(?:presence|addition)\s+of\s+(?:\d+(?:\.\d+)?\s*(?:[mµu]?M|%)\s*"
+                r"(?:\(?[vw]/[vw]\)?\s*)?)?(?:" + _SURFACTANTS + r")"
+                r"|\b\d+(?:\.\d+)?\s*(?:[mµu]?M|%)\s*(?:\(?[vw]/[vw]\)?\s*)?(?:" + _IONIC_LIQUIDS + r")"
+                r"|\bin\s+(?:an?\s+|the\s+)?ionic\s+liquids?\b", re.IGNORECASE),
+     "an assay with a surfactant or ionic liquid added"),
     (re.compile(r"\bsubtype\s+[A-Z0-9]{1,3}\b|\bclade\s+[A-Z]\b|\bdrug[- ]resistant\b"
                 r"|\bmultidrug[- ]resistant\b", re.IGNORECASE),
      "a named subtype or variant of the enzyme"),
@@ -383,7 +420,26 @@ TISSUE_ISOFORMS = {
     "2.7.3.2": {"muscle": ("CKM", " (CK-M)"), "brain": ("CKB", " (CK-B)")},
     "2.4.1.1": {"muscle": ("PYGM", ""), "liver": ("PYGL", ""), "brain": ("PYGB", "")},
     "2.7.1.11": {"muscle": ("PFKM", ""), "liver": ("PFKL", ""), "platelet": ("PFKP", "")},
+    # "wild-type muscle enzyme" and "wild-type liver enzyme" (human FBPase,
+    # ref 664962) both carry the UniProt cell P09467 (FBP1); the muscle row
+    # was carried as "the row measured isoform FBP1" (sixth round, NEW-07).
+    "3.1.3.11": {"muscle": ("FBP2", " (muscle FBPase)"), "liver": ("FBP1", " (liver FBPase)"),
+                 "kidney": ("FBP1", " (liver FBPase, also the kidney's)")},
 }
+
+def _isoform_aliases(ec: Optional[str]) -> dict:
+    """{alias: isoform} for the short names `TISSUE_ISOFORMS` gives an EC's
+    isoforms in its notes: "aldolase B" for ALDOB, "CK-M" for CKM. A row
+    naming one names that isoform, before its UniProt cell is read: human
+    "aldolase B" (ref 4945) was read as naming no isoform beside ALDOB's own
+    rows (sixth round, NEW-03)."""
+    out = {}
+    for isoform, note in (TISSUE_ISOFORMS.get(ec or "") or {}).values():
+        found = re.fullmatch(r"\s*\(([A-Za-z]+[ -][A-Z0-9]{1,2})\)\s*", note or "")
+        if found:
+            out[found.group(1)] = isoform
+    return out
+
 
 _ROW_TISSUE = re.compile(
     r"\b(skeletal\s+muscle|muscle|liver|heart|cardiac|brain|erythrocyte|red\s+cell|platelet|kidney)"
@@ -401,6 +457,9 @@ def tissue_isoform_of_row(ec: Optional[str], commentary: Optional[str]) -> Optio
     Rabbit glycogen phosphorylase, asked for as "from rabbit muscle" (PYGM):
     the Km carried was 6.0 mM, "heart phosphorylase I and III" (ref 488283),
     said to name no isoform (fifth round of the real-values review)."""
+    for alias, isoform in _isoform_aliases(ec).items():
+        if re.search(rf"(?<![A-Za-z0-9-]){re.escape(alias)}(?![A-Za-z0-9])", commentary or ""):
+            return isoform
     table = TISSUE_ISOFORMS.get(ec or "")
     if not table:
         return None

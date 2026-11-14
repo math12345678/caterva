@@ -242,6 +242,12 @@ def _label(row: Mapping[str, Any], unit: Optional[str]) -> str:
         f", BRENDA ref {ref}" if ref else "")
 
 
+#: The resolver's clause for a paper set aside as a probable error
+#: (fallback_logic.resolve_kinetic_pair).
+_SET_ASIDE = re.compile(r"BRENDA ref \d+'s row was not used: .*?supplies neither constant"
+                        r"(?: \(it gave [^)]*\))?")
+
+
 def carry(measured: Mapping[str, Any], refused: Mapping[str, str], narrowed: Narrowed,
           modes: Mapping[str, Optional[str]], isoform: Optional[str]) -> tuple:
     """`(measured, refused, notes)` with the resolver's row carried for every
@@ -257,6 +263,16 @@ def carry(measured: Mapping[str, Any], refused: Mapping[str, str], narrowed: Nar
         answer = narrowed.answers[identifier]
         carried = out.get(identifier)
         if carried is not None and same_row(_row_of(carried), row):
+            # The same row, reached by the selections: the paper the
+            # resolver set aside on the way is still said. Human aldolase B:
+            # ref 651313's Km of 0.0022 mM, a probable unit slip, was passed
+            # over for ref 4945's 3.7 mM without a word (sixth round, NEW-03).
+            said = getattr(carried, "chosen_because", None) or ""
+            own = " ".join(str(getattr(answer, name, None) or "")
+                           for name in ("chosen_because", "resolver_because"))
+            for clause in dict.fromkeys(_SET_ASIDE.findall(own)):
+                if clause not in said:
+                    notes.append(f"`{identifier}`: {clause}")
             continue
         what = _asked(isoform, modes.get(identifier))
         because = (f"the resolver's row for {what}, ranked among every row BRENDA holds "

@@ -716,12 +716,37 @@ def _mark_unattributed(entries) -> None:
         except ImportError:
             return None
     naming = {str(getattr(e, "reference_id", None)) for e in entries if words_name(e)}
+
+    def several(e) -> bool:
+        return bool(getattr(e, "uniprot_from_row", False)
+                    and len(row_form.accessions(getattr(e, "uniprot", None))) >= 2)
+
+    # One paper, one compound, one multi-protein cell and one set of words,
+    # but several values: a value per protein, with no word saying which is
+    # whose. PARP1's NAD+ Km was the median of ref 776950's five rows
+    # (0.011 to 0.251 mM), each listing PARP1, PARP2, PARP3, TNKS and TNKS2
+    # (sixth round, NEW-09).
+    values: dict = {}
     for e in entries:
+        if several(e) and not words_name(e):
+            key = (str(getattr(e, "reference_id", None)), _key_of(getattr(e, "substrate", None)),
+                   ",".join(sorted(row_form.accessions(getattr(e, "uniprot", None)))),
+                   " ".join(str(getattr(e, "conditions", None) or "").split()).casefold(),
+                   getattr(e, "kind", None) or getattr(e, "parameter", None))
+            values.setdefault(key, set()).add(getattr(e, "km_value", None))
+    spread = {k for k, v in values.items() if len({x for x in v if x is not None}) >= 2}
+    for e in entries:
+        key = (str(getattr(e, "reference_id", None)), _key_of(getattr(e, "substrate", None)),
+               ",".join(sorted(row_form.accessions(getattr(e, "uniprot", None)))),
+               " ".join(str(getattr(e, "conditions", None) or "").split()).casefold(),
+               getattr(e, "kind", None) or getattr(e, "parameter", None))
         e.unattributed = bool(
-            getattr(e, "uniprot_from_row", False)
-            and len(row_form.accessions(getattr(e, "uniprot", None))) >= 2
-            and str(getattr(e, "reference_id", None)) in naming
-            and not words_name(e))
+            several(e) and not words_name(e)
+            and (str(getattr(e, "reference_id", None)) in naming or key in spread))
+
+
+def _key_of(name) -> str:
+    return " ".join(str(name or "").split()).casefold()
 
 
 def _mark_other_enzyme(entry) -> None:
@@ -1404,6 +1429,16 @@ def _row_notes(entry, quantity) -> list:
         if k05:
             notes.append(f"the row is {k05}, not a Michaelis-Menten Km: a hyperbolic rate law "
                          "built with it approximates a cooperative enzyme")
+    if quantity == "ki" and row_form.half_saturation(text):
+        # "wild-type, pH 7.0, 37°C, Hill-coefficient 1.9" (AMP and human
+        # FBPase, ref 730751): a cooperative, allosteric inhibitor, built
+        # into a one-site competitive model without a word (sixth round,
+        # NEW-07).
+        hill = row_form._HILL_VALUE.search(text or "")
+        notes.append("the row reports cooperative inhibition"
+                     + (f" (a Hill coefficient of {hill.group(1)})" if hill else "")
+                     + ": the inhibitor binds at more than one site, as an allosteric inhibitor "
+                       "does, and a one-site model of inhibition leaves that out")
     if _is_mutant(entry):
         # Carried only when asked for ("IDH1 R132H") or when no wild-type
         # row exists; either way the reader is told it is a mutant's.
@@ -1443,6 +1478,16 @@ def _row_notes(entry, quantity) -> list:
     except ImportError:
         commentary_isoform = None
     accession_isoform = _isoform_from_accession(entry)
+    tissue = row_form.tissue_isoform_of_row(getattr(entry, "ec_number", None), text)
+    if (tissue and accession_isoform and not commentary_isoform
+            and not _same_isoform(tissue, accession_isoform)):
+        # "wild-type muscle enzyme" under the cell P09467 (FBP1): the words
+        # name FBP2, and the row is read as FBP2's (sixth round, NEW-07).
+        notes.append(f"the row's words name {tissue}, though BRENDA's UniProt cell lists "
+                     f"{entry.uniprot} ({accession_isoform}); it is read as {tissue}'s row")
+        accession_isoform = None
+    elif tissue and not commentary_isoform:
+        accession_isoform = None
     if (accession_isoform and not commentary_isoform
             and row_form.proteins_in_organism_of(entry.ec_number, entry.uniprot) > 1):
         notes.append(f"the row's UniProt accession ({entry.uniprot}) is {accession_isoform}")
@@ -1866,7 +1911,12 @@ def _best_evidenced(
     # not name; the bare row was carried (fourth round's review).
     prefer(lambda e: not _unlabelled_beside_wild_type(e, rows),
            lambda n, out: (f"{n} unlabelled row(s) passed over for the same paper's row labelled "
-                           "wild-type under otherwise the same stated conditions"),
+                           "wild-type under otherwise the same stated conditions ("
+                           # The values, so the report can say how far they
+                           # sit (sixth round, NEW-18: 0.0204 mM beside the
+                           # carried 0.219 mM, unmentioned).
+                           + ", ".join(f"{e.km_value:g} {getattr(e, 'unit', '') or ''}".strip()
+                                       for e in out[:4]) + ")"),
            "labelled wild-type where the same paper labels one")
 
     prefer(lambda e: not _developing_beside_adult(e, rows),
@@ -3822,8 +3872,98 @@ def probable_error_papers(enzyme_ec, organism, substrate, html_provider, quantit
     elif not kwargs.get("allow_variants"):
         rows, _ = _partition_variants(rows, keep_isozymes=True)
     lone = isolated([e.km_value for e in rows])
-    return {str(rows[i].reference_id): rows[i].km_value for i in lone
-            if getattr(rows[i], "reference_id", None)}
+    out = _ProbableErrors({str(rows[i].reference_id): rows[i].km_value for i in lone
+                           if getattr(rows[i], "reference_id", None)})
+    for paper, (value, why) in minority_cluster(rows).items():
+        if paper not in out:
+            out[paper] = value
+            out.why[paper] = why
+    return out
+
+
+class _ProbableErrors(dict):
+    """{paper: value}, with `why[paper]` for a paper set aside by another
+    rule than "more than 100-fold from every other row"."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.why: dict = {}
+
+
+#: How near (fold) two papers' rows must lie to be read as one cluster, how
+#: many papers a far cluster may hold, and how many times as many papers the
+#: rest must number, for the cluster to be set aside (`minority_cluster`).
+CLUSTER_NEAR_FOLD = 10.0
+CLUSTER_MAX_PAPERS = 2
+CLUSTER_OUTNUMBERED_BY = 3
+
+
+def minority_cluster(rows) -> dict:
+    """{paper: (value, why)} for the papers whose row sits in a far cluster
+    of one or two papers: every other paper's rows lie more than
+    CLUSTER_NEAR_FOLD from it, those papers outnumber the cluster at least
+    CLUSTER_OUTNUMBERED_BY to one, and the row lies more than
+    ISOFORM_OUTLIER_FOLD from their median.
+
+    `isolated` asks that no other row come near, so two papers sharing a
+    slip hide each other. Human aldolase B and fructose 1-phosphate: refs
+    651313 and 651985 give Km 0.0022 and 0.0024 mM, and six other papers
+    give 0.24 to 27 mM (median 3 mM): a thousand-fold apart, the mark of mM
+    written for uM. The 0.0022 mM row was carried as aldolase B's (sixth
+    round, NEW-03).
+
+    A paper with rows inside and outside the cluster is running a series,
+    and is left alone. A cluster naming an isoform that no row outside it names is left alone:
+    it may be the only measurement of a different protein (glucokinase
+    beside the hexokinases), which is not an error."""
+    from statistics import median
+
+    vals = [(str(e.reference_id), float(e.km_value), e) for e in rows
+            if getattr(e, "reference_id", None) and isinstance(getattr(e, "km_value", None), (int, float))
+            and e.km_value > 0]
+    if len({p for p, _, _ in vals}) < 1 + CLUSTER_OUTNUMBERED_BY:
+        return {}
+
+    def isoform(e):
+        try:
+            return _row_isoform(e)
+        except Exception:  # noqa: BLE001 - unread is unnamed
+            return None
+
+    out: dict = {}
+    for paper, value, _ in vals:
+        if paper in out:
+            continue
+        cluster = {p for p, v, _ in vals if max(v / value, value / v) <= CLUSTER_NEAR_FOLD}
+        if any(max(v / value, value / v) > CLUSTER_NEAR_FOLD for p, v, _ in vals if p in cluster):
+            # A paper with rows near and far is a series over a condition
+            # (aldolase B, ref 649476: patients' enzyme beside the wild
+            # type's, 250-fold apart in kcat), not a slip.
+            continue
+        rest = [(p, v, e) for p, v, e in vals if p not in cluster]
+        rest_papers = {p for p, _, _ in rest}
+        if (len(cluster) > CLUSTER_MAX_PAPERS
+                or len(rest_papers) < CLUSTER_OUTNUMBERED_BY * len(cluster)):
+            continue
+        mid = median(v for _, v, _ in rest)
+        fold = max(value / mid, mid / value)
+        if fold <= ISOFORM_OUTLIER_FOLD:
+            continue
+        inside = {isoform(e) for p, _, e in vals if p in cluster} - {None}
+        outside = {isoform(e) for _, _, e in rest} - {None}
+        if any(not any(_same_isoform(i, o) for o in outside) for i in inside):
+            continue
+        near = sorted(cluster - {paper})
+        why = (f"lies {fold:.3g}-fold from the median ({mid:g}) of the {len(rest)} rows "
+               f"{len(rest_papers)} other papers give"
+               + (f", and only BRENDA ref {', '.join(near)} comes near it" if near else "")
+               + ": a probable error (a unit slip in the database, such as mM written for µM, "
+                 "looks like this)")
+        for p in cluster:
+            mine = [v for q, v, _ in vals if q == p and max(v / value, value / v) <= CLUSTER_NEAR_FOLD]
+            out[p] = (mine[0], why if p == paper else why.replace(
+                f"BRENDA ref {', '.join(near)}", f"BRENDA ref {', '.join(sorted(cluster - {p}))}"))
+    return out
 
 
 def _is_dict_row(a, b) -> bool:
@@ -3910,19 +4050,27 @@ def resolve_kinetic_pair(
         own = cited in errors_of[quantity] and cited not in errors_of[other]
         errors = errors_of[quantity] if own else errors_of[other]
         if cited in errors:
+            # A far cluster of two papers is set aside together, or the
+            # second takes the first's place (`minority_cluster`).
+            twins = tuple(p for p in getattr(errors, "why", {}) if p != cited
+                          and cited in getattr(errors, "why", {}))
             again = resolve_kinetic_value(enzyme_ec=enzyme_ec, organism=organism,
                                           substrate=substrate, html_provider=page,
                                           quantity=quantity,
-                                          **{**kwargs, "exclude_references": (cited,)})
+                                          **{**kwargs, "exclude_references": (cited,) + twins})
             if again.found:
                 which = quantity if own else other
+                how = getattr(errors, "why", {}).get(cited) or (
+                    f"lies more than {ISOFORM_OUTLIER_FOLD:g}-fold from every other row, a "
+                    "probable error")
                 note = (f"BRENDA ref {cited}'s row was not used: "
                         + ("its " if own else "the same paper's ")
-                        + f"{'kcat' if which == 'kcat' else 'Km'} ({errors[cited]:g}) lies more "
-                        f"than {ISOFORM_OUTLIER_FOLD:g}-fold from every other row, a probable "
-                        f"error, so that paper supplies neither constant"
+                        + f"{'kcat' if which == 'kcat' else 'Km'} ({errors[cited]:g}) {how}, "
+                        f"so that paper supplies neither constant"
                         + ("" if own else f" (it gave {result.value:g} {result.unit or ''}".rstrip() + ")"))
                 discredited[cited] = errors[cited]
+                for twin in twins:
+                    discredited[twin] = errors[twin]
                 said[quantity] = note
                 again = _with_clause(again, note)
                 if quantity == "km":

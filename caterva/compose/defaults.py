@@ -580,6 +580,43 @@ def _unlabelled_rows(html: str, ec: str, table: str, client: object) -> Tuple[_R
     return tuple(r for ranged, r in out if not ranged or key(r) not in single)
 
 
+def ranges_of_paper(ec: str, table: str, organism: Optional[str],
+                    reference: Optional[str]) -> Tuple[Tuple[str, str, str], ...]:
+    """(value as written, compound, commentary) of each row of `table` that
+    `reference` gives in `organism` as a range ("20 - 50"). The parser
+    keeps a range only where the compound has no single value
+    (brenda_client._ranges_only_where_alone), so these rows are otherwise
+    never seen: human trypsin's ref 678332 gives kcat 88.2 1/s and "20 - 50"
+    1/s under the same stated conditions, and the spread note said "2
+    values, 88.2 to 158" (sixth round, R5A2-03). () when the page cannot be
+    read."""
+    if not reference or table not in _TABLE_LABELS:
+        return ()
+    try:
+        html = _page(ec)
+    except Exception:  # noqa: BLE001 - no page, nothing to say
+        return ()
+    match = re.search(r"showTable\('(tab\d+)'\)\">" + re.escape(_TABLE_LABELS[table]) + "<", html)
+    if not match:
+        return ()
+    cells: Dict[str, Dict[int, str]] = {}
+    for row_id, index, cell in re.findall(
+            r'<div id="(' + match.group(1) + r'r\d+(?:sr\d+)?)c(\d+)"[^>]*>(.*?)</div>', html, flags=re.S):
+        cells.setdefault(row_id, {})[int(index)] = _text(cell)
+    out = []
+    for row in cells.values():
+        texts = [row.get(i, "") for i in range(max(row) + 1)]
+        if len(texts) < 6 or not re.fullmatch(r"\d+\.?\d*\s*-\s*\d+\.?\d*", texts[0]):
+            continue
+        if organism and texts[2].casefold() != organism.casefold():
+            continue
+        found = re.match(r"\d+", texts[5])
+        if not found or found.group(0) != str(reference):
+            continue
+        out.append((texts[0], texts[1], texts[4] if texts[4] != "-" else ""))
+    return tuple(out)
+
+
 #: The parser's plausibility bounds per table (brenda_client), by name.
 _BOUNDS = {"km": ("KM_PLAUSIBLE_MIN_MM", "KM_PLAUSIBLE_MAX_MM"),
            # A Ki has no Michaelis floor (brenda_client.KI_PLAUSIBLE_MIN_MM):
@@ -730,9 +767,29 @@ _MACROMOLECULE = re.compile(
     r"xylan|pectin|dextran|pullulan|inulin|peptidoglycan|dna|rna|poly\(.+\))s?$", re.IGNORECASE)
 
 
+#: A glycoprotein or glycoconjugate as a substrate: its sialic acids or
+#: sugars per mole are a preparation's, and its molar Km rests on an
+#: assumed molecular weight. Influenza neuraminidase was modelled on fetuin
+#: (Km 0.00051 mM) over the defined sialyllactoses (sixth round, NEW-11).
+_GLYCOCONJUGATE = re.compile(
+    r"^(?:(?:asialo-?|bovine |human |porcine |ovine |calf |submaxillary |gastric |salivary ))*(?:fetuin|mucin|glycoproteins?"
+    r"|transferrin|orosomucoid|alpha1?-acid glycoprotein|thyroglobulin|immunoglobulin g?|igg"
+    r"|lactoferrin|haptoglobin|ceruloplasmin|glycophorin)s?\b"
+    r"|\bconjugate$|\bneoglycoprotein\b|^colominic acid$|^polysialic acid$", re.IGNORECASE)
+
+
 def is_macromolecule(name: str) -> bool:
-    """A protein or polydisperse polymer named as a substrate (`_MACROMOLECULE`)."""
-    return bool(_MACROMOLECULE.match((name or "").strip()))
+    """A protein or polydisperse polymer named as a substrate (`_MACROMOLECULE`),
+    or a glycoprotein or glycoconjugate (`_GLYCOCONJUGATE`)."""
+    text = (name or "").strip()
+    return bool(_MACROMOLECULE.match(text) or _GLYCOCONJUGATE.search(text))
+
+
+def is_ill_defined(name: str) -> bool:
+    """A glycoprotein or glycoconjugate substrate (`_GLYCOCONJUGATE`): ranked
+    after every defined natural substrate with a Km row, whichever has the
+    kcat row."""
+    return bool(_GLYCOCONJUGATE.search((name or "").strip()))
 
 
 #: An engineered reporter or construct named as a substrate: a fluorescent
@@ -770,6 +827,42 @@ _CHROMOGENIC = re.compile(
 def is_chromogenic(name: str) -> bool:
     """A synthetic chromogenic or fluorogenic assay substrate (`_CHROMOGENIC`)."""
     return bool(_CHROMOGENIC.search(name or ""))
+
+
+#: What makes a compound a synthetic analogue of another: a phosphonate for
+#: a phosphate, a deoxy, halo, aza or carba form. BRENDA's Natural
+#: Substrates table lists some ("6-phosphono-D-gluconate" for sheep 6PGD),
+#: and with one Km and one kcat row it was chosen over 6-phosphogluconate's
+#: 14 Km rows (sixth round, NEW-12).
+_ANALOGUE_MARK = re.compile(
+    r"phosphono|(?:\d+'?,?)*-?(?:di|tri)?deoxy-?|\d+'?-(?:fluoro|chloro|bromo|iodo)-?|\d+-?(?:deaza|aza)-?"
+    r"|\d*a?-?carba-?|methylene(?=phosphon)", re.IGNORECASE)
+
+
+def _skeleton(name: str) -> str:
+    """A name without locants, configuration descriptors or punctuation."""
+    text = re.sub(r"(?<![A-Za-z0-9])(?:[DL]{1,2}|\([RS+\-]\))-", "", name or "")
+    return re.sub(r"[^a-z]", "", text.casefold())
+
+
+def analogue_of(name: str, parents: Iterable[str]) -> Optional[str]:
+    """The compound of `parents` that `name` is a synthetic analogue of: a
+    name carrying an analogue mark (`_ANALOGUE_MARK`) that, the mark undone,
+    reads as that compound (four in five letters alike). None when it
+    carries no mark or imitates none of them."""
+    if not _ANALOGUE_MARK.search(name or ""):
+        return None
+    undone = _skeleton(_ANALOGUE_MARK.sub(lambda m: "phospho" if m.group(0).lower() == "phosphono"
+                                          else "", name))
+    from difflib import SequenceMatcher
+
+    for parent in parents:
+        if _ANALOGUE_MARK.search(parent or "") or not parent:
+            continue
+        theirs = _skeleton(parent)
+        if theirs and SequenceMatcher(None, undone, theirs).ratio() >= 0.8:
+            return parent
+    return None
 
 
 def is_cofactor(name: str) -> bool:
@@ -1367,9 +1460,23 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
         # cofactor list says: adenylate kinase's AMP (third round's review).
         return is_cofactor(counts.name(k)) and k not in named
 
+    # A synthetic analogue of a natural substrate with Km rows ranks after
+    # it, whichever has the kcat row (NEW-12).
+    parents = [counts.name(k) for k in candidates if k in natural and rows(k)["km"] > 0
+               and not cofactor(k)]
+    imitates = {k: analogue_of(counts.name(k), [p for p in parents if p != counts.name(k)])
+                for k in candidates}
+    # A glycoprotein or glycoconjugate ranks after a defined natural
+    # substrate with Km rows likewise (NEW-11).
+    defined = [p for p in parents if not is_macromolecule(p) and not is_chromogenic(p)]
+    for k in candidates:
+        if imitates[k] is None and defined and is_ill_defined(counts.name(k)) and k not in named:
+            imitates[k] = defined[0]
+
     def rank(k: str) -> tuple:
         return (cofactor(k), rows(k)["km"] == 0,
                 bool(isoform) and not counts.names_isoform(k, tables), bool(neighbours[k]),
+                imitates[k] is not None,
                 not has_both(k), rows(k)["km"] > 0 and counts.own(k, "km") == 0,
                 (is_macromolecule(counts.name(k)) or is_engineered(counts.name(k)))
                 and k not in named,
@@ -1421,6 +1528,8 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
         if any(not has_both(k) and total(k) > total(best) and not is_cofactor(counts.name(k))
                for k in candidates):
             how = f"it has {most('rows')} of those with both a Km and a kcat row"
+    elif needs_kcat and any(imitates[k] is not None and has_both(k) for k in candidates):
+        how = f"it has {most('Km rows')}, and no kcat row"
     elif needs_kcat:
         how = (f"none has both a Km and a kcat row there, and it has {most('Km rows')}, so its kcat "
                "stays a placeholder unless the search finds one")
@@ -1453,6 +1562,31 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
         top = better[0]
         natural_tail = (f"; better-measured assay substrates, such as {counts.name(top)} "
                         f"({_described_counts(rows(top))}), rank after it")
+    copies = [counts.name(k) for k in ranked if imitates[k] is not None and has_both(k)
+              and imitates[k] is not None]
+    if needs_kcat and r["km"] and not has_both(best) and copies:
+        glyco = [c for c in copies if is_ill_defined(c)]
+        analogues = [c for c in copies if c not in glyco]
+        said = []
+        if analogues:
+            said.append(("a synthetic analogue" if len(analogues) == 1 else "synthetic analogues")
+                        + " of a natural substrate (a phosphonate, deoxy, halo, aza or carba form), "
+                          "not a compound the enzyme meets in the cell"
+                        if not glyco else
+                        ", ".join(analogues[:3]) + (" is a synthetic analogue" if len(analogues) == 1
+                                                     else " are synthetic analogues")
+                        + " of a natural substrate")
+        if glyco:
+            said.append((", ".join(glyco[:3]) + (" is" if len(glyco) == 1 else " are") + " "
+                         if analogues else "")
+                        + ("a glycoprotein or glycoconjugate" if len(glyco) == 1
+                           else "glycoproteins or glycoconjugates")
+                        + ", whose molar Km rests on an assumed molecular weight and sugar content")
+        one = len(copies) == 1
+        how += ("; " + ", ".join(copies[:3]) + (" has" if one else " have")
+                + " both a Km and a kcat row, but " + ("it is " if one else "they are ")
+                + "; ".join(said) + f", so {'it ranks' if one else 'they rank'} after the defined "
+                  "natural substrates, and the kcat stays a placeholder unless the search finds one")
     if isoform and r["km"] and counts.names_isoform(best, tables) and any(
             not counts.names_isoform(k, tables) and total(k) > total(best) for k in candidates):
         how += f"; substrates whose rows do not name {isoform} rank after it"
@@ -1484,8 +1618,9 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
         how += "; " + "; ".join(
             f"{counts.name(k)} has more rows ({_described_counts(rows(k))}), but only "
             f"{_described_counts({t: counts.own(k, t) for t in tables})} measured the enzyme's own "
-            f"constant (the rest with an effector present, or the treated arm of its paper's "
-            f"presence/absence experiment), against {own_total(best)} here"
+            f"constant (the rest measured a construct or altered preparation, an assay with an "
+            f"effector present, or the treated arm of its paper's presence/absence experiment), "
+            f"against {own_total(best)} here"
             for k in effected[:2])
     polymers = [counts.name(k) for k in candidates if is_macromolecule(counts.name(k))
                 and k not in named and total(k) > total(best) and has_both(k) == has_both(best)]
@@ -1774,7 +1909,48 @@ def neighbour_of(ec: str, table: str, compound: str, organism: Optional[str],
             and abs(r.value - float(value)) <= 1e-9 * max(1.0, abs(float(value)))]
     if not same or any(_group_key(r.compound) == want for r in same):
         return None
+    every = table_rows(ec, table, None)
+    if all(stereo_twin(r.compound, compound, [x.compound for x in every]) for r in same):
+        return None
     return tuple(sorted({r.compound for r in same}))
+
+
+#: A configuration descriptor written before a name: D-, L-, DL-, (R)-, (S)-,
+#: (2S)-. Not an anomer (alpha-, beta-), which names another compound.
+_CONFIGURATION = re.compile(r"^(?:[DL]{1,2}|\((?:\d+[a-z]?)?[RS]\)|\(\+\)|\(-\))-(?=\S)", re.IGNORECASE)
+
+
+def _configuration_of(name: str) -> Tuple[str, str]:
+    """(descriptor, the name after it): ("D", "fructose 1-phosphate") for
+    "D-Fructose 1-phosphate"; ("", name) when it carries none."""
+    text = " ".join((name or "").split())
+    m = _CONFIGURATION.match(text)
+    if not m:
+        return "", text
+    return m.group(0)[:-1].upper(), text[m.end():]
+
+
+def stereo_twin(compound: str, target: str, listed: Iterable[str] = ()) -> bool:
+    """Whether `compound` is `target` with a configuration descriptor that
+    `target` leaves out ("D-Fructose 1-phosphate" for "fructose
+    1-phosphate"), and the page lists no other configuration of it (no
+    "L-fructose 1-phosphate" in `listed`), so the bare name can mean no
+    other form.
+
+    Aldolase B and fructose 1-phosphate in human: BRENDA lists both
+    spellings, the search took the D- row, and that row was withheld as
+    another compound's, leaving both constants placeholders; the advice to
+    pass --substrate "D-Fructose 1-phosphate" was the only way to a value
+    (sixth round, NEW-03). A name inside a longer name is still not the
+    compound: "2-deoxy-D-glucose" is no twin of "glucose", since only a
+    leading descriptor is read."""
+    mine, body = _configuration_of(compound)
+    theirs, wanted = _configuration_of(target)
+    if not mine or theirs or _group_key(body) != _group_key(wanted):
+        return False
+    forms = {_configuration_of(n)[0] for n in listed
+             if _group_key(_configuration_of(n)[1]) == _group_key(body)} - {""}
+    return forms <= {mine}
 
 
 def rows_of_value(ec: str, table: str, organism: Optional[str], value: float,
@@ -1866,9 +2042,42 @@ def organisms_with_isoform(ec: str, isoform: Optional[str]) -> Tuple[str, ...]:
     return tuple(sorted(set(out), key=lambda o: (o != PREFERRED_ORGANISM, o)))
 
 
+#: Enzymes whose name, said with no organism, means one organism's enzyme:
+#: (EC, the name as typed, the organism, what the name means). "RNase A" is
+#: bovine pancreatic ribonuclease, and was modelled as human RNASE1 because
+#: Homo sapiens covered both constants (sixth round, NEW-13); "lysozyme" is
+#: hen egg-white lysozyme, the reference enzyme, and was modelled in a
+#: chiton, Liolophura japonica, from one paper (XS5R2-10); beta-galactosidase
+#: is E. coli LacZ, the ONPG enzyme (NEW-16). The organism the name means is
+#: used when it covers as many of the model's constants as the organism
+#: chosen without it, and is otherwise named first among the others.
+IMPLIED_ORGANISMS: Tuple[Tuple[str, "re.Pattern[str]", str, str], ...] = (
+    ("4.6.1.18", re.compile(r"\b(?:ribonuclease|rnase)[- ]?a\b|\bpancreatic ribonuclease\b",
+                            re.IGNORECASE),
+     "Bos taurus", "RNase A is bovine pancreatic ribonuclease"),
+    ("3.2.1.17", re.compile(r"^\s*(?:hen\s+egg[- ]?white\s+|egg[- ]?white\s+|c-type\s+)?lysozyme\b",
+                            re.IGNORECASE),
+     "Gallus gallus", "lysozyme with no source named is hen egg-white lysozyme, the reference enzyme"),
+    ("3.2.1.23", re.compile(r"^\s*(?:beta|β|b)[- ]?galactosidase\b|\blac ?z\b", re.IGNORECASE),
+     "Escherichia coli", "beta-galactosidase with no source named is E. coli LacZ, the reference "
+                         "enzyme for ONPG and lactose"),
+)
+
+
+def implied_organism(ec: str, typed: Optional[str]) -> Optional[Tuple[str, str]]:
+    """(organism, why) when the enzyme's name as typed means one organism's
+    enzyme (`IMPLIED_ORGANISMS`), else None."""
+    if not typed:
+        return None
+    for code, pattern, organism, why in IMPLIED_ORGANISMS:
+        if code == ec and pattern.search(typed):
+            return organism, why
+    return None
+
+
 def choose_organism(ec: str, substrate: Optional[str] = None, inhibitor: Optional[str] = None, *,
                     needs: Sequence[str] = ("km", "kcat"), strict: bool = False,
-                    isoform: Optional[str] = None) -> Optional[Choice]:
+                    isoform: Optional[str] = None, named_as: Optional[str] = None) -> Optional[Choice]:
     """The organism whose rows cover the most of what the model needs
     (`needs`: "km", "kcat", "ki"), for `substrate` and `inhibitor` when they
     are named; None when no organism has a row for the first of `needs`
@@ -1877,7 +2086,8 @@ def choose_organism(ec: str, substrate: Optional[str] = None, inhibitor: Optiona
     names so are chosen among (`organisms_with_isoform`), when it names any."""
     try:
         return _choose_organism(ec, substrate, inhibitor, tuple(needs),
-                                organisms_with_isoform(ec, isoform), isoform)
+                                organisms_with_isoform(ec, isoform), isoform,
+                                implied_organism(ec, named_as))
     except Exception:  # noqa: BLE001
         if strict:
             raise
@@ -1886,12 +2096,16 @@ def choose_organism(ec: str, substrate: Optional[str] = None, inhibitor: Optiona
 
 def _choose_organism(ec: str, substrate: Optional[str], inhibitor: Optional[str],
                      needs: Tuple[str, ...], among: Tuple[str, ...] = (),
-                     isoform: Optional[str] = None) -> Optional[Choice]:
+                     isoform: Optional[str] = None,
+                     implied: Optional[Tuple[str, str]] = None) -> Optional[Choice]:
     needs = tuple(t for t in ("km", "kcat", "ki") if t in needs or (t == "ki" and inhibitor))
     if not needs:
         return None
     named = {"km": substrate, "kcat": substrate, "ki": inhibitor}
     per: Dict[str, Dict[str, int]] = {}
+    # The papers behind an organism's rows: one paper's temperature series
+    # is one measurement, not nine (sixth round, XS5R2-02).
+    refs: Dict[str, set] = {}
     # Per organism and substrate, which tables have a row: a substrate with
     # a Km in one organism and a kcat only in another covers one constant
     # in each, not two.
@@ -1903,6 +2117,7 @@ def _choose_organism(ec: str, substrate: Optional[str], inhibitor: Optional[str]
             if named[table] and not _matches(row.compound, named[table]):
                 continue
             per.setdefault(row.organism, {t: 0 for t in needs})[table] += 1
+            refs.setdefault(row.organism, set()).add(row.reference_id or f"{table}:{row.value}")
             if table in ("km", "kcat"):
                 pair.setdefault(row.organism, {}).setdefault(_group_key(row.compound), set()).add(table)
     anchor = needs[0]
@@ -1918,6 +2133,7 @@ def _choose_organism(ec: str, substrate: Optional[str], inhibitor: Optional[str]
                     if named[table] and not _matches(row.compound, named[table]):
                         continue
                     per.setdefault(organism, {t: 0 for t in needs})[table] += 1
+                    refs.setdefault(organism, set()).add(row.reference_id or f"{table}:{row.value}")
                     if table in ("km", "kcat"):
                         pair.setdefault(organism, {}).setdefault(_group_key(row.compound), set()).add(table)
         organisms = [o for o, r in per.items() if r.get(anchor, 0) > 0]
@@ -1977,20 +2193,43 @@ def _choose_organism(ec: str, substrate: Optional[str], inhibitor: Optional[str]
         except Exception:  # noqa: BLE001
             return True
 
+    def papers(o: str) -> int:
+        return len(refs.get(o, ()))
+
     def rank(o: str) -> tuple:
-        return (without_named_ki(o), -covered(o), -sum(per[o].values()), -breadth(o), unindexed(o), o)
+        return (without_named_ki(o), -covered(o), -papers(o), -sum(per[o].values()), -breadth(o),
+                unindexed(o), o)
 
     ranked = sorted(organisms, key=rank)
     full = len(needs)
     human = PREFERRED_ORGANISM in organisms and covered(PREFERRED_ORGANISM) == full
-    best = PREFERRED_ORGANISM if human else ranked[0]
-    if human:
+    otherwise = PREFERRED_ORGANISM if human else ranked[0]
+    # The organism the name means is used when it covers as many constants
+    # as the organism chosen without it: hen egg-white lysozyme has Km rows
+    # and no kcat row, and a model with a placeholder is not a better answer
+    # than one fully measured in another organism. It is then named first
+    # among the others.
+    meant = implied[0] if (implied and implied[0] in organisms and not without_named_ki(implied[0])
+                           and covered(implied[0]) >= covered(otherwise)) else None
+    meant_short = (implied[0] if implied and meant is None and implied[0] in per
+                   and implied[0] != otherwise else None)
+    human = meant is None and human
+    best = meant or otherwise
+    if best != ranked[0]:
         ranked = [best] + [o for o in ranked if o != best]
+    if meant_short and meant_short in ranked:
+        ranked = [ranked[0], meant_short] + [o for o in ranked[1:] if o != meant_short]
     what = ", ".join(
         f"{TABLE_NAMES[t]}" + (f" for {named[t]}" if named[t] else "") for t in needs)
     r = per[best]
     counts = ", ".join(f"{r[t]} {TABLE_NAMES[t]}" for t in needs)
-    if human:
+    if meant:
+        lacking = [TABLE_NAMES[t] for t in needs if not r.get(t)]
+        how = (f"{implied[1]}, and it has rows for {covered(best)} of the {full} constant(s) this "
+               f"model needs ({what}: {counts})"
+               + (f"; its {' and '.join(lacking)} stays a placeholder unless the search finds one, "
+                  f"rather than another organism's enzyme standing in for it" if lacking else ""))
+    elif human:
         how = (f"{PREFERRED_ORGANISM} is used when it has rows for every constant this model needs "
                f"({what}), and it does ({counts})")
     else:
@@ -2010,7 +2249,18 @@ def _choose_organism(ec: str, substrate: Optional[str], inhibitor: Optional[str]
         on_rows = _tied(ranked, rank, drop=3)
         on_breadth = _tied(ranked, rank, drop=2)
         tied = _tied(ranked, rank)
-        most = "as many rows as any other" if on_rows else "the most rows"
+        on_papers = _tied(ranked, rank, drop=4)
+        most = ("as many rows as any other" if on_rows else "the most rows")
+        most = (f"the most papers ({papers(best)})" if not on_papers else
+                f"as many papers as any other ({papers(best)})") + f", then {most},"
+        fewer_papers = [o for o in organisms if o != best and covered(o) == covered(best)
+                        and not without_named_ki(o) and sum(per[o].values()) > sum(per[best].values())
+                        and papers(o) < papers(best)]
+        if fewer_papers:
+            o = fewer_papers[0]
+            named_first += (f"; {o} has more rows ({sum(per[o].values())}), but from "
+                            f"{_plural(papers(o), 'paper')}, and organisms are ranked by papers: one "
+                            f"paper's temperature or condition series is one study, not many")
         broke = [o for o in on_rows if o not in on_breadth]
         by_breadth = (f"; it ties on those rows with {_shown(broke)}, and has more Km and kcat rows "
                       f"of every compound under EC {ec} ({breadth(best)} against at most "
@@ -2024,9 +2274,46 @@ def _choose_organism(ec: str, substrate: Optional[str], inhibitor: Optional[str]
         how = (f"it has rows for {covered(best)} of the {full} constant(s) this model needs "
                f"({what}) and {most} of those that do ({counts}){lacking}{named_first}"
                f"{by_breadth}{_tie_clause(tied)}")
-    why = f"of the {_plural(len(organisms), 'organism')} with rows under EC {ec}{limited}, {how}"
+    others_only = sorted((o for o in per if o not in organisms and any(per[o].values())),
+                         key=lambda o: (-sum(per[o].values()), o))
+    also = ""
+    if others_only and not among:
+        # "2 organisms with rows" for lysozyme, while Homo sapiens has a kcat
+        # row (sixth round, XS5R2-10): every organism with rows is counted.
+        also = (f" with a {TABLE_NAMES[anchor]} row (and {len(others_only)} more with rows for other "
+                f"constants only: " + "; ".join(
+                    f"{o} ({', '.join(f'{n} {TABLE_NAMES[t]}' for t, n in per[o].items() if n)})"
+                    for o in others_only[:3]) + (" and more" if len(others_only) > 3 else "") + ")")
+    if meant_short:
+        theirs = per[meant_short]
+        how += (f"; {implied[1]}, but {meant_short} has rows for fewer of them ("
+                + ", ".join(f"{theirs.get(t, 0)} {TABLE_NAMES[t]}" for t in needs)
+                + f"), so a model of it would keep a placeholder; pass --organism "
+                  f"\"{meant_short}\" to model it all the same")
+    why = (f"of the {_plural(len(organisms), 'organism')} with rows under EC {ec}{also}{limited}, "
+           f"{how}{_subtypes_clause(best, per)}")
     alternatives = tuple(Option(o, dict(per[o])) for o in ranked[1:1 + ALTERNATIVES_NAMED])
     return Choice("organism", best, why, alternatives, len(organisms), dict(r))
+
+
+def _subtypes_clause(best: str, per: Mapping[str, Mapping[str, int]]) -> str:
+    """"; BRENDA files more of influenza A virus's rows under its subtypes
+    (...)": the organisms whose name is the chosen one's with a strain or
+    subtype after it, counted apart because the search takes one organism's
+    rows; said so the reader can model one (sixth round, NEW-11: the
+    standard MUNANA pair is filed under "influenza A virus H1N1")."""
+    if _BINOMIAL.fullmatch(best):
+        return ""
+    under = sorted((o for o in per if o != best and o.startswith(best + " ") and any(per[o].values())),
+                   key=lambda o: (-sum(per[o].values()), o))
+    if not under:
+        return ""
+    return ("; BRENDA files more of " + best + "'s rows under its subtypes or strains ("
+            + "; ".join(f"{o}: {', '.join(f'{n} {TABLE_NAMES[t]}' for t, n in per[o].items() if n)}"
+                        for o in under[:4])
+            + (" and more" if len(under) > 4 else "")
+            + "), each an organism of its own to the search; pass --organism with one of them to "
+              "model it")
 
 
 # ---------------------------------------------------------------------------

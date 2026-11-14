@@ -94,7 +94,10 @@ def test_the_substrate_is_the_best_measured_with_the_cosubstrate_set_aside(recor
     # Counted as the search counts: 12 of the 25 Km rows and 48 of the 61
     # kcat rows measured a mutant or an isozyme, which it withholds.
     assert "not counted, because the search cannot use them: 60 rows of a variant" in choice.why
-    assert [o.name for o in choice.alternatives][:3] == ["2-deoxy-D-glucose", "D-mannose", "D-fructose"]
+    # 2-deoxy-D-glucose is a synthetic analogue of D-glucose: since the sixth
+    # round (NEW-12) it ranks after the natural sugars, its kcat row or not.
+    assert [o.name for o in choice.alternatives][:2] == ["D-mannose", "D-fructose"]
+    assert "2-deoxy-D-glucose" in [o.name for o in choice.alternatives]
 
 
 def test_a_model_without_a_kcat_ranks_by_km_alone(recorded):
@@ -430,7 +433,9 @@ def test_the_studio_result_carries_each_choice_in_order(tmp_path):
     assert [c["role"] for c in search["choices"]] == ["substrate"]
     (choice,) = search["choices"]
     assert choice["chosen"] == "D-glucose" and choice["considered"] == 10
-    assert choice["alternatives"][0] == {"name": "2-deoxy-D-glucose", "rows": {"km": 4, "kcat": 1}}
+    # A synthetic analogue (2-deoxy-D-glucose) ranks after the natural
+    # sugars since the sixth round (NEW-12).
+    assert choice["alternatives"][0] == {"name": "D-mannose", "rows": {"km": 4, "kcat": 0}}
     assert choice["rows"] == {"km": 13, "kcat": 13} and choice["instead"] is None
     assert search["substrate"] == "D-glucose" and search["measured"] == 2
     assert any(n.startswith("No substrate was named, so Caterva used D-glucose:")
@@ -755,7 +760,10 @@ def test_an_organism_tie_broken_by_name_is_said_to_be_one(monkeypatch):
                          "kcat": [_row("x", organism="Boops boops"), _row("x", organism="Sparus aurata")]})
     choice = defaults.choose_organism("3.4.21.4", needs=("km", "kcat"))
     assert choice.chosen == "Boops boops"
-    assert "as many rows as any other of those that do" in choice.why
+    # Organisms are ranked by papers, then rows, since the sixth round
+    # (XS5R2-02): one paper's series is one study.
+    assert "as many papers as any other (1), then as many rows as any other, of those that do" \
+        in choice.why
     assert "tied on every count with Sparus aurata, and was taken first by name" in choice.why
 
 

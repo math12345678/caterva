@@ -1711,6 +1711,12 @@ def _substrate_from(args: Any, reading: Any, out: DescriptionReading) -> bool:
         return False
     listed = _read_substrates(ec, args.organism)
     candidates = _not_organism_words(ec, tuple(reading.substrate_candidates), listed)
+    if not candidates:
+        # Every word was the organism's ("influenza" for influenza
+        # neuraminidase): no word is left to say was not a substrate, and
+        # the notes read "No word of your description () is ..." (sixth
+        # round, NEW-11).
+        return False
     shown = ", ".join(repr(c) for c in candidates[:4])
     where = f" for {args.organism}" if args.organism else ""
     if listed is None:
@@ -2346,6 +2352,19 @@ def _km_organisms_usable(ec: str) -> Dict[str, int]:
     return {o: n for o, n in counts.items() if n > 0}
 
 
+def _enzyme_words(args: Any) -> Optional[str]:
+    """The enzyme's name as the user typed it ("ribonuclease A", "lysozyme"),
+    for the organism a name implies (`defaults.IMPLIED_ORGANISMS`); None when
+    only an EC number was given."""
+    text = getattr(args, "enzyme_text", None)
+    if not isinstance(text, str) or not text.strip():
+        subject = getattr(args, "subject", None)
+        text = subject if isinstance(subject, str) else None
+    if not text or re.fullmatch(r"[\d.\-n]+", text.strip()):
+        return None
+    return text
+
+
 def _organism_has_no_rows(ec: str, organism: str, enzyme_text: Optional[str] = None) -> Optional[str]:
     """The refusal for an organism the user NAMED that has no Km row for
     `ec` at all, listing the organisms that do; None when it has rows, or
@@ -2504,7 +2523,7 @@ def _choose_what_was_not_named(model: Any, args: Any) -> Tuple[Any, Optional[str
     if not args.organism and (needs_substrate or needs_inhibitor or args.substrate):
         chosen = defaults.choose_organism(
             ec, substrate=args.substrate or None, inhibitor=inhibitor, needs=tables or ("km",),
-            isoform=getattr(args, "isoform", None) or None)
+            isoform=getattr(args, "isoform", None) or None, named_as=_enzyme_words(args))
         if chosen is not None:
             args.organism = chosen.chosen
             _remember(args, organism_chosen=True)
@@ -2577,9 +2596,25 @@ def _choose_what_was_not_named(model: Any, args: Any) -> Tuple[Any, Optional[str
                 except Exception:  # noqa: BLE001
                     wild = None
                 if wild is not None:
+                    # Whether any organism has the mutant's row: "no Km row in
+                    # Bos taurus measures H12A" read as if another organism's
+                    # did, and none does (sixth round, NEW-13).
+                    try:
+                        token = re.compile(rf"(?<![A-Za-z0-9]){re.escape(str(mutation))}(?![0-9])")
+                        elsewhere = sorted({r.organism for r in defaults.table_rows(ec, "km", None)
+                                            if r.organism and r.organism != args.organism
+                                            and token.search(r.conditions or "")})
+                    except Exception:  # noqa: BLE001 - said as before
+                        elsewhere = None
+                    anywhere = ""
+                    if elsewhere == [] and where:
+                        anywhere = f" (nor does any row in another organism)"
+                    elif elsewhere:
+                        anywhere = (f" (rows in {', '.join(elsewhere[:3])} do; pass --organism with "
+                                    f"one of them to model the mutant there)")
                     return replace(model, choices=tuple(choices)), (
                         f"No search was run: no Km row{where} under EC {ec} measures the mutant "
-                        f"{mutation}, and naming a substrate will not change that: BRENDA's rows"
+                        f"{mutation}{anywhere}, and naming a substrate will not change that: BRENDA's rows"
                         f"{where} are of the wild type or other variants. To model the wild-type "
                         f"enzyme instead, re-run without {mutation} in the description (Caterva "
                         f"would then use {wild.chosen}), or supply the mutant's constants yourself.")
@@ -2757,8 +2792,10 @@ def _search_resolved(
         not_found.update(_organism_chosen_said(not_found))
         said = {k: not_found[k] for k in said}
     withheld.update({k: said[k] for k in withheld if k in said})
-    far = _far_from_other_organisms(model, measured, ec, args.organism)
-    selection_notes = list(chosen.notes) + far + _filed_under_other_names(model, measured, ec)
+    far = (_far_from_other_organisms(model, measured, ec, args.organism)
+           + _far_from_other_papers(model, measured, ec, args.organism))
+    selection_notes = (list(chosen.notes) + far + _ranges_left_out(model, measured, ec, args.organism)
+                       + _filed_under_other_names(model, measured, ec))
     cautions = tuple((note[1:note.index("`", 1)], note.split(": ", 1)[1]) for note in far
                      if note.startswith("`") and ": " in note)
     if getattr(args, "isoform", None):
@@ -3455,7 +3492,16 @@ def _available_elsewhere(ec: str, table: str, compound: Optional[str], reason: s
             # human LDHA), then by rows.
             near = {o: n for o, n in silent.items() if o in orthologs}
             far = {o: n for o, n in silent.items() if o not in orthologs}
-            listed = "; ".join(x for x in (_counted(near), _counted(far)) if x)
+            if orthologs and far:
+                # Organisms Caterva lists no such protein for are said apart:
+                # PARP1's kcat advice offered Aeromonas hydrophila and
+                # Streptomyces scabiei, whose rows under EC 2.4.2.30 are
+                # bacterial toxins', beside rat (sixth round, NEW-09).
+                apart = (f"in organisms Caterva lists no {isoform} for, where the enzyme under this "
+                         f"EC number may be another protein altogether: {_counted(far)}")
+                listed = "; ".join(x for x in (_counted(near), apart) if x)
+            else:
+                listed = "; ".join(x for x in (_counted(near), _counted(far)) if x)
             parts.append(f"rows naming no isoform, so whether they measured {isoform}'s counterpart is "
                          f"unknown: {listed}")
         if other:
@@ -3611,6 +3657,134 @@ def _pairing_said_after_windows(measured: Dict[str, Any]) -> Dict[str, Any]:
             except (TypeError, ValueError):
                 pass
     return out
+
+
+#: How far (fold) a carried Km or kcat may sit from the median of the other
+#: papers' rows for the compound in its organism before the report says so.
+FAR_FROM_OTHER_PAPERS = 100.0
+
+
+def _far_from_other_papers(model: Any, measured: Mapping[str, Any], ec: Optional[str],
+                           organism: Optional[str]) -> List[str]:
+    """Notes for a carried Km or kcat lying more than FAR_FROM_OTHER_PAPERS
+    from the median of the wild-type rows other papers give for the compound
+    in the organism (at least two other papers).
+
+    Human aldolase B and fructose 1-phosphate: ref 651313's wild-type Km,
+    0.0022 mM, is carried as the row naming ALDOB, and every other paper's
+    human row lies at 0.24 to 3.7 mM: 100 to 1700 times higher, the mark of
+    a mM/uM slip in the database (sixth round, NEW-03). The row is real and
+    it is carried; the reader is told how far it sits."""
+    if not ec or not organism or not measured:
+        return []
+    from statistics import median
+
+    from caterva.compose import defaults
+
+    notes: List[str] = []
+    for q in getattr(model, "resolvable", ()) or ():
+        m = measured.get(q.parameter_id)
+        if m is None or q.table not in ("km", "kcat"):
+            continue
+        compound = model.compound_for(q)
+        ref = getattr(m, "reference_id", None)
+        if ref is None:
+            cited = re.search(r"BRENDA ref (\d+)", str(getattr(m, "citation", "") or ""))
+            ref = cited.group(1) if cited else None
+        try:
+            value = float(m.value)
+            rows = defaults.table_rows(ec, q.table, organism)
+        except Exception:  # noqa: BLE001
+            continue
+        if not compound or not ref or value <= 0:
+            continue
+        names = [r.compound for r in rows]
+        others = [r for r in rows if str(r.reference_id) != str(ref) and r.value and not r.flagged
+                  and not r.variant and (defaults._matches(r.compound, compound)
+                                         or defaults.stereo_twin(r.compound, compound, names))]
+        papers = {r.reference_id for r in others}
+        if len(papers) < 2:
+            continue
+        mid = median(float(r.value) for r in others)
+        fold = max(value / mid, mid / value)
+        if fold < FAR_FROM_OTHER_PAPERS:
+            continue
+        side = "below" if value < mid else "above"
+        # A paper that agrees is said: ref 651985's 0.0024 mM beside ref
+        # 651313's 0.0022 mM (aldolase B, 22°C) is not a lone slip.
+        near = sorted({(str(r.reference_id), float(r.value)) for r in others
+                       if max(float(r.value) / value, value / float(r.value)) <= 3.0})
+        agree = ""
+        if near:
+            agree = ("; only " + ", ".join(f"BRENDA ref {p} ({v:g} {m.unit})" for p, v in near[:3])
+                     + " comes near it, so read those papers together")
+        notes.append(
+            f"`{q.parameter_id}`: {m.value:g} {m.unit} (BRENDA ref {ref}) lies {fold:.2g}-fold {side} "
+            f"the median ({mid:g} {m.unit}) of the {len(others)} wild-type rows {len(papers)} other "
+            f"papers give for {compound} in {organism}{agree}: read that paper before relying on it "
+            "(a unit or transcription slip in the database is possible)")
+    return notes
+
+
+_MUTANT_WORDS = re.compile(r"\bmutant|\bvariant|\b[A-Z]\d{1,4}[A-Z]\b|\bdes-")
+
+
+def _ranges_left_out(model: Any, measured: Mapping[str, Any], ec: Optional[str],
+                     organism: Optional[str]) -> List[str]:
+    """Notes for the rows the carried value's own paper gives as a range for
+    the same compound (`defaults.ranges_of_paper`), which no spread counts.
+    Human trypsin, ref 678332: kcat "20 - 50" 1/s beside the carried 88.2
+    1/s, under the same stated conditions (sixth round, R5A2-03)."""
+    if not ec or not measured:
+        return []
+    from caterva.compose import defaults
+
+    notes: List[str] = []
+    for q in getattr(model, "resolvable", ()) or ():
+        m = measured.get(q.parameter_id)
+        if m is None or q.table not in ("km", "kcat", "ki"):
+            continue
+        ref = getattr(m, "reference_id", None)
+        if ref is None:
+            cited = re.search(r"BRENDA ref (\d+)", str(getattr(m, "citation", "") or ""))
+            ref = cited.group(1) if cited else None
+        where = getattr(m, "organism", None) or organism
+        compound = model.compound_for(q)
+        # The carried row's paper first, then the other papers the spread
+        # counts: once trypsin carried ref 772843's pair, ref 678332 was
+        # still among the spread's sources, and its range still unsaid.
+        papers = [str(ref)] if ref else []
+        for row in getattr(m, "alternatives", ()) or ():
+            other = str(row.get("reference_id") or "") if isinstance(row, dict) else ""
+            if other and other not in papers:
+                papers.append(other)
+        said = []
+        for paper in papers:
+            try:
+                ranges = defaults.ranges_of_paper(ec, q.table, where, paper)
+            except Exception:  # noqa: BLE001
+                continue
+            # Wild-type rows only: a mutant's range is no rival of the
+            # wild-type value carried (chymotrypsin's "3 - 6" 1/s is mutant
+            # D236R's).
+            ranges = [r for r in ranges if (not compound or defaults._matches(r[1], compound)
+                                            or defaults._group_key(r[1]) == defaults._group_key(compound))
+                      and not _MUTANT_WORDS.search(r[2] or "")]
+            if not ranges:
+                continue
+            shown = "; ".join(f"{v} {m.unit}" + (f" ({' '.join(c.split())})" if c else "")
+                              for v, _, c in ranges[:3])
+            whose = ("the carried row's paper" if paper == str(ref)
+                     else "one of the papers whose values are counted above")
+            said.append(f"BRENDA ref {paper}, {whose}, also gives "
+                        f"{'a range' if len(ranges) == 1 else f'{len(ranges)} ranges'} for "
+                        f"{compound}: {shown}")
+        if said:
+            notes.append(
+                f"`{q.parameter_id}`: " + ". ".join(said) + ". A range is used only where a "
+                "compound has no single value, so it is not among the values counted above; read "
+                "the paper for what it spans")
+    return notes
 
 
 #: How far (fold) a carried Ki may sit from the same compound's Ki rows in

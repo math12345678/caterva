@@ -618,7 +618,8 @@ def _row_kind_concerns(model: Any) -> List[Concern]:
                 detail=f"`{name}`: {sentence}",
                 remedy="read the cited paper before relying on the value, or pass the constant "
                        "yourself",
-                qualifier=f"{name} lies far from every other organism's rows for its compound"))
+                qualifier=(f"{name} lies far from the other rows for its compound (other organisms' or "
+                           "other papers')")))
     try:
         from caterva.compose.row_scope import ASSAY_SUBSTRATE, IRREVERSIBLE, read_scope
     except ImportError:  # pragma: no cover

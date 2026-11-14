@@ -236,7 +236,10 @@ def test_the_search_takes_every_spelling_and_the_native_row():
 @pytest.mark.parametrize("commentary, what", [
     ("human serum albumin-bound enzyme, pH 5.2, 37°C", "an enzyme bound to a carrier"),
     ("reaction catalyzed by the catalyctic domain of the enzyme", "an isolated domain"),
-    ("pH 8.0, 37°C, uncleaved enzyme, nonsulfated", "a modification state of the enzyme"),
+    # "uncleaved enzyme, nonsulfated" is the intact enzyme since the sixth
+    # round (R5A2-04); sulfation is still a modification of it.
+    ("pH 8.0, 37°C, uncleaved enzyme, sulfated", "a modification state of the enzyme"),
+    ("pH 8.0, 37°C, cleaved enzyme, nonsulfated", "a modification state of the enzyme"),
 ])
 def test_an_altered_preparation_is_read(commentary, what):
     assert (row_form.construct_of(commentary) or "").startswith(what)
