@@ -521,7 +521,11 @@ def test_an_entry_name_outside_the_symbol_table_is_refused_with_its_enzyme_not_d
     amb = reading.ambiguity
     assert amb is not None and amb.confirm_only, text
     assert ec in {c.ec for c in amb.candidates}
-    assert "entry name" in amb.reason and "--isoform" in amb.reason
+    # Since the sixth round of the real-values review GSK3B is read as what
+    # UniProt says it is, the gene symbol of GSK3B_HUMAN, not only as an
+    # entry name to confirm. The protein is under several EC numbers, so it
+    # is still a choice; `compose` settles it by the rows that name GSK3B.
+    assert "gene symbol" in amb.reason and amb.gene == "GSK3B"
 
 
 @pytest.mark.parametrize("text", [

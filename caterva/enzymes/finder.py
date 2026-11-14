@@ -255,6 +255,15 @@ def _within(a: str, b: str, limit: int) -> Optional[int]:
     return previous[-1] if previous[-1] <= limit else None
 
 
+def _head_word_limit(q: str, w: str) -> int:
+    """One edit for a five-letter last word whose near word in a name is an
+    enzyme's head word ending -ase: "phosphoglycerate kinse" got the shape
+    refusal and no suggestion, because no five-letter word may carry a typo
+    (sixth round of the real-values review). Only beside other words that
+    match (the caller's rule), never for a one-word query."""
+    return 1 if len(q) == 5 and q.isalpha() and len(w) >= 6 and w.endswith("ase") else 0
+
+
 def _typo_limit(length: int) -> int:
     """Edits allowed for a query this long. None below six characters: a
     four-letter abbreviation is within one edit of unrelated abbreviations,
@@ -426,6 +435,12 @@ class Ambiguous:
     #: dehydrogenase"). Unlike a bare class word, the organism can settle it
     #: when only one of the family lists its protein and has its rows.
     family: bool = False
+    #: The gene symbol the query is, when it is one protein's gene symbol
+    #: (UniProt) and the nomenclature lists that protein under several EC
+    #: numbers: "AKR1C3" is P42330, under seven (sixth round of the
+    #: real-values review). The candidates are those EC numbers; the rows
+    #: naming the protein can settle which one (`compose`).
+    gene: Optional[str] = None
 
 
 Resolution = (Resolved, Ambiguous)
@@ -563,6 +578,12 @@ def _order(candidate: Candidate, organism_known: bool) -> tuple:
     return (
         candidate.tier,
         candidate.distance,
+        # A typo is ranked by the organism before its leftover words: "rabbit
+        # phosphoglucomutse" is one letter from beta-phosphoglucomutase (EC
+        # 5.4.2.6, bacterial) and from phosphoglucomutase (EC 5.4.2.2, which
+        # lists rabbit PGM1), and the refusal recommended the one with no
+        # rabbit protein (sixth round of the real-values review).
+        (0 if (candidate.has_organism_protein or not organism_known) else 1) if candidate.via == "typo" else 0,
         candidate.spare,
         # Inside a tier the abbreviation table's own readings come first, in its order.
         0 if candidate.via == "abbreviation" else 1,
@@ -630,7 +651,8 @@ class _Hit:
 
 
 def _typo_distance(q_tokens: Sequence[str], window: Sequence[str], limit: int, vocabulary: frozenset = frozenset(),
-                   memo: Optional[Dict[Tuple[str, str], Optional[int]]] = None) -> Optional[int]:
+                   memo: Optional[Dict[tuple, Optional[int]]] = None,
+                   short_head: bool = False) -> Optional[int]:
     """Total edits between a query and a run of a name's words, or None.
 
     Only a word of six letters or more may carry an edit (`_typo_limit`), and
@@ -647,14 +669,16 @@ def _typo_distance(q_tokens: Sequence[str], window: Sequence[str], limit: int, v
     if len(q_tokens) != len(window):
         return None
     total = 0
-    for q, w in zip(q_tokens, window):
+    last = len(q_tokens) - 1
+    for k, (q, w) in enumerate(zip(q_tokens, window)):
         if q == w:
             continue
-        key = (q, w)
+        head = short_head and k == last
+        key = (q, w, head)
         if memo is not None and key in memo:
             d = memo[key]
         else:
-            per_word = _typo_limit(len(q))
+            per_word = _typo_limit(len(q)) or (_head_word_limit(q, w) if head else 0)
             if not per_word or any(ch.isdigit() for ch in q + w) or q in vocabulary:
                 d = None
             else:
@@ -826,15 +850,21 @@ def _search(query: str, code: Optional[str], index: EnzymeIndex) -> List[Candida
         return []
     q_tokens = q_loose.split()
     n_words = len(q_tokens)
+    # The last word of several, the others words of names: it may be a
+    # five-letter head word mistyped ("kinse" for kinase, `_head_word_limit`).
+    short_head = n_words > 1 and all(q in tables.vocabulary for q in q_tokens[:-1])
     typo: Dict[str, Tuple[int, str, List[str]]] = {}
-    memo: Dict[Tuple[str, str], Optional[int]] = {}
+    memo: Dict[tuple, Optional[int]] = {}
     # Each query word is compared once with each distinct word of every name;
     # a name none of whose words is near one of the query's cannot match.
     near: List[frozenset] = []
-    for q in q_tokens:
+    for k, q in enumerate(q_tokens):
+        head = short_head and k == n_words - 1
+        per_word = _typo_limit(len(q)) or (1 if head and len(q) == 5 else 0)
         close = {q}
         for w in tables.vocabulary:
-            if w != q and _typo_distance((q,), (w,), _typo_limit(len(q)), tables.vocabulary, memo) is not None:
+            if w != q and _typo_distance((q,), (w,), per_word, tables.vocabulary, memo,
+                                         short_head=head) is not None:
                 close.add(w)
         near.append(frozenset(close))
     for name in tables.names:
@@ -845,12 +875,16 @@ def _search(query: str, code: Optional[str], index: EnzymeIndex) -> List[Candida
             continue
         distance = None
         for i in range(len(tokens) - n_words + 1):
-            d = _typo_distance(q_tokens, tokens[i:i + n_words], limit, tables.vocabulary, memo)
+            d = _typo_distance(q_tokens, tokens[i:i + n_words], limit, tables.vocabulary, memo,
+                               short_head=short_head)
             if d is not None and (distance is None or d < distance):
                 distance = d
         if distance is None:
             continue
-        spare = len(tokens) - n_words
+        # Words left over outside the name's parentheses: the qualifier in
+        # "phosphoglucomutase (alpha-D-glucose-1,6-bisphosphate-dependent)"
+        # is not a word the typed name lacks (sixth round's review).
+        spare = max(0, len(loose_key(_outside_parentheses(name.text)).split()) - n_words)
         held_typo = typo.get(name.ec)
         if held_typo is None or (distance, spare) < held_typo[:2]:
             if name.accepted:
@@ -1027,6 +1061,12 @@ def resolve(
     gene = _mnemonic_is_the_gene(result, text, code, index)
     if gene is not None:
         return gene
+    gene_read = _gene_symbol(result, text, code, index)
+    if gene_read is not None:
+        return gene_read
+    spelt = _acid_spelling(result, text, code, index)
+    if spelt is not None:
+        return spelt
     sibling = _qualified_sibling(result, text, code, index)
     if sibling is not None:
         return sibling
@@ -1123,6 +1163,190 @@ def _mnemonic_is_the_gene(result: Resolution, text: str, code: Optional[str],
                     notes=(f"The constants are taken from rows that name {found.gene} where there are any; "
                            "pass --subject with an EC number if you meant another enzyme.",),
                     symbol_read=True)
+
+
+#: A word written as a gene or protein symbol is: three characters or more,
+#: starting with a letter, and marked by a capital letter or a digit
+#: ("AKR1C3", "MurA", "Pgm1"). "mura" in lower case is a word.
+_GENE_WRITTEN = re.compile(r"^[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)?$")
+
+
+def written_as_gene_symbol(text: str) -> bool:
+    text = (text or "").strip()
+    letters = re.sub(r"[^A-Za-z]", "", text)
+    return (bool(_GENE_WRITTEN.match(text)) and len(text) >= 3 and len(letters) >= 2
+            and (any(ch.isupper() for ch in text) or any(ch.isdigit() for ch in text)))
+
+
+@lru_cache(maxsize=2)
+def _genes(index: EnzymeIndex) -> Dict[str, Dict[str, Dict[str, Tuple[Protein, List[str]]]]]:
+    """gene symbol (case folded) -> organism code -> accession -> (protein,
+    the active EC numbers the nomenclature lists it under), for the
+    proteins `protein_names` gives a gene symbol (human, mouse, yeast, E.
+    coli K-12)."""
+    from .protein_names import info
+
+    out: Dict[str, Dict[str, Dict[str, Tuple[Protein, List[str]]]]] = {}
+    for ec, entry in index.entries.items():
+        if entry.status != ACTIVE:
+            continue
+        for code, proteins in entry.proteins.items():
+            for protein in proteins:
+                found = info(protein.accession)
+                if found is None or not found.gene:
+                    continue
+                held = out.setdefault(found.gene.casefold(), {}).setdefault(code, {})
+                held.setdefault(protein.accession, (protein, []))[1].append(ec)
+    return out
+
+
+def _written_as_the_gene(typed: str, gene: str) -> bool:
+    """The gene as typed, as its protein is written ("MurA" for murA), or in
+    capitals when the gene itself starts with one (Pgm1 as PGM1). A bacterial
+    gene in capitals is not read: "UDP" is a nucleotide, not E. coli's udp."""
+    return bool(gene) and (typed == gene or typed == gene[:1].upper() + gene[1:]
+                           or (gene[:1].isupper() and typed == gene.upper()))
+
+
+def knows_gene_symbol(text: str, index: Optional[EnzymeIndex] = None) -> bool:
+    """Whether `text`, written as a symbol, is some listed protein's gene symbol."""
+    return written_as_gene_symbol(text) and text.strip().casefold() in _genes(index or load_index())
+
+
+def _gene_symbol(result: Resolution, text: str, code: Optional[str],
+                 index: EnzymeIndex) -> Optional[Resolution]:
+    """The enzyme, or the enzymes, a gene symbol's protein is listed under.
+
+    The curated table (symbols.py) holds the symbols people type most; the
+    protein names file holds every listed protein's gene symbol in four
+    organisms. "MurA inhibited by fosfomycin in E. coli" and "AKR1C3 with a
+    competitive inhibitor" were read as naming no enzyme, while ALDH2 and
+    NQO1 were read (sixth round of the real-values review). The gene is
+    read for the organism given, or for Homo sapiens when none was given and
+    it is written as a human gene symbol is, as the table reads its own.
+
+    A protein the nomenclature lists under one EC number resolves to it,
+    with the gene as the isoform when the organism has other proteins there.
+    One listed under several (AKR1C3 under seven) is an `Ambiguous` with
+    those EC numbers and `gene` set, never a guess: the rows that name the
+    protein are what can settle it. Never read when the words are some
+    other enzyme's exact name."""
+    if not written_as_gene_symbol(text) or read_ec(text) is not None:
+        return None
+    assumed = None
+    if code is None:
+        from .symbols import human_style
+
+        if not human_style(text):
+            return None
+        code, assumed = "HUMAN", "Homo sapiens"
+    typed = text.strip()
+    held = {acc: item for acc, item in _genes(index).get(typed.casefold(), {}).get(code, {}).items()
+            if _written_as_the_gene(typed, item[0].gene or "")}
+    if not held:
+        return None
+    if isinstance(result, Resolved):
+        return None
+    ecs = sorted({ec for _, listed in held.values() for ec in listed}, key=_ec_key)
+    if isinstance(result, Ambiguous) and any(
+            c.tier <= TIER_ALTERNATIVE_TOLERANT and c.via in ("name", "abbreviation") and c.ec not in ecs
+            for c in result.candidates):
+        return None
+    from .protein_names import info
+
+    proteins = [p for p, _ in held.values()]
+    gene = info(proteins[0].accession).gene
+    label = organism_label(code)
+    entries = ", ".join(f"{p.entry_name} (UniProtKB {p.accession})" for p in proteins)
+    assumed_note = ((f"No organism was given; {text} is written as a human gene symbol, so Homo sapiens "
+                     "was searched (pass --organism to change it).",) if assumed else ())
+    if len(ecs) == 1:
+        ec = ecs[0]
+        how = (f"{text!r} is the gene symbol UniProt gives {entries}, the {label} protein the enzyme "
+               "nomenclature lists under this enzyme and no other")
+        head = _candidate(index, index.entries[ec], TIER_ABBREVIATION, how, code, via="abbreviation")
+        others = index.proteins_in(ec, code)[1] > 1
+        notes = assumed_note + ((f"The constants are taken from rows that name {gene} where there are any; "
+                                 "pass --subject with an EC number if you meant another enzyme.",) if others else
+                                (f"Read {text!r} as EC {ec}; pass --subject with an EC number if you meant "
+                                 "another enzyme.",))
+        # The same letters as another protein's entry-name mnemonic: NAGA is
+        # the gene of NAGAB_HUMAN (EC 3.2.1.49), and NAGA_HUMAN is another
+        # protein under another EC number. The gene is what people type; the
+        # other is said, with the flag that takes it.
+        lookalikes = [(e, name) for e, name in _tables(index).symbols.get(strict_key(typed), ())
+                      if name.endswith("_" + code) and e != ec]
+        cautions = tuple(f"{name}, a UniProt entry name spelled the same, is another protein, under EC {e}; "
+                         f"pass --subject {e} if it is the one you mean." for e, name in lookalikes[:2])
+        return Resolved(ec=ec, how=how, candidate=head, cautions=cautions, isoform=gene if others else None,
+                        organism=assumed, notes=notes, symbol_read=True)
+    why = f"{entries} ({gene}) is listed under this enzyme"
+    candidates = tuple(_candidate(index, index.entries[ec], TIER_ABBREVIATION, why, code, via="gene")
+                       for ec in ecs)
+    reason = (f"{text!r} is the gene symbol UniProt gives {entries}, a {label} protein the enzyme "
+              f"nomenclature lists under {len(ecs)} EC numbers ("
+              + ", ".join(f"EC {ec} {index.entries[ec].name}" for ec in ecs)
+              + "): it is one protein, with several reactions"
+              + ("; the organism was taken as Homo sapiens because none was given and it is written as a "
+                 "human gene symbol is" if assumed else ""))
+    return Ambiguous(query=text, candidates=candidates, confirm_only=True, organism=code,
+                     release=index.release, reason=reason, gene=gene)
+
+
+#: An acid's name and its anion's: "6-phosphogluconic dehydrogenase" is the
+#: nomenclature's other name for EC 1.1.1.44, and people type
+#: "6-phosphogluconate dehydrogenase" (sixth round of the review).
+_ANION = re.compile(r"(?<=[a-z]{4})ate$")
+_ACID = re.compile(r"(?<=[a-z]{4})ic$")
+
+
+def _acid_spellings(text: str) -> List[str]:
+    """`text` with each word ending -ate written -ic, and with each word
+    ending -ic written -ate: the two spellings of one compound in a name."""
+    words = text.split()
+    out = []
+    for pattern, ending in ((_ANION, "ic"), (_ACID, "ate")):
+        swapped = [pattern.sub(ending, w) if len(w) >= 7 else w for w in words]
+        if swapped != words:
+            out.append(" ".join(swapped))
+    return out
+
+
+def acid_spelling_variants(text: str) -> List[str]:
+    """The spellings `_acid_spelling` tries, for a reader's quick gate."""
+    return _acid_spellings(" ".join((text or "").split()))
+
+
+def _acid_spelling(result: Resolution, text: str, code: Optional[str],
+                   index: EnzymeIndex) -> Optional[Resolution]:
+    """The reading of `text` with an acid's name written as its anion's or
+    the reverse, when the words as typed match no name whole and the other
+    spelling does (an exact name, or one with stereo labels aside). The
+    same compound either way, so the same name; the reason says how it was
+    read. Never for a name that already matched whole."""
+    if isinstance(result, Resolved):
+        return None
+    # The words as typed are a phrase of some name ("isocitrate
+    # dehydrogenase" in "isocitrate dehydrogenase (NAD(+))"): that reading
+    # stands. "isocitric dehydrogenase" is another name of EC 1.1.1.41 only,
+    # and taking it would have dropped EC 1.1.1.42 from the choice.
+    if isinstance(result, Ambiguous) and any(c.tier <= TIER_ALTERNATIVE_PHRASE for c in result.candidates):
+        return None
+    for spelt in _acid_spellings(text):
+        other = _resolve(spelt, code, index=index)
+        said = (f"Read {text!r} as {spelt!r}, the spelling the enzyme nomenclature lists: an acid's name "
+                "and its anion's (-ic, -ate) name one compound.")
+        if isinstance(other, Resolved) and other.candidate is not None and other.candidate.tier <= \
+                TIER_ALTERNATIVE_TOLERANT:
+            return Resolved(ec=other.ec, how=other.how, candidate=other.candidate, cautions=other.cautions,
+                            isoform=other.isoform, organism=other.organism, notes=other.notes + (said,),
+                            symbol_read=other.symbol_read)
+        if isinstance(other, Ambiguous) and other.candidates and \
+                other.candidates[0].tier <= TIER_ALTERNATIVE_TOLERANT:
+            from dataclasses import replace as _replace
+
+            return _replace(other, query=text, reason=f"{said} {other.reason}".strip())
+    return None
 
 
 def _qualified_sibling(result: Resolution, text: str, code: Optional[str],

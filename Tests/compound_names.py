@@ -321,6 +321,36 @@ ALIASES = (
     ("PIP3", "phosphatidylinositol 3,4,5-trisphosphate"),
     ("PtdIns(3,4,5)P3", "phosphatidylinositol 3,4,5-trisphosphate"),
     ("PI(3,4,5)P3", "phosphatidylinositol 3,4,5-trisphosphate"),
+    # Drugs by their INN or development code, filed by BRENDA under a
+    # research name or a full chemical name (sixth round of the real-values
+    # review): each Ki was a placeholder, and the placeholder listed the
+    # same compound under its other name as "another inhibitor".
+    # Forodesine is immucillin-H (BCX-1777); ulodesine is DADMe-immucillin-H
+    # (BCX4208). Both bind purine nucleoside phosphorylase slowly and tightly.
+    ("forodesine", "immucillin-H"), ("BCX-1777", "immucillin-H"), ("BCX1777", "immucillin-H"),
+    ("ImmH", "immucillin-H"), ("Imm-H", "immucillin-H"),
+    ("ulodesine", "DADMe-immucillin-H"), ("BCX4208", "DADMe-immucillin-H"),
+    ("BCX-4208", "DADMe-immucillin-H"),
+    # The arginase inhibitors by their usual abbreviations; BRENDA writes
+    # the omega nitrogen "Nomega-" (human arginase's 51 nM row, ref 654612).
+    ("nor-NOHA", "Nomega-hydroxy-nor-L-arginine"), ("norNOHA", "Nomega-hydroxy-nor-L-arginine"),
+    ("N-omega-hydroxy-nor-L-arginine", "Nomega-hydroxy-nor-L-arginine"),
+    ("Nomega-hydroxy-nor-arginine", "Nomega-hydroxy-nor-L-arginine"),
+    ("N(omega)-hydroxy-nor-L-arginine", "Nomega-hydroxy-nor-L-arginine"),
+    ("NOHA", "Nomega-hydroxy-L-arginine"), ("L-NOHA", "Nomega-hydroxy-L-arginine"),
+    ("N-omega-hydroxy-L-arginine", "Nomega-hydroxy-L-arginine"),
+    ("N(omega)-hydroxy-L-arginine", "Nomega-hydroxy-L-arginine"),
+    ("NG-hydroxy-L-arginine", "Nomega-hydroxy-L-arginine"),
+    # Terbinafine under its systematic name, as squalene epoxidase's rat
+    # and Candida rows file it (EC 1.14.14.17, ref 438202; the counter-ion
+    # "hydrochloride" is set aside by the key).
+    ("terbinafine", "(E)-N-(6,6-dimethylhept-2-en-4-ynyl)-N-methyl-1-naphthalenemethaneamine"),
+    ("Lamisil", "(E)-N-(6,6-dimethylhept-2-en-4-ynyl)-N-methyl-1-naphthalenemethaneamine"),
+    ("SF 86-327", "(E)-N-(6,6-dimethylhept-2-en-4-ynyl)-N-methyl-1-naphthalenemethaneamine"),
+    ("(E)-N-(6,6-dimethyl-2-hepten-4-ynyl)-N-methyl-1-naphthalenemethanamine",
+     "(E)-N-(6,6-dimethylhept-2-en-4-ynyl)-N-methyl-1-naphthalenemethaneamine"),
+    ("(E)-N-(6,6-dimethylhept-2-en-4-ynyl)-N-methyl-1-naphthalenemethanamine",
+     "(E)-N-(6,6-dimethylhept-2-en-4-ynyl)-N-methyl-1-naphthalenemethaneamine"),
     ("BAPNA", "N-benzoyl-DL-arginine 4-nitroanilide"),
     ("DL-BAPNA", "N-benzoyl-DL-arginine 4-nitroanilide"),
     ("L-BAPNA", "N-benzoyl-L-arginine 4-nitroanilide"),
