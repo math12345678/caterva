@@ -179,6 +179,30 @@ def _conditions_lost(pick: Any, row: Mapping[str, Any], isoform: str) -> str:
             ", not because it is the better-described measurement")
 
 
+def _own_accession_of(m: Any, isoform: str) -> Optional[str]:
+    """The one UniProt accession of the carried row's own cell, when UniProt
+    names that protein `isoform` (`protein_names`); else None. The carried
+    row is found among the measurement's ranked rows by its value and
+    reference."""
+    try:
+        from caterva.enzymes.protein_names import info
+    except ImportError:  # pragma: no cover
+        return None
+    cited = getattr(m, "reference_id", None) or "".join(
+        re.findall(r"BRENDA ref (\d+)", str(getattr(m, "citation", None) or ""))[:1])
+    for r in getattr(m, "alternatives", ()) or ():
+        if not isinstance(r, dict) or r.get("value") is None or not r.get("uniprot"):
+            continue
+        if (float(r["value"]) != float(m.value)
+                or not cited or str(r.get("reference_id") or "") != str(cited)
+                or (r.get("conditions") or None) != (getattr(m, "commentary", None) or None)):
+            continue
+        found = info(str(r["uniprot"]))
+        if found is not None and any(same_isoform(name, isoform) for name in found.names or ()):
+            return str(r["uniprot"])
+    return None
+
+
 def select_isoform(measured: Mapping[str, Any], isoform: str,
                    asked: str = ASKED_BY_FLAG) -> IsoformSelection:
     """Each measured constant, taken from a row that measured `isoform` where
@@ -206,6 +230,16 @@ def select_isoform(measured: Mapping[str, Any], isoform: str,
                   or getattr(m, "row_isoform", None))
         if same_isoform(chosen, isoform):
             out.measured[identifier] = m
+            continue
+        accession = _own_accession_of(m, isoform) if chosen is None else None
+        if accession:
+            # The protein asked for is the only one the EC number lists in
+            # the organism, so the resolver reads no isoform off the cell
+            # (it is the enzyme itself): AKR1C3's P42330 rows under EC
+            # 1.1.1.188 were said to be rows of which "whether it measured
+            # AKR1C3 is unknown" (sixth round of the real-values review).
+            out.measured[identifier] = m
+            out.notes.append(f"`{identifier}`: the row's UniProt accession ({accession}) is {isoform}")
             continue
         because = (getattr(m, "chosen_because", None) or "") + (getattr(m, "resolver_because", None) or "")
         if chosen is None and PAIRED_ACROSS_TIERS in because:

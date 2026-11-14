@@ -981,6 +981,10 @@ _MECHANISM_STEMS = (
     "transport", "pump", "channel", "receptor", "binding", "complex", "inhibit", "allosteric",
     "cooperativ", "hill", "network", "circuit", "signal", "phosphorylation", "dephosph", "competition",
     "competing", "branch", "reversible", "two-substrate", "bi-bi", "ping-pong",
+    # Read since bacterial gene symbols are ("EnvZ phosphorylating OmpR, a
+    # two-component system" names an enzyme now; the phrase is the shape,
+    # not a compound the enzyme acts on; sixth round of the review).
+    "two-component", "two component", "phosphorelay",
 )
 
 
@@ -1034,12 +1038,16 @@ def _flag_subject_ec(args: Any) -> Optional[str]:
         return None
 
 
-def _shape_from(description: str, reading: Any) -> Tuple[str, str, Optional[str]]:
+def _shape_from(description: str, reading: Any, subject: Optional[str] = None) -> Tuple[str, str, Optional[str]]:
     """(what to compose, the rule it builds, a note) for `description`.
 
     Raises the grammar's UnrecognisedShape unless the description named an
     enzyme and nothing a mechanism is made of, in which case the shape is
     one enzyme turning one substrate into product and the note says so.
+    `--subject` names the enzyme too: "6-phosphogluconate dehydrogenase from
+    sheep liver --subject 1.1.1.43", the command a refusal advised, was
+    refused again with the same words, because the reader could not place
+    the name the flag had already settled (sixth round of the review).
     """
     from caterva.compose.grammar import UnrecognisedShape, _named_pathway_in, recognise
 
@@ -1071,14 +1079,14 @@ def _shape_from(description: str, reading: Any) -> Tuple[str, str, Optional[str]
         # A named pathway ("glycolysis") and a missing motif library are
         # refusals with their own remedy; only "no shape matches" is a
         # description that may just have named an enzyme and stopped.
-        if (type(exc) is not UnrecognisedShape or not reading.names_enzyme
+        if (type(exc) is not UnrecognisedShape or not (reading.names_enzyme or subject)
                 or _named_pathway_in(description.lower()) is not None):
             raise
-        enzyme = reading.enzyme_text
+        enzyme = reading.enzyme_text or f"--subject {subject}"
         mechanism = [w for w in reading.remainder.lower().split()
                      if any(w.startswith(stem) for stem in _MECHANISM_STEMS)]
         if mechanism:
-            ec = reading.ec or "<its EC number>"
+            ec = reading.ec or subject or "<its EC number>"
             raise UnrecognisedShape(
                 description,
                 exc.reason + f" Your description names the enzyme {enzyme!r}, and also "
@@ -1086,8 +1094,10 @@ def _shape_from(description: str, reading: Any) -> Tuple[str, str, Optional[str]
                 "builds, so it was not read as one enzyme turning one substrate into product. "
                 f"To model it that way, run: caterva compose \"{NAMED_ENZYME_SHAPE}\" --subject {ec}",
                 suggestions=exc.suggestions) from None
+        named = (f"Your description named an enzyme ({enzyme!r})" if reading.enzyme_text else
+                 f"--subject {subject} named the enzyme, your description")
         return NAMED_ENZYME_SHAPE, "michaelis_menten", (
-            f"Your description named an enzyme ({enzyme!r}) and no mechanism this grammar "
+            f"{named} and no mechanism this grammar "
             "recognises, so its shape was read as Michaelis-Menten: one enzyme turning one "
             "substrate into one product. To build another mechanism, describe it, e.g. "
             "'Michaelis-Menten with a competitive inhibitor'.")
@@ -1182,7 +1192,7 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
     err = sys.stderr if err is None else err
     typed = args.description
     reading = read_sentence(typed, organism=getattr(args, "organism", None))
-    description, rule, shape_note = _shape_from(typed, reading)
+    description, rule, shape_note = _shape_from(typed, reading, getattr(args, "subject", None))
     out = DescriptionReading(description=description)
     if shape_note:
         out.notes.append(shape_note)
@@ -1240,13 +1250,30 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
                              "was used instead, because a flag wins over the description.")
     elif reading.ambiguity is not None and (
             chosen := (_enzyme_the_data_singles_out(reading, args)
-                       or _enzyme_the_organism_singles_out(reading, args))) is not None:
+                       or _enzyme_the_organism_singles_out(reading, args)
+                       or _enzyme_the_gene_rows_single_out(reading, args, description))) is not None:
         # A name that is a few specific enzymes ("citrate synthase": the Si-
         # and Re- enzymes), of which BRENDA has measurements for one only
         # (ADR 0182). Taken, and said with the others named; a class word, a
         # symbol, a typo, or two candidates that both have rows stay refused.
         args.subject = chosen.chosen
         out.choices.append(chosen)
+        gene = getattr(reading.ambiguity, "gene", None)
+        if gene:
+            # A gene symbol is one protein: its rows are the ones searched,
+            # in the organism it was read for (sixth round's review).
+            if not getattr(args, "isoform", None):
+                args.isoform = gene
+                args.isoform_asked = DESCRIPTION_ASKED
+            if not getattr(args, "organism", None) and not reading.organism:
+                from caterva.enzymes.index import ORGANISMS
+
+                code = getattr(reading.ambiguity, "organism", None)
+                if code in ORGANISMS:
+                    args.organism = ORGANISMS[code][0]
+                    out.notes.append(f"No organism was given; {reading.enzyme_text} is written as a "
+                                     f"{ORGANISMS[code][1]} gene symbol, so {args.organism} was searched "
+                                     "(pass --organism to change it).")
         # The tissue word reads the same here as for a name that is one
         # enzyme: "lactate dehydrogenase from rabbit muscle" chose EC
         # 1.1.1.27 by its rows and then left LDHA or LDHB open (S5-08).
@@ -1292,6 +1319,9 @@ def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = Tr
                 said = re.sub(r"Re-run with the one you meant, for example .*$",
                               "Name the one you meant with --subject, together with an --organism "
                               "that has its rows, as listed next.", said, flags=re.S)
+            elif blocker.startswith("EC ") and getattr(reading.ambiguity, "suggestions_only", False):
+                # The spelling's own command, with the organism it lacks.
+                said = re.sub(r"(--subject \S+?)\.?$", r"\1 --organism <one listed next>", said)
             stop = "" if said.endswith((".", "!", "?", ")")) else "."
             out.name_refusal = NameNotResolved(
                 f"{said}{stop} {blocker}", r.candidates, r.named, r.kind, recommended=r.recommended,
@@ -1447,15 +1477,21 @@ def _no_candidate_in_the_organism(ambiguity: Any, organism: Optional[str]) -> Op
     nor EC 2.3.3.16, has a mouse Km row. The advice must lead to a run that
     can succeed (round-1 review of ADR 0182).
     """
-    if not organism or ambiguity is None or getattr(ambiguity, "class_word", False) \
-            or getattr(ambiguity, "suggestions_only", False):
+    if not organism or ambiguity is None or getattr(ambiguity, "class_word", False):
         return None
     from caterva.compose import defaults
     from caterva.compose.organisms import normalise_organism
 
     where = normalise_organism(organism)[0] or organism
-    candidates = [c for c in ambiguity.candidates
-                  if getattr(c, "via", "name") in ("name", "ec")][:CANDIDATES_READ_FOR_THE_ORGANISM]
+    if getattr(ambiguity, "suggestions_only", False):
+        # A near spelling: the refusal's "did you mean" names the first
+        # candidate, and the command it gives must be one that can run.
+        # "phosphoglucomutse from rabbit muscle" advised EC 5.4.2.2, which
+        # has no rabbit Km row in BRENDA (sixth round of the review).
+        candidates = list(ambiguity.candidates[:1])
+    else:
+        candidates = [c for c in ambiguity.candidates
+                      if getattr(c, "via", "name") in ("name", "ec")][:CANDIDATES_READ_FOR_THE_ORGANISM]
     if not candidates:
         return None
     try:
@@ -1474,9 +1510,11 @@ def _no_candidate_in_the_organism(ambiguity: Any, organism: Optional[str]) -> Op
         organisms = _km_organisms_usable(first)
     except Exception:  # noqa: BLE001
         organisms = {}
-    text = (f"None of " + ", ".join(f"EC {c.ec}" for c in candidates) + f" has a Km row in {where} in "
-            "BRENDA, so naming one would be refused again: the organism, not the enzyme name, is what "
-            "is missing.")
+    text = ((f"EC {first} has no Km row in {where} in BRENDA, so naming it would be refused again: the "
+             "organism, not the spelling, is what is missing.") if len(candidates) == 1 else
+            (f"None of " + ", ".join(f"EC {c.ec}" for c in candidates) + f" has a Km row in {where} in "
+             "BRENDA, so naming one would be refused again: the organism, not the enzyme name, is what "
+             "is missing."))
     if organisms:
         text += (f" Organisms with Km rows for EC {first}: {_counted(organisms)}. Re-run with --subject "
                  "and --organism set to one of them (Caterva never substitutes another organism's value "
@@ -1571,6 +1609,83 @@ def _enzyme_the_data_singles_out(reading: Any, args: Any) -> Optional[Any]:
     # is not a reading of the name the user typed: never settled by rows
     # alone.
     return None
+
+
+#: At most this many EC numbers of one gene's protein are read for its rows.
+GENE_ECS_READ = 8
+
+
+def _rows_naming_gene(ec: str, table: str, organism: Optional[str], gene: str) -> int:
+    """BRENDA rows of `ec` in `organism` that name the protein `gene` (in
+    their words or by their one UniProt accession), not flagged, not a
+    variant's."""
+    from caterva.compose import defaults
+
+    count = 0
+    for row in defaults.table_rows(ec, table, organism):
+        if row.flagged or (row.variant and not row.isozyme):
+            continue
+        said = defaults._isoform_read(row.conditions)
+        if (said and defaults._same_isoform(said, gene)) or defaults._accession_says(row.uniprot, gene) is True:
+            count += 1
+    return count
+
+
+def _enzyme_the_gene_rows_single_out(reading: Any, args: Any, description: str) -> Optional[Any]:
+    """The `Choice` of one EC number for a gene symbol whose protein the
+    nomenclature lists under several (ADR 0182): the one whose BRENDA rows
+    naming the protein cover the most of the model's constants, then hold
+    the most such rows; None on a tie or when no page names it.
+
+    "AKR1C3 with a competitive inhibitor" said no enzyme was named. AKR1C3
+    is one human protein (P42330) under seven EC numbers; its rows are under
+    EC 1.1.1.357 (Km and kcat, no Ki) and EC 1.1.1.188 (Km, kcat and Ki),
+    among others (sixth round of the real-values review). The note names
+    the choice, the reason and each other EC number with its rows."""
+    ambiguity = getattr(reading, "ambiguity", None)
+    gene = getattr(ambiguity, "gene", None)
+    if not gene or not ambiguity.candidates or len(ambiguity.candidates) > GENE_ECS_READ:
+        return None
+    from caterva.compose import defaults
+    from caterva.enzymes.index import ORGANISMS
+
+    organism = getattr(args, "organism", None) or reading.organism
+    if not organism:
+        code = getattr(ambiguity, "organism", None)
+        organism = ORGANISMS[code][0] if code in ORGANISMS else None
+    try:
+        from caterva.compose.pipeline import compose
+
+        needed = [t for t in ("km", "kcat", "ki")
+                  if t in {q.table for q in compose(description).resolvable}] or ["km", "kcat"]
+    except Exception:  # noqa: BLE001 - the shape's constants unknown: the enzyme's own
+        needed = ["km", "kcat"]
+    rows: Dict[str, Dict[str, int]] = {}
+    try:
+        for c in ambiguity.candidates:
+            rows[c.ec] = {t: _rows_naming_gene(c.ec, t, organism, gene) for t in needed}
+    except Exception:  # noqa: BLE001 - one unreadable page and nothing is chosen
+        return None
+
+    def rank(ec: str) -> Tuple[int, int]:
+        return (sum(1 for n in rows[ec].values() if n), sum(rows[ec].values()))
+
+    names = {c.ec: c.name for c in ambiguity.candidates}
+    ranked = sorted(rows, key=lambda ec: (tuple(-v for v in rank(ec)),
+                                          [c.ec for c in ambiguity.candidates].index(ec)))
+    best = ranked[0]
+    if rank(best)[1] == 0 or (len(ranked) > 1 and rank(ranked[1]) == rank(best)):
+        return None
+    where = f" in {organism}" if organism else ""
+    covered = defaults._described_counts({t: n for t, n in rows[best].items() if n})
+    why = (f"your description names {reading.enzyme_text!r}, the gene symbol of one protein the enzyme "
+           f"nomenclature lists under {len(ambiguity.candidates)} EC numbers; {names[best]} is used because "
+           f"its BRENDA rows that name {gene}{where} cover the most of this model's constants "
+           f"({covered})")
+    alternatives = tuple(defaults.Option(f"EC {ec} ({names[ec]})", dict(rows[ec]),
+                                         none_said=f"no row naming {gene}")
+                         for ec in ranked[1:])
+    return defaults.Choice("enzyme", best, why, alternatives, len(ranked), dict(rows[best]))
 
 
 #: At most this many candidates listing a protein of the organism are read

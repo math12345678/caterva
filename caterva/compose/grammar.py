@@ -2440,13 +2440,23 @@ def _misspelt_enzyme(query: str) -> Optional[str]:
         return None
     words = query.split()
     best = None
+    # The organism the description names ranks the suggestions, as it ranks
+    # them in the reader: "phosphoglucomutse from rabbit muscle" is closest
+    # to the enzyme listing rabbit PGM1 (sixth round of the review).
+    try:
+        from caterva.enzymes.sentence import _read_organism, _tokens
+
+        named = {binomial for _, _, _, binomial in _read_organism(_tokens(query))}
+        organism = named.pop() if len(named) == 1 else None
+    except Exception:  # noqa: BLE001 - no organism read: the finder's own order
+        organism = None
     for size in range(min(5, len(words)), 0, -1):
         for start in range(len(words) - size + 1):
             window = " ".join(words[start:start + size]).strip(",.;:")
             if len(window) < 6:
                 continue
             try:
-                found = [c for c in find(window, limit=None) if c.tier == TIER_TYPO]
+                found = [c for c in find(window, organism, limit=None) if c.tier == TIER_TYPO]
             except Exception:  # noqa: BLE001
                 continue
             if found:

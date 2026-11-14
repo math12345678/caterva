@@ -368,6 +368,7 @@ def table_rows(ec: str, table: str, organism: Optional[str]) -> Tuple[_Row, ...]
         out = tuple(_other_enzyme_is_no_isozyme(ec, _sole_protein_is_no_isozyme(ec, r))
                     for r in out)
         out = _treated_arms_not_own(out)
+        out = _mutant_twins_are_variants(out, client)
     if len(_PARSED) >= _PARSED_MAX:
         # Keep the every-organism parses: an organism's rows are filtered
         # from them, and clearing them made each of the 63 organisms of the
@@ -460,6 +461,29 @@ def _treated_arms_not_own(rows: Tuple[_Row, ...]) -> Tuple[_Row, ...]:
                                 for x in effectors)
         out.append(replace(r, own=False) if treated else r)
     return tuple(out)
+
+
+def _mutant_twins_are_variants(rows: Tuple[_Row, ...], client: object) -> Tuple[_Row, ...]:
+    """A row that repeats a mutant row's value and says nothing about the
+    enzyme form, in a paper that states the wild type's value separately,
+    is the mutant's row entered twice (row_form.mutant_twins), as the
+    resolver reads it (fallback_logic._mark_mutant_twins). MurA's
+    fosfomycin Ki "at pH 8.0" (1 mM, ref 637598) is the C115D mutant's."""
+    classify = getattr(client, "classify_variant", None)
+    if not callable(classify) or not any(r.variant and not r.isozyme for r in rows):
+        return rows
+    try:
+        from caterva.checkout import literature_module
+
+        def described(r: _Row) -> dict:
+            status = "variant" if r.variant else getattr(classify(r.conditions), "status", "unstated")
+            return {"reference": r.reference_id, "compound": r.compound, "organism": r.organism,
+                    "value": r.value, "status": status,
+                    "kind": ("isozyme" if r.isozyme else "mutant") if r.variant else None}
+        twins = literature_module("row_form").mutant_twins([described(r) for r in rows])
+    except Exception:  # noqa: BLE001 - a preference, never a requirement
+        return rows
+    return tuple(replace(r, variant=True, isozyme=False) if i in twins else r for i, r in enumerate(rows))
 
 
 def _sole_protein_is_no_isozyme(ec: str, row: _Row) -> _Row:

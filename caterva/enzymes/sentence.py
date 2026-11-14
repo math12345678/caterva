@@ -981,14 +981,34 @@ def _name_keys() -> frozenset:
 _KEYS: Optional[frozenset] = None
 
 
+def _could_be_a_gene(typed: str) -> bool:
+    """A word written as a gene symbol that some listed protein's gene is
+    ("MurA", "AKR1C3"), and no compound abbreviation ("PEP", "UDP")."""
+    from .finder import knows_gene_symbol
+
+    return _substrate_key(typed) not in SUBSTRATE_ABBREVIATIONS and knows_gene_symbol(typed)
+
+
+def _gene_ambiguity(result: Ambiguous, typed: str) -> bool:
+    """A gene symbol whose one protein the nomenclature lists under several
+    EC numbers ("AKR1C3"): the description named an enzyme, and the
+    refusal or the choice names those EC numbers (sixth round's review)."""
+    return bool(getattr(result, "gene", None)) and bool(result.candidates) \
+        and _substrate_key(typed) not in SUBSTRATE_ABBREVIATIONS
+
+
 def _could_be_a_name(text: str) -> bool:
     global _KEYS
     if _KEYS is None:
         _KEYS = _name_keys()
     from .symbols import load_symbols
 
-    from .finder import respelt_symbol
+    from .finder import acid_spelling_variants, respelt_symbol
 
+    # An acid's name for its anion's, or the reverse ("6-phosphogluconate
+    # dehydrogenase" for the listed "6-phosphogluconic dehydrogenase").
+    if any(strict_key(v) in _KEYS or loose_key(v) in _KEYS for v in acid_spelling_variants(text)):
+        return True
     if (strict_key(text) in _KEYS or loose_key(text) in _KEYS
             or "compact:" + compact_name_key(text) in _KEYS or load_symbols().knows(text)
             or respelt_symbol(text) is not None
@@ -1159,6 +1179,7 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
     ambiguity: Optional[Ambiguous] = None
     ambiguity_text: Optional[str] = None
     near: Optional[Tuple[str, str, str, str]] = None
+    gene_ambiguity: Optional[Tuple[int, int, str, Ambiguous]] = None
     for first, last, typed in _read_ec(tokens):
         result = resolve(typed, rank_by)
         if isinstance(result, Resolved) and _acceptable(result, typed):
@@ -1179,7 +1200,8 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
         # finder (`finder._mnemonic_is_the_gene`); any other mnemonic is
         # still only offered, in the passes below (fifth round's review).
         if not _could_be_a_name(typed) and not (
-                rank_by and len(words) == 1 and _written_as_a_mnemonic(typed)):
+                rank_by and len(words) == 1 and _written_as_a_mnemonic(typed)) and not (
+                len(words) == 1 and _could_be_a_gene(typed)):
             continue
         result = resolve(typed, rank_by)
         if isinstance(result, Resolved) and _acceptable(result, typed):
@@ -1187,6 +1209,13 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
         elif isinstance(result, Ambiguous) and _reportable(result):
             if ambiguity is None:
                 ambiguity, ambiguity_text = result, typed
+        elif isinstance(result, Ambiguous) and _gene_ambiguity(result, typed):
+            # A gene symbol of one protein under several EC numbers
+            # ("AKR1C3"). Kept aside: it is the enzyme only when nothing
+            # else in the description names one ("lysozyme with SDS" names
+            # lysozyme; SDS is a detergent and also a human gene symbol).
+            if gene_ambiguity is None:
+                gene_ambiguity = (first, last, typed, result)
         elif _near(result):
             # "lysine oxidase" is L-lysine oxidase only once the L- is set
             # aside. Not read as naming it, and not silently passed over:
@@ -1281,6 +1310,16 @@ def read_sentence(text: str, organism: Optional[str] = None) -> SentenceReading:
                 for k in range(first, last):
                     tokens[k].used = True
                 break
+
+    if gene_ambiguity is not None:
+        first, last, typed, result = gene_ambiguity
+        if not hits and ambiguity is None and near is None:
+            ambiguity, ambiguity_text = result, typed
+        else:
+            # Another enzyme was named: the word is a compound or reagent
+            # again, free to be read as the substrate or inhibitor.
+            for k in range(first, last):
+                tokens[k].used = False
 
     enzyme: Optional[Tuple[str, Resolved]] = None
     others: List[Tuple[str, str, str]] = []

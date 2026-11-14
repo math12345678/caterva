@@ -662,11 +662,52 @@ def same_measurement(a: dict, b: dict, substrate: Optional[str] = None) -> bool:
             == condition_words(words_b, substrate))
 
 
+def mutant_twins(rows: Iterable[dict]) -> set:
+    """The indices of rows that say nothing about the enzyme form and are a
+    mutant's row entered a second time.
+
+    BRENDA sometimes files one measurement as two rows, each with half of
+    its commentary: MurA's fosfomycin Ki in E. coli (EC 2.5.1.7, ref 637598)
+    is listed as 1 mM "mutant C115D" and again as 1 mM "at pH 8.0", beside
+    0.0086 mM "wild-type enzyme". The "at pH 8.0" row is the mutant's, and
+    was carried as the enzyme's Ki (sixth round of the real-values review).
+
+    A row (dict with reference, compound, organism, value, status, kind) is
+    such a twin when, in one paper, for one compound and organism: its
+    status is "unstated"; a mutant's row has exactly its value; and the
+    paper states the wild type's value in a row of its own, which differs.
+    At most as many twins as there are mutant rows with that value. Without
+    the wild-type row nothing is claimed: an unlabelled row is then the
+    usual way a wild-type value is filed."""
+    groups: dict = {}
+    for i, r in enumerate(rows):
+        if r.get("reference") in (None, "") or r.get("value") is None:
+            continue
+        key = (str(r["reference"]), " ".join(str(r.get("compound") or "").lower().split()),
+               r.get("organism"))
+        groups.setdefault(key, []).append((i, r))
+    out: set = set()
+    for members in groups.values():
+        wild = {float(r["value"]) for _, r in members if r.get("status") == "wild_type"}
+        mutant: dict = {}
+        for _, r in members:
+            if r.get("status") == "variant" and r.get("kind") == "mutant":
+                mutant[float(r["value"])] = mutant.get(float(r["value"]), 0) + 1
+        if not wild or not mutant:
+            continue
+        for i, r in members:
+            value = float(r["value"])
+            if r.get("status") == "unstated" and mutant.get(value, 0) > 0 and value not in wild:
+                mutant[value] -= 1
+                out.add(i)
+    return out
+
+
 def distinct_values(rows: Iterable[dict]) -> set:
     return {float(r["value"]) for r in rows}
 
 
 __all__ = [
     "accessions", "condition_words", "construct_of", "half_saturation", "is_ion",
-    "isoforms_of_accessions", "proteins_in_organism_of", "same_measurement",
+    "isoforms_of_accessions", "mutant_twins", "proteins_in_organism_of", "same_measurement",
 ]

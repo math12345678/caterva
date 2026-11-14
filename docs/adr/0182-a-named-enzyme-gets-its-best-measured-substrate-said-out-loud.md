@@ -766,3 +766,69 @@ by that exact name still carries ref 651313's 0.0022 mM, flagged as
 1200-fold below the other papers: only three other papers use that
 spelling, too few to set it aside. "6-phosphogluconate dehydrogenase" as
 typed is still not resolved to EC 1.1.1.44 (a names question).
+
+## Sixth round (2026-11-13): reading names, symbols and drugs
+
+The names half of the sixth adversarial round. Each change has a regression
+test in `caterva/tests/test_sixth_round_review_names.py` or
+`Tests/test_sixth_round_review_names.py`, and each query was re-run live.
+
+- **An acid's name and its anion's are one compound.** The nomenclature lists
+  "6-phosphogluconic dehydrogenase"; people type "6-phosphogluconate
+  dehydrogenase", which was refused with EC 1.1.1.43 as the only suggestion.
+  When the words as typed are no phrase of any name, the reader tries the
+  other spelling (-ate for -ic, or the reverse) and says so. Sheep's rows
+  then settle EC 1.1.1.44 (Km 0.03 mM, kcat 9.0 1/s, ref 654952). A phrase
+  of a listed name is never respelt: "isocitrate dehydrogenase" stays a
+  choice of EC 1.1.1.41 and 1.1.1.42.
+- **--subject names the enzyme.** A description whose enzyme name the reader
+  cannot place, run with the --subject a refusal advised, is now read as one
+  enzyme turning one substrate, instead of being refused with the same words.
+- **Gene symbols from UniProt.** Every gene symbol the protein names file
+  gives a listed protein (human, mouse, yeast, E. coli K-12) is read, as
+  written ("MurA", "murA"; never "mura", never a bacterial gene in capitals
+  such as "UDP"). A protein under one EC number resolves to it: MurA in E.
+  coli is EC 2.5.1.7, and fosfomycin's Ki is said to be an irreversible
+  inactivator's. A protein under several (AKR1C3, P42330, under seven) is a
+  choice settled by the BRENDA rows that name it: the EC number whose rows
+  cover the most of the model's constants, then hold the most rows. AKR1C3
+  with a competitive inhibitor is EC 1.1.1.188 (2 Km, 2 kcat, 8 Ki), and the
+  note names the other six with their counts. The rows carried (Km 0.0015
+  mM and kcat 1.4 1/s, ref 685035; Ki 0.0019 mM, ref 697271) have P42330 in
+  their own UniProt cell, and the report says so: it used to say "whether it
+  measured AKR1C3 is unknown", because the resolver reads no isoform off the
+  cell of an EC number's only protein in the organism. No organism given: a symbol
+  written as a human one is read in Homo sapiens, and the note says so. A
+  symbol of several EC numbers is read only when nothing else in the
+  description names an enzyme ("lysozyme with SDS" is lysozyme; SDS is a
+  detergent as well as a human gene). GSK3B is now read as GSK3B_HUMAN's
+  gene, not offered as an entry name to confirm.
+- **A mutant's row entered twice is the mutant's.** Reading MurA showed
+  one more thing. BRENDA files its fosfomycin Ki (ref 637598) as 0.0086 mM
+  "wild-type enzyme", 1 mM "mutant C115D" and again 1 mM "at pH 8.0". The
+  "at pH 8.0" row was carried: the resistant mutant's value, a hundred times
+  the wild type's. A row that says nothing about the enzyme form and repeats
+  a mutant row's value, for the same compound in the same paper, is now
+  withheld as a variant's, but only when that paper states the wild type's
+  value in a row of its own (`row_form.mutant_twins`, read alike by the
+  resolver and by `defaults`). MurA with fosfomycin now carries 0.0086 mM,
+  with Km 0.004 mM and kcat 3.8 1/s (ref 721372, P0A749).
+- **Drugs by their usual names.** The curated alias table
+  (`Tests/compound_names.py`, `ALIASES`) holds the names BRENDA files a drug
+  under: forodesine (BCX-1777) is immucillin-H, ulodesine is
+  DADMe-immucillin-H, nor-NOHA is Nomega-hydroxy-nor-L-arginine, NOHA is
+  Nomega-hydroxy-L-arginine, terbinafine is its systematic name. PNP with
+  forodesine now carries 5.79e-08 mM (ref 672251), arginase with nor-NOHA
+  5.1e-05 mM (ref 654612), squalene epoxidase with terbinafine 0.077 mM in
+  rat (ref 438202). Each note says BRENDA files the row under the other
+  name. Rat is now the organism chosen for terbinafine, because its
+  systematic-name row is counted.
+- **Typos ranked by the organism.** Among names one letter away, the one
+  listing a protein of the organism named comes first: "phosphoglucomutse
+  from rabbit muscle" suggests EC 5.4.2.2 (rabbit PGM1), not
+  beta-phosphoglucomutase. BRENDA has no rabbit Km row there, so the advice
+  says the organism is what is missing and lists the organisms that have
+  rows. A five-letter head word ending -ase may carry one typo beside other
+  words of names: "phosphoglycerate kinse from yeast" suggests EC 2.7.2.3
+  (yeast PGK1), and the advised command builds (0.77 mM, 354 1/s, ref
+  642293). A one-word query of five letters is still never a typo.

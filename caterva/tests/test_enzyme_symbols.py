@@ -131,7 +131,14 @@ def test_the_part_of_an_entry_name_before_the_underscore_is_not_read_as_a_gene_s
     assert mnemonic and all(c.partial and c.tier == TIER_SYMBOL for c in mnemonic)
     assert "NAGA_HUMAN" in mnemonic[0].why and "not always the gene symbol" in mnemonic[0].why
     assert not any("NAGA_MOUSE" in c.why for c in listed), "only the organism asked about"
-    assert isinstance(resolve("NAGA", "human"), Ambiguous)
+    # The mnemonic NAGA_HUMAN is still never read as the enzyme. Since the
+    # sixth round of the real-values review the gene symbol NAGA is: UniProt
+    # gives it to NAGAB_HUMAN (EC 3.2.1.49), and the reading says the
+    # look-alike entry name is another protein, with its EC number.
+    naga = resolve("NAGA", "human")
+    mnemonic_ecs = {c.ec for c in mnemonic}
+    assert isinstance(naga, Resolved) and naga.ec == "3.2.1.49" and naga.ec not in mnemonic_ecs
+    assert any("NAGA_HUMAN" in c and "another protein" in c for c in naga.cautions)
     assert all(c.via != "mnemonic" for c in find("NAGA", None, limit=None)), "no organism, no entry name is read"
 
 

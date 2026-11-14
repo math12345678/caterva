@@ -700,7 +700,30 @@ def _brenda_entries(
             e.paper_isoform = _paper_isoform(e, papers)
             _mark_other_enzyme(e)
         _mark_unattributed(entries)
+        _mark_mutant_twins(entries)
     return entries
+
+
+def _mark_mutant_twins(entries) -> None:
+    """A row that says nothing about the enzyme form and repeats a mutant
+    row's value, in a paper that states the wild type's value separately,
+    is the mutant's row entered twice (`row_form.mutant_twins`): withheld
+    as a variant's. MurA's fosfomycin Ki "at pH 8.0" (1 mM, ref 637598) is
+    the C115D mutant's; the wild type's is 0.0086 mM."""
+    def described(e):
+        verdict = getattr(e, "variant", None)
+        return {"reference": getattr(e, "reference_id", None), "compound": getattr(e, "substrate", None),
+                "organism": getattr(e, "organism", None), "value": getattr(e, "km_value", None),
+                "status": getattr(verdict, "status", "unstated") if verdict is not None else "unstated",
+                "kind": getattr(verdict, "kind", None)}
+    for i in row_form.mutant_twins([described(e) for e in entries]):
+        e = entries[i]
+        e.variant = VariantVerdict(
+            status="variant", kind="mutant",
+            evidence=f"the same value as a mutant's row of BRENDA ref {e.reference_id}",
+            reason=("The row says nothing about the enzyme form and repeats the value of a mutant's row "
+                    "from the same paper, which states the wild type's value in another row: BRENDA "
+                    "entered the mutant's measurement twice."))
 
 
 def _mark_unattributed(entries) -> None:
@@ -1508,6 +1531,8 @@ IRREVERSIBLE_INHIBITOR = re.compile(
     r"|phenylmethyl(?:sulfonyl|sulphonyl) fluoride|\bPMSF\b|\bDFP\b|selegiline|deprenyl|rasagiline"
     r"|clorgyline|pargyline|tranylcypromine|phenelzine|\baspirin\b|acetylsalicylic|clavulan"
     r"|sulbactam|tazobactam|difluoromethylornithine|\bDFMO\b|eflornithine|vigabatrin"
+    # Fosfomycin alkylates MurA's active-site cysteine (sixth round's review).
+    r"|fosfomycin|phosphomycin"
     r"|iodoacetamide|iodoacetate|N-ethylmaleimide|\bTLCK\b|\bTPCK\b|tosyl-L-(?:lysine|phenylalanine) "
     r"chloromethyl"
     # Serpins trap their protease in a covalent complex (suicide substrates).
