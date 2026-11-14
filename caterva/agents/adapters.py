@@ -228,7 +228,20 @@ def to_parameter_source(
         if withheld:
             reason += f" -- {what}: {sep.join(withheld)}"
         unnamed = getattr(result, "isoform_unnamed_withheld", 0) or 0
-        if source == "isoform_withheld" and isinstance(unnamed, int) and unnamed:
+        if source == "isoform_withheld" and withheld and all(
+                str(w).startswith("rows that cannot be attributed") for w in withheld):
+            # No row named another isoform: each listed several proteins and
+            # named none. PARP1's NAD+ Km (ref 776950, five values, one per
+            # PARP-family protein) read "measured another isoform" (sixth
+            # round, NEW-09).
+            reason = reason.replace(
+                "every row BRENDA holds for this constant measured another isoform than the one "
+                "asked for, and a constant of another isoform is a different protein's, so none "
+                "is used",
+                "every row BRENDA holds for this constant lists several proteins' accessions and "
+                "names none of them, and its paper gives a value per protein, so which value is "
+                "the one asked for cannot be told, and none is used")
+        elif source == "isoform_withheld" and isinstance(unnamed, int) and unnamed:
             # Not every row named another isoform: some named none, and were
             # not taken because every row naming a protein named another.
             reason = reason.replace(

@@ -154,6 +154,31 @@ def _same_paper_partner(rows: List[Mapping[str, Any]], partner: Mapping[str, Any
     return None
 
 
+_PH = re.compile(r"\bpH\s*\d")
+_TEMPERATURE = re.compile(r"\d\s*°\s*C\b|\d\s*(?:degrees?|deg)\s*C\b", re.IGNORECASE)
+
+
+def _states_both(text: Optional[str]) -> bool:
+    return bool(text and _PH.search(text) and _TEMPERATURE.search(text))
+
+
+def _conditions_lost(pick: Any, row: Mapping[str, Any], isoform: str) -> str:
+    """"; that row states no pH or temperature ...": said when the row for
+    the isoform states neither while the resolver's pick states both.
+    DPP4: ref 678195's "dimeric rDPP-IV" (Km 0.09 mM, kcat 87 1/s, its
+    UniProt cell P27487) replaced the pick 0.165 mM (pH 7.6, 30°C) and 20.3
+    1/s (pH 8.0); its kcat is 3.6 to 4.4 times every wild-type row stating
+    conditions, and the report gave no reason to doubt it (sixth round,
+    XS5R2-06)."""
+    theirs = str(row.get("conditions") or "")
+    mine = str(getattr(pick, "commentary", None) or "")
+    if _PH.search(theirs) or _TEMPERATURE.search(theirs) or not _states_both(mine):
+        return ""
+    return (f"; that row states no pH or temperature ({theirs!r}), while the resolver's pick states "
+            f"both ({' '.join(mine.split())!r}): it is taken because it names {isoform}"
+            ", not because it is the better-described measurement")
+
+
 def select_isoform(measured: Mapping[str, Any], isoform: str,
                    asked: str = ASKED_BY_FLAG) -> IsoformSelection:
     """Each measured constant, taken from a row that measured `isoform` where
@@ -241,7 +266,7 @@ def select_isoform(measured: Mapping[str, Any], isoform: str,
             out.notes.append(
                 f"`{identifier}`: the resolver's pick ({m.value:g} {m.unit}) {was}; the row for "
                 f"{isoform} ({float(row['value']):g} {m.unit}, BRENDA ref {row.get('reference_id')}) "
-                f"is used instead, as {asked} asked")
+                f"is used instead, as {asked} asked" + _conditions_lost(m, row, isoform))
             continue
         if chosen is None:
             out.measured[identifier] = m

@@ -381,6 +381,9 @@ class ModelDossier:
             note = _wild_type_label_note(measured[identifier])
             if note:
                 notes.append(f"`{identifier}`: {note}")
+            construct = _construct_note(measured[identifier])
+            if construct:
+                notes.append(f"`{identifier}`: {construct}")
             reaction = _reaction_of(measured[identifier]) or _reaction_on_the_page(
                 self.model, measured[identifier], getattr(by_id.get(identifier), "table", None))
             if reaction:
@@ -1349,7 +1352,28 @@ def _other_conditions(commentary: Optional[str]) -> Optional[str]:
 #: labelled wild-type (fallback_logic `_unlabelled_beside_wild_type`).
 _WILD_LABEL_PASSED = re.compile(
     r"(\d+) unlabelled row\(s\) passed over for the same paper's row labelled wild-type under "
-    r"otherwise the same stated conditions")
+    r"otherwise the same stated conditions(?: \(([^)]*)\))?")
+
+
+def _construct_note(record: Any) -> Optional[str]:
+    """What a carried row measured when it is a construct or an altered
+    preparation (row_form.construct_of): a tagged or refolded enzyme, an
+    assay in D2O or with a surfactant added. Human CES1's only wild-type kcat
+    row, 7.6 1/s, is a "recombinant refolded His-taggged" enzyme (ref
+    752090), and the report said nothing of it (sixth round, NEW-08)."""
+    text = getattr(record, "commentary", None)
+    if not text:
+        return None
+    try:
+        from caterva.checkout import literature_module
+
+        construct = literature_module("row_form").construct_of(text)
+    except Exception:  # noqa: BLE001 - without the literature layer, no such note
+        return None
+    if not construct:
+        return None
+    return (f"the row measured {construct}, not the native enzyme; it is carried because no row of "
+            "the native enzyme was left for this constant")
 
 
 def _wild_type_label_note(record: Any) -> Optional[str]:
@@ -1367,8 +1391,20 @@ def _wild_type_label_note(record: Any) -> Optional[str]:
     n = int(found.group(1))
     ref = getattr(record, "reference_id", None) or _reference_of(record)
     paper = f"BRENDA ref {ref}" if ref else "the same paper"
+    values = (found.group(2) or "").strip()
+    far = ""
+    try:
+        carried = float(record.value)
+        nums = [float(v.split()[0]) for v in values.split(",") if v.strip()]
+        folds = [max(carried / v, v / carried) for v in nums if v > 0 and carried > 0]
+        if folds and max(folds) > 3:
+            far = f", {max(folds):.2g}-fold from the value carried"
+    except (TypeError, ValueError, AttributeError, IndexError):
+        far = ""
     return (f"the row carried is labelled wild-type; {paper} also gives "
-            f"{'a row' if n == 1 else f'{n} rows'} under otherwise the same stated conditions that "
+            f"{'a row' if n == 1 else f'{n} rows'}"
+            + (f" ({values}{far})" if values else "")
+            + f" under otherwise the same stated conditions that "
             f"{'states' if n == 1 else 'state'} no wild-type label (possibly a construct or variant "
             f"the commentary does not name), passed over for the labelled one")
 

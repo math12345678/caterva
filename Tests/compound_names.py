@@ -301,6 +301,30 @@ ALIASES = (
     ("O2-", "superoxide"), ("O2.-", "superoxide"), ("O2•-", "superoxide"), ("O2·-", "superoxide"),
     ("superoxide anion", "superoxide"), ("superoxide radical", "superoxide"),
     ("superoxide anion radical", "superoxide"), ("superoxide radical anion", "superoxide"),
+    # One amine, four spellings: MAO-B's tally split "2-Phenylethylamine"
+    # (3 Km, 1 kcat) from "Phenylethylamine" (2 Km, 1 kcat), and kynuramine
+    # was called the best measured (sixth round, VR2-03).
+    ("phenylethylamine", "2-phenylethylamine"), ("beta-phenylethylamine", "2-phenylethylamine"),
+    ("β-phenylethylamine", "2-phenylethylamine"), ("phenethylamine", "2-phenylethylamine"),
+    ("2-phenethylamine", "2-phenylethylamine"), ("beta-phenethylamine", "2-phenylethylamine"),
+    # 6-phosphogluconate dehydrogenase's substrate under three names: sheep
+    # 6PGD's 14 Km rows were split between two of them and lost to a
+    # phosphonate analogue (sixth round, NEW-12).
+    ("6-phospho-D-gluconate", "6-phosphogluconate"), ("D-gluconate 6-phosphate", "6-phosphogluconate"),
+    ("6-phospho-D-gluconic acid", "6-phosphogluconate"), ("6-phosphogluconic acid", "6-phosphogluconate"),
+    ("gluconate 6-phosphate", "6-phosphogluconate"), ("D-gluconate-6-phosphate", "6-phosphogluconate"),
+    # RNase A's classic substrate under five spellings: bovine RNase A was
+    # modelled on ref 682742's "cyclic 2',3'-cytidine monophosphate" (1 Km,
+    # 0.0023 mM) as if it were another compound than the 5 wild-type
+    # "cytidine-2',3'-cyclic monophosphate" rows at 0.45-0.62 mM (sixth
+    # round, NEW-13).
+    ("cyclic 2',3'-CMP", "cytidine 2',3'-cyclic monophosphate"),
+    ("cyclic 2',3'-cytidine monophosphate", "cytidine 2',3'-cyclic monophosphate"),
+    ("cytidine-2',3'-cyclic monophosphate", "cytidine 2',3'-cyclic monophosphate"),
+    ("cytidine 2',3'-cyclic phosphate", "cytidine 2',3'-cyclic monophosphate"),
+    ("cytidine 2',3'-phosphate", "cytidine 2',3'-cyclic monophosphate"),
+    ("2',3'-cCMP", "cytidine 2',3'-cyclic monophosphate"),
+    ("2',3'-cyclic CMP", "cytidine 2',3'-cyclic monophosphate"),
     ("HMG-CoA", "3-hydroxy-3-methylglutaryl-CoA"),
     ("hydroxymethylglutaryl-CoA", "3-hydroxy-3-methylglutaryl-CoA"),
     ("3-hydroxy-3-methylglutaryl-coenzyme A", "3-hydroxy-3-methylglutaryl-CoA"),

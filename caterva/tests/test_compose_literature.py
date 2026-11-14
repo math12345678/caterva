@@ -605,12 +605,14 @@ class TestTheExitCodeWhenASearchIsRefused:
         assert asked["compounds"] == {"@inhibitor": "D-glucose 1,6-diphosphate"}
         assert [c.role for c in found.choices] == ["substrate", "inhibitor"]
         assert found.substrate == "D-glucose"
+        # 2-deoxy-D-glucose, a synthetic analogue of D-glucose, ranks after the
+        # natural compounds since the sixth round (NEW-12).
         assert found.choices[0].note() == (
             "No substrate was named, so Caterva used D-glucose: of the 10 substrates BRENDA lists "
             "Km rows for under EC 2.7.1.1 in Homo sapiens, it has the most Km and kcat rows (13 Km, "
             "13 kcat; the cosubstrate ATP set aside; not counted, because the search cannot use "
-            "them: 60 rows of a variant). Others: 2-deoxy-D-glucose (4 Km, 1 kcat); D-mannose "
-            "(4 Km); D-fructose (2 Km); D-glucosamine (3 Km); ITP (1 Km); and 4 more. "
+            "them: 60 rows of a variant). Others: D-mannose (4 Km); D-fructose (2 Km); "
+            "D-glucosamine (3 Km); ITP (1 Km); 2-deoxy-D-glucose (4 Km, 1 kcat); and 4 more. "
             "Pass --substrate NAME to model another.")
         assert "--substrate NAME" not in (note or ""), "the search ran, for D-glucose"
 

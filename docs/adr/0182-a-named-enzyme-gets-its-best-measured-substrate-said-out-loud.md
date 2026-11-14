@@ -681,3 +681,88 @@ constants' own picks is not carried) also changes a run the advice branch
 checked: "acid phosphatase" in Homo sapiens now carries Km 0.36 mM (ref
 134741) beside kcat 14.1 1/s (ref 663781), not ref 663781's pair (4.7 mM,
 26.4 1/s), and says why. It is still fully measured.
+
+## Sixth round (2026-11-13): which row, substrate and organism are carried
+
+The sixth round found numbers carried for the wrong preparation, the wrong
+compound or the wrong organism. Each fix is a general rule, not one enzyme's.
+
+- **Altered preparations lose to native rows.** A row measured with a
+  surfactant or an ionic liquid in the assay ("presence of 2 mM
+  cetyltrimethylammonium bromide"), in D2O, refolded, or tagged (BRENDA's
+  "His-taggged" typo included) is a construct or altered preparation
+  (`row_form.construct_of`). It is passed over for a native row, and left
+  out of the substrate tally's count of the enzyme's own constant. When it is
+  still the only row and is carried, the report says what it measured.
+  "Uncleaved, nonsulfated" is the intact enzyme and is no longer read as a
+  modification.
+- **One paper's value per protein is no protein's.** A row whose UniProt
+  cell lists several proteins, whose words name none, and whose paper gives
+  several values for the same compound under the same words is unattributed.
+  PARP1's NAD+ Km was the median of five such rows (ref 776950), one per
+  PARP-family protein. It is now withheld when PARP1 is asked for.
+- **A stereo descriptor the model's name leaves out is the same compound**
+  when the page lists no other configuration ("D-Fructose 1-phosphate" for
+  "fructose 1-phosphate"). A name inside a longer name never is.
+- **Synonyms are merged in the tallies**: 2-phenylethylamine and
+  phenylethylamine; 6-phosphogluconate and 6-phospho-D-gluconate.
+- **Synthetic analogues and ill-defined substrates rank after defined
+  natural ones**, even when they alone have a kcat row. A phosphonate,
+  deoxy, halo, aza or carba form of a natural substrate is an analogue
+  (sheep 6PGD's 6-phosphono-D-gluconate). A glycoprotein such as fetuin, whose
+  molar Km rests on an assumed molecular weight, is ill-defined (influenza
+  neuraminidase). The choice note says why, and the kcat stays a placeholder
+  unless the search finds one.
+- **Organisms are ranked by papers before rows.** Arthrobacter sp. won ONPG
+  with two papers' temperature series. E. coli, with four papers, now wins,
+  and the note says why.
+- **A name that means one organism's enzyme picks that organism** when it
+  covers as many of the model's constants as the organism chosen without it:
+  RNase A is Bos taurus, plain "beta-galactosidase" is E. coli LacZ. Hen
+  egg-white lysozyme (Gallus gallus) has Km rows and no kcat row, so plain
+  "lysozyme" keeps the organism that measures both, and the note names the
+  hen enzyme first among the others, with the --organism to pass. A model
+  with a placeholder is not a better answer than a fully measured one. Every
+  organism with any row is counted in the note, and subtypes filed as
+  organisms of their own ("influenza A virus H1N1") are named.
+- **Two papers sharing a slip do not hide each other.** A paper was a
+  probable error only when its row lay more than 100-fold from every other
+  row. Human aldolase B's Km for fructose 1-phosphate is 0.0022 and 0.0024 mM
+  in refs 651313 and 651985, and 0.24 to 27 mM in six other papers. A far
+  cluster of one or two papers is now set aside when the other papers
+  outnumber it three to one and their median is more than 100-fold away
+  (`fallback_logic.minority_cluster`). A paper with rows near and far is a
+  series over a condition and is left alone, and so is a cluster naming an
+  isoform no other row names. Aldolase B now carries ref 4945's pair (3.7
+  mM, 10.8 1/s), and the report says which paper was set aside and why.
+- **What the carried row is, said.** A Ki row with a Hill coefficient is
+  reported as cooperative inhibition. Tissue words ("muscle", "liver") and
+  the short names the tissue table already gives ("aldolase B", "CK-M") name
+  the isoform over a UniProt cell that says otherwise. An isoform row that states no pH or temperature, replacing
+  a pick that states both, is said to (DPP4, ref 678195). A carried value
+  still more than 100-fold from the median of other papers' wild-type rows
+  is flagged, and any paper that agrees with it is named. A same-paper
+  unlabelled row passed over is given with its value and distance. A range
+  given by any paper the spread counts is quoted, since no spread counts it
+  (trypsin, ref 678332: kcat "20 - 50" 1/s). In the advice for a constant
+  with no row for the isoform asked, organisms Caterva lists no such protein
+  for are said apart from the ones it does (PARP1: rat, then the bacterial
+  toxins' organisms).
+
+Carried values that changed in the 56 corpus queries, both meant: plain
+"trypsin" in human now carries ref 772843's intact-enzyme pair (0.0361 mM,
+154 1/s) instead of the mesotrypsin paper's, and MAO-B now uses
+2-phenylethylamine (0.016 mM, 3.82 1/s, ref 672153), the best measured once
+its spellings are counted together. No query lost a measured constant.
+
+Not done: "hCE-1"/"hCE-2" are not read as CES1/CES2, and "carboxylesterase
+1" is not read as naming CES1 (names questions), so CES1's untagged pair
+still needs --isoform; its kcat is still the refolded His-tagged row, the
+only wild-type one, and the report says so. Without an isoform the FBPase
+muscle (FBP2) row is carried and labelled as FBP2's rather than swapped for
+the liver row. DPP4 still carries the row whose UniProt cell names it; the
+report now says it states no conditions. Asking for "D-Fructose 1-phosphate"
+by that exact name still carries ref 651313's 0.0022 mM, flagged as
+1200-fold below the other papers: only three other papers use that
+spelling, too few to set it aside. "6-phosphogluconate dehydrogenase" as
+typed is still not resolved to EC 1.1.1.44 (a names question).
