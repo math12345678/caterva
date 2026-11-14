@@ -151,7 +151,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "198 test files -- kinetics & Michaelis-Menten correctness, " +
+          "201 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -292,10 +292,14 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-11-13 (ADR 0182, the fifth round's polish) on
         // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
         // 7848 tests, 7846 passed, 2 skipped, 0 failed, 367 s.
-        passed: 7846,
+        //
+        // Measured 2026-11-14 (ADR 0182, sixth round's fixes) on
+        // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
+        // 7923 tests, 7921 passed, 2 skipped, 0 failed, 326 s.
+        passed: 7921,
         skipped: 2,
         failed: 0,
-        collected: 7848,
+        collected: 7923,
       },
     ],
   },
@@ -305,7 +309,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "104 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "106 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -422,10 +426,20 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-11-13 (ADR 0182, the fifth round's polish) on
         // fix/studio-real-values, Tests/ with pytest-xdist (-n 8): 1961
         // tests, 1961 passed, 0 skipped, 0 failed, 317 s.
-        passed: 1961,
+        //
+        // Measured 2026-11-14 (ADR 0182, sixth round's fixes) on
+        // fix/studio-real-values, Tests/: 1990 tests, 1990 passed, 0
+        // skipped, 0 failed. Not one run: PubChem was refusing this
+        // machine's requests (503, "too many requests per second or
+        // blacklisted"), and one test that asks it for compound identities
+        // (test_a_re_selection_to_another_substrates_row_says_so) held an
+        // xdist worker through its retries. 1953 passed in the xdist run
+        // (-n 8), the 36 queued behind it passed run on their own, and
+        // that test passed alone in 418 s.
+        passed: 1990,
         skipped: 0,
         failed: 0,
-        collected: 1961,
+        collected: 1990,
       },
     ],
   },
@@ -435,7 +449,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "87 test files -- query resolution, parameter provenance, " +
+          "89 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
@@ -527,7 +541,11 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-11-13 (ADR 0182, fifth round's fixes) on
         // fix/studio-real-values, vitest run with the project venv on PATH:
         // 87 files, 938 tests, 938 passed.
-        passed: 938,
+        //
+        // Measured 2026-11-14 (ADR 0182, sixth round's fixes) on
+        // fix/studio-real-values, vitest run with the project venv on PATH:
+        // 89 files, 953 tests, 953 passed.
+        passed: 953,
         skipped: 0,
         failed: 0,
       },
@@ -575,7 +593,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "81 test files -- the `scientific` CLI end to end and its " +
+          "82 test files -- the `scientific` CLI end to end and its " +
           "refusals, the literature resolver, the Python engine bridge, " +
           "inhibition models, exports, request validation, result storage " +
           "and reproducibility checks",
@@ -606,7 +624,10 @@ export const TEST_SUITES: TestSuite[] = [
         //
         // Measured 2026-11-13 (ADR 0182, the fifth round's polish) on
         // fix/studio-real-values: jest, 81 suites, 1031 tests, 1031 passed.
-        passed: 1031,
+        //
+        // Measured 2026-11-14 (ADR 0182, sixth round's fixes) on
+        // fix/studio-real-values: jest, 82 suites, 1036 tests, 1036 passed.
+        passed: 1036,
         skipped: 0,
         failed: 0,
       },
