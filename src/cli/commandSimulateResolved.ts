@@ -130,6 +130,9 @@ export interface ParameterProvenance {
    * compose's report and the Studio print them (third real-values round).
    */
   rowNotes?: string[];
+  /** For the Km: which protein of a multi-protein EC the model is
+   *  (XS5R2-04), printed once above the table. */
+  isozyme?: { headline: string; detail: string; remedy: string };
 }
 
 /**
@@ -1191,6 +1194,7 @@ export async function commandSimulateResolved(
           assayConditions: assayConditionsFor(result),
           rowScope: rowScopeOf(result, options.isoform),
           rowNotes: result.rowNotes && result.rowNotes.length > 0 ? result.rowNotes : undefined,
+          ...(result.isozymeNotice ? { isozyme: result.isozymeNotice } : {}),
         });
       } else {
         // Vmax is not a BRENDA table. It is kcat x [E]0, and [E]0 is a
@@ -1988,6 +1992,21 @@ function wrap(text: string, width: number): string[] {
 
 function printProvenance(rows: ParameterProvenance[]): void {
   if (rows.length === 0) return;
+
+  // Which protein the model is, before the numbers: "hexokinase" carried
+  // glucokinase's K0.5 with nothing saying HK1 and HK2 were not modelled
+  // (sixth round, XS5R2-04). Compose's words, from the same function.
+  const isozyme = rows.find((r) => r.isozyme)?.isozyme;
+  if (isozyme) {
+    process.stdout.write(`\n${c(BOLD, 'Which protein')}\n`);
+    for (const line of wrap(`${isozyme.detail}.`, 72)) {
+      process.stdout.write(`  ${c(YELLOW, line)}\n`);
+    }
+    if (isozyme.remedy) {
+      const remedy = `${isozyme.remedy[0]!.toUpperCase()}${isozyme.remedy.slice(1)}.`;
+      for (const line of wrap(remedy, 72)) process.stdout.write(`  ${line}\n`);
+    }
+  }
 
   process.stdout.write(`\n${c(BOLD, 'Parameters and where they came from')}\n`);
 

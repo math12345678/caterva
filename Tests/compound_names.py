@@ -72,8 +72,10 @@ _SALT_FORM = re.compile(
 )
 _PRIMES = str.maketrans({"’": "'", "′": "'", "‘": "'", "α": "alpha", "β": "beta"})
 #: An o-/m-/p- locant written as a letter, lower case only ("O-acetyl" is an
-#: oxygen substituent).
-_LETTER_LOCANT = re.compile(r"(?<![A-Za-z0-9])([pom])-(?=[a-z])")
+#: oxygen substituent). The name after it may start with a capital: BRENDA
+#: files "p-Aminobenzoate" beside "4-aminobenzoate", and the two were listed
+#: as two compounds (sixth round, NEW-17).
+_LETTER_LOCANT = re.compile(r"(?<![A-Za-z0-9])([pom])-(?=[A-Za-z])")
 _LOCANT_NUMBER = {"o": "2", "m": "3", "p": "4"}
 #: The benzyloxycarbonyl protecting group, under each name papers use.
 _Z_GROUP = re.compile(

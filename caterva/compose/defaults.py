@@ -721,7 +721,8 @@ _PRIMES = str.maketrans({"’": "'", "′": "'", "‘": "'"})
 #: phosphate") or a number ("4-nitrophenyl phosphate"): one compound, which
 #: BRENDA files under both. Lower case only, before case is folded: "O-" is
 #: an oxygen substituent ("O-acetyl"), not ortho.
-_LETTER_LOCANT = re.compile(r"(?<![A-Za-z0-9])([pom])-(?=[a-z])")
+# The name after the locant may start with a capital ("p-Aminobenzoate").
+_LETTER_LOCANT = re.compile(r"(?<![A-Za-z0-9])([pom])-(?=[A-Za-z])")
 _LOCANT_NUMBER = {"o": "2", "m": "3", "p": "4"}
 
 
@@ -981,8 +982,41 @@ def _by_paper(row: _Row, isoform: str, papers: dict) -> Optional[bool]:
     return None if any(_same_isoform(r, isoform) for r in readings) else False
 
 
+def _strict_names(row: _Row, strict: Mapping[str, Any]) -> bool:
+    """Whether a row names the protein of a curated alias whose rows must
+    name it (`protein_rows.strict_alias`): its one UniProt accession is that
+    protein's, or its words name it. A row listing several proteins'
+    accessions and naming none is not its row (TEM-1, ref 696728)."""
+    cells = {c.strip() for c in str(row.uniprot or "").split(",") if c.strip()}
+    curated = {str(a) for a in strict.get("accessions", [])}
+    if cells and cells <= curated:
+        return True
+    try:
+        from caterva.compose.protein_rows import _names_it
+    except ImportError:  # pragma: no cover
+        return False
+    names = [n for n in [strict.get("isoform") or "", *strict.get("names", []),
+                         *strict.get("row_names", [])] if n]
+    return _names_it(row.conditions, names)
+
+
+def _strict_alias(ec: str, isoform: Optional[str]) -> Optional[Mapping[str, Any]]:
+    """`protein_rows.strict_alias`, or None when it cannot be read."""
+    if not isoform:
+        return None
+    try:
+        from caterva.compose.protein_rows import strict_alias
+    except ImportError:  # pragma: no cover
+        return None
+    try:
+        return strict_alias(ec, isoform)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _usable(rows: Sequence[_Row], isoform: Optional[str] = None, mode: Optional[str] = None,
-            substrate: Optional[str] = None, papers: Optional[dict] = None) -> _Usable:
+            substrate: Optional[str] = None, papers: Optional[dict] = None,
+            strict: Optional[Mapping[str, Any]] = None) -> _Usable:
     """The rows of one compound the resolver would choose among, by its own
     steps in its order (fallback_logic.resolve_kinetic_value): flagged rows
     never; with an isoform, the rows naming it, or failing those the rows
@@ -1012,6 +1046,24 @@ def _usable(rows: Sequence[_Row], isoform: Optional[str] = None, mode: Optional[
             pool_unnamed = [r for r in pool_unnamed if r not in silent
                             or _by_paper(r, isoform, papers) is None]
         others = len(pool) - len(mine) - len(pool_unnamed)
+        if strict is not None:
+            # A protein whose rows must name it (TEM-1 under EC 3.5.2.6):
+            # the search withholds a row naming none, so it is not counted.
+            # Benzylpenicillin was chosen for TEM-1 on "1 Km, 1 kcat" the
+            # search could use, and the run withheld both (sixth round,
+            # VR2-04).
+            # A row its paper's other entries tie to the protein is not one
+            # the search takes either: the row itself must name it.
+            by_words = [r for r in mine if _same_isoform(_isoform_read(r.conditions), isoform)
+                        or _strict_names(r, strict)]
+            silent_mine = len(mine) - len(by_words)
+            mine = by_words
+            naming = [r for r in pool_unnamed if _strict_names(r, strict)]
+            silent = len(pool_unnamed) - len(naming) + silent_mine
+            if silent:
+                out.set_aside[f"a paper that does not name {isoform} in the row (only rows naming it are taken for it)"] += silent
+            mine = mine + naming
+            pool_unnamed = []
         if not mine and pool_unnamed and others >= 2 and others > len(pool_unnamed):
             # The resolver's rule (fallback_logic._isoform_tiers): rows naming
             # none, among more rows naming only other proteins, are theirs.
@@ -1060,9 +1112,11 @@ class _Counts:
     search can use of them (`_usable`)."""
 
     def __init__(self, isoform: Optional[str] = None, mode: Optional[str] = None,
-                 substrate: Optional[str] = None, papers: Optional[dict] = None) -> None:
+                 substrate: Optional[str] = None, papers: Optional[dict] = None,
+                 strict: Optional[Mapping[str, Any]] = None) -> None:
         self.isoform, self.mode, self.substrate = isoform, mode, substrate
         self.paper_isoforms = papers or {}
+        self.strict = strict
         self.by_table: Dict[str, Dict[str, List[_Row]]] = {}
         self.spellings: Dict[str, Counter] = {}
         self._usable: Dict[Tuple[str, str], _Usable] = {}
@@ -1085,7 +1139,7 @@ class _Counts:
             found = _Usable([])
             for rows in self._by_spelling(key, table).values():
                 part = _usable(rows, self.isoform, self.mode if table == "ki" else None,
-                               self.substrate, self.paper_isoforms)
+                               self.substrate, self.paper_isoforms, self.strict)
                 found.rows.extend(part.rows)
                 found.set_aside.update(part.set_aside)
             self._usable[(key, table)] = found
@@ -1162,7 +1216,7 @@ class _Counts:
         spelling = _search_key(self.name(key))
         return any(_usable(self._by_spelling(key, t).get(spelling, []), self.isoform,
                            self.mode if t == "ki" else None, self.substrate,
-                           self.paper_isoforms).names_isoform
+                           self.paper_isoforms, self.strict).names_isoform
                    for t in tables)
 
     def keys(self, table: str) -> List[str]:
@@ -1299,7 +1353,10 @@ def _ties(ranked: Sequence[str], rank, papers, name, elsewhere=None,
     return True, clause
 
 
-def _isoform_clause(isoform: Optional[str]) -> str:
+def _isoform_clause(isoform: Optional[str], strict: bool = False) -> str:
+    if isoform and strict:
+        # TEM-1: rows naming no isoform are not taken (sixth round, VR2-04).
+        return f", counting the rows the search can use for {isoform} (rows naming it)"
     return (f", counting the rows the search can use for {isoform} (rows naming it, or where none "
             f"does, rows naming no isoform)" if isoform else "")
 
@@ -1423,7 +1480,8 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
     # wild type's 19 isocitrate Km rows chose isocitrate, while R132H's
     # rows are as many for 2-oxoglutarate, its neomorphic reaction (fourth
     # round of the real-values review).
-    counts = _Counts(isoform, papers=_papers(ec) if isoform else None)
+    counts = _Counts(isoform, papers=_papers(ec) if isoform else None,
+                     strict=_strict_alias(ec, isoform))
     km_rows, left_out = _of_mutant(table_rows(ec, "km", organism), mutation)
     counts.add("km", km_rows)
     tables = ["km"]
@@ -1680,14 +1738,14 @@ def _choose_substrate(ec: str, organism: Optional[str], needs_kcat: bool,
         # The counts are in `how`, after the substrate's own description.
         how = how.replace(f"({measured})", f"({measured}{detail})", 1)
         why = (f"of the {_plural(len(candidates), 'substrate')}{which} BRENDA lists Km rows for under "
-               f"{_where(ec, organism)}{_isoform_clause(isoform)}{mutant}, {how}{natural_tail}"
+               f"{_where(ec, organism)}{_isoform_clause(isoform, counts.strict is not None)}{mutant}, {how}{natural_tail}"
                f"{tie_clause}")
     else:
         # The counts follow the clause they count: after the reporters'
         # clause they read as the reporters' (trypsin, fifth round, R5V1-4).
         first, _, rest = how.partition("; ")
         why = (f"of the {_plural(len(candidates), 'substrate')}{which} BRENDA lists Km rows for under "
-               f"{_where(ec, organism)}{_isoform_clause(isoform)}{mutant}, {first} ({measured}"
+               f"{_where(ec, organism)}{_isoform_clause(isoform, counts.strict is not None)}{mutant}, {first} ({measured}"
                f"{detail}){'; ' + rest if rest else ''}{tie_clause}")
     alternatives = tuple(Option(counts.name(k), rows(k), USABLE_NONE)
                          for k in ranked[1:1 + ALTERNATIVES_NAMED])
@@ -1735,7 +1793,8 @@ def choose_inhibitor(ec: str, organism: Optional[str], substrate: Optional[str] 
 
 def _choose_inhibitor(ec: str, organism: Optional[str], substrate: Optional[str],
                       isoform: Optional[str] = None, mode: Optional[str] = None) -> Optional[Choice]:
-    counts = _Counts(isoform, mode, substrate, papers=_papers(ec) if isoform else None)
+    counts = _Counts(isoform, mode, substrate, papers=_papers(ec) if isoform else None,
+                     strict=_strict_alias(ec, isoform))
     counts.add("ki", table_rows(ec, "ki", organism))
     excluded = _group_key(substrate) if substrate else None
     candidates = [k for k in counts.keys("ki") if k != excluded]

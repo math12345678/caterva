@@ -267,7 +267,20 @@ def extract_effectors(commentary: str | None) -> list[Effector]:
             # "enzyme with removed helix alpha13": the construct, not the assay.
             continue
         presence = _presence_of(m.group("lead"))
-        parts = [(compound, m.group("conc") or None)]
+        conc_after = None
+        trailing = re.match(rf"(?P<conc>{_CONCENTRATION})", commentary[m.end("compound") - 1:]) \
+            if re.search(r"\s\d+$", compound) else None
+        whole = re.search(rf"\s+(?P<conc>{_CONCENTRATION})$", compound)
+        if whole and not trailing:
+            # "with NADH 1 mM": the same, read whole.
+            compound, conc_after = compound[:whole.start()], whole.group("conc")
+        elif trailing:
+            # "with papyriferic acid 0.04 mM": the concentration follows the
+            # name, and the name read as "papyriferic acid 0" (sixth round,
+            # NEW-17).
+            compound = re.sub(r"\s+\d+$", "", compound)
+            conc_after = trailing.group("conc")
+        parts = [(compound, m.group("conc") or conc_after)]
         joined = _CONJUNCTION_RE.search(compound)
         if joined:
             # "X or Y": either was used, and the row does not say which, so

@@ -225,6 +225,14 @@ def to_parameter_source(
             reason += f" -- available in: {', '.join(sorted(available))}"
         field_name, what, sep = _WITHHELD_LISTS.get(source, (None, None, None))
         withheld = list(getattr(result, field_name, []) or []) if field_name else []
+        if source == "variant_withheld" and getattr(result, "variant_isozymes_only", False) is True:
+            # Every row withheld names an isozyme ("isoenzyme A"): a
+            # wild-type protein, not a variant, and taken when --isoform
+            # names it (Vibrio tyrosinaticus's tyrosinase, sixth round,
+            # XS5R2-03).
+            reason = ("every row BRENDA holds for this constant names an isozyme, a wild-type protein "
+                      "in its own right, and a named isozyme's row is taken only when --isoform names it")
+            what = "the isozymes"
         if withheld:
             reason += f" -- {what}: {sep.join(withheld)}"
         unnamed = getattr(result, "isoform_unnamed_withheld", 0) or 0

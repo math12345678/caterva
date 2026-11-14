@@ -169,7 +169,12 @@ export function readWithCompose(sentence: string, flags: ReadFlags = {}): ReadAn
     };
   }
   const why = ((proc.stderr || proc.stdout || '') + (proc.error ? String(proc.error) : '')).trim().split('\n').pop();
-  return { kind: 'unavailable', reason: why || `the reader exited ${proc.status}` };
+  // A reader killed from outside has no exit status, only a signal: say
+  // that, not "exited null" (sixth round, XS5R2-09).
+  const how = proc.signal
+    ? `the reader was stopped by a signal (${proc.signal})`
+    : `the reader exited with status ${proc.status}`;
+  return { kind: 'unavailable', reason: why || how };
 }
 
 /** The --model a sentence's rule is, when the CLI has one for it. */

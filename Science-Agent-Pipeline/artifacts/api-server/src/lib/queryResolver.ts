@@ -574,6 +574,86 @@ function missingKeyDetails(
 }
 
 /**
+ * Why a kcat lookup came back empty, in a sentence, or undefined when it
+ * simply found nothing. Shared by the Vmax bridge and by the advice given
+ * before an enzyme concentration is stated (XS5R2-05), so the two say the
+ * same thing.
+ */
+function kcatWithheldReason(
+  agentResult: Partial<ScienceAgentResult>,
+  organism: string | undefined,
+): string | undefined {
+  const asked = organism ? ` measured in ${organism}` : "";
+  if (agentResult.source === "cross_species_withheld") {
+    const variantOnly = new Set(agentResult.crossSpeciesVariantOnly ?? []);
+    const all = agentResult.crossSpeciesOrganismsAvailable ?? [];
+    const others = all.filter((o) => !variantOnly.has(o));
+    if (others.length === 0 && all.length > 0 && variantOnly.size > 0) {
+      const isozymeOnly = new Set(agentResult.crossSpeciesIsozymeOnly ?? []);
+      if (all.every((o) => isozymeOnly.has(o))) {
+        // Isozyme rows are wild-type proteins, not variants (XS5R2-03).
+        return (
+          `BRENDA's only kcat rows for this enzyme outside ${organism ?? "the organism asked for"} ` +
+          `(${all.join(", ")}) each name an isozyme, taken only when that isoform is asked for, ` +
+          "so Vmax was not bridged from them."
+        );
+      }
+      return (
+        `BRENDA's only kcat rows for this enzyme outside ${organism ?? "the organism asked for"} ` +
+        `(${all.join(", ")}) measured a protein variant, so Vmax was not bridged from them.`
+      );
+    }
+    return (
+      `BRENDA holds a kcat for this enzyme` +
+      (others.length > 0 ? ` from ${others.join(", ")}` : " from another organism") +
+      `, but none${asked}. Kinetic constants are species-specific, so ` +
+      "Vmax was not bridged from another species' kcat."
+    );
+  }
+  if (agentResult.source === "variant_withheld") {
+    const variants = agentResult.variantCandidatesAvailable ?? [];
+    if (agentResult.variantIsozymesOnly) {
+      // Isozymes are wild-type proteins; --isoform takes their rows (XS5R2-03).
+      return (
+        "Every kcat BRENDA holds for this enzyme" +
+        (variants.length > 0 ? ` (${variants.join(", ")})` : "") +
+        " names an isozyme, taken only when the isoform is named, so Vmax was " +
+        "not bridged from it; name one of them as the isoform to model that isozyme."
+      );
+    }
+    return (
+      "Every kcat BRENDA holds for this enzyme" +
+      (variants.length > 0 ? ` (${variants.join(", ")})` : "") +
+      " was measured on a sequence variant, not on the enzyme as found, " +
+      "so Vmax was not bridged from it."
+    );
+  }
+  if (agentResult.source === "implausible_withheld") {
+    const values = agentResult.implausibleValues ?? [];
+    return (
+      "Every kcat BRENDA holds for this enzyme" +
+      (values.length > 0 ? ` (${values.join("; ")})` : "") +
+      " is outside the physically plausible range for a turnover number, " +
+      "so Vmax was not bridged from it."
+    );
+  }
+  if (agentResult.choiceRefusal) {
+    // Nothing to choose a substrate from (ADR 0182): the runner's own
+    // sentence names what is missing and what would fix it.
+    return agentResult.choiceRefusal;
+  }
+  if (agentResult.source === "isoform_withheld") {
+    const isoforms = agentResult.isoformsAvailable ?? [];
+    return (
+      "BRENDA's kcat rows for this enzyme measure " +
+      (isoforms.length > 0 ? isoforms.join(", ") : "other isoforms") +
+      ", not the isoform asked for, so Vmax was not bridged from them."
+    );
+  }
+  return undefined;
+}
+
+/**
  * Helper to build unresolved kinetic provenance (consistent format).
  */
 /**
@@ -954,6 +1034,27 @@ function rowNotesWithIsoform(result: ScienceAgentResult): string[] {
   return notes;
 }
 
+/** The isozyme notice as one flag: what is the case, then what to do. */
+export function isozymeNoticeFlag(
+  notice: ScienceAgentResult["isozymeNotice"],
+): string | undefined {
+  if (!notice?.detail) return undefined;
+  const remedy = notice.remedy
+    ? ` ${notice.remedy[0]!.toUpperCase()}${notice.remedy.slice(1)}.`
+    : "";
+  return `isozymes: ${notice.detail}.${remedy}`;
+}
+
+/** A Km's note, with the isozyme headline after it when there is one. */
+function withIsozymeHeadline(
+  note: string | undefined,
+  notice: ScienceAgentResult["isozymeNotice"],
+): string | undefined {
+  if (!notice?.headline) return note;
+  const line = `which protein: ${notice.headline}`;
+  return note ? `${note}; ${line}` : line;
+}
+
 function provenanceNote(chosen: string | undefined | null, rowNotes?: string[]): string | undefined {
   const parts = [chosen, ...(rowNotes ?? []).map((n) => `the row: ${n}`)].filter(
     (p): p is string => typeof p === "string" && p.length > 0,
@@ -1001,6 +1102,8 @@ async function applyKineticResolution(
   /** The entities with every name the runner chose filled in (ADR 0182),
    *  so the kcat bridge after this looks up the SAME substrate. */
   entities?: EntityExtraction;
+  /** The kcat half of the Km's pair, when the runner computed one. */
+  pairedKcat?: Partial<ScienceAgentResult>;
 }> {
   if (!entities?.ecNumber && !entities?.enzymeName) {
     return { parameters, parameterProvenance, flags, entities };
@@ -1068,6 +1171,7 @@ async function applyKineticResolution(
   // Accumulate parameter changes to avoid repeated object spreading
   const parameterUpdates: Record<string, number | number[]> = {};
   const provenanceUpdates: Record<string, ParameterProvenance> = {};
+  let pairedKcat: Partial<ScienceAgentResult> | undefined;
 
   // Resolve each quantity independently: the runner reads BRENDA's KM
   // Values table for "km" and its Ki Values table for "ki", so each key
@@ -1100,6 +1204,7 @@ async function applyKineticResolution(
     // Stated whether or not the lookup then found a value: "kept looking
     // for D-glucose and found no human row" is about D-glucose too.
     adoptChoices(readChoices(agentResult.choices));
+    if (key === "km" && agentResult.pairedKcat) pairedKcat = agentResult.pairedKcat;
 
     if (!agentResult.found) {
       if (
@@ -1273,14 +1378,20 @@ async function applyKineticResolution(
         citationStatus,
         assayConditions: toAssayConditions(agentResult.assayConditions, agentResult.effectors),
         citationLocators: buildCitationLocators(agentResult.citation),
-        ...(provenanceNote(
-          chosenNote(key, [...(entities.choices ?? []), ...readChoices(agentResult.choices)]),
-          rowNotesWithIsoform(agentResult),
+        ...(withIsozymeHeadline(
+          provenanceNote(
+            chosenNote(key, [...(entities.choices ?? []), ...readChoices(agentResult.choices)]),
+            rowNotesWithIsoform(agentResult),
+          ),
+          agentResult.isozymeNotice,
         )
           ? {
-              note: provenanceNote(
-                chosenNote(key, [...(entities.choices ?? []), ...readChoices(agentResult.choices)]),
-                rowNotesWithIsoform(agentResult),
+              note: withIsozymeHeadline(
+                provenanceNote(
+                  chosenNote(key, [...(entities.choices ?? []), ...readChoices(agentResult.choices)]),
+                  rowNotesWithIsoform(agentResult),
+                ),
+                agentResult.isozymeNotice,
               ),
             }
           : {}),
@@ -1339,6 +1450,11 @@ async function applyKineticResolution(
       for (const note of agentResult.rowNotes ?? []) {
         flags.push(`${key.toUpperCase()} row: ${note}.`);
       }
+      // Which protein the model is, for an EC that is several in the
+      // organism: compose and the Studio said "the model is of GCK, one of
+      // 5 human proteins"; the API said only the row's accession (XS5R2-04).
+      const isozymeFlag = isozymeNoticeFlag(agentResult.isozymeNotice);
+      if (isozymeFlag && !flags.includes(isozymeFlag)) flags.push(isozymeFlag);
       flags.push(
         ...ensembleCandidateFlags(key, agentResult.ensembleCandidates),
       );
@@ -1361,6 +1477,7 @@ async function applyKineticResolution(
     parameterProvenance: { ...parameterProvenance, ...provenanceUpdates },
     flags,
     entities: working,
+    pairedKcat,
   };
 }
 
@@ -1389,6 +1506,7 @@ async function applyVmaxFromKcatResolution(
   parameters: Record<string, number | number[]>,
   parameterProvenance: Record<string, ParameterProvenance>,
   flags: string[],
+  pairedKcat?: Partial<ScienceAgentResult>,
 ): Promise<{
   parameters: Record<string, number | number[]>;
   parameterProvenance: Record<string, ParameterProvenance>;
@@ -1434,6 +1552,32 @@ async function applyVmaxFromKcatResolution(
     // succeed — if BRENDA holds no kcat, the flag above says so — only
     // offered, which is the honest shape.
     const existing = parameterProvenance["vmax"];
+    // The Km's lookup already resolved the kcat half of its pair. When that
+    // came back empty, "state the enzyme concentration and Vmax is derived"
+    // is advice that fails on the next run (sixth round, XS5R2-05: tyrosinase
+    // in mouse, COX-2 with celecoxib). Say what the kcat search found
+    // instead, and what would work.
+    if (existing && pairedKcat && pairedKcat.found === false) {
+      const reason = kcatWithheldReason(pairedKcat, entities.organism);
+      parameterProvenance = {
+        ...parameterProvenance,
+        vmax: {
+          ...existing,
+          unresolvedReason: "not_found",
+          note:
+            "Vmax = kcat × [E]0, and the kcat search for this query came " +
+            "back empty: " +
+            (reason ??
+              "BRENDA, KEGG and PubMed hold no usable kcat for this enzyme, " +
+                "substrate and organism.") +
+            " So stating an enzyme concentration alone will not give a Vmax. " +
+            "Supply kcat=<value> (in 1/s) with the enzyme concentration, or " +
+            "vmax=<value> you measured yourself, and attach the paper with " +
+            "--cite; or name another organism or substrate that has kcat rows.",
+        },
+      };
+      return { parameters, parameterProvenance, flags };
+    }
     if (existing) {
       parameterProvenance = {
         ...parameterProvenance,
@@ -1448,7 +1592,11 @@ async function applyVmaxFromKcatResolution(
             "State the enzyme concentration — e.g. \"with 50 nM enzyme\" " +
             "or enzyme_conc=0.00005 (mM) — and Vmax is derived and cited " +
             "for you. Copying a Vmax out of a paper instead would import " +
-            "that paper's enzyme concentration along with it.",
+            "that paper's enzyme concentration along with it." +
+            (pairedKcat?.found === true && typeof pairedKcat.kcat === "number"
+              ? ` The kcat search for this query found ${pairedKcat.kcat} 1/s, ` +
+                "so a stated enzyme concentration is all that is missing."
+              : ""),
         },
       };
     }
@@ -1503,58 +1651,8 @@ async function applyVmaxFromKcatResolution(
   // sentence, telling a student the science was empty when it was this
   // system's species policy that said no. The bridge never forwards
   // allowCrossSpecies, so the sentence offers no flag that would not work.
-  const withheldKcat = (): string | undefined => {
-    const asked = entities.organism ? ` measured in ${entities.organism}` : "";
-    if (agentResult.source === "cross_species_withheld") {
-      const variantOnly = new Set(agentResult.crossSpeciesVariantOnly ?? []);
-      const all = agentResult.crossSpeciesOrganismsAvailable ?? [];
-      const others = all.filter((o) => !variantOnly.has(o));
-      if (others.length === 0 && all.length > 0 && variantOnly.size > 0) {
-        return (
-          `BRENDA's only kcat rows for this enzyme outside ${entities.organism ?? "the organism asked for"} ` +
-          `(${all.join(", ")}) measured a protein variant, so Vmax was not bridged from them.`
-        );
-      }
-      return (
-        `BRENDA holds a kcat for this enzyme` +
-        (others.length > 0 ? ` from ${others.join(", ")}` : " from another organism") +
-        `, but none${asked}. Kinetic constants are species-specific, so ` +
-        "Vmax was not bridged from another species' kcat."
-      );
-    }
-    if (agentResult.source === "variant_withheld") {
-      const variants = agentResult.variantCandidatesAvailable ?? [];
-      return (
-        "Every kcat BRENDA holds for this enzyme" +
-        (variants.length > 0 ? ` (${variants.join(", ")})` : "") +
-        " was measured on a sequence variant, not on the enzyme as found, " +
-        "so Vmax was not bridged from it."
-      );
-    }
-    if (agentResult.source === "implausible_withheld") {
-      const values = agentResult.implausibleValues ?? [];
-      return (
-        "Every kcat BRENDA holds for this enzyme" +
-        (values.length > 0 ? ` (${values.join("; ")})` : "") +
-        " is outside the physically plausible range for a turnover number, " +
-        "so Vmax was not bridged from it."
-      );
-    }
-    if (agentResult.choiceRefusal) {
-      // Nothing to choose a substrate from (ADR 0182): the runner's own
-      // sentence names what is missing and what would fix it.
-      return agentResult.choiceRefusal;
-    }
-    if (agentResult.source === "isoform_withheld") {
-      const isoforms = agentResult.isoformsAvailable ?? [];
-      return (
-        "BRENDA's kcat rows for this enzyme measure " +
-        (isoforms.length > 0 ? isoforms.join(", ") : "other isoforms") +
-        ", not the isoform asked for, so Vmax was not bridged from them."
-      );
-    }
-    return undefined;
-  };
+  const withheldKcat = (): string | undefined =>
+    kcatWithheldReason(agentResult, entities.organism);
 
   if (!agentResult.found || agentResult.kcat === undefined) {
     const withheld = withheldKcat();
@@ -3198,6 +3296,7 @@ export async function resolveQuery(
     // The entities the kcat bridge uses: the Km lookup's, with any name the
     // runner chose for it filled in, so both constants are of one substrate.
     let bridgeEntities = llmEntities;
+    let bridgePairedKcat: Partial<ScienceAgentResult> | undefined;
     if (
       (llmResult.domain === "mm" ||
         llmResult.domain === "mm_competitive_inhibition") &&
@@ -3223,6 +3322,7 @@ export async function resolveQuery(
       parameterProvenance = result.parameterProvenance;
       flags = result.flags;
       bridgeEntities = result.entities ?? llmEntities;
+      bridgePairedKcat = result.pairedKcat;
     }
 
     // ADR 0019: bridge a literature kcat to Vmax, but only when the query
@@ -3235,6 +3335,7 @@ export async function resolveQuery(
         parameters,
         parameterProvenance,
         flags,
+        bridgePairedKcat,
       );
       parameters = vmaxResult.parameters;
       parameterProvenance = vmaxResult.parameterProvenance;
@@ -3571,6 +3672,7 @@ export async function resolveQuery(
   // As on the LLM path: the kcat bridge looks up the substrate the Km did,
   // chosen or named.
   let bridgeEntities = fallbackEntities;
+  let bridgePairedKcat: Partial<ScienceAgentResult> | undefined;
   if (
     (best.domain === "mm" || best.domain === "mm_competitive_inhibition") &&
     (fallbackEntities?.ecNumber || fallbackEntities?.enzymeName) &&
@@ -3591,6 +3693,7 @@ export async function resolveQuery(
     parameterProvenance = result.parameterProvenance;
     flags = result.flags;
     bridgeEntities = result.entities ?? fallbackEntities;
+    bridgePairedKcat = result.pairedKcat;
   }
 
   // ADR 0019: bridge a literature kcat to Vmax, but only when the query
@@ -3609,6 +3712,7 @@ export async function resolveQuery(
       parameters,
       parameterProvenance,
       flags,
+      bridgePairedKcat,
     );
     parameters = vmaxResult.parameters;
     parameterProvenance = vmaxResult.parameterProvenance;

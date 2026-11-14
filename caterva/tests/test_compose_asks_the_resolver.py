@@ -382,8 +382,11 @@ class TestCarry:
         # The resolver's own Measurement, with its full citation.
         assert carried.citation == "BRENDA ref 739793 — “a title”"
         assert carried.chosen_because == (
-            "the resolver's row for LDH-A and a noncompetitive model, ranked among every row "
-            "BRENDA holds before choosing on evidence")
+            # Sixth round (VR2-05): "the resolver's row for NOS1" read as a row
+            # naming NOS1 when the row named no isoform. It is the row the
+            # resolver returns when asked for that isoform.
+            "the row the resolver returns when asked for LDH-A and a noncompetitive model, "
+            "ranked among every row BRENDA holds before choosing on evidence")
         assert refused == {} and notes == [
             "`reaction_Ki`: choosing among the rows the evidence alone returned arrives at "
             "0.00059 mM, BRENDA ref 739793; the resolver, asked for LDH-A and a noncompetitive "

@@ -1544,6 +1544,26 @@ async function main() {
             ...(flags['isoform'] ? { isoform: flags['isoform'] } : {}),
           };
           let answer = readWithCompose(query, readFlags);
+          // Once more before anything else when the reader died. A reader
+          // killed from outside (a SIGTERM, a crash under load) usually reads
+          // on a second try, and the older reader is not a safe stand-in:
+          // for "DPP4" it dropped the isoform and carried 0.17 mM and 20 1/s
+          // (ref 653810) where every other surface carried 0.09 mM and 87 1/s
+          // (ref 678195) (sixth round, XS5R2-09). A reader that ran out of
+          // time is not tried again here: that is said below.
+          let failedTwice: string | undefined;
+          if (answer.kind === 'unavailable' && !answer.timedOut && answer.reason !== 'the sentence reader is off') {
+            const first = answer.reason;
+            const again = readWithCompose(query, readFlags);
+            if (again.kind === 'read') {
+              answer = again;
+              if (!booleans.has('json')) {
+                info(`Compose's sentence reader gave no reading the first time (${first}); a second try read it.`);
+              }
+            } else {
+              failedTwice = `${first}; then ${again.reason}`;
+            }
+          }
           if (answer.kind === 'read' && !answer.reading.ec && (enzyme || ec)) {
             // The question names no mechanism the grammar builds ("simulate
             // competitive"); the flags name the enzyme. Read the model's own
@@ -1602,11 +1622,23 @@ async function main() {
               );
               process.exit(1);
             }
+            if (failedTwice && (!(enzyme || ec) || !substrate || !organism)) {
+              // The flags do not state the whole system, so the older reader
+              // would decide part of it, and can decide it differently from
+              // every other surface. Stop instead (XS5R2-09).
+              error(
+                `Compose's sentence reader gave no reading, twice (${failedTwice}). Nothing was ` +
+                'resolved: the older reader can read your question differently from `caterva compose`, ' +
+                'and carry other values than the API and the Studio would. Run the command again, or ' +
+                'state the system with --enzyme (or --ec), --substrate and --organism (and --isoform for ' +
+                'one protein of several).'
+              );
+              process.exit(1);
+            }
             if (answer.reason !== 'the sentence reader is off' && !booleans.has('json')) {
               warning(
-                `Compose's sentence reader gave no reading (${answer.reason}), so your question ` +
-                'was read by the older reader, which can read it differently from `caterva compose`. ' +
-                'Check the system shown below, or run the command again.'
+                `Compose's sentence reader gave no reading (${failedTwice ?? answer.reason}), so the ` +
+                'system is the one your flags state, read by the older reader. Check the system shown below.'
               );
             }
             parsed = readSystemFromQuery(query);

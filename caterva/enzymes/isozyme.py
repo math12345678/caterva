@@ -157,6 +157,13 @@ class IsozymeNotice:
     #: since no human kcat row names HK1 (fifth round, R5V1-3).
     measured_pairs: Optional[Tuple[str, ...]] = None
     substrate: Optional[str] = None
+    #: (symbol, rows naming it) for the listed proteins, counted over the
+    #: model substrate's Km and kcat rows in the organism, when that was
+    #: counted. The example in the remedy is the best-measured other
+    #: protein, not the first in the list: "--isoform HKDC1" was offered for
+    #: hexokinase only because it came first, and its run switched the
+    #: substrate to D-mannose (sixth round, R5A2-01).
+    named_rows: Optional[Tuple[Tuple[str, int], ...]] = None
 
     @property
     def broad(self) -> bool:
@@ -301,17 +308,28 @@ class IsozymeNotice:
                     f"--isoform {self.measured_as} to keep each constant to rows naming it, or another "
                     "protein's name only to model that protein instead")
             if self.measured_pairs is not None:
-                others = [p for p in self.symbols if p not in self.measured_pairs]
+                # The protein the model already is is not one of "the rest":
+                # trypsin's sentence told the user to pass PRSS3 and then
+                # listed PRSS3 among those that give no pair (XS5R2-08).
+                others = [p for p in self.symbols
+                          if p not in self.measured_pairs and p != self.measured_as]
                 if others:
+                    example = self._best_measured(others)
                     have = (f"only {_named(list(self.measured_pairs))} {'has' if len(self.measured_pairs) == 1 else 'have'}"
                             if self.measured_pairs else "none has")
+                    # What the run then does depends on the rows: a constant
+                    # no row names for that protein is left a placeholder
+                    # (HK1's kcat), or taken from a row naming no isozyme
+                    # when the search finds one (trypsin with PRSS1). The
+                    # sentence said only the second (R5A2-01, R5B2-03).
                     text += (f"; of the proteins listed, {have} both a Km and a kcat row naming "
                              f"{'it' if len(self.measured_pairs) == 1 else 'them'}"
                              + (f" for {self.substrate}" if self.substrate else "")
-                             + f" in {self.label}, so --isoform {others[0]}"
+                             + f" in {self.label}, so --isoform {example}"
                              + (" (or another of the rest)" if len(others) > 1 else "")
-                             + " gives no measured pair: its kcat would come from a row naming no "
-                               "isozyme, which may be another protein's")
+                             + " gives no pair measured on that protein: a constant no row names "
+                               "for it stays a placeholder, or comes from a row naming no isozyme, "
+                               "which may be another protein's")
             return text
         if first is None and not self.isoform:
             return ("pass --isoform with the name the rows' own commentary gives the isozyme you mean "
@@ -328,6 +346,14 @@ class IsozymeNotice:
         return (f"pass --isoform with one of these names (for example --isoform {first}) to take each constant "
                 "from a row whose commentary names that isozyme; a constant whose rows name none is kept and "
                 "flagged, and one whose rows all name another isozyme is refused")
+
+    def _best_measured(self, candidates: Sequence[str]) -> str:
+        """The candidate with the most rows naming it, then the
+        lowest-numbered (`_natural_order`); a cited row's isozyme first."""
+        if self.suggest in candidates:
+            return str(self.suggest)
+        counts = dict(self.named_rows or ())
+        return min(candidates, key=lambda p: (-counts.get(p, 0), _natural_order(p)))
 
     @property
     def text(self) -> str:
@@ -541,8 +567,9 @@ def notice_for_model(model: Any) -> Optional[IsozymeNotice]:
         first = readings[0]
         if all(r == first or same_isoform(r, first) for r in readings[1:]):
             from dataclasses import replace as _replace
+            pairs, named = _measured_pairs_and_counts(notice, model)
             return _replace(notice, measured_as=first, substrate=getattr(model, "substrate", None),
-                            measured_pairs=_measured_pairs(notice, model))
+                            measured_pairs=pairs, named_rows=named)
     return notice
 
 
@@ -550,25 +577,39 @@ def _measured_pairs(notice: IsozymeNotice, model: Any) -> Optional[Tuple[str, ..
     """The listed proteins with both a Km and a kcat row naming them for the
     model's substrate in its organism (`IsozymeNotice.measured_pairs`), or
     None when that cannot be counted."""
+    return _measured_pairs_and_counts(notice, model)[0]
+
+
+def _measured_pairs_and_counts(
+    notice: IsozymeNotice, model: Any,
+) -> Tuple[Optional[Tuple[str, ...]], Optional[Tuple[Tuple[str, int], ...]]]:
+    """`_measured_pairs`, and how many of those Km and kcat rows name each
+    listed protein (`IsozymeNotice.named_rows`). (None, None) when they
+    cannot be counted."""
     substrate = getattr(model, "substrate", None)
     organism = getattr(model, "organism", None)
     if not substrate or not organism or not notice.symbols or notice.broad:
-        return None
+        return None, None
     try:
         from caterva.compose import defaults
 
         tables = {t: [r for r in defaults.table_rows(notice.ec, t, organism)
                       if defaults._matches(r.compound, substrate)] for t in ("km", "kcat")}
+
+        def names(r: Any, symbol: str) -> bool:
+            reading = defaults._isoform_read(r.conditions)
+            return bool(reading and defaults._same_isoform(reading, symbol)) \
+                or defaults._accession_says(r.uniprot, symbol) is True
+
         out = []
+        counts = []
         for symbol in notice.symbols:
-            if all(any(defaults._isoform_read(r.conditions) and defaults._same_isoform(
-                    defaults._isoform_read(r.conditions), symbol)
-                    or defaults._accession_says(r.uniprot, symbol) is True for r in rows)
-                   for rows in tables.values()):
+            if all(any(names(r, symbol) for r in rows) for rows in tables.values()):
                 out.append(symbol)
-        return tuple(out)
+            counts.append((symbol, sum(1 for rows in tables.values() for r in rows if names(r, symbol))))
+        return tuple(out), tuple(counts)
     except Exception:  # noqa: BLE001 - uncounted: the remedy says less
-        return None
+        return None, None
 
 
 __all__ = ["BROAD_CLASS", "IsozymeNotice", "describe_isoform", "isozyme_notice", "notice_for_model", "organism_precise"]

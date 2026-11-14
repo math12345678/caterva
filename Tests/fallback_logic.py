@@ -230,6 +230,13 @@ class KineticResult(BaseModel):
     #: V7-04). Empty when variants were allowed or a mutation was asked for.
     cross_species_variant_only: list[str] = []
 
+    #: Those of `cross_species_variant_only` whose withheld rows all name an
+    #: isozyme ("isoenzyme A"): wild-type proteins in their own right, taken
+    #: only when the isoform is asked for. Said apart, so no surface calls
+    #: them variants (Vibrio tyrosinaticus's tyrosinase, sixth round,
+    #: XS5R2-03).
+    cross_species_isozyme_only: list[str] = []
+
     #: Every cross-species row WITH its value, when the requested organism
     #: had none.
     #:
@@ -273,6 +280,11 @@ class KineticResult(BaseModel):
     #: cannot say what it refused leaves the user unable to exercise the
     #: opt-in it just demanded of them.
     variant_candidates_available: list[str] = []
+
+    #: True when every row behind a variant_withheld names an isozyme
+    #: ("isoenzyme A"): wild-type proteins, taken when the isoform is asked
+    #: for, and said as isozymes, not variants (sixth round, XS5R2-03).
+    variant_isozymes_only: bool = False
 
     #: The isoforms BRENDA's rows measured, when an isoform was asked for
     #: and no row measured it or named none. Populated only for
@@ -1877,7 +1889,20 @@ def _best_evidenced(
         nonlocal rows
         kept_rows = [e for e in rows if keep(e)]
         if kept_rows and len(kept_rows) < len(rows):
-            passed_over.append(clause(len(rows) - len(kept_rows), [e for e in rows if not keep(e)]))
+            out = [e for e in rows if not keep(e)]
+            text = clause(len(rows) - len(kept_rows), out)
+            # The values are said, as for the rows not stating pH and
+            # temperature: ACE's recombinant 408 1/s row (ref 81212) was
+            # passed over for its paper's native row and named nowhere, and
+            # rat nNOS's 4.8 mM row likewise (sixth round, R5B2-02, VR2-05).
+            values = sorted({float(e.km_value) for e in out
+                             if isinstance(getattr(e, "km_value", None), (int, float))})
+            if values and " passed over" in text:
+                shown = ", ".join(f"{v:g}" for v in values[:4]) + (" ..." if len(values) > 4 else "")
+                unit = getattr(out[0], "unit", "") or ""
+                at = text.index(" passed over") + len(" passed over")
+                text = f"{text[:at]} ({shown}{' ' + unit if unit else ''}){text[at:]}"
+            passed_over.append(text)
             log.append(f"{tier}: kept the {len(kept_rows)} of {len(rows)} row(s) {line}")
             rows = kept_rows
 
@@ -2174,7 +2199,11 @@ def _best_evidenced(
                + " (an actual row, so the value is one real measurement, not an average)")
     because = f"{chosen.km_value:g} {unit} (BRENDA ref {_ref(chosen)}) is {how}"
     if fold is not None:
-        because += f"; the {len(kept)} remaining rows span {lo:g} to {hi:g} {unit}"
+        # The carried row is one of them, and is said to be: "the 6
+        # remaining rows" read as six rows besides it, after a header that
+        # counted three (sixth round, R5B2-01).
+        because += (f"; the {len(kept)} rows left after the checks, this one among them, span "
+                    f"{lo:g} to {hi:g} {unit}")
         if wide and unit_slip is None:
             because += (f", a {fold:.3g}-fold spread: the literature disagrees by more than "
                         f"{WIDE_SPREAD_FOLD:g}-fold, so this one value hides most of what is known")
@@ -3185,6 +3214,8 @@ def _variant_withheld_result(withheld, log):
         found=False,
         source="variant_withheld",
         variant_candidates_available=described,
+        variant_isozymes_only=bool(withheld) and all(
+            e.variant is not None and e.variant.kind == "isozyme" for e in withheld),
         search_log=log,
     )
 
@@ -3449,10 +3480,14 @@ def resolve_kinetic_value(
     if broad and not allow_cross_species:
         organisms = sorted({e.organism for e in broad if e.organism})
         variant_only: list[str] = []
+        isozyme_only: list[str] = []
         if not allow_variants and not mutation:
-            kept, _ = _partition_variants(broad)
+            kept, withheld_rows = _partition_variants(broad)
             with_usable = {e.organism for e in kept if e.organism}
             variant_only = [o for o in organisms if o not in with_usable]
+            isozyme_only = [o for o in variant_only
+                            if all(getattr(getattr(e, "variant", None), "kind", None) == "isozyme"
+                                   for e in withheld_rows if e.organism == o)]
         log.append(
             f"Cross-species value(s) found in {', '.join(organisms) or 'unnamed organism(s)'} "
             f"but withheld: allow_cross_species=False"
@@ -3462,6 +3497,7 @@ def resolve_kinetic_value(
             source="cross_species_withheld",
             cross_species_organisms_available=organisms,
             cross_species_variant_only=variant_only,
+            cross_species_isozyme_only=isozyme_only,
             # The numbers, not only the names. Every one is a real
             # measurement with a reference; none of them is a measurement
             # of the organism that was asked about, and nothing here says

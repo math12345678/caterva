@@ -83,7 +83,10 @@ def test_the_remedy_says_which_isozymes_have_a_measured_pair():
                            symbols=("HKDC1", "HK1", "HK2", "HK3", "GCK"), measured_as="GCK",
                            measured_pairs=("GCK",), substrate="D-glucose")
     assert "only GCK has both a Km and a kcat row naming it for D-glucose" in notice.remedy
-    assert "gives no measured pair" in notice.remedy
+    # Sixth round (R5A2-01, R5B2-03): the sentence no longer promises the kcat
+    # "would come from a row naming no isozyme". Run, it stayed a placeholder.
+    assert "gives no pair measured on that protein" in notice.remedy
+    assert "stays a placeholder" in notice.remedy
 
 
 # -- R5V1-13: a genus is a choice among its species ------------------------------------------
