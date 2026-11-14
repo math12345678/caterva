@@ -662,7 +662,7 @@ class ModelDossier:
         note above did (sixth round, VR2-05)."""
         reason = str(spread.carried_as or "")
         try:
-            notes = " ".join(str(n) for n in self.recognition.composition.notes)
+            notes = " ".join(str(n) for n in self.model.recognition.composition.notes)
         except AttributeError:
             return ""
         out = []

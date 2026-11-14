@@ -420,9 +420,30 @@ def test_an_end_of_the_spread_the_reason_does_not_mention_is_explained():
     notes = ("`reaction_Km`: a row naming NOS1 exists (4.8 mM, BRENDA ref 659257), but no row "
              "naming NOS1 gives the kcat, so the resolver's pick, which names no isoform, is kept "
              "beside it: one evidence rule for both constants",)
-    me = SimpleNamespace(recognition=SimpleNamespace(composition=SimpleNamespace(notes=notes)))
+    me = SimpleNamespace(model=SimpleNamespace(
+        recognition=SimpleNamespace(composition=SimpleNamespace(notes=notes))))
     spread = SimpleNamespace(low=0.0022, high=4.8, unit="mM",
                              carried_as="0.0022 mM (BRENDA ref 658119) is the only row remaining")
     said = ModelDossier._end_set_aside(me, "reaction_Km", spread)
     assert said.startswith("the 4.8 mM row is not carried: a row naming NOS1 exists (4.8 mM, BRENDA ref 659257)")
     assert "0.0022 mM row" not in said
+
+
+def test_a_word_of_the_chosen_organism_typed_is_not_called_no_organism():
+    src = (REPO / "caterva" / "compose" / "__main__.py").read_text()
+    # "influenza neuraminidase inhibited by zanamivir": the whole description
+    # is searched for a word of the organism Caterva chose.
+    assert 'typed = str(getattr(args, "description", None) or "")' in src
+    assert "but no \"\n" in src or "names {said[0]!r} but no" in src
+
+
+def test_a_para_locant_before_a_capital_is_the_same_compound():
+    # DHPS listed "4-Aminobenzoate (2 Km, 1 kcat)" and "p-Aminobenzoate (1 Km)"
+    # as two compounds. The chooser and the search agree they are one.
+    from caterva.compose import defaults
+
+    assert defaults._group_key("p-Aminobenzoate") == defaults._group_key("4-aminobenzoate")
+    assert defaults._matches("p-Aminobenzoate", "4-Aminobenzoate")
+    assert defaults._group_key("p-Nitrophenyl phosphate") == defaults._group_key("4-nitrophenyl phosphate")
+    # An oxygen substituent is not an ortho locant.
+    assert defaults._group_key("O-Acetylserine") != defaults._group_key("2-acetylserine")

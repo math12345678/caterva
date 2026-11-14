@@ -693,7 +693,7 @@ and the CLI's `src/literature/__tests__/sixthRoundSurfaces.test.ts`).
   query text alone, so the stream replayed an older engine's numbers
   (donepezil's Km 0.04 mM, ref 666973, where every other surface carried
   0.054 mM, ref 652194). Each stored result now records the engine build, a
-  hash of the sources under `caterva/` and the API server's `src/`
+  hash of the sources under `caterva/`, `Tests/` and the API server's `src/`
   (`CATERVA_ENGINE_BUILD` overrides it). Only the same build replays it; an
   entry with no build is never replayed. The replay notice names the build.
 - **A finished job's stream ends.** A cache hit's SSE stream sent its
@@ -743,5 +743,11 @@ and the CLI's `src/literature/__tests__/sixthRoundSurfaces.test.ts`).
   isoform HXK4"). "Your description names 'influenza' but no organism
   Caterva can search by", not "No organism was named".
 
-Not done here (other themes): lysozyme still defaults to a non-hen enzyme;
-"4-Aminobenzoate" and "p-Aminobenzoate" are still counted as two compounds.
+"p-Aminobenzoate" and "4-Aminobenzoate" are one compound: a para locant
+before a capital letter is read as before a small one, by the chooser and
+by the search.
+
+The build hash also covers `Tests/`, where the resolver the runner imports
+lives (`fallback_logic.py`); its `test_*.py` files are left out.
+
+Not done here (another theme): lysozyme still defaults to a non-hen enzyme.

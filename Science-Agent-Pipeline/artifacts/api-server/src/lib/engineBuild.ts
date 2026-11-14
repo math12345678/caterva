@@ -16,7 +16,9 @@ import { findRepositoryRoot } from "./repoRoot";
  * a changed engine.
  *
  * The build is a hash of the code that decides a result: the Python
- * engine under `caterva/` and this server's own resolver sources. A
+ * engine under `caterva/`, the literature resolver the runner imports
+ * from `Tests/` (fallback_logic.py and what it uses; the `test_*.py`
+ * files there are left out), and this server's own resolver sources. A
  * content hash, not a git sha, so an uncommitted edit is a new build too.
  * Tests are left out: they do not change what a query resolves to.
  *
@@ -81,6 +83,15 @@ export function hashSources(root: string, trees: readonly string[]): string {
   return hash.digest("hex").slice(0, 16);
 }
 
+/** The source trees whose contents decide what a query resolves to. */
+export const ENGINE_TREES: readonly string[] = [
+  "caterva",
+  // Where the resolver lives: science_agent_runner.py imports
+  // fallback_logic from here. A change to it changes the numbers.
+  "Tests",
+  path.join("Science-Agent-Pipeline", "artifacts", "api-server", "src"),
+];
+
 export function engineBuild(): string {
   const override = process.env["CATERVA_ENGINE_BUILD"]?.trim();
   if (override) return override;
@@ -88,10 +99,7 @@ export function engineBuild(): string {
   try {
     const here = path.dirname(fileURLToPath(import.meta.url));
     const root = findRepositoryRoot(here);
-    cached = hashSources(root, [
-      "caterva",
-      path.join("Science-Agent-Pipeline", "artifacts", "api-server", "src"),
-    ]);
+    cached = hashSources(root, ENGINE_TREES);
   } catch {
     cached = "unknown";
   }

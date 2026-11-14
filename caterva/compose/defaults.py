@@ -660,7 +660,8 @@ _PRIMES = str.maketrans({"’": "'", "′": "'", "‘": "'"})
 #: phosphate") or a number ("4-nitrophenyl phosphate"): one compound, which
 #: BRENDA files under both. Lower case only, before case is folded: "O-" is
 #: an oxygen substituent ("O-acetyl"), not ortho.
-_LETTER_LOCANT = re.compile(r"(?<![A-Za-z0-9])([pom])-(?=[a-z])")
+# The name after the locant may start with a capital ("p-Aminobenzoate").
+_LETTER_LOCANT = re.compile(r"(?<![A-Za-z0-9])([pom])-(?=[A-Za-z])")
 _LOCANT_NUMBER = {"o": "2", "m": "3", "p": "4"}
 
 

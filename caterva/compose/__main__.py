@@ -2506,7 +2506,7 @@ def _choose_what_was_not_named(model: Any, args: Any) -> Tuple[Any, Optional[str
             ec, substrate=args.substrate or None, inhibitor=inhibitor, needs=tables or ("km",),
             isoform=getattr(args, "isoform", None) or None)
         if chosen is not None:
-            typed = str(getattr(args, "enzyme_text", None) or "")
+            typed = str(getattr(args, "description", None) or "")
             said = [w for w in re.findall(r"[A-Za-z]{5,}", typed)
                     if re.search(rf"\b{re.escape(w)}\b", chosen.chosen, re.IGNORECASE)]
             if said and not chosen.instead:

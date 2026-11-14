@@ -125,6 +125,8 @@ EMITTED_AS: dict[str, str | None] = {
     "cross_species_flag": "crossSpecies",
     "cross_species_organisms_available": "crossSpeciesOrganismsAvailable",
     "cross_species_variant_only": "crossSpeciesVariantOnly",
+    "cross_species_isozyme_only": "crossSpeciesIsozymeOnly",
+    "variant_isozymes_only": "variantIsozymesOnly",
     "variant_candidates_available": "variantCandidatesAvailable",
     # ADR 0182. Every row's value when each is outside the plausible range
     # (source "implausible_withheld"), and why the row carried was carried.

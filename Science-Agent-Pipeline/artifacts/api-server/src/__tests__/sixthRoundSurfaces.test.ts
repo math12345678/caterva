@@ -25,7 +25,7 @@ process.env["CACHE_FILE"] = cacheFile;
 
 const { findCachedEntryByQuery, persistJob, resetCache, restoreCache } =
   await import("../lib/cache");
-const { engineBuild, hashSources, replayableBuild } = await import(
+const { ENGINE_TREES, engineBuild, hashSources, replayableBuild } = await import(
   "../lib/engineBuild"
 );
 
@@ -72,6 +72,21 @@ describe("XS5R2-01: a result is replayed only by the build that computed it", ()
     writeFileSync(join(root, "caterva", "pick.py"), "KM = 0.054\n");
     expect(hashSources(root, ["caterva"])).not.toBe(before);
     expect(hashSources(join(root, "missing"), ["caterva"])).toBe("unknown");
+  });
+
+  it("the resolver the runner imports from Tests/ is part of the build", () => {
+    // fallback_logic.py decides the numbers and lives under Tests/. Its
+    // test files do not.
+    expect(ENGINE_TREES).toContain("Tests");
+    const root = mkdtempSync(join(tmpdir(), "rv6-build-"));
+    mkdirSync(join(root, "Tests"));
+    writeFileSync(join(root, "Tests", "fallback_logic.py"), "A = 1\n");
+    writeFileSync(join(root, "Tests", "test_fallback.py"), "A = 1\n");
+    const before = hashSources(root, ["Tests"]);
+    writeFileSync(join(root, "Tests", "test_fallback.py"), "A = 2\n");
+    expect(hashSources(root, ["Tests"])).toBe(before);
+    writeFileSync(join(root, "Tests", "fallback_logic.py"), "A = 2\n");
+    expect(hashSources(root, ["Tests"])).not.toBe(before);
   });
 
   it("a result stored by this build is replayed", async () => {

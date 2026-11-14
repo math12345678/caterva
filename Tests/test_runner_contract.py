@@ -288,6 +288,31 @@ def test_golden_found_output_shape(monkeypatch):
         "literatureCandidates": [],
         "logs": ["BRENDA exact: 1.1.1.27, Homo sapiens, lactate"],
         "choices": [],  # nothing was chosen: the payload named all of it (ADR 0182)
+        # Which protein of a multi-protein EC the Km is, in compose's own
+        # words, so the API and the TypeScript CLI say what compose and the
+        # Studio say (sixth round, XS5R2-04). LDH is five human proteins and
+        # the stub's row names none.
+        "isozymeNotice": {
+            "headline": "EC 1.1.1.27 is 5 proteins in human and no --isoform was given, so the "
+                        "constants may belong to any of them",
+            "detail": "EC 1.1.1.27 has 5 human isozymes in the enzyme nomenclature's UniProt "
+                      "entries (LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC) and no --isoform was given, so "
+                      "the cited constants may belong to any of them; isozymes of one enzyme can "
+                      "differ many-fold in Km and kcat",
+            "remedy": "pass --isoform with one of these names (for example --isoform LDHAL6A) to "
+                      "take each constant from a row whose commentary names that isozyme; a "
+                      "constant whose rows name none is kept and flagged, and one whose rows all "
+                      "name another isozyme is refused",
+            "summary": "EC 1.1.1.27 is 5 proteins in human, none chosen",
+        },
+        # The kcat half of the pair (XS5R2-05). The stub answers every
+        # lookup alike, so it carries the Km's number.
+        "pairedKcat": {
+            "found": True, "source": "brenda_exact", "kcat": 10.73,
+            "citation": {"notes": None, "organism": "Homo sapiens", "referenceId": "740253",
+                         "source": "BRENDA", "title": None,
+                         "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27"},
+        },
     }
 
 
@@ -735,6 +760,10 @@ def test_not_found_output_shape(monkeypatch):
         "crossSpeciesOrganismsAvailable": [],
         # Those whose every row measured a variant (fifth round, V7-04).
         "crossSpeciesVariantOnly": [],
+        # Of those, the ones whose rows each name an isozyme: said as
+        # isozymes, not variants (sixth round, XS5R2-03).
+        "crossSpeciesIsozymeOnly": [],
+        "variantIsozymesOnly": False,
         # Always present on the not-found branch, empty unless the miss was
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
@@ -757,6 +786,17 @@ def test_not_found_output_shape(monkeypatch):
         ],
         "logs": ["genuine gap"],
         "choices": [],  # nothing was chosen: the payload named all of it (ADR 0182)
+        # The kcat half of the Km's pair, which the Km lookup already
+        # computes: /api/resolve's Vmax advice reads it to say whether a kcat
+        # exists before asking for an enzyme concentration (sixth round,
+        # XS5R2-05). The stub answers every lookup alike, so it mirrors the Km.
+        "pairedKcat": {
+            "found": False, "source": "literature_candidates",
+            "crossSpeciesOrganismsAvailable": [],
+            "crossSpeciesVariantOnly": [], "crossSpeciesIsozymeOnly": [],
+            "variantCandidatesAvailable": [], "variantIsozymesOnly": False,
+            "implausibleValues": [], "isoformsAvailable": [],
+        },
     }
 
 
@@ -801,6 +841,10 @@ def test_core_candidate_output_shape(monkeypatch):
         "crossSpeciesOrganismsAvailable": [],
         # Those whose every row measured a variant (fifth round, V7-04).
         "crossSpeciesVariantOnly": [],
+        # Of those, the ones whose rows each name an isozyme: said as
+        # isozymes, not variants (sixth round, XS5R2-03).
+        "crossSpeciesIsozymeOnly": [],
+        "variantIsozymesOnly": False,
         # Always present on the not-found branch, empty unless the miss was
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
@@ -823,6 +867,17 @@ def test_core_candidate_output_shape(monkeypatch):
         ],
         "logs": ["genuine gap"],
         "choices": [],  # nothing was chosen: the payload named all of it (ADR 0182)
+        # The kcat half of the Km's pair, which the Km lookup already
+        # computes: /api/resolve's Vmax advice reads it to say whether a kcat
+        # exists before asking for an enzyme concentration (sixth round,
+        # XS5R2-05). The stub answers every lookup alike, so it mirrors the Km.
+        "pairedKcat": {
+            "found": False, "source": "literature_candidates",
+            "crossSpeciesOrganismsAvailable": [],
+            "crossSpeciesVariantOnly": [], "crossSpeciesIsozymeOnly": [],
+            "variantCandidatesAvailable": [], "variantIsozymesOnly": False,
+            "implausibleValues": [], "isoformsAvailable": [],
+        },
     }
 
 
@@ -1206,6 +1261,10 @@ def test_cross_species_withheld_output_shape(monkeypatch):
         "crossSpeciesOrganismsAvailable": ["Oryctolagus cuniculus", "Sus scrofa"],
         # Those whose every row measured a variant (fifth round, V7-04).
         "crossSpeciesVariantOnly": [],
+        # Of those, the ones whose rows each name an isozyme: said as
+        # isozymes, not variants (sixth round, XS5R2-03).
+        "crossSpeciesIsozymeOnly": [],
+        "variantIsozymesOnly": False,
         # Always present on the not-found branch, empty unless the miss was
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
@@ -1228,6 +1287,17 @@ def test_cross_species_withheld_output_shape(monkeypatch):
         "logs": ["Cross-species value(s) found in Oryctolagus cuniculus, "
                  "Sus scrofa but withheld: allow_cross_species=False"],
         "choices": [],  # nothing was chosen: the payload named all of it (ADR 0182)
+        # The kcat half of the Km's pair, which the Km lookup already
+        # computes: /api/resolve's Vmax advice reads it to say whether a kcat
+        # exists before asking for an enzyme concentration (sixth round,
+        # XS5R2-05). The stub answers every lookup alike, so it mirrors the Km.
+        "pairedKcat": {
+            "found": False, "source": "cross_species_withheld",
+            "crossSpeciesOrganismsAvailable": ["Oryctolagus cuniculus", "Sus scrofa"],
+            "crossSpeciesVariantOnly": [], "crossSpeciesIsozymeOnly": [],
+            "variantCandidatesAvailable": [], "variantIsozymesOnly": False,
+            "implausibleValues": [], "isoformsAvailable": [],
+        },
     }
 
 
