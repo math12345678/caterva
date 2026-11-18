@@ -30,10 +30,15 @@ import { RELEASE_TAG } from "@/lib/domains";
 // the plain v0.7.0 release was published, as `gh release view v0.7.0
 // --json publishedAt` gives it (2026-11-02T03:12:44Z, UTC, as for v0.6.0);
 // it read 2026-11-01 until the release existed to check it against.
+// Re-read 2026-11-17 for v0.7.1: `git diff v0.7.0 -- caterva/app.py` changes
+// only the help text (a plain-words example and how an enzyme name is
+// read); the COMMANDS table is the same, and the release workflow attaches
+// the same three platforms. The date is the day the tag was cut, until the
+// published release can be checked with `gh release view v0.7.1`.
 const RELEASE = {
   tag: RELEASE_TAG,
-  readFor: "v0.7.0",
-  date: "2026-11-02",
+  readFor: "v0.7.1",
+  date: "2026-11-17",
   url: `https://github.com/math12345678/caterva/releases/tag/${RELEASE_TAG}`,
   platforms: ["macOS (Apple silicon)", "Linux x86_64", "Windows x86_64"],
   commands: [

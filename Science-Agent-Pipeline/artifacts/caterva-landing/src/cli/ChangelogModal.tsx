@@ -26,6 +26,12 @@ interface Release {
 // Every line below names something CHANGELOG.md records.
 const RELEASES: Release[] = [
   {
+    date: "November 17, 2026",
+    tag: "fix",
+    title: "v0.7.1: real measured values by default",
+    desc: "Name an enzyme and Caterva models it with real, cited BRENDA values: when the substrate, inhibitor or organism is not named, it chooses the best-measured one and says what it chose and why. A number is never attached to the wrong substrate, organism, isoform or variant. The default time course now runs to the end of the reaction, and a test checks it against the exact Michaelis-Menten solution.",
+  },
+  {
     date: "November 1, 2026",
     tag: "fix",
     title: "v0.7.0: every public number measured, derived or removed",

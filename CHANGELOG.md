@@ -14,6 +14,8 @@ done: there was no release to version.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-17
+
 Plain-language questions reach measured, cited values (ADR 0181), and a named
 enzyme gets its best-measured substrate, said out loud (ADR 0182).
 
@@ -24,6 +26,9 @@ enzyme gets its best-measured substrate, said out loud (ADR 0182).
 - `--antimony` reads and searches the description as the report does, compiles the measured values, and names each constant's origin in a comment block above the source.
 
 ### Fixed
+- The default time course runs to the end of the reaction. Its window came from the settling time at the steady state, where an enzyme is first-order; from saturating starting amounts it is zero-order and takes far longer, so human LDH stopped at t=1.2 with 12% of the pyruvate converted. A derived window is lengthened while the curve is still moving at its end, and the report says so. A new test compares the time course built from a sentence with the closed-form Michaelis-Menten solution (Lambert W), computed outside Caterva.
+- "an enzyme converts a substrate to a product" builds Michaelis-Menten instead of "did you mean furin?": mechanism words are not read as misspelt enzyme names.
+- Km and kcat are taken from one protein, and where possible one paper under the same conditions; mutants, tagged constructs, chimeras, altered preparations (surfactants, D2O, immobilised), inhibited assays and probable unit slips are passed over and named. A UniProt outage no longer discards BRENDA's values. The Studio app, the API and the TypeScript CLI read a sentence with compose's reader, and the API's stream cache is keyed by engine build (ADR 0182, six review rounds).
 - A Km, kcat or Ki whose BRENDA row is another compound's is withheld with that compound named, instead of being carried under the name asked for. The search finds a name inside longer names: chymotrypsin's chosen L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide carried the N-succinyl compound's Km (0.219 mM, ref 769319), and ACE's angiotensin I the Km of [Phe9,Arg10]angiotensin I (0.011 mM, ref 669424). Applied whenever the name is one BRENDA's table lists exactly, typed or chosen (ADR 0182).
 - A chosen substrate's note no longer opens "No substrate was named" when the description named a compound BRENDA does not list, and a word that matches several listed substrates is chosen among those only.
 - An organism the user named that has no Km row for the enzyme ("glucose-6-phosphate dehydrogenase" in S. cerevisiae) is refused as the organism, with the organisms that do have rows and their counts, instead of "Re-run with --substrate NAME", which would not have helped.
