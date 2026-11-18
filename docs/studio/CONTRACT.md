@@ -1066,7 +1066,7 @@ Command Line Tools (no Xcode project).
 - Packaging: the page is built (`pnpm ... run build`), the wheel is built
   with `caterva/studio/static/**` inside (pyproject package-data), frozen by
   `scripts/build_app.py`, wrapped as `Caterva.app`, and put in a DMG with
-  `hdiutil`, by a build script and a GitHub Actions workflow (macos-14
+  `hdiutil`, by a build script and a GitHub Actions workflow (macos-15
   runner), which runs `caterva studio --self-test` from the frozen folder
   before packaging.
 
