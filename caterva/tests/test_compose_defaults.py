@@ -73,6 +73,18 @@ def _rows(monkeypatch, tables, reaction=(frozenset(), frozenset())):
     # The real reader returns `_key`s; the fixtures are written as names.
     keyed = tuple(frozenset(defaults._key(n) for n in side) for side in reaction)
     monkeypatch.setattr(defaults, "_reaction_compounds", lambda ec: keyed)
+    # The organism-cell reader fetches the live page; answer it from the same
+    # tables, or a test depends on BRENDA being up (a 500 failed CI, PR #47).
+    from collections import Counter
+
+    def organisms_on_page(ec, table):
+        out = Counter()
+        for (t, org), counts in tables.items():
+            if t == table and org is not None:
+                out[org] += sum(counts.values())
+        return out
+
+    monkeypatch.setattr(defaults, "_organisms_on_page", organisms_on_page)
 
 
 def _args(**fields):
