@@ -2346,7 +2346,17 @@ RULES: Tuple[Rule, ...] = (
                                   "enzyme-catalyzed", "enzyme catalysed",
                                   "enzyme catalyzed", "enzymatic reaction",
                                   "enzyme reaction", "enzyme converting",
-                                  "enzyme turning", "enzyme that converts"),
+                                  "enzyme turning", "enzyme that converts",
+                                  # The plainest sentence a student types,
+                                  # "an enzyme converts a substrate to a
+                                  # product", was refused with "did you mean
+                                  # furin?" ('converts' is close to
+                                  # 'convertase').
+                                  "enzyme converts", "enzyme turns",
+                                  "enzyme that turns", "substrate to a product",
+                                  "substrate into a product",
+                                  "substrate to product",
+                                  "substrate into product"),
          _single_enzyme,
          "one enzyme turning one substrate into one product", 45),
     Rule("conversion", (), ("no catalyst", "a -> b", "first order conversion", "converts to",
@@ -2427,6 +2437,19 @@ __all__ = [
 ]
 
 
+#: Ordinary words of a mechanism's description, never read as a misspelt
+#: enzyme name by `_misspelt_enzyme`.
+_MECHANISM_WORDS = frozenset("""
+convert converts converted converting conversion turns turning catalyse catalyses
+catalysed catalysing catalyze catalyzes catalyzed catalyzing produce produces produced
+producing product products substrate substrates forms forming formed binds binding
+inhibits inhibited inhibiting inhibitor inhibition activates activated activating
+cleaves cleaved cleaving hydrolyses hydrolyzes hydrolysed hydrolyzed transfers
+transferring oxidises oxidizes oxidised oxidized reduces reduced reducing
+phosphorylates phosphorylated phosphorylating enzyme enzymes reaction reactions
+""".split())
+
+
 def _misspelt_enzyme(query: str) -> Optional[str]:
     """"Did you mean ..." for a description whose enzyme name is misspelt,
     or None. "glyceraldehyde-3-phosphate dehydrogenaes from rabbit muscle"
@@ -2454,6 +2477,12 @@ def _misspelt_enzyme(query: str) -> Optional[str]:
         for start in range(len(words) - size + 1):
             window = " ".join(words[start:start + size]).strip(",.;:")
             if len(window) < 6:
+                continue
+            if all(w.lower().strip(",.;:") in _MECHANISM_WORDS for w in window.split()):
+                # The words a mechanism is described in are not misspelt
+                # enzyme names: "converts" is two letters from 'convertase'
+                # and "an enzyme converts a substrate to a product" was
+                # answered with "did you mean furin?".
                 continue
             try:
                 found = [c for c in find(window, organism, limit=None) if c.tier == TIER_TYPO]
