@@ -611,7 +611,13 @@ def _smoke(bundle: Path, version: str, require_studio_page: bool = False) -> Non
 
 
 #: What the offline literature check must find in the report, and must not.
-LITERATURE_MARKERS = ("VERDICT:", "2 of 2 constant(s) came from the literature", "BRENDA ref 641068", "BRENDA ref 739603")
+#: Since 0.7.1 the two constants are one protein's (ADR 0182): human
+#: hexokinase's kcat rows are all glucokinase's, so the Km is GCK's too, and
+#: both come from BRENDA ref 739603 (6.3 mM, 40.1 1/s). It read ref 641068
+#: (6.0 mM, a row of another isozyme) for the Km before.
+LITERATURE_MARKERS = ("VERDICT:", "2 of 2 constant(s) came from the literature",
+                      "| `reaction_Km` | 6.3 mM | literature (Homo sapiens) | BRENDA ref 739603 |",
+                      "| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |")
 LITERATURE_REFUSAL = "could not run"
 
 
@@ -650,7 +656,7 @@ def _literature_smoke(run, bundle: Path) -> None:
             f"stdout tail {r.stdout[-400:]!r}, stderr {r.stderr[-600:]!r}"
         )
     print("smoke  : compose --subject 2.7.1.1 ran the literature search from the frozen folder, offline,")
-    print("         and cited BRENDA ref 641068 and 739603 for the constants")
+    print("         and cited BRENDA ref 739603 for both constants (6.3 mM, 40.1 1/s)")
 
 
 #: Where the studio's built page lands inside a onedir folder: PyInstaller's
