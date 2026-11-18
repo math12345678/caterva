@@ -309,7 +309,7 @@ jobs:
     name: signed update archive + appcast.xml
     needs: [studio-dmg]
     if: ${{ github.event_name == 'push' || github.event.inputs.publish == 'true' }}
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 20
     permissions:
       contents: read
