@@ -147,14 +147,14 @@ PERMISSION: dict[str, tuple[str, str]] = {
     # --- Numerics ---------------------------------------------------------
     "numpy": ("BSD-3-Clause", "Use, modify and redistribute with the notice retained."),
     "scipy": ("BSD-3-Clause", "Use, modify and redistribute with the notice retained."),
-    "stdpopsim": (
-        "GPL-3.0",
-        "Optional and NOT redistributed by Caterva. Imported at runtime "
-        "when a user has installed it themselves; the population-genetics "
-        "tests skip when it is absent. Caterva ships no stdpopsim code, so "
-        "no GPL obligation attaches to Caterva's own distribution. Revisit "
-        "if it ever becomes a hard requirement or is bundled.",
-    ),
+    # "stdpopsim" (GPL-3.0) was recorded here until 2026-11-01 as optional
+    # and not redistributed. That day requirements-popgen.txt, the only
+    # manifest that declared it, moved to archive/legacy_domains/ with the
+    # resolver that imported it, so the grant described nothing this guard
+    # reads. Removed rather than kept "just in case": if stdpopsim is ever
+    # declared again, the guard SHOULD stop and make someone re-decide the
+    # GPL question (docs/LICENSING.md, ADR 0061) instead of finding a
+    # permission already on file.
     # --- HTTP / parsing ---------------------------------------------------
     "requests": ("Apache-2.0", "Use, modify, redistribute, commercially; attribution."),
     "httpx": ("BSD-3-Clause", "Use, modify and redistribute with the notice retained."),
@@ -345,7 +345,8 @@ def python_deps() -> dict[str, str]:
     ("requirements.txt", "requirements-dev.txt") and
     `requirements-popgen.txt` was created the same day this guard was --
     carrying the one GPL dependency in the project, and invisible to the
-    check written to find exactly that.
+    check written to find exactly that. (That file moved to
+    archive/legacy_domains/ on 2026-11-01; the glob is still the point.)
 
     A guard that names its inputs fails open: a manifest it does not name is
     unscanned, and an unscanned manifest is indistinguishable from a clean

@@ -155,7 +155,7 @@ def test_a_substrate_miss_names_the_labels_that_would_have_worked():
     gap is not. Saying "not found" for both discards the distinction the
     resolver established.
     """
-    result = report(resolved={"km": ask("L-lactate")})
+    result = report(resolved={"km": ask("lactic acid")})
     joined = " ".join(result.refusals)
     assert "(S)-lactate" in joined
     assert "does not substitute" in joined

@@ -35,8 +35,13 @@ History: the original version of this parser (brenda_structured.py)
 silently returned 0 results for AChE because BRENDA renders the
 substrate name as "acetyl thiocholine" (two words) while the substrate
 whitelist checked for "acetylthiocholine" (one word) as a substring.
-Substring matching is fragile for exactly this reason - matching here is
-intentionally permissive (case-insensitive substring), and callers should
+Substring matching is fragile for exactly this reason. It was then made
+permissive (case-insensitive substring), which over-matched instead:
+"D-glucose" took 2-deoxy-D-glucose rows and "pyruvate" phenylpyruvate ones,
+each relabelled with the target. Since 2026-11-11 the WHOLE compound cell is
+compared (`substrate_matches`), ignoring case, spaces ("acetyl thiocholine")
+and a counter-ion, and the organism is matched on the organism cell
+(`organism_matches`), never as a substring of the row. Callers should still
 pass every known spelling variant for a substrate name when they have one.
 """
 
@@ -56,12 +61,26 @@ from assay_conditions import parse_assay_conditions
 from http_retry import retry_get
 
 
+#: A value cell that is a range ("0.038 - 0.04").
+_RANGE_VALUE = re.compile(r"^(\d+\.?\d*)\s*-\s*(\d+\.?\d*)$")
+#: BRENDA's aggregate summary row: "0.0018 - 1100 | (S)-lactate | 50 entries".
+_AGGREGATE_ROW = re.compile(r"\b\d+\s+entries\b", re.IGNORECASE)
+
+
 class BRENDAKmEntry(BaseModel):
     km_value: float
+    #: (low, high) when the paper gave a range; `km_value` is then `low`.
+    value_range: tuple[float, float] | None = None
     unit: str = "mM"
     substrate: str
     organism: str
     uniprot: str | None = None
+    #: True when `uniprot` is not the row's own cell but the caller's
+    #: `fallback_uniprot` (UniProt's accession for the EC in the organism):
+    #: a guess about the row, which says nothing about which isoform it
+    #: measured. LDH's human pyruvate rows have no accession cell and were
+    #: stamped P07864 (LDHC), and read as LDH-C rows (2026-11-12).
+    uniprot_guessed: bool = False
     #: Raw commentary cell from BRENDA, e.g. "pH 8.5, 25°C, isozyme H4".
     conditions: str | None = None
     # --- Structured assay conditions, parsed from `conditions` -------------
@@ -123,6 +142,27 @@ class BRENDAKmEntry(BaseModel):
     # it's metadata for downstream filtering/ranking decisions, not a
     # parsing-stage filter.
     substrate_type: str = "classic"
+    #: True when `uniprot` is the row's own accession cell, False when it is
+    #: the caller's `fallback_uniprot` (the organism's canonical entry, which
+    #: says nothing about which isozyme the row measured). The isoform check
+    #: reads only the row's own: BRENDA's P35557 on a human hexokinase row is
+    #: glucokinase whatever the commentary says.
+    uniprot_from_row: bool = False
+    #: Compounds the row states were PRESENT in the assay that are inhibitors
+    #: of this enzyme (BRENDA lists Ki rows for them on the same page, or the
+    #: commentary calls them inhibitors): an apparent constant, not the
+    #: enzyme's own. Filled by fallback_logic._brenda_entries, which holds the
+    #: page; empty from the parser alone.
+    inhibitors_present: List[str] = Field(default_factory=list)
+    #: The one isoform the row's PAPER names in its other entries on the
+    #: page (row_form.paper_isoforms), for a row whose own words and own
+    #: UniProt cell name none. Filled by fallback_logic._brenda_entries;
+    #: None from the parser alone, and when the paper names none or several.
+    paper_isoform: str | None = None
+    #: The row lists several proteins' accessions in its own UniProt cell,
+    #: names none in its words, and its paper's other rows name one each:
+    #: no protein can be read off it. Filled by fallback_logic._brenda_entries.
+    unattributed: bool = False
 
 
 # Keywords that mark a substrate as an engineered/reporter construct rather
@@ -152,6 +192,14 @@ def classify_substrate(substrate_name: str) -> str:
 # not a genuine Michaelis constant. Generic heuristic, not enzyme-specific.
 KM_PLAUSIBLE_MIN_MM = 0.0000001
 KM_PLAUSIBLE_MAX_MM = 1000
+
+# A Ki has no Michaelis floor: tight-binding inhibitors reach picomolar and
+# below honestly (hirudin and thrombin, 2.37e-10 mM, BRENDA ref 652618).
+# Bounding the Ki table by KM_PLAUSIBLE_MIN_MM flagged that row, and the
+# resolver returned "not found" for one of the best-measured Ki values in
+# BRENDA while fallback_logic said "Ki is not bounded here". 1e-12 mM (1 fM)
+# is past any reversible inhibitor reported; below it is a unit slip.
+KI_PLAUSIBLE_MIN_MM = 1e-12
 
 # kcat (turnover number), s^-1. Must match caterva/core/data_structures.py
 # exactly -- ADR 0003 makes these a cross-layer contract, and
@@ -245,7 +293,7 @@ _UNIPROT_ACCESSION = (
 # A cell can carry multiple comma-separated accessions (isozyme subunits
 # sharing one BRENDA row, e.g. LDH's "P00339,P00336" or chymotrypsin's
 # "Q6GPI1,P17538") - matched and kept whole, not truncated to one.
-UNIPROT_CELL_PATTERN = re.compile(rf"^{_UNIPROT_ACCESSION}(?:,{_UNIPROT_ACCESSION})*$")
+UNIPROT_CELL_PATTERN = re.compile(rf"^{_UNIPROT_ACCESSION}(?:\s*,\s*{_UNIPROT_ACCESSION})*$")
 
 # Regex to pull a tab id (e.g. "tab12") out of a BRENDA nav link's href,
 # which looks like: javascript:showTable('tab12')
@@ -300,12 +348,15 @@ def has_data_table(html: str, table_label: str) -> bool:
     ------------------------------
     `_find_table_container` returns None when the label is absent, and its
     docstring tells the caller to "fall back to whole-page scanning and
-    treat results as less trustworthy". `parse_brenda_km_html` does exactly
-    that, which is right for the resolver: with a target substrate and a
-    target organism, rows from the wrong table are filtered out anyway.
+    treat results as less trustworthy". `parse_brenda_km_html` did exactly
+    that until 2026-11-11; it now returns no rows when the page's navigation
+    lists other tables but not this one (`_has_table_navigation`), and scans
+    the whole page only when there is no navigation at all.
 
-    It is NOT right for a caller running in permissive mode, where nothing
-    filters. Measured: `parse_brenda_km_html(..., table_label="Ki Values",
+    The whole-page scan was not right for a caller running in permissive
+    mode, where nothing filters, nor for the resolver: a Km row for the
+    target substrate and organism read as a turnover number is still the
+    wrong quantity. Measured: `parse_brenda_km_html(..., table_label="Ki Values",
     target_substrates=[], target_organism=None,
     require_substrate_match=False)` on an LDH page that has only a "KM
     Values" table returns 8 rows -- the Km table's -- and a caller that
@@ -318,14 +369,228 @@ def has_data_table(html: str, table_label: str) -> bool:
     return _find_table_container(BeautifulSoup(html, "html.parser"), table_label) is not None
 
 
+def _has_table_navigation(soup: BeautifulSoup) -> bool:
+    """Whether this page carries BRENDA's table navigation at all.
+
+    The distinction `parse_brenda_km_html` needs. A page WITH the navigation
+    but without the label asked for is a page that has no such table: EC
+    2.7.10.1 (receptor protein-tyrosine kinase) has no "Turnover Numbers"
+    link, and the whole-page fallback scan then returned ~580 rows from the
+    Km, IC50 and inhibitor tables as turnover numbers (measured 2026-11-11).
+    A page WITHOUT any navigation is a cut-down fixture or an unfamiliar
+    layout, where the whole-page scan is the only option and its rows are
+    marked `table_scoped=False`."""
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if isinstance(href, list):
+            href = href[0] if href else ""
+        if _SHOW_TABLE_HREF_PATTERN.search(str(href)):
+            return True
+    return False
+
+
+#: What may follow the binomial in an organism cell and still be the same
+#: organism as BRENDA names it: a strain, subspecies or variety ("Escherichia
+#: coli K-12", "Brassica rapa subsp. oleifera"). Short, and none of the
+#: punctuation a commentary is written with.
+_ORGANISM_SUFFIX_MAX = 40
+_NOT_AN_ORGANISM_SUFFIX = re.compile(r"[,;:°]|\bpH\b|\bmutant\b", re.IGNORECASE)
+
+
+def organism_matches(cell: str, target: str) -> bool:
+    """Whether one organism cell names the target organism.
+
+    EXACT ON THE BINOMIAL, case-insensitive, at a word boundary. The parser
+    used a substring test over the WHOLE ROW (`target in full_text`) and then
+    relabelled the row with the target string. Two real failures came from
+    that:
+
+    - A partial name matched every row it was a prefix of. `--organism "Homo
+      S"` was normalised to "Homo s", which is a substring of "Homo sapiens":
+      all 159 human Km rows of hexokinase matched, and every report printed
+      them as measured in "Homo s".
+    - A name in the COMMENTARY matched too. "recombinant enzyme expressed in
+      Escherichia coli" is in the commentary of human, yeast and plant rows
+      alike, and a search for E. coli then carried those rows relabelled
+      "Escherichia coli".
+
+    A strain or subspecies suffix after the binomial still matches
+    ("Escherichia coli K-12" for "Escherichia coli"), because that is the
+    organism asked for, written more precisely. A one-word target (a genus,
+    or "Mammalia") matches only a cell that is exactly that word: it is not
+    a binomial, and a genus is not a species.
+    """
+    c = " ".join((cell or "").split())
+    t = " ".join((target or "").split())
+    if not c or not t:
+        return False
+    if c.lower() == t.lower():
+        return True
+    if len(t.split()) < 2 or not c.lower().startswith(t.lower()):
+        return False
+    rest = c[len(t):]
+    if not rest[:1].isspace():
+        # "Homo sapiens" for "Homo s": the target ends inside a word.
+        return False
+    rest = rest.strip()
+    return len(rest) <= _ORGANISM_SUFFIX_MAX and not _NOT_AN_ORGANISM_SUFFIX.search(rest)
+
+
+def _row_organism_cell(cell_texts: list, target_organism: str) -> str | None:
+    """The row's organism cell, as BRENDA writes it, when it names the target.
+
+    BRENDA's layout puts the organism in cell 2 (value | compound | organism
+    | uniprot | commentary | reference). Some rows have no compound cell and
+    put it in cell 1 (EC 3.1.1.7: "0.0146 | Homo sapiens | - | hemolysate").
+    Cell 1 is read only when cell 2 is not itself an organism, so a compound
+    whose name begins with an organism's cannot be mistaken for one. The
+    commentary is never read for the organism: it names expression hosts
+    and source organisms that are not the row's."""
+    cells = [c.strip() for c in cell_texts]
+    if len(cells) > 2 and organism_matches(cells[2], target_organism):
+        return " ".join(cells[2].split())
+    if len(cells) > 1 and organism_matches(cells[1], target_organism):
+        if len(cells) <= 2 or not GENERIC_ORGANISM_PATTERN.fullmatch(cells[2]):
+            return " ".join(cells[1].split())
+    return None
+
+
+#: Counter-ions BRENDA writes after a substrate's name. "acetylthiocholine
+#: iodide" is acetylthiocholine as far as the enzyme is concerned.
+_COUNTER_ION = re.compile(
+    r"\s+(?:iodide|chloride|bromide|perchlorate|hydrochloride|sulfate|"
+    r"(?:mono|di|tri)?sodium salt|potassium salt|lithium salt)$",
+    re.IGNORECASE,
+)
+#: Stereo and anomer descriptors that may precede a name: "(S)-", "L-",
+#: "DL-", "beta-D-", "(2R,3S)-".
+_STEREO_PREFIX = re.compile(
+    # "S-dihydroorotate" (human DHODH, beside "dihydroorotate") is the
+    # (S)-form written without parentheses: an R or S alone before a name.
+    # Not before a substituent ("S-adenosyl", "S-methyl"), where the S is a
+    # sulfur atom, not a configuration.
+    r"^(?:(?:\([0-9A-Za-z,+\-]+\)|[DL]{1,2}|[RS](?=-(?!adenosyl|methyl|ethyl|acetyl|benzyl"
+    r"|nitroso|sulfo|carbamoyl|propyl|allyl|glutathionyl)[a-z])|alpha|beta|cis|trans|[αβ])-)+",
+    re.IGNORECASE,
+)
+
+
+def _same_compound(a: str, b: str) -> bool:
+    try:
+        from compound_names import same_compound
+    except ImportError:  # imported as Tests.brenda_client
+        from Tests.compound_names import same_compound
+    return same_compound(a, b)
+
+
+def _substrate_key(name: str) -> str:
+    """A compound name compared: lower case, no whitespace, no counter-ion."""
+    text = _COUNTER_ION.sub("", " ".join((name or "").split()))
+    return re.sub(r"\s+", "", text).lower()
+
+
+def substrate_matches(compound: str, target: str) -> bool:
+    """Whether a row's compound cell is the target compound.
+
+    Equal names match, ignoring case, spaces ("acetyl thiocholine") and a
+    counter-ion ("acetylthiocholine iodide"). A stereo or anomer descriptor
+    before the target matches only when the target carries none itself:
+    "lactate" asks for no particular form, so "(S)-lactate" is a form of
+    it; "D-glucose" does, so "beta-D-glucose" and "L-glucose" are not it.
+    Nothing else matches: "2-deoxy-D-glucose" is not D-glucose and
+    "phenylpyruvate" is not pyruvate, though each contains the other's name.
+    """
+    if not compound or not target:
+        return False
+    c, t = _substrate_key(compound), _substrate_key(target)
+    if not t:
+        return False
+    if c == t:
+        return True
+    # One compound under another of BRENDA's spellings (compound_names):
+    # "Z-" / "N-benzyloxycarbonyl-", "p-" / "4-", a hyphen or a space,
+    # GSSG / glutathione disulfide. Asked for one, the search reaches all.
+    if _same_compound(compound, target):
+        return True
+    if _STEREO_PREFIX.match(t):
+        return False
+    prefix = _STEREO_PREFIX.match(c)
+    return bool(prefix) and c[prefix.end():] == t
+
+
+#: `_STEREO_PREFIX` without its start anchor, for finding a compound inside
+#: running text rather than at the start of a cell.
+_STEREO_RUN = r"(?:(?:\([0-9A-Za-z,+\-]+\)|[DL]{1,2}|alpha|beta|cis|trans|[αβ])-)+"
+
+
+def substrate_named_in(text: str, target: str) -> str | None:
+    """The target compound as `text` names it, or None when it names it
+    only as part of another compound.
+
+    For a row with no compound cell (EC 3.1.1.7 writes "0.0146 | Homo
+    sapiens | - | hemolysate ..."), the whole row is the only text there is,
+    and the match used to be a substring of it: a commentary reading "with
+    2-deoxy-D-glucose as substrate" made the row a "D-glucose" row, and
+    "phenylpyruvate" a "pyruvate" one -- the miscitation `substrate_matches`
+    closed for rows WITH a compound cell, left open for rows without one
+    (found in review, 2026-11-11). The same rules apply here as there: the
+    name must stand as a whole word (not after a letter, digit or hyphen,
+    not before one), spaces inside it are ignored ("acetyl thiocholine"),
+    and a stereo descriptor before it is accepted only when the target
+    carries none itself. The span returned is the text's own spelling, so a
+    row matched through a descriptor is labelled "(S)-lactate", not
+    "lactate"."""
+    if not text or not target:
+        return None
+    t = _substrate_key(target)
+    if not t:
+        return None
+    body = r"\s*".join(re.escape(ch) for ch in t)
+    stereo = "" if _STEREO_PREFIX.match(t) else f"(?:{_STEREO_RUN})?"
+    m = re.search(rf"(?<![\w\-]){stereo}{body}(?![\w\-])", text, re.IGNORECASE)
+    return " ".join(m.group(0).split()) if m else None
+
+
+#: A reference cell: one BRENDA reference id or several, comma-separated
+#: ("697525,701131"). Group 1 is the first.
+_REFERENCE_CELL = re.compile(r"(\d{1,7})(?:\s*,\s*\d{1,7})*")
+
+
+def _reference_index(cell_texts: list) -> int | None:
+    """The index of the row's reference cell: the last cell from index 3 on
+    (after value, compound and organism) that is a reference id or a list of
+    them.
+
+    This was "the last cell of exactly six digits, anywhere", which failed
+    two ways on the live carbonic anhydrase page (2026-11-11). BRENDA's older
+    references have five digits ("33572"), so 27 human CO2 turnover rows came
+    back with no reference at all; and a six-digit VALUE was taken for the
+    reference when the real one was not six digits: "130000 | CO2 | Homo
+    sapiens | - | - | 33536" was cited as BRENDA ref 130000, a reference that
+    is not this row's. Index 0 is the value and is never read as one now."""
+    for idx in range(len(cell_texts) - 1, 2, -1):
+        if _REFERENCE_CELL.fullmatch(cell_texts[idx].strip()):
+            return idx
+    return None
+
+
 def _compound_cell(cell_texts: list, target_organism: str | None) -> str | None:
     """The compound named by a data row: the first cell after the value that
     is not an organism, an accession, a placeholder or a bare number. None
     when the row has no such cell before its commentary would begin."""
-    for cell in cell_texts[1:3]:
-        c = cell.strip()
+    cells = [c.strip() for c in cell_texts]
+    for index, c in enumerate(cells[1:3], start=1):
         if not c or c == "-":
             continue
+        # Cell 1 is the compound when cell 2 holds the row's organism, even
+        # when the compound's name has a binomial's shape: "Phenolphthalein
+        # diphosphate | Homo sapiens" on EC 3.1.3.2 was read as a row with no
+        # compound cell, and the whole row then matched "diphosphate" (fifth
+        # round's review, N10).
+        if (index == 1 and target_organism and len(cells) > 2
+                and " ".join(cells[2].split()) == " ".join(target_organism.split())
+                and " ".join(c.split()) != " ".join(target_organism.split())):
+            return c
         if GENERIC_ORGANISM_PATTERN.fullmatch(c) or (target_organism and c == target_organism):
             return None
         if UNIPROT_CELL_PATTERN.match(c) or re.match(r"^\d+\.?\d*$", c):
@@ -386,7 +651,7 @@ def parse_brenda_km_html(
         _min_value, _max_value = KCAT_PLAUSIBLE_MIN_PER_S, KCAT_PLAUSIBLE_MAX_PER_S
     elif table_label == KI_TABLE_LABEL:
         _quantity, _unit = "Ki", "mM"
-        _min_value, _max_value = KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM
+        _min_value, _max_value = KI_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM
     else:
         _quantity, _unit = "Km", "mM"
         _min_value, _max_value = KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM
@@ -397,6 +662,14 @@ def parse_brenda_km_html(
     if km_table is not None:
         search_root = km_table
         table_scoped = True
+    elif _has_table_navigation(soup):
+        # The page has BRENDA's table navigation and no link for this
+        # table: the enzyme has no such table. Nothing from another table
+        # may stand in for it. Before this returned, the whole-page scan
+        # below ran here too, and EC 2.7.10.1 (no "Turnover Numbers" table)
+        # gave ~580 "turnover numbers" read out of its Km, IC50 and
+        # inhibitor tables.
+        return []
     else:
         # Couldn't find the "KM Values" nav link/container (e.g. a fixture
         # without the nav sidebar, or a genuinely different page layout).
@@ -451,24 +724,54 @@ def parse_brenda_km_html(
         # organism. This is the organism twin of the documented "" substrate
         # pitfall below ("require_substrate_match = bool(substrate)").
         # Deeper rationale: ADR 0174.
+        #
+        # The match is on the row's ORGANISM CELL, exact on the binomial,
+        # and the row keeps the organism as BRENDA wrote it
+        # (`organism_matches`). This was `target_organism in full_text` and
+        # `row_organism = target_organism`: "Homo s" matched every human
+        # row and printed them as "Homo s", and a commentary reading
+        # "expressed in Escherichia coli" made any organism's row an E. coli
+        # one.
         if target_organism:
-            if target_organism not in full_text:
+            row_organism = _row_organism_cell(cell_texts, target_organism)
+            if row_organism is None:
                 continue
-            row_organism = target_organism
         else:
+            # By the layout, as `_row_organism_cell` reads it: cell 2, else
+            # cell 1 when cell 2 is not organism-shaped. This took the first
+            # binomial-shaped cell, so a compound named like one
+            # ("Phenolphthalein diphosphate", "Sodium diphosphate") became
+            # the row's organism, and potato acid phosphatase's advice
+            # listed them as the organisms to re-run in (fifth round's
+            # review, N10).
             row_organism = None
-            for cell in cell_texts:
-                cell_clean = cell.strip()
-                if GENERIC_ORGANISM_PATTERN.fullmatch(cell_clean):
-                    row_organism = cell_clean
-                    break
+            stripped = [c.strip() for c in cell_texts]
+            if len(stripped) > 2 and GENERIC_ORGANISM_PATTERN.fullmatch(stripped[2]):
+                row_organism = stripped[2]
+            elif len(stripped) > 1 and GENERIC_ORGANISM_PATTERN.fullmatch(stripped[1]):
+                row_organism = stripped[1]
             if row_organism is None:
                 continue
 
         km_match = re.match(r"^(\d+\.?\d*)$", cell_texts[0].strip())
+        value_range = None
         if not km_match:
-            continue
-        km_value = float(km_match.group(1))
+            # "0.038 - 0.04 | AMP | Escherichia coli | - | pH 7.4, 27°C |
+            # 642585" is one paper's measurement given as a range, not
+            # BRENDA's aggregate summary row (whose organism cell reads "N
+            # entries"). Both were dropped, and E. coli adenylate kinase lost
+            # AMP, its natural substrate (third round's review). The lower
+            # bound is carried -- a number the paper gives, never a midpoint
+            # -- and `value_range` says the paper gave a range.
+            ranged = _RANGE_VALUE.match(cell_texts[0].strip())
+            if not ranged or _AGGREGATE_ROW.search(full_text):
+                continue
+            low, high = float(ranged.group(1)), float(ranged.group(2))
+            if not 0 < low < high:
+                continue
+            km_value, value_range = low, (low, high)
+        else:
+            km_value = float(km_match.group(1))
 
         # Match the target against the row's COMPOUND cell, not the whole
         # row. The commentary names other molecules too: BRENDA's LDH Ki row
@@ -480,13 +783,44 @@ def parse_brenda_km_html(
         # website then called it oxamate. Only a row with no identifiable
         # compound cell (organism in cell 1, as on EC 3.1.1.7) falls back to
         # the whole row, which is the only text it has.
-        compound_cell = _compound_cell(cell_texts, target_organism)
-        haystack = (compound_cell if compound_cell is not None else full_text).lower()
+        compound_cell = _compound_cell(cell_texts, row_organism)
+        #
+        # And against the WHOLE compound, not a substring of it. "D-glucose"
+        # is a substring of "2-deoxy-D-glucose", "pyruvate" of
+        # "phenylpyruvate": on the recorded hexokinase page a human
+        # "D-glucose" Km pool held five 2-deoxy-D-glucose rows, and the
+        # kcat pool sixteen beta-D-glucose rows and one 2-deoxy-D-glucose
+        # row, every one labelled "D-glucose". A professor reading the
+        # citation finds a different molecule. `substrate_matches` takes
+        # the same compound spelled with or without spaces, a counter-ion
+        # ("acetylthiocholine iodide"), and -- only when the target names
+        # no stereochemistry itself -- a stereo descriptor ("(S)-lactate"
+        # for "lactate"); a row matched that last way keeps BRENDA's own
+        # name, so the label says which form it measured. A row with no
+        # compound cell still falls back to the whole row, the only text
+        # it has.
         matched_substrate = None
-        for sub in target_substrates:
-            if sub.lower() in haystack:
-                matched_substrate = sub
-                break
+        if compound_cell is not None:
+            for sub in target_substrates:
+                if substrate_matches(compound_cell, sub):
+                    matched_substrate = (
+                        sub if _substrate_key(compound_cell) == _substrate_key(sub)
+                        else compound_cell
+                    )
+                    break
+        else:
+            # No compound cell: the row's text is all there is, and the
+            # compound must stand in it as a whole name, by the same rules
+            # (`substrate_named_in`). This was `sub.lower() in full_text`,
+            # which still read "2-deoxy-D-glucose" in a commentary as
+            # D-glucose.
+            for sub in target_substrates:
+                named = substrate_named_in(full_text, sub)
+                if named is not None:
+                    matched_substrate = (
+                        sub if _substrate_key(named) == _substrate_key(sub) else named
+                    )
+                    break
 
         substrate_verified = True
         if not matched_substrate:
@@ -508,7 +842,7 @@ def parse_brenda_km_html(
                         continue
                     if GENERIC_ORGANISM_PATTERN.fullmatch(cell_clean):
                         continue
-                    if target_organism is not None and cell_clean == target_organism:
+                    if cell_clean == row_organism:
                         continue
                     if UNIPROT_CELL_PATTERN.match(cell_clean):
                         continue
@@ -523,14 +857,17 @@ def parse_brenda_km_html(
                 continue
 
         uniprot = None
+        uniprot_from_row = False
         for cell in cell_texts:
             # Some rows (e.g. multi-isozyme entries like LDH's sub-rows)
             # carry more than one accession in a single comma-separated
             # cell, e.g. "P00339,P00336" - both are real, keep the cell
             # as-is rather than picking just one.
             if UNIPROT_CELL_PATTERN.match(cell.strip()):
-                uniprot = cell.strip()
+                uniprot = re.sub(r"\s*,\s*", ",", cell.strip())
+                uniprot_from_row = True
                 break
+        uniprot_guessed = uniprot is None and fallback_uniprot is not None
         if uniprot is None:
             uniprot = fallback_uniprot
 
@@ -552,11 +889,7 @@ def parse_brenda_km_html(
         # preserve.
         conditions = None
         if cell_texts:
-            ref_index = None
-            for idx in range(len(cell_texts) - 1, -1, -1):
-                if re.match(r"^\d{6}$", cell_texts[idx].strip()):
-                    ref_index = idx
-                    break
+            ref_index = _reference_index(cell_texts)
             if ref_index is not None and ref_index >= 1:
                 candidate = cell_texts[ref_index - 1].strip()
                 # Guard against a row missing its commentary entirely, where
@@ -583,11 +916,11 @@ def parse_brenda_km_html(
             # temperature. It found none, so nothing was fabricated, but the
             # field claimed a commentary that did not exist.
 
-        ref_id = None
-        for cell in reversed(cell_texts):
-            if re.match(r"^\d{6}$", cell.strip()):
-                ref_id = cell.strip()
-                break
+        _ref_at = _reference_index(cell_texts)
+        ref_id = (
+            _REFERENCE_CELL.fullmatch(cell_texts[_ref_at].strip()).group(1)
+            if _ref_at is not None else None
+        )
 
         flagged = False
         flag_reason = None
@@ -652,6 +985,8 @@ def parse_brenda_km_html(
                 substrate=matched_substrate,
                 organism=row_organism,
                 uniprot=uniprot,
+                uniprot_from_row=uniprot_from_row,
+                uniprot_guessed=uniprot_guessed,
                 conditions=conditions,
                 assay_ph=parsed_conditions.ph,
                 assay_temperature_c=parsed_conditions.temperature_c,
@@ -663,6 +998,7 @@ def parse_brenda_km_html(
                 effectors=extract_effectors(conditions),
                 reference_id=ref_id,
                 ec_number=ec_number,
+                value_range=value_range,
                 flagged=flagged,
                 flag_reason=flag_reason,
                 substrate_type=classify_substrate(matched_substrate),
@@ -671,7 +1007,24 @@ def parse_brenda_km_html(
             )
         )
 
-    return results
+    return _ranges_only_where_alone(results)
+
+
+def _ranges_only_where_alone(results: list) -> list:
+    """A row whose value is a range ("0.057 - 0.061") is kept only for a
+    compound and organism with no single-value row: a range often spans a
+    paper's several preparations ("wild-type and nonaggregating interface
+    mutant hexokinase I"), so it is evidence of last resort, used where it is
+    the only evidence (E. coli adenylate kinase and AMP)."""
+    def key(entry):
+        # A stereo form and the bare name are one compound here: the range
+        # of "glucose 6-phosphate" is not alone beside D-glucose 6-phosphate.
+        name = _substrate_key(entry.substrate)
+        prefix = _STEREO_PREFIX.match(name)
+        return (name[prefix.end():] if prefix else name, entry.organism)
+
+    single = {key(e) for e in results if not e.value_range}
+    return [e for e in results if not e.value_range or key(e) not in single]
 
 
 def parse_brenda_turnover_html(
@@ -831,11 +1184,14 @@ def fetch_and_parse_brenda_km(
         except Exception:
             taxon_id = None
 
-    fallback_uniprot = (
-        enzyme_lookup.fetch_uniprot_accession(ec_number, taxon_id)
-        if taxon_id
-        else None
-    )
+    # A fallback locator only (it stamps rows with no UniProt cell): a
+    # UniProt outage must not abort a search whose BRENDA page loads.
+    fallback_uniprot = None
+    if taxon_id:
+        try:
+            fallback_uniprot = enzyme_lookup.fetch_uniprot_accession(ec_number, taxon_id)
+        except Exception:
+            fallback_uniprot = None
     html = fetch_brenda_html(ec_number)
 
     entries = parse_brenda_km_html(

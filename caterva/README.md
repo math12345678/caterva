@@ -72,10 +72,13 @@ python -m caterva.cli --help
 ## Things that will bite you
 
 **`validation.py` is shared with the TypeScript side.** `vmax_from_kcat()`
-and `beta_gamma_from_r0()` are called from the API server through the runner
-bridge, deliberately, so the arithmetic and its bounds have one
-implementation rather than two ([ADR 0019](../docs/adr/), ADR 0020). Changing
-a bound here changes it there.
+is called from the API server through the runner bridge, deliberately, so
+the arithmetic and its bounds have one implementation rather than two
+([ADR 0019](../docs/adr/)). Changing a bound here changes it there.
+(Corrected 2026-11-01: this also named `beta_gamma_from_r0()` (ADR 0020),
+which left this `validation.py` when the epidemiology domains were
+archived on 2026-09-27, after v0.4.0; it is in
+`archive/legacy_domains/validation.py`.)
 
 **The engine is the contract** ([ADR 0007](../docs/adr/)). Physical validity
 is decided here, not by callers. A TypeScript caller that reimplements a

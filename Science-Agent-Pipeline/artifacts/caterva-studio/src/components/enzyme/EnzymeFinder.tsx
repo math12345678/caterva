@@ -21,6 +21,14 @@
  * - Hide a retired number. A transferred or deleted EC number is shown with
  *   its replacement, or with the fact that it has none.
  *
+ * NEVER A STALE ROW. While the next query is waiting (the debounce) or
+ *   fetching, the list on screen is the PREVIOUS query's answer, kept so the
+ *   panel does not flicker (`placeholderData: keepPreviousData`). Those rows
+ *   are dimmed and cannot be chosen by click or Enter until the answer for
+ *   what is typed arrives: a fast "granzyme B" typed over "tert" once sent
+ *   EC 1.14.19.48 (tert-amyl alcohol desaturase) because the old row was
+ *   still under the pointer.
+ *
  * KEYBOARD: ArrowDown and ArrowUp move through the candidates, Enter
  * chooses the highlighted one, Escape clears what was typed. The control is
  * a combobox with a listbox (WAI-ARIA 1.2): focus stays in the input and
@@ -57,6 +65,12 @@ export interface EnzymeFinderProps {
   organism?: string;
   /** Text to start the search with when nothing is chosen (a link that carried a name). */
   seed?: string;
+  /**
+   * Told the text in the input whenever it changes ("" once a row is chosen, on Change and on Escape). For a
+   * screen whose engine resolves a name itself (Compose): a name typed and never clicked was otherwise lost, and
+   * the run went ahead with placeholders as though no enzyme had been named.
+   */
+  onQueryChange?: (text: string) => void;
   label?: ReactNode;
   optional?: boolean;
   hint?: ReactNode;
@@ -185,10 +199,13 @@ function Option({
   organismAsked,
   scope,
   total,
+  stale,
   onChoose,
   onHover,
 }: {
   row: Row;
+  /** The row belongs to the previous query's answer, still on screen while the next one loads: shown, not choosable. */
+  stale: boolean;
   id: string;
   active: boolean;
   organismLabel: string | null;
@@ -204,7 +221,7 @@ function Option({
   const status = statusText(c);
   const proteins = c.organism_proteins;
   const line = row.source === "nomenclature" ? organismLine(proteins, c.organism_protein_count, organismLabel, organismAsked, scope) : null;
-  const disabled = row.choose === null;
+  const disabled = row.choose === null || stale;
   return (
     <li
       id={id}
@@ -214,6 +231,7 @@ function Option({
       className="enz-option"
       data-active={active ? "true" : undefined}
       data-disabled={disabled ? "true" : undefined}
+      data-stale={stale ? "true" : undefined}
       data-recommended={c.recommended ? "true" : undefined}
       onMouseDown={(e) => e.preventDefault()}
       onMouseMove={onHover}
@@ -263,6 +281,7 @@ export function EnzymeFinder({
   onChange,
   organism = "",
   seed = "",
+  onQueryChange,
   label = "Enzyme",
   optional = false,
   hint,
@@ -284,11 +303,21 @@ export function EnzymeFinder({
   const [focusAfter, setFocusAfter] = useState<"change" | "input" | null>(null);
 
   const typed = query.trim();
+  // A ref, so a screen passing a new arrow each render does not re-fire this for text that did not change.
+  const queryListener = useRef(onQueryChange);
+  queryListener.current = onQueryChange;
+  useEffect(() => {
+    queryListener.current?.(query);
+  }, [query]);
   const settled = useDebounced(typed, 200);
   const settledOrganism = useDebounced(organism.trim(), 300);
   const waiting = typed !== settled;
   const found = useEnzymeFind(settled, settledOrganism, open && value === "");
   const answer = found.data;
+  // The rows on screen answer an earlier question: the text changed and the debounce has not settled, or the
+  // query for the settled text (or a changed organism) is in flight and what is shown is the previous query's
+  // kept answer. A refetch of the same question is not stale: its rows are the ones asked for.
+  const stale = waiting || found.isPlaceholderData;
   const rows = useMemo(() => rowsOf(answer), [answer]);
   const organismAsked = Boolean(answer?.organism);
   const organismLabel = answer?.organism_label ?? null;
@@ -326,7 +355,7 @@ export function EnzymeFinder({
     value === "" ? null : picked && picked.ec === value ? picked : detail.data ? { ec: detail.data.ec, name: detail.data.name, reaction: detail.data.reaction } : null;
 
   const choose = (row: Row) => {
-    if (row.choose === null) return;
+    if (row.choose === null || stale) return;
     const ec = row.choose;
     const successor = ec !== row.candidate.ec;
     const chosen: ChosenEnzyme = successor
@@ -374,7 +403,7 @@ export function EnzymeFinder({
         // Never submit the form from here: Enter either chooses or does nothing yet.
         e.preventDefault();
         const row = rows[active];
-        if (row && row.choose !== null && !waiting) choose(row);
+        if (row && row.choose !== null && !stale) choose(row);
         return;
       }
       case "Escape":
@@ -517,7 +546,14 @@ export function EnzymeFinder({
             Try again
           </button>
         ) : null}
-        <ul id={listId} role="listbox" aria-label={`Enzymes matching ${typed}`} className="enz-list" hidden={rows.length === 0}>
+        <ul
+          id={listId}
+          role="listbox"
+          aria-label={stale && answer ? `Enzymes matching ${answer.query}, the previous search` : `Enzymes matching ${typed}`}
+          className="enz-list"
+          data-stale={stale ? "true" : undefined}
+          hidden={rows.length === 0}
+        >
           {rows.map((row, i) => (
             <Option
               key={row.key}
@@ -528,6 +564,7 @@ export function EnzymeFinder({
               organismAsked={organismAsked}
               scope={answer?.organism_scope ?? null}
               total={answer?.candidates_total ?? rows.length}
+              stale={stale}
               onChoose={() => choose(row)}
               onHover={() => setActive(i)}
             />

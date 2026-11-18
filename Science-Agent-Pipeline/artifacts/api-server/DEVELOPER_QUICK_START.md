@@ -32,14 +32,19 @@ Visit `http://localhost:5000` in your browser.
 # Via curl
 curl -X POST http://localhost:5000/api/simulate \
   -H "Content-Type: application/json" \
-  -d '{"query":"SIR beta=0.5 gamma=0.1 S0=900"}'
+  -d '{"query":"simulate michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51"}'
 
-# Response: 202 Accepted with job ID
+# Response: 202 Accepted with job ID (abbreviated)
 {
   "jobId": "abc-123",
+  "query": "simulate michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51",
   "status": "pending",
   "progress": 0
 }
+
+# SIR, SEIR, Wright-Fisher, molecular dynamics and the other domains
+# archived on 2026-09-27 are refused by this build (v0.4.0 is the last
+# release that runs them).
 
 # Poll for result
 curl http://localhost:5000/api/simulate/abc-123
@@ -64,7 +69,7 @@ If adding domain `new_domain`:
 2. **TypeScript** (`src/lib/catervaRunner.ts`):
    ```typescript
    export type SimulationDomain = 
-     | "mm" | "sir" | ... | "new_domain";
+     | "mm" | "mm_competitive_inhibition" | ... | "new_domain";
    ```
 
 3. **Schemas** (`src/lib/schemas.ts`):
@@ -211,9 +216,9 @@ Target: Keep coverage >90% on critical paths
 
 ### Understanding Error Messages
 
-**User sees:** `"MISSING_REQUIRED_INPUT: Cannot simulate 'sir': beta, gamma could not be resolved..."`
+**User sees:** `"MISSING_REQUIRED_INPUT: Cannot simulate 'mm': vmax is unresolved. ..."`
 
-**This means:** The resolver couldn't find `beta` and `gamma` parameters. User needs to add them to query.
+**This means:** Vmax is never read from the literature, because a published Vmax was measured at that paper's enzyme concentration. Literature resolves `km` (and `ki` for competitive inhibition) and `kcat`. The user adds `vmax=` to the query, or adds `enzyme_conc=` so Vmax = kcat x [E]0 can be derived from a literature kcat.
 
 **Developer sees:** `RequiredParametersMissingError` thrown from `queryResolver.ts` line X
 

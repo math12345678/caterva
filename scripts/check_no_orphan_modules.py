@@ -136,6 +136,19 @@ def _declared_entry_points() -> set[str]:
             blobs.extend(str(v) for v in value.values())
         elif isinstance(value, str):
             blobs.append(value)
+    # jest loads these itself (package.json "jest": globalSetup, ...), so
+    # they are entry points the way a script is: imported by nothing, run
+    # on every test run. src/testSupport/ keeps the suite out of the
+    # developer's ~/.caterva and lives only there.
+    jest = package.get("jest")
+    if isinstance(jest, dict):
+        for key in ("globalSetup", "globalTeardown", "setupFiles",
+                    "setupFilesAfterEnv"):
+            value = jest.get(key)
+            if isinstance(value, str):
+                blobs.append(value)
+            elif isinstance(value, list):
+                blobs.extend(str(v) for v in value)
 
     for blob in blobs:
         for match in re.finditer(r"[\w./-]+\.(?:ts|tsx|js|py)", blob):

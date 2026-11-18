@@ -35,6 +35,33 @@ export class RequiredParametersMissingError extends Error {
    * missing.
    */
   readonly resolvedSoFar: Record<string, number | number[]>;
+  /**
+   * Where each value in `resolvedSoFar` came from, and why each missing
+   * key is missing (`unresolvedReason`), keyed like `parameterProvenance`
+   * on a successful result.
+   *
+   * Without it the refusal shipped bare numbers. The landing page seeded
+   * its form from them and, on "run", re-sent EVERY one as `key=value` in
+   * the query text, which the resolver reads as the person typing it:
+   * "hexokinase glucose human" came back with BRENDA's Km 6 mM (ref
+   * 641068), and the run that followed reported km origin "user" with no
+   * citation -- the literature value relabelled as the student's own
+   * choice, and the default s0/end/points with it. A caller cannot keep
+   * a provenance it was never given.
+   */
+  readonly parameterProvenance: Record<string, ParameterProvenance>;
+  /**
+   * The resolver's flags up to the refusal, the same strings a successful
+   * result carries in `provenance.flags`.
+   *
+   * Without them an assumption made on the person's behalf vanished on the
+   * one path that stops to ask them something. Measured 2026-11-03:
+   * "hexokinase with glucose in humna" (a misspelt organism) came back 422
+   * with BRENDA's Homo sapiens Km (ref 641068) in `parameterProvenance` and
+   * no "assumed: organism = Homo sapiens" anywhere in the body, so the
+   * form showed a human value as if the query had asked for one.
+   */
+  readonly flags: string[];
 
   /**
    * `details` exists because the summary sentence is not always true.
@@ -64,6 +91,8 @@ export class RequiredParametersMissingError extends Error {
      * degrades to the previous `key=<value>` form.
      */
     examples: Record<string, number | number[]> = {},
+    parameterProvenance: Record<string, ParameterProvenance> = {},
+    flags: string[] = [],
   ) {
     const explained = missing.filter((k) => details[k]);
     const unexplained = missing.filter((k) => !details[k]);
@@ -133,6 +162,8 @@ export class RequiredParametersMissingError extends Error {
     this.missing = missing;
     this.details = details;
     this.resolvedSoFar = resolvedSoFar;
+    this.parameterProvenance = parameterProvenance;
+    this.flags = flags;
   }
 }
 
@@ -275,10 +306,11 @@ export const RESOLVABLE_FIELDS: Record<string, string[]> = {
   // assay conditions -- so a cross-species Ki never borrows a verified Km's
   // provenance (see applyKineticResolution in queryResolver.ts).
   mm_competitive_inhibition: ["km", "ki"],
-  // Population genetics: mutation_rate resolved from published literature
-  // (Rahbari et al., Nature Genetics, 2015 for human; other organisms
-  // in Tests/popgen_resolver.py with primary citations).
-  wright_fisher: ["mutation_rate"],
+  // wright_fisher: ["mutation_rate"] sat here until 2026-10-31. Population
+  // genetics was archived on 2026-09-27 (archive/legacy_domains/README.md;
+  // v0.4.0 is the last release that runs it), no live domain is named
+  // wright_fisher, and the runner answers parameterType "mutation_rate"
+  // with source "domain_archived".
 };
 
 /** The mechanisms a model can be of, and so the modes a Ki can be asked for
@@ -312,22 +344,6 @@ export const KI_MODE_OF_DOMAIN: Readonly<Record<string, InhibitionMode>> = {
 };
 
 /**
- * Domains whose (beta, gamma) resolve from a literature (R0, infectious
- * period) pair — ADR 0017 / ADR 0020.
- *
- * Deliberately NOT in RESOLVABLE_FIELDS: that map means "one BRENDA-style
- * table maps to one engine parameter", which is false here (an arithmetic
- * bridge feeds two parameters from one registry entry). It lives here
- * anyway, rather than as a bare `domain !== "sir"` inside the bridge, so
- * that the set below can be DERIVED from it. The bridge imports this;
- * there is one list, not two.
- */
-export const EPIDEMIOLOGY_BRIDGE_DOMAINS: ReadonlySet<string> = new Set<string>([
-  // Empty since epidemiology was archived on 2026-09-27; kept so the bridge
-  // still has one list to consult if the domain ever returns.
-]);
-
-/**
  * Every domain where ANY parameter has a literature lookup behind it.
  *
  * This exists because the refusal message was making a claim that is
@@ -350,7 +366,7 @@ export const EPIDEMIOLOGY_BRIDGE_DOMAINS: ReadonlySet<string> = new Set<string>(
  * stale.
  */
 export const DOMAINS_WITH_LITERATURE_RESOLUTION: ReadonlySet<string> =
-  new Set([...Object.keys(RESOLVABLE_FIELDS), ...EPIDEMIOLOGY_BRIDGE_DOMAINS]);
+  new Set(Object.keys(RESOLVABLE_FIELDS));
 
 /**
  * Assay conditions under which a kinetic constant was measured.
@@ -569,6 +585,12 @@ export interface ParameterProvenance {
     | "cross_species_withheld"
     | "cross_species_too_distant"
     | "variant_withheld"
+    /**
+     * Every row BRENDA holds is outside the physically plausible range for
+     * the constant (a kcat below 1e-3 1/s, a Km below 1e-7 mM): a unit slip
+     * or a misfiled row, far likelier than a measurement, and never used.
+     */
+    | "implausible_withheld"
     /** An isoform was asked for and every row measured another one. */
     | "isoform_withheld"
     /**
@@ -603,6 +625,25 @@ export interface ParameterProvenance {
      */
     | "ec_mismatch"
     /**
+     * The query names more than one organism (reagents such as "bovine
+     * serum albumin" set aside), so which one the enzyme came from is not
+     * in the text. Same stage as the three above: nothing was looked up,
+     * because a lookup in either species attaches a real citation to a
+     * guess.
+     */
+    | "organism_ambiguous"
+    /**
+     * No substrate was named AND none could be chosen (ADR 0182). Since
+     * then an unnamed substrate is chosen from BRENDA -- the one with the
+     * most measured rows -- and the choice is stated as a "substrate
+     * chosen:" flag; this reason is left for when BRENDA lists no row for
+     * any substrate of the enzyme in the organism, or the checkout has no
+     * chooser. The note is the runner's sentence naming what is missing and
+     * what would fix it. (Before ADR 0182 it was every guessed enzyme with
+     * no substrate named, refused without asking BRENDA.)
+     */
+    | "substrate_not_named"
+    /**
      * Nothing was found anywhere. The plain case, and the only one the
      * generic sentence actually describes — named explicitly so the union
      * covers what `buildUnresolvedKineticProvenance` can produce, rather
@@ -620,19 +661,6 @@ export interface ParameterProvenance {
      * omission. The literature was not silent — nobody read it out.
      */
     | "literature_candidates"
-    /**
-     * The run stopped at the DISEASE NAME (epidemiology's counterpart to
-     * `ec_not_resolved`), before the (R0, infectious period) registry was
-     * consulted at all -- either no disease name was recognized in the
-     * query, or the one that was is not among the short list this system
-     * has a verified, methodology-compatible source for (see diseases.ts
-     * and ADR 0017; today that list is COVID-19 only). The generic
-     * sentence would say beta/gamma "could not be resolved from
-     * literature", which reads as "we checked and the literature had
-     * nothing" -- false for a real, well-studied disease like measles or
-     * influenza that simply isn't registered here yet.
-     */
-    | "disease_not_registered"
     /**
      * Vmax is missing ONLY because the enzyme concentration is (ADR 0013 /
      * ADR 0019).
@@ -1116,8 +1144,11 @@ const NON_SCIENTIFIC_KEYS = new Set(["points"]);
  *
  * WHAT IS NOT ON THIS LIST, AND WHY
  * ---------------------------------
- * Every measured constant -- km, vmax, kcat, ki, beta, gamma,
- * mutation_rate -- is absent and stays hard-blocked. That is the product.
+ * Every measured constant -- km, vmax, kcat, ki, the Gillespie rate
+ * constant k -- is absent and stays hard-blocked. That is the product.
+ * (Until 2026-11-01 this sentence also named beta, gamma and
+ * mutation_rate, constants of the domains archived on 2026-09-27, after
+ * v0.4.0, the last release that runs them.)
  *
  * `enzyme_conc` is deliberately absent even though it IS an experimental
  * choice, because ADR 0013 makes it load-bearing: Vmax = kcat x [E]0, so a
@@ -1125,11 +1156,23 @@ const NON_SCIENTIFIC_KEYS = new Set(["points"]);
  * literature kcat. It is the one experimental choice whose default would
  * fabricate a measurement.
  *
- * `temperature` is present only because the sole domain that takes it as a
- * SIMULATION parameter is molecular dynamics, where it is a thermostat
- * setting in reduced units. Assay temperature -- the STRENDA one, which is
- * a scientific fact about a measurement -- lives in `assayConditions` and
- * is untouched by this.
+ * `temperature` was present until 2026-11-01 only because the sole domain
+ * that took it as a SIMULATION parameter was molecular dynamics, where it
+ * was a thermostat setting in reduced units. Molecular dynamics was
+ * archived on 2026-09-27, after v0.4.0 (the last release that runs it),
+ * and no live domain takes `temperature` as a simulation parameter, so it
+ * was removed with the other archived-domain keys below. Assay
+ * temperature -- the STRENDA one, which is a scientific fact about a
+ * measurement -- lives in `assayConditions` and was never on this list.
+ *
+ * (Note, 2026-11-01: both this list and EXPERIMENTAL_CHOICE_KEYS were
+ * pruned to the keys a live domain reads -- caterva_runner.py's run_mm,
+ * run_mm_competitive_inhibition, the three Gillespie runners and run_sbml.
+ * Removed: n_steps, timestep, e0, r0_recovered, n0, p0, v0,
+ * starting_frequency, starting_frequencies, cycles, generations,
+ * population_size, n_particles, density, temperature, n_samples and
+ * replicate_runs. A query can no longer set any of them, so a default for
+ * one could only have come from an archived domain's table.)
  *
  * Enumerated explicitly rather than derived from EXPERIMENTAL_CHOICE_KEYS
  * minus exclusions, so that adding a key here is a deliberate act someone
@@ -1140,32 +1183,15 @@ export const SCENARIO_DEFAULTABLE_KEYS = new Set([
   "start",
   "end",
   "points",
-  "n_steps",
-  "timestep",
-  // Initial conditions: what you put in the tube, or the population you
-  // are modelling. A choice, and ADR 0044 already says pre-filling one is
-  // not a fabrication.
+  // Initial conditions: what you put in the tube, or the molecule counts
+  // a Gillespie run starts from. A choice, and ADR 0044 already says
+  // pre-filling one is not a fabrication.
   "s0",
   "i0",
-  "e0",
-  "r0_recovered",
-  "n0",
   "a0",
   "b0",
-  "p0",
-  "v0",
-  "starting_frequency",
-  "starting_frequencies",
   // Experiment size and compute budget.
-  "cycles",
-  "generations",
-  "population_size",
-  "n_particles",
-  "density",
-  "temperature",
-  "n_samples",
   "n_replicates",
-  "replicate_runs",
   "seed",
 ]);
 
@@ -1192,7 +1218,10 @@ export function scenarioDefaultAllowed(
  * is useless for a repressilator, whose time is dimensionless and whose
  * sensible window is a few hundred units -- a reader has no way to tell
  * whether to type 5 or 5000, so the refusal that is supposed to unblock
- * them does not. "Add end=200" does.
+ * them does not. "Add end=200" does. (Note, 2026-11-01: the repressilator
+ * was archived on 2026-09-27, after v0.4.0, the last release that runs
+ * it. The point stands for any live domain whose window a reader cannot
+ * guess.)
  *
  * WHY THIS IS A WHITELIST AND NOT THE OBVIOUS INVERSE
  *
@@ -1217,31 +1246,14 @@ const EXPERIMENTAL_CHOICE_KEYS = new Set([
   "start",
   "end",
   "points",
-  "n_steps",
-  "timestep",
-  // initial conditions -- what you put in the tube, or the population
+  // initial conditions -- what you put in the tube
   "s0",
   "i0",
-  "e0",
-  "r0_recovered",
-  "n0",
   "a0",
   "b0",
-  "p0",
-  "v0",
   "enzyme_conc",
-  "starting_frequency",
-  "starting_frequencies",
   // experiment size and setup
-  "cycles",
-  "generations",
-  "population_size",
-  "n_particles",
-  "density",
-  "temperature",
-  "n_samples",
   "n_replicates",
-  "replicate_runs",
   "seed",
 ]);
 
@@ -1466,7 +1478,9 @@ export function classifyGap(
   // all: it is unregistered because Guerra et al. (2017), Lancet Infect Dis
   // 17(12):e420-e428, found R0 estimates vary far more than the cited 12-18
   // range and endorse no single value -- so no honest default exists. See
-  // `applyBetaGammaFromR0Resolution`, which argues this at length.
+  // ADR 0017 and ADR 0169. (The R0 bridge, applyBetaGammaFromR0Resolution,
+  // was removed on 2026-10-31: epidemiology was archived on 2026-09-27 and
+  // v0.4.0 is the last release that runs it. The rule below still holds.)
   //
   // A domain-shaped test cannot see that. A quantity is a free choice
   // because of what the QUANTITY is, not because of which table happens to

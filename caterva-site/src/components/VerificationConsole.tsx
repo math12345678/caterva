@@ -488,7 +488,7 @@ export default function VerificationConsole() {
             className="h-[5px] w-[5px] rounded-full"
             style={{ background: passing ? C.mint : C.red }}
           />
-          {passing ? 'all domains verified' : 'verification failing'}
+          {passing ? 'in-browser check passing' : 'in-browser check failing'}
         </span>
         <button
           className="px-3 py-[5px] text-[11px] transition-colors"
@@ -517,7 +517,7 @@ export default function VerificationConsole() {
               LIVE VERIFICATION
             </span>
             <span className="text-[11px]" style={{ color: C.dim }}>
-              wright_fisher · N={CONFIG.populationSize} ·{' '}
+              wright_fisher (archived domain) · N={CONFIG.populationSize} ·{' '}
               {CONFIG.replicates} replicates · seed={CONFIG.seed}
             </span>
           </div>
@@ -594,8 +594,16 @@ export default function VerificationConsole() {
           {bugged ? 'Revert' : 'Inject bug: 2N → N'}
         </button>
 
-        <span style={{ color: C.faint }}>
-          tests/test_popgen_correctness.py::test_heterozygosity_decay
+        {/* The PASS/FAIL beside this label is computed here, in the browser,
+            by the port of the test below; it is not a pytest result. The
+            Python test left tests/ when population genetics was archived on
+            2026-09-27 (archive/legacy_domains/README.md): it is not collected
+            by `make test` or CI, and runs only in v0.4.0. The label names its
+            exact node id there. */}
+        <span style={{ color: C.faint, overflowWrap: 'anywhere' }}>
+          in-browser port of
+          archive/legacy_domains/tests/test_popgen_correctness.py::test_heterozygosity_decay_matches_exact_rate
+          {' '}(archived; runs in v0.4.0)
         </span>
 
         <span

@@ -449,7 +449,7 @@ There is no `GET /api/metrics/history` endpoint in this repo (it's mentioned onl
 
 ### Prometheus Scrape Config
 
-> **Proposed — not implemented in this repo yet.** There is no `prometheus.yml`, scrape config, or Prometheus integration anywhere in this repository — no `/metrics` endpoint in Prometheus exposition format exists either (the JSON endpoints above are not Prometheus-format). The config below is illustrative only and would need a real Prometheus-format metrics endpoint to be added before it could work.
+> **Proposed for this server — not implemented.** This API server has no endpoint in Prometheus exposition format (the JSON endpoints above are not Prometheus-format), so the config below is illustrative only and would need one to be added before it could work. The repository does have a Prometheus stack, for its *other* HTTP server: `deploy/monitoring/prometheus.yml` scrapes `GET /metrics` on the dashboard server (`src/web/server.ts`, port 3000), not this one. An earlier version of this note said no `prometheus.yml` existed anywhere in the repository; one does, at the path above.
 
 ```yaml
 # prometheus.yml (proposed)
@@ -465,7 +465,7 @@ scrape_configs:
 
 ### Grafana Dashboards
 
-> **Proposed — not implemented in this repo yet.** No Grafana dashboards, provisioning config, or references exist in this repository.
+> **Proposed for this server — not implemented.** No Grafana dashboard reads this server's metrics. The dashboard and provisioning files in `deploy/monitoring/` (`deploy/monitoring/grafana-dashboard.json`) chart the dashboard server's `/metrics`, described above.
 
 **Key metrics to graph (proposed, contingent on the Prometheus integration above existing):**
 - HTTP request latency (p50, p95, p99)

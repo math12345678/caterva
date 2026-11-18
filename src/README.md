@@ -68,5 +68,7 @@ measured-parameter input carries a `value`. Its allowlist is empty on
 purpose.
 
 **Do not reimplement a Python check in TypeScript.** The engine is the
-contract. `vmax_from_kcat()` and `beta_gamma_from_r0()` are called *through*
-the bridge for this reason.
+contract. `vmax_from_kcat()` is called *through* the bridge for this
+reason. (Until 2026-11-01 this also named `beta_gamma_from_r0()`; it left
+`caterva/core/validation.py` with the SIR and SEIR domains on 2026-09-27
+and is now only in `archive/legacy_domains/validation.py`.)

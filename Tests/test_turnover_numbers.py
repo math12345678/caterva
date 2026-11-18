@@ -281,13 +281,17 @@ class TestTheOrchestratorIsReachable:
         kcat_entries = brenda_client.fetch_and_parse_brenda_kcat("3.1.1.7")
         km_entries = brenda_client.fetch_and_parse_brenda_km("3.1.1.7")
 
+        assert kcat_entries
         assert all(e.flagged is False for e in kcat_entries)
-        # The same HTML read as a KM Values table has no such container, so
-        # every row comes back unscoped and flagged.
-        assert km_entries, "expected the Km path to still return rows"
-        assert any(e.flagged for e in km_entries), (
-            "reading the turnover fixture as KM Values should flag rows as "
-            "unscoped; if it does not, table_label is not threading through"
+        # The same HTML read as a KM Values table has no such table: its
+        # navigation lists "Turnover Numbers" and no "KM Values". Until
+        # 2026-11-11 the Km path then scanned the whole page and returned
+        # the turnover rows as Km rows (flagged); it now returns none, which
+        # is what a page without a Km table holds. If table_label did not
+        # thread through, the Km path would read the turnover table here.
+        assert km_entries == [], (
+            "reading the turnover fixture as KM Values must find no Km table; "
+            "rows here mean another table was read as one"
         )
 
 

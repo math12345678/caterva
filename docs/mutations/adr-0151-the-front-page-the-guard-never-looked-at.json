@@ -1,0 +1,45 @@
+{
+  "_why": [
+    "ADR 0151's three findings as mutations.",
+    "",
+    "F1: the surface set was hand-listed (3 files) and missed the two front pages that mattered; it is",
+    "now derived from docs/readmes/*.md. Mutation: stop discovering.",
+    "F2: Tests/ was green or red depending on the working directory because Tests/pytest.ini lacked",
+    "`pythonpath = . ..`. Mutation: remove it. It only shows when run FROM Tests/, so that mutation has",
+    "its own cd; this set's single `test` command therefore runs both directories.",
+    "F3: deleting the 'not sourced' ROW from the Parameters table left the refusals section intact. This",
+    "is ADR 0133's L1 and is graded in adr-0133-lab-report.json; the same site is repeated here because",
+    "ADR 0151 is where its test was added. Its find string follows the file through the rename: the",
+    "sentence now reads 'What Caterva would not do' (Tests/lab_report.py), and a find string holding",
+    "the old name would match nothing and grade INDETERMINATE.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0151-the-front-page-the-guard-never-looked-at.json"
+  ],
+  "test": "python3 -m pytest Tests/test_documented_citations_guard.py Tests/test_lab_report.py -q -p no:cacheprovider && cd Tests && python3 -m pytest test_lab_report.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "F1",
+      "description": "the surface set is hand-listed again (published READMEs not discovered)",
+      "_claimed": "caught",
+      "file": "scripts/check_documented_citations_are_real.py",
+      "find": "    return _NAMED_SURFACES + tuple(discovered)",
+      "replace": "    return _NAMED_SURFACES"
+    },
+    {
+      "id": "F2",
+      "description": "Tests/pytest.ini loses `pythonpath = . ..`",
+      "_claimed": "caught (from Tests/ only)",
+      "file": "Tests/pytest.ini",
+      "find": "\npythonpath = . ..",
+      "replace": "\npythonpath = ."
+    },
+    {
+      "id": "F3",
+      "description": "an unsourced parameter is skipped instead of shown as not sourced",
+      "_claimed": "caught after test_an_unsourced_parameter_still_has_a_row_in_the_table was added",
+      "file": "Tests/lab_report.py",
+      "find": "        else:\n            lines.append(\n                f\"| {name} | — | **not sourced** | see *What Caterva would \"",
+      "replace": "        elif False:\n            lines.append(\n                f\"| {name} | — | **not sourced** | see *What Caterva would \""
+    }
+  ]
+}

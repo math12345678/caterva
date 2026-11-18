@@ -2,7 +2,8 @@
 
 BRENDA 711801 measured gossypol against three human LDH isoforms: 0.0014 mM
 (LDH-B), 0.0019 mM (LDH-A), 0.0042 mM (LDH-C). Without an isoform the
-resolver returns the first, LDH-B's. Asked for LDH-A it must return LDH-A's;
+resolver returns the median row, LDH-A's (ADR 0182; LDH-B's, the lowest,
+until 2026-11-11). Asked for LDH-A it must return LDH-A's;
 asked for one BRENDA does not hold, it must refuse and name the three,
 rather than return another protein's constant.
 
@@ -33,10 +34,14 @@ def gossypol(isoform=None, **kw):
     )
 
 
-def test_without_an_isoform_the_first_ranked_row_is_ldh_b():
+def test_without_an_isoform_the_median_row_is_ldh_a():
+    """No isoform asked: the three rows are candidates alike, and the median
+    row is returned (ADR 0182). It was the lowest, LDH-B's 0.0014, until
+    2026-11-11."""
     r = gossypol()
-    assert r.found and r.value == pytest.approx(0.0014)
-    assert r.commentary.startswith("LDH-B")
+    assert r.found and r.value == pytest.approx(0.0019)
+    assert r.commentary.startswith("LDH-A")
+    assert "median of the 3 remaining rows" in r.chosen_because
 
 
 @pytest.mark.parametrize("asked", ["LDH-A", "ldh-a", "LDH A"])
@@ -128,11 +133,21 @@ def test_clorgyline_for_mao_a_is_the_row_written_isoform_mao_a():
 
 
 def test_isatin_for_mao_b_counts_every_spelling_of_mao_b():
-    """Isatin's 26 human Ki rows name MAO-B in three spellings; 13 name it,
-    where the hyphen-only reader found 10."""
+    """Isatin's human Ki rows name MAO-B in three spellings ("isoform MAO
+    B", "monoamine oxidase B", "inhibition of MAO-B"), and every one is read.
+
+    Until 2026-11-11 this counted 26 isatin rows, 13 naming MAO-B, and
+    returned 0.00031 mM. Twelve of the 26 were not isatin: the substring
+    match took (E)-5-styrylisatin and three other styrylisatins, compounds
+    of their own, and labelled them "isatin"; 0.00031 was one of theirs.
+    Matching the whole compound (brenda_client.substrate_matches) leaves
+    the 14 rows that are isatin, 5 naming MAO-B; one is a mutant, two state
+    neither pH nor temperature, and of the two left the median row is 0.002 mM (ref
+    742446, "isoform MAO B, at pH 7.4 and 37°C")."""
     r = mao("isatin", "MAO-B")
-    assert r.found and r.value == pytest.approx(0.00031)
-    assert "Kept the 13 of 26 exact-match row(s) measuring MAO-B" in r.search_log
+    assert r.found and r.value == pytest.approx(0.002)
+    assert r.citation.reference_id == "742446"
+    assert "Kept the 5 of 14 exact-match row(s) measuring MAO-B" in r.search_log
 
 
 def test_names_compare_as_caterva_compares_them():

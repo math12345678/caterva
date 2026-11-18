@@ -183,6 +183,9 @@ def declared_distributions() -> set[str]:
     # a real declaration -- it names the package, pins it, and explains the
     # obligation -- but this guard only read two filenames, so it reported a
     # DECLARED dependency as undeclared for two days.
+    # (2026-11-01: that file moved to archive/legacy_domains/ with the
+    # population-genetics resolver, so no root requirements file names
+    # stdpopsim now. The glob, and the reason for it, stay.)
     #
     # A false accusation is worse than a missed one: it trains people to
     # ignore the guard, and this one sits in `make guards`. Globbing means

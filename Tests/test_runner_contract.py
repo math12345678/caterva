@@ -67,6 +67,19 @@ class _AnyReliability:
 ANY_RELIABILITY = _AnyReliability()
 
 
+@pytest.fixture(autouse=True)
+def _no_chooser_unless_a_test_brings_one(monkeypatch):
+    """Every test here runs without caterva.compose.defaults (ADR 0182).
+
+    The chooser counts BRENDA's rows over the network, and a payload with no
+    substrate reaches it. A contract test whose answer depends on BRENDA
+    being reachable is reporting the weather (see run_main), so the chooser
+    is absent unless a test installs a fake one; the tests that pin the
+    choosing do exactly that.
+    """
+    monkeypatch.setattr(science_agent_runner, "_chooser", lambda: None)
+
+
 def golden_result(cross_species: bool = False) -> KineticResult:
     """The golden G1 record, as the Python layer hands it to the runner."""
     return KineticResult(
@@ -154,6 +167,14 @@ def test_golden_found_output_shape(monkeypatch):
         # candidate, or every surviving candidate reported the same value.
         # Distinct from a tie with no candidates, which cannot occur.
         "selectionTie": None,
+        # The resolver's own reason for the row, and whether the rows it
+        # chose from span more than 100-fold (ADR 0182). None and False
+        # because `golden_result()` is built by hand and carries neither.
+        "chosenBecause": None,
+        "wideSpread": False,
+        # What the carried row is (third round of the real-values review):
+        # empty for the hand-built row.
+        "rowNotes": [],
         # Empty because `golden_result()` is built by hand and carries no
         # frontier -- not because a resolution has none. A real resolution
         # attaches every surviving row with its reliability grades, which is
@@ -266,6 +287,32 @@ def test_golden_found_output_shape(monkeypatch):
         "mechanismEvidence": None,
         "literatureCandidates": [],
         "logs": ["BRENDA exact: 1.1.1.27, Homo sapiens, lactate"],
+        "choices": [],  # nothing was chosen: the payload named all of it (ADR 0182)
+        # Which protein of a multi-protein EC the Km is, in compose's own
+        # words, so the API and the TypeScript CLI say what compose and the
+        # Studio say (sixth round, XS5R2-04). LDH is five human proteins and
+        # the stub's row names none.
+        "isozymeNotice": {
+            "headline": "EC 1.1.1.27 is 5 proteins in human and no --isoform was given, so the "
+                        "constants may belong to any of them",
+            "detail": "EC 1.1.1.27 has 5 human isozymes in the enzyme nomenclature's UniProt "
+                      "entries (LDHAL6A, LDHAL6B, LDHA, LDHB, LDHC) and no --isoform was given, so "
+                      "the cited constants may belong to any of them; isozymes of one enzyme can "
+                      "differ many-fold in Km and kcat",
+            "remedy": "pass --isoform with one of these names (for example --isoform LDHAL6A) to "
+                      "take each constant from a row whose commentary names that isozyme; a "
+                      "constant whose rows name none is kept and flagged, and one whose rows all "
+                      "name another isozyme is refused",
+            "summary": "EC 1.1.1.27 is 5 proteins in human, none chosen",
+        },
+        # The kcat half of the pair (XS5R2-05). The stub answers every
+        # lookup alike, so it carries the Km's number.
+        "pairedKcat": {
+            "found": True, "source": "brenda_exact", "kcat": 10.73,
+            "citation": {"notes": None, "organism": "Homo sapiens", "referenceId": "740253",
+                         "source": "BRENDA", "title": None,
+                         "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27"},
+        },
     }
 
 
@@ -288,6 +335,31 @@ def test_row_scope_crosses_the_boundary(monkeypatch):
     assert result["commentary"] == row.commentary
     assert result["rowScope"] == {"isoform": "LDH-B", "inhibitionMode": "unstated", "versus": None,
                                   "kitzWilson": False}
+
+
+def test_row_scope_says_whether_the_row_is_the_isoform_asked_for(monkeypatch):
+    """"HK2 with glucose" (adversarial round, 2026-11-11): the resolver kept
+    BRENDA's "wild type hexokinase II" row (ref 702867) for HK2, and the API
+    then called it "not HK2, ... a different protein's constant", because
+    its TypeScript mirror of same_isoform does not know HK-II is HK2. The
+    runner now says so itself, by caterva.bind.core.same_isoform."""
+    row = golden_result()
+    row.commentary = "wild type hexokinase II"
+    payload = {"enzymeName": "hexokinase", "substrate": "D-glucose",
+               "organism": "Homo sapiens", "ecNumber": "2.7.1.1", "quantity": "km",
+               "isoform": "HK2"}
+    result = run_main(monkeypatch, lambda *a, **k: row, payload)
+    assert result["rowScope"]["isoform"]
+    assert result["rowScope"]["sameIsoformAsRequested"] is True
+
+    row.commentary = "wild type hexokinase I"
+    result = run_main(monkeypatch, lambda *a, **k: row, payload)
+    assert result["rowScope"]["sameIsoformAsRequested"] is False
+
+    # No isoform asked for: nothing to compare, and no key.
+    del payload["isoform"]
+    result = run_main(monkeypatch, lambda *a, **k: row, payload)
+    assert "sameIsoformAsRequested" not in result["rowScope"]
 
 
 def test_a_kitz_wilson_row_says_what_it_is(monkeypatch):
@@ -631,22 +703,28 @@ def test_ki_quantity_emits_ki_key(monkeypatch):
 
 def test_quantity_defaults_to_km(monkeypatch):
     """A payload with no quantity keeps the Km contract intact: the value
-    is emitted under "km" and the resolver is told quantity="km"."""
-    captured = {}
+    is emitted under "km" and the resolver is told quantity="km".
+
+    A Km is resolved with its kcat (resolve_kinetic_pair, ADR 0182) unless
+    the caller says it needs no kcat, so the resolver is asked for the Km
+    first and then the kcat, and the Km is what is emitted."""
+    asked = []
 
     def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None, **kwargs):
-        captured["quantity"] = kwargs.get("quantity", "km")
+        asked.append(kwargs.get("quantity", "km"))
         return golden_result()
 
-    result = run_main(
-        monkeypatch,
-        fake_resolve,
-        {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
-         "organism": "Homo sapiens", "ecNumber": "1.1.1.27"},
-    )
-    assert captured["quantity"] == "km"
+    payload = {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
+               "organism": "Homo sapiens", "ecNumber": "1.1.1.27"}
+    result = run_main(monkeypatch, fake_resolve, payload)
+    assert asked == ["km", "kcat"]
     assert result["km"] == 10.73
-    assert "ki" not in result
+    assert "ki" not in result and "kcat" not in result
+
+    asked.clear()
+    result = run_main(monkeypatch, fake_resolve, {**payload, "needsKcat": False})
+    assert asked == ["km"], "a caller that needs no kcat gets the Km chosen on its own"
+    assert result["km"] == 10.73
 
 
 def test_not_found_output_shape(monkeypatch):
@@ -657,7 +735,7 @@ def test_not_found_output_shape(monkeypatch):
             literature_candidates=[
                 fallback_logic.LiteratureCandidate(
                     pmid="34962677",
-                    title="Some paper",
+                    title="Some paper on lactate dehydrogenase",  # names the enzyme: offered (V7-08)
                     url="https://pubmed.ncbi.nlm.nih.gov/34962677/",
                 )
             ],
@@ -680,10 +758,17 @@ def test_not_found_output_shape(monkeypatch):
         # and so this exact-equality assertion keeps failing if the shape
         # changes again, which is how this key got noticed at all.
         "crossSpeciesOrganismsAvailable": [],
+        # Those whose every row measured a variant (fifth round, V7-04).
+        "crossSpeciesVariantOnly": [],
+        # Of those, the ones whose rows each name an isozyme: said as
+        # isozymes, not variants (sixth round, XS5R2-03).
+        "crossSpeciesIsozymeOnly": [],
+        "variantIsozymesOnly": False,
         # Always present on the not-found branch, empty unless the miss was
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
         "variantCandidatesAvailable": [],
+        "implausibleValues": [],
         # The isoforms the rows measured, when an isoform was asked for and
         # none of them is it (source "isoform_withheld"). Empty otherwise.
         "isoformsAvailable": [],
@@ -691,13 +776,27 @@ def test_not_found_output_shape(monkeypatch):
         # for and every row states another (source "mode_withheld").
         "modesAvailable": [],
         "substratesAvailable": [],
+        # What the organism holds, in compose's words, for a name miss (V7-08).
+        "availableInTheOrganism": None,
         "relatedness": [],
         "literatureCandidates": [
-            {"pmid": "34962677", "title": "Some paper",
+            {"pmid": "34962677", "title": "Some paper on lactate dehydrogenase",
              "url": "https://pubmed.ncbi.nlm.nih.gov/34962677/",
              "source": "pubmed", "doi": None}
         ],
         "logs": ["genuine gap"],
+        "choices": [],  # nothing was chosen: the payload named all of it (ADR 0182)
+        # The kcat half of the Km's pair, which the Km lookup already
+        # computes: /api/resolve's Vmax advice reads it to say whether a kcat
+        # exists before asking for an enzyme concentration (sixth round,
+        # XS5R2-05). The stub answers every lookup alike, so it mirrors the Km.
+        "pairedKcat": {
+            "found": False, "source": "literature_candidates",
+            "crossSpeciesOrganismsAvailable": [],
+            "crossSpeciesVariantOnly": [], "crossSpeciesIsozymeOnly": [],
+            "variantCandidatesAvailable": [], "variantIsozymesOnly": False,
+            "implausibleValues": [], "isoformsAvailable": [],
+        },
     }
 
 
@@ -715,7 +814,7 @@ def test_core_candidate_output_shape(monkeypatch):
             source="literature_candidates",
             literature_candidates=[
                 fallback_logic.LiteratureCandidate(
-                    title="An open-access CORE result",
+                    title="An open-access CORE result on lactate dehydrogenase",  # names the enzyme (V7-08)
                     url="https://core.ac.uk/download/99999999.pdf",
                     source="core",
                     doi="10.1000/core.example",
@@ -740,10 +839,17 @@ def test_core_candidate_output_shape(monkeypatch):
         # and so this exact-equality assertion keeps failing if the shape
         # changes again, which is how this key got noticed at all.
         "crossSpeciesOrganismsAvailable": [],
+        # Those whose every row measured a variant (fifth round, V7-04).
+        "crossSpeciesVariantOnly": [],
+        # Of those, the ones whose rows each name an isozyme: said as
+        # isozymes, not variants (sixth round, XS5R2-03).
+        "crossSpeciesIsozymeOnly": [],
+        "variantIsozymesOnly": False,
         # Always present on the not-found branch, empty unless the miss was
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
         "variantCandidatesAvailable": [],
+        "implausibleValues": [],
         # The isoforms the rows measured, when an isoform was asked for and
         # none of them is it (source "isoform_withheld"). Empty otherwise.
         "isoformsAvailable": [],
@@ -751,13 +857,27 @@ def test_core_candidate_output_shape(monkeypatch):
         # for and every row states another (source "mode_withheld").
         "modesAvailable": [],
         "substratesAvailable": [],
+        # What the organism holds, in compose's words, for a name miss (V7-08).
+        "availableInTheOrganism": None,
         "relatedness": [],
         "literatureCandidates": [
-            {"pmid": None, "title": "An open-access CORE result",
+            {"pmid": None, "title": "An open-access CORE result on lactate dehydrogenase",
              "url": "https://core.ac.uk/download/99999999.pdf",
              "source": "core", "doi": "10.1000/core.example"}
         ],
         "logs": ["genuine gap"],
+        "choices": [],  # nothing was chosen: the payload named all of it (ADR 0182)
+        # The kcat half of the Km's pair, which the Km lookup already
+        # computes: /api/resolve's Vmax advice reads it to say whether a kcat
+        # exists before asking for an enzyme concentration (sixth round,
+        # XS5R2-05). The stub answers every lookup alike, so it mirrors the Km.
+        "pairedKcat": {
+            "found": False, "source": "literature_candidates",
+            "crossSpeciesOrganismsAvailable": [],
+            "crossSpeciesVariantOnly": [], "crossSpeciesIsozymeOnly": [],
+            "variantCandidatesAvailable": [], "variantIsozymesOnly": False,
+            "implausibleValues": [], "isoformsAvailable": [],
+        },
     }
 
 
@@ -804,12 +924,15 @@ def test_missing_ec_number_resolves_it_live_via_uniprot(monkeypatch):
     assert any("Resolved EC 3.2.1.1" in line for line in result["logs"])
 
 
-def test_missing_ec_number_also_resolves_substrate_via_kegg(monkeypatch):
-    """A live-resolved enzyme has no substrate name from the (unused)
-    enzymes.ts entry, and BRENDA's Km table is dominated by noise without
-    one (see enzyme_lookup.py's module docstring). This confirms the
-    KEGG substrate lookup actually reaches fallback_logic.resolve_kinetic_value,
-    not just that the runner doesn't crash without one."""
+def test_without_the_chooser_kegg_names_the_substrate_and_says_it_chose(monkeypatch):
+    """A checkout without caterva.compose.defaults falls back to the old fill.
+
+    Was `test_missing_ec_number_also_resolves_substrate_via_kegg`. KEGG's
+    first substrate still reaches fallback_logic.resolve_kinetic_value, so
+    BRENDA's row filter applies -- but since ADR 0182 it is a CHOICE, and is
+    reported as one in `choices`, not only in the log. The autouse fixture
+    removes the chooser, which is what makes this the fallback.
+    """
     import enzyme_lookup
 
     monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda organism: "9606")
@@ -838,9 +961,240 @@ def test_missing_ec_number_also_resolves_substrate_via_kegg(monkeypatch):
     assert result["ok"] is True
     assert captured_args["substrate"] == "starch"
     assert captured_args["enzyme_ec"] == "3.2.1.1"
-    assert any(
-        "Resolved substrate 'starch'" in line for line in result["logs"]
+    assert [c["chosen"] for c in result["choices"]] == ["starch"]
+    assert result["choices"][0]["role"] == "substrate"
+    assert "KEGG" in result["choices"][0]["why"]
+
+
+def test_without_the_chooser_or_kegg_nothing_is_looked_up_unfiltered(monkeypatch):
+    """No chooser and no KEGG substrate: refused, never sent as "any".
+
+    Before ADR 0182 this case logged "BRENDA lookup will be unfiltered by
+    substrate" and returned whichever substrate's row came first.
+    """
+    monkeypatch.setattr(science_agent_runner, "resolve_substrate_from_kegg", lambda ec: None)
+
+    def never(*a, **k):
+        raise AssertionError("an unnamed substrate reached BRENDA unfiltered")
+
+    result = run_main(
+        monkeypatch, never,
+        {"ecNumber": "2.7.1.1", "enzymeName": "", "organism": "Homo sapiens"},
     )
+    assert result["found"] is False
+    assert result["source"] == "substrate_not_named"
+    assert result["choices"] == []
+    assert "Name the substrate" in result["choiceRefusal"]
+
+
+class _Choice:
+    """The shape caterva.compose.defaults.Choice has (the SHARED CONTRACT)."""
+
+    def __init__(self, role, chosen, alternatives=(), considered=3):
+        self.role, self.chosen = role, chosen
+        self.why = f"most measured {role} for this enzyme"
+        self.alternatives = alternatives
+        self.considered = considered
+
+    def to_json(self):
+        return {
+            "role": self.role, "chosen": self.chosen, "why": self.why,
+            "alternatives": [{"name": n, "rows": r} for n, r in self.alternatives],
+            "considered": self.considered,
+        }
+
+
+class _FakeChooser:
+    """Stands in for caterva.compose.defaults; records what it was asked."""
+
+    def __init__(self, substrate=None, inhibitor=None, organism=None):
+        self.asked = []
+        self._answers = {"substrate": substrate, "inhibitor": inhibitor, "organism": organism}
+
+    def choose_substrate(self, ec, organism, *, needs_kcat=True):
+        self.asked.append(("substrate", ec, organism))
+        return self._answers["substrate"]
+
+    def choose_inhibitor(self, ec, organism, substrate=None):
+        self.asked.append(("inhibitor", ec, organism, substrate))
+        return self._answers["inhibitor"]
+
+    def choose_organism(self, ec, substrate=None, inhibitor=None, *, needs=("km", "kcat")):
+        # `needs` as the real chooser takes it: what the lookup needs rows for.
+        self.needs = tuple(needs)
+        self.asked.append(("organism", ec, substrate, inhibitor))
+        return self._answers["organism"]
+
+
+def _with_chooser(monkeypatch, chooser):
+    monkeypatch.setattr(science_agent_runner, "_chooser", lambda: chooser)
+
+
+def test_an_unnamed_substrate_is_chosen_and_the_lookup_is_for_it(monkeypatch):
+    """ADR 0182: the best-measured substrate is chosen, looked up, stated."""
+    chooser = _FakeChooser(substrate=_Choice(
+        "substrate", "D-glucose", (("ATP", {"km": 106}), ("D-mannose", {"km": 9})),
+    ))
+    _with_chooser(monkeypatch, chooser)
+    looked_up = {}
+
+    def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None, **kwargs):
+        looked_up.update(ec=enzyme_ec, organism=organism, substrate=substrate)
+        return golden_result()
+
+    result = run_main(
+        monkeypatch, fake_resolve,
+        {"ecNumber": "2.7.1.1", "organism": "Homo sapiens"},
+    )
+    assert chooser.asked == [("substrate", "2.7.1.1", "Homo sapiens")]
+    # The value is the row for exactly the chosen name.
+    assert looked_up == {"ec": "2.7.1.1", "organism": "Homo sapiens", "substrate": "D-glucose"}
+    assert result["found"] is True
+    assert result["choices"] == [{
+        "role": "substrate", "chosen": "D-glucose",
+        "why": "most measured substrate for this enzyme",
+        "alternatives": [{"name": "ATP", "rows": {"km": 106}},
+                         {"name": "D-mannose", "rows": {"km": 9}}],
+        "considered": 3,
+    }]
+
+
+def test_a_named_substrate_asks_no_chooser(monkeypatch):
+    chooser = _FakeChooser()
+    _with_chooser(monkeypatch, chooser)
+    result = run_main(
+        monkeypatch, lambda *a, **k: golden_result(),
+        {"ecNumber": "1.1.1.27", "substrate": "lactate", "organism": "Homo sapiens"},
+    )
+    assert chooser.asked == []
+    assert result["choices"] == []
+
+
+def test_an_unnamed_inhibitor_is_chosen_for_a_ki(monkeypatch):
+    """A Ki's `substrate` is the inhibitor; the model's substrate guides it."""
+    chooser = _FakeChooser(inhibitor=_Choice("inhibitor", "oxamate", (("gossypol", {"ki": 4}),)))
+    _with_chooser(monkeypatch, chooser)
+    looked_up = {}
+
+    def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None, **kwargs):
+        looked_up["inhibitor"] = substrate
+        return golden_result()
+
+    result = run_main(
+        monkeypatch, fake_resolve,
+        {"ecNumber": "1.1.1.27", "organism": "Homo sapiens", "quantity": "ki",
+         "inhibitionMode": "competitive", "modelSubstrate": "pyruvate"},
+    )
+    assert chooser.asked == [("inhibitor", "1.1.1.27", "Homo sapiens", "pyruvate")]
+    assert looked_up["inhibitor"] == "oxamate"
+    assert [c["role"] for c in result["choices"]] == ["inhibitor"]
+
+
+def test_an_unnamed_organism_is_chosen_before_the_substrate(monkeypatch):
+    chooser = _FakeChooser(
+        organism=_Choice("organism", "Rattus norvegicus", (("Homo sapiens", {"km": 12}),)),
+        substrate=_Choice("substrate", "D-glucose"),
+    )
+    _with_chooser(monkeypatch, chooser)
+    looked_up = {}
+
+    def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None, **kwargs):
+        looked_up.update(organism=organism, substrate=substrate)
+        return golden_result()
+
+    result = run_main(monkeypatch, fake_resolve, {"ecNumber": "2.7.1.1"})
+    assert [a[0] for a in chooser.asked] == ["organism", "substrate"]
+    assert chooser.asked[1] == ("substrate", "2.7.1.1", "Rattus norvegicus")
+    assert looked_up == {"organism": "Rattus norvegicus", "substrate": "D-glucose"}
+    assert [c["role"] for c in result["choices"]] == ["organism", "substrate"]
+
+
+def test_nothing_to_choose_from_says_what_is_missing_and_looks_nothing_up(monkeypatch):
+    """BRENDA holds no row: a refusal naming what is missing and the fix."""
+    _with_chooser(monkeypatch, _FakeChooser(substrate=None))
+
+    def never(*a, **k):
+        raise AssertionError("looked up a constant with no substrate to look it up for")
+
+    result = run_main(monkeypatch, never, {"ecNumber": "3.4.21.79", "organism": "Homo sapiens"})
+    assert result["found"] is False
+    assert result["source"] == "substrate_not_named"
+    assert result["choices"] == []
+    assert "no Km row for any substrate of EC 3.4.21.79 in Homo sapiens" in result["choiceRefusal"]
+    assert "km=" in result["choiceRefusal"]
+
+
+class _UnreadableChooser(_FakeChooser):
+    """The real chooser's shape when BRENDA cannot be reached: None unless
+    asked with strict=True, and then the network error."""
+
+    def choose_substrate(self, ec, organism, *, needs_kcat=True, strict=False):
+        self.asked.append(("substrate", ec, organism, strict))
+        if strict:
+            raise ConnectionError("BRENDA did not answer")
+        return None
+
+
+def test_brenda_unreachable_while_choosing_is_not_reported_as_brenda_having_no_rows(monkeypatch):
+    """A page that could not be read is a report saying so, not "no row".
+
+    The real chooser returns None for both "BRENDA lists nothing" and "the
+    page could not be read" unless asked strictly. Read as the first, the
+    refusal told the person to name another organism for an enzyme BRENDA
+    simply did not answer for.
+    """
+    chooser = _UnreadableChooser()
+    _with_chooser(monkeypatch, chooser)
+
+    def never(*a, **k):
+        raise AssertionError("looked up a constant with no substrate to look it up for")
+
+    result = run_main(monkeypatch, never, {"ecNumber": "2.7.1.1", "organism": "Homo sapiens"})
+    assert chooser.asked == [("substrate", "2.7.1.1", "Homo sapiens", True)]
+    assert result["ok"] is True and result["found"] is False
+    assert result["source"] == "substrate_not_named"
+    assert "could not be read" in result["choiceRefusal"]
+    assert "BRENDA did not answer" in result["choiceRefusal"]
+    assert "lists no" not in result["choiceRefusal"]
+
+
+def test_with_cross_species_allowed_an_organism_without_rows_chooses_from_every_organism(monkeypatch):
+    """The caller opted in to cross-species values: the substrate is chosen
+    from every organism's rows, and the advice never says "opt in"."""
+
+    class _OnlyAnywhere(_FakeChooser):
+        def choose_substrate(self, ec, organism, *, needs_kcat=True):
+            self.asked.append(("substrate", ec, organism))
+            return None if organism else _Choice("substrate", "D-glucose")
+
+    chooser = _OnlyAnywhere()
+    _with_chooser(monkeypatch, chooser)
+    looked_up = {}
+
+    def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None, **kwargs):
+        looked_up.update(organism=organism, substrate=substrate,
+                         cross=kwargs.get("allow_cross_species"))
+        return golden_result()
+
+    result = run_main(
+        monkeypatch, fake_resolve,
+        {"ecNumber": "2.7.1.1", "organism": "Homo sapiens", "allowCrossSpecies": True},
+    )
+    assert chooser.asked == [("substrate", "2.7.1.1", "Homo sapiens"),
+                             ("substrate", "2.7.1.1", None)]
+    # Still looked up in the organism asked for; the resolver labels a
+    # value from another species as cross-species, as for a typed name.
+    assert looked_up == {"organism": "Homo sapiens", "substrate": "D-glucose", "cross": True}
+    assert [c["chosen"] for c in result["choices"]] == ["D-glucose"]
+
+
+def test_without_cross_species_an_organism_without_rows_is_refused_with_both_fixes(monkeypatch):
+    _with_chooser(monkeypatch, _FakeChooser(substrate=None))
+    result = run_main(
+        monkeypatch, lambda *a, **k: golden_result(),
+        {"ecNumber": "2.7.1.1", "organism": "Homo sapiens"},
+    )
+    assert "name one, or opt in to cross-species values" in result["choiceRefusal"]
 
 
 def test_missing_ec_number_exhausted_uniprot_lookup_reports_not_found(monkeypatch):
@@ -905,10 +1259,17 @@ def test_cross_species_withheld_output_shape(monkeypatch):
         "found": False,
         "source": "cross_species_withheld",
         "crossSpeciesOrganismsAvailable": ["Oryctolagus cuniculus", "Sus scrofa"],
+        # Those whose every row measured a variant (fifth round, V7-04).
+        "crossSpeciesVariantOnly": [],
+        # Of those, the ones whose rows each name an isozyme: said as
+        # isozymes, not variants (sixth round, XS5R2-03).
+        "crossSpeciesIsozymeOnly": [],
+        "variantIsozymesOnly": False,
         # Always present on the not-found branch, empty unless the miss was
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
         "variantCandidatesAvailable": [],
+        "implausibleValues": [],
         # The isoforms the rows measured, when an isoform was asked for and
         # none of them is it (source "isoform_withheld"). Empty otherwise.
         "isoformsAvailable": [],
@@ -916,6 +1277,8 @@ def test_cross_species_withheld_output_shape(monkeypatch):
         # for and every row states another (source "mode_withheld").
         "modesAvailable": [],
         "substratesAvailable": [],
+        # What the organism holds, in compose's words, for a name miss (V7-08).
+        "availableInTheOrganism": None,
         # Empty here because the opt-in was never given, so no relatedness
         # check ran. Populated on the too_distant path, where it carries the
         # reason each candidate was rejected.
@@ -923,6 +1286,18 @@ def test_cross_species_withheld_output_shape(monkeypatch):
         "literatureCandidates": [],
         "logs": ["Cross-species value(s) found in Oryctolagus cuniculus, "
                  "Sus scrofa but withheld: allow_cross_species=False"],
+        "choices": [],  # nothing was chosen: the payload named all of it (ADR 0182)
+        # The kcat half of the Km's pair, which the Km lookup already
+        # computes: /api/resolve's Vmax advice reads it to say whether a kcat
+        # exists before asking for an enzyme concentration (sixth round,
+        # XS5R2-05). The stub answers every lookup alike, so it mirrors the Km.
+        "pairedKcat": {
+            "found": False, "source": "cross_species_withheld",
+            "crossSpeciesOrganismsAvailable": ["Oryctolagus cuniculus", "Sus scrofa"],
+            "crossSpeciesVariantOnly": [], "crossSpeciesIsozymeOnly": [],
+            "variantCandidatesAvailable": [], "variantIsozymesOnly": False,
+            "implausibleValues": [], "isoformsAvailable": [],
+        },
     }
 
 

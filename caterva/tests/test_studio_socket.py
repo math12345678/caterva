@@ -289,6 +289,12 @@ def test_a_request_dripped_in_slowly_is_cut_off_by_its_total_deadline(monkeypatc
                     break
             except (socket.timeout, BlockingIOError):
                 pass
+            except ConnectionResetError:
+                # The server closed with a dripped byte still unread, so the
+                # kernel answered with RST rather than FIN. That is the same
+                # cut-off; it lost a race with the byte, not the deadline.
+                closed = True
+                break
     finally:
         sock.close()
         stop.set()

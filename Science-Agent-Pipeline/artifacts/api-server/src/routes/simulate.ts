@@ -34,8 +34,10 @@ import {
   type CompositionReport,
   type ParameterizePayload,
 } from "../lib/literatureSearch";
+import { choiceFlag, readChoices } from "../lib/automaticChoice";
 import * as queue from "../lib/queue";
 import { findCachedEntryByQuery, persistJob } from "../lib/cache";
+import { engineBuild, replayableBuild } from "../lib/engineBuild";
 import { simulateLimiter } from "../lib/rateLimit";
 import {
   PARAMETER_ORIGINS,
@@ -601,6 +603,10 @@ async function runParameterizePipeline(
             : "The resolved set was not simulated."),
         modelCitations: [],
         flags: [
+          // A substrate or inhibitor a request did not name, chosen from
+          // BRENDA (ADR 0182): stated first, because every value below that
+          // was looked up for it is the constant of THAT name.
+          ...readChoices(engineResult.choices).map(choiceFlag),
           ...(search.chosenOrganism
             ? [`chosen_organism: ${search.chosenOrganism}`]
             : ["no_organism_chosen: the search did not settle on one."]),
@@ -861,6 +867,19 @@ router.get(
       };
 
       send(job);
+
+      // A job that is already finished (every cache hit is) gets no later
+      // update, so the subscribe callback below would never fire and the
+      // stream would stay open forever (XS5R2-07). Close it now.
+      if (
+        job.status === "completed" ||
+        job.status === "failed" ||
+        job.status === "cancelled"
+      ) {
+        queue.cleanupJob(jobId);
+        res.end();
+        return;
+      }
 
       const unsubscribe = queue.subscribe(jobId, (updated) => {
         send(updated);
@@ -1183,10 +1202,14 @@ function buildAuditReport(
   for (const [name, value] of Object.entries(parameters)) {
     const prov = provenance[name];
     if (!prov) continue;
-    // Array-valued parameters (e.g. starting_frequencies for two-locus
-    // Wright-Fisher) have no single scalar to run through the
+    // Array-valued parameters have no single scalar to run through the
     // literature/STRENDA numeric checks below, which are built around one
-    // kinetic-style value. Audited by presence/origin only.
+    // kinetic-style value. Audited by presence/origin only. (Note,
+    // 2026-11-01: the example this cited, two-locus Wright-Fisher's
+    // starting_frequencies, was archived on 2026-09-27, after v0.4.0, the
+    // last release that runs it, and a query override can no longer be a
+    // list. The branch stays for any non-scalar value that reaches this
+    // audit by another path.)
     if (typeof value !== "number") {
       parameterAudits.push({
         name,
@@ -1316,9 +1339,10 @@ function withReplayProvenance(cached: {
       ...result.provenance,
       flags: [
         ...result.provenance.flags,
-        `served_from_cache: this result was computed on ${cachedAt} and ` +
-          `replayed unchanged. Nothing was re-resolved, so any literature ` +
-          `curated since that date is not reflected here.`,
+        `served_from_cache: this result was computed on ${cachedAt} by ` +
+          `this same engine build (${engineBuild()}) and replayed unchanged. ` +
+          `Nothing was re-resolved, so any literature curated since that ` +
+          `date is not reflected here.`,
       ],
     },
   };
@@ -1358,6 +1382,16 @@ async function findCachedSimulation(
     // this build no longer runs that domain, and a cache hit would serve a
     // result the engine can no longer reproduce.
     if (!isSimulationDomain(row.domain)) return undefined;
+    // A row computed by another engine build is not replayed: it may carry
+    // numbers this build no longer picks (XS5R2-01). Rows written before
+    // builds were recorded have none, and are skipped for the same reason.
+    const storedProvenance = (row.provenance ?? {}) as {
+      reasoning?: string;
+      modelCitations?: string[];
+      flags?: string[];
+      engineBuild?: string;
+    };
+    if (!replayableBuild(storedProvenance.engineBuild)) return undefined;
 
     return {
       // The row's own createdAt, which is also what the replay notice
@@ -1369,14 +1403,10 @@ async function findCachedSimulation(
         domain: row.domain,
         parameters: (row.parameters as Record<string, unknown>) || {},
         trajectory: (row.trajectory as Record<string, unknown>[]) || [],
-        provenance: (row.provenance as {
-          reasoning: string;
-          modelCitations: string[];
-          flags: string[];
-        }) || {
-          reasoning: "",
-          modelCitations: [],
-          flags: [],
+        provenance: {
+          reasoning: storedProvenance.reasoning ?? "",
+          modelCitations: storedProvenance.modelCitations ?? [],
+          flags: storedProvenance.flags ?? [],
         },
         parameterProvenance:
           (row.parameterProvenance as Record<string, ParameterProvenance>) || {},
@@ -1747,7 +1777,9 @@ async function runPipeline(
         domain: asSimulationDomain(engineResult.domain),
         parameters: responseParameters,
         trajectory: engineResult.trajectory,
-        provenance,
+        // The build is stored with the row so a later build does not
+        // replay it (XS5R2-01). It is read back and dropped on replay.
+        provenance: { ...provenance, engineBuild: engineBuild() },
         parameterProvenance,
       });
     } else {

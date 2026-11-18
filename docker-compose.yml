@@ -28,8 +28,21 @@ services:
     environment:
       PORT: 3000
       NODE_ENV: production
+      # The job store lives in a mounted DIRECTORY, not a mounted file.
+      # caterva-jobs.jsonl is not tracked, and bind-mounting a host file that
+      # does not exist makes Docker create a directory in its place, so the
+      # old `./caterva-jobs.jsonl:/app/caterva-jobs.jsonl` broke on every
+      # fresh clone. src/storage/job-database.ts creates the file on first use.
+      #
+      # On Linux, create both host directories before the first `up`:
+      #   mkdir -p data logs && sudo chown 1001:1001 data logs
+      # A directory Docker creates for a bind mount is owned by root, the
+      # container runs as uid 1001 (Dockerfile), and the job store is opened
+      # when the server module loads -- so an unwritable ./data stops the
+      # server at startup rather than at the first save.
+      CATERVA_JOBS_FILE: /app/data/caterva-jobs.jsonl
     volumes:
-      - ./caterva-jobs.jsonl:/app/caterva-jobs.jsonl
+      - ./data:/app/data
       - ./logs:/app/logs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]

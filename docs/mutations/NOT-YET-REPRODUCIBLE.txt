@@ -26,7 +26,10 @@
 #      mark it as a correction -- do not quietly restate it
 #   4. delete the line here
 #
-# Baseline opened 2026-08-15 with 34 entries. 17 remain.
+# Baseline opened 2026-08-15 with 34 entries. How many remain is not
+# written here: check_mutation_tables_reproducible.py counts the entries
+# below on every run (its 'grandfathered' line). A literal in this spot
+# said 17 while the guard counted 21.
 #
 # Cleared: 0026 (pH, temperature), 0028 (buffers), 0032 (cofactors),
 #          0029 (variants), 0065 (error messages),
@@ -97,21 +100,10 @@
 0118   # the name the database uses -- arrived 2026-08-18, another agent's,
        # mid-pass. Asked, not claimed.
 0113   # the conditions that stayed on the screen -- arrived 2026-08-17,
+       # another agent's, mid-pass. Asked, not claimed: re-deriving it
+       # means editing their record if a result disagrees, and the record
+       # was minutes old when this line was written.
 0166   # the suite nobody ran -- NOT the ADR 0069 story. The restores here
-0125   # a score that could only be zero -- another author's table, no set
-       # file shipped with it. Parked rather than re-derived: a set built
-       # from someone else's prose risks the confident NOT CAUGHT the
-       # harness exists to prevent (registered 2026-08-29 to unblock the
-       # guard for CI; the ask stands with its author).
-0128   # the stage that failed -- same situation and same reasoning as 0125.
-0151   # the front page the guard never looked at -- same; note its table
-       # includes a mutation another record already claimed and could not
-       # catch, so a naive set file would grade a claim its own ADR
-       # disputes.
-0163   # run the tool instead of matching the string -- most recent of the
-       # four (2026-08-23) and post-harness, so this entry is debt by
-       # choice, not history: its evidence spans a live-resolver run that
-       # a set file's test command cannot assume network for.
        # were checked with `diff` and every guard re-run to exit 0, so the
        # instrument is not in doubt; what is missing is a harness verdict.
        # `mutate.py` grades a pytest suite by counting its tests, and all
@@ -125,9 +117,16 @@
        # them under caterva/tests/test_guard_selftests.py and inside
        # mutate.py's reach. Not done here; it is a change to the guards,
        # not to the record of this pass.
-       # another agent's, mid-pass. Asked, not claimed: re-deriving it
-       # means editing their record if a result disagrees, and the record
-       # was minutes old when this line was written.
+0163   # run the tool instead of matching the string -- most recent of the
+       # four parked here together (2026-08-23) and post-harness, so this
+       # entry is debt by choice, not history: its evidence spans a
+       # live-resolver run that a set file's test command cannot assume
+       # network for. The other three (0125, 0128, 0151) were cleared
+       # 2026-10-31 by set files that ran. Every claim in their tables
+       # held; the re-derived sets also found mutations the tables never
+       # listed (0128's S3/S5, the reason FIELD folded rather than the
+       # message; 0125's C5/C6) that came back NOT CAUGHT, and the tests
+       # were strengthened to catch them. Each set file's _why records which.
 
 # --- Why `--only` exists: the numbers ---
 #

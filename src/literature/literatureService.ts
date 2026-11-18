@@ -132,6 +132,11 @@ export class LiteratureDatabase {
   /**
    * Add literature to database
    */
+  /** How many sources were handed in; 0 means nothing local can be searched. */
+  get size(): number {
+    return this.db.size;
+  }
+
   add(literature: Literature): void {
     if (this.db.has(literature.id)) {
       logger.warn({ id: literature.id }, 'Literature already exists, updating');
@@ -510,6 +515,11 @@ export class LiteratureService {
    */
   addLiterature(lit: Literature): void {
     this.db.add(lit);
+  }
+
+  /** Sources in the in-memory database (see ScientificPipeline.execute). */
+  literatureCount(): number {
+    return this.db.size;
   }
 
   /**

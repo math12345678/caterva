@@ -135,10 +135,17 @@ def test_flagged_brenda_row_is_not_returned_as_exact_match(ache_provider):
         taxon_id_provider=fake_taxon_id_provider,
         search_literature=False,
     )
-    # Two matching rows exist (0.09 genuine, 6500 flagged). Must pick the
-    # genuine one and never the flagged one.
+    # Never a flagged row. Two genuine human rows match: 0.09 mM written
+    # "acetyl thiocholine" (ref 649716) and 0.025 mM written
+    # "acetylthiocholine" (ref 728999) -- one compound, two spellings, and
+    # since 2026-11-11 both are matched (`substrate_matches` ignores the
+    # space). Both state pH and temperature; the median row of two is the
+    # lower of the middle pair (ADR 0182), 0.025.
     assert result.found is True
-    assert result.value == 0.09
+    assert result.value == 0.025
+    assert result.citation.reference_id == "728999"
+    assert sorted(c["value"] for c in result.ensemble_candidates) == [0.025, 0.09]
+    assert "lower of the two middle values" in result.chosen_because
 
 
 # ---------------------------------------------------------------------------
@@ -429,8 +436,10 @@ def test_resolves_exact_human_ki_for_ldh_gossypol(ldh_ki_provider):
     assert result.found is True
     assert result.source == "brenda_exact"
     # Three real Homo sapiens gossypol sub-rows exist (LDH-B/A/C, 0.0014 /
-    # 0.0019 / 0.0042, all ref 711801); the minimum is the LDH-B isozyme.
-    assert result.value == 0.0014
+    # 0.0019 / 0.0042, all ref 711801). The median row is returned (ADR
+    # 0182), the LDH-A one; this was the minimum, 0.0014, until 2026-11-11.
+    assert result.value == 0.0019
+    assert "median of the 3 remaining rows" in result.chosen_because
     assert result.organism == "Homo sapiens"
     assert result.cross_species_flag is False
     assert result.citation is not None
@@ -474,7 +483,9 @@ def test_ki_cross_species_resolves_and_is_flagged(ldh_ki_provider):
     # "min across all organisms" was never a scientific criterion. It was
     # an arbitrary tie-break that happened to be reproducible, and it
     # selected on the wrong axis entirely.
-    assert result.value == 0.0014
+    # The median of the three human rows (0.0014 / 0.0019 / 0.0042), not
+    # their minimum (ADR 0182).
+    assert result.value == 0.0019
     assert result.organism == "Homo sapiens"
     assert result.citation.reference_id == "711801"
 
@@ -538,7 +549,7 @@ def test_quantity_selects_which_table_is_read(ldh_ki_provider, ldh_provider):
         quantity="ki",
     )
     assert ki_found.found is True
-    assert ki_found.value == 0.0014
+    assert ki_found.value == 0.0019  # the median gossypol row (ADR 0182)
 
 
 def test_ki_exact_row_does_not_borrow_km_provenance(ldh_ki_provider, ldh_provider):
@@ -586,12 +597,22 @@ def test_resolves_exact_human_kcat_for_ache(ache_kcat_provider):
     )
     assert result.found is True
     assert result.source == "brenda_exact"
-    assert result.value == 6500
+    # THE GOLDEN ROW IS STILL HERE; IT IS NO LONGER THE ONLY ONE. Until
+    # 2026-11-11 the substring match found only the row written "acetyl
+    # thiocholine" (6500 1/s, ref 649716). The fixture's human table also
+    # holds the same compound written "acetylthiocholine": 7.18 1/s (ref
+    # 749746) and 93 1/s (wild-type, ref 775647), plus a mutant (70 1/s,
+    # excluded). All three state pH and temperature; the median row, 93,
+    # is returned (ADR 0182), and the 905-fold spread is recorded so the
+    # report can say the literature disagrees.
+    assert result.value == 93
     assert result.organism == "Homo sapiens"
     assert result.cross_species_flag is False
     assert result.citation is not None
     assert result.citation.source == "BRENDA"
-    assert result.citation.reference_id == "649716"
+    assert result.citation.reference_id == "775647"
+    assert sorted(c["value"] for c in result.ensemble_candidates) == [7.18, 93.0, 6500.0]
+    assert result.wide_spread is True and round(result.spread_fold) == 905
 
 
 def test_kcat_never_fabricates_when_table_has_no_match(ache_kcat_provider):

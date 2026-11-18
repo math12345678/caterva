@@ -1,5 +1,14 @@
 import { motion } from "framer-motion";
 import Magnetic from "@/components/ui/Magnetic";
+import { RELEASE_TAG } from "@/lib/domains";
+
+// The version in the box and the download offered below are RELEASE_TAG,
+// derived from caterva/__init__.py. Corrected 2026-11-01: they were typed
+// as "v0.7.0", a version that has never existed, and "v0.4.0", one
+// release old (0.5.0 and 0.5.1 were only release candidates), while
+// v0.6.0 was the latest.
+const BOX_WIDTH = 26;
+const boxLine = (text: string) => `  │${`  ${text}`.padEnd(BOX_WIDTH)}│`;
 
 export default function NotFound() {
   return (
@@ -52,11 +61,13 @@ export default function NotFound() {
           <div className="p-6">
             {/* ASCII art */}
             <pre className="text-signal/40 text-[10px] leading-tight font-mono mb-6 select-none">
-              {`  ┌──────────────────────────┐
-  │  CATERVA v0.7.0          │
-  │  status: route not found │
-  │  exit code: 404          │
-  └──────────────────────────┘`}
+              {[
+                `  ┌${"─".repeat(BOX_WIDTH)}┐`,
+                boxLine(`CATERVA ${RELEASE_TAG}`),
+                boxLine("status: route not found"),
+                boxLine("exit code: 404"),
+                `  └${"─".repeat(BOX_WIDTH)}┘`,
+              ].join("\n")}
             </pre>
 
             <div className="mb-5">
@@ -109,7 +120,7 @@ export default function NotFound() {
                 {
                   label: "Get Caterva",
                   href: "/#get",
-                  desc: "Download v0.4.0 or build from the main branch",
+                  desc: `Download ${RELEASE_TAG} or build from the main branch`,
                 },
               ].map((link, i) => (
                 <motion.a

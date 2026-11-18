@@ -181,6 +181,10 @@ def _refused_reason(result: Any) -> str:
                 "are not borrowed across species")
     if source == "variant_withheld":
         return "BRENDA holds it only for protein variants (mutants), which are not the enzyme"
+    if source == "implausible_withheld":
+        found = getattr(result, "implausible_values", None) or []
+        return ("every row BRENDA holds for it is outside the physically plausible range"
+                + (f" ({'; '.join(found)})" if found else "") + ", so none is used")
     return "the resolver found no value for this enzyme, organism and compound"
 
 

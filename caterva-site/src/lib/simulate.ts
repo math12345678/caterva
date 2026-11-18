@@ -1,5 +1,6 @@
-// Client-side ODE integration for the live terminal's `run kinetics` and
-// `run epidemiology` commands.
+// Client-side ODE integration for the live terminal's kinetics commands.
+// (The SIR integrator that served `run epidemiology` left with that domain's
+// archiving on 2026-09-27.)
 //
 // This is not new physics written for the marketing site: it is the same
 // RK4 integrator already shipped in
@@ -94,52 +95,8 @@ export function simulateMichaelisMenten(p: MMParams): MMResult {
   return { trajectory, finalResidual };
 }
 
-export interface SIRParams {
-  beta: number;
-  gamma: number;
-  s0: number;
-  i0: number;
-  end: number;
-  points: number;
-}
-
-export interface SIRResult {
-  trajectory: Point[];
-  // S + I + R must equal N at every point (population conservation) -- the
-  // same invariant caterva/tests/test_properties.py checks with
-  // Hypothesis, spot-checked here at the final point.
-  conservationError: number;
-}
-
-export function simulateSIR(p: SIRParams): SIRResult {
-  const N = p.s0 + p.i0;
-  const derivs = ([S, I]: number[]) => {
-    const infection = (p.beta * S * I) / N;
-    const recovery = p.gamma * I;
-    return [-infection, infection - recovery, recovery];
-  };
-  const trajectory = integrate(derivs, [p.s0, p.i0, 0], p.end, p.points, [
-    'S',
-    'I',
-    'R',
-  ]);
-
-  const last = trajectory[trajectory.length - 1];
-  const conservationError = Math.abs(last.S + last.I + last.R - N);
-
-  return { trajectory, conservationError };
-}
-
 /** Default parameters used by the terminal demo commands. */
 export const DEFAULT_MM: MMParams = { km: 2, vmax: 5, s0: 10, end: 10, points: 51 };
-export const DEFAULT_SIR: SIRParams = {
-  beta: 0.4,
-  gamma: 0.1,
-  s0: 990,
-  i0: 10,
-  end: 60,
-  points: 61,
-};
 
 export interface MMCompetitiveParams {
   km: number;
@@ -191,4 +148,3 @@ export const DEFAULT_MM_COMPETITIVE: MMCompetitiveParams = {
 };
 
 export const MM_TOLERANCE = 1e-6;
-export const SIR_TOLERANCE = 1e-6;

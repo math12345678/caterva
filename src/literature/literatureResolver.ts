@@ -98,6 +98,14 @@ export interface ResolverQuery {
    */
   modelSubstrate?: string;
   /**
+   * How the caller's interface spells "give the EC number", for the re-run
+   * an ambiguity or mismatch refusal recommends. The runner defaults to the
+   * API's request field, `ecNumber`; the CLI passes `--ec`, the flag it
+   * actually has. Without it an LDH ambiguity told a CLI user to "re-run
+   * with ecNumber 1.1.1.27", which no command line accepts.
+   */
+  ecFlag?: '--ec';
+  /**
    * The conditions the model is meant to represent, for Bakker's
    * condition-proximity axis.
    *
@@ -325,6 +333,34 @@ export interface ResolvedKinetic {
    * that also gives LDH-A's and LDH-C's and states no mode for any.
    */
   commentary?: string | null;
+  /**
+   * Why this row was carried, in the resolver's words (ADR 0182): the
+   * median of how many rows, what was set aside, the spread, the paper a
+   * paired Km and kcat share. `wideSpread` when those rows span more than
+   * 100-fold.
+   */
+  chosenBecause?: string | null;
+  wideSpread?: boolean;
+  /**
+   * What the carried row IS beyond its value, in the resolver's words ("the
+   * row is a K0.5 with a Hill coefficient of 1.8, not a Michaelis-Menten
+   * Km"). Empty when the row is the plain enzyme's ordinary constant.
+   */
+  rowNotes?: string[];
+  /**
+   * For a Km: which protein of a multi-protein EC the constants are, in
+   * `caterva compose`'s words ("EC 2.7.1.1 is 5 proteins in human ... these
+   * are GCK's constants"). Compose and the Studio said it; this CLI said
+   * only the row's accession (sixth round, XS5R2-04).
+   */
+  isozymeNotice?: { headline: string; detail: string; remedy: string };
+  /**
+   * For a Km: what the kcat half of the pair came to (runner key
+   * `pairedKcat`). The API uses it for its Vmax advice; this CLI printed
+   * nothing, so a reader of the Km could not tell whether the turnover
+   * number that goes with it exists (sixth round's polish, V6R1-01).
+   */
+  pairedKcat?: { found: boolean; kcat?: number; source?: string | null };
   rowScope?: RowScope | null;
   /**
    * A row that is evidence against the model's mechanism (runner key
@@ -434,6 +470,12 @@ export interface RowScope {
    * stating no mode. Present, and true, only for such a row.
    */
   kitzWilson?: boolean;
+  /**
+   * The runner's verdict (caterva.bind.core.same_isoform, which asks UniProt)
+   * on whether `isoform` is the one --isoform asked for: "HK-II" is HK2.
+   * Absent when no isoform was asked for, or from an older runner.
+   */
+  sameIsoformAsRequested?: boolean;
 }
 
 /**
@@ -441,10 +483,56 @@ export interface RowScope {
  * never told it "states no inhibition mode": that is true of every Km and
  * says nothing. Empty when the scope has nothing to say.
  */
-export function rowScopeLines(quantity: string, scope: RowScope | null | undefined): string[] {
-  if (!scope) return [];
+/** Whether a row note says the row's UniProt cell is the isoform asked for
+ *  ("the row's UniProt accession (P27338) is MAOB"). */
+export function accessionNamesIsoform(rowNotes: string[] | undefined, isoform?: string): boolean {
+  if (!isoform) return false;
+  const want = isoform.replace(/[^0-9a-z]+/gi, '').toLowerCase();
+  return (rowNotes ?? []).some((n) => {
+    const m = /UniProt accession \([^)]*\) is ([A-Za-z0-9-]+)/.exec(n);
+    return !!m && m[1]!.replace(/[^0-9a-z]+/gi, '').toLowerCase() === want;
+  });
+}
+
+export function rowScopeLines(
+  quantity: string,
+  scope: RowScope | null | undefined,
+  requestedIsoform?: string,
+  rowNotes?: string[],
+): string[] {
   const lines: string[] = [];
-  if (scope.isoform) {
+  // The row's UniProt cell names the protein asked for: "names no isoform,
+  // so whether it measured DPP4 is unknown" was printed above "the row's
+  // UniProt accession (P27487) is DPP4" (sixth round's polish, XS6V1-04).
+  if (requestedIsoform && !scope?.isoform && accessionNamesIsoform(rowNotes, requestedIsoform)) {
+    return [
+      `The row's UniProt cell names ${requestedIsoform}, the one asked for.`,
+      ...rowScopeLines(quantity, scope, undefined, rowNotes),
+    ];
+  }
+  // A row that names no isoform, for a question that names one, is said too:
+  // the API says it (rowScopeFlags), and compose keeps such a constant
+  // flagged. Live, `simulate "HK2 with glucose" --resolve` carried kcat 60.4
+  // 1/s from BRENDA ref 703624 -- a glucokinase tryptophan-mutant paper
+  // whose wild-type row names no isoform -- under a Km row said to be HK2,
+  // and printed nothing about it (review of 2026-11-12). Silence there reads
+  // as "this is HK2's kcat".
+  if (requestedIsoform && !scope?.isoform) {
+    lines.push(
+      `The row names no isoform, so whether it measured ${requestedIsoform}, the one asked for, is unknown.`,
+    );
+  }
+  if (!scope) return lines;
+  if (scope.isoform && scope.sameIsoformAsRequested === true) {
+    // "HK2 with glucose" carried the HK2 row and then warned that it might
+    // be "a different protein's constant": the row's spelling (HK-II) is
+    // not the query's, and the runner knows they are one protein.
+    lines.push(`The row measured isoform ${scope.isoform}, the one asked for.`);
+  } else if (scope.isoform && scope.sameIsoformAsRequested === false && requestedIsoform) {
+    lines.push(
+      `The row measured isoform ${scope.isoform}, not ${requestedIsoform}, the one asked for: a different protein's constant.`,
+    );
+  } else if (scope.isoform) {
     lines.push(
       `The row measured isoform ${scope.isoform}. If the enzyme you mean is another isoform, this is a different protein's constant.`,
     );
@@ -481,6 +569,9 @@ function parseRowScope(raw: unknown): RowScope | null {
     inhibitionMode: text(r['inhibitionMode']),
     versus: text(r['versus']),
     ...(r['kitzWilson'] === true ? { kitzWilson: true } : {}),
+    ...(typeof r['sameIsoformAsRequested'] === 'boolean'
+      ? { sameIsoformAsRequested: r['sameIsoformAsRequested'] as boolean }
+      : {}),
   };
   return scope.isoform || scope.inhibitionMode || scope.versus ? scope : null;
 }
@@ -581,6 +672,25 @@ export interface UnresolvedKinetic {
   isoformsAvailable: string[];
   variantCandidatesAvailable: string[];
   crossSpeciesOrganismsAvailable: string[];
+  /** Those of `crossSpeciesOrganismsAvailable` whose every row measured a
+   * protein variant: --allow-cross-species would withhold those rows too
+   * (fifth round's review, V7-04). Optional: a runner that predates it sends
+   * none, and every organism is then taken as usable, as before. */
+  crossSpeciesVariantOnly?: string[];
+  /** Of those, the organisms whose rows each name an isozyme: wild-type
+   *  proteins, taken only when --isoform names one (XS5R2-03). */
+  crossSpeciesIsozymeOnly?: string[];
+  /** For variant_withheld: every withheld row names an isozyme (XS5R2-03). */
+  variantIsozymesOnly?: boolean;
+  /** For a compound with no row in the organism searched: what that
+   * organism's rows are for, counted, in `caterva compose`'s words, so the
+   * CLI, the API and compose offer the same alternatives (fifth round's
+   * review, V7-08). Null when the runner could not say it. */
+  availableInTheOrganism?: string | null;
+  /** Every row's value, "1e-06 1/s (BRENDA ref 729224)", when each is outside
+   * the physically plausible range for the constant. Empty (or absent)
+   * unless `source` is "implausible_withheld". */
+  implausibleValues?: string[];
   /** What the Ki rows state ("competitive inhibition versus NADH"), when
    * `--mode` asked for another mechanism and every row states one. Empty
    * unless `source` is "mode_withheld". */
@@ -688,12 +798,50 @@ export function withheldSentence(
         `(${list(result.isoformsAvailable, 'unnamed')}). An isoform is a different gene product; ` +
         `pass --isoform with one of those to use it.`;
     case 'variant_withheld':
+      if (result.variantIsozymesOnly) {
+        // Isozymes are wild-type proteins, and --isoform takes their rows
+        // (Vibrio tyrosinaticus, "isoenzyme A": sixth round, XS5R2-03).
+        return `BRENDA's rows for this ${result.quantity} each name an isozyme ` +
+          `(${list(result.variantCandidatesAvailable, 'unnamed')}), taken only when --isoform names it: ` +
+          `re-run with --isoform set to one of them to model that isozyme.`;
+      }
       return `BRENDA's rows for this ${result.quantity} were all measured on protein variants ` +
         `(${list(result.variantCandidatesAvailable, 'unnamed')}), which describe the variant, not the enzyme.`;
-    case 'cross_species_withheld':
+    case 'implausible_withheld':
+      return `Every ${result.quantity} row BRENDA holds for this system ` +
+        `(${list(result.implausibleValues ?? [], 'unnamed')}) is outside the physically plausible ` +
+        `range for it. A value like that is a unit slip or a misfiled row far more often than a ` +
+        `measurement, so none was used.`;
+    case 'cross_species_withheld': {
+      // Only organisms with a row the search would use are offered: one
+      // whose rows all measured a variant is refused again after the opt-in
+      // (human COX-2's kcat, Mus musculus N580A; fifth round's review, V7-04).
+      const variantOnly = new Set(result.crossSpeciesVariantOnly ?? []);
+      // Isozyme rows ("isoenzyme A") are wild-type proteins, not variants,
+      // and are said as such (sixth round, XS5R2-03: Vibrio tyrosinaticus).
+      const isozymeOnly = new Set(result.crossSpeciesIsozymeOnly ?? []);
+      const usable = result.crossSpeciesOrganismsAvailable.filter((o) => !variantOnly.has(o));
+      const variants = result.crossSpeciesOrganismsAvailable.filter(
+        (o) => variantOnly.has(o) && !isozymeOnly.has(o),
+      );
+      const isozymes = result.crossSpeciesOrganismsAvailable.filter((o) => isozymeOnly.has(o));
+      const isozymeClause = isozymes.length
+        ? `; rows of a named isozyme only, taken only with --isoform naming it: ${isozymes.join(', ')}`
+        : '';
+      if (usable.length === 0 && (variants.length > 0 || isozymes.length > 0)) {
+        return `BRENDA has no row for this ${result.quantity} in the organism asked for, and its ` +
+          `only rows elsewhere (${[...variants, ...isozymes].join(', ')}) ` +
+          (variants.length > 0
+            ? `measured a protein variant, which is withheld${isozymeClause}`
+            : `each name an isozyme, taken only with --isoform naming it`) +
+          `, so --allow-cross-species would not fill it either: supply it yourself.`;
+      }
       return `BRENDA holds this ${result.quantity} only for other organisms ` +
-        `(${list(result.crossSpeciesOrganismsAvailable, 'unnamed')}). Pass --allow-cross-species ` +
-        `to use one from a related organism, flagged as such.`;
+        `(${list(usable, 'unnamed')}` +
+        (variants.length ? `; rows of a protein variant only, withheld: ${variants.join(', ')}` : '') +
+        isozymeClause +
+        `). Pass --allow-cross-species to use one from a related organism, flagged as such.`;
+    }
     default:
       return null;
   }
@@ -857,8 +1005,14 @@ function scriptPath(): string {
   return process.env['CATERVA_LITERATURE_RUNNER'] || DEFAULT_SCRIPT_PATH;
 }
 
-/** BRENDA and PubMed are network calls; this is generous but finite. */
-const RESOLVER_TIMEOUT_MS = 120_000;
+/**
+ * BRENDA and PubMed are network calls; this is generous but finite. A cold
+ * BRENDA page under load took 170-970 s in the fourth round of the
+ * real-values review, and with compose, Studio and the API running at once
+ * 10 of 12 CLI runs ended at the old 120 s with nothing learned, while
+ * compose resolved the same queries.
+ */
+const RESOLVER_TIMEOUT_MS = 600_000;
 
 /** Raised when the resolver could not be run at all. Deliberately distinct
  *  from `found: false`: "the registry says no" and "we never asked" are
@@ -959,6 +1113,35 @@ export function mapFoundResult(
     // reason -- a check on presence would inherit the ambiguity it was
     // written to remove.
     selectionTie: parseSelectionTie(parsed['selectionTie']),
+    ...(typeof parsed['chosenBecause'] === 'string' ? { chosenBecause: parsed['chosenBecause'] as string } : {}),
+    ...(parsed['wideSpread'] === true ? { wideSpread: true } : {}),
+    ...(parsed['isozymeNotice'] && typeof parsed['isozymeNotice'] === 'object'
+      && typeof (parsed['isozymeNotice'] as Record<string, unknown>)['headline'] === 'string'
+      ? {
+          isozymeNotice: {
+            headline: String((parsed['isozymeNotice'] as Record<string, unknown>)['headline']),
+            detail: String((parsed['isozymeNotice'] as Record<string, unknown>)['detail'] ?? ''),
+            remedy: String((parsed['isozymeNotice'] as Record<string, unknown>)['remedy'] ?? ''),
+          },
+        }
+      : {}),
+    ...(parsed['pairedKcat'] && typeof parsed['pairedKcat'] === 'object'
+      ? {
+          pairedKcat: {
+            found: (parsed['pairedKcat'] as Record<string, unknown>)['found'] === true,
+            ...(typeof (parsed['pairedKcat'] as Record<string, unknown>)['kcat'] === 'number'
+              ? { kcat: (parsed['pairedKcat'] as Record<string, unknown>)['kcat'] as number }
+              : {}),
+            source:
+              typeof (parsed['pairedKcat'] as Record<string, unknown>)['source'] === 'string'
+                ? ((parsed['pairedKcat'] as Record<string, unknown>)['source'] as string)
+                : null,
+          },
+        }
+      : {}),
+    ...(Array.isArray(parsed['rowNotes'])
+      ? { rowNotes: (parsed['rowNotes'] as unknown[]).filter((n): n is string => typeof n === 'string') }
+      : {}),
     // Read through rather than cast: a row with no usable value or no grades
     // is not a candidate, and letting one through would put a blank line in
     // front of a student where a measurement should be.
@@ -1066,7 +1249,8 @@ export async function resolveKinetic(
       finish(() =>
         reject(
           new ResolverUnavailableError(
-            `Literature resolver exceeded ${RESOLVER_TIMEOUT_MS}ms`
+            `Literature resolver exceeded ${RESOLVER_TIMEOUT_MS / 1000} s (BRENDA did not ` +
+              `answer in time; this is not a finding about the enzyme, and a retry may succeed)`
           )
         )
       );
@@ -1130,7 +1314,8 @@ export async function resolveKinetic(
               ...(query.modelSubstrate ? { modelSubstrate: query.modelSubstrate } : {}),
             }
           : {}),
-        physiologicalReference: query.physiologicalReference
+        physiologicalReference: query.physiologicalReference,
+        ...(query.ecFlag ? { ecFlag: query.ecFlag } : {}),
       })
     );
     proc.stdin.end();
@@ -1158,7 +1343,9 @@ export async function resolveKinetic(
 
   if (parsed['found'] !== true) {
     const candidates = parseCandidatePapers(parsed['literatureCandidates']);
-    logger.info(
+    // debug, not info: the CLI prints what was not found in its own words,
+    // and this JSON line landed in the middle of its report (XS6V1-08).
+    logger.debug(
       { query, quantity, candidateCount: candidates.length },
       'Literature resolver found no value; reporting absence rather than a default'
     );
@@ -1173,7 +1360,15 @@ export async function resolveKinetic(
       isoformsAvailable: names(parsed['isoformsAvailable']),
       variantCandidatesAvailable: names(parsed['variantCandidatesAvailable']),
       crossSpeciesOrganismsAvailable: names(parsed['crossSpeciesOrganismsAvailable']),
+      crossSpeciesVariantOnly: names(parsed['crossSpeciesVariantOnly']),
+      crossSpeciesIsozymeOnly: names(parsed['crossSpeciesIsozymeOnly']),
+      ...(parsed['variantIsozymesOnly'] === true ? { variantIsozymesOnly: true } : {}),
+      availableInTheOrganism:
+        typeof parsed['availableInTheOrganism'] === 'string' && parsed['availableInTheOrganism'] !== ''
+          ? (parsed['availableInTheOrganism'] as string)
+          : null,
       modesAvailable: names(parsed['modesAvailable']),
+      implausibleValues: names(parsed['implausibleValues']),
     };
   }
 

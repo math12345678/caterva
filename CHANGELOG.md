@@ -12,6 +12,72 @@ onward and [Keep a Changelog](https://keepachangelog.com/) in shape.
 Entries before 0.1.0 are grouped by date, because that is how the work was
 done: there was no release to version.
 
+## [Unreleased]
+
+## [0.7.1] - 2026-11-17
+
+Plain-language questions reach measured, cited values (ADR 0181), and a named
+enzyme gets its best-measured substrate, said out loud (ADR 0182).
+
+### Changed
+- `caterva compose` no longer refuses a named enzyme for want of a substrate, inhibitor or organism. It chooses the best-measured real option on BRENDA's page (`caterva/compose/defaults.py`: cosubstrates such as ATP and NAD+ set aside; a substrate with both a Km and a kcat row first; a natural substrate before an assay one; then the most rows; an inhibitor that is a product of the reaction ranked last; Homo sapiens when it covers every constant, otherwise the organism that covers the most), runs the search with it, and says in a note what it chose, why, and the alternatives with their row counts, ending with the flag that overturns it. "hexokinase Michaelis-Menten kinetics" in human now gives Km 6.0 mM (BRENDA ref 641068) and kcat 40.1 1/s (ref 739603) for D-glucose, instead of exit 3 and two placeholders. Flags and words of the sentence always win; an organism the user named is never switched. The Studio result carries each choice in `search.choices`. Supersedes the refuse-without-a-substrate rule of ADR 0178 and ADR 0181.
+- A name that is a few enzymes is taken as the one BRENDA has Km rows for, when only one has them in the organism (or, with no organism, one has five times the rows of every other): "lactate dehydrogenase with pyruvate in human" is EC 1.1.1.27, "citrate synthase" EC 2.3.3.1, each said with the other candidate named. Class words, symbols and real ties are still refused with the candidates.
+- A description that names an enzyme and an inhibitor BRENDA lists Ki rows for, and no mechanism ("dihydrofolate reductase with methotrexate in E. coli"), is built as competitive inhibition, and the note quotes the mode BRENDA's rows state.
+- `--antimony` reads and searches the description as the report does, compiles the measured values, and names each constant's origin in a comment block above the source.
+
+### Fixed
+- The default time course runs to the end of the reaction. Its window came from the settling time at the steady state, where an enzyme is first-order; from saturating starting amounts it is zero-order and takes far longer, so human LDH stopped at t=1.2 with 12% of the pyruvate converted. A derived window is lengthened while the curve is still moving at its end, and the report says so. A new test compares the time course built from a sentence with the closed-form Michaelis-Menten solution (Lambert W), computed outside Caterva.
+- "an enzyme converts a substrate to a product" builds Michaelis-Menten instead of "did you mean furin?": mechanism words are not read as misspelt enzyme names.
+- Km and kcat are taken from one protein, and where possible one paper under the same conditions; mutants, tagged constructs, chimeras, altered preparations (surfactants, D2O, immobilised), inhibited assays and probable unit slips are passed over and named. A UniProt outage no longer discards BRENDA's values. The Studio app, the API and the TypeScript CLI read a sentence with compose's reader, and the API's stream cache is keyed by engine build (ADR 0182, six review rounds).
+- A Km, kcat or Ki whose BRENDA row is another compound's is withheld with that compound named, instead of being carried under the name asked for. The search finds a name inside longer names: chymotrypsin's chosen L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide carried the N-succinyl compound's Km (0.219 mM, ref 769319), and ACE's angiotensin I the Km of [Phe9,Arg10]angiotensin I (0.011 mM, ref 669424). Applied whenever the name is one BRENDA's table lists exactly, typed or chosen (ADR 0182).
+- A chosen substrate's note no longer opens "No substrate was named" when the description named a compound BRENDA does not list, and a word that matches several listed substrates is chosen among those only.
+- An organism the user named that has no Km row for the enzyme ("glucose-6-phosphate dehydrogenase" in S. cerevisiae) is refused as the organism, with the organisms that do have rows and their counts, instead of "Re-run with --substrate NAME", which would not have helped.
+- A partly measured model's verdict no longer says every constant is the library's illustrative value: it reads "STRUCTURAL (partly grounded: 2 of 3 constants measured)", its licence names which constants are measured and which are placeholders, and "Do this next" names the missing piece (the inhibitor, the substrate, the organism) instead of always advising another organism.
+- The search note no longer says a constant that was not looked up (an unnamed inhibitor's Ki) "ran and returned nothing"; it says it was not looked up, as the provenance table does.
+- A search over every organism that settles on none ("pepsin" or "alpha-amylase" with a substrate and no organism) is a report naming the organisms, not an uncaught `ExportRefused` traceback.
+- `caterva compose` reads the enzyme, organism and substrate from the sentence when the shape has one enzyme step: "hexokinase glucose human" builds Michaelis-Menten with Km 6.0 mM (BRENDA ref 641068) and kcat 40.1 1/s (BRENDA ref 739603) for Homo sapiens. Only an exact accepted name, a unique other name or an EC number is read; a name shared by two enzymes ("lactate dehydrogenase") is refused with the candidates and the exact re-run; flags win over the sentence; every reading is a note in the report. A word taken out of a longer compound name ("glucose" in "glucose 6-phosphate") is not the substrate, and a misspelt organism is said not read.
+- The web page no longer re-sends resolved values as the student's own, so BRENDA's Km keeps its citation through `/api/simulate`, and it shows each value's citation and why a run stopped. A 422 carries the per-parameter provenance, details and flags. Organism words read plurals and common names without matching inside "guinea pig", "naked mole rat" or a reagent such as bovine serum albumin; two organisms, two enzymes or a guessed enzyme with no substrate are refused instead of picking one.
+- The TypeScript CLI refuses when a flag contradicts the question, shows the EC its citation will be about, and prints labelled placeholders instead of example numbers (`--km 10.7mM`, `PMID 12345`) in its suggestions. Its tests no longer write runs to `~/.caterva`.
+- `caterva bind`, `fep` and `rates` read an enzyme name passed as `--ec` instead of searching BRENDA for it as a number, and Studio Compose sends a typed name. A word for a kind of enzyme ("protein", "enzyme", "peptidase", "protein kinase") is refused rather than read as the one enzyme a synonym happens to match, and an organism BRENDA's page does not name is reported as that, with a suggestion, not as "No Ki rows".
+- A Ki placeholder's reason names the inhibitor and `--inhibitor`, not "that substrate name" and `--substrate`, which cannot change a Ki ("acetylcholinesterase inhibited by donepezil in human", "COX-2 inhibited by celecoxib"). Every name-miss placeholder now says what BRENDA holds in the organism searched: the compounds with rows there and their counts, whether the named compound has rows only in another organism (labelled, never substituted) or none under that name; and when the organism has no row of that table at all (human kcat for CYP3A4, EC 1.14.14.1), that the organism is what is missing, with the organisms that have rows, instead of a list of other organisms' substrates.
+- "Do this next" is read from each placeholder's reason when nothing was measured too: a constant withheld as another isoform's names the substrates measured on the isoform asked for (CYP3A4: fenthion), and one withheld as a neighbour's row says so, instead of "re-run with --organism" for both.
+- A name refused as several enzymes with an organism none of them has a Km row in ("citrate synthase --organism mouse") says that the organism is what is missing and which organisms have rows, so following the refusal does not lead to a second one. An organism refusal whose words name that organism's protein under another EC number ("glucokinase in human": GCK, under EC 2.7.1.1) gives `--subject 2.7.1.1 --isoform GCK` first, not Zymomonas mobilis.
+- A substrate typed with an organism that has no Km row for it, while other organisms do ("pepsin with hemoglobin --organism pig"), is said to be measured elsewhere, with those organisms and their usable row counts, instead of "is not a substrate BRENDA lists" and "pass --substrate with BRENDA's own name", which was the name typed.
+- A substrate word of the description survives a failed read of BRENDA's substrate list: the read is retried, and if it still fails the search refuses, instead of the chooser modelling another substrate under "No substrate was named" ("hexokinase with mannose in human" carried D-glucose's Km).
+- "pepsin with hemoglobin" is pepsin acting on hemoglobin, not cooperative binding: a compound named beside an enzyme is not read as a mechanism when it is the only cue for one.
+- A placeholder's way out counts only rows the search would use: an organism, compound or isoform whose rows all measured a protein variant is no longer offered ("PTGS2 with arachidonic acid" in human was sent to Mus musculus, whose kcat rows are all COX-2 N580A); when nothing usable is left anywhere, the reason says so and "Do this next" is to supply the constant.
+- With an isoform asked for, a placeholder offers an organism only for rows that name that isoform ("CYP3A4 ... in human" was sent to Bacillus licheniformis, whose kcat rows are CYP102A7's, and that run was refused again); when no organism's rows name it, the step is to supply the constant, and an isoform placeholder with no compound measured on the isoform no longer advises `--substrate`.
+- An organism refusal that points to the organism's protein under another EC number says how many of that organism's rows name the protein; when none does ("glucokinase in mouse": 0 of 3 rows name Gck, and the advised run carried a 0.42 mM hexokinase-like Km), it says the rows may be another protein's. A substrate offered for one placeholder says whether it fills the model's other constants ("Renilla-type luciferase with coelenterazine" was sent to "Luciferin", which has no Km row there), a compound whose rows all name another isoform is not offered, an organism list says when no organism has the compound, an organism Caterva chose is no longer called "raised by your own request", and a lone isozyme letter ("lactate dehydrogenase A") no longer stops a search whose substrate list could not be read.
+- A Ki or kcat placeholder no longer calls PubMed's answer "candidate papers were found": the papers are what PubMed returned for the search's words, not checked to name the compound (a made-up inhibitor name got the same sentence).
+
+## [0.7.0] - 2026-11-01
+
+Caterva V7: every number on a public surface is measured, derived from the
+tree, or removed (ADR 0180).
+
+### Changed
+- The landing app reads its guard count, suite sizes and data sources from a generated `repoFacts.json`; `scripts/check_landing_test_counts.py` fails when that file, a row's `collected:` or its pass count is stale, and `--write` regenerates it. The landing CLI's `status` calls `/api/healthz` and `/api/metrics/health` and prints what came back.
+- `caterva-site`'s shell offers the five live domains only, runs Michaelis-Menten with the showcase's hexokinase constants and Gillespie with the domain catalogue's example rates in the browser, and answers an archived domain with its archive date and v0.4.0. Its tests run in CI and in the new `make test-site`.
+- The dashboard shows the literature score on a 0-1 scale, labelled a heuristic and not a probability, and computes the average tile from the runs shown.
+- `scripts/verify_citations_live.py` and `scripts/verify_values_live.py` end every check matched, mismatched or unreachable (exit 0, 2, 1); DOIs are checked through the CrossRef API; BRENDA ref 740253 is no longer checked as a PubMed id.
+- scipy is pinned to 1.16.0 on Python 3.11-3.13, because 1.15.3's cp313 wheel does not import `scipy.sparse.linalg` on macOS 27.0.1; Python 3.10 keeps 1.15.3. certifi is 2026.10.19.
+- The API server logs with pino 10.3.1 and pino-http 11.0.0, the pino-http release built on pino 10; pino-http 10 still required pino 9, and the two type definitions did not typecheck together. thread-stream is 4.2.0, the version pino 10 runs on, so the bundled log worker and the logger speak one protocol.
+- `docker-compose.yml` mounts `./data` for the job store (`CATERVA_JOBS_FILE`) instead of bind-mounting `./caterva-jobs.jsonl`; move that file into `./data` to keep a deployment's history.
+- `scripts/check_documented_counts.py` reads "N guards" as well as "N guard scripts", and skips a quoted count; it found three stale guard counts in `docs/readmes/`.
+- Monitoring files moved to `deploy/monitoring/`, their ports bound to 127.0.0.1, and Grafana's admin password is read from `GRAFANA_ADMIN_PASSWORD` with no default; `scripts/check_port_binding.py` reads that compose file too.
+- The landing page offers the release named by `__version__` (v0.7.0 in this release). `repoFacts.json` carries `releaseTag`, read from `caterva/__init__.py`, and the download box, roadmap, 404 page and domain statuses all use it; `check_landing_test_counts.py` fails when it is stale. Before this, the page offered v0.4.0, and the 404 page said v0.7.0. The changelog modal gains 0.6.0 and dates 0.3.3 to September 22.
+- `scripts/check_license_consistency.py` also reads the published OpenAPI spec and `pyproject.toml`, and fails when a file it is told to read is missing. The root `openapi.yaml` declares Apache-2.0 and links to github.com/math12345678/caterva.
+- CHANGELOG and CITATION.cff say that 0.5.0 and 0.5.1 were released only as candidates.
+- Docs that pointed readers at the 18 Terrium-sim repositories say those repositories are private; 17 were pushed on 2026-08-12 under the old name (the 18th is GitHub's demo repository) and none since; development is at github.com/math12345678/caterva.
+
+### Removed
+- The API server's epidemiology bridge (`applyBetaGammaFromR0Resolution`, `resolveEpidemiologyParameters`, `diseases.ts`) and the `wright_fisher` resolvable field, which no live domain reached.
+- Root probe scripts, a screenshot and the committed `caterva-jobs.jsonl`.
+- `Tests/epidemiology_resolver.py`, `Tests/popgen_resolver.py`, their tests and `requirements-popgen.txt` moved to `archive/legacy_domains/`, and the doctor, env check and guards no longer check for, install or advise installing stdpopsim. The query parser accepts only live parameter names, and has no array path.
+
+### Fixed
+- README: the `compose --subject` example names its mechanism, and the install section says the wheel needs Python 3.10-3.13 and that a checkout is installed with `make setup`.
+
 ## [0.6.0] - 2026-10-25
 
 Claims over pinned evidence: `caterva compose --claims DIR`, `caterva why`
@@ -48,6 +114,10 @@ notes did not describe them, and they are listed here.
 
 ## [0.5.1] - 2026-10-04
 
+**Released only as candidates** (`v0.5.1-rc.1`, `v0.5.1-rc.2`, both
+GitHub pre-releases). No final `v0.5.1` tag was cut; the next final release
+is 0.6.0, which carries everything below. Note added 2026-11-01.
+
 Caterva.app updates itself. A release candidate, `v0.5.1-rc.1`, comes first,
 as for 0.5.0.
 
@@ -61,6 +131,10 @@ as for 0.5.0.
 - Version 0.5.1. The Studio's desktop bridge has four new messages (`updateStatus`, `checkForUpdates`, `setUpdateOptions`, `reportActiveRuns`; `docs/studio/CONTRACT.md`, section 16).
 
 ## [0.5.0] - 2026-10-03
+
+**Released only as candidates** (`v0.5.0-rc.1`, `v0.5.0-rc.2`, both
+GitHub pre-releases). No final `v0.5.0` tag was cut; the next final release
+is 0.6.0, which carries everything below. Note added 2026-11-01.
 
 Caterva Studio, the enzyme finder, and a Mac app, on top of the tools listed
 below them.

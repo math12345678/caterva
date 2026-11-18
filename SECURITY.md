@@ -48,6 +48,14 @@ to be careful about.
 - **Do not expose it to a shared network or the public internet as-is.** Put
   it behind authentication first, and understand that nobody has designed or
   reviewed that.
+- **The monitoring stack is loopback-only too.**
+  `deploy/monitoring/docker-compose-monitoring.yml` publishes the API
+  (`127.0.0.1:3000`), Prometheus (`127.0.0.1:9090`, no login) and Grafana
+  (`127.0.0.1:3001`) on 127.0.0.1, and `scripts/check_port_binding.py` checks
+  it. Reach them remotely through an SSH tunnel
+  (`ssh -N -L 3001:127.0.0.1:3001 you@docker-host`), not by rebinding.
+  Grafana's admin password is read from `GRAFANA_ADMIN_PASSWORD` with no
+  default; until 2026-10-31 it was `admin`.
 - **If a class shares one instance, tell the students.** They should know
   their queries are visible to the room before they type anything.
 - **Do not type anything identifying into the query box.** Names, student

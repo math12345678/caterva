@@ -339,6 +339,18 @@ describe('a Ki withheld by mode or isoform says so, in this command\'s flags', (
       'ki (no inhibition constant for oxamate in the literature for this system)',
     );
   });
+
+  it('offers no number for the missing Ki, only a placeholder to replace', async () => {
+    // Live, "acetylcholinesterase inhibited by donepezil in human": the
+    // command printed "in full, with the example values above" ended
+    // `--ki 5mM`, a Ki for donepezil nobody measured, runnable as printed.
+    jest.mocked(resolveKinetic).mockResolvedValue(NOTHING('ki'));
+    await commandSimulateResolved({ ...LDH, json: false, model: 'competitive', inhibitor: 'oxamate' });
+    const text = out.join('').replace(/\x1b\[[0-9;]*m/g, '');
+    expect(text).not.toMatch(/--ki \d/);
+    expect(text).toContain('--ki "<your measured Ki, e.g. in mM>"');
+    expect(text).toContain('replace <your measured Ki, e.g. in mM> with your own before running it');
+  });
 });
 
 describe('the refusal hands back a command for the same model', () => {
@@ -639,10 +651,15 @@ describe('the command printed "in full" is the run that was asked for', () => {
     );
   });
 
-  it('keeps the plain heading when every value in it is one', async () => {
+  it('names the missing Ki as a placeholder too: no Ki is an example value', async () => {
+    // This heading was plain while the command ended `--ki 5mM`; a Ki the
+    // literature did not yield has no example value (see "offers no number
+    // for the missing Ki" above).
     jest.mocked(resolveKinetic).mockResolvedValue(NOTHING('ki'));
     await commandSimulateResolved({ ...LDH, json: false, model: 'competitive', inhibitor: 'oxamate' });
-    expect(fullCommand().heading).toBe('In full, with the example values above:');
+    expect(fullCommand().heading).toBe(
+      'In full, with the example values above; replace <your measured Ki, e.g. in mM> with your own before running it:',
+    );
   });
 });
 

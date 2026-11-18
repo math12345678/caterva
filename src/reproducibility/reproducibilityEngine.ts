@@ -724,6 +724,16 @@ export function legacyRecordsDir(): string {
 }
 
 export function recordsDir(): string {
+  // CATERVA_RECORDS_DIR first, mirroring CATERVA_HISTORY_FILE in
+  // historyPath(). Without it the only way to keep a test out of the real
+  // records directory was to repoint HOME, and the CLI tests that spawn the
+  // binary never did: by 2026-11 they had left 91 fixture records (and 57
+  // fixture runs in history.json, citing PMIDs like 12345678) in the
+  // developer's own ~/.caterva, where `history` and `verify` list them next
+  // to real runs. The jest globalSetup now points both variables at a
+  // scratch directory that every spawned child inherits.
+  const override = process.env['CATERVA_RECORDS_DIR'];
+  if (override) return override;
   // HOME first, then os.homedir(). They agree in a normal process, but
   // os.homedir() reads the real environment while a test runner (jest)
   // gives each test a COPY of process.env, so a test that set HOME to a
@@ -814,7 +824,13 @@ export class ReproducibilityService {
       // Records written before the rename (2026-09-27) live in
       // ~/.terrium/records. Read there too, so a job run under the old name
       // still verifies; new records are only ever written to ~/.caterva.
-      const file = [recordsDir(), legacyRecordsDir()]
+      // An explicit CATERVA_RECORDS_DIR names THE records directory: falling
+      // back to the real home's ~/.terrium would let a test's answer depend
+      // on what an older install happened to leave there.
+      const dirs = process.env['CATERVA_RECORDS_DIR']
+        ? [recordsDir()]
+        : [recordsDir(), legacyRecordsDir()];
+      const file = dirs
         .map((dir) => path.join(dir, `${jobId}.json`))
         .find((candidate) => fs.existsSync(candidate));
       if (file === undefined) return undefined;

@@ -65,8 +65,10 @@ class ComposedModel:
     #: the resolver's documented default is", which the resolver states.
     organism: Optional[str] = None
     #: The substrate a kinetic constant belongs to. A motif knows it needs
-    #: a Km; it cannot know what the Km is FOR, so this is the caller's
-    #: (ADR 0178). Without it BRENDA's km and ki tables cannot be read.
+    #: a Km; it cannot know what the Km is FOR (ADR 0178), so it is the
+    #: caller's, or, when the caller named none, the best-measured one
+    #: BRENDA lists, chosen out loud (ADR 0182, `choices`). Without one
+    #: BRENDA's km and ki tables cannot be read.
     substrate: Optional[str] = None
     #: What a literature search actually returned, parameter id ->
     #: `Measurement`. Empty until `with_measured` is called, which is the
@@ -99,6 +101,40 @@ class ComposedModel:
     #: Constants are then taken from rows that measured it (isoform.py), and
     #: the report says where no row did.
     isoform: Optional[str] = None
+    #: What asked for `isoform`: "--isoform", or "your description" when it
+    #: was read from the sentence, for the notes (fifth round's review, V5-5).
+    isoform_asked: Optional[str] = None
+    #: The point mutant the model is of ("R132H"), when the description named
+    #: one: constants come only from rows measuring it.
+    mutation: Optional[str] = None
+    #: Why the enzyme the DESCRIPTION names was not made the subject, when
+    #: it names one and it was not ("hexokinase" in a three-step cascade:
+    #: one enzyme's constants on every step would be ADR 0076's
+    #: adjacent-paper miscitation). Without it the report said "no enzyme
+    #: was named" about a sentence that named one (ADR 0181).
+    unapplied_subject: Optional[str] = None
+    #: What Caterva chose for something the user did not name -- the enzyme
+    #: a name that is a few enzymes was taken as, the organism, the
+    #: substrate, the inhibitor -- in the order the choices were made, each
+    #: a `caterva.compose.defaults.Choice` (ADR 0182). Every one is a note
+    #: in the report and an entry of the studio's `search.choices`, so a
+    #: choice is never made without the reader being told, with the
+    #: alternatives and their row counts, how to overturn it.
+    choices: Tuple[Any, ...] = ()
+    #: Cautions about a cited value the verdict must carry as concerns, as
+    #: (parameter id, sentence): a Ki lying 1e4-fold from every other
+    #: organism's rows for the compound (E. coli DHFR and methotrexate),
+    #: said only in the body until the fourth round of the review.
+    cautions: Tuple[Tuple[str, str], ...] = ()
+
+    def no_subject_reason(self) -> str:
+        """Why nothing was searched for, in words that are true of the query.
+
+        "no enzyme was named", unless the description named one that was
+        not applied, and then what happened to it."""
+        if self.unapplied_subject:
+            return self.unapplied_subject
+        return "no enzyme was named"
 
     def compound_for(self, quantity: ResolvableQuantity) -> Optional[str]:
         """The compound a constant is measured for, or None if unnamed."""
@@ -294,6 +330,21 @@ class ComposedModel:
             # would have returned (fallback_logic.ModeDefault).
             return motif_mode(quantity) if any_mode else None
 
+        wanted = [quantity for quantity in self.resolvable
+                  if quantity.table is not None and quantity.parameter_id not in skip]
+        # A Km and a kcat of one compound are taken from one paper when the
+        # literature allows (`fallback_logic.resolve_kinetic_pair`): both
+        # describe one enzyme turning one substrate, and two papers mean two
+        # preparations and often two temperatures. Only when the model asks
+        # for both: a model with no kcat keeps the Km the evidence alone picks.
+        tables_of: Dict[Any, set] = {}
+        for quantity in wanted:
+            tables_of.setdefault(self.compound_for(quantity), set()).add(quantity.table)
+
+        def paired(quantity: ResolvableQuantity) -> bool:
+            return (quantity.table in ("km", "kcat")
+                    and {"km", "kcat"} <= tables_of.get(self.compound_for(quantity), set()))
+
         return [
             ParameterRequest(
                 quantity=quantity.parameter_id,
@@ -306,14 +357,15 @@ class ComposedModel:
                 table=quantity.table,
                 expected_unit=quantity.unit,
                 isoform=self.isoform,
+                mutation=self.mutation,
                 inhibition_mode=mode_of(quantity),
                 compare_mode=compared(quantity),
                 # The model's substrate, which a Ki's mode is judged against;
                 # only sent with a mode, ranked by or compared with.
                 model_substrate=(self.substrate if motif_mode(quantity) else None),
+                paired=paired(quantity),
             )
-            for quantity in self.resolvable
-            if quantity.table is not None and quantity.parameter_id not in skip
+            for quantity in wanted
         ]
 
     @property
@@ -377,8 +429,9 @@ class ComposedModel:
             )
 
         if self.structure_only:
+            reason = self.no_subject_reason()
             lines.append(
-                f"No enzyme was named, so nothing was searched for. The "
+                f"{reason[:1].upper()}{reason[1:]}, so nothing was searched for. The "
                 f"{len(self.resolvable)} constant(s) this model needs are: "
                 + ", ".join(q.parameter_id for q in self.resolvable)
                 + ". Name the enzyme and Caterva will look each one up; "
@@ -445,6 +498,17 @@ def compose(
     cascade" means MAP2K1 specifically would attach a real protein's
     measured constants to a generic three-tier model, which is the
     adjacent-paper miscitation of ADR 0076 wearing different clothes.
+
+    The caller that reads a subject OUT of a description is
+    `caterva.compose.__main__.read_description` (ADR 0181), before this is
+    called, and only under the rules that keep ADR 0076 true: an enzyme
+    named exactly or by EC number ("human hexokinase", "EC 2.7.1.1"), never
+    a class word ("MAP kinase", "kinase") or a fragment of a name; applied
+    only to a one-enzyme shape, never to a cascade, a competition or a
+    pathway, where the report says it was not applied and why; and a name
+    that is several enzymes refused with each named. What it read arrives
+    here as `subject`, `organism` and `substrate`, like the flags, and the
+    report states every reading.
     """
     recognition = recognise(query, name=name)
     composition = recognition.composition
@@ -484,6 +548,7 @@ def compose_and_parameterise(
     compounds: Optional[Mapping[str, str]] = None,
     isoform: Optional[str] = None,
     any_mode: bool = False,
+    mutation: Optional[str] = None,
 ) -> Tuple[ComposedModel, Any]:
     """Compose, then run the agent architecture over the result.
 
@@ -499,6 +564,8 @@ def compose_and_parameterise(
     model = compose(query, subject=subject, organism=organism, substrate=substrate, compounds=compounds)
     if isoform:
         model = replace(model, isoform=isoform)
+    if mutation:
+        model = replace(model, mutation=mutation)
     requests = model.parameter_requests(any_mode=any_mode)
     if not requests:
         return model, None

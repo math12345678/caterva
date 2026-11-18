@@ -25,7 +25,9 @@ dependencies = [
     "antimony==2.14.0",
     "python-libsbml==5.21.1",
     "numpy==2.2.6",
-    "scipy==1.15.3",
+    # Split by interpreter; the reason is beside the pin in requirements.txt.
+    "scipy==1.15.3; python_version < '3.11'",
+    "scipy==1.16.0; python_version >= '3.11'",
     "requests==2.34.2",
     "certifi==2026.10.19",
     "beautifulsoup4==4.15.0",
@@ -179,7 +181,7 @@ exclude = ["caterva.tests", "caterva.tests.*"]
 # (caterva/_literature/, copied from Tests/ by scripts/vendor_literature.py,
 # git-ignored) are flat modules imported by caterva.checkout, so they ship as
 # data beside the package rather than as a subpackage.
-caterva = ["core/data/*.json", "core/data/README.md", "enzymes/data/enzyme_index.json.gz", "enzymes/data/protein_names.json.gz", "enzymes/data/symbols.json", "enzymes/data/NOTICE.txt", "studio/static/*", "studio/static/**/*", "_literature/*.py", "_literature/README.txt"]
+caterva = ["core/data/*.json", "core/data/README.md", "enzymes/data/enzyme_index.json.gz", "enzymes/data/protein_names.json.gz", "enzymes/data/symbols.json", "enzymes/data/aliases.json", "enzymes/data/NOTICE.txt", "studio/static/*", "studio/static/**/*", "_literature/*.py", "_literature/README.txt"]
 
 [tool.setuptools.exclude-package-data]
 caterva = ["conftest.py", "pytest.ini", ".coverage"]

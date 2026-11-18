@@ -3,6 +3,8 @@
 **Last Updated:** August 9, 2026  
 **Focus:** Identifying and addressing backend bottlenecks
 
+> **Note, 2026-11-01.** Example queries here used SIR until this date; epidemiology and the other non-enzyme domains were archived on 2026-09-27, after v0.4.0 (the last release that runs them), so they now use Michaelis-Menten.
+
 ## Performance Profile
 
 ### Current Baseline (Measured with 404-test suite)
@@ -131,11 +133,11 @@ for (const point of streamedTrajectory) {
 **Optimization:** Build a proper parser
 
 ```
-query = "SIR with beta=0.5 gamma=0.1 S0=900"
+query = "michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51"
 ↓ [tokenize]
-[SIR, beta=0.5, gamma=0.1, S0=900]
+[michaelis, menten, km=0.5, vmax=2, s0=10, end=10, points=51]
 ↓ [parse]
-{ domain: "sir", overrides: { beta: 0.5, ... } }
+{ domain: "mm", overrides: { km: 0.5, vmax: 2, ... } }
 ```
 
 **Impact:** More accurate extraction, handles edge cases
@@ -201,7 +203,7 @@ const result = await workers.run('simulation', parameters);
 
 **Problem:** Python startup and bridging overhead
 
-**Optimization:** Compile certain domains to WASM (Lotka-Volterra, cell cycle)
+**Optimization:** Compile the deterministic ODE domains to WASM (Michaelis-Menten, competitive inhibition; the Lotka-Volterra and cell-cycle examples this line used to give were archived on 2026-09-27, after v0.4.0)
 
 ```
 deterministic ODE → Rust → WebAssembly → JavaScript
@@ -281,9 +283,9 @@ async function getCachedResult(query: string) {
 POST /api/simulate/batch
 {
   "queries": [
-    "SIR beta=0.5 gamma=0.1",
-    "predator-prey with p0=100",
-    "cell cycle dynamics"
+    "michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51",
+    "competitive inhibition km=2 ki=1 vmax=5 s0=10 i0=1 end=10 points=51",
+    "gillespie stochastic decay a0=200 k=0.5 end=5 seed=9"
   ]
 }
 
@@ -311,7 +313,7 @@ wrk -t4 -c100 -d30s \
 ```lua
 request = function()
   return wrk.format("POST", "/api/simulate", nil,
-    '{"query":"SIR beta=0.5 gamma=0.1 S0=900"}')
+    '{"query":"michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51"}')
 end
 ```
 
@@ -387,7 +389,7 @@ function archiveJob(job: Job) {
 import { resolveQuery } from "../src/lib/queryResolver";
 
 async function benchmark() {
-  const query = "SIR beta=0.5 gamma=0.1 S0=900";
+  const query = "michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51";
   
   const iterations = 1000;
   const start = performance.now();

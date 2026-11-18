@@ -5,23 +5,27 @@
  *
  * Caterva's promise is "ask a question, get a verified simulation". Measured
  * against the running API, that promise had a 0% success rate for any
- * question not containing CLI syntax:
+ * question not containing CLI syntax. In "simulate hexokinase with 10 mM
+ * glucose for 5 minutes" the substrate concentration and the duration are
+ * in the sentence, but the only extraction that existed read CLI syntax --
+ * "s0=10", "s0:10", "s0 10" (extractParameterOverrides in queryResolver.ts)
+ * -- so a number stated in prose was invisible, and the system demanded it
+ * back as a flag.
  *
- *   "model a covid-19 outbreak in a town of 10000 people"
- *     -> FAILED: "s0, i0, r0_recovered, end, points could not be resolved
- *                 from literature and were not supplied in the query."
- *
- * The population is in the sentence. The user said "a town of 10000 people".
- * The only extraction that existed read CLI syntax -- "s0=10000", "s0:10000",
- * "s0 10000" (extractParameterOverrides in queryResolver.ts) -- so a number
- * stated in prose was invisible, and the system demanded it back as a flag.
+ * (Note, 2026-11-01: the measurement that started this file used an
+ * epidemic question, "model a covid-19 outbreak in a town of 10000 people".
+ * Epidemiology was archived on 2026-09-27, after v0.4.0 (the last release
+ * that runs it), and the population, infected-count, cycle and generation
+ * patterns that served it and the other archived domains were removed
+ * from this file as dead code. The hexokinase sentence is the same gap on
+ * a live domain.)
  *
  * WHY THIS DOES NOT WEAKEN THE "NEVER INVENT" RULE
  *
  * It is the same rule, applied honestly. "Never invent" forbids Caterva
  * supplying a number nobody chose. It does not require ignoring a number the
- * user chose out loud. "A town of 10000 people" is the user specifying a
- * population as surely as "s0=10000" is; the difference is grammar, not
+ * user chose out loud. "10 mM glucose" is the user specifying a substrate
+ * concentration as surely as "s0=10" is; the difference is grammar, not
  * provenance. Both are origin "user".
  *
  * The rule this code must not break is the OTHER direction: never bind a
@@ -30,24 +34,23 @@
  * plausible trajectory for a question nobody asked. Every design choice
  * below is made against that risk:
  *
- *   - Every pattern is ANCHORED to an explicit noun ("people", "infected",
- *     "cycles") or an explicit unit ("mM", "days"). A bare number is never
- *     harvested. This is what stops "COVID-19" yielding 19 and
- *     "SARS-CoV-2" yielding 2, and it is the same lesson PARAMETER_PATTERN
+ *   - Every pattern is ANCHORED to an explicit unit ("mM", "minutes"). A
+ *     bare number is never harvested. This is what stops "CYP2D6" yielding
+ *     6 or "HK2" yielding 2, and it is the same lesson PARAMETER_PATTERN
  *     in queryResolver.ts already learned the hard way: an unanchored regex
  *     there once read "k" out of protein names like CDK1 and ERK2 and
  *     stamped the result origin "user".
  *   - Every extraction carries the SOURCE PHRASE that produced it, so a
- *     reader can audit "s0=9995 because you said 'a town of 10000 people'"
+ *     reader can audit "s0=10 because you said '10 mM glucose'"
  *     and catch a misreading rather than discovering it in the results.
  *   - Anything ambiguous is left alone for the existing refusal path, which
  *     already names what is missing and how to supply it. Extracting
  *     nothing is always a safe outcome here; extracting the wrong thing is
  *     not.
  *
- * WHAT IS DELIBERATELY NOT HERE: see the comment above TIME_UNITS for why
- * time is domain-aware, and the note on population for why "a town of N"
- * is a TOTAL rather than a susceptible count.
+ * WHAT IS DELIBERATELY NOT HERE: see the comment above DOMAIN_TIME_UNIT
+ * for why time is extracted only for domains whose time unit is
+ * established.
  */
 import { matchEnzyme, type EnzymeEntry } from "./enzymes";
 import type { SimulationDomain } from "./catervaRunner";
@@ -137,36 +140,31 @@ export const TIME_IN_SECONDS: Record<string, number> = {
 /**
  * The time unit each domain's `end` is expressed in.
  *
- * This is a real trap, not a formality. The two families disagree:
+ * Enzyme kinetics carries time in SECONDS. Vmax is mM/s and kcat is 1/s
+ * (queryResolver.ts's bridge messages state both), so an `end` of 10 means
+ * 10 seconds, and "over 5 minutes" is end=300.
  *
- *   - Epidemiology carries time in DAYS. gamma is 1/infectious_period_days
- *     (Tests/epidemiology_resolver.py stores `infectious_period_days`), so
- *     an `end` of 100 means 100 days.
- *   - Enzyme kinetics carries time in SECONDS. Vmax is mM/s and kcat is 1/s
- *     (queryResolver.ts's bridge messages state both), so an `end` of 10
- *     means 10 seconds.
- *
- * So "over 30 days" is end=30 for sir and end=2,592,000 for mm. Reading it
- * as 30 for both would silently simulate half a minute of an assay the user
- * asked to run for a month.
+ * The table used to carry a second unit, days, for the epidemiology
+ * domains, where "over 30 days" meant end=30. Those domains were archived
+ * on 2026-09-27, after v0.4.0 (the last release that runs them), and the
+ * days branch was removed on 2026-11-01 because nothing could reach it.
+ * Should a live domain ever measure time in another unit, it needs its
+ * own entry and conversion here, not a guess.
  *
  * Domains absent from this table get no time extraction at all. That is
  * deliberate: for a domain whose time unit has not been established here,
  * refusing is correct and guessing is not.
  */
-const DOMAIN_TIME_UNIT: Partial<Record<SimulationDomain, "seconds" | "days">> =
-  {
-    mm: "seconds",
-    mm_competitive_inhibition: "seconds",
-  };
+const DOMAIN_TIME_UNIT: Partial<Record<SimulationDomain, "seconds">> = {
+  mm: "seconds",
+  mm_competitive_inhibition: "seconds",
+};
 
 function timeToDomainUnit(
   seconds: number,
   domain: SimulationDomain,
 ): number | undefined {
-  const unit = DOMAIN_TIME_UNIT[domain];
-  if (unit === undefined) return undefined;
-  return unit === "seconds" ? seconds : seconds / 86400;
+  return DOMAIN_TIME_UNIT[domain] === "seconds" ? seconds : undefined;
 }
 
 /** A number, possibly decimal or with thousands separators stripped. */
@@ -176,68 +174,6 @@ function toNumber(raw: string): number | undefined {
   const n = Number.parseFloat(raw.replace(/,/g, ""));
   return Number.isFinite(n) ? n : undefined;
 }
-
-/**
- * Matches a pattern and returns the first capture plus the whole matched
- * text, so the caller keeps the phrase for provenance.
- */
-function firstMatch(
-  query: string,
-  pattern: RegExp,
-): { value: number; phrase: string } | undefined {
-  const m = pattern.exec(query);
-  if (!m) return undefined;
-  const value = toNumber(m[1]!);
-  if (value === undefined) return undefined;
-  return { value, phrase: m[0].trim() };
-}
-
-/**
- * How many people are already infected.
- *
- * Anchored on an infection noun, so an ordinary number elsewhere in the
- * sentence cannot become a case count.
- */
-const INFECTED_RE = new RegExp(
-  `\\b${NUM}\\s+(?:initial\\s+|initially\\s+)?(?:infected|infectious|cases|sick)\\b`,
-  "i",
-);
-
-/**
- * Total population.
- *
- * "a town of 10000 people", "population of 10000", "10000 people".
- *
- * NOTE THIS IS A TOTAL, NOT s0. In the engine's SIR, s0 is the SUSCEPTIBLE
- * count and N = s0 + i0 + r0_recovered (caterva/core/validation.py's
- * validate_sir_params checks exactly that sum). So "a town of 10000 people
- * with 5 infected" means N=10000, i0=5, and therefore s0=9995. Binding
- * s0=10000 would quietly simulate a town of 10005 -- not the town the user
- * described.
- */
-const POPULATION_RE = new RegExp(
-  `\\b(?:population|town|city|village|community|cohort|school|group)\\s+of\\s+${NUM}` +
-    `|\\b${NUM}\\s+(?:people|persons|individuals|residents|students|inhabitants)\\b`,
-  "i",
-);
-
-function matchPopulation(
-  query: string,
-): { value: number; phrase: string } | undefined {
-  const m = POPULATION_RE.exec(query);
-  if (!m) return undefined;
-  // Two alternatives, so the number is in whichever group matched.
-  const raw = m[1] ?? m[2];
-  if (raw === undefined) return undefined;
-  const value = toNumber(raw);
-  if (value === undefined) return undefined;
-  return { value, phrase: m[0].trim() };
-}
-
-const CYCLES_RE = new RegExp(`\\b${NUM}\\s+cycles?\\b`, "i");
-
-/** Wright-Fisher runs in discrete generations -- a count, not a duration. */
-const GENERATIONS_RE = new RegExp(`\\b${NUM}\\s+generations?\\b`, "i");
 
 /** A concentration with an EXPLICIT unit. Never a bare number. */
 const CONCENTRATION_RE = new RegExp(
@@ -407,25 +343,16 @@ const DURATION_RE = new RegExp(
  * safe outcome -- the caller's existing refusal path then asks for what is
  * missing, which is strictly better than a guess.
  *
- * Domain-aware because the same words mean different parameters: "10000
- * people" is a population for sir and for wright_fisher, but those are
- * different parameter names, and "30 days" is a different number in each.
+ * Domain-aware because a quantity only means something for a domain that
+ * takes it: concentrations bind to s0 and enzyme_conc for the two
+ * Michaelis-Menten domains, and a duration binds to `end` only where
+ * DOMAIN_TIME_UNIT knows the domain's time unit.
  */
 export function extractStatedQuantities(
   query: string,
   domain: SimulationDomain,
 ): StatedQuantity[] {
   const out: StatedQuantity[] = [];
-  const push = (
-    key: string,
-    hit: { value: number; phrase: string } | undefined,
-  ): void => {
-    if (hit) out.push({ key, value: hit.value, sourcePhrase: hit.phrase });
-  };
-
-
-
-
 
   if (domain === "mm" || domain === "mm_competitive_inhibition") {
     const enzyme = matchEnzyme(query);

@@ -1,0 +1,94 @@
+{
+  "_why": [
+    "ADR 0125's mutation table, re-derived as a set file against the code as it stands.",
+    "",
+    "The dashboard printed 0% for a failed run, an errored run, and a correct unsourced run.",
+    "The ADR protects four things in src/web/dashboard.html: the cell renders the value it is given",
+    "(C1), a run with no literature shows n/a and a sourced one shows its score (C2, C5, C6), each",
+    "failure path shows a dash rather than borrowing '0' (C3, C4), the score is not shown as a",
+    "percentage (C7), and the column header says it is a heuristic, not a probability (C8).",
+    "",
+    "Not a port of the earlier set: that one targeted a `literature` local and an `if (literature",
+    "=== 0) {` block. The dashboard now computes the cell in one ternary on",
+    "`result.metadata?.literatureSourcesUsed`, so those find strings occur zero times here, and the",
+    "two failure paths are told apart by the line after the dash (`time: job.duration || 0` for a",
+    "job that reported an error, `time: 0` for one that threw).",
+    "",
+    "C5 AND C6 CAME BACK NOT CAUGHT before 'n/a is chosen by the zero-literature condition, not",
+    "merely present' was added: the older assertions check that 'n/a' and 'literatureSourcesUsed'",
+    "each occur somewhere, which an inverted or mis-defaulted condition still satisfies.",
+    "2026-10-31: the sourced branch now prints `validationConfidence.toFixed(2)` on a 0-1 scale under",
+    "'Literature agreement (heuristic, not a probability)', matching scientificCLI.ts",
+    "literatureScoreLines. C2 and C7 were re-derived against that line; C8 is new.",
+    "",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0125-a-score-that-could-only-be-zero.json"
+  ],
+  "test": "npx jest src/web/__tests__/confidenceIsNotAZero.test.ts src/web/__tests__/dashboardParameterGate.test.ts",
+  "mutations": [
+    {
+      "id": "C1",
+      "description": "the cell forces a percentage again",
+      "_claimed": "caught",
+      "file": "src/web/dashboard.html",
+      "find": "<td>${result.confidence}</td>",
+      "replace": "<td>${result.confidence}%</td>"
+    },
+    {
+      "id": "C2",
+      "description": "the n/a branch is removed",
+      "_claimed": "caught",
+      "file": "src/web/dashboard.html",
+      "find": "confidence: (result.metadata?.literatureSourcesUsed ?? 0) === 0\n                            ? 'n/a'\n                            : result.validationConfidence.toFixed(2),",
+      "replace": "confidence: result.validationConfidence.toFixed(2),"
+    },
+    {
+      "id": "C3",
+      "description": "the failed-job path reuses '0'",
+      "_claimed": "caught",
+      "file": "src/web/dashboard.html",
+      "find": "confidence: '\\u2014',\n                        time: job.duration || 0,",
+      "replace": "confidence: '0',\n                        time: job.duration || 0,"
+    },
+    {
+      "id": "C4",
+      "description": "the errored (thrown) path reuses '0'",
+      "_claimed": "caught",
+      "file": "src/web/dashboard.html",
+      "find": "confidence: '\\u2014',\n                    time: 0,",
+      "replace": "confidence: '0',\n                    time: 0,"
+    },
+    {
+      "id": "C5",
+      "description": "the n/a condition is inverted: sourced runs get n/a, unsourced runs get 0.00",
+      "_claimed": "caught after the ternary assertion was added",
+      "file": "src/web/dashboard.html",
+      "find": "literatureSourcesUsed ?? 0) === 0",
+      "replace": "literatureSourcesUsed ?? 0) !== 0"
+    },
+    {
+      "id": "C6",
+      "description": "a run with no literature count is treated as sourced and shown a score",
+      "_claimed": "caught after the ternary assertion was added",
+      "file": "src/web/dashboard.html",
+      "find": "literatureSourcesUsed ?? 0) === 0",
+      "replace": "literatureSourcesUsed ?? 1) === 0"
+    },
+    {
+      "id": "C7",
+      "description": "the score is printed as a percentage again",
+      "_claimed": "caught",
+      "file": "src/web/dashboard.html",
+      "find": "                            : result.validationConfidence.toFixed(2),",
+      "replace": "                            : (result.validationConfidence * 100).toFixed(1) + '%',"
+    },
+    {
+      "id": "C8",
+      "description": "the column header goes back to a bare 'Confidence'",
+      "_claimed": "caught",
+      "file": "src/web/dashboard.html",
+      "find": ">Literature agreement (heuristic, not a probability)</th>",
+      "replace": ">Confidence</th>"
+    }
+  ]
+}

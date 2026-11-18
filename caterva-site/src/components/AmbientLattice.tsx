@@ -1,13 +1,13 @@
 /**
- * The page background: a live Lennard-Jones molecular dynamics simulation.
+ * The page background: decoration, drawn from a Lennard-Jones-shaped pair
+ * force (lib/md.ts says why that is not molecular dynamics).
  *
  * Bonds are drawn between particles inside the interaction cutoff, with
- * opacity falling off as the pair separates — so the lattice visibly forms,
- * strains and breaks as the system evolves. The cursor acts as a repulsive
- * body, which is the same pairwise force with the sign flipped.
+ * opacity falling off as the pair separates, so the lattice visibly forms,
+ * strains and breaks. The cursor pushes particles away.
  *
- * It runs at a deliberately low contrast. It is texture, not decoration, and
- * it should never compete with the text sitting on top of it.
+ * It runs at a deliberately low contrast. It is texture, and it should never
+ * compete with the text sitting on top of it.
  */
 
 import { useEffect, useRef } from 'react';
@@ -66,7 +66,7 @@ export default function AmbientLattice() {
       if (!s) return;
 
       if (!reduced) {
-        // The cursor repels, using the same pair force with the sign flipped.
+        // The cursor repels with a capped inverse-square push.
         const { x: mx, y: my } = mouseRef.current;
         if (mx > -9000) {
           for (let i = 0; i < s.n; i++) {

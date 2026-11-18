@@ -2,9 +2,9 @@
 
 Entirely offline via an injectable `fetch` function, matching every other
 resolver's test pattern in this project (see test_fallback_logic.py's
-html_provider, test_popgen_resolver.py's stdpopsim import guard). No real
-network call is exercised here -- see the module docstring for why this
-project's sandbox cannot live-verify the CORE API directly.
+html_provider). No real network call is exercised here -- see the module
+docstring for why this project's sandbox cannot live-verify the CORE API
+directly.
 """
 
 from __future__ import annotations
@@ -79,7 +79,7 @@ class TestResolveWithoutApiKey:
     def test_missing_key_never_raises(self, monkeypatch):
         """A missing key is a configuration fact, not an error -- this
         must degrade exactly like every other resolver's missing-
-        dependency case (stdpopsim not installed, etc.), never propagate
+        dependency case, never propagate
         an exception the caller has to catch specially."""
         monkeypatch.setattr(core_fulltext, "CORE_API_KEY", None)
         resolve_open_access_fulltext("anything")  # must not raise

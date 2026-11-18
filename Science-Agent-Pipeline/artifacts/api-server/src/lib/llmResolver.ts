@@ -1,4 +1,5 @@
 import { logger } from "./logger";
+import type { AutomaticChoice } from "./automaticChoice";
 import type { SimulationDomain } from "./catervaRunner";
 
 export interface EntityExtraction {
@@ -49,6 +50,26 @@ export interface EntityExtraction {
    * empty instead of assuming.
    */
   organismAssumed?: boolean;
+  /**
+   * Set by the CALLER when reading the query found it does not name ONE
+   * enzyme in ONE organism, so no lookup may be made for it
+   * (queryResolver's extractEntitiesFromQuery). Never sent to the runner:
+   * the resolver refuses before calling it, with this note as the reason.
+   */
+  extractionRefusal?: {
+    reason: "organism_ambiguous" | "ec_ambiguous" | "substrate_not_named" | "not_found";
+    note: string;
+  };
+  /**
+   * Names chosen while READING the query, before any lookup (ADR 0182):
+   * the organism (told the inhibitor and every constant the model needs),
+   * the substrate, the inhibitor, the enzyme a name is a few of. Set by the
+   * caller from compose's reading (sentenceReader.ts); each becomes a
+   * "<role> chosen:" flag, as a choice the runner makes does. Never sent.
+   */
+  choices?: AutomaticChoice[];
+  /** Compose's other sentences about the reading ("Read 'HK2' as ..."). Never sent. */
+  readNotes?: string[];
 }
 
 export interface LLMResolvedSimulation {

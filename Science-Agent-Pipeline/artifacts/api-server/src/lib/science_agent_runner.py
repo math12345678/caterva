@@ -74,6 +74,17 @@ Output JSON shape (success, quantity="km"):
 
 With quantity="ki" the value is emitted under "ki" instead of "km".
 
+Every output also carries "choices": the names this runner CHOSE because
+the payload left them empty (ADR 0182) -- the organism, the substrate, or
+for a Ki the inhibitor -- each as caterva.compose.defaults' Choice.to_json()
+({"role", "chosen", "why", "alternatives": [{"name", "rows"}], "considered"}),
+in the order chosen. A value found after a choice is BRENDA's row for exactly
+the chosen name; the client must state the choice beside it. When a name was
+needed and BRENDA holds nothing to choose it from, the answer is found=false
+with source "substrate_not_named", "inhibitor_not_named" or
+"organism_not_chosen" and "choiceRefusal", the sentence saying what is
+missing and what would fix it. See choose_missing().
+
 The citation's keys are camelCase, as `_citation_to_dict` writes them. This
 example said "reference_id" until 2026-09-30, and the TypeScript CLI, written
 against it, dropped every reference id the runner sent.
@@ -100,12 +111,10 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
 import enzyme_lookup
-import epidemiology_resolver
 import fallback_logic
 import reliability
 from fallback_logic import KineticResult
 import httpx
-import popgen_resolver
 
 
 def resolve_ec_number(enzyme_name: str, organism: str) -> str | None:
@@ -137,7 +146,9 @@ class EcAgreement:
     named: list = field(default_factory=list)
 
 
-def check_ec_against_name(enzyme_name: str, organism: str, ec_number: str) -> EcAgreement:
+def check_ec_against_name(
+    enzyme_name: str, organism: str, ec_number: str, ec_flag: str = "ecNumber",
+) -> EcAgreement:
     """Does this name contradict this EC number? Decided by the one finder.
 
     THE ONLY QUESTION ASKED IS WHETHER THE NAME CONTRADICTS THE NUMBER. The
@@ -169,7 +180,7 @@ def check_ec_against_name(enzyme_name: str, organism: str, ec_number: str) -> Ec
     """
     ec = str(ec_number).strip()
     try:
-        named = resolve_enzyme(enzyme_name, organism)
+        named = resolve_enzyme(enzyme_name, organism, ec_flag)
     except enzyme_lookup.EnzymeNameNotResolved as exc:
         if exc.kind == "ambiguous":
             if ec in exc.candidates:
@@ -184,9 +195,9 @@ def check_ec_against_name(enzyme_name: str, organism: str, ec_number: str) -> Ec
                 False, True,
                 f"The enzyme name and the EC number given are not the same "
                 f"enzyme: '{enzyme_name}' names {len(exc.candidates)} enzymes "
-                f"({listed}), and ecNumber {ec} is none of them. A number the "
+                f"({listed}), and {ec_flag} {ec} is none of them. A number the "
                 f"name contradicts is a citation for the wrong protein, so "
-                f"nothing was looked up. Re-run with ecNumber "
+                f"nothing was looked up. Re-run with {ec_flag} "
                 f"{exc.recommended or exc.candidates[0]} for '{enzyme_name}', "
                 f"or with the name of the enzyme EC {ec} is.",
                 list(exc.candidates), list(exc.named_candidates),
@@ -207,15 +218,15 @@ def check_ec_against_name(enzyme_name: str, organism: str, ec_number: str) -> Ec
         False, True,
         f"The enzyme name and the EC number given are not the same enzyme: "
         f"'{enzyme_name}' is {label} by {named.source}'s reading "
-        f"({named.how}), and ecNumber {ec} was given. A number the name "
+        f"({named.how}), and {ec_flag} {ec} was given. A number the name "
         f"contradicts is a citation for the wrong protein, so nothing was "
-        f"looked up. Re-run with ecNumber {named.ec} for '{enzyme_name}', "
+        f"looked up. Re-run with {ec_flag} {named.ec} for '{enzyme_name}', "
         f"or with the name of the enzyme EC {ec} is.",
         [named.ec], [candidate],
     )
 
 
-def resolve_enzyme(enzyme_name: str, organism: str):
+def resolve_enzyme(enzyme_name: str, organism: str, ec_flag: str = "ecNumber"):
     """Enzyme name -> `NameResolution`, or `EnzymeNameNotResolved` naming the candidates.
 
     THE SAME POLICY EVERY OTHER COMMAND USES, NOT A COPY OF IT
@@ -251,7 +262,7 @@ def resolve_enzyme(enzyme_name: str, organism: str):
         return enzyme_lookup.fetch_ec_numbers_by_name(name, None)
 
     return enzyme_lookup.resolve_name(
-        enzyme_name, None, organism=organism, fetch=uniprot, rerun="ecNumber {ec}"
+        enzyme_name, None, organism=organism, fetch=uniprot, rerun=f"{ec_flag} {{ec}}"
     )
 
 
@@ -284,8 +295,12 @@ def taxon_id_for(organism: str | None) -> str | None:
 
 
 def resolve_substrate_from_kegg(ec_number: str) -> str | None:
-    """Live substrate-name lookup for an EC number via KEGG, used to fill
-    in a substrate name when the caller didn't supply one -- which happens
+    """Live substrate-name lookup for an EC number via KEGG.
+
+    Since ADR 0182 this is only the FALLBACK of `choose_missing`, for a
+    checkout without caterva.compose.defaults; the chooser, which counts
+    BRENDA's own rows, is what fills an unnamed substrate. It used to fill
+    in a substrate name whenever the caller didn't supply one -- which happens
     whenever the enzyme name came from the free-text guess in
     queryResolver.ts rather than the hardcoded enzymes.ts list (that list
     bundles a substrate per entry; a live-resolved enzyme has none yet).
@@ -322,6 +337,344 @@ def resolve_substrate_from_kegg(ec_number: str) -> str | None:
     return substrates[0] if substrates else None
 
 
+#: How a refusal names each constant. The keys are the runner's quantities.
+_QUANTITY_LABEL = {"km": "Km", "kcat": "kcat", "ki": "Ki"}
+
+
+@dataclass
+class Filled:
+    """What `choose_missing` decided: the names to look up, and why.
+
+    `choices` are `Choice.to_json()` dicts (caterva/compose/defaults.py),
+    one per name this runner chose, in the order chosen. `refusal` is set
+    when a name was needed and BRENDA holds no row to choose it from; it is
+    the sentence the person reads, saying what is missing and what fixes it.
+    """
+
+    organism: str
+    substrate: str
+    choices: list = field(default_factory=list)
+    log: list = field(default_factory=list)
+    refusal: Optional[str] = None
+    refusal_source: Optional[str] = None
+
+
+def _chooser():
+    """caterva.compose.defaults, or None in a checkout that predates it.
+
+    Imported lazily and by name, so a runner on a tree without the chooser
+    keeps working (and says, in its log and in `choices`, that nothing was
+    chosen) instead of failing to start. Any other failure inside the
+    chooser -- BRENDA unreachable, a parse error -- is NOT caught here but in
+    `_ask_strictly`, and becomes a refusal saying the page could not be read:
+    a report, never a silent fall back to an unfiltered lookup, and never
+    "BRENDA lists no row" when BRENDA was not reached.
+    """
+    try:
+        from caterva.compose import defaults  # noqa: PLC0415
+    except ImportError:
+        return None
+    return defaults
+
+
+class ChooserUnreadable(Exception):
+    """BRENDA's page could not be read while choosing, so nothing was chosen.
+
+    Kept apart from "BRENDA lists no row": the chooser's functions return
+    None for BOTH unless asked with `strict=True`, and a refusal that said
+    "BRENDA lists no Km row for any substrate" while BRENDA was simply down
+    would be false advice -- the person would go and name another organism
+    for an enzyme that has hundreds of rows.
+    """
+
+
+def _ask_strictly(fn, *args, **kwargs):
+    """Call a chooser function so that an unreadable page RAISES.
+
+    `strict=True` is the real chooser's switch for that (it is not in the
+    shared contract's signature, so a chooser without it is called as the
+    contract gives it, and its None stays ambiguous). Any error inside is
+    re-raised as ChooserUnreadable, which `choose_missing` turns into a
+    refusal saying the page could not be read -- a report, never a
+    traceback, and never an unfiltered lookup.
+    """
+    import inspect  # noqa: PLC0415
+
+    try:
+        accepts_strict = "strict" in inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        accepts_strict = False
+    try:
+        if accepts_strict:
+            return fn(*args, strict=True, **kwargs)
+        return fn(*args, **kwargs)
+    except Exception as exc:  # noqa: BLE001 - said, as a refusal
+        raise ChooserUnreadable(f"{type(exc).__name__}: {exc}") from exc
+
+
+def _unreadable_refusal(role: str, ec_number: str, quantity: str, why: str) -> str:
+    return (
+        f"No {role} was named, and BRENDA's page for EC {ec_number} could not be "
+        f"read to choose one ({why}), so nothing was looked up. This says "
+        "nothing about whether BRENDA has rows: try again, name the "
+        f"{role}, or supply {quantity}= from your own measurement."
+    )
+
+
+def choose_missing(
+    ec_number: str,
+    organism: str,
+    substrate: str,
+    quantity: str,
+    model_substrate: Optional[str] = None,
+    *,
+    needs_kcat: bool = True,
+    allow_cross_species: bool = False,
+) -> Filled:
+    """Choose the organism and the substrate (or, for a Ki, the inhibitor)
+    the caller left empty, from BRENDA's own rows (ADR 0182).
+
+    WHY THIS REPLACED THE KEGG FILL
+    -------------------------------
+    An empty substrate used to mean "any substrate": KEGG's first listed
+    substrate (KEGG is off by default, ADR 0068, so in practice never), or
+    BRENDA's rows unfiltered -- the Km of whichever substrate's row came
+    first, with nothing in the result naming it. The API's language-model
+    path, the curated enzyme table and /simulate/parameterize all reached
+    that. Refusing instead (ADR 0178/0181) was honest, and left a student
+    who asked about "hexokinase in humans" with placeholders while BRENDA
+    held 25 measured glucose rows.
+
+    The owner's rule since ADR 0182: choose the best-measured real option,
+    run with its real, cited values, and say what was chosen, why, and what
+    else there was. The chooser is caterva.compose.defaults, the one the
+    engine's report uses, so the API and `caterva compose` choose alike.
+    Every name chosen comes back in `choices`; the value the lookup then
+    returns is a row for exactly that name, through the same row filter a
+    typed name goes through.
+
+    Order: the organism first (choose_organism, told the substrate or
+    inhibitor when one was named), then the substrate or inhibitor in that
+    organism -- so "the most measured substrate" is counted in the organism
+    the value will come from.
+
+    Without the chooser (a checkout predating it) the old fill is the
+    fallback, stated as a choice when it names something: KEGG's first
+    substrate. With nothing to fill from, the lookup is refused with
+    source "substrate_not_named", which is what the API answered for an
+    unnamed substrate before ADR 0182; a Ki with no inhibitor is refused
+    likewise ("inhibitor_not_named"). Neither ever runs unfiltered.
+    """
+    filled = Filled(organism=organism, substrate=substrate)
+    label = _QUANTITY_LABEL.get(quantity, "Km")
+    is_ki = quantity == "ki"
+    role = "inhibitor" if is_ki else "substrate"
+    if not ec_number or (organism and substrate):
+        return filled
+    chooser = _chooser()
+
+    if not organism:
+        if chooser is None:
+            # As before: the resolver refuses an empty organism by itself.
+            filled.log.append(
+                "No organism was named, and this checkout has no chooser "
+                "(caterva.compose.defaults), so none was chosen."
+            )
+        else:
+            try:
+                choice = _ask_strictly(
+                    chooser.choose_organism,
+                    ec_number,
+                    substrate=(model_substrate if is_ki else substrate) or None,
+                    inhibitor=(substrate if is_ki else None) or None,
+                    # What THIS lookup needs rows for: a Ki lookup an organism
+                    # with Ki rows (for the inhibitor, when named); a Km one
+                    # Km and, unless the caller says it needs none, kcat rows.
+                    needs=("ki",) if is_ki else (("km", "kcat") if needs_kcat else ("km",)),
+                )
+            except ChooserUnreadable as exc:
+                filled.refusal = _unreadable_refusal("organism", ec_number, quantity, str(exc))
+                filled.refusal_source = "organism_not_chosen"
+                return filled
+            if choice is None:
+                filled.refusal = (
+                    f"No organism was named, and BRENDA holds no {label} row for "
+                    f"EC {ec_number} in any organism"
+                    + (f" for {substrate}" if substrate else "")
+                    + ", so none could be chosen and nothing was looked up. "
+                    f"Supply {quantity}= from your own measurement, or name an "
+                    "organism and a " + role + " BRENDA lists for this enzyme."
+                )
+                filled.refusal_source = "organism_not_chosen"
+                return filled
+            filled.organism = choice.chosen
+            filled.choices.append(choice.to_json())
+            filled.log.append(f"organism chosen: {choice.chosen} -- {choice.why}")
+
+    if filled.substrate:
+        return filled
+    where = f" in {filled.organism}" if filled.organism else ""
+
+    if chooser is None:
+        if not is_ki:
+            kegg = resolve_substrate_from_kegg(ec_number)
+            if kegg:
+                filled.substrate = kegg
+                filled.choices.append({
+                    "role": "substrate",
+                    "chosen": kegg,
+                    "why": (
+                        f"KEGG lists it first among EC {ec_number}'s substrates; "
+                        "this checkout has no BRENDA chooser, so its rows were not counted"
+                    ),
+                    "alternatives": [],
+                    "considered": 0,
+                })
+                filled.log.append(f"substrate chosen: {kegg} -- KEGG's first substrate")
+                return filled
+        filled.log.append(
+            f"No {role} was named, and this checkout has no chooser "
+            "(caterva.compose.defaults), so none was chosen."
+        )
+        filled.refusal = (
+            f"No {role} was named, and a {label} is the constant of one "
+            f"{role}: nothing was looked up, because a lookup without one "
+            f"returns whichever {role}'s row comes first. Name the {role}, "
+            f"or supply {quantity}= from your own measurement."
+        )
+        filled.refusal_source = f"{role}_not_named"
+        return filled
+
+    def ask(organism_scope: Optional[str]):
+        if is_ki:
+            return _ask_strictly(
+                chooser.choose_inhibitor,
+                ec_number, organism_scope, substrate=model_substrate or None,
+            )
+        return _ask_strictly(
+            chooser.choose_substrate, ec_number, organism_scope, needs_kcat=needs_kcat,
+        )
+
+    try:
+        choice = ask(filled.organism or None)
+        # The caller opted in to cross-species values (ADR 0024) and the
+        # organism holds no row for any substrate: the substrate is then
+        # chosen from every organism's rows, said in the log and the
+        # choice's own `why`, and the lookup that follows labels the value
+        # it finds as cross-species exactly as it would for a typed name.
+        if choice is None and filled.organism and allow_cross_species:
+            choice = ask(None)
+            if choice is not None:
+                filled.log.append(
+                    f"No {role} of EC {ec_number} has a {label} row in {filled.organism}; "
+                    f"{choice.chosen} was chosen from every organism's rows, because "
+                    "cross-species values were allowed."
+                )
+    except ChooserUnreadable as exc:
+        filled.refusal = _unreadable_refusal(role, ec_number, quantity, str(exc))
+        filled.refusal_source = f"{role}_not_named"
+        return filled
+    if choice is None:
+        # What is missing, and what fixes it -- never a placeholder offered
+        # as if the literature had been consulted and agreed.
+        filled.refusal = (
+            f"No {role} was named, and BRENDA lists no {label} row for any "
+            f"{role} of EC {ec_number}{where}, so none could be chosen and "
+            "nothing was looked up. "
+            # With cross-species values allowed, every organism was already
+            # asked above, so "try another organism" would be false advice.
+            + (
+                "Another organism may hold rows: name one, or opt in to "
+                "cross-species values. "
+                if filled.organism and not allow_cross_species else ""
+            )
+            + f"Or supply {quantity}= from your own measurement."
+        )
+        filled.refusal_source = f"{role}_not_named"
+        return filled
+    filled.substrate = choice.chosen
+    filled.choices.append(choice.to_json())
+    filled.log.append(f"{role} chosen: {choice.chosen} -- {choice.why}")
+    return filled
+
+
+#: The kcat half of the last Km pair resolved (`resolve_kinetic_value`
+#: with paired=True). The Km call already computes it; /api/resolve's Vmax
+#: advice reads it so it can say, before any enzyme concentration is
+#: stated, whether a kcat exists to multiply one by (sixth round, XS5R2-05).
+_LAST_PAIRED_KCAT: dict = {}
+
+
+def _paired_kcat_summary(kcat: Any) -> Optional[dict]:
+    """What the kcat half of a Km pair came to, in the not-found fields'
+    names, so the TypeScript side reads it as it reads a kcat lookup."""
+    if kcat is None:
+        return None
+    found = bool(getattr(kcat, "found", False)) and getattr(kcat, "value", None) is not None
+    out = {
+        "found": found,
+        "source": getattr(kcat, "source", None),
+    }
+    if found:
+        out["kcat"] = kcat.value
+        out["citation"] = _citation_to_dict(getattr(kcat, "citation", None))
+        return out
+    out.update({
+        "crossSpeciesOrganismsAvailable": getattr(kcat, "cross_species_organisms_available", None),
+        "crossSpeciesVariantOnly": list(getattr(kcat, "cross_species_variant_only", []) or []),
+        "crossSpeciesIsozymeOnly": list(getattr(kcat, "cross_species_isozyme_only", []) or []),
+        "variantCandidatesAvailable": getattr(kcat, "variant_candidates_available", None),
+        "variantIsozymesOnly": bool(getattr(kcat, "variant_isozymes_only", False)),
+        "implausibleValues": getattr(kcat, "implausible_values", None),
+        "isoformsAvailable": getattr(kcat, "isoforms_available", None),
+    })
+    return out
+
+
+def _isozyme_notice(ec_number: Optional[str], organism: Optional[str],
+                    isoform: Optional[str], substrate: Optional[str],
+                    km: Any, kcat: Any) -> Optional[dict]:
+    """Which protein of a multi-protein EC the model's constants are, in
+    `caterva compose`'s words (caterva.enzymes.isozyme.notice_for_model).
+
+    Compose and the Studio said "EC 2.7.1.1 is 5 human proteins ... the model
+    is of GCK"; the API and the TypeScript CLI said only "the row's UniProt
+    accession (P35557) is GCK", so a reader got glucokinase's 6.3 mM for
+    "hexokinase" with no word that HK1 and HK2 were not modelled (sixth
+    round, XS5R2-04). The same function decides it here, from the same rows.
+    None when there is nothing to say, or it cannot be said."""
+    if km is None or not getattr(km, "found", False):
+        return None
+    try:
+        from types import SimpleNamespace
+
+        from caterva.enzymes.isozyme import notice_for_model
+    except Exception:  # noqa: BLE001 - a checkout without the module says nothing
+        return None
+
+    def measured(result: Any) -> Any:
+        return SimpleNamespace(
+            commentary=getattr(result, "commentary", None),
+            row_isoform=getattr(result, "row_isoform", None),
+            resolver_because=getattr(result, "chosen_because", None),
+            citation=None,
+        )
+
+    rows = {"reaction_Km": measured(km)}
+    if kcat is not None and getattr(kcat, "found", False):
+        rows["reaction_kcat"] = measured(kcat)
+    model = SimpleNamespace(subject=ec_number, organism=organism, isoform=isoform or None,
+                            substrate=substrate, measured=rows)
+    try:
+        notice = notice_for_model(model)
+    except Exception:  # noqa: BLE001
+        return None
+    if notice is None:
+        return None
+    return {"headline": notice.headline, "detail": notice.detail,
+            "remedy": notice.remedy, "summary": notice.summary}
+
+
 def resolve_kinetic_value(
     enzyme_name: str,
     substrate: str,
@@ -333,8 +686,16 @@ def resolve_kinetic_value(
     isoform: Optional[str] = None,
     inhibition_mode: Optional[str] = None,
     model_substrate: Optional[str] = None,
+    paired: bool = False,
 ) -> KineticResult:
     """Thin wrapper around the real fallback logic in Tests/fallback_logic.py.
+
+    ``paired`` (a Km or a kcat for a model that needs both): the two are
+    resolved together by fallback_logic.resolve_kinetic_pair, which takes
+    them from one paper when some paper holds a row of each among the rows
+    each choice is made from, and this call returns the half asked for. The
+    Km call and the kcat call each compute the same pair from the same page,
+    so the API carries the pair `caterva compose` does (ADR 0182).
 
     ``quantity`` selects which BRENDA table is read ("km" -> KM Values,
     "ki" -> Ki Values). One call resolves exactly one quantity, so Km and
@@ -355,6 +716,22 @@ def resolve_kinetic_value(
     owns nothing. Defaulting it True here would silently re-enable the
     behaviour ADR 0024 disabled, in a file nobody would think to check.
     """
+    _LAST_PAIRED_KCAT.clear()
+    if paired and quantity in ("km", "kcat") and substrate:
+        km, kcat = fallback_logic.resolve_kinetic_pair(
+            ec_number,
+            organism,
+            substrate,
+            enzyme_name=enzyme_name,
+            allow_cross_species=allow_cross_species,
+            allow_variants=allow_variants,
+            isoform=isoform,
+            inhibition_mode=inhibition_mode,
+            model_substrate=model_substrate,
+        )
+        if quantity == "km":
+            _LAST_PAIRED_KCAT["result"] = kcat
+        return km if quantity == "km" else kcat
     return fallback_logic.resolve_kinetic_value(
         enzyme_ec=ec_number,
         organism=organism,
@@ -437,7 +814,7 @@ def _resolved_effectors_dict(effectors):
         return [e.model_dump() for e in effectors]
 
 
-def _row_scope(commentary):
+def _row_scope(commentary, requested_isoform=None):
     """{isoform, inhibitionMode, versus, kitzWilson} from a BRENDA row's
     commentary, or None when there is no commentary.
 
@@ -459,8 +836,23 @@ def _row_scope(commentary):
     except ImportError:
         return None
     row = read_row(commentary)
-    return {"isoform": row.isoform, "inhibitionMode": row.mode, "versus": row.versus,
-            "kitzWilson": row.kitz_wilson}
+    out = {"isoform": row.isoform, "inhibitionMode": row.mode, "versus": row.versus,
+           "kitzWilson": row.kitz_wilson}
+    # Whether the row's isoform IS the one the request names, by
+    # caterva.bind.core.same_isoform: the comparison the resolver filtered
+    # the rows by, which also asks UniProt whether two names are one protein.
+    # The TypeScript side had only a regex mirror of it, which called BRENDA's
+    # "hexokinase II" row (ref 702867) "not HK2, a different protein's
+    # constant" for the query "HK2 with glucose" (adversarial round,
+    # 2026-11-11). Absent when either side names no isoform.
+    if requested_isoform and row.isoform:
+        try:
+            from caterva.bind.core import same_isoform
+        except ImportError:
+            same_isoform = None
+        if same_isoform is not None:
+            out["sameIsoformAsRequested"] = bool(same_isoform(row.isoform, requested_isoform))
+    return out
 
 
 def _mechanism_evidence_dict(evidence):
@@ -564,8 +956,8 @@ def _reliability_dict(result, requested_organism: str, physiological=None) -> di
 def _ensure_caterva_path() -> str:
     """Ensure caterva/ directory is in sys.path for validation imports.
 
-    Returns the Caterva directory path. This is shared by vmax and beta_gamma bridges
-    to avoid duplicating the import setup logic.
+    Returns the Caterva directory path. Kept as its own function so the
+    vmax bridge's import setup is written once.
     """
     import pathlib
     import sys
@@ -590,8 +982,8 @@ def bridge_vmax_from_kcat(kcat: float, enzyme_conc: float) -> tuple[float, bool,
     ``core.data_structures``) WITHOUT executing caterva/__init__.py's
     full antimony-dependent import chain, which the public
     ``caterva_engine`` entry point requires just to expose one
-    pure-arithmetic function. This keeps every non-kcat lookup (km, ki,
-    mutation_rate) free of an antimony dependency it never needed.
+    pure-arithmetic function. This keeps every non-kcat lookup (km, ki)
+    free of an antimony dependency it never needed.
 
     Returns (vmax, ok, flagged, flag_reason_or_error). ``ok=False`` means
     the inputs were rejected (non-finite/non-positive); the caller must
@@ -606,53 +998,16 @@ def bridge_vmax_from_kcat(kcat: float, enzyme_conc: float) -> tuple[float, bool,
     return vmax, True, result.flagged, result.flag_reason
 
 
-def bridge_beta_gamma_from_r0(
-    r0: float, infectious_period_days: float
-) -> tuple[float, float, bool, bool, str | None]:
-    """Compute (beta, gamma) = R0/infectious-period bridge via the SAME
-    implementation the SIR engine itself uses
-    (caterva.core.validation.beta_gamma_from_r0), imported the same
-    lightweight way bridge_vmax_from_kcat() reaches vmax_from_kcat -- as
-    ``core.validation`` with caterva/ (not the Caterva package root) on
-    sys.path, never executing caterva/__init__.py's antimony-dependent
-    chain. See ADR 0017 for the resolver, ADR 0020 for this bridge.
-
-    Returns (beta, gamma, ok, flagged, flag_reason_or_error).
-    """
-    _ensure_caterva_path()
-    from core import validation as caterva_validation  # noqa: PLC0415
-
-    beta, gamma, result = caterva_validation.beta_gamma_from_r0(
-        r0, infectious_period_days
-    )
-    if not result.ok:
-        return 0.0, 0.0, False, False, "; ".join(result.errors)
-    return beta, gamma, True, result.flagged, result.flag_reason
-
-
-def resolve_popgen_parameter(param_type: str, organism: str) -> dict | None:
-    """Resolve a population genetics parameter from literature.
-    
-    Args:
-        param_type: Parameter type (e.g., 'mutation_rate')
-        organism: Organism name
-        
-    Returns:
-        Dict with value, unit, citation info, or None if not found.
-    """
-    if param_type == 'mutation_rate':
-        result = popgen_resolver.resolve_mutation_rate(organism)
-        if not result.found:
-            return None
-        return {
-            'value': result.value,
-            'unit': result.unit,
-            'source': result.source,
-            'citation': result.citation,
-            'organism': result.organism,
-            'doi': result.doi,
-        }
-    return None
+#: Parameter types that belonged to domains archived on 2026-09-27
+#: (archive/legacy_domains/README.md): population genetics asked for
+#: `mutation_rate`, epidemiology for `disease_parameters`. Their resolvers
+#: are no longer on this path. A request for one is answered found=false
+#: with a source that says why, rather than falling through to the enzyme
+#: path and being refused for a missing enzyme name it was never about.
+RETIRED_PARAMETER_TYPES: dict[str, str] = {
+    "mutation_rate": "population genetics",
+    "disease_parameters": "SIR / SEIR epidemiology",
+}
 
 
 def _citation_to_dict(citation) -> Dict[str, Any] | None:
@@ -685,6 +1040,102 @@ def _candidates_to_dict(candidates) -> list:
     ]
 
 
+def _available_in_the_organism(result, ec: str, quantity: str, compound: str,
+                               organism: str, isoform) -> str | None:
+    """`caterva compose`'s clause for a constant whose compound has no row in
+    the organism searched: the compounds that DO have rows there, counted,
+    and where the compound's own rows are. The API listed "indomethacin,
+    nimesulide" for human COX-2 with no organism or count, where compose said
+    that in Homo sapiens only nimesulide (1 row) has Ki rows (fifth round's
+    review, V7-08). None when there is no list, no organism, or the page
+    cannot be read."""
+    if (getattr(result, "source", None) not in ("not_found", "literature_candidates")
+            or not result.substrates_available
+            or not ec or not organism or quantity not in ("km", "kcat", "ki")):
+        return None
+    try:
+        from caterva.compose.__main__ import _what_the_organism_holds  # noqa: PLC0415
+
+        clause = _what_the_organism_holds(
+            ec, quantity, compound or None, organism,
+            "inhibitor" if quantity == "ki" else "substrate", isoform=isoform)
+    except Exception:  # noqa: BLE001 - the resolver's whole-page list stands
+        return None
+    return clause.lstrip(" -").strip() or None
+
+
+def _naming_the_enzyme(candidates, enzyme_name: str, ec: str, isoform,
+                       organism: str = "") -> list:
+    """The candidate papers whose title names the enzyme: by the name the
+    caller gave, the isoform, or the EC number's accepted or other names.
+
+    PubMed is searched on the compound's and the enzyme's words, and returns
+    papers on either: human COX-2's missing celecoxib Ki was offered
+    "Celecoxib is an inhibitor of enzyme acetylcholinesterase" as a paper
+    that may report it (fifth round's review, V7-08). A title that does not
+    name the enzyme is not offered. Every candidate is kept when no name can
+    be read for the enzyme."""
+    import re  # noqa: PLC0415
+
+    def norm(text: str) -> str:
+        return " " + re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).strip() + " "
+
+    names = {enzyme_name, isoform}
+    try:
+        from caterva.enzymes.index import load_index  # noqa: PLC0415
+
+        index = load_index()
+        entry = index.get(ec) if ec else None
+        if entry is not None:
+            names |= {entry.name, *entry.alternative_names}
+        if entry is not None and organism:
+            from caterva.enzymes.index import organism_code  # noqa: PLC0415
+
+            # UniProt's names for the organism's protein(s): "Cyclooxygenase-2"
+            # and "COX-2" are PTGS2's, not the EC number's.
+            proteins, _ = index.proteins_in(ec, organism_code(organism))
+            for protein in proteins:
+                if not isoform or isoform in (protein.gene, protein.symbol) or isoform in protein.names:
+                    names |= set(protein.names)
+    except Exception:  # noqa: BLE001 - the caller's own name still filters
+        pass
+    keys = {norm(n) for n in names if isinstance(n, str) and len(n.strip()) >= 3}
+    keys.discard("  ")
+    if not keys:
+        return list(candidates or [])
+    return [c for c in candidates or [] if any(k in norm(getattr(c, "title", "")) for k in keys)]
+
+
+def _canonical_organism(organism: str, log: list[str]) -> str:
+    """The organism as BRENDA indexes it: "humans" -> "Homo sapiens".
+
+    BRENDA files rows by binomial, and this runner passed the typed name
+    straight through. So "hexokinase on glucose in humans" was refused
+    with "BRENDA holds this km only for other organisms (... Homo sapiens
+    ...)": the organism asked for, listed as somebody else's, and a cited
+    6 mM (BRENDA ref 641068) withheld from the reader who asked for it.
+
+    Read by caterva.enzymes.index.organism_binomial, the one normaliser
+    every caller shares, so "human" means the same organism here as it
+    does to `caterva enzymes` and the finder. A name it does not hold, or a
+    strain more specific than the binomial, is passed through unchanged:
+    canonicalising is not guessing, and widening "E. coli K-12" to the
+    species would be. The rewrite is logged so it is never silent.
+    """
+    if not organism:
+        return organism
+    try:
+        from caterva.enzymes.index import organism_binomial  # noqa: PLC0415
+    except ImportError as exc:  # pragma: no cover - caterva is on PYTHONPATH in every caller
+        log.append(f"organism {organism!r} used as typed: caterva.enzymes unavailable ({exc})")
+        return organism
+    binomial = organism_binomial(organism)
+    if binomial is None or binomial == organism:
+        return organism
+    log.append(f"organism {organism!r} read as {binomial} (caterva.enzymes.index)")
+    return binomial
+
+
 def main() -> None:
     try:
         raw = sys.stdin.read()
@@ -703,6 +1154,13 @@ def main() -> None:
         # answer to a question nobody finished asking.
         organism = payload.get("organism") or ""
         ec_number = payload.get("ecNumber", "")
+        #: How the caller's own interface spells "give the EC number", for
+        #: the re-run a refusal recommends. The API's request field is
+        #: `ecNumber`; the CLI's flag is `--ec`, and an LDH ambiguity told a
+        #: CLI user to "re-run with ecNumber 1.1.1.27" -- a flag the CLI does
+        #: not have. Only the two real spellings are accepted: this text is
+        #: printed as an instruction, so it is not a free-form field.
+        ec_flag = "--ec" if payload.get("ecFlag") == "--ec" else "ecNumber"
         parameter_type = payload.get("parameterType", "")
         quantity = payload.get("quantity", "km")
         if quantity not in ("km", "ki", "kcat"):
@@ -742,132 +1200,25 @@ def main() -> None:
         #: the caller states, never assumed here (ADR 0012/0013).
         physiological = _parse_physiological(payload)
         resolution_log: list[str] = []
+        organism = _canonical_organism(organism, resolution_log)
 
-        # Handle population genetics parameter resolution
-        if parameter_type == "mutation_rate":
-            popgen_result = resolve_popgen_parameter("mutation_rate", organism)
-            if popgen_result is None:
-                print(
-                    json.dumps(
-                        {
-                            "ok": True,
-                            "found": False,
-                            "source": "popgen_not_found",
-                            "literatureCandidates": [],
-                            "logs": [
-                                f"No literature value found for mutation_rate in '{organism}'"
-                            ],
-                        }
-                    )
-                )
-                return
+        if parameter_type in RETIRED_PARAMETER_TYPES:
+            domain = RETIRED_PARAMETER_TYPES[parameter_type]
             print(
                 json.dumps(
                     {
                         "ok": True,
-                        "found": True,
-                        "km": popgen_result["value"],  # Reuse km field for the value
-                        "ki": None,
-                        "unit": popgen_result["unit"],
-                        "organism": popgen_result["organism"],
-                        "source": "popgen_literature",
-                        "crossSpecies": False,
-                        "assayConditions": {},
-                        "citation": {
-                            "source": popgen_result["source"],
-                            "referenceId": popgen_result["doi"],
-                            "url": f"https://doi.org/{popgen_result['doi']}" if popgen_result['doi'] else None,
-                            "title": popgen_result["citation"],
-                        },
+                        "found": False,
+                        "source": "domain_archived",
                         "literatureCandidates": [],
-                        "logs": [*resolution_log, f"Resolved mutation_rate from literature: {popgen_result['citation']}"],
+                        "logs": [
+                            f"parameterType '{parameter_type}' belongs to {domain}, "
+                            "archived on 2026-09-27 (archive/legacy_domains/). "
+                            "Release v0.4.0 still resolves it."
+                        ],
                     }
                 )
             )
-            return
-
-        # Handle epidemiology parameter resolution (ADR 0017 / ADR 0020):
-        # a disease name resolves to a hand-curated (R0, infectious period)
-        # golden tuple, then bridges to the SIR engine's own (beta, gamma)
-        # via the exact same beta_gamma_from_r0() the engine uses. Only
-        # diseases in the registry resolve; everything else is an honest
-        # found=False, never a fabricated R0.
-        if parameter_type == "disease_parameters":
-            disease = payload.get("disease", "")
-            epi_result = epidemiology_resolver.resolve_disease_parameters(disease)
-            if not epi_result.found:
-                print(
-                    json.dumps(
-                        {
-                            "ok": True,
-                            "found": False,
-                            "source": "epidemiology_not_found",
-                            "literatureCandidates": [],
-                            "logs": epi_result.search_log,
-                        }
-                    )
-                )
-                return
-
-            beta, gamma, bg_ok, bg_flagged, bg_reason = bridge_beta_gamma_from_r0(
-                epi_result.r0, epi_result.infectious_period_days
-            )
-            output = {
-                "ok": True,
-                "found": True,
-                "disease": epi_result.disease,
-                "r0": epi_result.r0,
-                "infectiousPeriodDays": epi_result.infectious_period_days,
-                "organism": None,
-                "source": epi_result.source,
-                "crossSpecies": False,
-                "assayConditions": {},
-                "citation": {
-                    "source": epi_result.source,
-                    "referenceId": epi_result.pmid,
-                    "url": f"https://doi.org/{epi_result.doi}" if epi_result.doi else None,
-                    "title": epi_result.citation,
-                },
-                # ADR 0169: a cross-study composite carries BOTH sources
-                # and must surface flagged, never verified. The secondary
-                # citation is the serial-interval half; omitting it would
-                # present a two-paper number as if one paper supported it.
-                "crossStudyComposite": epi_result.cross_study_composite,
-                "compositeNote": epi_result.composite_note,
-                "secondaryCitation": (
-                    {
-                        "source": epi_result.source,
-                        "referenceId": epi_result.secondary_pmid,
-                        "url": (
-                            f"https://doi.org/{epi_result.secondary_doi}"
-                            if epi_result.secondary_doi
-                            else None
-                        ),
-                        "title": epi_result.secondary_citation,
-                    }
-                    if epi_result.secondary_pmid
-                    else None
-                ),
-                "betaGammaValidation": {
-                    "ok": bg_ok,
-                    "flagged": bg_flagged,
-                    "reason": bg_reason,
-                },
-                "literatureCandidates": [],
-                "logs": epi_result.search_log,
-            }
-            if bg_ok:
-                output["beta"] = beta
-                # "gamma" here, NOT "gamma_rate" -- gamma_rate is only the
-                # Antimony-emitted model-string name (ADR 0004); the
-                # Python/TS API surface takes "gamma".
-                output["gamma"] = gamma
-                output["logs"] = output["logs"] + [
-                    f"Bridged beta={beta:g}, gamma={gamma:g} from R0="
-                    f"{epi_result.r0:g} and infectious_period="
-                    f"{epi_result.infectious_period_days:g} days."
-                ]
-            print(json.dumps(output))
             return
 
         if not ec_number:
@@ -876,7 +1227,7 @@ def main() -> None:
                     "enzymeName or ecNumber is required to resolve real enzyme parameters"
                 )
             try:
-                named = resolve_enzyme(enzyme_name, organism)
+                named = resolve_enzyme(enzyme_name, organism, ec_flag)
             except enzyme_lookup.EnzymeNameNotResolved as exc:
                 if exc.kind == "lookup_failed":
                     # UniProt could not be asked: an error, as it always was,
@@ -932,18 +1283,12 @@ def main() -> None:
                    else "the enzyme nomenclature: " + named.how + ".")
             )
             resolution_log.extend(named.cautions)
-            if not substrate:
-                kegg_substrate = resolve_substrate_from_kegg(ec_number)
-                if kegg_substrate:
-                    substrate = kegg_substrate
-                    resolution_log.append(
-                        f"Resolved substrate '{substrate}' for EC {ec_number} via KEGG."
-                    )
-                else:
-                    resolution_log.append(
-                        f"No KEGG substrate found for EC {ec_number}; "
-                        "BRENDA lookup will be unfiltered by substrate."
-                    )
+            # NO SUBSTRATE IS NO LONGER FILLED HERE. This branch used to
+            # take KEGG's first substrate, or send BRENDA's rows unfiltered,
+            # and say so only in the log -- and only when the EC came from
+            # the name: an EC sent with no substrate skipped even that and
+            # went unfiltered. Both paths now meet `choose_missing` below,
+            # which picks the best-measured real substrate and says so.
 
         elif enzyme_name:
             # Both arrived. The number is used only when the name does not
@@ -952,7 +1297,7 @@ def main() -> None:
             # than resolved in the number's favour. Silent when they agree:
             # the common case must stay silent, or the refusal is worthless
             # (test_one_candidate_is_not_an_ambiguity).
-            agreement = check_ec_against_name(enzyme_name, organism, ec_number)
+            agreement = check_ec_against_name(enzyme_name, organism, ec_number, ec_flag)
             if not agreement.agrees:
                 print(
                     json.dumps(
@@ -972,6 +1317,32 @@ def main() -> None:
             if not agreement.checked:
                 resolution_log.append(agreement.note)
 
+        # What the caller did not name, chosen from BRENDA's own rows and
+        # reported as a choice (ADR 0182). Before the lookup, so the row
+        # filter applies to the chosen name exactly as to a typed one.
+        filled = choose_missing(
+            ec_number, organism, substrate, quantity, model_substrate,
+            needs_kcat=payload.get("needsKcat") is not False,
+            allow_cross_species=allow_cross_species,
+        )
+        resolution_log.extend(filled.log)
+        if filled.refusal is not None:
+            print(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "found": False,
+                        "source": filled.refusal_source,
+                        "choices": filled.choices,
+                        "choiceRefusal": filled.refusal,
+                        "literatureCandidates": [],
+                        "logs": resolution_log,
+                    }
+                )
+            )
+            return
+        organism, substrate = filled.organism, filled.substrate
+
         result = resolve_kinetic_value(
             enzyme_name, substrate, organism, ec_number,
             quantity=quantity,
@@ -980,6 +1351,10 @@ def main() -> None:
             isoform=isoform,
             inhibition_mode=inhibition_mode,
             model_substrate=model_substrate,
+            # A Michaelis-Menten model needs a Km and a kcat (Vmax = kcat *
+            # [E]0); a caller that needs only the Km says so with
+            # needsKcat: false, and its Km is chosen on its own.
+            paired=payload.get("needsKcat") is not False,
         )
         result.search_log = resolution_log + result.search_log
 
@@ -1035,7 +1410,7 @@ def main() -> None:
                 # What that commentary says, decided HERE by the same parser
                 # `caterva bind` and `caterva compose` use, so the TypeScript
                 # side reports it rather than re-deriving it (ADR 0027).
-                "rowScope": _row_scope(getattr(result, "commentary", None)),
+                "rowScope": _row_scope(getattr(result, "commentary", None), isoform),
                 # A row that is evidence against the model's mechanism for
                 # the Ki returned: BRENDA ref 739793's "noncompetitive
                 # versus pyruvate" row, for a competitive pyruvate model
@@ -1097,6 +1472,24 @@ def main() -> None:
                     result.selected_form.model_dump()
                     if result.selected_form else None
                 ),
+                # Why this row was carried (the median of the best-described
+                # rows, what was set aside, the paired constant's paper) and
+                # whether the rows chosen from span more than 100-fold.
+                "chosenBecause": result.chosen_because,
+                "wideSpread": bool(result.wide_spread),
+                # What the carried row IS, beyond its value: "the row is a
+                # K0.5 with a Hill coefficient of 1.8, not a Michaelis-Menten
+                # Km", "the row's UniProt accession (P35557) is GCK". Compose
+                # and the Studio said these; the API and the TypeScript CLI
+                # printed a plain Km (third round's review).
+                "rowNotes": list(getattr(result, "row_notes", None) or []),
+                # Which protein of a multi-protein EC this is (XS5R2-04).
+                "isozymeNotice": (_isozyme_notice(
+                    ec_number, organism, isoform, substrate, result,
+                    _LAST_PAIRED_KCAT.get("result")) if quantity == "km" else None),
+                # The kcat half of the pair, for the Vmax advice (XS5R2-05).
+                "pairedKcat": (_paired_kcat_summary(_LAST_PAIRED_KCAT.get("result"))
+                               if quantity == "km" else None),
                 "selectionTie": (
                     result.selection_tie.model_dump()
                     if result.selection_tie else None
@@ -1166,6 +1559,10 @@ def main() -> None:
                 "citation": _citation_to_dict(result.citation),
                 "literatureCandidates": _candidates_to_dict(result.literature_candidates),
                 "logs": result.search_log,
+                # Every name this runner chose because the caller did not
+                # give one (ADR 0182), in the order chosen. The value above
+                # is the row for exactly that name; the client states it.
+                "choices": filled.choices,
             }
 
             # ADR 0019: a resolved kcat plus a caller-supplied enzyme
@@ -1212,10 +1609,25 @@ def main() -> None:
                         # get them -- the miss becomes unactionable at the
                         # API boundary even though the resolver knew.
                         "crossSpeciesOrganismsAvailable": result.cross_species_organisms_available,
+                        # Those whose every row measured a protein variant:
+                        # opting into another organism would not fill the
+                        # constant there either (fifth round's review, V7-04).
+                        "crossSpeciesVariantOnly": list(
+                            getattr(result, "cross_species_variant_only", []) or []),
+                        # Of those, the ones whose rows each name an isozyme
+                        # (XS5R2-03): said as isozymes, not variants.
+                        "crossSpeciesIsozymeOnly": list(
+                            getattr(result, "cross_species_isozyme_only", []) or []),
                         # Which variants were found and withheld. A refusal
                         # that cannot name what it refused leaves the opt-in
                         # it demands unexercisable.
                         "variantCandidatesAvailable": result.variant_candidates_available,
+                        # Every withheld row names an isozyme (XS5R2-03).
+                        "variantIsozymesOnly": bool(getattr(result, "variant_isozymes_only", False)),
+                        # Every row's value, when each is outside the
+                        # physically plausible range (source
+                        # "implausible_withheld"): named, never used.
+                        "implausibleValues": result.implausible_values,
                         # Which isoforms the rows measured, when the one
                         # asked for is not among them.
                         "isoformsAvailable": result.isoforms_available,
@@ -1231,9 +1643,22 @@ def main() -> None:
                         # so "lactate" matches by substring and "L-lactate"
                         # returns nothing at all.
                         "substratesAvailable": result.substrates_available,
+                        # The same list said for the organism searched, with
+                        # row counts, in `caterva compose`'s words, so the
+                        # API's advice and compose's agree (fifth round's
+                        # review, V7-08). None when it cannot be said.
+                        "availableInTheOrganism": _available_in_the_organism(
+                            result, ec_number, quantity, substrate, organism, isoform),
                         "relatedness": [v.model_dump() for v in result.relatedness],
-                        "literatureCandidates": _candidates_to_dict(result.literature_candidates),
+                        "literatureCandidates": _candidates_to_dict(_naming_the_enzyme(
+                            result.literature_candidates, enzyme_name, ec_number, isoform,
+                            organism)),
                         "logs": result.search_log,
+                        # A refusal for a chosen name is a refusal of THAT
+                        # name, and the client has to be able to say so.
+                        "choices": filled.choices,
+                        "pairedKcat": (_paired_kcat_summary(_LAST_PAIRED_KCAT.get("result"))
+                                       if quantity == "km" else None),
                     }
                 )
             )

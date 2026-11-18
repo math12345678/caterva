@@ -747,10 +747,16 @@ export default function CliApp() {
             notifications and publishes a feed; both work today.
           */}
           <TerminalWindow path="~ &mdash; updates" glow>
+            {/*
+              Corrected 2026-11-01: this promised that "the next release"
+              would carry the structure and molecular dynamics tools on the
+              main branch. v0.6.0 already carries them (its caterva/app.py
+              registers prepare, md, analyze, bind, complex and fep).
+            */}
             <p className="text-fg/70 text-[13px] mb-5 leading-relaxed">
-              The next release will carry the structure and molecular dynamics
-              tools that are on the main branch today. GitHub will tell you
-              when it is out.
+              {RELEASE_TAG} carries the enzyme kinetics, structure and
+              molecular dynamics tools. GitHub will tell you when the next
+              release is out.
             </p>
             <ol className="space-y-2 text-[12px] text-fg/76 mb-5 list-decimal pl-5">
               <li>

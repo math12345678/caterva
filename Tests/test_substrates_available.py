@@ -4,12 +4,15 @@ THE MEASUREMENT
 ---------------
 Through the real resolver, on the LDH fixture:
 
-    substrate="lactate"    -> found=True, 10.73
-    substrate="L-lactate"  -> found=False, source="not_found"
+    substrate="lactate"      -> found=True, 10.73
+    substrate="lactic acid"  -> found=False, source="not_found"
 
 Both name the same compound. BRENDA's label is `(S)-lactate`: "lactate"
-matches as a substring, "L-lactate" does not. A student reasonably concludes
-BRENDA has no lactate dehydrogenase data, and the data is right there.
+matches it, "lactic acid" does not. A student reasonably concludes BRENDA has
+no lactate dehydrogenase data, and the data is right there. (This read
+"lactic acid" until the third round of the real-values review, when
+`compound_names` made "lactic acid" and "(S)-lactate" one compound -- the same
+molecule, by a curated list, never a PubChem synonym set.)
 
 ADR 0024 already fixed this for ORGANISMS — a withheld cross-species result
 names which organisms held values, "so the opt-in can actually be
@@ -67,7 +70,7 @@ def ask(substrate: str, organism: str = "Homo sapiens") -> KineticResult:
 
 
 def test_the_synonym_that_missed_now_says_what_the_table_holds():
-    result = ask("L-lactate")
+    result = ask("lactic acid")
     assert not result.found
     assert result.source == "not_found"
     assert "(S)-lactate" in result.substrates_available, (
@@ -80,20 +83,20 @@ def test_the_substring_that_worked_still_works():
     """The pair is the point: one string resolves and its synonym does not,
     which is what makes the miss so misleading."""
     assert ask("lactate").found
-    assert not ask("L-lactate").found
+    assert not ask("lactic acid").found
 
 
 def test_nothing_is_substituted():
     """A list, not a match.
 
-    Silently resolving "L-lactate" to the `(S)-lactate` row would return a
+    Silently resolving "lactic acid" to the `(S)-lactate` row would return a
     measurement of a compound the student did not name, on the reasoning
     that the names look similar — ADR 0024's cross-species error in another
     costume. `expand_substrates_with_synonyms` exists and was deliberately
     not wired here: a PubChem synonym list can carry a salt, a stereoisomer
     or an ester, and any of those is a different molecule.
     """
-    result = ask("L-lactate")
+    result = ask("lactic acid")
     assert result.value is None
     assert result.found is False
 
@@ -143,7 +146,7 @@ def test_the_suppression_guard_is_tested_where_it_lives():
     assert present == [], "the substrate was present; there is nothing to suggest"
     assert log == [], "and nothing should have been said about it"
 
-    absent = _nothing_matched(LDH, "L-lactate", ldh_provider(), KM_TABLE_LABEL, log)
+    absent = _nothing_matched(LDH, "lactic acid", ldh_provider(), KM_TABLE_LABEL, log)
     assert "(S)-lactate" in absent, "the helper must still fire on a real miss"
 
 
@@ -192,7 +195,7 @@ def test_the_diagnostic_reparse_cannot_turn_a_miss_into_a_crash():
         raise RuntimeError("connection reset while re-reading the table")
 
     result = resolve_kinetic_value(
-        LDH, "Homo sapiens", "L-lactate",
+        LDH, "Homo sapiens", "lactic acid",
         html_provider=fails_on_the_second_read,
         uniprot_provider=fake_uniprot_provider,
         taxon_id_provider=fake_taxon_id_provider,
@@ -254,7 +257,7 @@ class TestTheListMustComeFromTheTableItNames:
         substrate list would send them round the same loop.
         """
         result = resolve_kinetic_value(
-            LDH, "Homo sapiens", "L-lactate",
+            LDH, "Homo sapiens", "lactic acid",
             html_provider=ldh_provider(),
             uniprot_provider=fake_uniprot_provider,
             taxon_id_provider=fake_taxon_id_provider,
@@ -283,12 +286,19 @@ def test_an_enzyme_whose_table_is_empty_says_nothing_rather_than_an_empty_list()
 
 
 def test_the_log_names_the_labels_and_refuses_to_substitute():
-    joined = " ".join(ask("L-lactate").search_log)
+    joined = " ".join(ask("lactic acid").search_log)
     assert "(S)-lactate" in joined
     assert "does not substitute one substrate for another" in joined
 
 
-@pytest.mark.parametrize("substrate", ["L-lactate", "lactic acid", "L-lactic acid"])
+def test_an_acid_named_with_its_stereo_form_is_its_anion():
+    """"L-lactic acid" is (S)-lactate: an acid and its anion are one compound
+    (compound_names, fourth round of the real-values review), so the search
+    finds the rows rather than advising a respelling."""
+    assert ask("L-lactic acid").found
+
+
+@pytest.mark.parametrize("substrate", ["lactic acid"])
 def test_the_aliases_a_student_would_plausibly_type_all_get_help(substrate):
     """Three spellings of the same compound, none of which BRENDA uses.
 

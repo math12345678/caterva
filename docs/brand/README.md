@@ -14,6 +14,7 @@ the reading that matters. Everything else follows from that ratio.
 | [`caterva-mark-on-ink.svg`](caterva-mark-on-ink.svg) | the mark for ink or dark grounds |
 | [`favicon.svg`](favicon.svg) | the mark on a paper tile, for browser tabs |
 | [`social-preview.png`](social-preview.png) | 1280 x 640, for GitHub's social preview and link cards |
+| [`caterva_ai_architecture.png`](caterva_ai_architecture.png) | 3703 x 4320, the science-agent architecture diagram from before the rename: it is titled *Terrium*, and its guard and test counts are that day's, not current ones |
 
 The site's copies (favicon, touch and PWA icons, social image) live in
 `Science-Agent-Pipeline/artifacts/caterva-landing/public/`. The mark's

@@ -235,10 +235,31 @@ export const ENZYMES: EnzymeEntry[] = [
   },
 ];
 
+/**
+ * `pattern` matched only as whole words.
+ *
+ * The patterns were tested as substrings, and the first entry that matched
+ * won: /trypsin/ matched inside "chymotrypsin", so every chymotrypsin query
+ * was answered with trypsin's EC 3.4.21.4 and a trypsin substrate's Km,
+ * cited to the trypsin page (found 2026-11-11). The abbreviations were worse
+ * still: /ache/ is in "headache", /sod/ in "episode", /acc/ in
+ * "accumulate". A name is a word or words, so it matches only where no
+ * letter or digit touches it on either side.
+ */
+const bounded = new Map<EnzymeEntry, RegExp>();
+function wholeWords(entry: EnzymeEntry): RegExp {
+  let re = bounded.get(entry);
+  if (!re) {
+    re = new RegExp(`(?<![a-z0-9])(?:${entry.pattern.source})(?![a-z0-9])`, "i");
+    bounded.set(entry, re);
+  }
+  return re;
+}
+
 export function matchEnzyme(query: string): EnzymeEntry | undefined {
   const lower = query.toLowerCase();
   for (const entry of ENZYMES) {
-    if (entry.pattern.test(lower)) {
+    if (wholeWords(entry).test(lower)) {
       return entry;
     }
   }

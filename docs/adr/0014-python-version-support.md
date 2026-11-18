@@ -141,3 +141,34 @@ verification.
 - `CONTRIBUTING.md` — the eigenvector-sign incident, the worked example of a
   numerical library failing silently across builds.
 - `Makefile` — `check-python` / `require-pytest`, which enforce the window.
+
+## Note (2026-10-31): scipy is pinned per interpreter
+
+The Amendment above names `scipy` 1.15.3 as the pin for the whole window. It
+no longer is. `requirements.txt` and `pyproject.toml` now pin
+`scipy==1.15.3; python_version < "3.11"` and
+`scipy==1.16.0; python_version >= "3.11"`.
+
+**Why.** On macOS 27.0.1, 1.15.3's cp313 arm64 wheel fails `import
+scipy.sparse.linalg` (and so `scipy.optimize`) in dlopen with "section
+'__DATA/__thread_bss' has a zero-fill section type, but offset field is not
+zero", which stops steady-state analysis and influence ranking. Reproduced in
+a scratch venv on 2026-10-31: 1.15.2 fails the same way, and 1.16.0 is the
+first release after 1.15.3 that imports there (each of 1.16.0–1.18.0 was
+tried); the record is the comment above the pins in `requirements.txt`.
+1.16.0 declares `Requires-Python >=3.11` on PyPI and publishes no cp310
+wheels, so 3.10 keeps 1.15.3.
+
+**Untested.** Python 3.10 on macOS 27 is untested: no 3.10 interpreter was
+available, so whether 1.15.3's cp310 wheel shows the same dlopen failure is
+unknown.
+
+**Guard.** `scripts/check_python_support_claim.py` kept its own copy of the
+pins and still said 1.15.3, so `--online` never looked at 1.16.0. It now reads
+the pins and their `python_version` markers from `requirements.txt`, checks
+each pin's wheels only for the versions its marker selects, and fails offline
+unless each window dependency is pinned exactly once per supported version
+(`--selftest` proves those failures fire). `--online` on 2026-10-31: scipy
+1.15.3 publishes cp310–cp313 (needs cp310), scipy 1.16.0 publishes cp311–cp313
+(needs cp311–cp313); libroadrunner 2.8.0, numpy 2.2.6 and python-libsbml
+5.21.1 cover cp310–cp313, and antimony 2.14.0 is version-agnostic.

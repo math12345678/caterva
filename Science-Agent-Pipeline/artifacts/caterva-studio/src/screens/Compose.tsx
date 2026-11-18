@@ -17,10 +17,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { attachAssistantCalls } from "@/api/assistant";
+import type { RerunPatch } from "@/api/choices";
 import { apiJson, apiPost } from "@/api/client";
 import { isCompleteEc, subjectFields } from "@/api/enzymes";
 import { plain } from "@/lib/copy";
-import type { ComposeAnalyses, ComposeRequest, NormaliseOrganismResponse, ShapesResponse } from "@/api/types";
+import type { ComposeAnalyses, ComposeRequest, NormaliseOrganismResponse, RunRecord, ShapesResponse } from "@/api/types";
 import { useRun } from "@/api/useRun";
 import { DescribeAssist, type DescribeUse } from "@/components/assistant/DescribeAssist";
 import { Disclosure } from "@/components/forms/Disclosure";
@@ -118,8 +119,13 @@ export function composeRequest(f: ComposeForm): ComposeRequest {
   for (const key of ["organism", "substrate", "inhibitor", "isoform"] as const) {
     if (f[key].trim()) request[key] = f[key].trim();
   }
-  // The engine is sent the EC number the person chose, never the text they typed.
-  if (isCompleteEc(f.subject)) request.subject = f.subject.trim();
+  // The EC number the person chose; else the name they typed and did not click, as typed. Dropping that name sent
+  // a run with no subject: it kept placeholders while the form showed "hexokinase" in the enzyme field, and nothing
+  // said it had been ignored. The engine reads a name by the same policy as `caterva compose --subject`
+  // (caterva/compose/__main__.py read_subject): exactly one enzyme is used and the report says how it was read;
+  // several are refused naming each, and ComposeResult offers them to choose from.
+  const subject = isCompleteEc(f.subject) ? f.subject.trim() : f.subjectSeed.trim() || f.subject.trim();
+  if (subject) request.subject = subject;
   if (f.any_mode) request.any_mode = true;
   if (f.no_simulate) request.no_simulate = true;
   if (f.no_analysis) request.no_analysis = true;
@@ -147,6 +153,27 @@ export function composeRequest(f: ComposeForm): ComposeRequest {
     if (steps !== undefined) request.sweep.steps = steps;
   }
   return request;
+}
+
+/** The help under the Substrate and Inhibitor fields: blank is a question Caterva answers, and says how (ADR 0182). */
+export const SUBSTRATE_HINT = "Leave blank: Caterva picks the best-measured one from BRENDA and tells you which, why, and what else there was.";
+export const INHIBITOR_HINT =
+  "Leave blank: Caterva picks the best-measured one from BRENDA and tells you (for a mechanism with an inhibition step).";
+export const ORGANISM_HINT =
+  "Leave blank: Caterva picks the organism BRENDA has the most measurements for and tells you. A measurement from another organism than the model's is always labelled as one.";
+
+/**
+ * The form for running a finished run again with some fields set: the run's own request (not whatever the form
+ * holds now, which may have been edited since), with the patch on top. A new enzyme or organism clears the
+ * isoform, which names a protein of the old one.
+ */
+export function rerunForm(request: Record<string, unknown>, patch: RerunPatch): ComposeForm {
+  const next = composeForm(request);
+  if (patch.subject !== undefined) Object.assign(next, subjectFields(patch.subject), { isoform: "" });
+  if (patch.organism !== undefined) Object.assign(next, { organism: patch.organism, isoform: "" });
+  if (patch.substrate !== undefined) next.substrate = patch.substrate;
+  if (patch.inhibitor !== undefined) next.inhibitor = patch.inhibitor;
+  return next;
 }
 
 /** The form a stored request was made from: the inverse of composeRequest. */
@@ -234,6 +261,16 @@ export default function ComposeScreen() {
     );
   };
   const chooseEnzyme = (ec: string) => setForm((f) => ({ ...f, subject: ec, subjectSeed: "", isoform: "" }));
+  // A chip of "Caterva chose ..." or the mismatch warning's button: the same request with that field set, run at
+  // once (the person already chose by clicking; filling the form and waiting for a second click would only
+  // add a step), and the form shows the request that is running.
+  const rerun = (record: RunRecord, patch: RerunPatch) => {
+    if (running) return;
+    const next = rerunForm(record.request, patch);
+    setForm(next);
+    setOrganismNote(null);
+    void run.submit(composeRequest(next));
+  };
   const chosen = ANALYSES.filter((a) => form.analyses[a.key]).length + (form.robustness ? 1 : 0) + (form.stochastic ? 1 : 0);
 
   const formPane = (
@@ -269,10 +306,11 @@ export default function ComposeScreen() {
           onChange={(ec) => setForm((f) => ({ ...f, subject: ec, subjectSeed: "", ...(ec === f.subject ? {} : { isoform: "" }) }))}
           organism={form.organism}
           seed={form.subjectSeed}
-          hint="A name, an abbreviation or an EC number. With one chosen, Km, kcat and Ki are searched in BRENDA; without one the model keeps labelled placeholders."
+          onQueryChange={(typed) => setForm((f) => (f.subject !== "" || f.subjectSeed === typed ? f : { ...f, subjectSeed: typed }))}
+          hint="A name, an abbreviation or an EC number. With one chosen, Km, kcat and Ki are searched in BRENDA. A name typed but not chosen is sent as typed: one enzyme is used and the report says how it was read; several are offered to choose from. With none, the model keeps labelled placeholders."
           error={err("subject")}
         />
-        <Field label="Organism" optional hint={organismNote ?? "Never inferred; a measurement in another organism is never substituted."} error={err("organism")}>
+        <Field label="Organism" optional hint={organismNote ?? ORGANISM_HINT} error={err("organism")}>
           <TextInput
             value={form.organism}
             onChange={(e) => {
@@ -283,7 +321,7 @@ export default function ComposeScreen() {
            
           />
         </Field>
-        <Field label="Substrate" optional error={err("substrate")}>
+        <Field label="Substrate" optional hint={SUBSTRATE_HINT} error={err("substrate")}>
           <TextInput value={form.substrate} onChange={(e) => set("substrate", e.target.value)} />
         </Field>
         <Field
@@ -295,7 +333,7 @@ export default function ComposeScreen() {
           <TextInput value={form.isoform} onChange={(e) => set("isoform", e.target.value)} />
         </Field>
         <IsoformChooser ec={form.subject} organism={form.organism} value={form.isoform} onChange={(v) => set("isoform", v)} />
-        <Field label="Inhibitor" optional error={err("inhibitor")}>
+        <Field label="Inhibitor" optional hint={INHIBITOR_HINT} error={err("inhibitor")}>
           <TextInput value={form.inhibitor} onChange={(e) => set("inhibitor", e.target.value)} />
         </Field>
         <Checkbox
@@ -393,9 +431,10 @@ export default function ComposeScreen() {
             idle={
               <EmptyState title="Describe a mechanism, not a pathway">
                 <p>
-                  A shape such as a cascade, a toggle switch or competitive inhibition. Name an enzyme, an organism
-                  and a substrate to have its constants looked up: each one then carries its BRENDA reference, and
-                  anything not found stays a placeholder that says why.
+                  A shape such as a cascade, a toggle switch or competitive inhibition. Name an enzyme to have its
+                  constants looked up in BRENDA: each one then carries its reference. Leave the substrate, inhibitor
+                  or organism blank and Caterva picks the best-measured one and says which; anything BRENDA has no
+                  row for stays a placeholder that says why.
                 </p>
                 <p className="muted">
                   The verdict comes first: what the model can answer, and the worst thing wrong with it.
@@ -403,7 +442,9 @@ export default function ComposeScreen() {
               </EmptyState>
             }
           >
-            {(result, record) => <ComposeResultView result={result} run={record} onChooseEnzyme={chooseEnzyme} />}
+            {(result, record) => (
+              <ComposeResultView result={result} run={record} onChooseEnzyme={chooseEnzyme} onRerun={(patch) => rerun(record, patch)} />
+            )}
           </KineticsRun>
         }
       />

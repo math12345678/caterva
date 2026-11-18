@@ -15,7 +15,9 @@ it again.
 `.skip` is the quieter one. Sometimes it is right: three suites here skip
 when the Python engine is genuinely absent, because 40 hard failures for a
 missing system library are noise rather than signal. That is the same call
-`Tests/test_popgen_resolver.py` makes with `pytest.importorskip`.
+`pytest.importorskip` makes for an optional import (the example here was
+`Tests/test_popgen_resolver.py` until 2026-11-01, when it moved to
+`archive/legacy_domains/tests/`).
 
 But Stage 10 Part 21 recorded what that leaves behind: a clean skip is
 invisible in a CI summary, so a whole domain's tests can stop running for

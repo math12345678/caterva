@@ -294,8 +294,9 @@ def test_every_resource_the_shell_loads_is_copied_into_the_bundle():
 
 
 def test_every_statement_of_the_minimum_macos_says_14():
-    """NumPy 2.2.6 and SciPy 1.15.3 are macosx_14_0 wheels, libRoadRunner 2.8.0
-    macosx_14_0_universal2: the app cannot run on 13, whatever the plist said."""
+    """NumPy 2.2.6 and SciPy (1.16.0 on the app's Python 3.12; 1.15.3 only below
+    3.11) are macosx_14_0 wheels, libRoadRunner 2.8.0 macosx_14_0_universal2:
+    the app cannot run on 13, whatever the plist said."""
     data = plistlib.loads(studio_app.render_info_plist(TEMPLATE, "1.2.3", "1"))
     assert studio_app.MIN_MACOS == data["LSMinimumSystemVersion"] == "14.0"
     assert "majorVersion: 14, minorVersion: 0" in SWIFT["Requirement.swift"]

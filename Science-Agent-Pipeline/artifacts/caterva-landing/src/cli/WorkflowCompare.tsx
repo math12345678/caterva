@@ -12,16 +12,21 @@
 // describes the WORK instead, which is verifiable by anyone who has done
 // it.
 //
-// The Caterva side keeps a number because that one is measurable, and was
-// measured end-to-end through POST /api/simulate on 2026-09-05:
+// The Caterva side no longer claims one either. It said "under 30
+// seconds (measured)", from three runs through POST /api/simulate on
+// 2026-09-05:
 //
 //   hexokinase (live BRENDA lookup)        28.3 s
 //   covid-19 SIR (local disease registry)   2.6 s
 //   seasonal influenza                      2.0 s
 //
-// "Under 30 seconds" is stated as the upper bound those runs support, not
-// as a typical figure -- the enzyme path is slow because it makes a real
-// network call to BRENDA, which is the point of it.
+// Two of the three are SIR/influenza domains, archived on 2026-09-27, so
+// the range described a product that no longer ships. What is left is one
+// enzyme run, on a code path two months older than this page, against a
+// live BRENDA whose latency is not Caterva's. One sample is not a bound,
+// and the repository holds no newer timing of an enzyme query, so the
+// figure is withdrawn rather than re-stated. Re-measure before restoring
+// it, and record the runs here.
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import TerminalWindow from "./TerminalWindow";
@@ -80,10 +85,10 @@ const WITH_CATERVA: Step[] = [
       "RK4 integration validated against closed-form solutions, an independent integrator, or a physical invariant, depending on the domain. Every resolved parameter carries its citation.",
   },
   {
-    icon: "\u26A1",
-    label: "Time: under 30 seconds",
+    icon: "\u23F1\uFE0F",
+    label: "Time: not yet measured",
     detail:
-      "From question to citable result. Measured 2.0-28.3 s across enzyme-kinetics and epidemiology queries; the enzyme path is the slow one because it makes a live BRENDA call.",
+      "From question to citable result. The enzyme path makes a live BRENDA call, so it waits on BRENDA; it has not been timed on the current code, so no figure is given.",
   },
 ];
 
@@ -216,9 +221,7 @@ export default function WorkflowCompare() {
             className={`mt-5 pt-4 border-t border-fg/[0.08] flex items-center justify-between text-[10px]`}
           >
             <span className="text-fg/66 font-mono">
-              {activeTab === "without"
-                ? "4 steps \u2022 3 tools"
-                : "4 steps \u2022 1 tool \u2022 under 30 s (measured)"}
+              {`${steps.length} steps`}
             </span>
             <span
               className={`font-mono ${

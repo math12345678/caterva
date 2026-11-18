@@ -117,6 +117,16 @@ _WILD_TYPE_RE = re.compile(
     re.IGNORECASE,
 )
 
+#: A value stated relative to the wild type's: "10fold higher than
+#: wild-type", "2-fold lower than that of the wild-type enzyme",
+#: "compared to wild-type".
+_RELATIVE_TO_WILD_TYPE_RE = re.compile(
+    r"\b(?:\d+(?:\.\d+)?\s*-?\s*fold\s+)?(?:higher|lower|increased|decreased|reduced|greater"
+    r"|smaller)\s+(?:than|compared\s+(?:to|with))\s+(?:that\s+of\s+|those\s+of\s+)?(?:the\s+)?"
+    r"wild[\s-]?type\b",
+    re.IGNORECASE,
+)
+
 #: A named isozyme or isoform: "isozyme H4", "isoform 2".
 #:
 #: An isozyme is not a mutant -- it is a distinct gene product, wild-type in
@@ -202,6 +212,24 @@ def classify(commentary: str | None) -> VariantVerdict:
                 "Substitutions are usually chosen because they change the "
                 "kinetics, so this number is not a property of the "
                 "wild-type enzyme."
+            ),
+        )
+
+    # "10fold higher than wild-type thymidylate synthase" (ref 692639, a
+    # K48Q row whose twin says "mutant K48Q"): a value stated against the
+    # wild type is a variant's, though the words "wild-type" appear (fifth
+    # round of the real-values review).
+    relative = _RELATIVE_TO_WILD_TYPE_RE.search(text)
+    if relative:
+        evidence = relative.group(0)
+        return VariantVerdict(
+            status="variant",
+            kind="mutant",
+            evidence=evidence,
+            recombinant=recombinant,
+            reason=(
+                f"The commentary says {evidence!r}: the value is stated against "
+                "the wild type's, so the row measured a variant, not the wild type."
             ),
         )
 

@@ -14,6 +14,15 @@ python examples/python_integration.py
 node examples/nodejs_integration.js
 ```
 
+`runs.csv` is sample output, not an example to run: what `caterva ssa`
+writes with `--out`, for the catalogue's replicates line
+(`src/cli/domainCatalogue.ts`). Columns `time,a,b`, one row per event plus
+the initial row and the final row snapped to `--end`. It is byte-identical to
+
+```bash
+python -m caterva.cli ssa --a0 100 --k 0.1 --end 50 --seed 1 --out runs.csv
+```
+
 ## These are checked, not decorative
 
 `scripts/check_commands_runnable.py` and

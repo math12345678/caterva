@@ -1,0 +1,103 @@
+version: '3.8'
+
+# Run from the repository root:
+#
+#   docker-compose -f deploy/monitoring/docker-compose-monitoring.yml up -d
+#
+# Compose resolves every relative path below against THIS file's directory,
+# not the shell's: the build context is two levels up (the repository root,
+# where the Dockerfile is) and the config mounts are this directory's
+# siblings. These files sat at the root until 2026-10-31, when `.` meant both.
+
+services:
+  # Caterva API Server
+  caterva:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    ports:
+      # Loopback only, as in the root docker-compose.yml: the API has no
+      # authentication (scripts/check_port_binding.py reads this file too).
+      - "127.0.0.1:3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # Without this the job store is written to /app, beside the volume
+      # rather than in it, and is lost with the container.
+      - CATERVA_JOBS_FILE=/app/data/caterva-jobs.jsonl
+    volumes:
+      - caterva_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      # Prometheus has no login either.
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      # prometheus.yml names `prometheus-rules.yml` under rule_files, which
+      # Prometheus resolves beside the config file. It was never mounted, so
+      # the alert rules this stack documents could not load.
+      - ./prometheus-rules.yml:/etc/prometheus/prometheus-rules.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Grafana - Dashboards & Visualization
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      # Grafana. Loopback only, like the other two.
+      - "127.0.0.1:3001:3000"
+    environment:
+      # No default: this was `=admin`, Grafana's own default, so anyone who
+      # reached the port was an administrator. Compose now refuses to start
+      # until it is set, e.g. in deploy/monitoring/.env (not committed):
+      #   GRAFANA_ADMIN_PASSWORD=<a password of your own>
+      # Grafana applies it only when its database is first created; on an
+      # existing grafana_data volume, change it with `grafana cli admin
+      # reset-admin-password` inside the container.
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD (see deploy/monitoring/docker-compose-monitoring.yml)}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
+      - ./grafana-dashboard.json:/etc/grafana/provisioning/dashboards/caterva.json
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  caterva_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  default:
+    driver: bridge

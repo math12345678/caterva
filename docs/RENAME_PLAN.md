@@ -52,10 +52,11 @@ the name. König's reaction is evidence about the effect, and it is
 independent of how carefully the name was derived. Both facts are true at
 once: coined independently, and colliding anyway.
 
-README.md says "The project was called Terrium until 2026-09-27, too close to Tellurium's name; it has been Caterva since." That remains the
-right thing to say publicly — it addresses the collision, which is real.
-This section addresses the derivation, which is different, and belongs in
-front of an attorney alongside it.
+README.md says the project "was called Terrium until 2026-09-27, a name too
+close to Tellurium's". That remains the right thing to say publicly — it
+addresses the collision, which is real. This section addresses the
+derivation, which is different, and belongs in front of an attorney
+alongside it.
 
 **Give both to the lawyer.** The spec is dated, internal, and predates the
 incident, which is exactly the kind of document that is worth much more

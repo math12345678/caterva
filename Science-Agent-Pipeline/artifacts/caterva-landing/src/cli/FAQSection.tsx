@@ -6,17 +6,24 @@ import {
 } from "@/components/ui/accordion";
 import Reveal from "./Reveal";
 import TerminalWindow from "./TerminalWindow";
+import { RELEASE_TAG } from "@/lib/domains";
 
 // Rewritten 2026-09-29 against the repository. The previous answers
 // described a hosted "platform" with pilot spots, a waitlist "typically 1-2
 // weeks", planned paid tiers, a private repository and fifteen domains. The
 // repository is public, nothing is priced, and the non-enzyme
 // domains were archived on 2026-09-27.
+//
+// Corrected 2026-11-01: two answers placed prepare, md, analyze, bind,
+// complex and fep "on the main branch". v0.6.0 (published 2026-10-28)
+// registers all six in caterva/app.py, so the answers name RELEASE_TAG.
+// "the v0.4.0 release still runs them" stays: that tag was cut before the
+// non-enzyme domains were moved, and a download of it still runs them.
 const FAQS = [
   {
     id: "what-is-caterva",
     q: "What is Caterva?",
-    a: "Free, open-source software (Apache-2.0) for enzyme kinetics and molecular dynamics, run on your own machine. `caterva compose` builds an enzyme model from a one-line description and looks up Km, kcat and Ki in BRENDA, giving each value's reference, organism and assay conditions; a constant it cannot find stays a labelled placeholder. `caterva sim` runs exact stochastic kinetics. On the main branch, `prepare`, `md`, `analyze`, `bind`, `complex` and `fep` audit a structure, set up GROMACS, analyse the trajectories and hold a binding free energy to a cited Ki.",
+    a: `Free, open-source software (Apache-2.0) for enzyme kinetics and molecular dynamics, run on your own machine. \`caterva compose\` builds an enzyme model from a one-line description and looks up Km, kcat and Ki in BRENDA, giving each value's reference, organism and assay conditions; a constant it cannot find stays a labelled placeholder. \`caterva sim\` runs exact stochastic kinetics. In ${RELEASE_TAG}, \`prepare\`, \`md\`, \`analyze\`, \`bind\`, \`complex\` and \`fep\` audit a structure, set up GROMACS, analyse the trajectories and hold a binding free energy to a cited Ki.`,
   },
   {
     id: "how-accurate",
@@ -31,7 +38,7 @@ const FAQS = [
   {
     id: "domains",
     q: "What does it cover?",
-    a: "Enzymes. Michaelis-Menten kinetics, plain and inhibited, and mechanisms composed from a library of motifs, with constants from BRENDA; exact Gillespie SSA; and, on the main branch, structure audit, GROMACS setup with replicas, trajectory analysis and binding free energies. Epidemiology, population genetics, PCR and the oscillators were moved to archive/legacy_domains on 2026-09-27; the v0.4.0 release still runs them.",
+    a: "Enzymes. Michaelis-Menten kinetics, plain and inhibited, and mechanisms composed from a library of motifs, with constants from BRENDA; exact Gillespie SSA; structure audit, GROMACS setup with replicas, trajectory analysis and binding free energies. Epidemiology, population genetics, PCR and the oscillators were moved to archive/legacy_domains on 2026-09-27; the v0.4.0 release still runs them.",
   },
   {
     id: "pricing",

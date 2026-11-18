@@ -68,14 +68,24 @@ QUICK START, in the order that teaches the most
   caterva compose "Michaelis Menten" --subject 2.7.1.1 --organism human --substrate glucose
       The same, with real measured constants from BRENDA, each cited.
 
+  caterva compose "Michaelis-Menten kinetics of human hexokinase on glucose"
+      The same in plain words: the enzyme, organism and substrate are read
+      from the sentence, and the report says how each word was read.
+
   caterva compose "Michaelis-Menten with a competitive inhibitor" --design
       Which measurement to make next, and what it would newly pin down.
 
-IT RECOGNISES A SHAPE, NEVER A SUBJECT
+IT BUILDS A SHAPE, NEVER A SUBJECT, AND READS AN ENZYME ONLY BY ITS EXACT NAME
 
   "two genes repressing each other"  builds.  "glycolysis" does not, and says
   why: that needs a pathway database, and guessing one would be worse than
   refusing. Most refusals are this.
+  An enzyme named exactly ("hexokinase", "EC 2.7.1.1") in a one-enzyme
+  mechanism is searched for; a sentence naming an enzyme and no mechanism is
+  built as Michaelis-Menten and says so. "kinase" or "MAP kinase" is never
+  read as one enzyme, a cascade is never grounded in the one enzyme a
+  sentence names, and "lactate dehydrogenase" (several enzymes) is refused
+  with each named and the command that picks one. Flags always win.
 
 COMMANDS
 

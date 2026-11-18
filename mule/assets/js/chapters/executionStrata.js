@@ -7,33 +7,39 @@
 import { h, s, qs } from '../lib/dom.js';
 import { facetPath, facetedEllipse } from '../lib/geometry.js';
 
+// What runs where, after the 2026-09-27 archiving (archive/legacy_domains/
+// README.md). This page used to list PCR, Monte Carlo, population genetics
+// and SIR/SEIR here; all four are archived and run only in v0.4.0. Each
+// entry now names a command that exists in the live engine; nothing here is
+// a plan. This standalone page has no in-browser playground (the main site's
+// copy does), so the first substrate is the stochastic engine, not "this page".
 const STRATA = [
   {
     id: 'browser',
     depth: '01',
-    name: 'Browser runtime',
-    label: 'Runs locally when the method permits.',
-    methods: ['PCR amplification', 'Monte Carlo simulation', 'Population genetics'],
-    availability: 'LOCAL',
+    name: 'Exact stochastic kinetics',
+    label: 'Runs on your machine: the Gillespie direct method, one event at a time, no approximation.',
+    methods: ['Gillespie SSA \u2014 decay', 'Gillespie SSA \u2014 association', 'Gillespie SSA \u2014 replicates'],
+    availability: 'LOCAL / PYTHON',
     status: 'supported'
   },
   {
     id: 'ode',
     depth: '02',
-    name: 'Local ODE runtime',
-    label: 'Solves browser-compatible mathematical systems locally.',
-    methods: ['SIR / SEIR modeling', 'Michaelis\u2013Menten kinetics'],
-    availability: 'LOCAL / NUMERICAL',
+    name: 'The Caterva engine',
+    label: 'Runs on your machine: ODEs through libroadrunner, with constants resolved from BRENDA, and structure audits.',
+    methods: ['Michaelis\u2013Menten, with inhibition', 'caterva structure', 'caterva prepare (PDB audit)'],
+    availability: 'LOCAL / PYTHON',
     status: 'supported'
   },
   {
     id: 'server',
     depth: '03',
-    name: 'Server or user-provided compute',
-    label: 'Uses backend or user-provided compute when the method requires it.',
-    methods: ['Molecular dynamics', 'Compute-intensive workloads'],
-    availability: 'EXTERNAL / HPC OR CLOUD',
-    status: 'review'
+    name: 'Your GROMACS',
+    label: 'Molecular dynamics runs where GROMACS is: a workstation or a cluster. Caterva writes the setup and reads the result.',
+    methods: ['caterva md (three replicas)', 'caterva analyze'],
+    availability: 'WORKSTATION OR HPC',
+    status: 'user'
   }
 ];
 

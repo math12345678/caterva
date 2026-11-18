@@ -46,7 +46,9 @@ describe("parameter overrides are never laundered out of ordinary words", () => 
 
   it("still extracts colon and scientific notation forms", () => {
     expect(
-      extractParameterOverrides("wright fisher mutation_rate=1.29e-8 k:3"),
-    ).toMatchObject({ mutation_rate: 1.29e-8, k: 3 });
+      // Was "wright fisher mutation_rate=1.29e-8 k:3" until 2026-11-01;
+      // mutation_rate left the override keys with its archived domain.
+      extractParameterOverrides("gillespie decay k=1.29e-8 a0:100"),
+    ).toEqual({ k: 1.29e-8, a0: 100 });
   });
 });

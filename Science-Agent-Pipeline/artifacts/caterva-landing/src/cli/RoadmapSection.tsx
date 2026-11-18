@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import Reveal from "./Reveal";
 import TerminalWindow from "./TerminalWindow";
+import { RELEASE_TAG } from "@/lib/domains";
 
 // Rewritten 2026-09-29 against the repository and the v0.4.0 tag. The
 // previous list had a "Classroom Pilot Program" in progress (there is no
@@ -9,6 +10,14 @@ import TerminalWindow from "./TerminalWindow";
 // every MD tool as "Live" although no release carries them, and the Ki
 // comparison as "Planned" although it is built. Statuses now say where a
 // thing is: in a release, on the main branch, or planned with no date.
+//
+// Corrected 2026-11-01: the label still read "In v0.4.0" and the structure,
+// MD and free-energy tools "On main" after v0.6.0 was published
+// (2026-10-28). `git show v0.6.0:caterva/app.py` registers prepare, md,
+// analyze, bind, complex and fep, and v0.6.0's compose has --isoform and
+// takes a Ki from a row of the model's own inhibition mode (--any-mode
+// opts out), so every built milestone below is released. The label is
+// RELEASE_TAG, derived from caterva/__init__.py, not a typed version.
 interface Milestone {
   id: string;
   title: string;
@@ -39,9 +48,9 @@ const MILESTONES: Milestone[] = [
     id: "right-row",
     title: "Constants from the Right Row",
     desc: "caterva compose --isoform, and a Ki taken from a row of the model's own inhibition mode: a constant BRENDA holds only for another isoform or another mechanism is refused, naming what exists, rather than filled with a different protein's or mechanism's value.",
-    status: "main",
+    status: "released",
     icon: "\u{1F3AF}",
-    color: "#946522",
+    color: "#5D7F8D",
   },
   {
     id: "stochastic",
@@ -55,33 +64,33 @@ const MILESTONES: Milestone[] = [
     id: "structure-audit",
     title: "Structure Preparation Audit",
     desc: "caterva prepare: sequence differences, chain breaks, truncated side chains and uncertain protonation states, ranked by distance to the M-CSA catalytic residues.",
-    status: "main",
+    status: "released",
     icon: "\u{1F52C}",
-    color: "#946522",
+    color: "#5D7F8D",
   },
   {
     id: "md-replicas",
     title: "GROMACS Setup and Replicas",
     desc: "caterva md at the assay conditions of a cited constant, three replicas by default, and a convergence verdict from block averaging.",
-    status: "main",
+    status: "released",
     icon: "\u269B",
-    color: "#946522",
+    color: "#5D7F8D",
   },
   {
     id: "enzyme-analysis",
     title: "Enzyme Trajectory Analysis",
     desc: "caterva analyze: catalytic distances and angles, hydrogen bonds, chi1 rotamers, active-site water and flexibility against the crystal, read natively from .xtc, equal to gmx distance, gangle, hbond, angle and select on real frames, and reported only when the replicas agree.",
-    status: "main",
+    status: "released",
     icon: "\u{1F4CF}",
-    color: "#946522",
+    color: "#5D7F8D",
   },
   {
     id: "ki-bridge",
     title: "Binding Free Energy against a Cited Ki",
     desc: "caterva bind, complex and fep: an absolute binding free energy run at the assay temperature of a cited Ki and judged against it. Built, and not yet shown to reproduce a measured Ki.",
-    status: "main",
+    status: "released",
     icon: "\u2696",
-    color: "#946522",
+    color: "#5D7F8D",
   },
   {
     id: "ligands",
@@ -106,7 +115,7 @@ const STATUS_CONFIG: Record<
   { label: string; bg: string; text: string; dot: string }
 > = {
   released: {
-    label: "In v0.4.0",
+    label: `In ${RELEASE_TAG}`,
     bg: "bg-signal/15",
     text: "text-signal",
     dot: "bg-signal",

@@ -104,6 +104,10 @@ export interface DomainMetrics {
   // Domain-specific metrics (when applicable)
   // For mm and mm_competitive_inhibition: Michaelis-Menten kinetics
   // BACKING: Lehninger et al. (2008) "Lehninger Principles of Biochemistry"
+  // (2026-11-01: sir, seir and wright_fisher below were archived on
+  // 2026-09-27, after v0.4.0, the last release that runs them. Their notes
+  // stay as the record; the Kermack & McKendrick entry and its
+  // "epidemiology" mapping, which nothing read, were removed.)
   // For sir/seir: Epidemiological compartments
   // BACKING: Kermack & McKendrick (1927), Anderson & May (1991)
   // For wright_fisher: Population genetics
@@ -229,13 +233,6 @@ const LITERATURE_DB: Record<string, LiteratureReference> = {
     title: "STRENDA: Reporting Standards for Enzyme Data",
     journal: "Nature Biotechnology",
     doi: "10.1016/j.pisc.2014.02.012",
-  },
-  KERMACK_MCKENDRICK: {
-    authors: "Kermack, W. O., & McKendrick, A. G.",
-    year: 1927,
-    title: "A contribution to the mathematical theory of epidemics",
-    journal: "Proceedings of the Royal Society",
-    doi: "10.1098/rspa.1927.0118",
   },
   GILLESPIE_SSA: {
     authors: "Gillespie, D. T.",
@@ -700,7 +697,6 @@ class VerifiableMetricsCollector {
       "latency-percentile": "HARTER_LEAST_SQUARES",
       "strenda-compliance": "STRENDA_GUIDELINES",
       "kinetic-parameters": "LEHNINGER_KINETICS",
-      "epidemiology": "KERMACK_MCKENDRICK",
       "stochastic-simulation": "GILLESPIE_SSA",
       "response-time": "NIELSEN_RESPONSE_TIME",
       "http-api": "RFC_7231",

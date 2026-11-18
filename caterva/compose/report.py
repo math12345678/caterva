@@ -20,8 +20,226 @@ should still not be misled.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, Sequence, Tuple
+
+
+#: A salt written with its concentration: "2.0 M NaCl", "0.1 M Na2SO4",
+#: "20 mM CaCl2", "0.1 M NaClO4".
+_SALT = re.compile(
+    r"(?<![\w.])(\d+(?:\.\d+)?\s*[mµun]?M)\s+((?:Na|K|Li|Ca|Mg|Mn|Zn|Cs|Rb|NH4|Ba|Sr)\d?"
+    r"(?:Cl\d?|ClO4|SO4|NO3|Br|F|I|HCO3|OAc)\d?)\b")
+#: An ion said to be present: "in the presence of K+".
+_ION_PRESENT = re.compile(r"\b(?:in the presence of|with)\s+((?:\d+(?:\.\d+)?\s*[mµun]?M\s+)?"
+                          r"(?:Na|K|Li|Ca|Mg|Mn|Zn|Cs|Rb|NH4|Co|Ni|Cu|Fe)\d?\+)")
+
+
+def _additives(commentary: Optional[str]) -> List[str]:
+    """The salts and ions the row's commentary says the assay held, for the
+    condition line: HIV-1 protease's pair "pH 5.0, 2.0 M NaCl" (ref 648156)
+    was printed "measured at pH 5", the 2 M salt left to the evidence
+    paragraph (fourth round of the real-values review)."""
+    text = commentary or ""
+    out = [f"with {m.group(1)} {m.group(2)}" for m in _SALT.finditer(text)]
+    out += [f"with {' '.join(m.group(1).split())}" for m in _ION_PRESENT.finditer(text)]
+    return list(dict.fromkeys(out))
+
+def _no_subject_reason(model: Any) -> str:
+    """`ComposedModel.no_subject_reason`, for any model this is handed.
+
+    "No enzyme was named" was printed under a description that named one
+    and could not have it applied (ADR 0181); the model says which."""
+    reason = getattr(model, "no_subject_reason", None)
+    return reason() if callable(reason) else "no enzyme was named"
+
+
+#: Rows passed over for stating less are said beside a carried row with no
+#: spread when one lies further than this from it.
+PASSED_OVER_FOLD = 3.0
+_PASSED_NUMBERS = re.compile(r"passed over \(([^)]*)\)")
+
+
+def _clauses(text: str) -> List[str]:
+    """`text` split at "; " outside parentheses: "construct or altered
+    preparation (an isolated domain ('N-domain'); a chimera)" is one clause,
+    and was cut in two (sixth round)."""
+    out, depth, start = [], 0, 0
+    for i, ch in enumerate(text):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        elif ch == ";" and depth == 0 and text[i + 1:i + 2] == " ":
+            out.append(text[start:i])
+            start = i + 2
+    out.append(text[start:])
+    return out
+
+
+def _same_number(a: float, b: float) -> bool:
+    """Whether two printed values are one number (to four significant figures)."""
+    try:
+        return f"{float(a):.4g}" == f"{float(b):.4g}"
+    except (TypeError, ValueError):
+        return False
+
+
+def _passed_over_far(record) -> List[str]:
+    """The resolver's "passed over (values)" clauses for a carried row whose
+    values lie more than PASSED_OVER_FOLD from it, or []."""
+    because = (getattr(record, "resolver_because", None) or getattr(record, "chosen_because", None)
+               or "")
+    try:
+        carried = float(record.value)
+    except (TypeError, ValueError):
+        return []
+    if carried <= 0:
+        return []
+    out = []
+    for clause in _clauses(because):
+        m = _PASSED_NUMBERS.search(clause)
+        if not m:
+            continue
+        inside = m.group(1)
+        # The values are the numbers before the first word: "(0.07 mM, and
+        # no row states both)" printed as "(0.07 both)", the last word taken
+        # for the unit (sixth round, NEW-17).
+        numbers = re.match(r"\s*((?:\d+(?:\.\d+)?(?:e[+-]?\d+)?(?:,\s*|\s+))*(?:\.\.\.\s*)?)"
+                           r"(?P<unit>1/[^\s,]+|[^\s,\d][^\s,]*)?", inside + " ")
+        found = re.findall(r"(?<![\w./])\d+(?:\.\d+)?(?:e[+-]?\d+)?(?![\w/.])",
+                           numbers.group(1) if numbers else inside)
+        unit = (numbers.group("unit") or "") if numbers else ""
+        rest = clause[m.end():].strip()
+        far = [v for v in found
+               if float(v) > 0 and max(float(v) / carried, carried / float(v)) > PASSED_OVER_FOLD]
+        if far:
+            # Only the far rows are listed as far: the note said every row
+            # passed over lay more than 3-fold away and then listed rows
+            # 1.2-fold away, and one equal to the value carried (fifth
+            # round, R5V1-2).
+            # What the rows were passed over FOR is part of the reason
+            # ("for the same paper's row of the enzyme from its own source").
+            head = clause[:m.start()].rstrip() + " passed over" + (f" {rest}" if rest else "")
+            head = re.sub(r"^of the \d+ candidate rows \([^)]*\):\s*", "", head.strip())
+            near = len(found) - len(far)
+            listed = f"({', '.join(far)}" + (f" {unit}" if unit else "") + ")"
+            if not near and head.endswith(listed):
+                # The clause already ends with the same values: say them once
+                # (sixth round's polish, R6A1-05: "(0.0204 mM), all more than
+                # 3-fold from it (0.0204 mM)").
+                out.append(f"{head[:-1]}, {'all ' if len(far) > 1 else ''}more than "
+                           f"{PASSED_OVER_FOLD:g}-fold from it)")
+                continue
+            out.append(f"{head}, {'all' if not near else f'{len(far)} of them'} more than "
+                       f"{PASSED_OVER_FOLD:g}-fold from it ({', '.join(far)}"
+                       + (f" {unit}" if unit else "") + ")")
+    return out
+
+
+def _stands_apart(record, passed: Sequence[str]) -> str:
+    """" Every one of those rows is higher than the carried value ...", when
+    two or more rows passed over lie more than PASSED_OVER_FOLD from the
+    carried value and all on one side of it; "" otherwise.
+
+    E. coli beta-galactosidase and 2-nitrophenyl galactoside: the carried
+    pair (0.04 mM, 90 1/s, ref 706624) is the lowest row on both constants,
+    beside 0.12 to 0.16 mM and 400 to 620 1/s from other papers, and the
+    note listed the far rows without saying which side stood alone (sixth
+    round's polish, R6A1-03)."""
+    try:
+        carried = float(record.value)
+    except (TypeError, ValueError):
+        return ""
+    far: List[float] = []
+    for clause in passed:
+        for group in re.findall(r"from it \(([^)]*)\)|\(([^()]*), (?:all )?more than [\d.]+-fold from it\)",
+                                clause):
+            for text in group:
+                far += [float(v) for v in re.findall(r"(?<![\w./])\d+(?:\.\d+)?(?:e[+-]?\d+)?(?![\w/.])",
+                                                     text)]
+    far = [v for v in far if v > 0 and max(v / carried, carried / v) > PASSED_OVER_FOLD]
+    if len(far) < 2:
+        return ""
+    # Rows passed over that AGREE with the carried value speak for it. Human
+    # carbonic anhydrase II's kcat of 1.4e6 1/s (ref 696613) was said to
+    # "stand apart" from two rows of one paper (15200, 16700 1/s) while two
+    # more passed-over rows lay within 3-fold of it: the note told the reader
+    # to distrust the textbook value (sixth round's second review, R6B2-01).
+    near = 0
+    for clause in passed:
+        m = re.search(r"(\d+) row\(s\).*?(\d+) of them more than", clause)
+        if m:
+            near += max(0, int(m.group(1)) - int(m.group(2)))
+    if near:
+        return (f" The other {near} row{'s' if near != 1 else ''} passed over "
+                f"{'lie' if near != 1 else 'lies'} within {PASSED_OVER_FOLD:g}-fold of the carried "
+                "value, so the far rows are the ones that differ.")
+    if all(v > carried for v in far):
+        side = "higher"
+    elif all(v < carried for v in far):
+        side = "lower"
+    else:
+        return ""
+    return (f" Every one of those {len(far)} rows is {side} than the carried value, so the carried "
+            "row is the one that stands apart: read its paper, and BRENDA's entry for it, before "
+            "relying on it.")
+
+
+def _ref_of(record) -> Optional[str]:
+    m = re.search(r"BRENDA ref (\w+)", str(getattr(record, "citation", None) or ""))
+    return m.group(1) if m else None
+
+
+def _other_papers(identifier: str, record, measured, model: Any = None) -> str:
+    """" The model's Ki comes from another paper (BRENDA ref X), whose own Km
+    row (0.07 mM) was passed over", when the other constants carried come
+    from another paper than this one, or "". Human HMG-CoA reductase carried
+    a Km of 0.6 mM (ref 712198) beside atorvastatin's Ki from ref 667627,
+    whose own Km is 0.07 mM, and nothing said the two came from different
+    papers (sixth round, VR2-06)."""
+    mine = _ref_of(record)
+    if not mine:
+        return ""
+    others = {}
+    for other_id, other in measured.items():
+        ref = _ref_of(other)
+        if other_id != identifier and ref and ref != mine:
+            others.setdefault(ref, []).append(other_id)
+    if not others:
+        return ""
+    alternatives = [a for a in (getattr(record, "alternatives", None) or ()) if isinstance(a, dict)]
+    parts = []
+    table_rows = _same_compound_rows(identifier, model)
+    for ref, ids in sorted(others.items()):
+        own = sorted({float(a["value"]) for a in alternatives
+                      if str(a.get("reference_id") or "") == ref and a.get("value") is not None}
+                     | {float(r.value) for r in table_rows
+                        if str(r.reference_id or "") == ref and r.value is not None})
+        parts.append(f"{', '.join(f'`{i}`' for i in sorted(ids))} {'comes' if len(ids) == 1 else 'come'} "
+                     f"from another paper (BRENDA ref {ref})"
+                     + (f", whose own row for this constant ({', '.join(f'{v:g}' for v in own)} "
+                        f"{record.unit}) was passed over" if own else ""))
+    return " The constants are not one paper's: " + "; ".join(parts) + "."
+
+
+def _same_compound_rows(identifier: str, model: Any) -> list:
+    """BRENDA's rows of the constant's own table for the compound it
+    measured, in the model's organism; [] when they cannot be read."""
+    if model is None:
+        return []
+    try:
+        from caterva.compose import defaults
+
+        q = next(q for q in getattr(model, "resolvable", ()) if q.parameter_id == identifier)
+        compound = model.compound_for(q)
+        ec, organism = getattr(model, "subject", None), getattr(model, "organism", None)
+        if not (compound and ec and organism and q.table in ("km", "kcat", "ki")):
+            return []
+        return [r for r in defaults.table_rows(ec, q.table, organism)
+                if defaults._matches(r.compound, compound)]
+    except Exception:  # noqa: BLE001 - the clause says less
+        return []
 
 
 @dataclass(frozen=True)
@@ -148,8 +366,9 @@ class ModelDossier:
         lines = ["", "## Where the numbers come from", ""]
 
         if self.model.structure_only:
+            why = _no_subject_reason(self.model)
             lines.append(
-                "**Nothing was searched for.** No enzyme was named, so there "
+                f"**Nothing was searched for.** {why[:1].upper()}{why[1:]}, so there "
                 "is nothing whose measured constants could be looked up. "
                 "These are the measurements that would complete the model:"
             )
@@ -289,7 +508,7 @@ class ModelDossier:
 
         The judgement is `row_scope.read_scope`, shared with the exports.
         """
-        from caterva.compose.row_scope import read_scope
+        from caterva.compose.row_scope import read_scope, row_isoform_of
 
         notes: List[str] = []
         for identifier in sorted(measured):
@@ -300,9 +519,32 @@ class ModelDossier:
                 table=getattr(quantity, "table", None),
                 substrate=getattr(self.model, "substrate", None),
                 isoform=getattr(self.model, "isoform", None),
+                row_isoform=row_isoform_of(measured[identifier], getattr(self.model, "isoform", None)),
+                compound=_compound_for(self.model, quantity),
             )
             if scope is not None:
                 notes += [f"`{identifier}`: {c.text}" for c in scope.concerns]
+        for identifier in sorted(measured):
+            note = _wild_type_label_note(measured[identifier])
+            if note:
+                notes.append(f"`{identifier}`: {note}")
+            construct = _construct_note(measured[identifier])
+            if construct:
+                notes.append(f"`{identifier}`: {construct}")
+            for what in _named_variant_notes(measured[identifier]):
+                notes.append(f"`{identifier}`: {what}")
+            reaction = _reaction_of(measured[identifier]) or _reaction_on_the_page(
+                self.model, measured[identifier], getattr(by_id.get(identifier), "table", None))
+            if reaction:
+                # CYP3A4 and fenthion, ref 706823: 0.089 mM is the
+                # desulfuration's Km and 0.131 mM the sulfoxidation's; the
+                # report did not say which (fifth round, R5B-08).
+                notes.append(f"`{identifier}`: its row measured one reaction of the substrate: "
+                             f"\"{' '.join(reaction.group(0).split())}\"")
+        from caterva.compose.row_scope import variant_mix
+        mixed = variant_mix({i: getattr(m, "commentary", None) for i, m in measured.items()})
+        if mixed:
+            notes.append(mixed)
         if not notes:
             return []
         return ["", "What each value's own row says it measured:", ""] + [f"- {n}" for n in notes]
@@ -350,15 +592,28 @@ class ModelDossier:
             return []
 
         lines = ["", "### The conditions these were measured under", ""]
+        read_ph = _readable_ph(stated)
         for identifier in sorted(stated):
             record = stated[identifier]
             parts = []
-            if record.assay_ph is not None:
+            garbled = _GARBLED_PH.search(getattr(record, "commentary", None) or "")
+            if garbled:
+                # "pH 4.u" is no pH 4: the decimal is lost, and the
+                # pairing reads it as the same paper's kcat row's pH 4.8.
+                # Printed as 4, it raised a 1 pH unit mismatch with a pH 5
+                # Ki that is 0.2 units away (fifth round, R5V1-1).
+                partner = read_ph.get(identifier)
+                parts.append(
+                    f"a pH BRENDA prints unreadably ('{garbled.group(0)}')"
+                    + (f", read as pH {partner[1]:g} from the same paper's `{partner[0]}` row"
+                       if partner else ""))
+            elif record.assay_ph is not None:
                 parts.append(f"pH {record.assay_ph:g}")
             if record.assay_temperature_c is not None:
                 parts.append(f"{record.assay_temperature_c:g} °C")
             if record.assay_buffer:
                 parts.append(f"in {record.assay_buffer}")
+            parts.extend(_additives(getattr(record, "commentary", None)))
             unreported = getattr(record, "assay_unreported", ()) or ()
             suffix = (
                 f" The source states it did not report: {', '.join(unreported)}."
@@ -367,6 +622,15 @@ class ModelDossier:
             lines.append(f"- `{identifier}` — measured at {', '.join(parts)}.{suffix}")
 
         silent = sorted(set(measured) - set(stated))
+        # A row that states no pH, temperature or buffer may still state
+        # other conditions: bovine glutamate dehydrogenase's kcat row reads
+        # "cofactor NAD+", and the report said the source stated none
+        # (fifth round's review, N19). Its words are quoted instead.
+        said = {name: _other_conditions(getattr(measured[name], "commentary", None)) for name in silent}
+        for name in [n for n in silent if said[n]]:
+            lines.append(f"- `{name}` — the source states no pH, temperature or buffer; its row "
+                         f"says: \"{said[name]}\".")
+        silent = [n for n in silent if not said[n]]
         if silent:
             lines.append(
                 f"- {', '.join(f'`{name}`' for name in silent)} — the source "
@@ -375,10 +639,10 @@ class ModelDossier:
                 f"rows above."
             )
 
-        lines += self._mixing_lines(stated)
+        lines += self._mixing_lines(stated, read_ph)
         return lines
 
-    def _mixing_lines(self, stated: dict) -> List[str]:
+    def _mixing_lines(self, stated: dict, read_ph: Optional[dict] = None) -> List[str]:
         """Whether the measured constants describe one experiment or several."""
         try:
             from caterva.checkout import literature_module
@@ -388,6 +652,15 @@ class ModelDossier:
             temperature_serious = compatibility.TEMPERATURE_C_SERIOUS
         except Exception:  # noqa: BLE001 - a missing layer is not a wrong answer
             return []
+
+        read_ph = read_ph or {}
+
+        def ph(name: str) -> Optional[float]:
+            # An unreadable pH is compared as the pH it is read as, or not
+            # at all; never as its units digit.
+            if _GARBLED_PH.search(getattr(stated[name], "commentary", None) or ""):
+                return read_ph[name][1] if name in read_ph else None
+            return stated[name].assay_ph
 
         names = sorted(stated)
         if len(names) < 2:
@@ -401,12 +674,13 @@ class ModelDossier:
         for i, first in enumerate(names):
             for second in names[i + 1:]:
                 a, b = stated[first], stated[second]
-                if a.assay_ph is not None and b.assay_ph is not None:
-                    gap = abs(a.assay_ph - b.assay_ph)
+                ph_a, ph_b = ph(first), ph(second)
+                if ph_a is not None and ph_b is not None:
+                    gap = round(abs(ph_a - ph_b), 6)
                     if gap >= ph_serious:
                         clashes.append(
                             f"`{first}` and `{second}` differ by {gap:g} pH "
-                            f"unit(s) ({a.assay_ph:g} against {b.assay_ph:g})"
+                            f"unit(s) ({ph_a:g} against {ph_b:g})"
                         )
                 if (a.assay_temperature_c is not None
                         and b.assay_temperature_c is not None):
@@ -419,7 +693,7 @@ class ModelDossier:
                         )
         comparable = sum(
             1 for name in names
-            if stated[name].assay_ph is not None
+            if ph(name) is not None
             or stated[name].assay_temperature_c is not None
         )
         if not clashes:
@@ -450,7 +724,48 @@ class ModelDossier:
             f"rate.",
         ]
 
-    def _disagreement_lines(self, measured: dict) -> List[str]:
+    def _end_set_aside(self, identifier: str, spread: Any, carried: Optional[float] = None) -> str:
+        """For an end of the spread the reason never mentions: why that row
+        was set aside, from the selection's own note, or "". Rat nNOS's Km
+        spread ran to 4.8 mM (ref 659257), the one row stating pH and
+        temperature, and the line never said why it was not carried; the
+        note above did (sixth round, VR2-05).
+
+        An end that IS the carried value is never explained this way. The
+        note about an isoform step reads "the row for X (VALUE, BRENDA ref N)
+        is used instead", which names the carried row; matching it printed
+        "the 3.7 mM row is not carried" beside "The model carries 3.7"
+        (sixth round's polish, R6B-01). Each clause is printed once."""
+        reason = str(spread.carried_as or "")
+        try:
+            notes = " ".join(str(n) for n in self.model.recognition.composition.notes)
+        except AttributeError:
+            return ""
+        out: List[str] = []
+        said: set = set()
+        for end in sorted({spread.low, spread.high}):
+            label = f"{end:g} {spread.unit}"
+            if f"{end:g}" in reason:
+                continue
+            if carried is not None and _same_number(end, carried):
+                continue
+            m = re.search(rf"`{re.escape(identifier)}`: ([^`]*?\({re.escape(label)}, BRENDA ref \w+\)"
+                          r"[^:`]*)", notes)
+            if not m:
+                continue
+            clause = m.group(1).strip().rstrip(',;')
+            # The clause must be about the row set aside, not the one taken:
+            # "... (LABEL, BRENDA ref N) is used instead" names the carried row.
+            after = clause[clause.index(f"({label}, BRENDA ref"):]
+            if re.match(r"\([^)]*\)\s+is used instead", after):
+                continue
+            if clause in said:
+                continue
+            said.add(clause)
+            out.append(f"the {label} row is not carried: {clause}; ")
+        return "".join(out)
+
+    def _disagreement_lines(self, measured: dict) -> List[str]:  # noqa: C901
         """The rows the resolver ranked equal and did not pick.
 
         WHY THIS IS NOT OPTIONAL
@@ -476,12 +791,28 @@ class ModelDossier:
             record = measured[identifier]
             spread = getattr(record, "spread", None)
             if spread is None:
+                passed = _passed_over_far(record)
+                if passed:
+                    # One row carried, and rows set aside for stating less lie
+                    # several-fold from it: E. coli beta-galactosidase's kcat
+                    # of 90 1/s beside native rows of 400 and 620 1/s, and
+                    # human HMG-CoA reductase's Km of 0.6 mM beside the Ki's
+                    # own paper's 0.07 mM, went unsaid (fifth round's review).
+                    disagreements.append(
+                        f"- `{identifier}`: the model carries {record.value:g} {record.unit} "
+                        f"({record.citation}), the row the checks kept; some rows "
+                        f"passed over lie more than {PASSED_OVER_FOLD:g}-fold from it: "
+                        + "; ".join(passed) + "."
+                        + _stands_apart(record, passed)
+                        + _other_papers(identifier, record, measured, self.model)
+                        + " Which one is right is a question about the papers.")
                 continue
             disagreements.append(
                 f"- `{identifier}`: {spread.what}, spanning **{spread.low:g} to {spread.high:g} "
                 f"{spread.unit}** ({spread.fold:.3g}-fold). The model carries "
                 f"{record.value:g} — {spread.carried_as}; "
-                f"{spread.why}."
+                + self._end_set_aside(identifier, spread, record.value)
+                + f"{spread.why}."
             )
         if not disagreements:
             return []
@@ -788,7 +1119,7 @@ class ModelDossier:
             "because this mechanism has no enzyme step, so its constants are "
             "not kept in an enzyme database"
             if not subject and not _database_could_supply(self.model)
-            else "because no enzyme was named" if not subject
+            else f"because {_no_subject_reason(self.model)}" if not subject
             else f"because no search has been run for {subject!r}"
             if count == total and not getattr(self.model, "searched", False)
             else f"because the search for {subject!r} did not find them"
@@ -1107,3 +1438,198 @@ def _default_target(model: Any) -> Optional[str]:
 
 
 __all__ = ["ModelDossier", "dossier"]
+
+
+def _compound_for(model: Any, quantity: Any) -> Optional[str]:
+    """The compound a constant is measured for (an inhibition constant's
+    inhibitor), or None when the model cannot say."""
+    try:
+        return model.compound_for(quantity) if quantity is not None else None
+    except Exception:  # noqa: BLE001 - a stand-in model without compounds
+        return None
+
+
+#: A pH whose decimal BRENDA printed unreadably ("pH 4.u"), as
+#: `row_form.garbled_ph` reads it in the literature layer.
+_GARBLED_PH = re.compile(r"\bpH\s*(\d{1,2})\.(?![\d\s])[^\s,;]*", re.IGNORECASE)
+
+
+def _readable_ph(stated: dict) -> dict:
+    """identifier -> (partner identifier, pH) for each record whose pH is
+    printed unreadably, read as the pH of another record of the same paper
+    whose stated pH has the same units digit (the pairing's reading)."""
+    out = {}
+    for name, record in stated.items():
+        garbled = _GARBLED_PH.search(getattr(record, "commentary", None) or "")
+        if not garbled:
+            continue
+        digit = int(garbled.group(1))
+        for other, partner in sorted(stated.items()):
+            if (other != name and partner.citation == record.citation
+                    and partner.assay_ph is not None
+                    and not _GARBLED_PH.search(getattr(partner, "commentary", None) or "")
+                    and int(partner.assay_ph) == digit):
+                out[name] = (other, float(partner.assay_ph))
+                break
+    return out
+
+
+#: A row's commentary naming which of a substrate's reactions it measured
+#: ("desulfuration by recombinant human CYPs to fenthion-oxon").
+_REACTION_OF_ROW = re.compile(
+    r"\b(?:\d'?-|[NOS]-)?(?:de)?(?:sulfur|sulfoxid|sulphoxid|hydroxyl|methyl|ethyl|alkyl|epoxid|"
+    r"glucuronid|sulfon)ation\b(?:[^,;]{0,60}?\bto\s+[^,;]+)?", re.IGNORECASE)
+
+
+def _reaction_of(record: Any) -> Optional[Any]:
+    """The reaction a carried row measured (`_REACTION_OF_ROW`), from its own
+    commentary or from the same paper's row of the same value: BRENDA prints
+    CYP3A4's fenthion Km 0.089 mM twice, "CYP3A4, at pH 7.4 and 37°C" and
+    "CYP3A4, desulfuration ... to fenthion-oxon" (ref 706823)."""
+    found = _REACTION_OF_ROW.search(getattr(record, "commentary", None) or "")
+    if found:
+        return found
+    mine = re.search(r"BRENDA ref (\d+)", str(getattr(record, "citation", "") or ""))
+    try:
+        value = float(record.value)
+    except (TypeError, ValueError, AttributeError):
+        return None
+    for row in getattr(record, "alternatives", ()) or ():
+        if not isinstance(row, dict) or row.get("value") is None:
+            continue
+        if mine and str(row.get("reference_id")) == mine.group(1) and float(row["value"]) == value:
+            found = _REACTION_OF_ROW.search(str(row.get("conditions") or ""))
+            if found:
+                return found
+    return None
+
+
+def _reaction_on_the_page(model: Any, record: Any, table: Optional[str]) -> Optional[Any]:
+    """`_reaction_of`, read from BRENDA's page itself: the parser keeps one
+    commentary per entry, so ref 706823's "desulfuration ... to fenthion-oxon"
+    reaches no ranked row, while the page holds it beside the same value."""
+    ec = getattr(model, "subject", None) or getattr(model, "ec_number", None)
+    organism = getattr(model, "organism", None)
+    mine = re.search(r"BRENDA ref (\d+)", str(getattr(record, "citation", "") or ""))
+    if not (ec and organism and mine and table in ("km", "kcat", "ki")):
+        return None
+    try:
+        from caterva.compose import defaults
+
+        value = float(record.value)
+        for row in defaults.table_rows(str(ec), table, organism):
+            if str(row.reference_id) == mine.group(1) and row.value is not None \
+                    and float(row.value) == value:
+                found = _REACTION_OF_ROW.search(row.conditions or "")
+                if found:
+                    return found
+    except Exception:  # noqa: BLE001 - the note is a courtesy
+        return None
+    return None
+
+
+def _other_conditions(commentary: Optional[str]) -> Optional[str]:
+    """A row's commentary when it states something (a cofactor, an assay
+    detail), else None: an empty cell, "-", or BRENDA's "pH and temperature
+    not specified in the publication" says nothing more than the silence."""
+    text = " ".join(str(commentary or "").split())
+    if not text or text == "-":
+        return None
+    if re.fullmatch(r"(?i)(?:pH and )?temperature not specified in the publication\.?|"
+                    r"pH not specified in the publication\.?", text):
+        return None
+    return text
+
+
+#: The resolver's clause for a paper's unlabelled row passed over for its row
+#: labelled wild-type (fallback_logic `_unlabelled_beside_wild_type`).
+_WILD_LABEL_PASSED = re.compile(
+    r"(\d+) unlabelled row\(s\) passed over for the same paper's row labelled wild-type under "
+    r"otherwise the same stated conditions(?: \(([^)]*)\))?")
+
+
+def _construct_note(record: Any) -> Optional[str]:
+    """What a carried row measured when it is a construct or an altered
+    preparation (row_form.construct_of): a tagged or refolded enzyme, an
+    assay in D2O or with a surfactant added. Human CES1's only wild-type kcat
+    row, 7.6 1/s, is a "recombinant refolded His-taggged" enzyme (ref
+    752090), and the report said nothing of it (sixth round, NEW-08)."""
+    text = getattr(record, "commentary", None)
+    if not text:
+        return None
+    try:
+        from caterva.checkout import literature_module
+
+        construct = literature_module("row_form").construct_of(text)
+    except Exception:  # noqa: BLE001 - without the literature layer, no such note
+        return None
+    if not construct:
+        return None
+    return (f"the row measured {construct}, not the native enzyme: read the value as that "
+            "preparation's")
+
+
+_ALLOZYME = re.compile(r"\ballozyme\s+([A-Z][A-Za-z0-9]{0,7})(?![A-Za-z0-9])")
+
+
+def _named_variant_notes(record: Any) -> List[str]:
+    """What a carried row says of the form it measured that is neither a
+    construct nor an isoform: a named allozyme, or one product's formation.
+    Human alkaline phosphatase's pair is "allozyme D" of the placental
+    enzyme (ref 651458), and the report never used the word (sixth round's
+    polish, V6R1-05)."""
+    text = str(getattr(record, "commentary", None) or "")
+    out: List[str] = []
+    found = _ALLOZYME.search(text)
+    if found:
+        out.append(f"the row measured allozyme {found.group(1)}, one named genetic variant of the "
+                   "enzyme; other allozymes can differ")
+    try:
+        from caterva.checkout import literature_module
+
+        product = literature_module("row_form").one_product_formed(text)
+    except Exception:  # noqa: BLE001 - without the literature layer, no such note
+        product = None
+    if product:
+        out.append(f"the row measured the formation of one product ({product}), which is not the "
+                   "turnover of the reaction as a whole when the enzyme makes several")
+    return out
+
+
+def _wild_type_label_note(record: Any) -> Optional[str]:
+    """A sentence when the carried row was taken over its own paper's row
+    that states no wild-type label, and no spread section says so (the
+    spread's own sentence carries the resolver's reason). Human
+    chymotrypsin, ref 769319: "wild-type, pH 8" (0.575 mM) was carried over
+    a bare "pH 8" row (0.304 mM), and the report said nothing of it (fifth
+    round's review, A4-04)."""
+    if getattr(record, "spread", None) is not None:
+        return None
+    found = _WILD_LABEL_PASSED.search(str(getattr(record, "resolver_because", "") or ""))
+    if not found:
+        return None
+    n = int(found.group(1))
+    ref = getattr(record, "reference_id", None) or _reference_of(record)
+    paper = f"BRENDA ref {ref}" if ref else "the same paper"
+    values = (found.group(2) or "").strip()
+    far = ""
+    try:
+        carried = float(record.value)
+        nums = [float(v.split()[0]) for v in values.split(",") if v.strip()]
+        folds = [max(carried / v, v / carried) for v in nums if v > 0 and carried > 0]
+        if folds and max(folds) > 3:
+            far = f", {max(folds):.2g}-fold from the value carried"
+    except (TypeError, ValueError, AttributeError, IndexError):
+        far = ""
+    return (f"the row carried is labelled wild-type; {paper} also gives "
+            f"{'a row' if n == 1 else f'{n} rows'}"
+            + (f" ({values}{far})" if values else "")
+            + f" under otherwise the same stated conditions that "
+            f"{'states' if n == 1 else 'state'} no wild-type label (possibly a construct or variant "
+            f"the commentary does not name), passed over for the labelled one")
+
+
+def _reference_of(record: Any) -> Optional[str]:
+    """The BRENDA reference in a measurement's citation text, else None."""
+    found = re.search(r"\bref (\d+)", str(getattr(record, "citation", "") or ""))
+    return found.group(1) if found else None

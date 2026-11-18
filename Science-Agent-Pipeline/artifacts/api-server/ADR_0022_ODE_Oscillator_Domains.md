@@ -1,7 +1,7 @@
 # ADR 0022: ODE Oscillator Domains
 
 **Date:** August 2026  
-**Status:** Accepted  
+**Status:** Accepted; the domains it adds were archived on 2026-09-27, after v0.4.0 (note added 2026-11-01). This build refuses them; v0.4.0 is the last release that runs them.  
 **Stakeholders:** Science team, Backend architecture
 
 ## Problem

@@ -258,11 +258,12 @@ router.get(
             "Tipton et al. (2014) -- STRENDA reporting standards, applied: " +
             "a resolved kinetic value whose source omits pH or temperature " +
             "is reported flagged rather than verified.",
-          epidemiology:
-            "Kermack & McKendrick (1927) -- the compartmental model. Note " +
-            "the engine integrates the frequency-dependent form " +
-            "(\u03B2\u00B7S\u00B7I/N), not the density-dependent one in the " +
-            "1927 paper.",
+          // An `epidemiology` entry (Kermack & McKendrick 1927, with a note
+          // on the frequency-dependent form the engine integrated) stood
+          // here until 2026-11-01. Epidemiology was archived on 2026-09-27,
+          // after v0.4.0, the last release that runs it; none of the
+          // `domains` above uses that model, so this route no longer
+          // credits it.
         },
       });
     } catch (err) {

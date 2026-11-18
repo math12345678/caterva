@@ -81,45 +81,16 @@ def check_imports() -> None:
                 "pip install -r requirements.txt")
 
 
-def check_resolver_deps() -> None:
-    """Dependencies the LITERATURE resolvers need, checked separately.
-
-    `stdpopsim` is pinned in requirements.txt and is where
-    `Tests/popgen_resolver.py` gets its mutation rates -- it is not
-    optional. But it needs libgsl-dev to build, so it is genuinely absent
-    in some environments (ADR 0021 records the review sandbox as one).
-
-    `Tests/test_popgen_resolver.py` therefore calls
-    `pytest.importorskip("stdpopsim")`, which is the right call: 19 hard
-    failures for a missing system library are noise, not signal.
-
-    The danger is what that leaves behind. A clean skip is invisible in a
-    CI summary, so the population-genetics literature path can go entirely
-    untested for months and read as green. This check exists so the
-    environment gap is reported ONCE, clearly, in the place people look --
-    rather than as nineteen tests that quietly stopped running.
-
-    Warned rather than failed: the engine and every other resolver work
-    without it, and `make check` is the gate for "is this stack usable".
-    """
-    print("\nLiterature resolvers")
-    for module, label, consequence in [
-        (
-            "stdpopsim",
-            "stdpopsim (population-genetics mutation rates)",
-            "popgen mutation-rate resolution is UNTESTED and unavailable; "
-            "test_popgen_resolver.py will skip silently",
-        ),
-    ]:
-        try:
-            mod = __import__(module)
-            ok(f"{label} {getattr(mod, '__version__', '?')}")
-        except ImportError:
-            warn(
-                f"{label} missing -- {consequence}. "
-                "Install with: pip install stdpopsim "
-                "(needs libgsl-dev on Debian/Ubuntu)"
-            )
+# `check_resolver_deps()` stood here until 2026-11-01. It warned when
+# `stdpopsim` was missing, because `Tests/popgen_resolver.py` took its
+# mutation rates from it and `Tests/test_popgen_resolver.py` skipped
+# without it. That day both moved to archive/legacy_domains/ with the
+# Wright-Fisher domain they served (archived on 2026-09-27, after
+# v0.4.0, the last release that runs it), and
+# requirements-popgen.txt went with them. A warning telling a contributor
+# to install a GPL package, with a system library, for a resolver nothing
+# calls is advice that costs them an afternoon for nothing, so the check
+# went too rather than being left to describe a path that no longer exists.
 
 
 def check_test_deps() -> None:
@@ -232,7 +203,6 @@ def main() -> int:
 
     check_python()
     check_imports()
-    check_resolver_deps()
     check_test_deps()
     check_end_to_end()
 

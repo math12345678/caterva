@@ -25,10 +25,6 @@ const find = (
 ) => extractStatedQuantities(query, domain).find((q) => q.key === key);
 
 describe("extractStatedQuantities — what the user actually said", () => {
-
-
-
-
   // ---- units: getting these wrong is silent, plausible, wrong science ---
 
   it("converts concentrations into mM, the canonical unit", () => {
@@ -47,8 +43,16 @@ describe("extractStatedQuantities — what the user actually said", () => {
     expect(find("run for 30 days", "gillespie_ssa", "end")).toBeUndefined();
   });
 
-
-
+  it("converts a stated duration into seconds for the Michaelis-Menten domains", () => {
+    // Enzyme kinetics runs in seconds (Vmax is mM/s). The days branch that
+    // the archived epidemiology domains used is gone, so "2 days" is read
+    // as 172800 s of assay, never as end=2.
+    expect(find("hexokinase with 10 mM glucose for 5 minutes", "mm", "end")?.value).toBe(300);
+    expect(
+      find("competitive inhibition of hexokinase over 2 days", "mm_competitive_inhibition", "end")
+        ?.value,
+    ).toBe(172800);
+  });
 
   // ---- the part that matters most --------------------------------------
 
@@ -139,6 +143,19 @@ describe("extractStatedQuantities — what the user actually said", () => {
   it("does not apply epidemiology nouns to unrelated domains", () => {
     // "people" means nothing to enzyme kinetics.
     expect(find("hexokinase with 500 people", "mm", "s0")).toBeUndefined();
+  });
+
+  it("binds nothing from the archived domains' nouns", () => {
+    // Population, infected-count, cycle and generation patterns served
+    // SIR/SEIR, PCR and Wright-Fisher, archived on 2026-09-27 (after
+    // v0.4.0, the last release that runs them), and were removed as dead
+    // code on 2026-11-01. None of these phrases
+    // may become a parameter of a live domain.
+    const q =
+      "hexokinase in a town of 10000 people with 5 infected over 30 cycles and 50 generations";
+    for (const key of ["s0", "i0", "enzyme_conc", "end", "cycles", "generations", "population_size"]) {
+      expect(find(q, "mm", key), key).toBeUndefined();
+    }
   });
 
   it("returns nothing for a query that states no quantities", () => {
@@ -241,12 +258,11 @@ describe("the hard block stays hard except where measured otherwise", () => {
       s0: { origin: "default" },
       end: { origin: "default" },
       i0: { origin: "default" },
-      r0_recovered: { origin: "default" },
       km: { origin: "default" },
       vmax: { origin: "llm" },
     });
     // Chosen: a documented default is allowed.
-    for (const chosen of ["points", "s0", "end", "i0", "r0_recovered"]) {
+    for (const chosen of ["points", "s0", "end", "i0"]) {
       expect(blocked, `${chosen} is a choice, not a measurement`).not.toContain(
         chosen,
       );

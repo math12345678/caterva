@@ -149,7 +149,7 @@ spawn("python", [userQuery], { shell: false });
 
 ```typescript
 // ✅ Safe - Just a string
-const query = "SIR with beta=0.5";
+const query = "michaelis menten with km=0.5";
 // No eval, no template evaluation, no code execution
 ```
 
@@ -501,7 +501,7 @@ git commit -S -m "Security update"
 // ✅ User sees this
 {
   "error": "MISSING_REQUIRED_INPUT",
-  "message": "Cannot simulate 'sir': beta, gamma could not be resolved..."
+  "message": "Cannot simulate 'mm': vmax is unresolved. ..."
 }
 ```
 
@@ -644,7 +644,7 @@ logger.info({ jobId, domain, parameters }, "Simulation started");
 //   "level": 30,
 //   "time": "2026-08-09T12:34:56Z",
 //   "jobId": "abc-123",
-//   "domain": "sir",
+//   "domain": "mm",
 //   "parameters": {...},
 //   "msg": "Simulation started"
 // }
@@ -693,9 +693,11 @@ no `fast-check` dependency (confirmed absent from `package.json`), and no `valid
 a description of tests that run today. The closest real equivalents are the Zod validation in
 `src/lib/schemas.ts` (`ResolveBody`) and the parameter-override extraction/validation in
 `src/lib/queryResolver.ts` (`extractParameterOverrides`, `ArrayOverrideValidationError`), which
-are exercised by `src/__tests__/schemas.test.ts`, `src/__tests__/queryOverrides.test.ts`, and
-`src/__tests__/arrayOverride.test.ts` — but none of those tests use fuzzing (`fast-check`) or
-target SQL/command-injection payloads by name the way the examples below suggest.
+are exercised by `src/__tests__/schemas.test.ts` and `src/__tests__/queryOverrides.test.ts`
+(`src/__tests__/arrayOverride.test.ts` was removed on 2026-11-01 with the array-valued
+`starting_frequencies` override of two-locus Wright-Fisher, archived on 2026-09-27, after
+v0.4.0) — but none of those tests use fuzzing (`fast-check`) or target SQL/command-injection
+payloads by name the way the examples below suggest.
 
 ### Input Fuzzing (proposed)
 
@@ -749,11 +751,11 @@ it("prevents command injection", () => {
 
 ```typescript
 it("handles duplicate parameters safely", () => {
-  // ?beta=0.5&beta=0.3
+  // ?km=0.5&km=0.3
   // Should use one value, not both
-  const result = resolveParameters({ beta: ["0.5", "0.3"] });
-  expect(result.beta).toBeDefined();
-  expect(typeof result.beta).toBe("number");
+  const result = resolveParameters({ km: ["0.5", "0.3"] });
+  expect(result.km).toBeDefined();
+  expect(typeof result.km).toBe("number");
 });
 ```
 

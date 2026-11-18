@@ -9,6 +9,12 @@
  *
  * Nothing here is illustrative or representative. If a number appears on the
  * page it came from a run.
+ *
+ * The population-genetics domain itself was archived on 2026-09-27, with
+ * epidemiology, PCR, Monte Carlo and the Lennard-Jones toy MD
+ * (archive/legacy_domains/README.md). The walkthrough below stays because it
+ * is a true account of how a domain was built; it is not a claim that the
+ * domain is live.
  */
 
 export type StageState = 'idle' | 'active' | 'done' | 'conflict';
@@ -103,9 +109,14 @@ export interface LedgerRow {
 }
 
 /**
- * The verification ledger. The `reference` column is the product — it is the
- * difference between "our simulation says" and "this matches a result
- * published in 1962 that we did not produce."
+ * The verification ledger: claims about the live domains only (README.md:53,
+ * "five simulation domains"). The `reference` column is the product -- it is
+ * the difference between "our simulation says" and "this matches a result
+ * published elsewhere that we did not produce."
+ *
+ * Every count the site prints from this (Hero's claim and domain counters,
+ * the console's ledger rail) is derived from it, so a row here is a row
+ * advertised as verified today.
  */
 export const LEDGER: LedgerRow[] = [
   {
@@ -114,6 +125,29 @@ export const LEDGER: LedgerRow[] = [
     method: 'exact closed form',
     reference: 'implicit Michaelis-Menten solution',
   },
+  {
+    domain: 'gillespie_ssa',
+    claim: 'E[a(t)] = a₀·e^(−kt), a+b ≡ a₀',
+    method: 'exact SSA mean vs closed form (50 seeds)',
+    reference: 'Gillespie, J. Phys. Chem. 81, 2340 (1977)',
+  },
+  {
+    domain: 'gillespie_ssa_bimolecular',
+    claim: 'a(t) = (a₀−b₀)/(1−(b₀/a₀)e^(−k(a₀−b₀)t)), a+c ≡ a₀, b+c ≡ b₀',
+    method: 'exact SSA mean vs ODE closed form',
+    reference: 'Gillespie, J. Phys. Chem. 81, 2340 (1977)',
+  },
+];
+
+/**
+ * Claims that were verified for domains archived on 2026-09-27 (epidemiology,
+ * PCR, Monte Carlo, population genetics, Lennard-Jones MD; see
+ * archive/legacy_domains/README.md). The tests behind them now live under
+ * archive/legacy_domains/tests/, are not collected by `make test` or CI, and
+ * run only in v0.4.0. Kept as the record of what was checked, and kept out of
+ * LEDGER so no counter on the site advertises them as current.
+ */
+export const ARCHIVED_LEDGER: LedgerRow[] = [
   {
     domain: 'epidemiology',
     claim: 'peak at S = N/R₀',
@@ -155,17 +189,5 @@ export const LEDGER: LedgerRow[] = [
     claim: '|ΔE|/E ∝ Δt²',
     method: 'symplectic order check',
     reference: 'Swope et al., J. Chem. Phys. 76, 637 (1982)',
-  },
-  {
-    domain: 'gillespie_ssa',
-    claim: 'E[a(t)] = a₀·e^(−kt), a+b ≡ a₀',
-    method: 'exact SSA mean vs closed form (50 seeds)',
-    reference: 'Gillespie, J. Phys. Chem. 81, 2340 (1977)',
-  },
-  {
-    domain: 'gillespie_ssa_bimolecular',
-    claim: 'a(t) = (a₀−b₀)/(1−(b₀/a₀)e^(−k(a₀−b₀)t)), a+c ≡ a₀, b+c ≡ b₀',
-    method: 'exact SSA mean vs ODE closed form',
-    reference: 'Gillespie, J. Phys. Chem. 81, 2340 (1977)',
   },
 ];

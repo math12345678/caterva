@@ -36,9 +36,20 @@ KJ_PER_KCAL = 4.184
 
 
 def _target(a) -> Optional[Target]:
-    from caterva.bind.__main__ import COMMON, _rows, _compound_names
+    from caterva.bind.__main__ import _compound_names, _rows, organism_missing, organism_of, resolve_ec
     from caterva.bind.core import target
-    organism = COMMON.get(a.organism.strip().lower(), a.organism.strip())
+    organism = organism_of(a.organism)
+    # The same reading `caterva bind --ec` gives, so the target a run is
+    # held to is the one `caterva bind` lists: a name resolved to its EC
+    # number (and said so), or refused with the candidates before BRENDA is
+    # read, instead of "no Ki for gossypol with EC lactate dehydrogenase".
+    subject = resolve_ec(a.ec, organism)
+    if subject.ec is None:
+        print(f"caterva fep: {subject.refusal}", file=sys.stderr)
+        return None
+    if subject.note:
+        print(subject.note)
+    a.ec = subject.ec
     if a.html:
         html = a.html.read_text(encoding="utf-8")
     else:
@@ -46,6 +57,11 @@ def _target(a) -> Optional[Target]:
         html = literature_module("brenda_client").fetch_brenda_html(a.ec)
     rows = _rows(html, a.ec, organism, a.inhibitor)
     if not rows:
+        # An organism the page never names is not an absence of Ki values.
+        missing = organism_missing(html, a.ec, organism)
+        if missing:
+            print(f"caterva fep: {missing}", file=sys.stderr)
+            return None
         names = _compound_names(html, a.ec, organism)
         print(f"caterva fep: no Ki for {a.inhibitor!r} with EC {a.ec} in {organism}; nothing to hold "
               f"a calculation to." + (f" Compounds with one: {'; '.join(names)}" if names else ""), file=sys.stderr)

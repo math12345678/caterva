@@ -5,8 +5,10 @@ backed by literature. That claim was, until this guard existed,
 unfalsifiable — and therefore worth nothing. Three things were true at the
 same time:
 
-  * `RESOLVABLE_FIELDS` resolves exactly five parameters live (km, ki,
+  * `RESOLVABLE_FIELDS` resolved exactly five parameters live (km, ki,
     kcat/vmax, mutation_rate, beta/gamma-from-R0). Real, cited, verified.
+    (2026-10-31: mutation_rate and the beta/gamma-from-R0 bridge went with
+    the archived domains; RESOLVABLE_FIELDS now lists km and ki.)
   * `DOMAIN_DEFAULTS` in queryResolver.ts contains 64 hardcoded numbers
     across 14 domains — km=2, vmax=5, beta=0.3, gamma=0.1 — none of which
     is checked against any source. (The first count taken by hand said
@@ -34,7 +36,10 @@ What it demands is that every number be **declared**, in
 
   RESOLVED       - not a constant at all; fetched live from a primary
                    source per query, with a citation attached to the value
-                   (BRENDA, stdpopsim, the ADR 0017 registry).
+                   (BRENDA; stdpopsim and the ADR 0017 registry too until
+                   2026-09-27, when the SIR, SEIR and Wright-Fisher entries
+                   left this inventory with their domains, after v0.4.0 --
+                   every RESOLVED entry has been BRENDA since).
   VERIFIED       - a constant whose value was checked against a named
                    primary source, with the check itself automated.
   UNVERIFIED     - a teaching default chosen for pedagogy, not derived from

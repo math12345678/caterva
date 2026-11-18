@@ -3,15 +3,26 @@
 **This describes a plan, not the current layout.** Caterva is *to be*
 published as 18 repositories under
 [github.com/Terrium-sim](https://github.com/Terrium-sim); today it is one
-repository, and `docs/PUBLISHING.md` holds the procedure that has not been
-run. This file records what would go where and, where the answer was not
-obvious, why.
+repository,
+[math12345678/caterva](https://github.com/math12345678/caterva), and all
+development happens there. `docs/PUBLISHING.md` holds the procedure. It was
+run once, on 2026-08-12, under the old name: 17 of the 18 Terrium-sim
+repositories exist from that push (the 18th, `demo-repository`, is
+GitHub's demo), all 18 are private (anyone else gets a 404), and none has
+been pushed since. There is no `caterva` or `caterva-site`
+repository there yet. This file records what would go where and, where the
+answer was not obvious, why.
 
 That distinction is the reason for this paragraph. The line above read
 "Caterva **is** published as 18 repositories", in the present tense, in a
 document `DOCUMENTATION_INDEX.md` offers as "find my way around the tree" —
 so a newcomer looking for `backend-main` would go hunting for a repository
 that does not exist and conclude they had lost it.
+
+(Corrected 2026-11-01: `backend-main` does exist, as one of the private
+Terrium-sim repositories from the 2026-08-12 push. A newcomer still cannot
+see it, since it is private and not kept up to date, so the point stands:
+look in math12345678/caterva.)
 
 After the split, `main` becomes an **umbrella**: top-level README, compose
 and container files, CI, and git submodules pointing at the others. No
@@ -34,7 +45,7 @@ back with the split rather than ahead of it.
 
 | repo | contents | source in the monorepo | history |
 |---|---|---|---|
-| `main` | umbrella: README, LICENSE, CITATION.cff, CONTRIBUTING, SECURITY, CHANGELOG, Docker/compose, submodules | root files (14 current docs) | new |
+| `main` | umbrella: README, LICENSE, CITATION.cff, CONTRIBUTING, SECURITY, CHANGELOG, Docker/compose, the monitoring stack, submodules | root files (14 current docs), `deploy/monitoring/` | new |
 | `backend-main` | TypeScript library, CLI, engine bridge, web server, storage, validation, literature layer | `src/`, `examples/` | preserved |
 | `frontend-main` | the dashboard UI served by the web server | `src/web/dashboard.html` | preserved |
 | `wiring-main` | the guards, CI workflow, Makefile, build/lint/type config | `scripts/`, `.github/`, `Makefile`, `pyproject.toml`, `tsconfig.json`, `requirements*.txt` | preserved |
@@ -49,7 +60,7 @@ back with the split rather than ahead of it.
 | `worktrees` | git worktree scratch space | `Caterva.worktrees/` | new — see below |
 | `science-agent-pipeline-replit` | the Express API server and science-agent pipeline | `Science-Agent-Pipeline/` | preserved |
 | `archive` | 58 superseded status/session/completion reports | root `*.md` | new |
-| `miscellaneous` | uncategorised docs, images, the pitch deck, throwaway scripts | root loose files | new |
+| `miscellaneous` | the logo and the architecture diagram (the script also names `caterva_pitch_deck.pptx` and a root `FINAL_STATUS.txt`; neither is tracked, so a split skips them) | `Logo.png`, `docs/brand/caterva_ai_architecture.png` | new |
 | `mule` | MuleRun landing page | *(you add)* | new |
 | `demo-repository` | GitHub demo repo | *(unchanged)* | — |
 
@@ -94,8 +105,12 @@ replayed on top. Everything else splits directly, since no other path moved.
 ### `worktrees` starts empty
 
 `Caterva.worktrees/` contains no tracked files — it is scratch space for
-`git worktree add`. The repository is created with a README explaining what
-it is for, so that an empty repo is not mistaken for a failed push.
+`git worktree add`, and `.gitignore` ignores it. That was not quite true
+until 2026-10-31: the helper that creates the worktrees,
+`scripts/worktree.sh`, used to live inside the directory as its one tracked
+file. It now lives in `scripts/` and ships with `wiring-main`. The
+repository is created with a README explaining what it is for, so that an
+empty repo is not mistaken for a failed push.
 
 ### `archive` is large on purpose
 

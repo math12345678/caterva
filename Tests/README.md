@@ -27,11 +27,15 @@ Supporting modules, roughly in the order the chain uses them:
 | `form_mixture.py`, `source_context.py` | facts about the candidate *pool* rather than the winner |
 | `reliability.py` | Bakker's three axes |
 | `citation.py`, `citation_export.py` | the reference that travels with the value |
-| `epidemiology_resolver.py`, `popgen_resolver.py` | the non-enzyme domains |
 | `golden_set.py`, `fixture_lineages.py` | recorded corpora the tests run against offline |
 
 Files ending `_debug.py` and `big_test*.py` are exploration scratch, not
 part of the chain.
+
+The epidemiology and population-genetics resolvers that used to be listed
+here moved to `archive/legacy_domains/` on 2026-11-01, with the SIR, SEIR
+and Wright-Fisher domains they served (archived on 2026-09-27, after
+v0.4.0, the last release that runs them).
 
 ## Three-state, everywhere
 

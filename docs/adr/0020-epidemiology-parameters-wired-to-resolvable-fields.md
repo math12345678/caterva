@@ -127,3 +127,7 @@ domain (untouched, no bridge), every existing SIR/SEIR golden trajectory.
 - Hussein, M. et al. (2021). *Annals of Surgery* 273(3), 416–423. DOI
   10.1097/SLA.0000000000004400. PMID 33214421. R0 = 3.14, mean serial
   interval = 5.45 days.
+
+## Note (2026-10-31)
+
+`resolveEpidemiologyParameters` (scienceAgent.ts), `applyBetaGammaFromR0Resolution` (queryResolver.ts) and `diseases.ts` were removed from the API server on 2026-10-31. Epidemiology was archived on 2026-09-27 (`archive/legacy_domains/README.md`; v0.4.0 is the last release that runs it), no live domain can select the bridge, and the runner answers these parameter types with `domain_archived`. ADR 0180 records the removal.

@@ -155,3 +155,18 @@ should come with a mocked substitute that keeps the path covered.
   hand; that workaround is removed by this ADR.
 - STRENDA Guidelines v1.4.0, Beilstein-Institut — the standard's own scope
   is enzymology data, which is precisely the scope this ADR restores.
+
+## Note (2026-11-01)
+
+The Verification section above describes the tests as they stood on
+2026-08-09. On 2026-11-01 `src/__tests__/popgenProvenance.test.ts` was
+renamed `src/__tests__/strendaGoverned.test.ts` and now holds 3 tests, not
+5: `km` without assay conditions degrades to `flagged`, `km` with complete
+conditions stays `verified`, and a resolved non-governed key (`k`, a live
+Gillespie rate constant) carries no `strendaStatus` and produces no
+validator violations. The two `mutation_rate` cases and the `beta` case
+were dropped because population genetics and epidemiology were archived on
+2026-09-27, after v0.4.0 (the last release that runs them), and no live
+domain can resolve either key. `popgenResolutionE2E.test.ts` was removed
+with that archive (commit d990a73; v0.4.0 still carries it). The rule this
+ADR states is unchanged and both halves of it stay tested.

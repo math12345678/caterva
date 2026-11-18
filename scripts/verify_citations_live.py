@@ -13,7 +13,9 @@ script is the live half of that guarantee:
 
   * every golden-set tuple (Tests/test_golden_set.py) resolves to a real
     BRENDA enzyme page, and that page genuinely carries the reference id;
-  * every known PMID resolves on PubMed;
+  * every pinned PMID is the paper it is pinned for: its NCBI esummary
+    title must name the topic it is cited for (resolving is not enough --
+    see PMIDS);
   * every DOI in the model/resolved citations is registered (CrossRef API);
     doi.org redirects are avoided because publishers bot-gate them;
   * every static modelCitations URL in queryResolver.ts resolves.
@@ -23,11 +25,28 @@ DOIs get corrected), so a failing check is a flag to re-verify by hand,
 not an automatic CI failure. It reuses Tests/http_retry.py so the same
 backoff/retry policy as the live resolvers applies.
 
+THREE OUTCOMES, not two. Every check ends MATCHED (the host answered and
+the answer supports the citation), MISMATCHED (the host answered and the
+answer contradicts it: a 404/410, a missing reference id, a title about
+something else), or UNREACHABLE (the host did not give an answer: a
+timeout, a connection error, a 429/5xx, a bot gate). Until 2026-10-31 a
+network failure was counted as a failed citation, so a flaky host and a
+wrong reference printed the same red cross.
+
+Exit 0 = everything matched, 2 = at least one mismatch, 1 = no mismatch
+but at least one check could not be made. A mismatch outranks
+unreachability: it is a finding, the other is an absence of one.
+
+NCBI_API_KEY is used for the PubMed esummary call when it is set in the
+environment or in Science-Agent-Pipeline/.env. It is optional (NCBI
+allows 3 requests/s without one) and its value is never printed.
+
 Run:  python3 scripts/verify_citations_live.py
 """
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 import time
@@ -43,8 +62,8 @@ if str(TESTS_DIR) not in sys.path:
 from http_retry import retry_get  # noqa: E402
 
 #: Hard wall-clock budget for the whole run. The point of this script is to
-#: re-verify citations, and a citation whose host hangs is a FAIL, not a
-#: reason to hang the build. 2026-08-14: a stalled upstream host combined
+#: re-verify citations, and a citation whose host hangs is UNREACHABLE, not
+#: a reason to hang the build. 2026-08-14: a stalled upstream host combined
 #: with generous 20s-per-phase httpx timeouts made a single check eat the
 #: full 120s guard budget. A bounded deadline turns that into a fast,
 #: explicit failure.
@@ -91,11 +110,55 @@ GOLDEN_SET = [
     },
 ]
 
-# PMIDs pinned by the golden set / literature chain (citation.py, pubmed.py).
-PMIDS = ["740253", "34962677", "31520487"]
+# PMIDs pinned by the literature chain (citation.py, pubmed.py), each with
+# words of which at least one must appear in the paper's PubMed title.
+#
+# 740253 was listed here until 2026-10-31: it is a BRENDA reference id
+# (golden tuple G1, above), not a PMID, and PubMed resolves it -- to an
+# unrelated 1978 paper on jugular-vein cannulation. The check was "the
+# PubMed page answers 2xx", so a number from the wrong namespace passed.
+# An identifier that resolves is not an identifier that is right; the
+# title has to be about what it is cited for.
+PMIDS = {
+    "34962677": ("lactate dehydrogenase",),
+    "31520487": ("hexokinase",),
+}
+
+ENV_FILE = ROOT / "Science-Agent-Pipeline" / ".env"
+
+
+def load_env_keys(names: tuple[str, ...] = ("NCBI_API_KEY", "CORE_API_KEY")) -> dict[str, str]:
+    """API keys from the process environment, else Science-Agent-Pipeline/.env.
+
+    The environment wins so CI (which has no .env) and a deliberate
+    override both behave. Values are returned to the caller and never
+    printed; scrub() exists so an exception message carrying a request URL
+    cannot print one either.
+    """
+    keys = {n: os.environ[n] for n in names if os.environ.get(n)}
+    if ENV_FILE.is_file():
+        for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+            if "=" not in line or line.lstrip().startswith("#"):
+                continue
+            k, v = line.split("=", 1)
+            k = k.strip().removeprefix("export ").strip()
+            v = v.strip().strip("\"'")
+            if k in names and v and k not in keys:
+                keys[k] = v
+    return keys
+
+
+def scrub(text: str, keys: dict[str, str]) -> str:
+    """Replace every key value in text with <redacted>."""
+    for v in keys.values():
+        if v:
+            text = text.replace(v, "<redacted>")
+    return text
 
 # DOIs cited for resolved values (popgen_resolver.py via stdpopsim; ADR 0017
 # epidemiology registry). Kermack & McKendrick 1927 is the SIR model citation.
+# Both resolvers moved to archive/legacy_domains/ on 2026-11-01; the notes
+# below are kept because they record what this list once got wrong.
 DOIS = [
     # "10.1038/ng.3141" was listed here as "Rahbari et al. 2015 (human
     # mutation rate)" and removed 2026-08-09. It is a THIRD distinct
@@ -150,8 +213,12 @@ DOI_SOURCE_FILES = [
     ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/routes/pipeline.ts",
     ROOT / "caterva/core/data_structures.py",
     ROOT / "caterva/continuous/model_building.py",
-    ROOT / "Tests/epidemiology_resolver.py",
-    ROOT / "Tests/popgen_resolver.py",
+    # `Tests/epidemiology_resolver.py` and `Tests/popgen_resolver.py` were
+    # listed here until 2026-11-01, when they moved to
+    # archive/legacy_domains/ with the SIR, SEIR and Wright-Fisher domains
+    # they served. Nothing live serves their citations any more, and the
+    # FileNotFoundError in discovered_dois() would have stopped this whole
+    # check had the entries been left pointing at the old paths.
     # Added 2026-09-05. This list held only .ts and .py sources, so the one
     # document in the repository whose entire purpose is to enumerate
     # Caterva's citations was the one file the citation checker never read.
@@ -278,14 +345,35 @@ QUERY_RESOLVER = ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/que
 PASS = "\033[32m✓\033[0m"
 FAIL = "\033[31m✗\033[0m"
 WARN = "\033[33m!\033[0m"
+SKIP = "\033[33m?\033[0m"
+
+MATCHED, MISMATCHED, UNREACHABLE = "matched", "mismatched", "unreachable"
+
+#: Statuses that ARE an answer: the host is saying the thing is not there.
+#: Anything else outside 2xx (403 bot gates, 429, 5xx) says nothing about the
+#: citation -- only that we did not get to ask.
+ABSENT_STATUSES = frozenset({404, 410})
+
+#: A citation URL that is a DOI redirect; group 1 is the DOI.
+DOI_URL = re.compile(r"https?://(?:dx\.)?doi\.org/(10\.\S+)$", re.IGNORECASE)
 
 
-def check(label: str, ok: bool, detail: str) -> bool:
-    mark = PASS if ok else FAIL
+def report(label: str, outcome: str, detail: str, tally: dict[str, int]) -> str:
+    """Print one check in its three-outcome form and count it."""
+    tally[outcome] += 1
+    mark = {MATCHED: PASS, MISMATCHED: FAIL, UNREACHABLE: SKIP}[outcome]
     print(f"  {mark} {label}", flush=True)
-    if not ok:
-        print(f"      {detail}", flush=True)
-    return ok
+    if outcome != MATCHED:
+        tag = "UNREACHABLE: " if outcome == UNREACHABLE else ""
+        print(f"      {tag}{detail}", flush=True)
+    return outcome
+
+
+def status_outcome(status: int) -> str | None:
+    """None for a 2xx (the caller judges the body), else the outcome."""
+    if is_ok(status):
+        return None
+    return MISMATCHED if status in ABSENT_STATUSES else UNREACHABLE
 
 
 def is_ok(status: int) -> bool:
@@ -433,43 +521,76 @@ def brenda_url(ec: str) -> str:
     return f"https://www.brenda-enzymes.org/enzyme.php?ecno={ec}"
 
 
+def check_pmids(tally: dict[str, int], keys: dict[str, str]) -> None:
+    """Each pinned PMID's PubMed title must name the topic it is cited for.
+
+    One esummary call for all of them. NCBI answers 200 for an id it does
+    not know, with an `error` field in that id's entry, so "not in PubMed"
+    is a MISMATCH read from the body, not from a status code.
+    """
+    print("\nPubMed PMIDs (title must mention the topic cited for):")
+    url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
+    params = {"db": "pubmed", "retmode": "json", "id": ",".join(PMIDS)}
+    if keys.get("NCBI_API_KEY"):
+        params["api_key"] = keys["NCBI_API_KEY"]
+    try:
+        r = bounded_get(url, params=params)
+        status = status_outcome(r.status_code)
+        result = r.json().get("result", {}) if status is None else {}
+    except (httpx.HTTPError, ValueError) as exc:  # pragma: no cover - network
+        detail = scrub(f"esummary -> {exc!r}", keys)
+        for pmid in PMIDS:
+            report(f"PMID {pmid}", UNREACHABLE, detail, tally)
+        return
+    if status is not None:
+        # A non-2xx for the whole batch says nothing about any one PMID: a
+        # 404 here is the endpoint moving, not every pinned paper vanishing.
+        for pmid in PMIDS:
+            report(f"PMID {pmid}", UNREACHABLE,
+                   f"esummary -> HTTP {r.status_code}", tally)
+        return
+    for pmid, topics in PMIDS.items():
+        entry = result.get(pmid)
+        if not isinstance(entry, dict):
+            report(f"PMID {pmid}", UNREACHABLE,
+                   "esummary answered without an entry for this id", tally)
+            continue
+        if "error" in entry:
+            report(f"PMID {pmid}", MISMATCHED,
+                   f"PubMed has no such paper ({entry['error']!r})", tally)
+            continue
+        title = entry.get("title", "")
+        ok = any(t in title.lower() for t in topics)
+        report(f"PMID {pmid}", MATCHED if ok else MISMATCHED,
+               f"title {title!r} mentions none of {topics}", tally)
+        if ok:
+            print(f"      {title!r}", flush=True)
+
+
 def main() -> int:
-    failures = 0
+    tally = {MATCHED: 0, MISMATCHED: 0, UNREACHABLE: 0}
+    keys = load_env_keys(("NCBI_API_KEY",))
 
     print("\nBRENDA golden-set enzyme pages (must resolve AND list the ref):")
     for entry in GOLDEN_SET:
         url = brenda_url(entry["ec"])
+        label = f"[{entry['id']}]"
         try:
             r = bounded_get(url)
-            status = r.status_code
-            ok = is_ok(status) and str(entry["ref"]) in r.text
-            detail = f"{url} -> HTTP {status}"
-            if not ok:
-                if is_ok(status):
-                    detail += (
-                        f"; page does not contain ref {entry['ref']} "
-                        "(BRENDA may have restructured)"
-                    )
-                else:
-                    detail += " (expected 2xx)"
-            if not check(f"[{entry['id']}]", ok, detail):
-                failures += 1
         except httpx.HTTPError as exc:  # pragma: no cover - network dependent
-            failures += 1
-            check(f"[{entry['id']}]", False, f"{url} -> {exc!r}")
+            report(label, UNREACHABLE, f"{url} -> {exc!r}", tally)
+            continue
+        status = status_outcome(r.status_code)
+        if status is not None:
+            report(label, status, f"{url} -> HTTP {r.status_code}", tally)
+        elif str(entry["ref"]) in r.text:
+            report(label, MATCHED, "", tally)
+        else:
+            report(label, MISMATCHED,
+                   f"{url} -> HTTP {r.status_code}; page does not contain ref "
+                   f"{entry['ref']} (BRENDA may have restructured)", tally)
 
-    print("\nPubMed PMIDs (must resolve to a 2xx):")
-    for pmid in PMIDS:
-        url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
-        try:
-            r = bounded_get(url)
-            ok = is_ok(r.status_code)
-            check(f"PMID {pmid}", ok, f"{url} -> HTTP {r.status_code}")
-            if not ok:
-                failures += 1
-        except httpx.HTTPError as exc:  # pragma: no cover - network dependent
-            failures += 1
-            check(f"PMID {pmid}", False, f"{url} -> {exc!r}")
+    check_pmids(tally, keys)
 
     print(
         "\nDOIs (CrossRef registry = the DOI exists; publishers bot-gate doi.org"
@@ -495,9 +616,16 @@ def main() -> int:
     for doi in sorted(all_dois):
         where = ", ".join(sorted(set(all_dois[doi])))
         url = f"https://api.crossref.org/works/{doi}"
+        label = f"{doi}  [{where}]"
         try:
             r = bounded_get(url)
-            ok = is_ok(r.status_code)
+            status = status_outcome(r.status_code)
+            if status is not None:
+                # 404 is CrossRef saying the DOI is not registered: a
+                # finding. 429/5xx is CrossRef not answering: not one.
+                report(label, status, f"{url} -> HTTP {r.status_code}", tally)
+                continue
+            ok = True
             detail = f"{url} -> HTTP {r.status_code}"
 
             # A DOI that RESOLVES is not a DOI that supports the claim.
@@ -552,18 +680,15 @@ def main() -> int:
                     )
                     existence_only.append(f"{doi} ({reason})")
                     detail = f"{url} -> exists; NOT title-checked ({reason})"
-            # `check` prints detail only on failure, so a passing DOI's
+            # report() prints detail only when not matched, so a passing DOI's
             # registered title was being computed and discarded. The
             # existence-only marker is worth seeing on a pass, which is the
             # only time it matters.
-            check(f"{doi}  [{where}]", ok, detail)
+            report(label, MATCHED if ok else MISMATCHED, detail, tally)
             if ok and doi in {e.split(" ", 1)[0] for e in existence_only}:
                 print(f"      {detail}")
-            if not ok:
-                failures += 1
         except httpx.HTTPError as exc:  # pragma: no cover - network dependent
-            failures += 1
-            check(f"{doi}  [{where}]", False, f"{url} -> {exc!r}")
+            report(label, UNREACHABLE, f"{url} -> {exc!r}", tally)
 
     if ambiguous:
         print(
@@ -582,12 +707,12 @@ def main() -> int:
     print("\nStatic modelCitations URLs in queryResolver.ts (must resolve):")
     urls = set()
     if not QUERY_RESOLVER.exists():
-        failures += 1
-        check(
+        report(
             "queryResolver.ts",
-            False,
+            MISMATCHED,
             f"{QUERY_RESOLVER} does not exist, so NO static citation URL was "
             "checked.",
+            tally,
         )
     else:
         text = QUERY_RESOLVER.read_text()
@@ -598,7 +723,7 @@ def main() -> int:
             # exactly two URLs, both `https://www.brenda-enzymes.org/`, and
             # both end in a slash -- so `urls` was ALWAYS empty. The section
             # printed a header saying "must resolve", iterated nothing, added
-            # zero to `failures`, and fed a summary reading "all literature
+            # zero to the failure count, and fed a summary reading "all literature
             # checks passed live".
             #
             # A bare directory URL is exactly as worth checking as any other:
@@ -608,26 +733,31 @@ def main() -> int:
                 urls.add(url)
 
         if not urls:
-            failures += 1
-            check(
+            report(
                 "URL extraction",
-                False,
+                MISMATCHED,
                 "no URLs were extracted from queryResolver.ts, so this "
                 "section checked nothing. Either the citations stopped "
                 "carrying URLs or the pattern stopped matching; both are "
                 "worth knowing, and neither is a pass.",
+                tally,
             )
 
     for url in sorted(urls):
+        # A doi.org URL is asked of CrossRef, for the reason the module
+        # docstring gives: publishers bot-gate the doi.org redirect, so
+        # fetching it answers 403 and says nothing about the citation. This
+        # section asked doi.org directly anyway, and every doi.org citation
+        # in queryResolver.ts came back UNREACHABLE on every run.
+        doi = DOI_URL.match(url)
+        target = f"https://api.crossref.org/works/{doi.group(1)}" if doi else url
+        label = f"{url}  (via CrossRef)" if doi else url
         try:
-            r = bounded_get(url, follow_redirects=True)
-            ok = is_ok(r.status_code)
-            check(url, ok, f"-> HTTP {r.status_code}")
-            if not ok:
-                failures += 1
+            r = bounded_get(target, follow_redirects=True)
+            outcome = status_outcome(r.status_code) or MATCHED
+            report(label, outcome, f"{target} -> HTTP {r.status_code}", tally)
         except httpx.HTTPError as exc:  # pragma: no cover - network dependent
-            failures += 1
-            check(url, False, f"-> {exc!r}")
+            report(label, UNREACHABLE, f"{target} -> {exc!r}", tally)
 
     # Coverage, printed whether or not anything failed. "All literature
     # checks passed" was a conclusion about coverage the script never
@@ -646,22 +776,32 @@ def main() -> int:
         for line in existence_only:
             print(f"      {line}")
     if not all_dois:
-        failures += 1
+        tally[MISMATCHED] += 1
         print(
             f"  {FAIL} zero DOIs were checked. Refusing to report success: "
             "an empty check set is not a clean one."
         )
 
-    print()
-    if failures == 0:
+    print(
+        f"\nOutcomes: {tally[MATCHED]} matched, {tally[MISMATCHED]} "
+        f"mismatched, {tally[UNREACHABLE]} unreachable."
+    )
+    if tally[MISMATCHED]:
+        print(f"{FAIL} {tally[MISMATCHED]} check(s) MISMATCHED — re-verify by hand")
+        return 2
+    if tally[UNREACHABLE]:
         print(
-            f"{PASS} literature checks passed live "
-            f"({len(all_dois)} DOIs, {title_checked} title-verified, "
-            f"{len(urls)} URLs)"
+            f"{SKIP} nothing mismatched, but {tally[UNREACHABLE]} check(s) "
+            "could not be made. That is not a pass: re-run when the hosts "
+            "answer."
         )
-    else:
-        print(f"{FAIL} {failures} check(s) failed — re-verify by hand")
-    return 1 if failures else 0
+        return 1
+    print(
+        f"{PASS} literature checks passed live "
+        f"({len(all_dois)} DOIs, {title_checked} title-verified, "
+        f"{len(urls)} URLs)"
+    )
+    return 0
 
 
 if __name__ == "__main__":

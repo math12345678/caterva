@@ -27,6 +27,7 @@ import constants from "@/__fixtures__/api/kinetics/constants-hexokinase.json";
 import simAssociation from "@/__fixtures__/api/kinetics/sim-association.json";
 import simDecay from "@/__fixtures__/api/kinetics/sim-decay.json";
 import ldhDetail from "@/__fixtures__/api/enzymes/detail-1.1.1.27-human.json";
+import findHexokinase from "@/__fixtures__/api/enzymes/find-hexokinase-human.json";
 import capabilities from "@/__fixtures__/api/workspace/capabilities.json";
 import { frame, json, mockServer, setSessionToken, sseResponse } from "@/__tests__/helpers";
 import { resetRunStreamsForTests } from "@/api/runs";
@@ -377,6 +378,28 @@ describe("Compose screen", () => {
     expect(await screen.findAllByText(error.message)).not.toHaveLength(0);
     const post = seen.find((r) => r.method === "POST")!;
     expect(post.body).toEqual({ kind: "compose", request: { description: "reversible binding", analyses: { robustness: { samples: null } } } });
+  });
+});
+
+describe("Compose with a name typed in the enzyme finder and never clicked", () => {
+  it("sends the name as the subject instead of dropping it", async () => {
+    // The name went nowhere: the run had no subject and kept placeholders while the field still showed it.
+    setSessionToken("t0k");
+    const { seen } = mockServer((req) => {
+      if (req.url === "/api/compose/shapes") return json(200, shapes);
+      if (req.url.startsWith("/api/enzymes/find")) return json(200, findHexokinase.body);
+      if (req.method === "POST" && req.url === "/api/runs") return json(400, { error: { code: "malformed", message: "stop here" } });
+      return undefined;
+    });
+    stacked(true);
+    render(withApp("/compose", <ComposeScreen />));
+    await userEvent.type(screen.getByLabelText("Mechanism"), "Michaelis Menten");
+    await userEvent.type(screen.getByRole("combobox", { name: /^Enzyme/ }), "hexokinase");
+    await userEvent.click(screen.getByLabelText("Mechanism"));
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    await waitFor(() => expect(seen.some((r) => r.method === "POST")).toBe(true));
+    const post = seen.find((r) => r.method === "POST")!;
+    expect(post.body).toEqual({ kind: "compose", request: { description: "Michaelis Menten", subject: "hexokinase" } });
   });
 });
 

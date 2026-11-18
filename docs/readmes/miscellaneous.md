@@ -2,8 +2,8 @@
 
 Part of [**Caterva**](https://github.com/math12345678/caterva) — scientific computing for teaching labs.
 
-Things that are real but belong to no category: logos, the architecture
-diagram, the pitch deck, and a few throwaway probe scripts.
+Things that are real but belong to no category: the logo and the
+architecture diagram.
 
 Kept deliberately small. A miscellaneous repository is where things go to
 stop being found, so anything here that turns out to matter should move to

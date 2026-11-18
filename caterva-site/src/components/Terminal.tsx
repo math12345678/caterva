@@ -3,8 +3,8 @@
  *
  * Real input, real history, tab completion, and output that streams in a
  * line at a time. Commands compute their answers when invoked — see
- * lib/terminal.ts. Typing `run md` runs a golden-section search in the
- * browser and prints what it found.
+ * lib/terminal.ts. Typing `verify gillespie_ssa` runs fifty exact stochastic
+ * simulations in the browser and prints how close their mean came.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -12,8 +12,8 @@ import { execute, COMMAND_NAMES, type Line } from '../lib/terminal';
 import { useInView, useReducedMotion } from '../lib/motion';
 
 const BOOT: Line[] = [
-  { kind: 'dim', text: 'caterva verification shell · v0.4.2-alpha' },
-  { kind: 'dim', text: "type 'help' for commands, or try 'verify md'" },
+  { kind: 'dim', text: 'caterva verification shell' },
+  { kind: 'dim', text: "type 'help' for commands, or try 'verify gillespie_ssa'" },
 ];
 
 const KIND_CLASS: Record<Line['kind'], string> = {
@@ -102,7 +102,7 @@ export default function Terminal() {
   useEffect(() => {
     if (!inView || hasRun) return;
     setHasRun(true);
-    const t = window.setTimeout(() => submit('verify md'), reduced ? 0 : 700);
+    const t = window.setTimeout(() => submit('run mm'), reduced ? 0 : 700);
     return () => window.clearTimeout(t);
   }, [inView, hasRun, submit, reduced]);
 
@@ -237,8 +237,8 @@ export default function Terminal() {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-4 py-2 font-mono text-[10px] text-faint">
           <span>tab completes</span>
           <span>↑↓ history</span>
-          <span className="ml-auto flex gap-2">
-            {['help', 'verify md', 'mutate popgen', 'ledger', 'agents'].map((c) => (
+          <span className="ml-auto flex flex-wrap gap-2">
+            {['help', 'run mm', 'verify gillespie_ssa', 'mutate gillespie_ssa', 'domains'].map((c) => (
               <button
                 key={c}
                 onClick={(e) => {

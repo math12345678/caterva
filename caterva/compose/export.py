@@ -157,7 +157,7 @@ import csv
 import io
 import re
 from dataclasses import dataclass, replace
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from xml.sax.saxutils import escape
 
 try:
@@ -296,11 +296,25 @@ class Spread:
     n_values: int
     references: Tuple[str, ...]
     chosen_because: Optional[str] = None
+    #: The resolver's own reason for the row (`Measurement.resolver_because`).
+    resolver_because: Optional[str] = None
+    #: When the rows split into two forms of the enzyme their commentary
+    #: names ("membrane-bound form" and "soluble enzyme" for rat COMT), the
+    #: two labels and each form's span: the spread is the two forms, not
+    #: papers disagreeing about one (fourth round of the review).
+    forms: Optional[Tuple[Tuple[str, float, float], ...]] = None
 
     @property
     def carried_as(self) -> str:
-        """Why the carried value is the carried value."""
-        return self.chosen_because or "the resolver's pick, not a verdict"
+        """Why the carried value is the carried value: a re-selection's
+        reason, else the resolver's (the median of the best-described rows,
+        the paired constant's paper, the spread), else, for a resolver that
+        gave none, that it is the resolver's pick and not a verdict."""
+        if self.chosen_because:
+            return self.chosen_because
+        if self.resolver_because:
+            return f"chosen because {self.resolver_because}"
+        return "the resolver's pick, not a verdict"
 
     @property
     def fold(self) -> float:
@@ -316,11 +330,20 @@ class Spread:
     def what(self) -> str:
         if self.one_source:
             return f"one source (BRENDA ref {self.references[0]}) reports {self.n_values} values"
-        return (f"{len(self.references) or 'several'} sources report {self.n_values} values"
-                + (f" (BRENDA ref {', '.join(self.references)})" if self.references else ""))
+        distinct = " distinct" if self.n_values < len(self.references) else ""
+        return (f"{len(self.references) or 'several'} sources report {self.n_values}{distinct} values"
+                + (f" (BRENDA ref {', '.join(self.references)})" if self.references else "")
+                + " among the rows the resolver ranked for this protein (rows naming another "
+                  "isoform left out)")
 
     @property
     def why(self) -> str:
+        if self.forms:
+            parts = "; ".join(f"{label}: {lo:g} to {hi:g} {self.unit}" if lo != hi
+                              else f"{label}: {lo:g} {self.unit}" for label, lo, hi in self.forms)
+            return (f"the rows measured two forms of the enzyme ({parts}), so the spread is the "
+                    "difference between the forms, not papers disagreeing about one; read which "
+                    "form the carried row is before relying on it")
         if self.one_source:
             return ("two rows from one publication usually differ in the conditions or the "
                     "exact substrate, so read that paper before choosing")
@@ -331,6 +354,36 @@ class Spread:
                 f"({self.fold:.3g}-fold); this model carries {self.carried:g}, "
                 f"{self.carried_as}; {self.why}. The range is not an uncertainty estimate: "
                 f"it is bounded by which rows are in the database")
+
+
+#: Two forms of one enzyme a commentary names, as (label, pattern).
+_FORMS = (("membrane-bound form", re.compile(r"\bmembrane[- ]bound\b|\bMB-\w+", re.IGNORECASE)),
+          ("soluble form", re.compile(r"\bsoluble (?:form|enzyme)\b|\bS-COMT\b", re.IGNORECASE)))
+
+
+def _two_forms(rows: Sequence[Any]) -> Optional[Tuple[Tuple[str, float, float], ...]]:
+    """Each form's (label, low, high) when the rows name both forms and
+    their values do not overlap; None otherwise."""
+    spans = []
+    for label, pattern in _FORMS:
+        values = []
+        for row in rows:
+            get = row.get if isinstance(row, dict) else (lambda k, r=row: getattr(r, k, None))
+            text, value = get("conditions") or "", get("value")
+            if value is not None and pattern.search(text) and not any(
+                    p.search(text) for other, p in _FORMS if other != label):
+                values.append(float(value))
+        if not values:
+            return None
+        spans.append((label, min(values), max(values)))
+    (_, a_lo, a_hi), (_, b_lo, b_hi) = spans
+    return tuple(spans) if a_hi < b_lo or b_hi < a_lo else None
+
+
+def _mutations(text: Optional[str]) -> frozenset:
+    """The point substitutions a commentary names ("mutant enzyme R132H")."""
+    return frozenset(m.upper() for m in re.findall(
+        r"(?<![A-Za-z0-9])[A-Z]\d{1,4}[A-Z](?![A-Za-z0-9])", text or ""))
 
 
 @dataclass(frozen=True)
@@ -413,12 +466,85 @@ class Measurement:
     #: not the resolver's pick: "the row for LDH-A, as --isoform asked".
     #: None means the resolver chose it.
     chosen_because: Optional[str] = None
+    #: The resolver's own reason for carrying the row it chose
+    #: (`KineticResult.chosen_because`): the median of the best-described
+    #: rows, what it set aside, the spread, and the paper a paired Km and
+    #: kcat share (ADR 0182). Not a re-selection: `chosen_because` stays
+    #: None for the resolver's pick, and wins over this when set.
+    resolver_because: Optional[str] = None
+    #: The isoform the row measured as the resolver read it: its commentary,
+    #: else its own UniProt cell ("IDH1" for O75874, "GCK" for P35557). A row
+    #: whose words name none can still name one by accession; the isoform
+    #: checks read this when the words are silent (ADR 0182, second round).
+    row_isoform: Optional[str] = None
+
+    def _compared(self) -> Tuple[Any, ...]:
+        """The ranked rows that measured the carried row's protein: a row
+        naming another isoform is another protein's value, not a disagreement
+        about this one. Carbonic anhydrase II's kcat 1.4e6 1/s was reported as
+        a 108-fold disagreement with CA III's 13000 (third round's review)."""
+        rows = tuple(self.alternatives)
+        # A mutant's constant is compared with that mutant's rows only:
+        # "IDH1 R132H" printed a 400-fold spread built from wild-type and
+        # other mutants' rows as a question about the papers (fourth round).
+        variant = _mutations(self.commentary)
+        if variant:
+            rows = tuple(r for r in rows if _mutations(
+                r.get("conditions") if isinstance(r, dict) else getattr(r, "conditions", None))
+                == variant)
+        mine = self.row_isoform
+        if not mine:
+            return rows
+        try:
+            from caterva.bind.core import same_isoform
+        except ImportError:  # pragma: no cover - caterva is importable here
+            return tuple(self.alternatives)
+        try:
+            from caterva.bind.core import read_isoform
+            named_itself = bool(read_isoform(self.commentary or ""))
+        except ImportError:  # pragma: no cover
+            named_itself = False
+        kept = []
+        for row in rows:
+            get = row.get if isinstance(row, dict) else (lambda k, r=row: getattr(r, k, None))
+            # Only a row that names its isoform itself, in its words or its
+            # own UniProt cell, is set aside: a reading from its paper's
+            # other entries is a weaker guess than a spread can rest on.
+            own = get("isoform_own")
+            if own and own != mine and not same_isoform(own, mine):
+                continue
+            # A row naming none whose paper's other entries name only another
+            # protein is that protein's too: human HK2's Km spread was built
+            # from refs 641067 and 641068, glucokinase papers (3.8 and 6 mM),
+            # and called a disagreement about HK2 (fourth round's review).
+            paper = get("isoform")
+            if not own and paper and paper != mine and " and " not in paper and named_itself \
+                    and not same_isoform(paper, mine):
+                continue
+            kept.append(row)
+        if named_itself:
+            # The carried row names its protein, and others do too: those
+            # are the comparison. Rat glucokinase's spread counted a 0.05 mM
+            # row naming no isozyme, a hexokinase-range value, as a 154-fold
+            # disagreement about HXK4 (fifth round, S5-05).
+            def names_mine(row: Any) -> bool:
+                get = row.get if isinstance(row, dict) else (lambda k, r=row: getattr(r, k, None))
+                own = get("isoform_own") or read_isoform(
+                    (get("conditions") or "") if isinstance(get("conditions"), str) else "")
+                return bool(own) and (own == mine or same_isoform(own, mine))
+            # Rows naming none are not counted against it either: human
+            # HK2's Km spread counted two glucokinase-range rows naming no
+            # isozyme (refs 641067, 641068) as a disagreement about HK2
+            # (fifth round, R5B-05).
+            return tuple(row for row in kept if names_mine(row))
+        return tuple(kept)
 
     @property
     def disagreement(self) -> Optional[Tuple[float, float]]:
-        """`(low, high)` across every ranked row, or None when they agree."""
+        """`(low, high)` across every ranked row of the carried row's protein,
+        or None when they agree."""
         values = [float(self.value)]
-        for row in self.alternatives:
+        for row in self._compared():
             candidate = row.get("value") if isinstance(row, dict) else getattr(row, "value", None)
             if candidate is None:
                 continue
@@ -436,12 +562,24 @@ class Measurement:
         span = self.disagreement
         if span is None:
             return None
-        rows = [r for r in self.alternatives if isinstance(r, dict)]
-        values = {r.get("value") for r in rows if r.get("value") is not None}
-        references = tuple(sorted({str(r["reference_id"]) for r in rows if r.get("reference_id")}))
+        rows = [r for r in self._compared() if isinstance(r, dict)]
+        values = {float(r["value"]) for r in rows if r.get("value") is not None}
+        values.add(float(self.value))
+        refs = {str(r["reference_id"]) for r in rows if r.get("reference_id")}
+        # The carried row's own paper is one of the sources: succinate
+        # dehydrogenase carried 0.1 mM from ref 2877 under "one source
+        # (BRENDA ref 699137) reports 2 values, spanning 0.1 to 0.303 mM"
+        # (fifth round, S5-03).
+        mine = re.search(r"BRENDA ref (\d+)", str(self.citation or ""))
+        if mine and not any(r.get("value") is not None and float(r["value"]) == float(self.value)
+                            for r in rows):
+            refs.add(mine.group(1))
+        references = tuple(sorted(refs))
         return Spread(low=span[0], high=span[1], unit=self.unit, carried=float(self.value),
                       n_values=max(len(values), 2), references=references,
-                      chosen_because=self.chosen_because)
+                      chosen_because=self.chosen_because,
+                      resolver_because=self.resolver_because,
+                      forms=_two_forms(rows))
 
     def __post_init__(self) -> None:
         if not str(self.citation).strip():
@@ -749,9 +887,9 @@ def provenance_of(
     substrate = getattr(source, "substrate", None)
     isoform = getattr(source, "isoform", None)
     try:
-        from caterva.compose.row_scope import read_scope
+        from caterva.compose.row_scope import read_scope, row_isoform_of
     except ImportError:  # pragma: no cover - flat layout
-        from compose.row_scope import read_scope  # type: ignore[no-redef]
+        from compose.row_scope import read_scope, row_isoform_of  # type: ignore[no-redef]
 
     for species_id in composition.species_ids:
         if species_id in supplied:
@@ -819,7 +957,8 @@ def provenance_of(
                     measurement=measurement,
                     scope=(
                         read_scope(measurement.commentary, motif=instance.motif.name,
-                                   table=parameter.table, substrate=substrate, isoform=isoform)
+                                   table=parameter.table, substrate=substrate, isoform=isoform,
+                                   row_isoform=row_isoform_of(measurement, isoform))
                         if measurement is not None else None
                     ),
                 )
@@ -915,6 +1054,8 @@ def measured_from_search(search: Any) -> Dict[str, Measurement]:
             # number three layers downstream.
             alternatives=tuple(getattr(source, "candidates", ()) or ()),
             commentary=getattr(source, "commentary", None),
+            resolver_because=getattr(source, "resolver_because", None),
+            row_isoform=getattr(source, "row_isoform", None),
         )
     return out
 

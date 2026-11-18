@@ -28,6 +28,17 @@ WHAT IT CHECKS
    mechanism by which the CC BY attribution reaches downstream users; an
    empty or missing NOTICE breaks the chain silently.
 
+WHERE IT LOOKS FOR DECLARATIONS
+-------------------------------
+Every tracked `package.json` and `*.cff`, and (since 2026-11-01) every
+tracked OpenAPI spec and `pyproject.toml`. The first version read only the
+first two, and that was the same defect in a smaller form: at f4ab5f7 the
+root `openapi.yaml` said `license: name: MIT`, served to every client by
+`GET /api/openapi.json`, while this guard printed OK. It was checking two
+kinds of file and reporting on the repository. `pyproject.toml`'s
+`[project] license` is the one the published wheel carries in its metadata,
+so it is the declaration most people downstream actually read.
+
 WHAT IT DOES NOT CHECK
 ----------------------
 Whether Apache 2.0 is the right licence. That is a decision for a lawyer at
@@ -35,7 +46,9 @@ incorporation, and a script that appeared to validate it would be worse than
 no script — the "check that cannot fail" failure, applied to a legal
 question.
 
-Exit 0 = consistent. Exit 1 = a real disagreement.
+Exit 0 = consistent. Exit 1 = a real disagreement, or a published
+manifest named in PUBLISHED_SPECS / PUBLISHED_PYPROJECT is missing.
+Exit 3 = could not check (a declaration this machine cannot parse).
 """
 from __future__ import annotations
 
@@ -71,18 +84,188 @@ CONTRADICTIONS = [
 ]
 
 
-def tracked(pattern: str) -> list[pathlib.Path]:
+#: OpenAPI specs that are published, and so MUST declare a licence. For any
+#: other spec a missing licence passes and only a wrong one fails.
+#:
+#: The root spec is served to every client by `GET /api/openapi.json`
+#: (src/web/server.ts), and docs/api/OPENAPI_GUIDE.md calls it the spec
+#: "Caterva publishes", so a reader takes its `info.license` as the terms.
+#: `Science-Agent-Pipeline/lib/api-spec/openapi.yaml` is left out on
+#: purpose: it is the codegen input of a `"private": true` workspace
+#: package, nothing serves it, and its `info` block is generator
+#: boilerplate ("Do not change the title"). Saying nothing there is not a
+#: claim about the terms; saying MIT there would be one, and is caught.
+PUBLISHED_SPECS = {"openapi.yaml"}
+
+#: The pyproject whose `[project] license` becomes the published wheel's
+#: metadata. It must declare one: a wheel without it says UNKNOWN on PyPI
+#: and to every SBOM tool, which is a statement about the terms too.
+PUBLISHED_PYPROJECT = "pyproject.toml"
+
+#: A spec by file name, the way generators and the guide name them. Matched
+#: on the base name, so a spec added in a new package is found without
+#: editing this file. `openapitools.json` does not match: it is the
+#: generator's own config, not a spec.
+_SPEC_NAME = re.compile(r"^(openapi|swagger)([._-][^/]*)?\.(ya?ml|json)$", re.I)
+
+
+class CouldNotCheckError(Exception):
+    """A declaration exists that this machine cannot read.
+
+    Reported as exit 3, not 0. A guard that skips the file it cannot parse
+    and prints OK is the defect this file was written about.
+    """
+
+
+def tracked(pattern: str, root: pathlib.Path = REPO) -> list[pathlib.Path]:
     out = subprocess.run(
-        ["git", "ls-files", pattern], cwd=REPO, capture_output=True, text=True
+        ["git", "ls-files", pattern], cwd=root, capture_output=True, text=True
     )
-    return [REPO / line for line in out.stdout.split() if line]
+    return [root / line for line in out.stdout.splitlines() if line]
 
 
-def declared_licences() -> list[tuple[pathlib.Path, str]]:
+def openapi_specs(root: pathlib.Path = REPO) -> list[pathlib.Path]:
+    return [
+        p for p in tracked("*", root)
+        if _SPEC_NAME.match(p.name) and "node_modules" not in p.parts
+    ]
+
+
+def _load_spec(path: pathlib.Path) -> object:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if path.suffix.lower() == ".json":
+        return json.loads(text)
+    # PyYAML, not a regex. It is pinned in requirements-dev.txt and CI
+    # installs it for check_ci_toolchain.py. A regex for `name: MIT` would
+    # have to know which block it sits in, and a spec may write
+    # `license: {name: MIT}` in flow style on one line; the parser knows.
+    try:
+        import yaml
+    except ImportError as exc:  # pragma: no cover - PyYAML is in requirements-dev
+        raise CouldNotCheckError(
+            f"{path.name} is YAML and PyYAML is not installed "
+            "(pip install -r requirements-dev.txt)."
+        ) from exc
+    return yaml.safe_load(text)
+
+
+def spec_licences(path: pathlib.Path) -> list[str] | None:
+    """Every licence string a spec's `info.license` states.
+
+    None when the file is not an OpenAPI or Swagger document at all. Both
+    `name` and the 3.1 `identifier` are read: a spec saying
+    `identifier: Apache-2.0` and `name: MIT` contradicts itself, and
+    reading only one of them would pass it.
+    """
+    try:
+        data = _load_spec(path)
+    except CouldNotCheckError:
+        raise
+    except Exception as exc:  # a malformed spec is "could not check", not a skip
+        raise CouldNotCheckError(f"{path.name} could not be parsed: {exc}") from exc
+    if not isinstance(data, dict) or not ({"openapi", "swagger"} & set(data)):
+        return None
+    info = data.get("info")
+    licence = info.get("license") if isinstance(info, dict) else None
+    if isinstance(licence, str):
+        return [licence]
+    if not isinstance(licence, dict):
+        return []
+    return [str(licence[k]) for k in ("identifier", "name") if k in licence]
+
+
+def pyproject_licence(path: pathlib.Path) -> str | None:
+    """`[project] license` as a string, or None when it states none.
+
+    tomllib is in the standard library from 3.11. The repository supports
+    3.10 and declares no `tomli` (nothing else here parses TOML), so on 3.10
+    a regex reads the one key, scoped to the `[project]` table. It accepts
+    the PEP 639 string form and the older `{text = "..."}` table, the two
+    forms that state an identifier. `{file = "LICENSE"}` states none, and
+    returns None under both readers.
+    """
+    text = path.read_text(encoding="utf-8", errors="replace")
+    try:
+        import tomllib
+    except ImportError:  # Python 3.10
+        tomllib = None  # type: ignore[assignment]
+    if tomllib is not None:
+        try:
+            project = tomllib.loads(text).get("project", {})
+        except tomllib.TOMLDecodeError as exc:
+            raise CouldNotCheckError(f"{path.name} could not be parsed: {exc}") from exc
+        licence = project.get("license")
+        if isinstance(licence, str):
+            return licence
+        if isinstance(licence, dict) and isinstance(licence.get("text"), str):
+            return licence["text"]
+        return None
+    return _pyproject_licence_by_regex(text)
+
+
+def _pyproject_licence_by_regex(text: str) -> str | None:
+    """The 3.10 reader. Kept separate so a test can run it on any Python."""
+    section = re.search(r"^\[project\][ \t]*$(.*?)(?=^\[|\Z)", text, re.M | re.S)
+    if not section:
+        return None
+    match = re.search(
+        r'^license\s*=\s*(?:"([^"]+)"|\{\s*text\s*=\s*"([^"]+)"\s*\})',
+        section.group(1), re.M,
+    )
+    return (match.group(1) or match.group(2)) if match else None
+
+
+def missing_declarations(root: pathlib.Path = REPO) -> list[str]:
+    """Published manifests that are missing, or that state no licence.
+
+    A published file that is not there is a failure, not a pass. Until
+    2026-11-01 each check ran only `if path.exists()`, so renaming or
+    moving the root openapi.yaml (say, to a new name server.ts serves)
+    would have turned the published spec into an "internal" one where
+    silence passes, and nothing would have said the published file was
+    gone. The constant names what is published; when it goes stale the
+    reader is told to update it.
+    """
+    problems = []
+    for rel in sorted(PUBLISHED_SPECS):
+        path = root / rel
+        if not path.is_file():
+            problems.append(
+                f"{rel} is listed in PUBLISHED_SPECS but does not exist. If "
+                "the published spec moved or was renamed, update "
+                "PUBLISHED_SPECS in scripts/check_license_consistency.py to "
+                "the file GET /api/openapi.json now serves; until then the "
+                "published spec's licence is not being checked."
+            )
+            continue
+        if not spec_licences(path):
+            problems.append(
+                f"{rel} declares no info.license, and it is published "
+                "(served by GET /api/openapi.json). A client reading it "
+                "learns nothing about the terms."
+            )
+    pyproject = root / PUBLISHED_PYPROJECT
+    if not pyproject.is_file():
+        problems.append(
+            f"{PUBLISHED_PYPROJECT} is PUBLISHED_PYPROJECT but does not "
+            "exist. If the wheel is now built from another pyproject.toml, "
+            "update PUBLISHED_PYPROJECT in "
+            "scripts/check_license_consistency.py; until then the wheel's "
+            "licence metadata is not being checked."
+        )
+    elif pyproject_licence(pyproject) is None:
+        problems.append(
+            f"{PUBLISHED_PYPROJECT} has no [project] license, so the "
+            "published wheel's metadata says UNKNOWN."
+        )
+    return problems
+
+
+def declared_licences(root: pathlib.Path = REPO) -> list[tuple[pathlib.Path, str]]:
     """(file, identifier) for every file that declares one."""
     found: list[tuple[pathlib.Path, str]] = []
 
-    for path in tracked("*package.json"):
+    for path in tracked("*package.json", root):
         if "node_modules" in path.parts:
             continue
         try:
@@ -93,26 +276,48 @@ def declared_licences() -> list[tuple[pathlib.Path, str]]:
         if isinstance(licence, str):
             found.append((path, licence))
 
-    for path in tracked("*.cff"):
+    for path in tracked("*.cff", root):
         text = path.read_text(encoding="utf-8", errors="replace")
         match = re.search(r"^license:\s*(\S+)\s*$", text, re.M)
         if match:
             found.append((path, match.group(1).strip('"\'')))
 
+    for path in openapi_specs(root):
+        found.extend((path, licence) for licence in spec_licences(path) or [])
+
+    for path in tracked("*pyproject.toml", root):
+        if path.name != "pyproject.toml":
+            continue
+        licence = pyproject_licence(path)
+        if licence is not None:
+            found.append((path, licence))
+
     return found
 
 
-def main() -> int:
+def main(root: pathlib.Path | None = None) -> int:
+    """Run every check on `root` (the repository by default).
+
+    `root` exists so a test can run the whole guard, exit code included,
+    on a planted tree instead of only calling the helpers.
+    """
+    root = REPO if root is None else root
     problems: list[str] = []
     checked = 0
 
     # --- 1. identifiers agree ------------------------------------------
-    declarations = declared_licences()
+    try:
+        declarations = declared_licences(root)
+        problems.extend(missing_declarations(root))
+    except CouldNotCheckError as exc:
+        print(f"check_license_consistency: could not check: {exc}")
+        print("This is 'could not check', NOT 'checked and fine'. Exiting 3.")
+        return 3
     for path, licence in declarations:
         checked += 1
         if licence != EXPECTED:
             problems.append(
-                f"{path.relative_to(REPO)} declares license '{licence}', "
+                f"{path.relative_to(root)} declares license '{licence}', "
                 f"but the repository is {EXPECTED}. Two files claiming "
                 "different terms is the exact defect this guard was written "
                 "for."
@@ -125,7 +330,7 @@ def main() -> int:
         )
 
     # --- 2. LICENSE contains the licence it claims ---------------------
-    licence_file = REPO / "LICENSE"
+    licence_file = root / "LICENSE"
     if not licence_file.exists():
         problems.append("LICENSE is missing.")
     else:
@@ -166,7 +371,7 @@ def main() -> int:
             )
 
     # --- 4. NOTICE credits BRENDA --------------------------------------
-    notice = REPO / "NOTICE"
+    notice = root / "NOTICE"
     checked += 1
     if not notice.exists():
         problems.append(
@@ -201,7 +406,7 @@ def main() -> int:
     # Checked here rather than in a new guard because "the repository is
     # unambiguous about its own terms" is this file's subject, and inbound
     # terms are terms.
-    inbound = REPO / "docs" / "INBOUND_LICENSE.md"
+    inbound = root / "docs" / "INBOUND_LICENSE.md"
     if not inbound.exists():
         problems.append(
             "docs/INBOUND_LICENSE.md is missing. Nothing states what a "
@@ -224,7 +429,7 @@ def main() -> int:
                     f"({why})."
                 )
 
-    contributing = REPO / "CONTRIBUTING.md"
+    contributing = root / "CONTRIBUTING.md"
     if contributing.exists():
         checked += 1
         contributing_text = contributing.read_text(encoding="utf-8", errors="replace")
@@ -239,7 +444,7 @@ def main() -> int:
     print(f"Checked {checked} licence declaration(s) across "
           f"{len(declarations)} manifest file(s), LICENSE and NOTICE.")
     for path, licence in sorted(declarations):
-        print(f"  {path.relative_to(REPO)}: {licence}")
+        print(f"  {path.relative_to(root)}: {licence}")
 
     if problems:
         print()

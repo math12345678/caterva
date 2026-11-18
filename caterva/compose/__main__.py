@@ -89,7 +89,7 @@ import re
 import argparse
 import contextlib
 import sys
-from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 #: `--robustness` given with no sample count. argparse cannot use `None`
 #: for both "flag absent" and "flag present, number unstated", and the
@@ -951,6 +951,1103 @@ def _validate_section(
 
 
 # ---------------------------------------------------------------------------
+# What the description itself names (ADR 0181)
+# ---------------------------------------------------------------------------
+
+#: The shapes a description's enzyme is applied to: ONE enzyme, whatever it
+#: is inhibited by or however many substrates it takes. A cascade, a
+#: competition, a pathway or a futile cycle has an enzyme per step, and one
+#: named enzyme's constants on every step is ADR 0076's adjacent-paper
+#: miscitation: "three step cascade of hexokinase" would carry hexokinase's
+#: Km on two steps hexokinase does not run.
+SINGLE_ENZYME_RULES = frozenset({
+    "michaelis_menten", "competitive_inhibition", "noncompetitive_inhibition",
+    "uncompetitive_inhibition", "mixed_inhibition", "substrate_inhibition",
+    "product_inhibition", "cooperative_catalysis", "reversible_catalysis",
+    "ordered_bi_bi", "ping_pong_bi_bi", "mwc_allostery",
+})
+
+#: The shape built when a description names an enzyme and no mechanism.
+NAMED_ENZYME_SHAPE = "Michaelis Menten"
+
+#: Word stems that describe a mechanism. A description the grammar did not
+#: recognise that names an enzyme AND one of these ("hexokinase
+#: oscillator") is refused, not read as one enzyme on one substrate: the
+#: person asked for a mechanism this grammar does not build, and building
+#: Michaelis-Menten instead would answer a question they did not ask.
+_MECHANISM_STEMS = (
+    "oscillat", "switch", "toggle", "feedback", "feed-forward", "feedforward", "loop", "cascade",
+    "cycle", "pathway", "bistab", "gene", "promoter", "repress", "transcri", "translat",
+    "transport", "pump", "channel", "receptor", "binding", "complex", "inhibit", "allosteric",
+    "cooperativ", "hill", "network", "circuit", "signal", "phosphorylation", "dephosph", "competition",
+    "competing", "branch", "reversible", "two-substrate", "bi-bi", "ping-pong",
+    # Read since bacterial gene symbols are ("EnvZ phosphorylating OmpR, a
+    # two-component system" names an enzyme now; the phrase is the shape,
+    # not a compound the enzyme acts on; sixth round of the review).
+    "two-component", "two component", "phosphorelay",
+)
+
+
+@dataclass
+class DescriptionReading:
+    """What `read_description` made of `args.description`.
+
+    `description` is what to compose: the description as typed, or
+    NAMED_ENZYME_SHAPE when it named an enzyme and no mechanism. `notes`
+    are sentences for the report, each inference stated. `name_refusal`
+    is the policy's `NameNotResolved` when the enzyme the description names
+    is several enzymes, and `refusal_note` the search note that says so.
+    `unapplied` says why a named enzyme was not made the subject.
+    """
+
+    description: str
+    notes: List[str] = field(default_factory=list)
+    name_refusal: Optional[Any] = None
+    refusal_note: Optional[str] = None
+    unapplied: Optional[str] = None
+    enzyme_text: Optional[str] = None
+    #: Choices made while reading (ADR 0182): the enzyme a name that is a
+    #: few enzymes was taken as, when BRENDA's data singles one out.
+    choices: List[Any] = field(default_factory=list)
+
+
+#: The shape built when a description that named an enzyme and no
+#: mechanism also named an inhibitor (ADR 0182): the commonest mode, said.
+INHIBITED_ENZYME_SHAPE = "Michaelis-Menten with a competitive inhibitor"
+
+
+def _rerun_command(description: str) -> str:
+    """`caterva compose "<description>" --subject {ec}`, quoted for a shell and
+    with its braces doubled, because the refusal fills `{ec}` with format()."""
+    import shlex
+
+    quoted = (f'"{description}"' if not re.search(r'["$`\\!]', description)
+              else shlex.quote(description))
+    return f"caterva compose {quoted} --subject {{ec}}".replace("{", "{{").replace("}", "}}") \
+        .replace("{{ec}}", "{ec}")
+
+
+def _flag_subject_ec(args: Any) -> Optional[str]:
+    """The EC number `--subject` names, offline, or None when it does not
+    name exactly one (the search then refuses it, as it always has)."""
+    try:
+        from caterva.enzymes.policy import resolve_enzyme_name
+
+        return resolve_enzyme_name(args.subject, args.organism, allow_unlisted_ec=True).ec
+    except Exception:  # noqa: BLE001 - read_subject refuses it, with the candidates named
+        return None
+
+
+def _shape_from(description: str, reading: Any, subject: Optional[str] = None) -> Tuple[str, str, Optional[str]]:
+    """(what to compose, the rule it builds, a note) for `description`.
+
+    Raises the grammar's UnrecognisedShape unless the description named an
+    enzyme and nothing a mechanism is made of, in which case the shape is
+    one enzyme turning one substrate into product and the note says so.
+    `--subject` names the enzyme too: "6-phosphogluconate dehydrogenase from
+    sheep liver --subject 1.1.1.43", the command a refusal advised, was
+    refused again with the same words, because the reader could not place
+    the name the flag had already settled (sixth round of the review).
+    """
+    from caterva.compose.grammar import UnrecognisedShape, _named_pathway_in, recognise
+
+    try:
+        rule = recognise(description).rule
+        compound = _only_cue_is_a_compound(description, reading)
+        if (compound is None and rule not in SINGLE_ENZYME_RULES and reading.names_enzyme
+                and getattr(reading, "inhibitor_text", None)):
+            # "Na+/K+-ATPase inhibited by ouabain": the pump's name made the
+            # grammar build primary active transport, the enzyme was then not
+            # applied, and the run ended with three placeholders. A sentence
+            # naming an enzyme and what inhibits it asks about the
+            # inhibition (fourth round of the real-values review).
+            return INHIBITED_ENZYME_SHAPE, "competitive_inhibition", (
+                f"Your description named an enzyme ({reading.enzyme_text!r}) and an inhibitor "
+                f"({reading.inhibitor_text!r}); the grammar also reads it as "
+                f"{rule.replace('_', ' ')}, but with an enzyme and its inhibitor named the question is "
+                "the inhibition, so it was built as Michaelis-Menten with a competitive inhibitor. To "
+                f"build {rule.replace('_', ' ')}, describe it without naming the enzyme.")
+        if compound is None:
+            return description, rule, None
+        return NAMED_ENZYME_SHAPE, "michaelis_menten", (
+            f"Your description named an enzyme ({reading.enzyme_text!r}) and {compound!r}, which the "
+            f"grammar also reads as a cue for {rule.replace('_', ' ')}; with an enzyme named and no other "
+            f"word of a mechanism, {compound!r} was read as a compound the enzyme acts on, and the "
+            "shape as Michaelis-Menten: one enzyme turning one substrate into one product. To build "
+            f"{rule.replace('_', ' ')}, describe it without naming the enzyme, or name its mechanism.")
+    except UnrecognisedShape as exc:
+        # A named pathway ("glycolysis") and a missing motif library are
+        # refusals with their own remedy; only "no shape matches" is a
+        # description that may just have named an enzyme and stopped.
+        if (type(exc) is not UnrecognisedShape or not (reading.names_enzyme or subject)
+                or _named_pathway_in(description.lower()) is not None):
+            raise
+        enzyme = reading.enzyme_text or f"--subject {subject}"
+        mechanism = [w for w in reading.remainder.lower().split()
+                     if any(w.startswith(stem) for stem in _MECHANISM_STEMS)]
+        if mechanism:
+            ec = reading.ec or subject or "<its EC number>"
+            raise UnrecognisedShape(
+                description,
+                exc.reason + f" Your description names the enzyme {enzyme!r}, and also "
+                + ", ".join(repr(w) for w in mechanism) + ", which is not a mechanism this grammar "
+                "builds, so it was not read as one enzyme turning one substrate into product. "
+                f"To model it that way, run: caterva compose \"{NAMED_ENZYME_SHAPE}\" --subject {ec}",
+                suggestions=exc.suggestions) from None
+        named = (f"Your description named an enzyme ({enzyme!r})" if reading.enzyme_text else
+                 f"--subject {subject} named the enzyme, your description")
+        return NAMED_ENZYME_SHAPE, "michaelis_menten", (
+            f"{named} and no mechanism this grammar "
+            "recognises, so its shape was read as Michaelis-Menten: one enzyme turning one "
+            "substrate into one product. To build another mechanism, describe it, e.g. "
+            "'Michaelis-Menten with a competitive inhibitor'.")
+
+
+def _only_cue_is_a_compound(description: str, reading: Any) -> Optional[str]:
+    """The compound word that alone made the grammar recognise a mechanism,
+    when the description also names one enzyme; None otherwise.
+
+    "pepsin with hemoglobin" was built as cooperative binding, because
+    "hemoglobin" is the textbook cooperative protein, and pepsin was then
+    "not applied": nothing was searched, though BRENDA has pepsin's
+    hemoglobin Km and kcat rows (round-1 review of ADR 0182). A compound
+    named beside an enzyme is what the enzyme acts on. Decided by masking:
+    the description with the compound words replaced must recognise no
+    shape at all, so a mechanism stated in other words ("hexokinase with
+    glucose with a competitive inhibitor", "phosphofructokinase") stands.
+    """
+    from caterva.compose.grammar import UnrecognisedShape, _named_pathway_in, recognise
+
+    if not getattr(reading, "ec", None) or not getattr(reading, "substrate_candidates", None):
+        return None
+    masked = description
+    found = None
+    for candidate in reading.substrate_candidates:
+        low = candidate.lower()
+        if any(stem in low for stem in _MECHANISM_STEMS) or not candidate.strip():
+            continue
+        pattern = re.compile(re.escape(candidate), re.IGNORECASE)
+        if pattern.search(masked):
+            masked = pattern.sub("the compound", masked)
+            found = found or candidate
+    if found is None or _named_pathway_in(masked.lower()) is not None:
+        return None
+    try:
+        recognise(masked)
+    except UnrecognisedShape as exc:
+        return found if type(exc) is UnrecognisedShape else None
+    return None
+
+
+def _why_not_applied(rule: str, model_tables: Sequence[Optional[str]], reading: Any) -> str:
+    named = f"the enzyme your description names ({reading.enzyme_text!r}"
+    named += f", EC {reading.ec})" if reading.ec else ")"
+    kcats = sum(1 for t in model_tables if t == "kcat")
+    if not any(t in ("kcat", "km") for t in model_tables):
+        return (f"{named} was not applied: this mechanism ({rule.replace('_', ' ')}) has no enzyme step, "
+                "so no constant of it is an enzyme's")
+    if kcats > 1:
+        return (f"{named} was not applied: this mechanism ({rule.replace('_', ' ')}) has {kcats} catalytic "
+                "steps, and one enzyme's measured constants on every step would ground steps the "
+                "description did not attach to it (ADR 0076)")
+    return (f"{named} was not applied: this mechanism ({rule.replace('_', ' ')}) is not one of the "
+            "single-enzyme shapes a description's enzyme is applied to (ADR 0181). Pass --subject to "
+            "apply it deliberately")
+
+
+def read_description(args: Any, *, err: Any = None, look_up_substrate: bool = True) -> DescriptionReading:
+    """Fill what no flag set from what the description names, and say so.
+
+    THE ONE PLACE a description is read for its subject: `compose_report`
+    (so the terminal and Caterva Studio), `_export` and `--antimony` all call
+    this, so the three cannot read one sentence three ways. Flags always win:
+    the description only fills `args.subject`, `args.organism`,
+    `args.substrate` and `args.inhibitor` where no flag set them, and every
+    value it fills is a note in the report.
+
+    * An enzyme (caterva.enzymes.sentence: exact names and EC numbers only)
+      becomes the subject only in a single-enzyme shape (SINGLE_ENZYME_RULES);
+      in any other the report says it was not applied and why. A
+      description that named an enzyme and no mechanism is built as
+      Michaelis-Menten, and the note says that is how it was read.
+    * A name that is several enzymes is refused, the candidates named and
+      the exact command that accepts one given (`name_refusal`).
+    * A substrate only when BRENDA lists it for that enzyme
+      (`brenda_km_substrates`, `match_substrate`); otherwise the search
+      chooses the best-measured substrate BRENDA lists and says so (ADR
+      0182, `_search_resolved`). A word BRENDA lists only as an inhibitor
+      ("dihydrofolate reductase with methotrexate") is read as the
+      inhibitor, and a description with no mechanism is then built with
+      it (`_built_with_its_inhibitor`). `look_up_substrate` False skips
+      the fetch.
+    * A name that is a few enzymes of which BRENDA has rows for one only is
+      taken as that one, as a choice the report states
+      (`_enzyme_the_data_singles_out`); otherwise it is refused as before.
+    * `--organism`, `--substrate` or `--inhibitor` given while no subject
+      was named or read are said to have gone unused, on `err` and in a
+      note, instead of being dropped without a word.
+    """
+    from caterva.enzymes.sentence import read_sentence
+
+    err = sys.stderr if err is None else err
+    typed = args.description
+    reading = read_sentence(typed, organism=getattr(args, "organism", None))
+    description, rule, shape_note = _shape_from(typed, reading, getattr(args, "subject", None))
+    out = DescriptionReading(description=description)
+    if shape_note:
+        out.notes.append(shape_note)
+    tables: Sequence[Optional[str]] = ()
+    if reading.names_enzyme and rule not in SINGLE_ENZYME_RULES:
+        from caterva.compose.pipeline import compose
+
+        tables = [q.table for q in compose(description).resolvable]
+
+    if getattr(args, "subject", None):
+        if reading.ec and args.subject.strip() not in (reading.ec, reading.enzyme_text):
+            out.notes.append(
+                f"Your description names {reading.enzyme_text!r} (EC {reading.ec}); --subject "
+                f"{args.subject} was used, because a flag wins over the description.")
+        # The flag chose the EC number; the description still says which
+        # protein of it. "ADH1B with ethanol --subject 1.1.1.1" and "AKR1C3
+        # --subject 1.1.1.188" dropped the gene and reported "no --isoform
+        # was given" (sixth round's polish, R6V1-02, V6R1-03).
+        gene = getattr(getattr(reading, "ambiguity", None), "gene", None)
+        listed = {c.ec for c in getattr(getattr(reading, "ambiguity", None), "candidates", ()) or ()}
+        kept = None
+        if not getattr(args, "isoform", None):
+            if reading.ec and args.subject.strip() == reading.ec and getattr(reading, "isoform", None):
+                kept = reading.isoform
+            elif gene and args.subject.strip() in listed:
+                kept = gene
+        if kept:
+            args.isoform = kept
+            args.isoform_asked = DESCRIPTION_ASKED
+            out.notes.append(f"Read {reading.enzyme_text or kept!r} in your description as the isoform {kept} "
+                             f"of EC {args.subject.strip()}; the constants are taken from BRENDA rows that "
+                             "name it where there are any (pass --isoform to change it).")
+    elif reading.names_enzyme and rule not in SINGLE_ENZYME_RULES:
+        out.unapplied = _why_not_applied(rule, tables, reading)
+        out.notes.append(out.unapplied[:1].upper() + out.unapplied[1:] + ".")
+    elif reading.ec:
+        args.subject = reading.ec
+        _remember(args, enzyme_text=reading.enzyme_text)
+        # "glucokinase from rat liver": the name's EC number has no rat
+        # protein and no rat row, and rat glucokinase is HXK4 of EC 2.7.1.1,
+        # whose rows name it (fifth round's review). Sets --subject and
+        # --isoform when it applies.
+        elsewhere = (_read_as_the_protein_filed_elsewhere(reading, args)
+                     or _read_as_the_human_protein_filed_elsewhere(reading, args)
+                     or _read_where_the_organism_has_rows(reading, args))
+        out.notes.append(elsewhere or reading.enzyme_note())
+        # ADR 0182: a symbol is one protein of its EC number ("HK2"); the
+        # enzyme note says the constants come from rows that name it, so the
+        # isoform is searched for unless --isoform set one.
+        if getattr(reading, "isoform", None) and not getattr(args, "isoform", None):
+            args.isoform = reading.isoform
+            args.isoform_asked = DESCRIPTION_ASKED
+        tissue = _tissue_isoform(args.subject, typed)
+        if tissue and not getattr(args, "isoform", None):
+            word, isoform, said = tissue
+            args.isoform = isoform
+            args.isoform_asked = DESCRIPTION_ASKED
+            out.notes.append(f"Read {word!r} with EC {args.subject} as its {word} isoform {isoform}"
+                             f"{said}; the constants are taken from rows naming it where there are any "
+                             "(pass --isoform to change it).")
+        elif tissue is None and _TISSUE_WORD.search(typed) and not getattr(args, "isoform", None):
+            word = _TISSUE_WORD.search(typed).group(0)
+            out.notes.append(f"The word {word!r} in your description was not used: Caterva has no "
+                             f"tissue isoform of EC {args.subject} for it, so the constants may be any "
+                             "tissue's; pass --isoform to choose one.")
+        if getattr(reading, "mutations", None):
+            # "IDH1 R132H": the constants come from the mutant's own rows,
+            # never the wild type's (resolve_kinetic_value's `mutation`).
+            args.mutation = "/".join(reading.mutations)
+        elif getattr(reading, "isoform", None) and args.isoform != reading.isoform:
+            # The enzyme note above says the constants come from rows naming
+            # the description's isoform; the flag's isoform is the one used.
+            out.notes.append(f"Your description names the isoform {reading.isoform}; --isoform {args.isoform} "
+                             "was used instead, because a flag wins over the description.")
+    elif reading.ambiguity is not None and (
+            chosen := (_enzyme_the_data_singles_out(reading, args)
+                       or _enzyme_the_organism_singles_out(reading, args)
+                       or _enzyme_the_gene_rows_single_out(reading, args, description))) is not None:
+        # A name that is a few specific enzymes ("citrate synthase": the Si-
+        # and Re- enzymes), of which BRENDA has measurements for one only
+        # (ADR 0182). Taken, and said with the others named; a class word, a
+        # symbol, a typo, or two candidates that both have rows stay refused.
+        args.subject = chosen.chosen
+        out.choices.append(chosen)
+        gene = getattr(reading.ambiguity, "gene", None)
+        if gene:
+            # A gene symbol is one protein: its rows are the ones searched,
+            # in the organism it was read for (sixth round's review).
+            if not getattr(args, "isoform", None):
+                args.isoform = gene
+                args.isoform_asked = DESCRIPTION_ASKED
+            if not getattr(args, "organism", None) and not reading.organism:
+                from caterva.enzymes.index import ORGANISMS
+
+                code = getattr(reading.ambiguity, "organism", None)
+                if code in ORGANISMS:
+                    args.organism = ORGANISMS[code][0]
+                    out.notes.append(f"No organism was given; {reading.enzyme_text} is written as a "
+                                     f"{ORGANISMS[code][1]} gene symbol, so {args.organism} was searched "
+                                     "(pass --organism to change it).")
+        # The tissue word reads the same here as for a name that is one
+        # enzyme: "lactate dehydrogenase from rabbit muscle" chose EC
+        # 1.1.1.27 by its rows and then left LDHA or LDHB open (S5-08).
+        tissue = _tissue_isoform(args.subject, typed)
+        if tissue and not getattr(args, "isoform", None):
+            word, isoform, said = tissue
+            args.isoform = isoform
+            args.isoform_asked = DESCRIPTION_ASKED
+            out.notes.append(f"Read {word!r} with EC {args.subject} as its {word} isoform {isoform}"
+                             f"{said}; the constants are taken from rows naming it where there are any "
+                             "(pass --isoform to change it).")
+    elif reading.ambiguity is not None:
+        from caterva.enzymes.policy import AMBIGUOUS, _refuse
+
+        out.enzyme_text = reading.enzyme_text
+        ambiguity, by_substrate = _ordered_by_the_substrate(
+            reading.ambiguity, getattr(args, "substrate", None) or next(
+                iter(getattr(reading, "substrate_candidates", ()) or ()), None),
+            getattr(args, "organism", None) or reading.organism)
+        out.name_refusal = _refuse(ambiguity, _rerun_command(typed), AMBIGUOUS)
+        if by_substrate:
+            from caterva.enzymes.policy import NameNotResolved
+
+            r = out.name_refusal
+            said = str(r).rstrip()
+            stop = "" if said.endswith((".", "!", "?", ")")) else "."
+            out.name_refusal = NameNotResolved(
+                f"{said}{stop} {by_substrate}", r.candidates, r.named, r.kind, recommended=r.recommended,
+                rerun=r.rerun, confirm_only=r.confirm_only)
+        blocker = _no_candidate_in_the_organism(
+            reading.ambiguity, getattr(args, "organism", None) or reading.organism)
+        if blocker:
+            from caterva.enzymes.policy import NameNotResolved
+
+            r = out.name_refusal
+            # The refusal can end on its example command, with no stop.
+            said = str(r).rstrip()
+            if blocker.startswith("None of"):
+                # Its example ("--subject 2.3.3.1") would be refused again
+                # for the organism, as the next sentence says: lead with the
+                # flags that would run (third round's review, citrate
+                # synthase in mouse).
+                said = re.sub(r"Re-run with the one you meant, for example .*$",
+                              "Name the one you meant with --subject, together with an --organism "
+                              "that has its rows, as listed next.", said, flags=re.S)
+            elif blocker.startswith("EC ") and getattr(reading.ambiguity, "suggestions_only", False):
+                # The spelling's own command, with the organism it lacks.
+                said = re.sub(r"(--subject \S+?)\.?$", r"\1 --organism <one listed next>", said)
+            stop = "" if said.endswith((".", "!", "?", ")")) else "."
+            out.name_refusal = NameNotResolved(
+                f"{said}{stop} {blocker}", r.candidates, r.named, r.kind, recommended=r.recommended,
+                rerun=r.rerun, confirm_only=r.confirm_only)
+        # A near spelling or a bare abbreviation is not "several enzymes":
+        # the refusal's own first line says what it is.
+        plain = (getattr(reading.ambiguity, "suggestions_only", False)
+                 or getattr(reading.ambiguity, "confirm_only", False)
+                 or not getattr(reading.ambiguity, "candidates", ()))
+        out.refusal_note = (f"No search was run: your description names {reading.enzyme_text!r}"
+                            + (". " if plain else ", which is not one enzyme. ")
+                            + f"{out.name_refusal}")
+    elif reading.near is not None:
+        note = reading.near_note()
+        out.unapplied = note[:1].lower() + note[1:].rstrip(".")
+        out.notes.append(note)
+    elif reading.other_enzymes:
+        out.unapplied = ("the enzymes your description names ("
+                         + ", ".join(f"{t!r}, EC {ec}" for t, ec, _ in reading.other_enzymes)
+                         + ") are several, and none was applied: a model grounded in one of them would "
+                         "carry constants for a protein the description did not single out")
+        out.notes.append(out.unapplied[:1].upper() + out.unapplied[1:] + ".")
+
+    if args.subject:
+        if reading.organism and not args.organism:
+            args.organism = reading.organism
+            out.notes.append(reading.organism_note())
+        elif reading.organism and args.organism != reading.organism:
+            out.notes.append(
+                f"Your description names {reading.organism_text!r} ({reading.organism}); --organism "
+                f"{args.organism} was used, because a flag wins over the description.")
+        if len(reading.organisms_named) > 1 and not args.organism:
+            out.notes.append("Your description names " + " and ".join(
+                f"{t!r} ({b})" for t, b in reading.organisms_named)
+                + "; no organism was read from it, because choosing one would be a guess.")
+        if reading.unread_organism is not None and not args.organism:
+            out.notes.append(reading.unread_organism_note())
+            # The search must not choose an organism in its place (below).
+            args.organism_unread = reading.unread_organism[0]
+        inhibitor_read = False
+        if reading.inhibitor_text and not getattr(args, "inhibitor", None):
+            args.inhibitor = reading.inhibitor_text
+            inhibitor_read = True
+            out.notes.append(f"Read {reading.inhibitor_text!r} in your description as the inhibitor.")
+        if look_up_substrate and not args.substrate and reading.substrate_candidates:
+            inhibitor_read = _substrate_from(args, reading, out) or inhibitor_read
+        if inhibitor_read and rule == "michaelis_menten":
+            _built_with_its_inhibitor(args, out)
+    else:
+        named_inhibitor = getattr(reading, "inhibitor_text", None) if reading is not None else None
+        if named_inhibitor and not getattr(args, "inhibitor", None):
+            # "Na+/K+-ATPase inhibited by ouabain" built a pump with no word
+            # about ouabain (third round's review): an inhibitor the sentence
+            # names is said to be unused, with why, never dropped.
+            why = out.unapplied or "no enzyme was read from the description"
+            out.notes.append(
+                f"Read {named_inhibitor!r} in your description as an inhibitor; it is not in this "
+                f"model and no Ki was looked up for it, because {why}. To model it, name the enzyme "
+                "with --subject and describe a mechanism with an inhibition step (for example "
+                "'competitive inhibition'), with --inhibitor naming it.")
+        unused = [f"--{flag} {getattr(args, flag)}" for flag in ("organism", "substrate", "inhibitor")
+                  if getattr(args, flag, None)]
+        if unused and out.name_refusal is None:
+            why = out.unapplied or "no enzyme was named, by --subject or in the description"
+            text = (f"{' and '.join(unused)} {'was' if len(unused) == 1 else 'were'} given, but "
+                    f"{why}, so nothing was searched for and {'it was' if len(unused) == 1 else 'they were'} "
+                    "not used. Name the enzyme with --subject to search for it.")
+            out.notes.append(text)
+            print(f"Not used: {text}", file=err)
+    return out
+
+
+#: At most this many of a refused name's candidates are read for rows in
+#: the organism named (each is a parse of a BRENDA page).
+CANDIDATES_READ_FOR_THE_ORGANISM = 5
+
+
+def _ordered_by_the_substrate(ambiguity: Any, substrate: Optional[str],
+                              organism: Optional[str]) -> Tuple[Any, Optional[str]]:
+    """(ambiguity, sentence): a refused name's best-tied candidates in order
+    of their rows for the substrate the description names, and a sentence
+    with the counts; the ambiguity unchanged and None without a substrate,
+    with a recommendation, or when the pages cannot be read.
+
+    "michaelis menten for amylase with starch" was refused with beta-amylase
+    first and "--subject 3.2.1.2" as the example, while alpha-amylase holds
+    more than five times as many starch rows (third round's review)."""
+    if not substrate or ambiguity is None or getattr(ambiguity, "recommended", None) is not None:
+        return ambiguity, None
+    if getattr(ambiguity, "class_word", False) or getattr(ambiguity, "suggestions_only", False):
+        return ambiguity, None
+    candidates = list(getattr(ambiguity, "candidates", ()) or ())
+    if len(candidates) < 2:
+        return ambiguity, None
+    best = min(c.tier for c in candidates)
+    tied = [c for c in candidates if c.tier == best]
+    if len(tied) < 2 or len(tied) > CANDIDATES_READ_FOR_THE_ORGANISM:
+        return ambiguity, None
+    from caterva.compose import defaults
+
+    counts: Dict[str, Dict[str, int]] = {}
+    try:
+        for c in tied:
+            counts[c.ec] = {t: sum(1 for r in _usable(defaults.table_rows(c.ec, t, organism))
+                                   if defaults._matches(r.compound, substrate))
+                            for t in ("km", "kcat")}
+    except Exception:  # noqa: BLE001 - unreadable pages: the finder's order stands
+        return ambiguity, None
+    if not any(sum(v.values()) for v in counts.values()):
+        # No rows for it anywhere: the enzyme whose own name is of the
+        # substrate comes first. "PTEN with PIP3" offered --subject 3.1.3.48
+        # (protein-tyrosine phosphatase), and following it modelled PTP1B;
+        # PIP3 is in the name of EC 3.1.3.67 (fifth round, R5V1-15).
+        key = defaults._identity_key(substrate) or ""
+        named = [c for c in tied if key and len(key) > 4
+                 and key in (defaults._identity_key(c.name) or "")]
+        if len(named) != 1:
+            return ambiguity, None
+        from dataclasses import replace as _replace
+
+        try:
+            ambiguity = _replace(ambiguity, candidates=tuple(
+                named + [c for c in candidates if c not in named]))
+        except (TypeError, ValueError):
+            return ambiguity, None
+        return ambiguity, (f"{substrate!r} in your description is in the name of EC {named[0].ec} "
+                           f"({named[0].name}), so it is the example; BRENDA holds no Km or kcat "
+                           f"row for {substrate} under any of these.")
+    ordered = sorted(tied, key=lambda c: (-sum(counts[c.ec].values()), candidates.index(c)))
+    rest = [c for c in candidates if c not in tied]
+    from dataclasses import replace as _replace
+
+    try:
+        ambiguity = _replace(ambiguity, candidates=tuple(ordered + rest))
+    except (TypeError, ValueError):
+        return ambiguity, None
+    where = f" in {organism}" if organism else ""
+    listed = "; ".join(f"EC {c.ec} ({counts[c.ec]['km']} Km, {counts[c.ec]['kcat']} kcat)"
+                       for c in ordered)
+    return ambiguity, (f"BRENDA's rows for {substrate}{where} the search can use (spelled "
+                       f"{substrate!r} or a stereo form of it; other spellings, variants and "
+                       f"flagged rows not counted), which order these and the example: {listed}.")
+
+
+def _no_candidate_in_the_organism(ambiguity: Any, organism: Optional[str]) -> Optional[str]:
+    """For a name refused as several enzymes, with an organism named: a
+    sentence saying which candidates have Km rows in that organism, or that
+    none does and the organism is what is missing; None without an organism,
+    when every candidate has rows, or when a page cannot be read.
+
+    "citrate synthase --organism mouse" was refused with "Re-run with ...
+    --subject 2.3.3.1", and that run was refused again: neither best match,
+    nor EC 2.3.3.16, has a mouse Km row. The advice must lead to a run that
+    can succeed (round-1 review of ADR 0182).
+    """
+    if not organism or ambiguity is None or getattr(ambiguity, "class_word", False):
+        return None
+    from caterva.compose import defaults
+    from caterva.compose.organisms import normalise_organism
+
+    where = normalise_organism(organism)[0] or organism
+    if getattr(ambiguity, "suggestions_only", False):
+        # A near spelling: the refusal's "did you mean" names the first
+        # candidate, and the command it gives must be one that can run.
+        # "phosphoglucomutse from rabbit muscle" advised EC 5.4.2.2, which
+        # has no rabbit Km row in BRENDA (sixth round of the review).
+        candidates = list(ambiguity.candidates[:1])
+    else:
+        candidates = [c for c in ambiguity.candidates
+                      if getattr(c, "via", "name") in ("name", "ec")][:CANDIDATES_READ_FOR_THE_ORGANISM]
+    if not candidates:
+        return None
+    try:
+        rows = {c.ec: len(defaults.table_rows(c.ec, "km", where)) for c in candidates}
+    except Exception:  # noqa: BLE001 - nothing is claimed about a page not read
+        return None
+    with_rows = [c.ec for c in candidates if rows[c.ec]]
+    if len(with_rows) == len(candidates):
+        return None
+    if with_rows:
+        return (f"Of these, the ones with Km rows in {where} are "
+                + ", ".join(f"EC {ec} ({rows[ec]} row{'s' if rows[ec] != 1 else ''})" for ec in with_rows)
+                + f"; the others have none there, so naming one of them would be refused for the organism.")
+    first = candidates[0].ec
+    try:
+        organisms = _km_organisms_usable(first)
+    except Exception:  # noqa: BLE001
+        organisms = {}
+    text = ((f"EC {first} has no Km row in {where} in BRENDA, so naming it would be refused again: the "
+             "organism, not the spelling, is what is missing.") if len(candidates) == 1 else
+            (f"None of " + ", ".join(f"EC {c.ec}" for c in candidates) + f" has a Km row in {where} in "
+             "BRENDA, so naming one would be refused again: the organism, not the enzyme name, is what "
+             "is missing."))
+    if organisms:
+        text += (f" Organisms with Km rows for EC {first}: {_counted(organisms)}. Re-run with --subject "
+                 "and --organism set to one of them (Caterva never substitutes another organism's value "
+                 "for the one you named, ADR 0024), or supply the constants yourself.")
+    return text
+
+
+def _enzyme_the_inhibitor_singles_out(reading: Any, ambiguity: Any) -> Optional[Any]:
+    """For a name several enzymes go by ("HMG-CoA reductase": EC 1.1.1.34
+    and 1.1.1.88) and an inhibitor named in the sentence, the one candidate
+    whose BRENDA page has Ki rows for that inhibitor, in any organism, as a
+    `Choice`; None when none or several have. "HMG-CoA reductase inhibited
+    by atorvastatin" was refused, though only EC 1.1.1.34 has atorvastatin
+    Ki rows (fourth round of the real-values review)."""
+    inhibitor = getattr(reading, "inhibitor_text", None)
+    if not inhibitor:
+        return None
+    from caterva.compose import defaults
+
+    best = min(c.tier for c in ambiguity.candidates)
+    tied = [c for c in ambiguity.candidates if c.tier == best][:defaults.ENZYME_CANDIDATES_CONSIDERED]
+    if len(tied) < 2:
+        return None
+    rows: Dict[str, int] = {}
+    for c in tied:
+        try:
+            rows[c.ec] = sum(1 for r in defaults.table_rows(c.ec, "ki", None)
+                             if defaults._matches(r.compound, inhibitor) and not r.flagged)
+        except Exception:  # noqa: BLE001 - one unreadable page and nothing is singled out
+            return None
+    with_rows = [ec for ec, n in rows.items() if n]
+    if len(with_rows) != 1:
+        return None
+    ec = with_rows[0]
+    names = {c.ec: c.name for c in tied}
+    why = (f"your description names {reading.enzyme_text or reading.text!r}, a name "
+           f"{len(tied)} enzymes go by; {names[ec]} is used because it is the only one of them with "
+           f"Ki rows for {inhibitor}, the inhibitor you named ({rows[ec]} in BRENDA, any organism)")
+    alternatives = tuple(defaults.Option(f"EC {e} ({names[e]})", {"ki": rows[e]}) for e in rows if e != ec)
+    return defaults.Choice("enzyme", ec, why, alternatives, len(tied), {"ki": rows[ec]})
+
+
+def _enzyme_the_data_singles_out(reading: Any, args: Any) -> Optional[Any]:
+    """The `Choice` of one EC number for an enzyme name that is a few
+    enzymes, when BRENDA's Km rows single one out (ADR 0182); None otherwise.
+
+    Only the candidates the finder ranks best (its lowest tier: "these 2
+    match best") are weighed, at most four, and never for a class word, an
+    abbreviation or symbol offered for confirmation, or typo suggestions:
+    those are not a few readings of one name but a question only the user
+    can answer. `defaults.choose_enzyme` then takes one only when it is the
+    one candidate with rows in the organism, or (no organism) has five
+    times the rows of every other.
+    """
+    ambiguity = reading.ambiguity
+    if (ambiguity is not None and getattr(ambiguity, "confirm_only", False)
+            and not getattr(ambiguity, "class_word", False) and ambiguity.candidates):
+        by_inhibitor = _enzyme_the_inhibitor_singles_out(reading, ambiguity)
+        if by_inhibitor is not None:
+            return by_inhibitor
+    if (ambiguity is None or getattr(ambiguity, "class_word", False)
+            or getattr(ambiguity, "confirm_only", False)
+            or getattr(ambiguity, "suggestions_only", False) or not ambiguity.candidates):
+        return None
+    best = min(c.tier for c in ambiguity.candidates)
+    tied_candidates = [c for c in ambiguity.candidates if c.tier == best]
+    tied = [(c.ec, c.name) for c in tied_candidates]
+    from caterva.compose.defaults import ENZYME_CANDIDATES_CONSIDERED, choose_enzyme
+
+    organism = getattr(args, "organism", None) or reading.organism
+    plain = not any(getattr(c, "partial", False) or getattr(c, "abbreviation", False)
+                    or getattr(c, "via", "name") not in ("name", "ec") for c in tied_candidates)
+    if plain and len(tied) <= ENZYME_CANDIDATES_CONSIDERED:
+        return choose_enzyme(reading.enzyme_text or reading.text, tied, organism)
+    recommended = getattr(ambiguity, "recommended", None)
+    if (organism and recommended is not None and recommended.ec in dict(tied)
+            and getattr(recommended, "via", "name") == "name"
+            and not getattr(recommended, "abbreviation", False)
+            and not any(getattr(c, "abbreviation", False) or getattr(c, "via", "name") != "name"
+                        for c in tied_candidates)):
+        # One reading singled out twice over: the only one matched with a
+        # protein of the organism given AND the only one with Km rows there,
+        # however many readings the name has. "glyceraldehyde-3-phosphate
+        # dehydrogenase from rabbit muscle" is a phrase inside seven accepted
+        # names; EC 1.2.1.12 is both, and the run was refused although the
+        # refusal said so (third round's review).
+        chosen = choose_enzyme(reading.enzyme_text or reading.text, tied, organism, limit=None,
+                               by_protein=recommended.ec)
+        if chosen is not None:
+            return chosen
+    # A fragment of a longer name, a typo, an abbreviation or a class match
+    # is not a reading of the name the user typed: never settled by rows
+    # alone.
+    return None
+
+
+#: At most this many EC numbers of one gene's protein are read for its rows.
+GENE_ECS_READ = 8
+
+
+def _rows_naming_gene(ec: str, table: str, organism: Optional[str], gene: str) -> int:
+    """BRENDA rows of `ec` in `organism` that name the protein `gene` (in
+    their words or by their one UniProt accession), not flagged, not a
+    variant's."""
+    from caterva.compose import defaults
+
+    count = 0
+    for row in defaults.table_rows(ec, table, organism):
+        if row.flagged or (row.variant and not row.isozyme):
+            continue
+        said = defaults._isoform_read(row.conditions)
+        if (said and defaults._same_isoform(said, gene)) or defaults._accession_says(row.uniprot, gene) is True:
+            count += 1
+    return count
+
+
+def _enzyme_the_gene_rows_single_out(reading: Any, args: Any, description: str) -> Optional[Any]:
+    """The `Choice` of one EC number for a gene symbol whose protein the
+    nomenclature lists under several (ADR 0182): the one whose BRENDA rows
+    naming the protein cover the most of the model's constants, then hold
+    the most such rows; None on a tie or when no page names it.
+
+    "AKR1C3 with a competitive inhibitor" said no enzyme was named. AKR1C3
+    is one human protein (P42330) under seven EC numbers; its rows are under
+    EC 1.1.1.357 (Km and kcat, no Ki) and EC 1.1.1.188 (Km, kcat and Ki),
+    among others (sixth round of the real-values review). The note names
+    the choice, the reason and each other EC number with its rows."""
+    ambiguity = getattr(reading, "ambiguity", None)
+    gene = getattr(ambiguity, "gene", None)
+    if not gene or not ambiguity.candidates or len(ambiguity.candidates) > GENE_ECS_READ:
+        return None
+    from caterva.compose import defaults
+    from caterva.enzymes.index import ORGANISMS
+
+    organism = getattr(args, "organism", None) or reading.organism
+    if not organism:
+        code = getattr(ambiguity, "organism", None)
+        organism = ORGANISMS[code][0] if code in ORGANISMS else None
+    try:
+        from caterva.compose.pipeline import compose
+
+        needed = [t for t in ("km", "kcat", "ki")
+                  if t in {q.table for q in compose(description).resolvable}] or ["km", "kcat"]
+    except Exception:  # noqa: BLE001 - the shape's constants unknown: the enzyme's own
+        needed = ["km", "kcat"]
+    rows: Dict[str, Dict[str, int]] = {}
+    try:
+        for c in ambiguity.candidates:
+            rows[c.ec] = {t: _rows_naming_gene(c.ec, t, organism, gene) for t in needed}
+    except Exception:  # noqa: BLE001 - one unreadable page and nothing is chosen
+        return None
+
+    def rank(ec: str) -> Tuple[int, int]:
+        return (sum(1 for n in rows[ec].values() if n), sum(rows[ec].values()))
+
+    # A tie on the model's own constants is broken by every row that names
+    # the protein, the Ki table included: bare "AKR1C3" tied EC 1.1.1.188
+    # with EC 1.1.1.357 on 2 Km and 2 kcat rows each and was refused, while
+    # EC 1.1.1.188 also holds its 8 Ki rows (sixth round's polish, V6R1-03).
+    every: Dict[str, int] = {}
+
+    def all_rows(ec: str) -> int:
+        if ec not in every:
+            try:
+                every[ec] = sum(_rows_naming_gene(ec, t, organism, gene) for t in ("km", "kcat", "ki"))
+            except Exception:  # noqa: BLE001 - unreadable: no tie-break from it
+                every[ec] = 0
+        return every[ec]
+
+    names = {c.ec: c.name for c in ambiguity.candidates}
+    ranked = sorted(rows, key=lambda ec: (tuple(-v for v in rank(ec)),
+                                          [c.ec for c in ambiguity.candidates].index(ec)))
+    best = ranked[0]
+    if rank(best)[1] == 0:
+        return None
+    tie_broken = ""
+    tied = [ec for ec in ranked if rank(ec) == rank(best)]
+    if len(tied) > 1:
+        tied.sort(key=lambda ec: -all_rows(ec))
+        if all_rows(tied[0]) == all_rows(tied[1]):
+            return None
+        best = tied[0]
+        ranked = [best] + [ec for ec in ranked if ec != best]
+        tie_broken = (f"; it ties with EC {tied[1]} on those, and holds more rows naming {gene} in all, "
+                      f"counting Km, kcat and Ki ({all_rows(best)} against {all_rows(tied[1])})")
+    where = f" in {organism}" if organism else ""
+    covered = defaults._described_counts({t: n for t, n in rows[best].items() if n})
+    why = (f"your description names {reading.enzyme_text!r}, the gene symbol of one protein the enzyme "
+           f"nomenclature lists under {len(ambiguity.candidates)} EC numbers; {names[best]} is used because "
+           f"its BRENDA rows that name {gene}{where} cover the most of this model's constants "
+           f"({covered}){tie_broken}")
+    alternatives = tuple(defaults.Option(f"EC {ec} ({names[ec]})", dict(rows[ec]),
+                                         none_said=f"no row naming {gene}")
+                         for ec in ranked[1:])
+    return defaults.Choice("enzyme", best, why, alternatives, len(ranked), dict(rows[best]))
+
+
+#: At most this many candidates listing a protein of the organism are read
+#: for an enzyme the organism singles out; more is a family, not a few readings.
+ORGANISM_PROTEIN_CANDIDATES = 4
+
+
+def _enzyme_the_organism_singles_out(reading: Any, args: Any) -> Optional[Any]:
+    """The `Choice` of one EC number for a name several enzymes match, when
+    the organism named settles it twice over: exactly one candidate both
+    lists a protein of that organism in the enzyme nomenclature and has Km
+    rows for it in BRENDA, and no other candidate read has any Km row there.
+
+    "soybean lipoxygenase with linoleic acid" listed 13 enzymes; two list a
+    soybean protein and only EC 1.13.11.12 has soybean Km rows (10), and the
+    refusal said exactly that before refusing. "thioredoxin reductase
+    inhibited by auranofin in rat" is a phrase inside eight enzymes' names;
+    only EC 1.8.1.9 lists rat proteins (TRXR1, TRXR2) and has rat Km rows
+    (fifth round of the real-values review). Both were placeholders. A
+    class word, a typo, an abbreviation, a symbol or a mnemonic is never
+    settled this way: those are questions about what was meant, which no
+    row answers. The note names the choice, the reason and the others.
+    """
+    ambiguity = getattr(reading, "ambiguity", None)
+    organism = getattr(args, "organism", None) or getattr(reading, "organism", None)
+    # A family name ("dihydroorotate dehydrogenase": EC 1.3.98.1 by another
+    # name, and the family word of 1.3.5.2, 1.3.1.14, 1.3.1.15) is settled
+    # the same way: in human only EC 1.3.5.2 lists a protein (DHODH) and
+    # has Km rows, and the run was refused (fifth round, R5V1-03).
+    if not organism or ambiguity is None or getattr(ambiguity, "confirm_only", False) \
+            or (getattr(ambiguity, "class_word", False) and not getattr(ambiguity, "family", False)):
+        return None
+    from caterva.enzymes.finder import TIER_TYPO
+
+    candidates = [c for c in getattr(ambiguity, "candidates", ()) or ()
+                  if getattr(c, "via", "name") in ("name", "ec") and not getattr(c, "abbreviation", False)
+                  and c.tier != TIER_TYPO]
+    if len(candidates) < 2:
+        return None
+    with_protein = [c for c in candidates if c.has_organism_protein]
+    if not with_protein or len(with_protein) > ORGANISM_PROTEIN_CANDIDATES:
+        return None
+    from caterva.compose import defaults
+    from caterva.compose.organisms import normalise_organism
+
+    where = normalise_organism(organism)[0] or organism
+    others = [c for c in candidates if c not in with_protein][:CANDIDATES_READ_FOR_THE_ORGANISM]
+    read = with_protein + others
+    try:
+        rows = {c.ec: len(_usable(defaults.table_rows(c.ec, "km", where))) for c in read}
+    except Exception:  # noqa: BLE001 - one unreadable page and nothing is singled out
+        return None
+    with_rows = [c for c in read if rows[c.ec]]
+    if len(with_rows) != 1 or with_rows[0] not in with_protein:
+        return None
+    best = with_rows[0]
+    proteins = ", ".join(p.label for p in best.organism_proteins[:4]) or \
+        f"{best.organism_protein_count} UniProt entries"
+    listing = "; ".join(f"EC {c.ec}" for c in with_protein)
+    unread = len(candidates) - len(read)
+    how = (f"of the {len(candidates)} enzymes the name matches, "
+           + (f"only it lists a protein of {where} in the enzyme nomenclature ({proteins})"
+              if len(with_protein) == 1 else
+              f"{len(with_protein)} list a protein of {where} in the enzyme nomenclature ({listing}), "
+              f"and it is the only one of them with Km rows there")
+           + f"; BRENDA holds {defaults._plural(rows[best.ec], 'Km row')} for it in {where}, and none for "
+           + (f"the {len(read) - 1} other{'s' if len(read) != 2 else ''} read"
+              + (f" ({unread} more, which list no {where} protein, were not read)" if unread else "")))
+    text = reading.enzyme_text or reading.text
+    why = (f"your description names {text!r}, which is not one enzyme; {best.name} is used because {how}")
+    alternatives = tuple(defaults.Option(f"EC {c.ec} ({c.name})", {"km": rows[c.ec]})
+                         for c in read if c is not best)[:defaults.ALTERNATIVES_NAMED]
+    return defaults.Choice("enzyme", best.ec, why, alternatives, len(candidates), {"km": rows[best.ec]})
+
+
+def _built_with_its_inhibitor(args: Any, out: DescriptionReading) -> None:
+    """A description that named an enzyme and an inhibitor and no mechanism
+    is built with the inhibitor in it (ADR 0182), and the note says which
+    mode, and what BRENDA's rows for that inhibitor state about theirs.
+
+    "dihydrofolate reductase with methotrexate in E. coli" was built as
+    plain Michaelis-Menten, two constants, with methotrexate dropped without
+    a word: the model had no place for the one compound the user named.
+    Competitive is the commonest mode and the one the grammar names first;
+    the note quotes the rows' own modes so a reader whose inhibitor is
+    noncompetitive sees it and can say so.
+    """
+    out.description = INHIBITED_ENZYME_SHAPE
+    stated = ""
+    ec = _flag_subject_ec(args) if args.subject else None
+    if ec:
+        try:
+            from caterva.compose.defaults import ki_modes
+
+            modes = ki_modes(ec, args.organism, args.inhibitor)
+        except Exception:  # noqa: BLE001 - the mode note is a courtesy
+            modes = None
+        where = f" in {args.organism}" if args.organism else ""
+        if modes:
+            stated = (f"; BRENDA's Ki rows for {args.inhibitor} under EC {ec}{where} state: "
+                      + ", ".join(f"{m} ({n} row{'s' if n != 1 else ''})"
+                                  for m, n in sorted(modes.items(), key=lambda kv: (-kv[1], kv[0]))))
+        elif modes is not None:
+            stated = f"; BRENDA has no Ki row for {args.inhibitor} under EC {ec}{where}"
+    out.notes.append(
+        f"Your description named an inhibitor ({args.inhibitor!r}) and no mechanism, so the model "
+        f"is competitive inhibition{stated}. To build another mode, describe it, e.g. "
+        "'noncompetitive inhibition'.")
+
+
+def _not_organism_words(ec: str, candidates: Tuple[str, ...], listed: Any = None) -> Tuple[str, ...]:
+    """`candidates` less a lone word that is a word of an organism's name on
+    the EC number's page: "influenza neuraminidase" listed 'influenza' as a
+    word that is not a substrate (fifth round, R5V1-07). It names the source."""
+    try:
+        from caterva.compose.defaults import km_organisms
+
+        words = {w.casefold() for o in km_organisms(ec) for w in o.split() if len(w) > 3}
+    except Exception:  # noqa: BLE001
+        return candidates
+    # A compound BRENDA lists is kept whatever organism shares its word
+    # ("glycine" and Glycine max).
+    words -= {strict_key_of(n) for n in (listed or ())}
+    words -= {str(n).casefold() for n in (listed or ())}
+    return tuple(c for c in candidates
+                 if not (len(c.split()) == 1 and c.strip().casefold() in words))
+
+
+def _substrate_from(args: Any, reading: Any, out: DescriptionReading) -> bool:
+    """Accept a word of the description as `args.substrate`, only against
+    what BRENDA lists for the subject's EC number; a word BRENDA lists as an
+    inhibitor (a Ki row) instead, with no inhibitor named, as
+    `args.inhibitor`. True when an inhibitor was read."""
+    from caterva.enzymes.sentence import match_substrate
+
+    ec = reading.ec if reading.ec and args.subject == reading.ec else _flag_subject_ec(args)
+    if ec is None:
+        return False
+    listed = _read_substrates(ec, args.organism)
+    candidates = _not_organism_words(ec, tuple(reading.substrate_candidates), listed)
+    if not candidates:
+        # Every word was the organism's ("influenza" for influenza
+        # neuraminidase): no word is left to say was not a substrate, and
+        # the notes read "No word of your description () is ..." (sixth
+        # round, NEW-11).
+        return False
+    shown = ", ".join(repr(c) for c in candidates[:4])
+    where = f" for {args.organism}" if args.organism else ""
+    if listed is None:
+        out.notes.append(
+            f"BRENDA's substrate list for EC {ec} could not be read, so no word of your description "
+            f"({shown}) could be checked as the substrate, and none was taken.")
+        # The search must not then choose a substrate in its place: a read
+        # that failed here and succeeded a moment later in the chooser
+        # replaced "mannose" with D-glucose under "No substrate was named"
+        # (round-1 review of ADR 0182). `_choose_what_was_not_named` refuses.
+        # A lone letter or numeral left over from an isozyme's name
+        # ("lactate dehydrogenase A", "hexokinase II") is not a compound,
+        # and must not stop the search on its own.
+        _remember(args, substrate_unread=tuple(
+            c for c in candidates if not _ISOZYME_CODE.fullmatch(c.strip())))
+        return False
+    # The mapping, not its keys: with the row counts, an abbreviation that
+    # BRENDA lists under several spellings takes the best-measured one.
+    match = match_substrate(candidates, listed)
+    possible = getattr(reading, "possible_inhibitor_text", None)
+    others = [c for c in ((possible,) if possible else ()) + tuple(candidates)
+              if match.name is not None and strict_key_of(c) != strict_key_of(match.typed)]
+    if others and not getattr(args, "inhibitor", None):
+        # Another compound beside the substrate that was read ("with X", "in
+        # the presence of X", "dihydrofolate and methotrexate"): it is the
+        # inhibitor when BRENDA lists Ki rows for it under this EC number,
+        # and nothing otherwise (the reader only flags it: sentence.py). A
+        # "with X" the reader flagged is tried first.
+        inhibitor = _inhibitor_from(ec, args.organism, others, prefix_set_aside=True)
+        if inhibitor is not None:
+            typed, name = inhibitor
+            args.inhibitor = name
+            args.substrate = match.name
+            how = (" (its stereo or anomer prefix set aside, the only substrate BRENDA lists under "
+                   "that name)" if match.prefix_set_aside else "")
+            out.notes.append(
+                f"Read {match.typed!r} in your description as the substrate {match.name}, which "
+                f"BRENDA lists for EC {ec}{where}{how}, and {typed!r} as the inhibitor {name}, "
+                f"which BRENDA lists Ki rows for under EC {ec}{where}.")
+            return True
+    if match.name is None and not match.rivals and not getattr(args, "inhibitor", None):
+        inhibitor = _inhibitor_from(ec, args.organism, candidates)
+        if inhibitor is not None:
+            typed, name = inhibitor
+            args.inhibitor = name
+            out.notes.append(
+                f"Read {typed!r} in your description as the inhibitor {name}, which BRENDA lists Ki "
+                f"rows for under EC {ec}{where} (it lists no Km for it as a substrate).")
+            return True
+    if match.name is not None:
+        args.substrate = match.name
+        how = (" with its stereo or anomer prefix set aside, the only substrate BRENDA lists under "
+               "that name" if match.prefix_set_aside else "")
+        out.notes.append(
+            f"Read {match.typed!r} in your description as the substrate {match.name}, which BRENDA "
+            f"lists for EC {ec}{where}{how}.")
+    elif match.rivals:
+        out.notes.append(
+            "Your description's words match more than one substrate BRENDA lists for EC "
+            f"{ec}{where} (" + "; ".join(f"{t!r} as {n}" for t, n in match.rivals)
+            + "), so none was read as the substrate; the search chooses among them by their rows.")
+        # The choice is held to what the user's word matched (ADR 0182):
+        # "glucose" decides between D-glucose and beta-D-glucose by rows, and
+        # never becomes D-mannose because D-mannose is better measured.
+        _remember(args, substrate_among=tuple(n for _, n in match.rivals),
+                  substrate_instead=(
+                      "Your description's words match several substrates BRENDA lists ("
+                      + "; ".join(f"{t!r} as {n}" for t, n in match.rivals) + ")"))
+    else:
+        # The word is never relabelled as a listed substrate (ADR 0076).
+        # The search then chooses the best-measured one BRENDA lists and
+        # says so in its own note (ADR 0182); this says the typed word is
+        # not what the model is of, so the two notes cannot be misread.
+        elsewhere = _substrate_measured_elsewhere(ec, args.organism, candidates)
+        if elsewhere is not None:
+            typed, name, counts = elsewhere
+            called = "" if strict_key_of(typed) == strict_key_of(name) else f" {name},"
+            out.notes.append(
+                f"{typed!r} in your description is{called} a substrate BRENDA lists Km rows for under "
+                f"EC {ec}, but in other organisms only, none in {args.organism}: {_counted(counts)}. "
+                f"So it was not taken as the substrate, and the model is not of it. To model it, "
+                f"re-run with --organism set to one of them (each organism's own measurement, never "
+                f"substituted for yours, ADR 0024), or supply its constants yourself.")
+        else:
+            listed = _listed_without_rows(ec, candidates)
+            if listed:
+                # "CYP3A4 metabolising midazolam": BRENDA lists midazolam's
+                # reaction for EC 1.14.14.1 (Substrates/Products) and holds no
+                # Km or kcat row for it; "not a substrate BRENDA lists" was
+                # false (fourth round of the real-values review).
+                out.notes.append(
+                    f"{listed!r} in your description is a substrate BRENDA lists for EC {ec} (in its "
+                    f"Substrates/Products table), but BRENDA holds no Km or kcat row for it"
+                    f"{where}, so it could not be the model's substrate: the model is not of it. "
+                    "Supply its constants yourself, or pass --substrate with a compound that has rows.")
+            else:
+                out.notes.append(
+                    f"No word of your description ({shown}) is a substrate BRENDA lists for EC "
+                    f"{ec}{where}, so none was taken as the substrate, and if you typed one it was not "
+                    "used: the model is not of it. Pass --substrate with BRENDA's own name for the "
+                    "compound you meant.")
+        # The choice's note must not then open "No substrate was named":
+        # the user may well have named one BRENDA does not list.
+        _remember(args, substrate_instead=(
+            f"No substrate BRENDA lists Km rows for under EC {ec}"
+            + (f" in {args.organism}" if args.organism else "")
+            + f" was named (no word of your description, {shown}, is one)"))
+    return False
+
+
+def _listed_without_rows(ec: str, candidates: Sequence[str]) -> Optional[str]:
+    """The first word of the description BRENDA's Substrates/Products or
+    Natural Substrates tables list for `ec` (a reaction it has, with no
+    kinetic row for it here), or None."""
+    from caterva.compose import defaults
+
+    try:
+        natural, reaction = defaults._reaction_compounds(ec)
+    except Exception:  # noqa: BLE001 - unreadable: say nothing more
+        return None
+    listed = natural | reaction
+    for word in candidates or ():
+        if word and defaults._in(word, defaults._group_key(word), listed):
+            return word
+    return None
+
+
+def strict_key_of(name: Optional[str]) -> str:
+    """A compound name with case and spacing set aside."""
+    return " ".join((name or "").split()).casefold()
+
+
+def _remember(args: Any, **fields: Any) -> None:
+    """Carry what the reader learned to the search's choice (`args` is the
+    one object both see); silently nothing for an args that refuses it."""
+    for name, value in fields.items():
+        try:
+            setattr(args, name, value)
+        except (AttributeError, TypeError):  # pragma: no cover - a frozen args
+            pass
+
+
+def _inhibitor_from(ec: str, organism: Optional[str], candidates: Sequence[str],
+                    *, prefix_set_aside: bool = False) -> Optional[Tuple[str, str]]:
+    """(the word as typed, BRENDA's name) for the first candidate that is,
+    case aside, a compound BRENDA lists Ki rows for under `ec` (in
+    `organism`); None when none is, or the page cannot be read. Whole
+    names only, never a word inside a longer compound's name: exactly, case
+    aside ("methotrexate"), or with `prefix_set_aside` by the substrate's
+    rule (`match_substrate`: "glucose 6-phosphate" for the one listed
+    "D-glucose 6-phosphate"). The looser rule is for a compound named
+    BESIDE a substrate already read, which can only be the inhibitor; a
+    word that was the only candidate ("hexokinase on glucose 6-phosphate")
+    may be a substrate BRENDA does not list, and is not relabelled."""
+    from caterva.enzymes.sentence import match_substrate
+
+    try:
+        from caterva.compose.defaults import ki_compounds
+
+        listed = ki_compounds(ec, organism)
+    except Exception:  # noqa: BLE001 - not reading one is not reading one
+        return None
+    by_key = {strict_key_of(n): n for n in listed}
+    for typed in candidates:
+        name = by_key.get(strict_key_of(typed))
+        if name is None and prefix_set_aside:
+            name = match_substrate((typed,), list(listed)).name
+        if name is not None:
+            return typed, name
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Export
 # ---------------------------------------------------------------------------
 
@@ -1012,7 +2109,26 @@ def read_subject(model: Any, args: Any) -> Tuple[Any, Optional[str], Optional[st
             allow_unlisted_ec=True)
     except NameNotResolved as exc:
         return model, None, f"No search was run: {exc}", exc
-    note = " ".join(resolution.notes(subject)) or None
+    # ADR 0182: what the name implies (the isoform of "HK2", Homo sapiens
+    # for a human gene symbol) fills only what no flag set, and the notes
+    # claim a search narrowed to it only when it was filled here.
+    isoform_applied = bool(getattr(resolution, "isoform", None) and not getattr(args, "isoform", None))
+    organism_applied = bool(getattr(resolution, "organism", None) and not getattr(args, "organism", None))
+    if isoform_applied:
+        args.isoform = resolution.isoform
+        if getattr(args, "isoform_asked", None) is None:
+            args.isoform_asked = NAME_ASKED
+    if organism_applied:
+        args.organism = resolution.organism
+    from caterva.enzymes.policy import split_mutation
+    _, mutations = split_mutation(" ".join(str(subject).split()))
+    if mutations and not getattr(args, "mutation", None):
+        # The note says the constants come from the mutant's rows only.
+        args.mutation = "/".join(mutations)
+    notes = resolution.notes(subject, isoform_applied=isoform_applied, organism_applied=organism_applied)
+    if getattr(resolution, "isoform", None) and not isoform_applied and args.isoform != resolution.isoform:
+        notes.append(f"--isoform {args.isoform} was used, because a flag wins over what {subject.strip()!r} implies.")
+    note = " ".join(notes) or None
     if resolution.ec != (model.subject or "").strip():
         model = replace(model, subject=resolution.ec)
     return model, note, None, None
@@ -1069,27 +2185,87 @@ def search_the_literature(
     return found.model, found.note, found.refused
 
 
-#: How many substrates the missing-substrate refusal names at most.
+#: How many organisms the no-rows-in-your-organism refusal names at most.
+#: (It named substrates until ADR 0182, when a missing substrate became a
+#: choice that names its alternatives itself: `defaults.ALTERNATIVES_NAMED`.)
 SUBSTRATES_NAMED = 8
 
 
-def _substrates_brenda_lists(ec: str, organism: Optional[str]) -> str:
-    """Name the substrates BRENDA holds Km rows for, so the refusal can be acted on.
+#: Reads of BRENDA's substrate list made before a word of the description
+#: is given up on, and the pause between them, in seconds: a timeout is
+#: usually transient, and a word lost to one is a model of something else.
+SUBSTRATE_LIST_READS = 3
+SUBSTRATE_LIST_PAUSE = 2.0
 
-    The enzyme WAS found when this is called; what is missing is the one
-    thing only the user knows. Naming the candidates turns "re-run with
-    --substrate" into a choice the user can make, without Caterva making it
-    for them: picking one would cite a Km for a reaction nobody asked about.
-    Returns "" when the list cannot be built, because the refusal stands
-    either way and a failed lookup must not replace it.
 
-    The order is by how many rows each substrate has, and the sentence says
-    exactly that. It used to call them "the best-measured", which a row
-    count cannot show: one row is a single measurement, however good, and
-    a substrate with one row was printed under that heading. At most
-    SUBSTRATES_NAMED are named, so a page with fifty substrates stays one
-    readable sentence; the total is stated beside them, so a reader can tell
-    when the list is not all of it.
+#: A word that is an isozyme's code, not a compound: one letter or digit,
+#: or a Roman numeral ("A", "2", "II", "IV").
+_ISOZYME_CODE = re.compile(r"[A-Za-z0-9]|[IVXivx]{1,4}")
+
+
+def _substrate_measured_elsewhere(
+    ec: str, organism: Optional[str], candidates: Sequence[str],
+) -> Optional[Tuple[str, str, Dict[str, int]]]:
+    """(the word typed, BRENDA's name for it, organism -> usable Km rows) when
+    a word of the description is a substrate BRENDA lists Km rows for under
+    `ec` in other organisms but not in `organism`; None otherwise, or when
+    that cannot be read.
+
+    "pepsin with hemoglobin --organism pig" said "No word of your
+    description ('hemoglobin') is a substrate BRENDA lists for EC 3.4.23.1
+    for Sus scrofa" and to pass --substrate with BRENDA's own name. BRENDA
+    lists "Hemoglobin + H2O" as pig pepsin's natural substrate, and its
+    hemoglobin Km rows are fish pepsins' (Saurida micropectoralis, 3 rows):
+    the word was BRENDA's own name, and what is missing is the organism
+    (review of ADR 0182's F14 fix). Variant rows are not counted
+    (`_usable`), so an organism is offered only where a re-run would use it.
+    """
+    if not organism or not candidates:
+        return None
+    from caterva.compose import defaults
+    from caterva.enzymes.sentence import match_substrate
+
+    everywhere = _read_substrates(ec, None)
+    if not everywhere:
+        return None
+    match = match_substrate(candidates, everywhere)
+    if match.name is None:
+        return None
+    key = defaults._search_key(match.name)
+    try:
+        rows = defaults.table_rows(ec, "km", None)
+    except Exception:  # noqa: BLE001 - the sentence then stays as it was
+        return None
+    counts: Dict[str, int] = {}
+    for row in _usable(r for r in rows if defaults._search_key(r.compound) == key):
+        if row.organism and row.organism != organism:
+            counts[row.organism] = counts.get(row.organism, 0) + 1
+    if not counts:
+        return None
+    return match.typed, match.name, counts
+
+
+def _read_substrates(ec: str, organism: Optional[str]) -> Optional[Dict[str, int]]:
+    """`brenda_km_substrates`, read again after a pause when it fails."""
+    import time
+
+    for attempt in range(SUBSTRATE_LIST_READS):
+        listed = brenda_km_substrates(ec, organism)
+        if listed is not None:
+            return listed
+        if attempt + 1 < SUBSTRATE_LIST_READS:
+            time.sleep(SUBSTRATE_LIST_PAUSE)
+    return None
+
+
+def brenda_km_substrates(ec: str, organism: Optional[str]) -> Optional[Dict[str, int]]:
+    """substrate -> Km row count on BRENDA's page for `ec`, for `organism`
+    when one is given; None when the page could not be read.
+
+    The plain-language reader accepts a word of the description as the
+    substrate only when it is one of these; `defaults.choose_substrate`
+    reads the same page with the same parser, so a word is never read as a
+    substrate the choice would not have listed.
     """
     try:
         from caterva.checkout import literature_module
@@ -1099,20 +2275,638 @@ def _substrates_brenda_lists(ec: str, organism: Optional[str]) -> str:
         html = client.fetch_brenda_html(ec)
         rows = client.parse_brenda_km_html(
             html, ec, [], name, require_substrate_match=False)
-    except Exception:  # noqa: BLE001 - the refusal above is the answer
-        return ""
+    except Exception:  # noqa: BLE001 - each caller says what not having it means
+        return None
     counts: Dict[str, int] = {}
     for row in rows:
         counts[row.substrate] = counts.get(row.substrate, 0) + 1
-    if not counts:
-        return ""
-    top = sorted(counts, key=lambda k: (-counts[k], k))[:SUBSTRATES_NAMED]
-    listed = "; ".join(f"{n} ({counts[n]} row{'s' if counts[n] != 1 else ''})" for n in top)
-    which = (f"the {len(top)} with the most rows" if len(top) < len(counts)
-             else "most rows first")
-    where = f" for {name}" if name else ""
-    return (f" BRENDA holds Km rows{where} for {len(counts)} substrate(s) of "
-            f"EC {ec}; {which}: {listed}. Pass one with --substrate.")
+    return counts
+
+
+def _not_named(model: Any, args: Any) -> Tuple[List[str], bool, bool]:
+    """(the tables this model reads, whether a constant needs a substrate
+    nobody named, whether one needs an inhibitor nobody named)."""
+    named = replace(model, substrate=getattr(args, "substrate", None) or None,
+                    compounds=compounds_from(args))
+    asked = [q for q in model.resolvable if q.table is not None and not q.lookup_refused]
+    tables = [t for t in ("km", "kcat", "ki") if any(q.table == t for q in asked)]
+    substrate = any(q.primary and named.compound_for(q) is None for q in asked)
+    inhibitor = any(q.ligand_role == "regulator" and named.compound_for(q) is None for q in asked)
+    return tables, substrate, inhibitor
+
+
+def _protein_under_another_ec(ec: str, organism: str, text: Optional[str]) -> Optional[Tuple[Any, Any, list, list]]:
+    """(candidate, protein, usable Km rows, rows naming the protein) for the
+    enzyme words `text` when they name a protein of `organism` that the
+    nomenclature files under ANOTHER EC number than `ec`; None otherwise,
+    or when that EC number's page cannot be read.
+
+    The words name the protein when UniProt gives it them as a name
+    ("Glucokinase" for human GCK), or when they are the isozyme's name in
+    the words papers use ("glucokinase" is HXK4, hexokinase IV, in rat,
+    whose UniProt names this build does not hold). A word inside a longer
+    name ("ADP-dependent glucokinase") does not count. A row names the
+    protein by its commentary's words or by its own UniProt accession: human
+    GCK's wild-type K0.5 row (ref 739603) names it only by P35557, and the
+    refusal said none of the 54 rows named GCK (fifth round's review).
+    """
+    if not text:
+        return None
+    from caterva.enzymes import finder
+    from caterva.enzymes.index import load_index
+    from caterva.compose import defaults
+    from caterva.bind.core import read_isoform, same_isoform
+
+    key = finder.strict_key(text)
+    try:
+        ranked = finder._search(text, finder.organism_code(organism), load_index())
+    except Exception:  # noqa: BLE001
+        return None
+    for candidate in ranked:
+        if candidate.ec == ec or candidate.via != "name" or candidate.tier == finder.TIER_TYPO:
+            continue
+        for protein in candidate.organism_proteins:
+            if not (any(finder.strict_key(n) == key for n in protein.names)
+                    or same_isoform(protein.label, text)):
+                continue
+            try:
+                # Counted as the search would use them: a variant's row is
+                # withheld (ADR 0029), so it is no way out.
+                rows = _usable(defaults.table_rows(candidate.ec, "km", organism))
+            except Exception:  # noqa: BLE001
+                return None
+            accession = getattr(protein, "accession", None)
+
+            def names_it(row: Any) -> bool:
+                said = read_isoform(row.conditions or "")
+                if said and (same_isoform(said, protein.label) or same_isoform(said, text)):
+                    return True
+                cells = [c.strip() for c in (row.uniprot or "").split(",") if c.strip()]
+                if len(cells) != 1:
+                    return False
+                return cells[0] == accession or defaults._accession_says(cells[0], protein.label) is True
+
+            return candidate, protein, rows, [r for r in rows if names_it(r)]
+    return None
+
+
+def _filed_under_another_ec(ec: str, organism: str, text: Optional[str]) -> Optional[str]:
+    """When the enzyme words name a protein of `organism` that the
+    nomenclature files under ANOTHER EC number, the sentence that says so and
+    gives the command; None otherwise.
+
+    "glucokinase in human" was refused for EC 2.7.1.2, which has no human Km
+    row, and pointed at Zymomonas mobilis, while human glucokinase is GCK,
+    listed under EC 2.7.1.1 (hexokinase), whose human rows include GCK's own.
+    Only a protein whose UniProt names include the words exactly counts (GCK
+    is "Glucokinase"); a word inside a longer name ("ADP-dependent
+    glucokinase") does not. When rows do name it, compose reads that EC
+    number itself (`_read_as_the_protein_filed_elsewhere`); this sentence is
+    for a run that did not.
+    """
+    found = _protein_under_another_ec(ec, organism, text)
+    if found is None:
+        return None
+    candidate, protein, rows, naming = found
+    if not rows:
+        return None
+    said = (f"In {organism}, {text!r} is the protein {protein.label}, which the nomenclature files "
+            f"under EC {candidate.ec} ({candidate.name}); BRENDA has {len(rows)} Km "
+            f"row{'s' if len(rows) != 1 else ''} for EC {candidate.ec} in {organism}")
+    if naming:
+        return (said + f", {len(naming)} of which name{'s' if len(naming) == 1 else ''} {protein.label} "
+                f"(in their words or by UniProt accession). To model it, re-run with --subject "
+                f"{candidate.ec} --isoform {protein.label} (the constants are then taken from rows that "
+                f"name {protein.label} where there are any, and the report says which rows name no "
+                "isozyme).")
+    # No row names the protein: the run the advice leads to carries a
+    # row of whichever protein of that EC number it measured.
+    # "glucokinase in mouse" was sent to EC 2.7.1.1 --isoform Gck and
+    # came back GROUNDED with Km 0.42 mM from a mouse row naming no
+    # isozyme: a low-Km hexokinase's value, not glucokinase's (S0.5
+    # near 8 mM). Said before the command, not left to a flag after it.
+    return (said + f", and none of them names {protein.label}, in its words or by UniProt accession, so "
+            f"each may have measured another protein of EC {candidate.ec}. To model it from those rows, "
+            f"re-run with --subject {candidate.ec} --isoform {protein.label} and read the papers of the "
+            "rows it carries (the report flags each row that names no isozyme; it cannot say whose it "
+            f"is), or supply {protein.label}'s constants yourself.")
+
+
+def _read_as_the_protein_filed_elsewhere(reading: Any, args: Any) -> Optional[str]:
+    """For an enzyme name read as an EC number that lists no protein of the
+    organism and has no Km row there, while the words name a protein of that
+    organism filed under another EC number whose BRENDA rows name it: that
+    EC number and protein are used (`args.subject`, `args.isoform`), and
+    the sentence saying so is returned; None otherwise.
+
+    "glucokinase from rat liver" was read as EC 2.7.1.2, the bacterial
+    glucokinase, which lists no rat protein, and refused with advice to
+    model Zymomonas mobilis, while BRENDA's rat rows for hexokinase IV
+    (glucokinase, HXK4) are under EC 2.7.1.1: 7.7 mM for D-glucose (ref
+    641070, "adult glucokinase"). The cofactor-sibling rule for glutamate
+    dehydrogenase (EC 1.4.1.2 to 1.4.1.3, fourth round) is the same idea;
+    this one rests on rows that name the protein (fifth round's review).
+    """
+    ec = reading.ec
+    organism = getattr(args, "organism", None) or reading.organism
+    if not ec or not organism or getattr(args, "isoform", None) or getattr(reading, "isoform", None):
+        return None
+    from caterva.compose import defaults
+    from caterva.compose.organisms import normalise_organism
+
+    where = normalise_organism(organism)[0] or organism
+    try:
+        from caterva.enzymes import finder
+        from caterva.enzymes.index import load_index
+
+        code = finder.organism_code(where)
+        _, count = load_index().proteins_in(ec, code)
+        if code is None or count:
+            return None
+        if _usable(defaults.table_rows(ec, "km", where)):
+            return None
+    except Exception:  # noqa: BLE001 - unreadable: the reading stands
+        return None
+    found = _protein_under_another_ec(ec, where, reading.enzyme_text)
+    if found is None:
+        return None
+    other, protein, rows, naming = found
+    if not naming:
+        return None
+    args.subject = other.ec
+    args.isoform = protein.label
+    args.isoform_asked = DESCRIPTION_ASKED
+    name = reading.enzyme_name or ec
+    return (f"Read {reading.enzyme_text!r} in your description as EC {other.ec} ({other.name}), the "
+            f"{where} protein {protein.label}: EC {ec} ({name}), whose name it is, lists no {where} "
+            f"protein in the enzyme nomenclature and BRENDA holds no Km row for it there, while the "
+            f"nomenclature files {where} {protein.label} under EC {other.ec}, where "
+            f"{defaults._plural(len(naming), 'Km row')} of {len(rows)} name it. The constants are taken "
+            f"from rows that name {protein.label} where there are any; pass --subject {ec} to model "
+            f"EC {ec} instead.")
+
+
+def _read_as_the_human_protein_filed_elsewhere(reading: Any, args: Any) -> Optional[str]:
+    """`_read_as_the_protein_filed_elsewhere` for a description that names no
+    organism, read for Homo sapiens, the organism preferred when none is
+    named (ADR 0182); None when an organism was named or it does not apply.
+
+    "glucokinase" alone was modelled as EC 2.7.1.2 in Trypanosoma cruzi and
+    never said that the glucokinase of human biochemistry (GCK, hexokinase
+    IV) is filed under EC 2.7.1.1, while "glucokinase in human" was read as
+    GCK (sixth round's polish, R6V1-10). The EC number the name belongs to
+    stays one flag away, and the sentence says so."""
+    if getattr(args, "organism", None) or reading.organism or getattr(reading, "unread_organism", None):
+        return None
+    args.organism = "Homo sapiens"
+    try:
+        note = _read_as_the_protein_filed_elsewhere(reading, args)
+    except Exception:  # noqa: BLE001 - the reading stands
+        note = None
+    if note is None:
+        args.organism = None
+        return None
+    _remember(args, organism_chosen=True)
+    return (note + " No organism was named, so Homo sapiens was searched, as it is for any enzyme "
+                   "with human rows (pass --organism to change it).")
+
+
+def _read_where_the_organism_has_rows(reading: Any, args: Any) -> Optional[str]:
+    """For an enzyme name whose EC number has no Km row in the organism
+    named, while exactly one other EC number the same name is a name of has
+    such rows, and the nomenclature lists no protein of that organism (it
+    indexes few organisms): that EC number is used (`args.subject`), and the
+    sentence saying so is returned; None otherwise.
+
+    "lactase from Kluyveromyces lactis", the industrial lactase, was read
+    as EC 3.2.1.108 (mammalian lactase-phlorizin hydrolase) and refused with
+    advice to model sheep, rat or human lactase, while "lactase" is also a
+    name of EC 3.2.1.23 (beta-galactosidase), where BRENDA holds K. lactis
+    lactose Km rows (19.8 mM, ref 655098) (fifth round, R5V1-04).
+    """
+    ec = reading.ec
+    organism = getattr(args, "organism", None) or reading.organism
+    text = getattr(reading, "enzyme_text", None)
+    if not ec or not organism or not text or getattr(args, "isoform", None) \
+            or getattr(reading, "isoform", None):
+        return None
+    from caterva.compose import defaults
+    from caterva.compose.organisms import normalise_organism
+
+    where = normalise_organism(organism)[0] or organism
+    try:
+        from caterva.enzymes import finder
+        from caterva.enzymes.index import load_index
+
+        code = finder.organism_code(where)
+        if code is not None:
+            return None  # an indexed organism: `_read_as_the_protein_filed_elsewhere`'s case
+        if _usable(defaults.table_rows(ec, "km", where)):
+            return None
+        ranked = [c for c in finder._search(text, None, load_index())
+                  if c.ec != ec and c.via == "name" and c.tier != finder.TIER_TYPO
+                  and not getattr(c, "abbreviation", False)][:CANDIDATES_READ_FOR_THE_ORGANISM]
+        rows = {c.ec: len(_usable(defaults.table_rows(c.ec, "km", where))) for c in ranked}
+    except Exception:  # noqa: BLE001 - unreadable: the reading stands
+        return None
+    with_rows = [c for c in ranked if rows.get(c.ec)]
+    if len(with_rows) != 1:
+        return None
+    other = with_rows[0]
+    args.subject = other.ec
+    _remember(args, enzyme_text=text)
+    name = reading.enzyme_name or ec
+    return (f"Read {text!r} in your description as EC {other.ec} ({other.name}): EC {ec} ({name}), "
+            f"whose name it is, has no Km row in {where} on BRENDA, while {text!r} is also a name of "
+            f"EC {other.ec}, which has {defaults._plural(rows[other.ec], 'Km row')} there. Pass "
+            f"--subject {ec} to model EC {ec} instead.")
+
+
+def _km_organisms_usable(ec: str) -> Dict[str, int]:
+    """`defaults.km_organisms(ec)` less the rows of a protein variant
+    (`_usable`): an organism offered as the way out of a refusal must hold a
+    Km row the search would use."""
+    from caterva.compose import defaults
+
+    counts = dict(defaults.km_organisms(ec))
+    for row in defaults.table_rows(ec, "km", None):
+        if row.organism in counts and _a_variant(row):
+            counts[row.organism] -= 1
+    return {o: n for o, n in counts.items() if n > 0}
+
+
+def _enzyme_words(args: Any) -> Optional[str]:
+    """The enzyme's name as the user typed it ("ribonuclease A", "lysozyme"),
+    for the organism a name implies (`defaults.IMPLIED_ORGANISMS`); None when
+    only an EC number was given."""
+    text = getattr(args, "enzyme_text", None)
+    if not isinstance(text, str) or not text.strip():
+        subject = getattr(args, "subject", None)
+        text = subject if isinstance(subject, str) else None
+    if not text or re.fullmatch(r"[\d.\-n]+", text.strip()):
+        return None
+    return text
+
+
+def _organism_has_no_rows(ec: str, organism: str, enzyme_text: Optional[str] = None) -> Optional[str]:
+    """The refusal for an organism the user NAMED that has no Km row for
+    `ec` at all, listing the organisms that do; None when it has rows, or
+    when the page cannot be read (the substrate choice then says that).
+
+    "glucose-6-phosphate dehydrogenase in S. cerevisiae" was refused with
+    "Re-run with --substrate NAME" -- and a user who did would have got
+    placeholders again, because BRENDA's page for EC 1.1.1.49 has no yeast
+    Km row at all. The organism is the blocker, so the advice names it.
+    Another organism is never substituted for the one named (ADR 0024).
+    """
+    from caterva.compose.defaults import table_rows
+
+    try:
+        by_organism = _km_organisms_usable(ec)
+        mine = len(table_rows(ec, "km", organism))
+    except Exception:  # noqa: BLE001
+        return None
+    if mine:
+        return None
+    ranked = sorted(by_organism, key=lambda o: (-by_organism[o], o))
+    listed = "; ".join(f"{o} ({by_organism[o]} row{'s' if by_organism[o] != 1 else ''})"
+                       for o in ranked[:SUBSTRATES_NAMED])
+    more = f" and {len(ranked) - SUBSTRATES_NAMED} more" if len(ranked) > SUBSTRATES_NAMED else ""
+    sibling = _filed_under_another_ec(ec, organism, enzyme_text)
+    if not ranked:
+        return (f"No search was run: BRENDA's page for EC {ec} holds no Km row for any organism, "
+                "so there is no measured substrate to model. "
+                + (f"{sibling} Otherwise supply" if sibling else "Supply") + " the constants yourself.")
+    text = (f"No search was run: BRENDA holds no Km row for EC {ec} in {organism}, so no substrate "
+            f"could be chosen and no constant of this model can be measured there. The organism, "
+            f"not the substrate, is what is missing: naming a substrate would not help. ")
+    if sibling:
+        # The protein the user means is under another EC number: that is
+        # the first remedy, before any other organism.
+        return (text + f"{sibling} Organisms with Km rows for EC {ec} itself: {listed}{more} (Caterva "
+                "never substitutes another organism's value for the one you named, ADR 0024).")
+    return (text + f"Organisms "
+            f"with Km rows for EC {ec}: {listed}{more}. Re-run with --organism set to one of them "
+            f"(Caterva never substitutes another organism's value for the one you named, ADR 0024), "
+            f"or supply the constants yourself.")
+
+
+def _inhibition_mode(model: Any, args: Any) -> Optional[str]:
+    """The inhibition mode the search will ask a Ki for (the motif's; none
+    under --any-mode), so an inhibitor is chosen by the rows it will take."""
+    if getattr(args, "any_mode", False):
+        return None
+    from caterva.compose.row_scope import INHIBITION_TABLES, MODE_OF_MOTIF
+
+    for q in getattr(model, "resolvable", ()) or ():
+        if q.table in INHIBITION_TABLES and MODE_OF_MOTIF.get(q.motif_name):
+            return MODE_OF_MOTIF[q.motif_name]
+    return None
+
+
+def _mixed_mutant_note(ec: str, args: Any, tables: Sequence[str]) -> Optional[str]:
+    """What BRENDA's rows of a mutant mixed with the wild type measured, for
+    a model of that mutant, or None when there is none (R6V1-01)."""
+    mutation = getattr(args, "mutation", None) or None
+    if not mutation:
+        return None
+    from caterva.compose import defaults
+
+    try:
+        rows = defaults.mixed_rows_of_mutant(ec, getattr(args, "organism", None) or None, str(mutation),
+                                             [t for t in tables if t in ("km", "kcat")] or ("km",))
+    except Exception:  # noqa: BLE001
+        return None
+    if not rows:
+        return None
+    shown = "; ".join(
+        f"{r.value:g} for {r.compound} (BRENDA ref {r.reference_id}: \"{r.conditions}\")"
+        for r in rows[:3] if r.value is not None)
+    more = f"; and {len(rows) - 3} more" if len(rows) > 3 else ""
+    return (f"{defaults._plural(len(rows), 'row')} naming {mutation} measured the mutant together with "
+            f"the wild type, not the mutant alone, so {'it is' if len(rows) == 1 else 'they are'} not taken "
+            f"as {mutation}'s constant: {shown}{more}.")
+
+
+def _filed_under_longer_name(ec: str, organism: str) -> Optional[Any]:
+    """The `Choice` of the organism BRENDA files `organism` under, when the
+    name typed has no Km row for `ec` and exactly one organism with rows is
+    the same genus and carries every other word typed: a serovar, strain or
+    subspecies name. None otherwise.
+
+    "tryptophan synthase from Salmonella typhimurium" was refused: BRENDA
+    files that organism as "Salmonella enterica subsp. enterica serovar
+    Typhimurium", which the refusal then listed first among the organisms
+    to try instead (sixth round's polish, R6V1-03). It is the organism the
+    person named, under its current name, so reading it is not putting
+    another organism in its place (ADR 0024); the note says how it was read.
+    """
+    words = [w for w in re.split(r"[\s.]+", (organism or "").strip()) if w]
+    if len(words) < 2 or not all(w.isalpha() and len(w) >= 3 for w in words):
+        return None
+    from caterva.compose import defaults
+
+    try:
+        if defaults.table_rows(ec, "km", organism):
+            return None
+        counts = _km_organisms_usable(ec)
+    except Exception:  # noqa: BLE001
+        return None
+    genus, rest = words[0].lower(), [w.lower() for w in words[1:]]
+    found = []
+    for name, n in counts.items():
+        theirs = [w.lower() for w in re.split(r"[\s.]+", name) if w]
+        if n > 0 and len(theirs) > len(words) and theirs[0] == genus and all(w in theirs[1:] for w in rest):
+            found.append(name)
+    if len(found) != 1:
+        return None
+    best = found[0]
+    why = (f"BRENDA has no row under the name {organism!r} for EC {ec}, and files "
+           f"{defaults._plural(counts[best], 'Km row')} under {best!r}, the one organism with rows "
+           "there whose name carries every word you gave")
+    return defaults.Choice("organism", best, why, (), 1, {"km": counts[best]},
+                           instead=f"You named the organism {organism!r}")
+
+
+def _species_of_genus(ec: str, typed: str) -> Optional[Any]:
+    """The `Choice` of the best-measured species of the genus `typed`
+    names, when it is one word that is the genus of organisms with Km rows
+    for `ec`; None otherwise.
+
+    "glucose isomerase from Streptomyces" was refused as naming no organism
+    Caterva reads, and the advice listed every organism on the page
+    (Actinoplanes, Thermus ...) rather than the Streptomyces species (fifth
+    round, R5V1-13). A genus is a choice among its species, made as ADR 0182
+    makes one for an organism not named: the most rows, said, with the others.
+    """
+    word = (typed or "").strip()
+    if not re.fullmatch(r"[A-Z][a-z]{2,}", word):
+        return None
+    from caterva.compose import defaults
+
+    try:
+        counts = _km_organisms_usable(ec)
+    except Exception:  # noqa: BLE001
+        return None
+    species = {o: n for o, n in counts.items()
+               if o.split()[0] == word and len(o.split()) >= 2 and n > 0}
+    if not species:
+        return None
+    ranked = sorted(species, key=lambda o: (-species[o], o.endswith(" sp."), o))
+    best = ranked[0]
+    others = ranked[1:]
+    why = (f"of the {len(species)} species of {word} with Km rows under EC {ec}, it has the most "
+           f"({defaults._plural(species[best], 'Km row')})")
+    alternatives = tuple(defaults.Option(o, {"km": species[o]}) for o in others[:defaults.ALTERNATIVES_NAMED])
+    return defaults.Choice("organism", best, why, alternatives, len(species), {"km": species[best]},
+                           instead=f"Your description names the genus {word!r}, not a species")
+
+
+def _unread_organism_refusal(ec: str, typed: str) -> str:
+    """The refusal for a description that named the enzyme's source in words
+    Caterva does not read as an organism ("beta-glucosidase from almond"
+    before almond was in the table). The search used to go on and choose an
+    organism as though none had been named -- Homo sapiens, GROUNDED, for
+    sweet-almond beta-glucosidase (names-stream review, 2026-11-12). The
+    person named one, so another is never put in its place (ADR 0024); the
+    organisms with Km rows are listed for the re-run.
+    """
+    from caterva.compose.defaults import km_organisms
+
+    try:
+        by_organism = km_organisms(ec)
+    except Exception:  # noqa: BLE001
+        by_organism = {}
+    ranked = sorted(by_organism, key=lambda o: (-by_organism[o], o))
+    listed = "; ".join(f"{o} ({by_organism[o]} row{'s' if by_organism[o] != 1 else ''})"
+                       for o in ranked[:SUBSTRATES_NAMED])
+    more = f" and {len(ranked) - SUBSTRATES_NAMED} more" if len(ranked) > SUBSTRATES_NAMED else ""
+    where = (f" Organisms with Km rows for EC {ec}, most rows first: {listed}{more}." if ranked else "")
+    return (f"No search was run: your description names {typed!r} as the enzyme's source, which is not an "
+            f"organism name Caterva reads, and another organism is never put in place of the one you named "
+            f"(ADR 0024): a value measured in it would be cited for {typed!r}. Re-run with --organism and the "
+            f"binomial BRENDA files that source under.{where}")
+
+
+def _choose_what_was_not_named(model: Any, args: Any) -> Tuple[Any, Optional[str]]:
+    """Choose, out loud, the organism, substrate and inhibitor the user did
+    not name, before the search, so the search is run for them (ADR 0182).
+
+    Returns `(model, refusal)`: the model with the choices recorded on it
+    (`ComposedModel.choices`) and `args` filled as if the flags had been
+    typed, or a refusal sentence when nothing can be searched.
+
+    ORDER MATTERS. The organism first, given the substrate and inhibitor
+    when either was named (so "xanthine oxidase inhibited by allopurinol"
+    is modelled in Bos taurus, the one organism with an allopurinol Ki row,
+    not in whichever organism a search of everything happened to settle
+    on); then the substrate, in that organism; then the inhibitor, given
+    both. A flag or a compound the sentence named is never replaced. An
+    organism the user named that has no Km row at all is a refusal naming
+    the organisms that have one, never a switch.
+
+    WHEN NOTHING CAN BE CHOSEN the old refusal stands, worded for what is
+    actually missing: the page could not be read (re-run with --substrate,
+    as before), or it lists no substrate.
+    """
+    from caterva.compose import defaults
+
+    ec = model.ec_number
+    if ec is None:
+        return model, None
+    tables, needs_substrate, needs_inhibitor = _not_named(model, args)
+    choices = list(getattr(model, "choices", ()) or ())
+    inhibitor = compounds_from(args).get("@inhibitor")
+
+    unread = getattr(args, "organism_unread", None)
+    if not args.organism and isinstance(unread, str) and unread:
+        genus = _species_of_genus(ec, unread)
+        if genus is None:
+            return replace(model, choices=tuple(choices)), _unread_organism_refusal(ec, unread)
+        args.organism = genus.chosen
+        _remember(args, organism_chosen=True)
+        choices.append(genus)
+
+    if args.organism:
+        longer = _filed_under_longer_name(ec, args.organism)
+        if longer is not None:
+            args.organism = longer.chosen
+            choices.append(longer)
+
+    if not args.organism and (needs_substrate or needs_inhibitor or args.substrate):
+        chosen = defaults.choose_organism(
+            ec, substrate=args.substrate or None, inhibitor=inhibitor, needs=tables or ("km",),
+            isoform=getattr(args, "isoform", None) or None, named_as=_enzyme_words(args))
+        if chosen is not None:
+            typed = str(getattr(args, "description", None) or "")
+            said = [w for w in re.findall(r"[A-Za-z]{5,}", typed)
+                    if re.search(rf"\b{re.escape(w)}\b", chosen.chosen, re.IGNORECASE)]
+            if said and not chosen.instead:
+                # "influenza neuraminidase": the user named influenza, not a
+                # species of it, and "No organism was named" was false
+                # (sixth round, NEW-17).
+                chosen = replace(chosen, instead=(f"Your description names {said[0]!r} but no "
+                                                  "organism Caterva can search by"))
+            args.organism = chosen.chosen
+            _remember(args, organism_chosen=True)
+            choices.append(chosen)
+    elif args.organism and needs_substrate:
+        text = getattr(args, "enzyme_text", None)
+        if not isinstance(text, str) and getattr(args, "subject", None) and _flag_subject_ec(args) == ec \
+                and not re.fullmatch(r"[\d.\-n]+", str(args.subject).strip()):
+            text = args.subject
+        blocked = _organism_has_no_rows(ec, args.organism,
+                                        text if isinstance(text, str) else None)
+        if blocked is not None:
+            return replace(model, choices=tuple(choices)), blocked
+
+    isoform = getattr(args, "isoform", None) or None
+    unread = getattr(args, "substrate_unread", None)
+    if needs_substrate and isinstance(unread, tuple) and unread:
+        # The sentence named words that may be the substrate, and BRENDA's
+        # list could not be read to check them: choosing another substrate
+        # now would replace the user's word with Caterva's pick.
+        shown = ", ".join(repr(c) for c in unread[:4])
+        return replace(model, choices=tuple(choices)), (
+            f"No search was run: your description names what may be the substrate ({shown}), and "
+            f"BRENDA's substrate list for EC {ec} could not be read to check it, so it could not be "
+            "taken, and no other substrate is chosen in its place. Re-run when BRENDA answers, or "
+            "pass --substrate with BRENDA's name for the compound.")
+
+    if needs_substrate:
+        among = getattr(args, "substrate_among", None)
+        among = tuple(among) if isinstance(among, (tuple, list)) and among else None
+        try:
+            mutation = getattr(args, "mutation", None) or None
+            chosen = defaults.choose_substrate(ec, args.organism, needs_kcat="kcat" in tables,
+                                               strict=True, among=among, isoform=isoform,
+                                               mutation=mutation)
+            if chosen is None and among:
+                # None of the matched names has a row here after all: the
+                # whole list, said as such by the `instead` clause.
+                chosen = defaults.choose_substrate(ec, args.organism, needs_kcat="kcat" in tables,
+                                                   strict=True, isoform=isoform, mutation=mutation)
+        except Exception:  # noqa: BLE001 - the page could not be read: the old refusal
+            chosen = None
+            unreadable = True
+        else:
+            unreadable = False
+        instead = getattr(args, "substrate_instead", None)
+        if chosen is not None and isinstance(instead, str) and instead:
+            chosen = replace(chosen, instead=instead)
+        if chosen is None:
+            where = f" in {args.organism}" if args.organism else ""
+            missing = ", ".join(t for t in tables if t in ("km", "kcat", "ki"))
+            if unreadable:
+                # A page that did not answer is an outage, not an absence: the
+                # remedy is a re-run, and --substrate only skips the choice
+                # (the search still reads the page). Fourth round's review.
+                return replace(model, choices=tuple(choices)), (
+                    f"No search was run: this model needs {missing} from BRENDA, and no substrate "
+                    f"was named; BRENDA's page for EC {ec} could not be read just now (the site did "
+                    f"not answer in time), so none could be chosen. This is not a finding about the "
+                    f"enzyme: re-run when BRENDA answers. Passing --substrate NAME only skips the "
+                    f"choice; the search still reads the same page.")
+            if mutation:
+                # The mutant has no row, not the organism: EGFR T790M and
+                # carbonic anhydrase II H64A in human were told BRENDA had no
+                # human Km row for the EC, and to name a substrate, which
+                # changed nothing (fifth round, R5V1-16).
+                try:
+                    wild = defaults.choose_substrate(ec, args.organism, needs_kcat="kcat" in tables,
+                                                     strict=True, isoform=isoform)
+                except Exception:  # noqa: BLE001
+                    wild = None
+                if wild is not None:
+                    # Whether any organism has the mutant's row: "no Km row in
+                    # Bos taurus measures H12A" read as if another organism's
+                    # did, and none does (sixth round, NEW-13).
+                    try:
+                        token = re.compile(rf"(?<![A-Za-z0-9]){re.escape(str(mutation))}(?![0-9])")
+                        elsewhere = sorted({r.organism for r in defaults.table_rows(ec, "km", None)
+                                            if r.organism and r.organism != args.organism
+                                            and token.search(r.conditions or "")})
+                    except Exception:  # noqa: BLE001 - said as before
+                        elsewhere = None
+                    anywhere = ""
+                    if elsewhere == [] and where:
+                        anywhere = f" (nor does any row in another organism)"
+                    elif elsewhere:
+                        anywhere = (f" (rows in {', '.join(elsewhere[:3])} do; pass --organism with "
+                                    f"one of them to model the mutant there)")
+                    mixed = _mixed_mutant_note(ec, args, tables)
+                    return replace(model, choices=tuple(choices)), (
+                        f"No search was run: no Km row{where} under EC {ec} measures the mutant "
+                        f"{mutation}{anywhere}, and naming a substrate will not change that: BRENDA's rows"
+                        f"{where} are of the wild type or other variants."
+                        + (f" {mixed}" if mixed else "") + " To model the wild-type "
+                        f"enzyme instead, re-run without {mutation} in the description (Caterva "
+                        f"would then use {wild.chosen}), or supply the mutant's constants yourself.")
+            reason = f"BRENDA lists no substrate with a Km row for EC {ec}{where} to choose"
+            return replace(model, choices=tuple(choices)), (
+                f"No search was run: this model needs {missing} from BRENDA, and those tables "
+                f"are per-substrate; no substrate was named and {reason}. Re-run with "
+                f"--substrate NAME.")
+        args.substrate = chosen.chosen
+        choices.append(chosen)
+
+    mixed_note = _mixed_mutant_note(ec, args, tables)
+    if mixed_note:
+        try:
+            model.recognition.composition.note(mixed_note)
+        except AttributeError:
+            pass
+
+    if needs_inhibitor:
+        chosen = defaults.choose_inhibitor(ec, args.organism, args.substrate, isoform=isoform,
+                                           mode=_inhibition_mode(model, args))
+        if chosen is not None:
+            args.inhibitor = chosen.chosen
+            choices.append(chosen)
+
+    model = replace(model, organism=args.organism, substrate=args.substrate or None,
+                    compounds=compounds_from(args), choices=tuple(choices))
+    return model, None
 
 
 def _search_resolved(
@@ -1121,8 +2915,11 @@ def _search_resolved(
     """Resolve this model's constants from the literature.
 
     Returns `(model, note, refused)`. `refused` is True when the search
-    could not be RUN -- an ambiguous enzyme name, a missing substrate, no
+    could not be RUN -- an ambiguous enzyme name, an organism named with no
+    Km row, a page that could not be read to choose a substrate, no
     literature layer, a crash -- and False when it ran, whatever it found.
+    What the user did not name is chosen first, out loud
+    (`_choose_what_was_not_named`, ADR 0182).
 
     THE DISTINCTION THE EXIT CODE NEEDS
     -----------------------------------
@@ -1167,23 +2964,11 @@ def _search_resolved(
     from caterva.checkout import LiteratureLayerUnavailable
 
     if getattr(args, "isoform", None):
-        model = replace(model, isoform=args.isoform)
+        model = replace(model, isoform=args.isoform, isoform_asked=_isoform_asked(args))
     ec = model.ec_number
-    # Only constants measured on the primary substrate need --substrate;
-    # an inhibitor's Ki needs the inhibitor instead (see unsearched()).
-    needs_substrate = sorted(
-        q.table for q in model.resolvable
-        if q.table in ("km", "ki") and q.table is not None and q.primary
-        and not q.lookup_refused and q.ligand_port not in compounds_from(args)
-    )
-    if needs_substrate and not args.substrate:
-        return model, (
-            f"No search was run: this model needs {', '.join(sorted(set(needs_substrate)))} "
-            f"from BRENDA, and those tables are per-substrate. A motif knows "
-            f"it needs a Km; it cannot know what the Km is FOR. Re-run with "
-            f"--substrate NAME."
-            + _substrates_brenda_lists(ec, args.organism)
-        ), True
+    model, blocked = _choose_what_was_not_named(model, args)
+    if blocked is not None:
+        return model, blocked, True
 
     try:
         from caterva.compose.export import unresolved_from_search
@@ -1194,6 +2979,7 @@ def _search_resolved(
             isoform=getattr(args, "isoform", None) or None,
             any_mode=bool(getattr(args, "any_mode", False)),
             resolve=resolve,
+            mutation=getattr(args, "mutation", None) or None,
         )
     except LiteratureLayerUnavailable as exc:
         return model, str(exc), True
@@ -1217,24 +3003,92 @@ def _search_resolved(
     from caterva.compose.ki_mode import constants_of
     from caterva.compose.narrowed import select_for_model
 
+    from caterva.compose.export import ExportRefused
+
     not_found = {**skipped, **unresolved_from_search(search)}
-    chosen = select_for_model(
-        search, constants_of(model),
-        substrate=getattr(model, "substrate", None) or getattr(args, "substrate", None),
-        isoform=getattr(args, "isoform", None) or None,
-        any_mode=bool(getattr(args, "any_mode", False)),
-    )
-    measured = chosen.measured
+    try:
+        chosen = select_for_model(
+            search, constants_of(model),
+            substrate=getattr(model, "substrate", None) or getattr(args, "substrate", None),
+            isoform=getattr(args, "isoform", None) or None,
+            any_mode=bool(getattr(args, "any_mode", False)),
+            isoform_asked=_isoform_asked(args),
+        )
+    except ExportRefused as exc:
+        # The search ran over every organism and settled on none (several
+        # gave a whole model, or none did). This was an uncaught traceback
+        # for "pepsin with hemoglobin" and "alpha-amylase with starch" with
+        # no organism; it is a report, with the organisms named. Reached
+        # only when no organism could be chosen before the search.
+        undecided = [o for o in getattr(search, "undecided", ()) if o]
+        why = (f"the search ran over every organism and settled on no single one: "
+               + (f"{', '.join(undecided)} each give a whole model, and nothing separates them"
+                  if undecided else "no organism gave a value for every constant")
+               + ". Re-run with --organism NAME")
+        return replace(model, search_refused=why), f"No measured value was used: {why}", True
+    measured = _pairing_said_after_windows(dict(chosen.measured))
+    # A value whose BRENDA row is another compound's -- the resolver finds
+    # a name inside longer names -- is withheld, never carried under the
+    # name the user typed or Caterva chose (`_neighbours_withheld`).
+    neighbours = _neighbours_withheld(model, measured, ec)
+    for identifier in neighbours:
+        measured.pop(identifier, None)
+    # A value carried for a named protein (SIRT1, HER2, KPC-2) whose BRENDA
+    # row is another protein's -- by its UniProt accession, or, for a name
+    # filed under an EC number of many proteins, by not naming it -- is
+    # withheld likewise (`protein_rows`).
+    if getattr(args, "isoform", None):
+        from caterva.compose.protein_rows import other_protein_withheld
+
+        try:
+            other_protein = other_protein_withheld(model, measured, ec, args.isoform,
+                                                   getattr(args, "organism", None))
+        except Exception:  # noqa: BLE001 - unverifiable is not wrong
+            other_protein = {}
+        for identifier in other_protein:
+            measured.pop(identifier, None)
+        neighbours = {**neighbours, **other_protein}
     # Constants the search returned a value for, or found rows for, and did
     # not use. They end up placeholders like the ones the search found
     # nothing for, and must not be described as found-nothing.
-    withheld: Dict[str, str] = chosen.withheld
+    withheld: Dict[str, str] = {**chosen.withheld, **neighbours}
     not_found.update(withheld)
-    selection_notes = chosen.notes
+    # Each reason said for the organism searched, not BRENDA's whole page.
+    said = _said_for_the_organism(
+        replace(model, organism=args.organism, compounds=compounds_from(args)),
+        {k: v for k, v in not_found.items() if k not in skipped}, ec, args.organism,
+        mutation=getattr(args, "mutation", None) or None)
+    not_found.update(said)
+    not_found.update(_no_inhibitor_would_fill(model, skipped, ec, args.organism))
+    if getattr(args, "organism_chosen", False) is True:
+        not_found.update(_organism_chosen_said(not_found))
+        said = {k: not_found[k] for k in said}
+    withheld.update({k: said[k] for k in withheld if k in said})
+    far = (_far_from_other_organisms(model, measured, ec, args.organism)
+           + _far_from_other_papers(model, measured, ec, args.organism))
+    selection_notes = (list(chosen.notes) + far + _ranges_left_out(model, measured, ec, args.organism)
+                       + _filed_under_other_names(model, measured, ec))
+    cautions = tuple((note[1:note.index("`", 1)], note.split(": ", 1)[1]) for note in far
+                     if note.startswith("`") and ": " in note)
     if getattr(args, "isoform", None):
         from caterva.enzymes.isozyme import describe_isoform
 
         reading = describe_isoform(ec, args.organism, args.isoform)
+        if reading and _isoform_asked(args) != "--isoform":
+            # The flag was not passed: say where the label came from (fifth
+            # round's review, V5-5).
+            typed = str(getattr(args, "enzyme_text", None) or "")
+            if typed and re.search(rf"(?<![A-Za-z0-9]){re.escape(str(args.isoform))}(?![A-Za-z0-9])",
+                                   typed, re.IGNORECASE) is None:
+                # The label is not a word the user typed: "glucokinase" was
+                # said as "'HXK4' in your description", and "neuronal nitric
+                # oxide synthase" as "'NOS1' in your description" (sixth
+                # round, NEW-17). Say what was typed and what it named.
+                reading = reading.replace(f"--isoform {args.isoform!r} was read as",
+                                          f"{typed!r} in {_isoform_asked(args)} was read as the "
+                                          "isoform", 1)
+            reading = reading.replace(f"--isoform {args.isoform!r}",
+                                      f"{args.isoform!r} in {_isoform_asked(args)}", 1)
         if reading:
             selection_notes = [reading, *selection_notes]
     failures = [
@@ -1243,8 +3097,20 @@ def _search_resolved(
         for run in getattr(record, "ran", ())
         if getattr(run, "failed", False)
     ]
+    # A constant whose own scout failed (a timeout, a 503) was not searched.
+    # Without a reason of its own the report printed "searched the km table
+    # and found nothing" and advised another organism -- a false statement
+    # of absence for rows BRENDA holds, which a plain re-run filled
+    # (round-3 review: queries 10 and 24).
+    for run in failures:
+        quantity = str(getattr(run, "agent", "")).partition("scout:")[2]
+        if quantity and quantity not in measured and quantity not in not_found:
+            not_found[quantity] = _not_searched(str(run.failure))
     sourced = model.with_measured(measured, not_found=not_found)
-    if not measured and failures and not not_found:
+    if cautions:
+        sourced = replace(sourced, cautions=cautions)
+    if not measured and failures and not any(
+            not str(v).startswith("not searched") for v in not_found.values()):
         # Every scout failed and none reported an absence: the search did
         # not run, whatever the HTTP layer called it. A 404 from BRENDA's
         # enzyme page means the EC number is not one BRENDA has.
@@ -1256,7 +3122,7 @@ def _search_resolved(
                 f"copy the number at the top of its page"
             )
         else:
-            why = f"the literature search could not run: {text}"
+            why = f"the literature search could not run: {_service_failed(text)}"
         return replace(model, search_refused=why), why, True
     if not measured:
         why = "; ".join(sorted({r.failure for r in failures})) if failures else (
@@ -1276,7 +3142,7 @@ def _search_resolved(
             f"{', '.join(sorted(withheld))} and each was withheld, for the "
             f"reason the provenance table gives"
         )
-        rest = [q for q in sourced.unmeasured if q not in withheld]
+        rest = [q for q in sourced.unmeasured if q not in withheld and q not in skipped]
         if rest and failures:
             note += (f". {len(rest)} still the motif library's placeholder "
                      f"({', '.join(rest)}), and part of the search failed: {why}")
@@ -1288,6 +3154,7 @@ def _search_resolved(
             )
         elif failures:
             note += f". Part of the search failed: {why}"
+        note += _not_looked_up(skipped)
         if selection_notes:
             note += ". " + "; ".join(selection_notes)
         return sourced, note, False
@@ -1309,13 +3176,18 @@ def _search_resolved(
                 f"{', '.join(chosen)}, which the search chose; pass "
                 f"--organism to choose it yourself"
             )
-    still = [q for q in sourced.unmeasured if q not in withheld]
+    # A constant deliberately not looked up (its compound unnamed) is not
+    # one the search "ran and returned nothing for": the note said exactly
+    # that about a Ki whose provenance row, three lines below, said "not
+    # looked up" (found 2026-11-11, granzyme B with --substrate).
+    still = [q for q in sourced.unmeasured if q not in withheld and q not in skipped]
     if still:
         note += (
             f". {len(still)} still the motif library's placeholder "
             f"({', '.join(still)}): the search ran and returned nothing for "
             f"them, which is different from their not having been looked for"
         )
+    note += _not_looked_up(skipped)
     if withheld:
         # Found and refused is a third fact, beside found and not found:
         # "returned nothing" said of a refused --isoform constant was false.
@@ -1326,6 +3198,1201 @@ def _search_resolved(
     if selection_notes:
         note += ". " + "; ".join(selection_notes)
     return sourced, note, False
+
+
+def _organism_chosen_said(reasons: Mapping[str, Any]) -> Dict[str, Any]:
+    """`reasons` with the scout's "raised by your own request" said of an
+    organism Caterva CHOSE (`_choose_what_was_not_named`). The scout sees
+    the chosen organism as the input's, so "xanthine oxidase inhibited by
+    febuxostat" read "organism must be Bos taurus, raised by your own
+    request" when no organism was typed. An automatic choice is never
+    reported as the user's (ADR 0182)."""
+    return {k: (v.replace(", raised by your own request)",
+                          ", the organism Caterva chose because your description named none)")
+                if isinstance(v, str) else v)
+            for k, v in reasons.items()}
+
+
+#: The clause `adapters.name_miss_clause` writes: the compound's name has
+#: no row, and the names BRENDA lists in any organism.
+_NAME_MISS = re.compile(r" -- BRENDA has no (?:Ki |Km |kcat )?row for that (?:substrate|inhibitor) "
+                        r"name;.*?set to the one you meant", re.S)
+
+#: How many names a placeholder's reason lists before "and N more".
+NAMES_LISTED = 8
+
+
+def _counted(counts: Mapping[str, int], shown: int = NAMES_LISTED,
+             first: Optional[Iterable[str]] = None) -> str:
+    """"A (3 rows); B (1 row) and 2 more", by rows; the names in `first`
+    (organisms of the asked one's class) before the rest."""
+    near = set(first or ())
+    ranked = sorted(counts, key=lambda k: (k not in near, -counts[k], k))
+    text = "; ".join(f"{k} ({counts[k]} row{'s' if counts[k] != 1 else ''})" for k in ranked[:shown])
+    return text + (f" and {len(ranked) - shown} more" if len(ranked) > shown else "")
+
+
+def _what_the_mutant_holds(ec: str, table: str, compound: Optional[str], organism: str,
+                           mutation: str, also: Sequence[str] = ()) -> str:
+    """The clause for a mutant's constant that has no row, from the rows of
+    THAT MUTANT only. The advice for "phenylalanine hydroxylase R408W"
+    offered organisms and substrates by their wild-type rows; each run it
+    led to was refused or kept the placeholder, because the search takes
+    only the mutant's rows (sixth round's polish, R6V1-11)."""
+    from caterva.compose import defaults
+
+    label = defaults.TABLE_NAMES[table]
+    here = [r for r in defaults._of_mutant(defaults.table_rows(ec, table, organism), mutation)[0]
+            if not getattr(r, "flagged", False)]
+    if not here:
+        elsewhere: Dict[str, int] = {}
+        for row in defaults._of_mutant(defaults.table_rows(ec, table, None), mutation)[0]:
+            if row.organism and row.organism != organism and not getattr(row, "flagged", False):
+                elsewhere[row.organism] = elsewhere.get(row.organism, 0) + 1
+        if not elsewhere:
+            return (f" -- BRENDA holds no {label} row measuring the mutant {mutation} under EC {ec} in "
+                    "any organism, and a wild-type row is never used for a mutant: neither another "
+                    "substrate nor a different species would fill it, so supply it yourself")
+        return (f" -- BRENDA holds no {label} row measuring the mutant {mutation} under EC {ec} in "
+                f"{organism}; the mutant is measured only in another organism. Organisms with {label} "
+                f"rows naming {mutation}: {_counted(elsewhere)}. Re-run with --organism set to one of "
+                "them to model that organism's mutant, or supply it yourself")
+    listed: Dict[str, int] = {}
+    for row in here:
+        listed[row.compound] = listed.get(row.compound, 0) + 1
+    named = f" for {compound}" if compound else ""
+    text = (f" -- BRENDA has no {label} row of the mutant {mutation}{named} under EC {ec} in {organism}. "
+            f"Counting only that mutant's rows, the substrates it lists {label} rows for there: "
+            f"{_counted(listed)}. Re-run with --substrate set to one of them, or supply it yourself")
+    if also:
+        others = " and ".join(defaults.TABLE_NAMES[t] for t in also)
+        have = {t: {defaults._search_key(r.compound)
+                    for r in defaults._of_mutant(defaults.table_rows(ec, t, organism), mutation)[0]}
+                for t in also}
+        both = {c: n for c, n in listed.items() if all(defaults._search_key(c) in have[t] for t in also)}
+        if both:
+            text += (f". Of these, the ones with a {others} row there too, so that naming one fills this "
+                     f"model's other constant{'s' if len(also) > 1 else ''} as well: {_counted(both)}")
+        else:
+            text += (f". None of them has a {others} row of the mutant there, so naming one would leave "
+                     f"the {others} a placeholder in this one's place")
+    return text
+
+
+def _said_for_the_organism(model: Any, reasons: Mapping[str, str], ec: Optional[str],
+                           organism: Optional[str], mutation: Optional[str] = None) -> Dict[str, str]:
+    """`reasons` with each "BRENDA has no row for that name" clause replaced
+    by what BRENDA holds IN THE ORGANISM SEARCHED (round-1 review of ADR 0182).
+
+    The resolver lists the names the table carries in every organism, so a
+    human kcat placeholder for CYP3A4 listed Bacillus fatty acids under
+    "Re-run with --substrate" while BRENDA has no human Turnover row on that
+    page at all: no substrate could fill it, and the organism was the
+    blocker. Here, per constant:
+
+    * the organism has no row of that table under the EC number at all: said,
+      as the organism being what is missing, with the organisms that have
+      rows (and those with rows for the compound named, first);
+    * it has rows, none for the compound named: the compounds it has rows
+      for THERE, with the flag that names one (--inhibitor for a Ki, which
+      BRENDA files under the inhibitor), and whether the compound has rows
+      in another organism (labelled as that organism's, never substituted,
+      ADR 0024) or in none under that name.
+
+    A clause is left as the resolver wrote it when no organism was searched
+    or the page cannot be read.
+    """
+    if not ec or not organism or not reasons:
+        return dict(reasons)
+    from caterva.compose.organisms import normalise_organism
+
+    where = normalise_organism(organism)[0] or organism
+    by_id = {q.parameter_id: q for q in getattr(model, "resolvable", ())}
+    out = dict(reasons)
+    isoform = getattr(model, "isoform", None)
+    for name, reason in reasons.items():
+        q = by_id.get(name)
+        if q is None or q.table not in ("km", "kcat", "ki"):
+            continue
+        if mutation and q.table in ("km", "kcat"):
+            also = tuple(sorted({
+                other.table for other in by_id.values()
+                if other is not q and other.table in ("km", "kcat") and other.table != q.table
+                and model.compound_for(other) == model.compound_for(q)}))
+            try:
+                clause = _what_the_mutant_holds(ec, q.table, model.compound_for(q), where,
+                                                str(mutation), also=also)
+            except Exception:  # noqa: BLE001 - the resolver's reason stands
+                continue
+            searched = re.search(r" \(searched [^()]*(?:\([^()]*\)[^()]*)*\)\s*$", reason)
+            out[name] = reason.split(" -- ", 1)[0] + clause + (searched.group(0) if searched else "")
+            continue
+        if isoform and "measured another isoform" in reason:
+            try:
+                out[name] = reason + _measured_on_the_isoform(ec, q.table, where, isoform,
+                                                              "inhibitor" if q.table == "ki" else "substrate")
+            except Exception:  # noqa: BLE001 - the resolver's reason stands
+                pass
+            continue
+        if (not isoform and "measured a protein variant, and variants are withheld" in reason
+                and not _AVAILABLE_IN.search(reason)):
+            # Every row in the organism measured a variant: E. coli
+            # thymidylate synthase's dUMP kcat is K48Q's only, and the advice
+            # was "supply it yourself" though human wild-type rows exist
+            # (3.11 1/s, ref 706625; sixth round, NEW-17). The organisms
+            # whose rows the search would use are named, as for a constant
+            # with no row in the organism at all.
+            try:
+                elsewhere = _wild_type_elsewhere(ec, q.table, model.compound_for(q), where)
+            except Exception:  # noqa: BLE001 - the resolver's reason stands
+                elsewhere = ""
+            if elsewhere:
+                out[name] = reason + elsewhere
+            continue
+        if _AVAILABLE_IN.search(reason):
+            try:
+                rewritten = _available_elsewhere(ec, q.table, model.compound_for(q), reason,
+                                                 isoform=isoform, asked=where)
+            except Exception:  # noqa: BLE001 - the resolver's reason stands
+                rewritten = None
+            if rewritten:
+                out[name] = rewritten
+            if q.table == "ki":
+                try:
+                    here = _inhibitors_here(ec, where, model, model.compound_for(q))
+                except Exception:  # noqa: BLE001 - the reason stands
+                    here = ""
+                if here:
+                    out[name] = out.get(name, reason) + here
+            if q.table == "kcat":
+                under = _kcat_under_a_cosubstrate(ec, where, model.compound_for(q))
+                if under:
+                    out[name] = out.get(name, reason) + under
+            continue
+        if not _NAME_MISS.search(reason):
+            continue
+        # A substrate named instead changes every constant looked up under
+        # it: the advice says which of the substrates offered fill them all.
+        also = () if q.table == "ki" else tuple(sorted({
+            other.table for other in by_id.values()
+            if other is not q and other.table in ("km", "kcat") and other.table != q.table
+            and model.compound_for(other) == model.compound_for(q)}))
+        try:
+            clause = _what_the_organism_holds(ec, q.table, model.compound_for(q), where,
+                                              "inhibitor" if q.table == "ki" else "substrate",
+                                              isoform=isoform, also=also)
+        except Exception:  # noqa: BLE001 - the resolver's clause stands
+            continue
+        out[name] = _NAME_MISS.sub(lambda _m: clause, reason, count=1)
+    return out
+
+
+def _wild_type_elsewhere(ec: str, table: str, compound: Optional[str], organism: str) -> str:
+    """For a constant whose every row in `organism` measured a variant: " --
+    available in: A (n rows); B (m rows)", the other organisms holding rows
+    of `compound` the search would use (no variant, no named isozyme), the
+    asked organism's class first; "" when there are none."""
+    from caterva.compose import defaults
+
+    if not compound:
+        return ""
+    by_organism: Dict[str, List[Any]] = {}
+    for r in defaults.table_rows(ec, table, None):
+        # By the resolver's own match: E. coli's Km rows say
+        # "2'-deoxyuridylate" and human kcat rows "dUMP".
+        if r.organism and r.organism != organism and defaults._matches(r.compound, compound):
+            by_organism.setdefault(r.organism, []).append(r)
+    usable: Dict[str, int] = {}
+    for other, rows in by_organism.items():
+        good = [r for r in _usable(rows) if not getattr(r, "isozyme", False)]
+        if good:
+            usable[other] = len(good)
+    if not usable:
+        return ""
+    return (" -- the enzyme as found (no variant) is measured for it elsewhere -- available in: "
+            + _counted(usable, first=_same_class(organism, usable)))
+
+
+def _inhibitors_here(ec: str, organism: str, model: Any, compound: Optional[str]) -> str:
+    """For a Ki whose inhibitor has rows only in other organisms: the
+    inhibitors the organism searched DOES have Ki rows for, counted the way
+    the inhibitor choice counts them (rows the search can use for this
+    model's mode and isoform), so naming one leads to a run that fills it.
+    Human AChE with donepezil sent the reader to Mus musculus only, though
+    human Ki rows exist for other inhibitors (fifth round's review, A4-08).
+    "" when the organism has none."""
+    from caterva.compose import defaults
+    from caterva.compose.row_scope import INHIBITION_TABLES, MODE_OF_MOTIF
+
+    mode = next((MODE_OF_MOTIF[q.motif_name] for q in getattr(model, "resolvable", ()) or ()
+                 if q.table in INHIBITION_TABLES and MODE_OF_MOTIF.get(q.motif_name)), None)
+    choice = defaults.choose_inhibitor(ec, organism, getattr(model, "substrate", None),
+                                       isoform=getattr(model, "isoform", None), mode=mode)
+    if choice is None:
+        return ""
+    counted: Dict[str, int] = {}
+    if choice.rows.get("ki"):
+        counted[choice.chosen] = choice.rows["ki"]
+    for option in choice.alternatives:
+        if option.rows.get("ki"):
+            counted[option.name] = option.rows["ki"]
+    if compound:
+        counted = {k: v for k, v in counted.items()
+                   if defaults._search_key(k) != defaults._search_key(compound)}
+    if not counted:
+        return ""
+    return (f". In {organism}, the inhibitors with Ki rows the search can use"
+            + (f" for a {mode} model" if mode else "") + ", best measured first: "
+            + "; ".join(f"{k} ({v} row{'s' if v != 1 else ''})" for k, v in counted.items())
+            + "; re-run with "
+            "--inhibitor set to one of them to model that inhibitor in this organism instead")
+
+
+#: What asked for the isoform when no --isoform flag was passed, for the
+#: notes that said "as --isoform asked" of an isoform read from the sentence
+#: (DPP4, CA2, IMPDH2, NOS2: fifth round's review, V5-5).
+DESCRIPTION_ASKED = "your description"
+NAME_ASKED = "the enzyme name"
+
+
+def _isoform_asked(args: Any) -> str:
+    """"--isoform" when the flag set the isoform, else what did."""
+    asked = getattr(args, "isoform_asked", None)
+    return asked if isinstance(asked, str) and asked else "--isoform"
+
+
+def _no_inhibitor_would_fill(model: Any, skipped: Mapping[str, str], ec: Optional[str],
+                             organism: Optional[str]) -> Dict[str, str]:
+    """For a Ki left unlooked-up because no inhibitor was named, in an
+    organism with no Ki row the search can use under the EC number: the
+    reason says the organism is what is missing and lists the organisms that
+    do have Ki rows. It said "Name it with --inhibitor NAME", and no name
+    could fill it: rat acetyl-CoA carboxylase has no Ki row for any inhibitor
+    (fifth round's review, N11). {} otherwise, and when a page cannot be read.
+    """
+    if not ec or not organism or not skipped:
+        return {}
+    from caterva.compose.organisms import normalise_organism
+
+    where = normalise_organism(organism)[0] or organism
+    by_id = {q.parameter_id: q for q in getattr(model, "resolvable", ())}
+    out: Dict[str, str] = {}
+    for name, reason in skipped.items():
+        q = by_id.get(name)
+        if q is None or q.table != "ki" or "--inhibitor" not in reason:
+            continue
+        try:
+            from caterva.compose import defaults
+
+            if _usable(defaults.table_rows(ec, "ki", where)):
+                continue
+            whole = tuple(t for t in ("km", "kcat") if any(o.table == t for o in by_id.values()))
+            clause = _what_the_organism_holds(ec, "ki", None, where, "inhibitor",
+                                              isoform=getattr(model, "isoform", None), whole=whole)
+        except Exception:  # noqa: BLE001 - the reason stands as it was
+            continue
+        out[name] = ("not looked up: no inhibitor was named"
+                     + clause.replace("naming another inhibitor", "naming an inhibitor"))
+    return out
+
+
+def _kcat_under_a_cosubstrate(ec: str, organism: str, compound: Optional[str]) -> str:
+    """A clause for a kcat placeholder "measured only in another organism"
+    when the organism DOES hold kcat rows, filed under a cosubstrate: yeast
+    glutathione reductase's 900 1/s (native Glr1, ref 689967, the Km's own
+    paper) is filed under NADPH, and the advice sent the reader to another
+    organism (third round's review). Offered, labelled as a turnover measured
+    varying the cosubstrate, never carried as the substrate's. "" otherwise."""
+    from caterva.compose import defaults
+
+    try:
+        rows = _usable(defaults.table_rows(ec, "kcat", organism))
+    except Exception:  # noqa: BLE001
+        return ""
+    if not rows or any(compound and defaults._matches(r.compound, compound) for r in rows):
+        return ""
+    under: Dict[str, int] = {}
+    for r in rows:
+        if defaults.is_cofactor(r.compound):
+            under[r.compound] = under.get(r.compound, 0) + 1
+    if not under or len(under) < len({r.compound for r in rows}):
+        return ""
+    first = max(under, key=under.get)
+    return (f". {organism} does have kcat rows under EC {ec}, filed under the cosubstrate "
+            f"{_counted(under)}: a turnover number measured varying the cosubstrate, usually in the "
+            f"same assay, which is not carried as {compound}'s; re-run with --substrate {first} to "
+            "model it, or supply this constant from those rows yourself")
+
+
+def _measured_on_the_isoform(ec: str, table: str, organism: str, isoform: str, role: str) -> str:
+    """The compounds whose rows in `organism` name `isoform`, for a constant
+    withheld because every row for the compound modelled measured another
+    isoform: "CYP3A4 metabolising midazolam" was given 7-ethoxyresorufin,
+    whose human rows are CYP1A1's, and the advice was "re-run with
+    --organism", while human rows naming CYP3A4 exist for other substrates."""
+    from caterva.bind.core import read_isoform, same_isoform
+    from caterva.compose import defaults
+
+    label = defaults.TABLE_NAMES[table]
+    named: Dict[str, int] = {}
+    try:
+        from caterva.compose.protein_rows import strict_alias
+
+        curated = {str(a) for a in (strict_alias(ec, isoform) or {}).get("accessions", [])}
+    except Exception:  # noqa: BLE001 - no curated accessions: words and the index
+        curated = set()
+    shared_only: Dict[str, set] = {}
+    for row in _usable(defaults.table_rows(ec, table, organism)):
+        cells = {a.strip() for a in str(row.uniprot or "").split(",") if a.strip()}
+        if curated and curated & cells:
+            if len(cells) > 1 and not read_isoform(row.conditions):
+                # A row listing several proteins and naming none is not
+                # taken by the search: TEM-1's nitrocefin rows (ref 696728,
+                # "P13661, P62593") were offered as filling the Km, and the
+                # run they led to withheld them (fifth round, R5B-01).
+                shared_only.setdefault(str(row.reference_id or "?"), set()).add(row.compound)
+                continue
+            named[row.compound] = named.get(row.compound, 0) + 1
+            continue
+        # By its words, or by its own UniProt cell: TEM-1's E. coli rows name
+        # it only as P62593 (nitrocefin, cephalothin), and the advice said no
+        # row named it (third round's review).
+        if same_isoform(read_isoform(row.conditions), isoform) or defaults._accession_says(
+                row.uniprot, isoform):
+            named[row.compound] = named.get(row.compound, 0) + 1
+    if not named:
+        # Where the isoform's rows of this table ARE: its orthologue in
+        # another organism, named in words (HK2's kcat: mouse Hk2, ref
+        # 758915), labelled as that organism's and never substituted.
+        # The orthologue by its UniProt cell first (the enzyme index files
+        # mouse O08528 as Hk2); words alone only when no cell names it, since
+        # "HXK2" in Entamoeba is that amoeba's second hexokinase.
+        elsewhere: Dict[str, int] = {}
+        by_words: Dict[str, int] = {}
+        try:
+            from caterva.checkout import literature_module
+
+            row_form = literature_module("row_form")
+            for row in _usable(defaults.table_rows(ec, table, None)):
+                if not row.organism or row.organism == organism:
+                    continue
+                cell = row_form.isoforms_of_accessions(ec, row.uniprot) if row.uniprot else ()
+                if any(same_isoform(label, isoform) for label in cell):
+                    elsewhere[row.organism] = elsewhere.get(row.organism, 0) + 1
+                elif same_isoform(read_isoform(row.conditions), isoform):
+                    by_words[row.organism] = by_words.get(row.organism, 0) + 1
+        except Exception:  # noqa: BLE001 - the clause stands without it
+            elsewhere, by_words = {}, {}
+        elsewhere = elsewhere or by_words
+        clause = (f". BRENDA has no {label} row naming {isoform} under EC {ec} in {organism} for any "
+                  f"{role}")
+        if shared_only:
+            refs = sorted(shared_only)
+            clause += (f" that the search takes: the rows of BRENDA ref {', '.join(refs[:3])} ("
+                       + ", ".join(sorted({c for r in refs for c in shared_only[r]})[:3])
+                       + f") list {isoform}'s accession among other proteins' and name none of them, "
+                         "so whose constant each is cannot be told; supply it yourself, reading "
+                         "that paper")
+        if elsewhere:
+            clause += (f"; rows naming it are in {_counted(elsewhere)} (another organism's "
+                       f"protein, never substituted: re-run with --organism set to one of them "
+                       f"to model it there)")
+        return clause
+    shared = sorted({r.reference_id for r in defaults.table_rows(ec, table, organism)
+                     if r.compound in named and r.reference_id
+                     and len([c for c in (r.uniprot or "").split(",") if c.strip()]) > 1})
+    tail = ""
+    if shared:
+        # TEM-1: nitrocefin's rows list both OXA-1's and TEM-1's accessions
+        # (ref 696728), and naming it fills this constant only (fourth round).
+        tail = (f" (the rows of BRENDA ref {', '.join(shared[:3])} list several proteins' accessions, "
+                f"{isoform}'s among them, so which one they measured is not certain)")
+    return (f". The {role}s with {label} rows naming {isoform} under EC {ec} in {organism}: "
+            f"{_counted(named)}{tail}. Re-run with --{role} set to one of them; that fills this "
+            f"{label} only, and the model's other constants are looked up for it afresh")
+
+
+def _a_variant(row: Any) -> bool:
+    """Whether a BRENDA row measured a sequence variant ("mutant N580A"),
+    which the search withholds (ADR 0029), by the classifier the search
+    itself uses. An isozyme is not a variant here: it is wild-type in its
+    own right, and the isoform rule decides about it."""
+    if getattr(row, "variant", False) and not getattr(row, "isozyme", False):
+        return True  # the parser's own verdict (defaults._Row), which the chooser counts by
+    from caterva.checkout import literature_module
+
+    verdict = literature_module("protein_variant").classify(getattr(row, "conditions", "") or None)
+    return verdict.status == "variant" and verdict.kind != "isozyme"
+
+
+def _usable(rows: Iterable[Any]) -> List[Any]:
+    """The rows a search could carry: every row but a variant's, and never
+    one the parser flagged as implausible (the chooser's `defaults._usable`
+    sets those aside too, so advice and choice count the same rows).
+
+    "PTGS2 with arachidonic acid in human" had no human kcat row, and the
+    advice was "re-run with --organism set to one of them: Mus musculus (3
+    rows)". All three mouse rows measured the N580A mutant, so that run
+    came back with placeholders too. A row is only offered as a way out
+    when the search would use it (round-1 review of ADR 0182)."""
+    return [row for row in rows if not getattr(row, "flagged", False) and not _a_variant(row)]
+
+
+def _rows_for_the_compound_here(ec: str, table: str, key: str, organism: str) -> bool:
+    """Whether another of the Km/kcat/Ki tables holds a usable row for the
+    compound (by `defaults._key`) in `organism`: the compound is then one
+    this model carries there, not only a name."""
+    from caterva.compose import defaults
+
+    for other in ("km", "kcat", "ki"):
+        if other != table and any(defaults._search_key(r.compound) == key
+                                  for r in _usable(defaults.table_rows(ec, other, organism))):
+            return True
+    return False
+
+
+def _what_the_organism_holds(ec: str, table: str, compound: Optional[str], organism: str,
+                             role: str, isoform: Optional[str] = None,
+                             also: Sequence[str] = (), whole: Sequence[str] = ()) -> str:
+    """The clause for `_said_for_the_organism`, from BRENDA's own rows.
+    Only rows the search would use are counted or offered (`_usable`).
+
+    With an isoform asked for, an organism is offered as the way out only
+    for rows that name that isoform: "CYP3A4 ... in human" has no human kcat
+    row on EC 1.14.14.1, and the organisms that have one are Bacillus and
+    Streptomyces, whose rows measured CYP102 enzymes; re-running there is
+    refused again by the isoform rule, so it is not offered.
+
+    The compounds offered in the organism are counted the same way: with an
+    isoform asked for, a row that names ANOTHER isoform is not counted (the
+    isoform rule refuses it). `also` is the model's other tables looked up
+    under the same substrate: "Renilla-type luciferase with coelenterazine"
+    had no kcat row for coelenterazine, and the advice offered "Luciferin",
+    which has no Km row there, so following it would have emptied the Km in
+    place of the kcat. The substrates that fill every one are said first.
+    """
+    from caterva.compose import defaults
+
+    label = defaults.TABLE_NAMES[table]
+    flag = f"--{role}"
+    key = defaults._search_key(compound) if compound else None
+    every_row = defaults.table_rows(ec, table, None)
+    here_row = defaults.table_rows(ec, table, organism)
+    every = _usable(every_row)
+    here = _usable(here_row)
+    elsewhere: Dict[str, int] = {}
+    if key:
+        for row in every:
+            if row.organism and row.organism != organism and defaults._search_key(row.compound) == key:
+                elsewhere[row.organism] = elsewhere.get(row.organism, 0) + 1
+    named = f" for {compound}" if compound else ""
+    if not here:
+        organisms: Dict[str, int] = {}
+        for row in every:
+            if row.organism:
+                organisms[row.organism] = organisms.get(row.organism, 0) + 1
+        if organisms and isoform:
+            from caterva.bind.core import read_isoform, same_isoform
+
+            organisms = {}
+            for row in every:
+                if row.organism and same_isoform(read_isoform(row.conditions), isoform):
+                    organisms[row.organism] = organisms.get(row.organism, 0) + 1
+            if not organisms:
+                return (f" -- BRENDA holds no {label} row for EC {ec} in {organism} at all, and no row "
+                        f"of that table in any organism names {isoform} (BRENDA's rows for that EC number "
+                        f"measured other proteins): neither another {role} nor a different species "
+                        "would fill it, so supply it yourself")
+        if not organisms:
+            if every_row:
+                return (f" -- every {label} row BRENDA holds for EC {ec}, in any organism, measured a "
+                        "protein variant, and variants are withheld (ADR 0029): neither another "
+                        f"{role} nor a different species would fill it, so supply it yourself")
+            return f" -- BRENDA holds no {label} row for EC {ec} in any organism: supply it yourself"
+        anywhere = key and any(defaults._search_key(r.compound) == key
+                               or defaults._matches(r.compound, compound) for r in every_row)
+        if key and not anywhere and role == "inhibitor":
+            # "glycogen phosphorylase inhibited by caffeine": no organism has
+            # a caffeine Ki, so "the organism is what is missing" sent the
+            # reader to rabbit, where it is missing too (fourth round).
+            which = f"naming {isoform}" if isoform else "that are not of a variant"
+            return (f" -- BRENDA holds no {label} row for {compound} under EC {ec} in any organism "
+                    f"(under that name; a compound is filed under the name its paper used), so the "
+                    f"{role}, not only the organism, is what is missing: another organism would not "
+                    f"fill it for {compound}. {organism} has no {label} row for EC {ec} at all; "
+                    f"organisms with {label} rows for other {role}s {which}: {_counted(organisms)}. "
+                    f"Supply it yourself, or re-run with --organism and {flag} set to a compound one "
+                    "of them has rows for")
+        if here_row:
+            text = (f" -- BRENDA's {label} rows for EC {ec} in {organism} all measured a protein variant, "
+                    f"and variants are withheld (ADR 0029), so naming another {role} would not fill it: "
+                    "the organism is what is missing")
+        else:
+            text = (f" -- BRENDA holds no {label} row for EC {ec} in {organism} at all, so naming "
+                    f"another {role} would not fill it: the organism is what is missing")
+        if elsewhere:
+            text += (f". {label} rows{named} are in: {_counted(elsewhere)}, each that organism's "
+                     "measurement, never substituted for yours (ADR 0024)")
+        elif key and _rows_for_the_compound_here(ec, table, key, organism):
+            # "cathepsin D with hemoglobin": the Km is hemoglobin's, and no
+            # organism has a kcat row for hemoglobin, so the organisms below
+            # would give a model of another substrate. Said, not left implied.
+            text += (f". No organism has a {label} row for {compound} under EC {ec}, so in any organism "
+                     f"listed next the model would be of another {role}, not {compound}")
+        which = f"naming {isoform}" if isoform else "that are not of a variant"
+        listed = _counted(organisms)
+        if whole:
+            # The organisms where the model's other tables have rows too come
+            # first: rat acetyl-CoA carboxylase's Ki sent the reader to E.
+            # coli, which has no kcat row, ahead of Homo sapiens, which has
+            # all three (fifth round's review, N11).
+            # One compound with a row in every one of those tables, as the
+            # substrate choice needs: yeast has Km rows and kcat rows under
+            # EC 6.4.1.2, for different compounds, and its kcat stayed a
+            # placeholder. A cosubstrate (ATP) is set aside by the choice,
+            # so it does not count.
+            have = [{(r.organism, defaults._search_key(r.compound))
+                     for r in _usable(defaults.table_rows(ec, t, None))
+                     if r.organism and not defaults.is_cofactor(r.compound)} for t in whole]
+            pairs = set.intersection(*have) if have else set()
+            full = {o: n for o, n in organisms.items() if any(org == o for org, _ in pairs)}
+            rest = {o: n for o, n in organisms.items() if o not in full}
+            if full and rest:
+                tables = " and ".join(defaults.TABLE_NAMES[t] for t in whole)
+                listed = (f"{_counted(full)} (with {tables} rows there too, so the whole model is "
+                          f"measured); then {_counted(rest)}")
+        text += (f". Organisms with {label} rows for EC {ec} {which}: "
+                 f"{listed}. Re-run with --organism set to one of them to model that "
+                 "organism, or supply it yourself")
+        return text
+    if isoform:
+        from caterva.bind.core import read_isoform, same_isoform
+
+        def _not_another_isoform(rows: Iterable[Any]) -> List[Any]:
+            # Its own UniProt cell counts as well as its words: CYP2D6 was
+            # offered erdafitinib, whose rows name P20815 and Q9HB55 (CYP3A5,
+            # CYP3A43), and the run it led to refused them (fifth round,
+            # R5V1-14).
+            out = []
+            for row in rows:
+                read = read_isoform(row.conditions)
+                if read is None and defaults._accession_says(getattr(row, "uniprot", None),
+                                                             isoform) is False:
+                    continue
+                if read is None or same_isoform(read, isoform):
+                    out.append(row)
+            return out
+    else:
+        def _not_another_isoform(rows: Iterable[Any]) -> List[Any]:
+            return list(rows)
+    listed: Dict[str, int] = {}
+    for row in _not_another_isoform(here):
+        listed[row.compound] = listed.get(row.compound, 0) + 1
+    if not listed:
+        return (f" -- BRENDA has no {label} row{named} under EC {ec} in {organism}, and every {label} row "
+                f"it holds there names another isoform than {isoform}, which the isoform rule refuses: "
+                f"naming another {role} would not fill it, so supply it yourself")
+    text = (f" -- BRENDA has no {label} row{named} under EC {ec} in {organism}; the {role}s it lists "
+            f"{label} rows for there: {_counted(listed)}. Re-run with {flag} set to one of them, or "
+            "supply it yourself")
+    if also:
+        others = " and ".join(defaults.TABLE_NAMES[t] for t in also)
+        have: Dict[str, set] = {}
+        for t in also:
+            have[t] = {defaults._search_key(r.compound)
+                       for r in _not_another_isoform(_usable(defaults.table_rows(ec, t, organism)))}
+        both = {c: n for c, n in listed.items() if all(defaults._search_key(c) in have[t] for t in also)}
+        if both:
+            text += (f". Of these, the ones with a {others} row there too, so that naming one fills this "
+                     f"model's other constant{'s' if len(also) > 1 else ''} as well: {_counted(both)}")
+        else:
+            text += (f". None of them has a {others} row there, so naming one would leave the {others} a "
+                     "placeholder in this one's place")
+    if compound and elsewhere:
+        text += (f". {compound} has {label} rows in other organisms only: {_counted(elsewhere)}, each "
+                 "that organism's measurement, never substituted for yours (ADR 0024)")
+    elif compound:
+        text += (f". BRENDA holds no {label} row for {compound} under EC {ec} in any organism under that "
+                 "name (a compound is filed under the name its paper used, so it may be there under "
+                 "another)")
+    return text
+
+
+#: The clause `adapters.to_parameter_source` appends to a cross-species
+#: refusal: the organisms the resolver found rows in.
+_AVAILABLE_IN = re.compile(r" -- available in: ([^-(]+?)(?= -- | \(|$)")
+
+
+def _same_class(asked: Optional[str], organisms: Iterable[str]) -> List[str]:
+    """Those of `organisms` in the asked organism's class, as far as the
+    enzyme index's organism codes tell: a mammal for a mammal. Mouse
+    tyrosinase's kcat advice led with Streptomyces and hid human's native
+    L-Dopa kcat in "and 15 more" (sixth round, NEW-17). [] when it cannot
+    be told."""
+    try:
+        from caterva.enzymes.symbols import MAMMALS, _code_of
+    except ImportError:  # pragma: no cover
+        return []
+    if _code_of(asked) not in MAMMALS:
+        return []
+    return [o for o in organisms if _code_of(o) in MAMMALS]
+
+
+def _available_elsewhere(ec: str, table: str, compound: Optional[str], reason: str,
+                         isoform: Optional[str] = None,
+                         asked: Optional[str] = None) -> Optional[str]:
+    """`reason` with its "available in" organisms cut to those holding a row
+    the search would use for `compound`; a reason with no such organism is
+    rewritten to say the rows elsewhere are variants', and to supply the
+    constant. None leaves the reason as it is (no list, no compound, or the
+    rows cannot be matched to the compound by name)."""
+    from caterva.compose import defaults
+
+    match = _AVAILABLE_IN.search(reason)
+    if not match or not compound:
+        return None
+    key = defaults._search_key(compound)
+    listed = [o.strip() for o in match.group(1).split(",") if o.strip()]
+    usable: Dict[str, int] = {}
+    variants: Dict[str, int] = {}
+    isozymes: Dict[str, int] = {}
+    for organism in listed:
+        rows = [r for r in defaults.table_rows(ec, table, organism) if defaults._search_key(r.compound) == key]
+        good = _usable(rows)
+        if not isoform:
+            # With no --isoform, the search sets a named isozyme's row aside
+            # (defaults._usable: "taken only when --isoform asks for it").
+            # Vibrio tyrosinaticus's kcat rows are "isoenzyme A" and
+            # "isoenzyme B"; offered as a re-run, that run withheld both
+            # (sixth round, XS5R2-03).
+            named = [r for r in good if getattr(r, "isozyme", False)]
+            good = [r for r in good if not getattr(r, "isozyme", False)]
+            if named and not good:
+                isozymes[organism] = len(named)
+                continue
+        if good:
+            usable[organism] = len(good)
+        elif rows:
+            variants[organism] = len(rows)
+    near = _same_class(asked, usable)
+    if isozymes:
+        # Said as isozymes, not variants: wild-type proteins in their own
+        # right, which a re-run takes only when --isoform names one.
+        aside = (f" (rows of a named isozyme only, which a re-run takes only with --isoform naming "
+                 f"it: {_counted(isozymes)})")
+        if usable and not variants:
+            return _AVAILABLE_IN.sub(lambda _m: f" -- available in: {_counted(usable, first=near)}{aside}",
+                                     reason, count=1)
+    if isoform and usable:
+        # With an isoform carried, an organism whose rows name another
+        # isoform is not where to find this one's: human LDHA's kcat
+        # placeholder offered Plasmodium falciparum (parasite LDH) and
+        # Rhizopus delemar (rows naming LDHB) first, and rabbit, the muscle
+        # LDH-A4 source, fifth (third round's review).
+        naming, silent, other = {}, {}, {}
+        # A name matches in another organism only where that organism has
+        # the isoform's ortholog: Enterococcus mundtii's "LDH-1" rows were
+        # offered first as "rows naming LDHA" (fourth round's review).
+        orthologs = set(defaults.organisms_with_isoform(ec, isoform))
+        for organism, count in usable.items():
+            rows = _usable([r for r in defaults.table_rows(ec, table, organism)
+                            if defaults._search_key(r.compound) == key])
+            said = [defaults._isoform_read(r.conditions) for r in rows]
+            names_it = any(x and defaults._same_isoform(x, isoform) for x in said) or any(
+                defaults._accession_says(r.uniprot, isoform) for r in rows)
+            if names_it and orthologs and organism not in orthologs:
+                other[organism] = count
+            elif names_it:
+                naming[organism] = count
+            elif all(x for x in said):
+                other[organism] = count
+            else:
+                silent[organism] = count
+        parts = []
+        if naming:
+            parts.append(f"rows naming {isoform}: {_counted(naming)}")
+        if silent:
+            # The organisms with the isoform's ortholog first (rabbit for
+            # human LDHA), then by rows.
+            near = {o: n for o, n in silent.items() if o in orthologs}
+            far = {o: n for o, n in silent.items() if o not in orthologs}
+            if orthologs and far:
+                # Organisms Caterva lists no such protein for are said apart:
+                # PARP1's kcat advice offered Aeromonas hydrophila and
+                # Streptomyces scabiei, whose rows under EC 2.4.2.30 are
+                # bacterial toxins', beside rat (sixth round, NEW-09).
+                apart = (f"in organisms Caterva lists no {isoform} for, where the enzyme under this "
+                         f"EC number may be another protein altogether: {_counted(far)}")
+                listed = "; ".join(x for x in (_counted(near), apart) if x)
+            else:
+                listed = "; ".join(x for x in (_counted(near), _counted(far)) if x)
+            parts.append(f"rows naming no isoform, so whether they measured {isoform}'s counterpart is "
+                         f"unknown: {listed}")
+        if other:
+            parts.append(f"not offered, their rows name another isoform than {isoform}: {_counted(other)}")
+        if variants:
+            parts.append(f"rows of a protein variant only, withheld: {_counted(variants)}")
+        return _AVAILABLE_IN.sub(lambda _m: " -- available in: " + "; ".join(parts), reason, count=1)
+    if not variants:
+        # Counted, so the advice can name where the measurements are and how
+        # many: "available in: Mus musculus, Tetronarce californica" gave no
+        # sense of which to pick (fifth round's review, A4-08).
+        if not usable and not isozymes:
+            return None
+        if usable:
+            return _AVAILABLE_IN.sub(lambda _m: f" -- available in: {_counted(usable, first=near)}", reason,
+                                     count=1)
+    if usable:
+        return _AVAILABLE_IN.sub(lambda _m: f" -- available in: {_counted(usable, first=near)} (rows of a "
+                                 f"protein variant only, withheld: {_counted(variants)})"
+                                 + (f"{aside}" if isozymes else ""), reason, count=1)
+    label = defaults.TABLE_NAMES[table]
+    if isozymes and not variants:
+        return (f"no usable value: the organism searched has no {label} row for {compound}, and the only "
+                f"rows elsewhere ({_counted(isozymes)}) each name an isozyme, which a re-run takes only "
+                "with --isoform naming it, so re-running with --organism alone would not fill it: pass "
+                "--isoform with the isozyme a row names, or supply it yourself"
+                + reason[match.end():])
+    return (f"no usable value: the organism searched has no {label} row for {compound}, and the only "
+            f"rows elsewhere ({_counted(variants)}) measured a protein variant, which is withheld "
+            f"(ADR 0029), so re-running in {'that organism' if len(variants) == 1 else 'any of them'} would "
+            "not fill it either: supply it yourself"
+            + (f"{aside}" if isozymes else "")
+            + reason[match.end():])
+
+
+def _neighbours_withheld(model: Any, measured: Mapping[str, Any], ec: Optional[str]) -> Dict[str, str]:
+    """parameter id -> the reason it is withheld, for each value the search
+    returned whose BRENDA row is a different compound's than the one the
+    constant is for (`defaults.neighbour_of`).
+
+    Found by reviewing ADR 0182's own live run: chymotrypsin in Homo
+    sapiens, the substrate chosen as L-alanyl-L-alanyl-L-prolyl-L-
+    phenylalanine p-nitroanilide, carried Km 0.219 mM (ref 769319), which is
+    BRENDA's row for the N-succinyl compound the note named as the
+    alternative. Withholding it leaves a labelled placeholder with the
+    reason; the other compound is named, so the reader can model it
+    instead. A page that cannot be read withholds nothing: the search read
+    the same page, and an unverifiable check is not a failed one.
+    """
+    if not ec or not measured:
+        return {}
+    from caterva.compose import defaults
+
+    out: Dict[str, str] = {}
+    for q in getattr(model, "resolvable", ()) or ():
+        m = measured.get(q.parameter_id)
+        if m is None or q.table not in ("km", "kcat", "ki"):
+            continue
+        compound = model.compound_for(q)
+        # The search's Measurement carries the reference in its citation
+        # ("BRENDA ref 769319"), not always in `reference_id`.
+        ref = getattr(m, "reference_id", None)
+        if ref is None:
+            cited = re.search(r"BRENDA ref (\d+)", str(getattr(m, "citation", "") or ""))
+            ref = cited.group(1) if cited else None
+        try:
+            other = defaults.neighbour_of(
+                ec, q.table, compound, getattr(m, "organism", None) or getattr(model, "organism", None),
+                m.value, ref)
+        except Exception:  # noqa: BLE001 - unverifiable is not wrong
+            other = None
+        if not other:
+            continue
+        flag = "--inhibitor" if q.table == "ki" else "--substrate"
+        out[q.parameter_id] = (
+            f"withheld: the value the search returned ({m.value:g} {m.unit}, BRENDA ref "
+            f"{ref}) is BRENDA's row for {' / '.join(other)}, not for {compound} -- the "
+            f"search matches a name inside longer names, and another compound's value is never "
+            f"carried under this one's (ADR 0076). Pass {flag} with that name to model it, or "
+            f"supply this constant yourself")
+    return out
+
+
+def _filed_under_other_names(model: Any, measured: Mapping[str, Any], ec: Optional[str]) -> List[str]:
+    """One sentence per carried value whose BRENDA row files its compound
+    under another name than the one the model uses, saying both.
+
+    "acetylcholinesterase inhibited by donepezil" carried Ki 2.2e-06 mM
+    (ref 651163) from a row BRENDA files as "(R,S)-1-benzyl-4-[(5,6-
+    dimethoxy-1-indanon)-2-yl]methylpiperidine hydrochloride", racemic
+    donepezil hydrochloride, which Caterva's compound names read as
+    donepezil; no surface said so (fifth round of the real-values review).
+    A spelling that differs only in case, spacing or a counter-ion is not
+    another name and is not said. A page that cannot be read says nothing.
+    """
+    if not ec or not measured:
+        return []
+    from caterva.compose import defaults
+
+    out: List[str] = []
+    for q in getattr(model, "resolvable", ()) or ():
+        m = measured.get(q.parameter_id)
+        if m is None or q.table not in ("km", "kcat", "ki"):
+            continue
+        compound = model.compound_for(q)
+        if not compound:
+            continue
+        ref = getattr(m, "reference_id", None)
+        if ref is None:
+            cited = re.search(r"BRENDA ref (\d+)", str(getattr(m, "citation", "") or ""))
+            ref = cited.group(1) if cited else None
+        try:
+            rows = defaults.rows_of_value(
+                ec, q.table, getattr(m, "organism", None) or getattr(model, "organism", None), m.value, ref)
+        except Exception:  # noqa: BLE001 - unverifiable: nothing said
+            continue
+        # Only the rows the search takes for the compound: another compound
+        # of the same paper can share the value (CPA's 6.08 1/s, ref 650016).
+        cells = sorted({r.compound for r in rows if defaults._matches(r.compound, compound)})
+        if not cells or any(defaults._search_key(c) == defaults._search_key(compound) for c in cells):
+            continue
+        shown = " / ".join(repr(c) for c in cells[:2])
+        same = all(defaults._group_key(c) == defaults._group_key(compound) for c in cells)
+        out.append(f"`{q.parameter_id}`: BRENDA files the row it came from (ref {ref}) as {shown}, "
+                   + (f"which Caterva reads as {compound}, the compound the model names: the same "
+                      "compound under another name" if same else
+                      f"which the search took for {compound}, the compound the model names, because "
+                      "BRENDA's name holds it; read the row to check it is the compound you mean"))
+    return out
+
+
+#: How a window re-selection's reason begins (caterva.agents.scouts).
+_WINDOW_MOVED = "it is the row nearest the assay window"
+_INDEPENDENT = "the Km and the kcat were chosen independently, not as a measured pair"
+
+
+def _pairing_said_after_windows(measured: Dict[str, Any]) -> Dict[str, Any]:
+    """A constant whose reason says the Km and kcat were "chosen
+    independently, not as a measured pair", when an assay window then moved
+    the other constant onto the same paper's row, is told so: rabbit
+    aldolase's kcat said the pair of ref 770643 "was not carried", beside a
+    Km the window had moved to ref 770643 (third round's review)."""
+    import re as _re
+    from dataclasses import replace as _replace
+
+    def ref(m: Any) -> Optional[str]:
+        found = _re.search(r"ref (\d+)", str(getattr(m, "citation", "") or ""))
+        return found.group(1) if found else None
+
+    moved = {ref(m) for m in measured.values()
+             if str(getattr(m, "resolver_because", "") or "").startswith(_WINDOW_MOVED)}
+    moved.discard(None)
+    if not moved:
+        return measured
+    out = dict(measured)
+    for name, m in measured.items():
+        because = str(getattr(m, "resolver_because", "") or "")
+        if _INDEPENDENT in because and ref(m) in moved:
+            try:
+                out[name] = _replace(m, resolver_because=(
+                    because + f"; the assay window then moved the other constant onto BRENDA ref "
+                    f"{ref(m)}'s row, so both carried rows are that paper's after all"))
+            except (TypeError, ValueError):
+                pass
+    return out
+
+
+#: How far (fold) a carried Km or kcat may sit from the median of the other
+#: papers' rows for the compound in its organism before the report says so.
+FAR_FROM_OTHER_PAPERS = 100.0
+
+
+def _far_from_other_papers(model: Any, measured: Mapping[str, Any], ec: Optional[str],
+                           organism: Optional[str]) -> List[str]:
+    """Notes for a carried Km or kcat lying more than FAR_FROM_OTHER_PAPERS
+    from the median of the wild-type rows other papers give for the compound
+    in the organism (at least two other papers).
+
+    Human aldolase B and fructose 1-phosphate: ref 651313's wild-type Km,
+    0.0022 mM, is carried as the row naming ALDOB, and every other paper's
+    human row lies at 0.24 to 3.7 mM: 100 to 1700 times higher, the mark of
+    a mM/uM slip in the database (sixth round, NEW-03). The row is real and
+    it is carried; the reader is told how far it sits."""
+    if not ec or not organism or not measured:
+        return []
+    from statistics import median
+
+    from caterva.compose import defaults
+
+    notes: List[str] = []
+    for q in getattr(model, "resolvable", ()) or ():
+        m = measured.get(q.parameter_id)
+        if m is None or q.table not in ("km", "kcat"):
+            continue
+        compound = model.compound_for(q)
+        ref = getattr(m, "reference_id", None)
+        if ref is None:
+            cited = re.search(r"BRENDA ref (\d+)", str(getattr(m, "citation", "") or ""))
+            ref = cited.group(1) if cited else None
+        try:
+            value = float(m.value)
+            rows = defaults.table_rows(ec, q.table, organism)
+        except Exception:  # noqa: BLE001
+            continue
+        if not compound or not ref or value <= 0:
+            continue
+        names = [r.compound for r in rows]
+        # Rows of the enzyme's own constant only: a row measured "in presence
+        # of" a second substrate, or naming another activity, is a different
+        # assay. E. coli catalase's 11000 1/s (ref 688196) was called a
+        # possible unit slip against a median set by one paper's 15
+        # peroxidase-donor rows ("presence of ABTS", pH 4-6), while three
+        # other papers' catalase rows agree with it (sixth round's polish,
+        # R6A1-01).
+        others = [r for r in rows if str(r.reference_id) != str(ref) and r.value and not r.flagged
+                  and not r.variant and getattr(r, "own", True)
+                  and not _ANOTHER_ASSAY.search(r.conditions or "")
+                  and (defaults._matches(r.compound, compound)
+                       or defaults.stereo_twin(r.compound, compound, names))]
+        isoform = getattr(model, "isoform", None)
+        if isoform:
+            # A model of one protein is compared with that protein's rows:
+            # ADH1B's 0.022 mM for ethanol was "far from the other rows",
+            # which were other alcohol dehydrogenases' or named none.
+            def _its(r: Any) -> bool:
+                read = defaults._isoform_read(r.conditions) or getattr(r, "named_form", None)
+                # A cell listing only other proteins overrides a word that
+                # reads alike ("isozyme ADH2" in a paper of ADH1C and ADH4).
+                cells = {c.strip() for c in str(r.uniprot or "").split(",") if c.strip()}
+                curated = {str(a) for a in (defaults._strict_alias(ec, isoform) or {}).get("accessions", [])}
+                if curated and cells and not (cells & curated):
+                    return False
+                says = defaults._accession_says(r.uniprot, isoform)
+                return bool(says or (says is not False and read
+                                     and defaults._same_isoform(read, isoform)))
+            others = [r for r in rows if str(r.reference_id) != str(ref) and r.value and not r.flagged
+                      and not (r.variant and not r.isozyme) and getattr(r, "own", True)
+                      and not _ANOTHER_ASSAY.search(r.conditions or "") and _its(r)
+                      and (defaults._matches(r.compound, compound)
+                           or defaults.stereo_twin(r.compound, compound, names))]
+        papers = {r.reference_id for r in others}
+        if len(papers) < 2:
+            continue
+        # The median over papers, each counted once by its own median row: a
+        # paper with a 15-row series does not outvote four papers.
+        mid = median(median(float(r.value) for r in others if r.reference_id == paper)
+                     for paper in papers)
+        fold = max(value / mid, mid / value)
+        if fold < FAR_FROM_OTHER_PAPERS:
+            continue
+        side = "below" if value < mid else "above"
+        # A paper that agrees is said: ref 651985's 0.0024 mM beside ref
+        # 651313's 0.0022 mM (aldolase B, 22°C) is not a lone slip.
+        near = sorted({(str(r.reference_id), float(r.value)) for r in others
+                       if max(float(r.value) / value, value / float(r.value)) <= 3.0})
+        if len({p for p, _ in near}) >= 2:
+            # Two other papers within 3-fold: the carried value is not alone.
+            continue
+        agree = ""
+        if near:
+            agree = ("; only " + ", ".join(f"BRENDA ref {p} ({v:g} {m.unit})" for p, v in near[:3])
+                     + " comes near it, so read those papers together")
+        notes.append(
+            f"`{q.parameter_id}`: {m.value:g} {m.unit} (BRENDA ref {ref}) lies {fold:.2g}-fold {side} "
+            f"the median ({mid:g} {m.unit}) over the {len(papers)} other papers that give wild-type "
+            f"rows for {compound} in {organism} ({len(others)} rows){agree}: read that paper before "
+            "relying on it "
+            "(a unit or transcription slip in the database is possible)")
+    return notes
+
+
+#: A row's commentary saying it measured another assay than the enzyme's own
+#: constant for the compound: a second substrate present, or another activity.
+_ANOTHER_ASSAY = re.compile(r"\b(?:in\s+)?(?:the\s+)?presence of\b|\bperoxidase activity\b|\bperoxidatic\b",
+                            re.IGNORECASE)
+
+_MUTANT_WORDS = re.compile(r"\bmutant|\bvariant|\b[A-Z]\d{1,4}[A-Z]\b|\bdes-")
+
+
+def _ranges_left_out(model: Any, measured: Mapping[str, Any], ec: Optional[str],
+                     organism: Optional[str]) -> List[str]:
+    """Notes for the rows the carried value's own paper gives as a range for
+    the same compound (`defaults.ranges_of_paper`), which no spread counts.
+    Human trypsin, ref 678332: kcat "20 - 50" 1/s beside the carried 88.2
+    1/s, under the same stated conditions (sixth round, R5A2-03)."""
+    if not ec or not measured:
+        return []
+    from caterva.compose import defaults
+
+    notes: List[str] = []
+    for q in getattr(model, "resolvable", ()) or ():
+        m = measured.get(q.parameter_id)
+        if m is None or q.table not in ("km", "kcat", "ki"):
+            continue
+        ref = getattr(m, "reference_id", None)
+        if ref is None:
+            cited = re.search(r"BRENDA ref (\d+)", str(getattr(m, "citation", "") or ""))
+            ref = cited.group(1) if cited else None
+        where = getattr(m, "organism", None) or organism
+        compound = model.compound_for(q)
+        # The carried row's paper first, then the other papers the spread
+        # counts: once trypsin carried ref 772843's pair, ref 678332 was
+        # still among the spread's sources, and its range still unsaid.
+        papers = [str(ref)] if ref else []
+        for row in getattr(m, "alternatives", ()) or ():
+            other = str(row.get("reference_id") or "") if isinstance(row, dict) else ""
+            if other and other not in papers:
+                papers.append(other)
+        said = []
+        for paper in papers:
+            try:
+                ranges = defaults.ranges_of_paper(ec, q.table, where, paper)
+            except Exception:  # noqa: BLE001
+                continue
+            # Wild-type rows only: a mutant's range is no rival of the
+            # wild-type value carried (chymotrypsin's "3 - 6" 1/s is mutant
+            # D236R's).
+            ranges = [r for r in ranges if (not compound or defaults._matches(r[1], compound)
+                                            or defaults._group_key(r[1]) == defaults._group_key(compound))
+                      and not _MUTANT_WORDS.search(r[2] or "")]
+            if not ranges:
+                continue
+            shown = "; ".join(f"{v} {m.unit}" + (f" ({' '.join(c.split())})" if c else "")
+                              for v, _, c in ranges[:3])
+            whose = ("the carried row's paper" if paper == str(ref)
+                     else "one of the papers whose values are counted above")
+            said.append(f"BRENDA ref {paper}, {whose}, also gives "
+                        f"{'a range' if len(ranges) == 1 else f'{len(ranges)} ranges'} for "
+                        f"{compound}: {shown}")
+        if said:
+            notes.append(
+                f"`{q.parameter_id}`: " + ". ".join(said) + ". A range is used only where a "
+                "compound has no single value, so it is not among the values counted above; read "
+                "the paper for what it spans")
+    return notes
+
+
+#: How far (fold) a carried Ki may sit from the same compound's Ki rows in
+#: other organisms under the EC before the report says so.
+FAR_FROM_OTHER_ORGANISMS = 100.0
+#: How far (fold) outside the whole range of the other organisms' rows a
+#: carried Ki may sit, when it is its organism's only row and states no
+#: conditions, before the report says so.
+LONE_ROW_OUTSIDE_RANGE = 30.0
+
+
+def _far_from_other_organisms(model: Any, measured: Mapping[str, Any], ec: Optional[str],
+                              organism: Optional[str]) -> List[str]:
+    """Notes for a carried Ki lying more than FAR_FROM_OTHER_ORGANISMS from
+    the median of the compound's Ki rows in other organisms under the EC.
+
+    E. coli DHFR and methotrexate: BRENDA's only E. coli Ki row is 0.0059 mM
+    (ref 655867), about 1e5-fold weaker than the pM-nM binding the field
+    knows, and the scale check said "all numbers possible" (third round's
+    review). It is the only row and it is carried; the reader is told it is
+    the only row and how far it sits from every other organism's."""
+    if not ec or not organism or not measured:
+        return []
+    from statistics import median
+
+    from caterva.compose import defaults
+
+    notes: List[str] = []
+    for q in getattr(model, "resolvable", ()) or ():
+        m = measured.get(q.parameter_id)
+        if m is None or q.table != "ki":
+            continue
+        compound = model.compound_for(q)
+        try:
+            value = float(m.value)
+            rows = defaults.table_rows(ec, "ki", None)
+        except Exception:  # noqa: BLE001
+            continue
+        mine = [r for r in rows if r.organism == organism and compound
+                and defaults._matches(r.compound, compound) and not r.flagged]
+        others = [float(r.value) for r in rows if r.organism != organism and compound
+                  and r.value and defaults._matches(r.compound, compound) and not r.flagged
+                  and not re.search(r"\bmutant\b", r.conditions or "", re.IGNORECASE)]
+        if len(others) < 3 or value <= 0:
+            continue
+        mid = median(others)
+        fold = max(value / mid, mid / value)
+        # The organism's only row, stating no conditions, far outside the
+        # whole range of the other organisms' rows: bovine succinate
+        # dehydrogenase's malonate Ki of 0.00025 mM (ref 391123) sits 70-fold
+        # below every other row (0.018 to 0.088 mM) and under the median's
+        # 100-fold line, so nothing was said (sixth round's polish, V6R1-08).
+        outside = max(min(others) / value, value / max(others))
+        bare = len(mine) == 1 and not (mine[0].conditions or "").strip(" -")
+        lone = bare and outside >= LONE_ROW_OUTSIDE_RANGE
+        if fold < FAR_FROM_OTHER_ORGANISMS and not lone:
+            continue
+        variants = sum(1 for r in mine if r.variant)
+        only = ("the only Ki row" if len(mine) == 1 else
+                f"one of {len(mine)} Ki rows" + (f" ({variants} of them of variants)" if variants else ""))
+        how = (f"lies {fold:.2g}-fold from the median ({mid:g} {m.unit}) of the {len(others)} rows for it "
+               f"under EC {ec} in other organisms")
+        if fold < FAR_FROM_OTHER_ORGANISMS:
+            how = (f"states no conditions and lies {outside:.2g}-fold outside the whole range "
+                   f"({min(others):g} to {max(others):g} {m.unit}) of the {len(others)} rows for it under "
+                   f"EC {ec} in other organisms")
+        notes.append(
+            f"`{q.parameter_id}`: {m.value:g} {m.unit} is {only} for {compound} in {organism}, and it "
+            f"{how}: read that paper before relying on it (an inhibitor can bind one species' enzyme "
+            "far more tightly than another's, so this may be a real difference between species; a unit "
+            "or transcription slip in the database is also possible)")
+    return notes
+
+
+#: Tissue words that name a mammalian isoform for these EC numbers.
+#: "pyruvate kinase muscle human PEP" dropped "muscle" without a word
+#: (third round's review); the muscle and liver forms differ many-fold.
+def _tissue_isoforms() -> Dict[str, Dict[str, Tuple[str, str]]]:
+    # One table, the literature layer's (row_form.TISSUE_ISOFORMS): the
+    # resolver reads a row's tissue by it ("heart phosphorylase"), so the
+    # description's word and the row's cannot disagree.
+    try:
+        from caterva.checkout import literature_module
+
+        return literature_module("row_form").TISSUE_ISOFORMS
+    except Exception:  # noqa: BLE001 - without the literature layer, no table
+        return {}
+
+
+_TISSUE_WORD = re.compile(r"\b(?:muscle|liver|heart|brain|erythrocyte|red cell|platelet|kidney|placental"
+                          r"|placenta|intestinal|intestine|bone)\b",
+                          re.IGNORECASE)
+
+
+def _tissue_isoform(ec: Optional[str], typed: str) -> Optional[Tuple[str, str, str]]:
+    """(word, isoform, what it is) for a tissue word naming one of the EC's
+    isoforms; None when the EC has no tissue isoforms listed or no word
+    names one; "" (falsy, not None) is never returned."""
+    table = _tissue_isoforms().get(ec or "")
+    if not table:
+        return None
+    for word, (isoform, said) in table.items():
+        if re.search(rf"\b{re.escape(word)}\b", typed, re.IGNORECASE):
+            return word, isoform, said
+    return None
+
+
+def _service_failed(text: str) -> str:
+    """Which service failed, said for a reader, with the remedy: a network
+    failure is fixed by running again, not by another organism or name."""
+    low = text.lower()
+    service = ("UniProt" if "uniprot" in low else "NCBI taxonomy" if "ncbi" in low
+               else "BRENDA" if "brenda" in low else "a database the search reads")
+    kind = ("timed out" if "timeout" in low else
+            "answered with a server error" if any(c in low for c in ("503", "502", "504", "500"))
+            else "failed")
+    return (f"{service} {kind} ({text.strip()[:160]}). This is a network failure, not an "
+            f"absence of measurements: re-run the same command, which usually succeeds")
+
+
+def _not_searched(failure: str) -> str:
+    """The reason a constant whose scout failed carries: not searched."""
+    return f"not searched: {_service_failed(failure)}"
+
+
+def _not_looked_up(skipped: Mapping[str, str]) -> str:
+    """The note's clause for constants deliberately not looked up, or ""."""
+    if not skipped:
+        return ""
+    return (f". {len(skipped)} not looked up ({', '.join(sorted(skipped))}): "
+            "the provenance table says what would let "
+            + ("it" if len(skipped) == 1 else "them") + " be looked up")
 
 
 _search_the_literature = search_the_literature
@@ -1388,10 +4455,25 @@ def _export(description: str, subject: Optional[str], fmt: str,
 
     claims = None
     try:
+        read = None
+        if args is not None:
+            # The same reading `compose_report` makes, so an export of a
+            # sentence carries the values its report carries (ADR 0181).
+            read = read_description(args)
+            description, subject = read.description, args.subject
         model = compose(description, subject=subject,
                         organism=getattr(args, "organism", None),
                         substrate=getattr(args, "substrate", None),
                         compounds=compounds_from(args) if args is not None else None)
+        if read is not None and read.unapplied:
+            model = replace(model, unapplied_subject=read.unapplied)
+        if read is not None and read.choices:
+            model = replace(model, choices=tuple(read.choices))
+        if read is not None and read.name_refusal is not None:
+            # An export has no report to carry the refusal, so it goes to
+            # stderr, and the artefact carries placeholders, labelled so.
+            model = replace(model, subject=read.enzyme_text, search_refused=read.refusal_note)
+            print(read.refusal_note, file=sys.stderr)
         # Opened only once there is a model, as in `compose_report`: a
         # description that builds nothing writes no store (`_claims_run`).
         claims = _claims_run(args)
@@ -1406,6 +4488,11 @@ def _export(description: str, subject: Optional[str], fmt: str,
             finally:
                 if claims is not None:
                     claims.stop_recording()
+            # An export has no report: what was chosen for the user goes to
+            # stderr, so the artefact on stdout stays parseable and the
+            # choice is still said (ADR 0182).
+            for line in choice_notes(model):
+                print(f"Chose: {line}", file=sys.stderr)
         provenanced = provenanced_for_export(model)
         # The ids in the artefact are the ids in the bundle: one ClaimSet,
         # built from the same ProvenancedModel the artefact is written from.
@@ -1607,7 +4694,10 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
         print(
             "\nIt recognises a SHAPE, never a SUBJECT. 'three step "
             "phosphorylation cascade' builds; 'glycolysis' does not, and "
-            "says why."
+            "says why. An enzyme named exactly in a one-enzyme mechanism "
+            "('Michaelis-Menten kinetics of human hexokinase on glucose') "
+            "is searched for, and the report says how each word was read "
+            "(ADR 0181)."
         )
         return 0
 
@@ -1628,12 +4718,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
             return _export(args.description, args.subject, args.export, args)
 
         if args.antimony:
-            from caterva.compose.pipeline import compose
-            from caterva.core.network import compile_to_antimony
-
-            model = compose(args.description, subject=args.subject)
-            print(compile_to_antimony(model.network))
-            return 0
+            return _antimony(args)
 
         return compose_report(args, organism_note=organism_note).code
 
@@ -1642,6 +4727,54 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
         # crash, and a script should be able to tell the two apart.
         print(f"Not built.\n\n{exc}", file=sys.stderr)
         return 3
+
+
+def _antimony(args: Any) -> int:
+    """`--antimony`: the compiled source of the model the report would show,
+    with the numbers the report would carry and a comment saying where each
+    came from.
+
+    It used to search nothing: `caterva compose "thrombin with a competitive
+    inhibitor in human" --substrate ... --inhibitor argatroban --antimony`
+    printed kcat = 100, Km = 0.1, Ki = 0.5 -- the motif library's
+    placeholders, with no comment -- while the same command's report and
+    `--export antimony` carried three cited BRENDA values (found
+    2026-11-11). Source a reader pastes into a simulator must not be the
+    one artefact that silently drops the measurements. So the description
+    is read and searched exactly as for the report, the measured values are
+    in the network compiled, and a comment block above it names each
+    constant's origin; `--export antimony` remains the fully annotated form.
+    """
+    from caterva.compose.pipeline import compose
+    from caterva.core.network import compile_to_antimony
+
+    read = read_description(args)
+    model = compose(read.description, subject=args.subject, organism=args.organism,
+                    substrate=args.substrate, compounds=compounds_from(args))
+    if read.choices:
+        model = replace(model, choices=tuple(read.choices))
+    note = None
+    if args.subject:
+        model, note, _ = _search_the_literature(model, args)
+    elif read.refusal_note:
+        note = read.refusal_note
+    lines = ["# Compiled by caterva compose --antimony. Where each constant came from:"]
+    for q in model.resolvable:
+        m = (getattr(model, "measured", {}) or {}).get(q.parameter_id)
+        if m is not None:
+            where = f" ({m.organism})" if getattr(m, "organism", None) else ""
+            lines.append(f"#   {q.parameter_id} = {m.value:g} {m.unit}: {m.citation}{where}")
+        else:
+            reason = (getattr(model, "not_found", {}) or {}).get(q.parameter_id) or (
+                "no enzyme was named, so nothing was searched" if not args.subject else
+                "not found by the search")
+            lines.append(f"#   {q.parameter_id}: PLACEHOLDER, the motif library's illustrative "
+                         f"value -- {' '.join(str(reason).split())[:240]}")
+    for line in [*choice_notes(model), *([note] if note else [])]:
+        lines.append("# " + " ".join(str(line).split()))
+    print("\n".join(lines))
+    print(compile_to_antimony(model.network))
+    return 0
 
 
 @dataclass
@@ -1730,9 +4863,17 @@ def _compose_report(
     # verdict can read them, and printed by their sections afterwards
     # without being computed a second time.
     at("compose", "Composing the model from its description")
-    model = compose(args.description, subject=args.subject,
+    # What the description names fills what no flag set, before anything is
+    # composed or searched, so the search, the report and the studio's
+    # result all read the same subject (ADR 0181).
+    read = read_description(args, err=err)
+    model = compose(read.description, subject=args.subject,
                     organism=args.organism, substrate=args.substrate,
                     compounds=compounds_from(args))
+    if read.unapplied:
+        model = replace(model, unapplied_subject=read.unapplied)
+    if read.choices:
+        model = replace(model, choices=tuple(read.choices))
     claims = _claims_run(args)
     if claims is not None:
         closing.enter_context(claims)
@@ -1757,6 +4898,14 @@ def _compose_report(
         name_refusal = found.name_refusal
         if search_refused and not model.searched and model.search_refused is None:
             model = replace(model, search_refused=search_note)
+    elif read.name_refusal is not None:
+        # The description named an enzyme that is several. Refused exactly
+        # as `--subject "lactate dehydrogenase"` is, with the candidates
+        # named and the whole command that accepts one, never skipped: a
+        # report saying "no enzyme was named" here would be false, and one
+        # that picked would cite the wrong protein.
+        search_note, search_refused, name_refusal = read.refusal_note, True, read.name_refusal
+        model = replace(model, subject=read.enzyme_text, search_refused=search_note)
     claim_set = None
     if claims is not None:
         # Built now, from the same ProvenancedModel every export is written
@@ -1792,6 +4941,12 @@ def _compose_report(
     # pages has put its last word in the middle.
     if organism_note and args.subject:
         model.recognition.composition.note(organism_note)
+    for line in read.notes:
+        model.recognition.composition.note(line)
+    # Every choice Caterva made for something the user did not name, in the
+    # order it was made, before the search's own note (ADR 0182).
+    for line in choice_notes(model):
+        model.recognition.composition.note(line)
     if search_note:
         model.recognition.composition.note(search_note)
     print(report.markdown(footer=False), file=out)
@@ -1824,6 +4979,11 @@ def _compose_report(
         search_refused=search_refused, code=code, name_refusal=name_refusal,
         claims=claim_set,
     )
+
+
+def choice_notes(model: Any) -> List[str]:
+    """The report's note for each choice the model carries (ADR 0182)."""
+    return [choice.note() for choice in getattr(model, "choices", ()) or ()]
 
 
 def _announcing_resolver(progress: Any) -> Optional[Callable[..., Any]]:
@@ -1977,6 +5137,7 @@ __all__ = [
     "check_request", "compose_report", "export_texts", "main",
     "precompute_for_verdict", "provenanced_for_export", "run_analyses",
     "search_the_literature", "search_literature", "read_subject", "LiteratureSearch",
+    "read_description", "DescriptionReading", "brenda_km_substrates",
 ]
 
 

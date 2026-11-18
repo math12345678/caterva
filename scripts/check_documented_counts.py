@@ -218,9 +218,14 @@ def documented_guard_counts(text: str) -> List[Tuple[int, int]]:
     vaguer wording rather than truer wording.
     """
     claims: List[Tuple[int, int]] = []
-    pattern = re.compile(r"(~)?\s*(\d+)\s+guard scripts?\b", re.IGNORECASE)
+    # "<N> guards" as well as "<N> guard scripts" since 2026-11-01: the
+    # narrower pattern let "22 guards run on every build" and "The 21
+    # guards" stand in docs/readmes/ beside 79. A quoted count is a quote.
+    pattern = re.compile(r"(~)?\s*(\d+)\s+guard(?: scripts?|s)\b", re.IGNORECASE)
     for lineno, line in enumerate(text.splitlines(), start=1):
         for match in pattern.finditer(line):
+            if is_quoted(line, match.start(2), match.end(2)):
+                continue
             approximate = match.group(1) is not None
             value = int(match.group(2))
             claims.append((lineno, -value if approximate else value))
@@ -306,18 +311,13 @@ def documented_adr_counts(text: str) -> List[Tuple[int, int]]:
 _OUTCOME_WORDS = ("failed", "passed", "broke", "were", "did", "ran", "collected")
 
 
-#: Text before a `<N> tests` that means it is NOT a suite size.
-#:
-#: `test_popgen_resolver.py skips its 19 tests` is a true statement about
-#: one file. Checking it against the suite totals would fail forever, and a
-#: guard that fires on a correct sentence gets suppressed (ADR 0028) --
-#: which is very likely why README was excluded from the test-count check
-#: wholesale rather than having this three-line exception.
-#:
-#: Deliberately narrow. Anything not listed here IS checked: an exclusion
-#: list that grows to cover every awkward case is how a check stops
-#: checking.
-_NOT_A_SUITE_SIZE = re.compile(r"\bskips its\s*$")
+# `_NOT_A_SUITE_SIZE` stood here until 2026-11-01: a one-pattern
+# exception so README's "test_popgen_resolver.py skips its 19 tests", a
+# true sentence about one file, was not checked against the suite totals
+# (ADR 0154). That sentence left README when the resolver moved to
+# archive/legacy_domains/, and no checked document said "skips its" after
+# it, so the exception excused nothing and was removed. If a per-file
+# count needs exempting again, add it back with the sentence it exists for.
 
 
 def documented_test_counts(text: str) -> List[Tuple[int, int]]:
@@ -334,8 +334,6 @@ def documented_test_counts(text: str) -> List[Tuple[int, int]]:
     for lineno, line in enumerate(text.splitlines(), start=1):
         for match in pattern.finditer(line):
             if is_quoted(line, match.start(), match.end()):
-                continue
-            if _NOT_A_SUITE_SIZE.search(line[: match.start()]):
                 continue
             claims.append((lineno, int(match.group(1).replace(",", ""))))
     return claims
@@ -561,7 +559,7 @@ def rewrite(text: str, actual: dict, guards: int, adrs: int) -> Tuple[str, List[
             text = apply(text, re.compile(pattern), actual[key], label)
 
     text = apply(
-        text, re.compile(r"(~)?\s*(\d+) guard scripts?\b", re.IGNORECASE),
+        text, re.compile(r"(~)?\s*(\d+) guard(?: scripts?|s)\b", re.IGNORECASE),
         guards, "guard scripts",
     )
     text = apply(
@@ -658,7 +656,11 @@ def selftest() -> int:
     That is precisely how this guard's original scope went unnoticed.
     """
     guard_cases = [
-        ("22 guards run on every build", []),          # "guards" != "guard scripts"
+        # Read as a claim since 2026-11-01 (it was a deliberate non-match,
+        # and "22 guards run on every build" stood in docs/readmes/main.md).
+        ("22 guards run on every build", [22]),
+        ('it stated *"22 guards"*', []),               # a quote, not a claim
+        ("3 guardrails", []),
         ("all 14 guard scripts", [14]),
         ("~20 guard scripts", [-20]),
         ("35 guard scripts pass", [35]),
@@ -837,6 +839,9 @@ def main() -> int:
     # because `test_popgen_resolver.py` needs `stdpopsim`, which lives in
     # the optional `requirements-popgen.txt` that `make setup` does not
     # install -- and an Anaconda base happened to satisfy it.
+    # (2026-11-01: that file is now in archive/legacy_domains/tests/, out
+    # of the literature suite, so that half of the spread is gone. The
+    # engine half, and the reason to print the interpreter, remain.)
     #
     # So `--write` run from the wrong interpreter produces numbers that are
     # honestly measured and still wrong for this project, and the next
@@ -1035,6 +1040,23 @@ def main() -> int:
             if edits:
                 path.write_text(after, encoding="utf-8")
                 changed.extend(f"{relative} {e}" for e in edits)
+
+        # The landing page's copy of these counts (guard scripts, and the
+        # engine and literature counts the README now states) lives in a
+        # generated repoFacts.json that check_landing_test_counts.py holds
+        # to the tree. Regenerated here too, from the README just written,
+        # so one --write does not leave the page a count behind.
+        sys.path.insert(0, str(REPO_ROOT / "scripts"))
+        try:
+            import check_landing_test_counts as landing
+        finally:
+            sys.path.pop(0)
+        before_facts = landing.read_facts()
+        problems = landing.write_facts()
+        if problems:
+            print("NOTE: landing repoFacts.json not written: " + "; ".join(problems))
+        elif landing.read_facts() != before_facts:
+            changed.append(f"{landing.REPO_FACTS.relative_to(REPO_ROOT)} regenerated")
 
         if changed:
             print(f"WROTE {len(changed)} count(s):")

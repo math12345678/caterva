@@ -60,8 +60,8 @@ const NOTE =
 describe("the llm origin is distinct from default", () => {
   it("accepts an llm entry that explains itself", () => {
     const v = validateParameterProvenance(
-      { beta: 0.4 },
-      { beta: { origin: "llm", note: NOTE } },
+      { k: 0.4 },
+      { k: { origin: "llm", note: NOTE } },
     );
     expect(v).toEqual([]);
   });
@@ -71,11 +71,11 @@ describe("the llm origin is distinct from default", () => {
     // default once it reaches the API, because an llm entry carries no
     // citation by construction.
     const v = validateParameterProvenance(
-      { beta: 0.4 },
-      { beta: { origin: "llm" } },
+      { k: 0.4 },
+      { k: { origin: "llm" } },
     );
     expect(v).toEqual([
-      "beta is marked llm but carries no note explaining that the value is unverified",
+      "k is marked llm but carries no note explaining that the value is unverified",
     ]);
   });
 
@@ -83,26 +83,26 @@ describe("the llm origin is distinct from default", () => {
     // Nothing was looked up. A citation here would assert provenance that
     // does not exist -- worse than no provenance at all.
     const v = validateParameterProvenance(
-      { beta: 0.4 },
-      { beta: { origin: "llm", note: NOTE, citation: "BRENDA (ref 12345)" } },
+      { k: 0.4 },
+      { k: { origin: "llm", note: NOTE, citation: "BRENDA (ref 12345)" } },
     );
-    expect(v).toContain("beta has a citation but origin is 'llm'");
+    expect(v).toContain("k has a citation but origin is 'llm'");
   });
 
   it("an llm entry must never carry a citation status", () => {
     const v = validateParameterProvenance(
-      { beta: 0.4 },
-      { beta: { origin: "llm", note: NOTE, citationStatus: "verified" } },
+      { k: 0.4 },
+      { k: { origin: "llm", note: NOTE, citationStatus: "verified" } },
     );
-    expect(v).toContain("beta has a citation status but origin is 'llm'");
+    expect(v).toContain("k has a citation status but origin is 'llm'");
   });
 
   it("a plain default still needs no note", () => {
     // The new rule must not leak onto `default`, or every domain's
     // documented defaults would start demanding explanations.
     const v = validateParameterProvenance(
-      { beta: 0.4 },
-      { beta: { origin: "default" } },
+      { k: 0.4 },
+      { k: { origin: "default" } },
     );
     expect(v).toEqual([]);
   });
@@ -114,22 +114,30 @@ describe("Target J — an LLM-supplied parameter is hard-blocked (user directive
   });
 
   it("rejects a parameter the LLM invented instead of letting it reach the engine", async () => {
-    // The LLM resolver returns a beta that is not in the query and has no
-    // literature lookup behind it. The user directive hard-blocks any
+    // The LLM resolver returns a rate constant that is not in the query and
+    // has no literature lookup behind it. The user directive hard-blocks any
     // parameter whose origin is "llm": the value must be user-supplied or
     // literature-resolved, so resolveQuery() throws and names the key.
+    //
+    // (Until 2026-11-01 this case used an SIR outbreak and an invented
+    // beta. SIR was archived on 2026-09-27, after v0.4.0, the last release
+    // that runs it; the rule is the same on a live domain. The refusal
+    // reads the same whether or not the LLM ran, so the case also asserts
+    // the LLM path was taken: green only when the invented k was produced
+    // and then blocked.)
     vi.mocked(resolveQueryWithLLM).mockResolvedValueOnce({
-      domain: "sir",
-      parameters: { beta: 0.42, r0_recovered: 0 },
-      reasoning: "inferred a plausible transmission rate",
+      domain: "gillespie_ssa",
+      parameters: { k: 0.42 },
+      reasoning: "inferred a plausible decay rate",
       modelCitations: [],
     } as never);
 
     const error = await resolveQuery(
-      "simulate a moderately contagious outbreak gamma=0.1 s0=990 i0=10 end=100 points=101",
+      "simulate stochastic decay a0=1000 end=10",
     ).catch((e) => e);
+    expect(vi.mocked(resolveQueryWithLLM)).toHaveBeenCalled();
     expect(error).toBeInstanceOf(RequiredParametersMissingError);
-    expect(String(error.message)).toContain("beta");
+    expect((error as RequiredParametersMissingError).missing).toContain("k");
   });
 
   it("a user override in the query text still wins over an LLM value", async () => {

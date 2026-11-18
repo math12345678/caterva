@@ -88,7 +88,18 @@ one.
 ./scripts/split_repos.sh --push-ssh     # force SSH instead
 ```
 
-The 18 repositories already exist, so nothing needs creating.
+Most target repositories already exist under Terrium-sim, but `caterva`
+and `caterva-site` do not: the org still has the pre-rename `terium` and
+`terrium-site`. Rename those two (or create the new names) before pushing,
+or those two pushes fail with "Repository not found".
+
+*Corrected 2026-11-01.* This line used to say "The 18 repositories already
+exist, so nothing needs creating." The org does hold 18 private
+repositories, but 17 of them were created and pushed once, on 2026-08-12,
+under the old name (the 18th, `demo-repository`, is GitHub's demo), and
+nothing has been pushed to them since. Development happens only in
+[math12345678/caterva](https://github.com/math12345678/caterva), and the
+procedure on this page has not been run again since that first push.
 
 ### If a push fails
 
@@ -156,5 +167,7 @@ working tree.
 - **`mule`.** You said you would add the MuleRun page; it is created with a
   placeholder README.
 - **`demo-repository`.** Left untouched — it is GitHub's demo repo.
-- **`worktrees`.** Genuinely empty: `Caterva.worktrees/` tracks no files. It
-  gets a README so an empty repo is not mistaken for a failed push.
+- **`worktrees`.** Genuinely empty: `Caterva.worktrees/` tracks no files
+  (its helper, `scripts/worktree.sh`, moved out of it on 2026-10-31 and
+  ships with `wiring-main`). It gets a README so an empty repo is not
+  mistaken for a failed push.

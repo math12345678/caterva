@@ -1,5 +1,6 @@
 import * as readline from 'readline';
 
+import { describeChoice } from './chooseMissing';
 import type { ParsedSystem } from './suggestResolveCommand';
 
 /**
@@ -57,14 +58,28 @@ export interface ConfirmIO {
 }
 
 export function describeParsedSystem(system: ParsedSystem): string {
+  const chose = (role: string) => (system.choices ?? []).some((c) => c.role === role);
   return [
     '',
     'Your question names a system. Caterva read it as:',
     '',
     `    enzyme      ${system.enzyme}`,
-    `    substrate   ${system.substrate}`,
-    `    organism    ${system.organism}`,
+    // The EC is the identity the citation will be about. Without it a
+    // person can agree to a word ("enzyme") that the resolver turns into one
+    // specific protein they never saw named.
+    system.ec !== undefined
+      ? `    EC          ${system.ec}` + (system.ecName ? ` (${system.ecName})` : '')
+      : '    EC          not one enzyme by that name offline; the run says which, or refuses',
+    `    substrate   ${system.substrate}` + (chose('substrate') ? '   (chosen: you named none)' : ''),
+    // The binomial is what BRENDA is searched under; what was typed is
+    // shown beside it so "humans" is visibly the organism being agreed to.
+    `    organism    ${system.organism}` +
+      (system.organismTyped !== undefined ? `   (you wrote "${system.organismTyped}")` : '') +
+      (chose('organism') ? '   (chosen: you named none)' : ''),
     '',
+    // What Caterva chose, why, and what else BRENDA holds (ADR 0182). Above
+    // the question, so agreeing to the system is agreeing to the choice.
+    ...(system.choices ?? []).flatMap((choice) => [describeChoice(choice), '']),
     // Named consequences, not a generic "is this ok?". A student who does
     // not know what a wrong organism costs cannot judge the question.
     'These decide which measurement gets cited. A wrong organism here',

@@ -17,10 +17,15 @@ Two of those dependencies would carry real obligations if that changed:
                    and the ability for a recipient to relink against a
                    modified libSBML.
 
-  stdpopsim        GPL-3.0-or-later. Now opt-in via requirements-popgen.txt
-                   (ADR 0058), but a build that installs that file and is
-                   then published is a distribution of GPLv3 code, and the
-                   combined work's terms change accordingly.
+  stdpopsim        GPL-3.0-or-later. Opt-in via requirements-popgen.txt
+                   from 2026-08-16 (ADR 0061), and since 2026-11-01 named
+                   by no live manifest: that file moved to
+                   archive/legacy_domains/ with the resolver that used it.
+                   A build that installs it anyway and is then published
+                   is a distribution of GPLv3 code, and the combined
+                   work's terms change accordingly. (Corrected
+                   2026-11-01: this cited ADR 0058, an unrelated record;
+                   the stdpopsim decision is ADR 0061.)
 
 `.devcontainer/Dockerfile` already runs `pip install -r requirements-dev.txt`,
 so an image built from it CONTAINS libSBML. Building it locally is private
@@ -350,9 +355,9 @@ def main() -> int:
         "CONTAINS them\nchanges that:\n"
         "\n  python-libsbml is LGPL-2.1-or-later. Conveying it requires notice "
         "and that a\n  recipient be able to relink against a modified libSBML.\n"
-        "\n  stdpopsim is GPL-3.0-or-later. If the artifact includes "
-        "requirements-popgen.txt,\n  the combined work's terms change (ADR "
-        "0058).\n"
+        "\n  stdpopsim is GPL-3.0-or-later. No live manifest installs it "
+        "(ADR 0061), but if\n  the artifact includes it, the combined "
+        "work's terms change.\n"
         "\nAdd a conveyance section to NOTICE naming both, and get advice "
         "before shipping.\nDo not delete this guard to go green: the "
         "obligation exists whether or not the\nbuild is passing."

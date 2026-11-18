@@ -55,7 +55,7 @@
 # The wheel built here carries the page and is used only inside the app;
 # the wheel on the release page is release.yml's, built without the page.
 #
-# Apple silicon only (macos-14 is arm64). An Intel build would need its own
+# Apple silicon only (macos-15 is arm64; the shell is still compiled for macOS 14). An Intel build would need its own
 # runner and its own frozen Python; none is claimed.
 
 name: studio-dmg
@@ -81,7 +81,7 @@ env:
 jobs:
   dmg:
     name: Caterva.app (macOS arm64)
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4

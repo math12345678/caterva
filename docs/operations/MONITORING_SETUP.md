@@ -10,21 +10,55 @@ Complete monitoring stack for Caterva with real-time dashboards, alerts, and met
 
 ### 1. Start the Full Stack
 
+Choose a Grafana admin password first. The compose file has **no default**
+(it was `admin` until 2026-10-31) and refuses to start without one:
+
 ```bash
-docker-compose -f docker-compose-monitoring.yml up -d
+export GRAFANA_ADMIN_PASSWORD='<a password of your own>'
+docker-compose -f deploy/monitoring/docker-compose-monitoring.yml up -d
 ```
+
+Or put `GRAFANA_ADMIN_PASSWORD=...` in `deploy/monitoring/.env`, which git
+ignores (`.gitignore`: `.env`); Compose v2 reads `.env` from the project
+directory, by default the first `-f` file's directory. Grafana applies it
+only when its database is first created: on an existing `grafana_data`
+volume, the old password stays until reset inside the container with
+`grafana cli admin reset-admin-password`.
+
+Run it from the repository root. Every file this guide edits is in
+`deploy/monitoring/` (they were at the root until 2026-10-31).
 
 This starts:
 - **Caterva** at `http://localhost:3000`
 - **Prometheus** at `http://localhost:9090`
 - **Grafana** at `http://localhost:3001`
 
+### Reaching the stack from another machine
+
+All three ports are published on **127.0.0.1 only**
+(`deploy/monitoring/docker-compose-monitoring.yml`: `127.0.0.1:3000:3000`,
+`127.0.0.1:9090:9090`, `127.0.0.1:3001:3000`), so the URLs above work on the
+Docker host itself and nowhere else. That is deliberate: the Caterva API and
+Prometheus have no login at all, and `scripts/check_port_binding.py` fails
+the build if any of them is published to every interface.
+
+From another machine, use an SSH tunnel to the Docker host:
+
+```bash
+ssh -N -L 3000:127.0.0.1:3000 -L 9090:127.0.0.1:9090 -L 3001:127.0.0.1:3001 you@docker-host
+```
+
+then open the same `http://localhost:...` URLs locally. Prometheus scraping
+Caterva (`caterva:3000`) and Grafana querying Prometheus
+(`http://prometheus:9090`) happen on the compose network and are not
+affected by the loopback binding.
+
 ### 2. Access Grafana
 
 ```bash
 open http://localhost:3001
 # Username: admin
-# Password: admin
+# Password: the GRAFANA_ADMIN_PASSWORD you set in step 1
 ```
 
 ### 3. View Dashboard
@@ -35,8 +69,12 @@ open http://localhost:3001
 ### 4. Stop Everything
 
 ```bash
-docker-compose -f docker-compose-monitoring.yml down
+docker-compose -f deploy/monitoring/docker-compose-monitoring.yml down
 ```
+
+This needs `GRAFANA_ADMIN_PASSWORD` too: Compose substitutes variables for
+every command it runs against this file, `down` included, so run it from a
+shell where the variable is exported, or keep it in `deploy/monitoring/.env`.
 
 ---
 
@@ -202,22 +240,22 @@ open http://localhost:9090/targets
 ### prometheus.yml
 - **What:** Tells Prometheus where to scrape metrics
 - **Edit:** Add more scrape targets here
-- **Location:** `/prometheus.yml`
+- **Location:** `deploy/monitoring/prometheus.yml`
 
 ### prometheus-rules.yml
 - **What:** Alert rules (thresholds, durations, notifications)
 - **Edit:** Customize alert conditions here
-- **Location:** `/prometheus-rules.yml`
+- **Location:** `deploy/monitoring/prometheus-rules.yml`
 
 ### grafana-dashboard.json
 - **What:** Dashboard layout and panels
 - **Edit:** Customize visualization here (or in Grafana UI)
-- **Location:** `/grafana-dashboard.json`
+- **Location:** `deploy/monitoring/grafana-dashboard.json`
 
 ### docker-compose-monitoring.yml
 - **What:** Container configuration and networking
 - **Edit:** Add more services, change ports, adjust resources
-- **Location:** `/docker-compose-monitoring.yml`
+- **Location:** `deploy/monitoring/docker-compose-monitoring.yml`
 
 ---
 
@@ -374,7 +412,10 @@ docker exec grafana grafana-cli admin export-dashboard > dashboard-backup.json
 - Test alerts work
 
 ### 4. Enable Authentication
-- Change Grafana password (beyond default)
+- Grafana's admin password is already yours (`GRAFANA_ADMIN_PASSWORD`, no
+  default); add per-user accounts rather than sharing it
+- Keep the ports on loopback (see "Reaching the stack from another machine");
+  exposing them means putting authentication in front of all three first
 - Use network policies
 - Put behind reverse proxy (nginx)
 

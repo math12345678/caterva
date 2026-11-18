@@ -1,6 +1,6 @@
 {
   "name": "caterva-scientific-backend",
-  "version": "0.6.0",
+  "version": "0.7.1",
   "description": "Production-ready scientific validation and reproducibility framework. Unaffiliated with Tellurium.",
   "main": "src/integration/scientificPipeline.ts",
   "bin": {
@@ -63,6 +63,11 @@
       "<rootDir>/src"
     ],
     "testTimeout": 30000,
+    "globalSetup": "<rootDir>/src/testSupport/jestGlobalSetup.ts",
+    "globalTeardown": "<rootDir>/src/testSupport/jestGlobalTeardown.ts",
+    "setupFiles": [
+      "<rootDir>/src/testSupport/jestSetupEnv.ts"
+    ],
     "testMatch": [
       "**/__tests__/**/*.test.ts"
     ],
@@ -70,7 +75,8 @@
       "src/**/*.ts",
       "!src/**/*.test.ts",
       "!src/cli/**",
-      "!src/logger.ts"
+      "!src/logger.ts",
+      "!src/testSupport/**"
     ],
     "coverageThreshold": {
       "global": {

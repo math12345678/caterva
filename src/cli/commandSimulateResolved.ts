@@ -56,6 +56,7 @@ import {
   PRODUCT_INHIBITION_CAVEAT,
   type InhibitionModel,
 } from './inhibitionModels';
+import { formatDerived, formatValue } from './formatNumber';
 
 const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
@@ -80,6 +81,9 @@ export interface ParameterProvenance {
   crossSpecies?: boolean;
   /** true when the CLI had to assume the unit rather than being told. */
   unitAssumed?: boolean;
+  /** true for a value Caterva computed (Vmax = kcat x [E]0): printed to
+   *  four significant figures, not to the float's last noisy digit. */
+  derived?: boolean;
   /** Bakker's axes as (axis -> grade), for the exported model file. */
   reliability?: Record<string, string>;
   /** The same axes as (axis -> why). Carried separately from the grades
@@ -120,6 +124,15 @@ export interface ParameterProvenance {
    * table would present that constant as the model's mechanism.
    */
   rowScope?: string[];
+  /**
+   * What the carried row is (a K0.5, an isoform named by accession, a
+   * construct), in the resolver's words: printed under the value, as
+   * compose's report and the Studio print them (third real-values round).
+   */
+  rowNotes?: string[];
+  /** For the Km: which protein of a multi-protein EC the model is
+   *  (XS5R2-04), printed once above the table. */
+  isozyme?: { headline: string; detail: string; remedy: string };
 }
 
 /**
@@ -273,6 +286,17 @@ function notFoundBecause(
 ): { sentence: string; why: string } | null {
   const withheld = withheldSentence(result, advice);
   if (withheld) return { sentence: withheld, why: WITHHELD_WHY };
+  if (result.availableInTheOrganism) {
+    // What the organism DOES hold, counted, as compose and the API say it
+    // (fifth round's review, V7-08).
+    return {
+      sentence: result.availableInTheOrganism,
+      why:
+        'BRENDA has no row for the compound named in this organism; the line above lists the ' +
+        'ones it has rows for. Re-run naming one of them, or supply the value from a source ' +
+        'you can cite.',
+    };
+  }
   if (
     result.source === 'ec_ambiguous' ||
     result.source === 'ec_not_resolved' ||
@@ -295,8 +319,8 @@ function notFoundBecause(
  * undefined when the row says nothing worth a line. Read from the runner's
  * `rowScope` (parsed in Python by caterva.bind.core), never re-derived.
  */
-function rowScopeOf(result: ResolvedKinetic): string[] | undefined {
-  const lines = rowScopeLines(result.quantity, result.rowScope);
+function rowScopeOf(result: ResolvedKinetic, isoform?: string): string[] | undefined {
+  const lines = rowScopeLines(result.quantity, result.rowScope, isoform, result.rowNotes);
   return lines.length > 0 ? lines : undefined;
 }
 
@@ -329,6 +353,36 @@ function rowScopeOf(result: ResolvedKinetic): string[] | undefined {
  * Telling a student "vmax is unresolved" without saying which kind of
  * problem it is leaves them stuck in the same place either way.
  */
+/**
+ * What the "What to do next" block prints where a MEASURED value has to go.
+ *
+ * It used to print `--km 10.7mM`, `--vmax 1.2mM/s` and
+ * `--cite km="Smith 2019, PMID 12345"` -- plausible numbers and a plausible
+ * citation, under a heading that called them "example values", in a block
+ * whose whole point is that the literature did not yield this constant. A
+ * reader who copied the command "in full" ran a simulation on a Km nobody
+ * measured, cited to a PMID that is not a paper about this enzyme, and the
+ * provenance then showed it as `user`-supplied and cited: the exact
+ * plausible-default this tool refuses to produce itself.
+ *
+ * So the slot is a labelled placeholder: angle brackets that the heading
+ * names as "replace ... with your own", and that parseQuantity refuses if
+ * copied unedited, so the mistake fails loudly instead of running. The
+ * conditions (`--s0 10mM`, `--enzyme-conc 0.01mM`) keep real example
+ * values: they describe the reader's experiment, so any value is theirs to
+ * choose and none can be wrong about the enzyme.
+ */
+const MEASURED_PLACEHOLDER = {
+  km: '<your measured Km, e.g. in mM>',
+  vmax: '<your measured Vmax, e.g. in mM/s>',
+  // "acetylcholinesterase inhibited by donepezil in human", live 2026-11-11:
+  // no Ki row, and the command printed "in full, with the example values"
+  // ended `--ki 5mM` -- a number for donepezil, whose Ki is nanomolar,
+  // that nobody measured, runnable as printed.
+  ki: '<your measured Ki, e.g. in mM>',
+} as const;
+const CITE_PLACEHOLDER = '<author year, PMID>';
+
 interface Blocker {
   parameter: string;
   kind: 'condition' | 'literature';
@@ -336,6 +390,35 @@ interface Blocker {
   suggestion?: string;
   /** One line the reader can act on. */
   why: string;
+  /**
+   * Whether --allow-cross-species could fill this gap: true when the lookup
+   * said BRENDA holds the constant for other organisms
+   * ("cross_species_withheld"), false when it said something else (no row
+   * in any organism, an isoform or variant withheld), absent when it did not
+   * say. "Or widen the search ... --allow-cross-species" was printed under
+   * every gap: live, for "acetylcholinesterase inhibited by donepezil in
+   * human", where BRENDA has no donepezil Ki in any organism, so the advice
+   * could only return the same refusal (review of 2026-11-12; ADR 0182
+   * asks for correct advice).
+   */
+  crossSpecies?: boolean;
+}
+
+/** `crossSpecies` for a lookup that found nothing (see Blocker). */
+function crossSpeciesCouldFill(result: {
+  found: boolean;
+  source?: string | null;
+  crossSpeciesOrganismsAvailable?: string[];
+  crossSpeciesVariantOnly?: string[];
+}): boolean | undefined {
+  if (result.found) return false;
+  if (!result.source) return undefined;
+  if (result.source !== 'cross_species_withheld') return false;
+  // Every other organism's rows measured a variant: the opt-in would be
+  // refused again (fifth round's review, V7-04).
+  const variantOnly = new Set(result.crossSpeciesVariantOnly ?? []);
+  const others = result.crossSpeciesOrganismsAvailable ?? [];
+  return others.length === 0 || others.some((o) => !variantOnly.has(o));
 }
 
 /**
@@ -400,13 +483,19 @@ function renderNextStep(
     emit(
       `\n${c(DIM, '  If you have a source for one of these, record it rather than')}\n` +
         `${c(DIM, '  typing a bare number — the value then travels with its citation:')}\n\n` +
-        `    ${c(BOLD, `--cite ${gaps[0]!.parameter}="Smith 2019, PMID 12345"`)}\n` +
-        `${c(DIM, '      Caterva does not verify the source; it records that you supplied it.')}\n` +
-        `\n${c(DIM, '  Or widen the search, understanding what you are accepting:')}\n\n` +
-        `    ${c(BOLD, '--allow-cross-species')}\n` +
-        `${c(DIM, '      a value measured in a related organism, still checked for')}\n` +
-        `${c(DIM, '      taxonomic proximity and reported as a substitution.')}\n`,
+        `    ${c(BOLD, `--cite ${gaps[0]!.parameter}="${CITE_PLACEHOLDER}"`)}\n` +
+        `${c(DIM, '      Caterva does not verify the source; it records that you supplied it.')}\n`,
     );
+    // Only where it can help: a gap the lookup said exists in another
+    // organism, or one it said nothing about. Not when the run already has it.
+    if (options.allowCrossSpecies !== true && gaps.some((b) => b.crossSpecies !== false)) {
+      emit(
+        `\n${c(DIM, '  Or widen the search, understanding what you are accepting:')}\n\n` +
+          `    ${c(BOLD, '--allow-cross-species')}\n` +
+          `${c(DIM, '      a value measured in a related organism, still checked for')}\n` +
+          `${c(DIM, '      taxonomic proximity and reported as a substitution.')}\n`,
+      );
+    }
   }
 
   // The whole command, so it can be copied rather than reassembled. Built
@@ -464,7 +553,7 @@ function renderNextStep(
   // an inhibitor of LDH is not an inhibitor of whatever enzyme this run is
   // about, and a real name here would be a wrong one presented as a
   // suggestion. So the heading names what has to be replaced.
-  const placeholders = parts.join(' ').match(/<[a-z]+>/g) ?? [];
+  const placeholders = parts.join(' ').match(/<[^<>]+>/g) ?? [];
   const heading =
     placeholders.length > 0
       ? `  In full, with the example values above; replace ${[...new Set(placeholders)].join(' and ')} ` +
@@ -1061,6 +1150,7 @@ export async function commandSimulateResolved(
     try {
       if (name === 'km') {
         const result = await resolveKinetic({
+          ecFlag: '--ec',
           enzymeName: options.enzyme,
           ecNumber: options.ec,
           substrate: options.substrate,
@@ -1080,8 +1170,9 @@ export async function commandSimulateResolved(
           blockers.push({
             parameter: 'km',
             kind: 'literature',
-            suggestion: '--km 10.7mM',
+            suggestion: `--km "${MEASURED_PLACEHOLDER.km}"`,
             why: because ? because.why : 'BRENDA and PubMed returned no Km for this system.',
+            crossSpecies: crossSpeciesCouldFill(result),
           });
           continue;
         }
@@ -1101,7 +1192,9 @@ export async function commandSimulateResolved(
           reliability: reliabilityGrades(result),
           reliabilityReasons: reliabilityReasons(result),
           assayConditions: assayConditionsFor(result),
-          rowScope: rowScopeOf(result),
+          rowScope: rowScopeOf(result, options.isoform),
+          rowNotes: result.rowNotes && result.rowNotes.length > 0 ? result.rowNotes : undefined,
+          ...(result.isozymeNotice ? { isozyme: result.isozymeNotice } : {}),
         });
       } else {
         // Vmax is not a BRENDA table. It is kcat x [E]0, and [E]0 is a
@@ -1125,6 +1218,7 @@ export async function commandSimulateResolved(
           continue;
         }
         const result = await resolveKinetic({
+          ecFlag: '--ec',
           enzymeName: options.enzyme,
           ecNumber: options.ec,
           substrate: options.substrate,
@@ -1145,11 +1239,12 @@ export async function commandSimulateResolved(
           blockers.push({
             parameter: 'vmax',
             kind: 'literature',
-            suggestion: '--vmax 1.2mM/s',
+            suggestion: `--vmax "${MEASURED_PLACEHOLDER.vmax}"`,
             why: because
               ? because.why
               : 'No kcat was found for this system, so there is nothing to ' +
                 'multiply by [E]0 to obtain Vmax.',
+            crossSpecies: crossSpeciesCouldFill(result),
           });
           continue;
         }
@@ -1158,6 +1253,7 @@ export async function commandSimulateResolved(
           name: 'vmax',
           value: result.bridgedVmax,
           unit: 'mM/s',
+          derived: true,
           origin: `${result.source} → kcat x [E]0`,
           citation: result.citation
             ? `${result.citation.source} ref ${result.citation.reference_id ?? '?'}`
@@ -1173,7 +1269,8 @@ export async function commandSimulateResolved(
           reliability: reliabilityGrades(result),
           reliabilityReasons: reliabilityReasons(result),
           assayConditions: assayConditionsFor(result),
-          rowScope: rowScopeOf(result),
+          rowScope: rowScopeOf(result, options.isoform),
+          rowNotes: result.rowNotes && result.rowNotes.length > 0 ? result.rowNotes : undefined,
         });
       }
     } catch (err) {
@@ -1250,6 +1347,7 @@ export async function commandSimulateResolved(
     const mode = KI_MODE_OF_MODEL[model];
     try {
       const result = await resolveKinetic({
+        ecFlag: '--ec',
         enzymeName: options.enzyme,
         ecNumber: options.ec,
         substrate: inhibitor,
@@ -1276,7 +1374,8 @@ export async function commandSimulateResolved(
           requestedTaxonId: result.requestedTaxonId ?? undefined,
           inhibitor,
           askedMode: mode,
-          rowScope: rowScopeOf(result),
+          rowScope: rowScopeOf(result, options.isoform),
+          rowNotes: result.rowNotes && result.rowNotes.length > 0 ? result.rowNotes : undefined,
         });
       } else {
         // "mode_withheld" is not "no Ki": BRENDA holds constants for this
@@ -1293,10 +1392,11 @@ export async function commandSimulateResolved(
         blockers.push({
           parameter: 'ki',
           kind: 'literature',
-          suggestion: '--ki 5mM',
+          suggestion: `--ki "${MEASURED_PLACEHOLDER.ki}"`,
           why: because
             ? because.why
             : `No inhibition constant for ${inhibitor} in the literature for this system.`,
+          crossSpecies: crossSpeciesCouldFill(result),
         });
       }
     } catch (err) {
@@ -1893,10 +1993,29 @@ function wrap(text: string, width: number): string[] {
 function printProvenance(rows: ParameterProvenance[]): void {
   if (rows.length === 0) return;
 
+  // Which protein the model is, before the numbers: "hexokinase" carried
+  // glucokinase's K0.5 with nothing saying HK1 and HK2 were not modelled
+  // (sixth round, XS5R2-04). Compose's words, from the same function.
+  const isozyme = rows.find((r) => r.isozyme)?.isozyme;
+  if (isozyme) {
+    process.stdout.write(`\n${c(BOLD, 'Which protein')}\n`);
+    for (const line of wrap(`${isozyme.detail}.`, 72)) {
+      process.stdout.write(`  ${c(YELLOW, line)}\n`);
+    }
+    if (isozyme.remedy) {
+      const remedy = `${isozyme.remedy[0]!.toUpperCase()}${isozyme.remedy.slice(1)}.`;
+      for (const line of wrap(remedy, 72)) process.stdout.write(`  ${line}\n`);
+    }
+  }
+
   process.stdout.write(`\n${c(BOLD, 'Parameters and where they came from')}\n`);
 
   const nameWidth = Math.max(...rows.map((r) => r.name.length), 4);
-  const valueStrings = rows.map((r) => `${r.value} ${r.unit}`);
+  // Display only (formatNumber.ts): a computed Vmax to 4 s.f., everything
+  // else with the float's noise removed. --json keeps the full values.
+  const valueStrings = rows.map(
+    (r) => `${r.derived ? formatDerived(r.value) : formatValue(r.value)} ${r.unit}`,
+  );
   const valueWidth = Math.max(...valueStrings.map((v) => v.length), 5);
 
   rows.forEach((row, index) => {
@@ -1936,6 +2055,11 @@ function printProvenance(rows: ParameterProvenance[]): void {
     }
     for (const sentence of row.rowScope ?? []) {
       for (const line of wrap(sentence, 66)) {
+        process.stdout.write(`  ${' '.repeat(nameWidth)}  ${c(YELLOW, line)}\n`);
+      }
+    }
+    for (const note of row.rowNotes ?? []) {
+      for (const line of wrap(`the row: ${note}`, 66)) {
         process.stdout.write(`  ${' '.repeat(nameWidth)}  ${c(YELLOW, line)}\n`);
       }
     }

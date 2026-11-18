@@ -212,8 +212,9 @@ PYTHON_TEST_FILE = re.compile(r"^test_.*\.py$")
 #:
 #: The list may SHRINK, never grow. Anything not listed here is a failure.
 #:
-#: EVERY ENTRY MUST CARRY A REASON, and the four that remain do. That is the
-#: difference between a debt and a decision:
+#: EVERY ENTRY MUST CARRY A REASON, and the two that remain do. That is the
+#: difference between a debt and a decision (four remained until
+#: 2026-11-01; see the note at the end of the dict):
 #:
 #:   * a bare key says only "this is known", which is how an exemption
 #:     outlives the thing that justified it;
@@ -252,23 +253,14 @@ PYTHON_BASELINE: dict[str, str] = {
         "contradict what it checks. Non-emptiness is covered by the "
         "sibling test_the_fixture_parses_to_at_least_one_entry"
     ),
-    "Tests/test_popgen_resolver.py::test_mutation_rate_is_positive": (
-        "module-level skip when stdpopsim is absent (ADR 0061 made it "
-        "opt-in), so the body does not run silently -- but when it DOES "
-        "run and the resolver reports not-found, it asserts nothing. "
-        "HOW TO RETIRE THIS ENTRY: on a machine with stdpopsim installed, "
-        "confirm resolve_mutation_rate('Homo sapiens').found is True, then "
-        "change `if result.found:` to `assert result.found, "
-        "result.search_log`. Homo sapiens is stdpopsim's best-supported "
-        "species; if it does not resolve, that is the bug this test should "
-        "have been finding. Not done here because stdpopsim is not "
-        "installed in this environment and PyPI is unreachable, and a test "
-        "changed without being run is how a green suite starts lying"
-    ),
-    "Tests/test_popgen_resolver.py::test_mutation_rate_is_plausible": (
-        "same module-level skip, and the same retirement condition, as "
-        "test_mutation_rate_is_positive above"
-    ),
+    # Two entries for Tests/test_popgen_resolver.py
+    # (test_mutation_rate_is_positive, test_mutation_rate_is_plausible)
+    # stood here until 2026-11-01, waiting on a machine with stdpopsim to
+    # turn `if result.found:` into an assertion. That day the file moved to
+    # archive/legacy_domains/tests/, outside PYTHON_ROOTS, so the entries
+    # could no longer match anything and were deleted rather than left to
+    # excuse a test this guard does not scan. They were retired by the
+    # move, not by the fix they describe.
 }
 
 

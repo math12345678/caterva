@@ -479,7 +479,17 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      # fetch-depth 0: caterva-site's shell tests, at the end of this job,
+      # read the v0.4.0 tag (`git tag -l`, `git show v0.4.0:...`) to check
+      # every archived domain name; a default checkout fetches no tags.
+      # `fetch-tags: true` alone does not fix that: at depth 1 checkout@v4
+      # only drops `--no-tags`, and git's auto-follow then fetches just the
+      # tags on the one fetched commit (reproduced 2026-10-31 with
+      # checkout's fetch command against this repo: no v0.4.0). Depth 0
+      # adds `+refs/tags/*:refs/tags/*`, as release.yml's jobs rely on.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -558,6 +568,20 @@ jobs:
           jq -r '"\(.numTotalTestSuites) files, \(.numTotalTests) tests: \(.numPassedTests) passed, \(.numFailedTests) failed, \(.numPendingTests) skipped, \(.numTodoTests) todo"' root-jest-results.json
           jq -r '.testResults[] | .name as $file | .assertionResults[] | select(.status != "passed" and .status != "failed") | "  did not run (\(.status)): \($file) > \(.fullName)"' root-jest-results.json
           jq -e '.numPendingTests == 0 and .numTodoTests == 0' root-jest-results.json > /dev/null
+
+      # caterva-site, the public page and its browser shell, is its own npm
+      # package with its own lockfile. Its node:test suite pins the shell to
+      # the live domain catalogue, the archived names to v0.4.0, the
+      # hexokinase constants to showcase.py and the SSA checks' tolerance;
+      # until 2026-10-31 no job ran it. Here because this job already has
+      # Node; the tests import .ts directly, which Node 22 strips (22.18+).
+      - name: Install caterva-site dependencies
+        working-directory: caterva-site
+        run: npm ci
+
+      - name: caterva-site shell tests
+        working-directory: caterva-site
+        run: npm test
 
   # Caterva Studio: the page (Science-Agent-Pipeline/artifacts/caterva-studio)
   # and the server that serves it (caterva/studio). The page is checked the
@@ -638,9 +662,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # gromacs depends on gromacs-data of the SAME version. On 2026-11-01
+      # the runner's mirror offered gromacs 2025.2-1 and apt refused the
+      # pair ("Reached two conflicting assignments"), though main passed on
+      # 2026-10-28 with nothing in this job changed. So name both, at the
+      # candidate version of gromacs, and print apt's view if that fails.
       - name: Install GROMACS
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq gromacs
+          sudo apt-get update -qq && v=$(apt-cache policy gromacs | awk '/Candidate:/ {print $2}')
+          echo "gromacs candidate: $v"
+          if ! sudo apt-get install -y -qq "gromacs=$v" "gromacs-data=$v"; then
+            apt-cache policy gromacs gromacs-data
+            exit 1
+          fi
           gmx --version | head -3
       - name: Set up Caterva
         run: make setup

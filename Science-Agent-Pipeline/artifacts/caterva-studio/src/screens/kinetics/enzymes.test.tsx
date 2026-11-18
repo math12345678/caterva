@@ -2,7 +2,8 @@
  * The enzyme finder's effects on the kinetics screens, over real responses
  * (src/__fixtures__/api/enzymes, captured from the dispatch layer):
  *
- * - the request carries an EC number the person chose, never typed text;
+ * - Compose's request carries the EC number the person chose, else the name typed and not clicked (the engine
+ *   resolves it, or refuses it naming the candidates); Constants' carries only a chosen EC number;
  * - the engine's isozyme notice (the verdict's "Qualified" line and the
  *   [isozymes] concern) is on the page when the engine wrote it, stays when
  *   an isoform was given and a cited constant's row names no isozyme, and
@@ -50,13 +51,19 @@ const cap = <T,>(x: unknown) => x as T;
 afterEach(() => vi.unstubAllGlobals());
 
 describe("what the engine is sent", () => {
-  it("is the chosen EC number, and never the text that was typed", () => {
+  it("is the chosen EC number when one was chosen, else the name typed and not clicked, as typed", () => {
     expect(composeRequest({ ...EMPTY_COMPOSE, description: "Michaelis Menten", subject: "1.1.1.27", subjectSeed: "" })).toMatchObject({ subject: "1.1.1.27" });
-    // A name that only seeded the search is not a choice.
-    const seeded = composeRequest({ ...EMPTY_COMPOSE, description: "Michaelis Menten", subject: "", subjectSeed: "lactate dehydrogenase" });
-    expect(seeded).not.toHaveProperty("subject");
-    // Text in the subject that is not a complete EC number is not sent either.
-    expect(composeRequest({ ...EMPTY_COMPOSE, description: "x", subject: "hexokinase" })).not.toHaveProperty("subject");
+    // A chosen number wins over text left over from the search.
+    expect(composeRequest({ ...EMPTY_COMPOSE, description: "x", subject: "2.7.1.1", subjectSeed: "hexo" })).toMatchObject({ subject: "2.7.1.1" });
+    // A name typed but never clicked was dropped, and the run kept placeholders as though no enzyme had been
+    // named. Compose's engine reads a name itself and refuses one that is several enzymes, naming each: the
+    // recorded refusal below was made from exactly this request.
+    const typed = composeRequest({ ...EMPTY_COMPOSE, description: "Michaelis Menten", subject: "", subjectSeed: "lactate dehydrogenase", organism: "human", substrate: "pyruvate" });
+    expect(typed).toEqual(cap<RunRecord>(composeNames.run).request);
+    expect(composeRequest({ ...EMPTY_COMPOSE, description: "x", subject: "", subjectSeed: "  hexokinase " })).toMatchObject({ subject: "hexokinase" });
+    // Nothing typed, nothing chosen: no subject, and the model keeps its labelled placeholders.
+    expect(composeRequest({ ...EMPTY_COMPOSE, description: "x" })).not.toHaveProperty("subject");
+    expect(composeRequest({ ...EMPTY_COMPOSE, description: "x", subjectSeed: "   " })).not.toHaveProperty("subject");
     expect(constantsRequest({ ...EMPTY_CONSTANTS, ec: "2.7.1.1", substrate: "glucose" })).toMatchObject({ ec: "2.7.1.1" });
     expect(constantsRequest({ ...EMPTY_CONSTANTS, ec: "", ecSeed: "hexokinase", substrate: "glucose" })).not.toHaveProperty("enzyme");
   });

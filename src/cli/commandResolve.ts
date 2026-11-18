@@ -34,6 +34,8 @@ import {
   type InhibitionMode,
   type KineticQuantity,
 } from '../literature/literatureResolver';
+import { formatDerived, formatValue } from './formatNumber';
+import type { AutomaticChoice } from './chooseMissing';
 
 const BOLD = '[1m';
 const DIM = '[2m';
@@ -74,6 +76,11 @@ export interface ResolveOptions {
     temperatureToleranceC: number;
   };
   json: boolean;
+  /** The substrate (inhibitor) or organism the CLI CHOSE because none was
+   *  given (ADR 0182, chooseMissing.ts), in the order chosen. Printed
+   *  before the lookup for a person; under --json they are only in the
+   *  document, so every --json answer carries them, found or not. */
+  choices?: AutomaticChoice[];
 }
 
 /**
@@ -86,12 +93,16 @@ export interface ResolveOptions {
  * "no network", and an exit code is the only channel that survives `--json`
  * being parsed by something else.
  */
+/** Runner sources for a lookup that stopped at the enzyme name, before any search. */
+const STOPPED_AT_THE_NAME = new Set(['ec_ambiguous', 'ec_not_resolved', 'ec_mismatch']);
+
 export async function commandResolve(options: ResolveOptions): Promise<number> {
   const { substrate, organism, quantity } = options;
 
   let result;
   try {
     result = await resolveKinetic({
+      ecFlag: '--ec',
       enzymeName: options.enzyme,
       ecNumber: options.ec,
       substrate,
@@ -137,6 +148,9 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
             logs: result.logs,
             source: result.source,
             withheld: withheldSentence(result),
+            // The names this lookup was for that nobody typed: "not found
+            // for D-glucose" is about the substrate Caterva chose.
+            choices: options.choices ?? [],
             // Machine-readable too, not only in the prose above. A script
             // driving `resolve --json` is exactly the caller who would go
             // and fetch these.
@@ -172,6 +186,14 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
         // Rows WERE found; a policy withheld them. "Returned nothing" would
         // be false, and would hide the one change that gets a value.
         process.stdout.write(`${c(DIM, '  ' + withheld)}\n`);
+      } else if (STOPPED_AT_THE_NAME.has(result.source ?? '')) {
+        // The lookup stopped at the enzyme's NAME: nothing was searched, so
+        // "searched and returned nothing" would blame BRENDA for a question
+        // it was never asked. The search path below names the candidates.
+        process.stdout.write(
+          `${c(DIM, '  Nothing was searched: the lookup stopped at the enzyme name, before BRENDA or')}\n` +
+            `${c(DIM, '  PubMed was asked. The search path below says why, and what to pass instead.')}\n`,
+        );
       } else if (papers.length === 0) {
         process.stdout.write(
           `${c(DIM, '  BRENDA and PubMed were searched and returned nothing. This is an')}\n` +
@@ -210,13 +232,17 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
   }
 
   if (options.json) {
-    process.stdout.write(JSON.stringify({ ok: true, status: 'found', ...result }, null, 2) + '\n');
+    // `choices` beside the value: under --json nothing else says that the
+    // substrate (or organism) it is the constant of was chosen, not typed.
+    process.stdout.write(
+      JSON.stringify({ ok: true, status: 'found', ...result, choices: options.choices ?? [] }, null, 2) + '\n',
+    );
     return 0;
   }
 
   const label = quantity.toUpperCase();
   process.stdout.write(
-    `\n${c(GREEN, '✓')} ${c(BOLD, `${label} = ${result.value} ${result.unit}`)}\n\n`,
+    `\n${c(GREEN, '✓')} ${c(BOLD, `${label} = ${formatValue(result.value)} ${result.unit}`)}\n\n`,
   );
 
   const rows: Array<[string, string]> = [
@@ -238,7 +264,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
   if (result.bridgedVmax !== undefined) {
     rows.push([
       'Vmax',
-      `${result.bridgedVmax} mM/s  ${DIM}= kcat × [E]0, computed by the engine${RESET}`,
+      `${formatDerived(result.bridgedVmax)} mM/s  ${DIM}= kcat × [E]0, computed by the engine${RESET}`,
     ]);
   }
 
@@ -278,7 +304,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
     for (const row of rows) {
       const unit = row.unit ? ` ${row.unit}` : '';
       const ref = row.reference_id ? c(DIM, `  [ref ${row.reference_id}]`) : '';
-      process.stdout.write(`    ${row.value}${unit}${ref}\n`);
+      process.stdout.write(`    ${formatValue(row.value)}${unit}${ref}\n`);
       process.stdout.write(
         c(DIM, `        ${row.grades.assay_completeness} / ` +
           `${row.grades.condition_proximity} / ${row.grades.organism_match}\n`),
@@ -331,7 +357,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
       const ref = cand.reference_id ? c(DIM, `  [ref ${cand.reference_id}]`) : '';
       const returned = cand.selected ? c(DIM, '  (returned)') : '';
       process.stdout.write(
-        `${mark}${cand.value}${cand.unit ? ' ' + cand.unit : ''}${ref}${returned}\n` +
+        `${mark}${formatValue(cand.value)}${cand.unit ? ' ' + cand.unit : ''}${ref}${returned}\n` +
           (cand.conditions ? `${c(DIM, '        ' + cand.conditions)}\n` : ''),
       );
     }
@@ -381,7 +407,24 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
   // measured against, as the runner parsed them from the row's commentary.
   // The API puts the same reading into provenance.flags; this is the other
   // half, which `check_both_front_ends_read_it.py` requires.
-  const scopeLines = rowScopeLines(String(result.quantity), result.rowScope);
+  // WHY THIS ROW (ADR 0182), in the resolver's words, and said loudly when
+  // the rows it was chosen from disagree by more than 100-fold.
+  if (result.chosenBecause) {
+    const head = result.wideSpread ? `${c(YELLOW, '⚠')} ${c(BOLD, 'Why this row (the literature disagrees by more than 100-fold)')}` : c(BOLD, 'Why this row');
+    process.stdout.write(`\n${head}\n${c(DIM, '  ' + result.chosenBecause)}\n`);
+  }
+
+  // The kcat half of a Km's pair: found, or not, said beside the Km.
+  if (String(result.quantity).toLowerCase() === 'km' && result.pairedKcat) {
+    const paired = result.pairedKcat;
+    const line =
+      paired.found && typeof paired.kcat === 'number'
+        ? `The kcat search for this query found ${paired.kcat} 1/s, so Vmax = kcat x [E]0 needs only an enzyme concentration.`
+        : 'The kcat search for this query came back empty, so an enzyme concentration alone will not give a Vmax: supply kcat or Vmax yourself.';
+    process.stdout.write(`\n${c(BOLD, 'The turnover number that goes with it')}\n${c(DIM, '  ' + line)}\n`);
+  }
+
+  const scopeLines = rowScopeLines(String(result.quantity), result.rowScope, options.isoform, result.rowNotes);
   if (scopeLines.length > 0) {
     process.stdout.write(`\n${c(YELLOW, '⚠')} ${c(BOLD, 'What the source row measured')}\n`);
     for (const line of scopeLines) process.stdout.write(`${c(DIM, '  ' + line)}\n`);

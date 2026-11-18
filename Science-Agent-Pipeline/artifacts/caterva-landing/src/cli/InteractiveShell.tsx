@@ -56,7 +56,7 @@ function HelpOutput() {
     ["cite", "how to cite caterva in your work"],
     ["whoami", "who built this"],
     ["history", "show command history"],
-    ["status", "show pipeline service status"],
+    ["status", "ask the API server for its health, and show the answer"],
     ["version", "show version info"],
     ["export", "list supported export formats"],
     ["glossary", "open the key terms and definitions reference"],
@@ -148,25 +148,100 @@ function VersionOutput() {
   );
 }
 
-function StatusOutput() {
+// `status` asks the API server, and prints what it answers.
+//
+// It used to print four constant lines -- "pipeline: operational",
+// "llm-resolver: connected", "brenda-kegg: indexed", "pubmed:
+// rate-limited" -- that nothing measured, on a page with no server behind
+// it, one of them naming KEGG, which is off by default. Now each line is
+// one real request: GET /api/healthz (routes/health.ts, which answers
+// {"status":"ok"} while the process is up) and GET /api/metrics/health
+// (routes/metrics.ts: healthy, degraded or no_data, from the jobs this
+// process has run). Whatever comes back is shown as it came; a request that
+// fails is shown as unreachable, with the reason, and never as a status.
+const STATUS_API_BASE = import.meta.env.VITE_API_URL || "";
+
+const STATUS_ENDPOINTS = ["/api/healthz", "/api/metrics/health"] as const;
+
+type EndpointResult =
+  | { state: "pending" }
+  | { state: "answered"; httpStatus: number; body: string; json: boolean }
+  | { state: "unreachable"; reason: string };
+
+async function probe(path: string, signal: AbortSignal): Promise<EndpointResult> {
+  try {
+    const res = await fetch(`${STATUS_API_BASE}${path}`, { signal });
+    const text = await res.text();
+    let body = text.trim();
+    let json = false;
+    try {
+      body = JSON.stringify(JSON.parse(text));
+      json = true;
+    } catch {
+      // Not JSON (a static host's HTML fallback, say): show the start of
+      // what came back rather than pretend it was a status.
+      body = body.slice(0, 80) || "(empty body)";
+    }
+    return { state: "answered", httpStatus: res.status, body, json };
+  } catch (err) {
+    return {
+      state: "unreachable",
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export function StatusOutput() {
+  const [results, setResults] = useState<Record<string, EndpointResult>>(
+    () => Object.fromEntries(STATUS_ENDPOINTS.map((p) => [p, { state: "pending" }])),
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    for (const path of STATUS_ENDPOINTS) {
+      probe(path, controller.signal).then((r) => {
+        if (!controller.signal.aborted) {
+          setResults((prev) => ({ ...prev, [path]: r }));
+        }
+      });
+    }
+    return () => controller.abort();
+  }, []);
+
   return (
     <div className="space-y-1">
-      <div className="flex items-center gap-2 text-signal">
-        <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
-        <span>pipeline: operational</span>
-      </div>
-      <div className="flex items-center gap-2 text-fg/70">
-        <span className="w-1.5 h-1.5 rounded-full bg-signal/40" />
-        <span>llm-resolver: connected</span>
-      </div>
-      <div className="flex items-center gap-2 text-fg/70">
-        <span className="w-1.5 h-1.5 rounded-full bg-signal/40" />
-        <span>brenda-kegg: indexed</span>
-      </div>
-      <div className="flex items-center gap-2 text-fg/70">
-        <span className="w-1.5 h-1.5 rounded-full bg-yellow-500/40" />
-        <span>pubmed: rate-limited</span>
-      </div>
+      {STATUS_ENDPOINTS.map((path) => {
+        const r = results[path];
+        // Green only for a 2xx JSON answer: a static host's HTML fallback
+        // also says 200, and that is not the API server answering.
+        const ok =
+          r.state === "answered" && r.json && r.httpStatus >= 200 && r.httpStatus < 300;
+        const dot =
+          r.state === "pending"
+            ? "bg-fg/30"
+            : ok
+              ? "bg-signal"
+              : r.state === "answered"
+                ? "bg-yellow-500/60"
+                : "bg-red-400/60";
+        return (
+          <div key={path} className="flex items-start gap-2 text-fg/70">
+            <span className={`w-1.5 h-1.5 mt-1.5 rounded-full shrink-0 ${dot}`} />
+            <span className="break-all">
+              <span className="text-signal">GET {path}</span>{" "}
+              {r.state === "pending" && <span className="text-fg/66">checking...</span>}
+              {r.state === "answered" && (
+                <span>
+                  HTTP {r.httpStatus} {r.body}
+                </span>
+              )}
+              {r.state === "unreachable" && (
+                <span className="text-red-400/70">unreachable ({r.reason})</span>
+              )}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

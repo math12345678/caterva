@@ -16,8 +16,25 @@ one.
 | MISC | 6 | [`miscellaneous`](https://github.com/Terrium-sim/miscellaneous) |
 | ARCHIVE | 58 | [`archive`](https://github.com/Terrium-sim/archive) |
 
-Nothing is deleted. `archive` keeps the record of how the project got here,
-including several documents whose mistakes are worth remembering.
+**Note (2026-11-01).** The table above is left as it was written, because
+this file is a dated record. Its three Terrium-sim links do not work for a
+reader outside the project. The 18 repositories under
+github.com/Terrium-sim are private, so anyone else gets a 404. 17 of them
+were created and pushed once, on 2026-08-12, under the old name, and have
+not been pushed since (the 18th, `demo-repository`, is GitHub's demo).
+Development happens only in
+[math12345678/caterva](https://github.com/math12345678/caterva). The
+ARCHIVE files are in this repository at [`docs/archive/`](archive/) (moved
+there on 2026-08-16, per git; DOCUMENTATION_INDEX.md says 2026-08-15).
+The WIRING and MISC files, and the KEEP files that were not root entry
+points, moved into the `docs/` subfolders that
+[`DOCUMENTATION_INDEX.md`](../DOCUMENTATION_INDEX.md) lists (2026-10-24).
+README, CHANGELOG, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY and START_HERE
+stay at the root.
+
+Nothing is deleted. The ARCHIVE set, now in [`docs/archive/`](archive/),
+keeps the record of how the project got here, including several documents
+whose mistakes are worth remembering.
 
 ## Full classification
 

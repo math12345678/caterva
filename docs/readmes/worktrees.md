@@ -10,7 +10,8 @@ several agents work on the same repository at once. It is published so that
 an empty repo is not mistaken for a failed push.
 
 ```bash
-git worktree add ../Caterva.worktrees/feature-x -b feature-x
+scripts/worktree.sh new feature-x    # Caterva.worktrees/feature-x on branch agent/feature-x
+scripts/worktree.sh done feature-x   # removes it, refusing if work would be lost
 ```
 
 ## Licence, and one thing worth knowing

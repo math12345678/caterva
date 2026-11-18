@@ -70,14 +70,20 @@ Response to Client
 ### Environment Variables
 ```bash
 PORT=3000              # Server port (default: 3000)
+CATERVA_JOBS_FILE=...  # Job store path (default: ./caterva-jobs.jsonl;
+                       # docker-compose.yml sets /app/data/caterva-jobs.jsonl)
 PUBMED_EMAIL=...       # Your email (for API politeness)
 PUBMED_TOOL=caterva    # Tool name (for API identification)
 ```
 
 ### Storage
 - **In-Memory**: Cleared on restart (session jobs)
-- **Persistent**: `caterva-jobs.jsonl` (all completed jobs)
-- **Size**: ~1KB per job (scalable to thousands)
+- **Persistent**: `caterva-jobs.jsonl` (all completed jobs), at `CATERVA_JOBS_FILE`
+  if set. Created on first use and not tracked by git: a clone starts with
+  no job history. Under `docker-compose.yml` it is `./data/caterva-jobs.jsonl`
+  on the host.
+- **Size**: each line carries the job's whole trajectory, so it grows with
+  the number of time points, not at a fixed size per job
 
 ### Performance Tuning
 ```bash

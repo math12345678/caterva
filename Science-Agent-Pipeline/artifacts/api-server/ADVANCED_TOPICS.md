@@ -4,6 +4,8 @@
 **Status:** August 2026  
 **Depth:** Deep dives into sophisticated subsystems
 
+> **Note, 2026-11-01.** The examples here used SIR, Wright-Fisher and Lotka-Volterra until this date. Those domains (with SEIR, PCR, Monte Carlo, the ODE oscillators and Lennard-Jones molecular dynamics) were archived on 2026-09-27, after v0.4.0 (the last release that runs them), and are refused by this build; the examples now use the live Michaelis-Menten and Gillespie domains.
+
 ---
 
 ## Deep Dive: Parameter Resolution Algorithm
@@ -12,7 +14,7 @@ The query resolution system is deceptively complex. Understanding it fully revea
 
 ### The Full Resolution Pipeline
 
-When you submit a query like `"SIR with beta=0.5 gamma=0.1 S0=900"`, here's exactly what happens:
+When you submit a query like `"michaelis menten with km=0.5 vmax=2 s0=10"`, here's exactly what happens:
 
 #### Stage 1: Query Normalization (5ms)
 
@@ -26,50 +28,24 @@ const normalized = query
 ```
 
 **Why this matters:**
-- Allows "SIR" and "sir" and "S.I.R" to be same
+- Allows "Michaelis-Menten" and "michaelis-menten" to be same
 - Prevents spaces from breaking keyword matching
 - Removes punctuation that might confuse parser
 
-**Edge case:** User writes `"SIR!!!11"` → normalized to `"sir11"` → might not match "sir" keyword
+**Edge case:** User writes `"gillespie!!!11"` → normalized to `"gillespie11"` → might not match "gillespie" keyword
 
 **Solution:** Extra safeguard in keyword matching to ignore trailing numbers
 
 #### Stage 2: Parameter Extraction (8ms)
 
-Two phases: array parameters first, then scalars.
+Until 2026-11-01 this ran in two phases: array parameters first, on the raw query, then scalars. The only array parameter was `starting_frequencies` (two-locus Wright-Fisher, archived on 2026-09-27, after v0.4.0, the last release that runs it), so the array phase was removed together with the archived keys. A comma-separated value is now refused (`ArrayOverrideValidationError`) rather than parsed, and only the keys the live runner reads are recognised: `km`, `ki`, `vmax`, `kcat`, `enzyme_conc`, `s0`, `i0`, `end`, `points`, `a0`, `b0`, `k`, `n_replicates`, `seed`.
 
-**Phase 2A: Extract arrays (raw query)**
-
-```typescript
-// Must be done on RAW query first, not tokenized
-// Reason: "starting_frequencies=[0.5,0,0,0.5]" might be split by spaces
-const arrayPattern = /(\w+)\s*[=:]\s*\[([\d\.,\-eE\s]+)\]/g;
-// Matches: starting_frequencies=[0.5,0,0,0.5]
-// But NOT: starting_frequencies = 0.5, 0, 0, 0.5 (space-separated)
-```
-
-**Why two-phase?**
-
-If we naively tokenized first, we'd split `"starting_frequencies=[0.5,0,0,0.5]"` on spaces, losing array structure. By processing arrays on the raw string first, we:
-1. Capture complete arrays before tokenization
-2. Prevent array values from being misinterpreted as scalars
-3. Mark array keys so scalar phase skips them
-
-**Example of what goes wrong without two-phase:**
-```
-Raw: "starting_frequencies=[0.5,0,0,0.5]"
-Tokenize naively: ["starting_frequencies=[0.5,0,0,0.5]"] -- GOOD (no spaces inside)
-But: "starting_frequencies = [0.5, 0, 0, 0.5]"
-Tokenize naively: ["starting_frequencies", "=", "[0.5,", "0,", "0,", "0.5]"] -- BAD!
-So we MUST extract arrays from raw query first
-```
-
-**Phase 2B: Extract scalars (tokenized query)**
+**Extract scalars (tokenized query)**
 
 ```typescript
-// Now split on whitespace - safe because arrays already extracted
+// Split on whitespace
 const tokens = query.split(/\s+/);
-// Match: beta=0.5 or gamma: 0.1 or km 5
+// Match: km=0.5 or vmax: 2 or km 5
 const kvMatch = /^(\w+)\s*[=:]\s*(.+)$/.exec(token);
 const value = Number.parseFloat(rawValue);
 if (Number.isFinite(value)) {  // CRITICAL: reject NaN, Infinity
@@ -91,14 +67,14 @@ Number.parseFloat("Infinity") // → Infinity ✅ (rejected by isFinite)
 
 **Path A: LLM Classification**
 ```
-Query + system prompt → LLM API → "sir" + confidence
+Query + system prompt → LLM API → "mm" + confidence
 ```
 
 Timeout: 30 seconds (long because network can be slow)
 
 **Path B: Keyword Fallback**
 ```
-Extract keywords from query → Match against domain keywords → "sir"
+Extract keywords from query → Match against domain keywords → "mm"
 ```
 
 Timeout: ~10ms (immediate)
@@ -108,22 +84,22 @@ Timeout: ~10ms (immediate)
 Why not always use LLM?
 - Network failures shouldn't crash system
 - Keyword path is deterministic (same query → same domain)
-- For obvious queries ("SIR epidemic"), LLM is overkill
+- For obvious queries ("michaelis menten"), LLM is overkill
 - Keyword path is 50x faster
 
 Why not always use keywords?
 - LLM handles natural language better
-- "Predator-prey dynamics" → LLM nails it
+- "How fast does hexokinase turn over glucose" → LLM nails it
 - Keywords might miss domain hints in prose
 
 **Critical insight:** The two-path design is not "LLM with fallback." It's "smart routing based on certainty."
 
 ```typescript
 if (queryLooksOBVIOUS) {
-  // Fast path: keywords for "SIR beta=0.5"
+  // Fast path: keywords for "michaelis menten km=0.5"
   domain = keywordClassify(query);
 } else {
-  // LLM path for "simulate an epidemic with reproduction number 2.5"
+  // LLM path for "how quickly does lactate dehydrogenase use up pyruvate"
   domain = await llmClassify(query);
   if (llmFails) {
     domain = keywordClassify(query);  // Safety net
@@ -222,10 +198,10 @@ Caterva's cache strategy is deceptively simple, but understanding it reveals imp
 
 **Normalized means:**
 ```
-"SIR beta=0.5 gamma=0.1"
-"SIR  beta = 0.5  gamma = 0.1"
-"sir BETA=0.5 GAMMA=0.1"
-→ All map to same key: "sir beta=0.5 gamma=0.1"
+"michaelis menten km=0.5 vmax=2"
+"michaelis menten  km=0.5  vmax=2"
+"Michaelis Menten KM=0.5 VMAX=2"
+→ All map to same key: "michaelis menten km=0.5 vmax=2"
 ```
 
 **When is cache invalid?**
@@ -264,8 +240,8 @@ Caterva's cache strategy is deceptively simple, but understanding it reveals imp
 
 **Apparent equivalence:**
 ```
-"SIR beta=0.5 gamma=0.1"
-"SIR gamma=0.1 beta=0.5"
+"michaelis menten km=0.5 vmax=2"
+"michaelis menten vmax=2 km=0.5"
 ```
 
 Both should return the same result (order shouldn't matter).
@@ -275,16 +251,16 @@ Both should return the same result (order shouldn't matter).
 **Solution:** Normalize parameter order before caching
 ```typescript
 const normalized = normalizeAndSortParameters(query);
-// "SIR beta=0.5 gamma=0.1" regardless of input order
+// "michaelis menten km=0.5 vmax=2" regardless of input order
 ```
 
-**Current implementation detail:** Parameters are extracted as an object `{beta: 0.5, gamma: 0.1}`, then JSON.stringify with sorted keys. This normalizes order.
+**Current implementation detail:** Parameters are extracted as an object `{km: 0.5, vmax: 2}`, then JSON.stringify with sorted keys. This normalizes order.
 
 ### Cache Coherence Under Concurrency
 
 **Scenario:**
-1. Request A: Query "SIR beta=0.5"
-2. Request B: Query "SIR beta=0.5" (arrives 100ms later)
+1. Request A: Query "michaelis menten km=0.5"
+2. Request B: Query "michaelis menten km=0.5" (arrives 100ms later)
 3. A runs simulation, gets result R1
 4. B also runs simulation (A's result not yet cached), gets result R2
 5. Both try to cache their results
@@ -300,9 +276,9 @@ const normalized = normalizeAndSortParameters(query);
 
 Philosophically: No. If R1 and R2 differ, something is wrong (nondeterminism in stochastic domain).
 
-For stochastic domains (Gillespie, Wright-Fisher): R1 and R2 will differ. This is expected. Last-write-wins means if you query twice without a seed, you get the most recent result.
+For stochastic domains (Gillespie): R1 and R2 will differ. This is expected. Last-write-wins means if you query twice without a seed, you get the most recent result.
 
-For deterministic domains (SIR, Lotka-Volterra): R1 and R2 should be identical. Last-write-wins doesn't hurt.
+For deterministic domains (Michaelis-Menten, competitive inhibition): R1 and R2 should be identical. Last-write-wins doesn't hurt.
 
 **Better behavior:** 
 
@@ -555,8 +531,8 @@ The order optimizes for: Free → Cheap → Expensive → Fallback
 
 ### What Happens When LLM Returns Bad Classifications?
 
-User query: `"SIR with R0=2.5"`
-LLM returns: `{domain: "cell_cycle_oscillator", confidence: 0.8}`
+User query: `"michaelis menten for hexokinase"`
+LLM returns: `{domain: "gillespie_ssa", confidence: 0.8}`
 
 **Current behavior:** Trust the LLM's response
 
@@ -583,8 +559,8 @@ Reason: LLM often doesn't give confidence scores. And binary yes/no is less usef
 Two different simulations accidentally map to same cache key:
 
 ```javascript
-// Query 1: "SIR beta=0.5 gamma=0.1"
-// Query 2: "sir beta=0.5, gamma=0.1" (different punctuation)
+// Query 1: "michaelis menten km=0.5 vmax=2"
+// Query 2: "michaelis menten km=0.5, vmax=2" (different punctuation)
 
 // Both normalize to same key
 // Second query returns first's result
@@ -691,7 +667,7 @@ DISPATCH['my_model'] = run_my_model
 ```typescript
 export type SimulationDomain = 
   | 'mm' 
-  | 'sir' 
+  | 'mm_competitive_inhibition' 
   // ... existing domains
   | 'my_model';  // Add here
 ```
@@ -859,11 +835,11 @@ This process reveals:
 ❌ Can be accomplished with SBML escape hatch  
 
 **Example of NOT extending:**
-"I want to run SIR but with a small twist for COVID specifically"
+"I want to run Michaelis-Menten but for one specific isoform"
 → Use parameters and keyword matching, don't add new domain
 
 **Example of justifying extension:**
-"Lotka-Volterra is a canonical teaching model taught in 100s of ecology courses"
+"Competitive inhibition is a canonical enzymology model taught in every biochemistry course"
 → Worth adding, high maintenance benefit
 
 ---

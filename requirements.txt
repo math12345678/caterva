@@ -19,8 +19,9 @@
 # on the 2.8.0 line and numpy on 2.2.x -- the first lines that publish cp313
 # wheels while still covering the cp310 floor. numpy must stay on 2.2.x:
 # libroadrunner 2.8.0 pins numpy~=2.2, and numpy 2.2.x is the last line that
-# also satisfies scipy 1.15.3's numpy<2.5 cap with a single pin for every
-# supported interpreter. See docs/adr/0014-python-version-support.md.
+# also satisfies both scipy pins' numpy caps (1.15.3 <2.5, 1.16.0 <2.6) with a
+# single pin for every supported interpreter. See
+# docs/adr/0014-python-version-support.md.
 
 # --- Simulation engines (Tier 2 ODE domains) -------------------------------
 # NOTE: do NOT `pip install tellurium`. The umbrella package pulls in
@@ -39,7 +40,8 @@ antimony==2.14.0
 python-libsbml==5.21.1
 # SED-ML, for the COMBINE archive export. BSD (Frank Bergmann, Heidelberg),
 # so it sits under Apache-2.0 without the separation stdpopsim needed --
-# see requirements-popgen.txt for the GPL case and docs/LICENSING.md.
+# see docs/LICENSING.md for the GPL case (and, since 2026-11-01,
+# archive/legacy_domains/requirements-popgen.txt for the file it was).
 #
 # A hard dependency rather than optional: the archive is built THROUGH
 # libSEDML rather than string-formatted, so the document is correct by
@@ -50,7 +52,18 @@ python-libsedml==2.0.33
 
 # --- Numerics --------------------------------------------------------------
 numpy==2.2.6
-scipy==1.15.3
+# scipy is split by interpreter. 1.15.3's cp313 arm64 wheel does not load on
+# macOS 27.0.1: `import scipy.sparse.linalg` -- and with it
+# scipy.optimize -- fails in dlopen with "section '__DATA/__thread_bss' has a
+# zero-fill section type, but offset field is not zero", so steady-state
+# analysis and influence ranking stopped working. 1.15.2 fails the same way;
+# 1.16.0 is the first release after 1.15.3 that imports there (checked
+# 2026-10-31, each of 1.16.0-1.18.0 tried). 1.16.0 requires Python >=3.11, so
+# 3.10 keeps 1.15.3
+# -- the last line with cp310 wheels; whether its cp310 wheel shows the same
+# macOS 27 failure is unchecked (no 3.10 interpreter was available).
+scipy==1.15.3; python_version < "3.11"
+scipy==1.16.0; python_version >= "3.11"
 
 # --- Literature layer (BRENDA / KEGG / PubMed scraping) --------------------
 requests==2.34.2
@@ -62,7 +75,8 @@ pydantic==2.13.4
 
 # --- Population genetics -----------------------------------------------
 #
-# stdpopsim MOVED to requirements-popgen.txt on 2026-08-15. It is NOT
+# stdpopsim MOVED to requirements-popgen.txt on 2026-08-16 (ADR 0061 is
+# dated 2026-08-15; the commit, b1bc8f4, is 2026-08-16). It is NOT
 # installed by default, and that is a licence decision rather than a
 # packaging preference.
 #
@@ -74,16 +88,18 @@ pydantic==2.13.4
 # declares Apache-2.0 — a tension a reader would have had to discover by
 # reading two licence files and inferring the interaction.
 #
-# The code has always treated it as optional. `Tests/popgen_resolver.py`
-# wraps `import stdpopsim` in try/except ImportError and returns
-# `found=False` with a search log saying so; the 19 popgen tests skip
-# cleanly and `make check` already reports the absence as a warning. So the
+# The code had always treated it as optional. `Tests/popgen_resolver.py`
+# wrapped `import stdpopsim` in try/except ImportError and returned
+# `found=False` with a search log saying so; the 19 popgen tests skipped
+# cleanly and `make check` reported the absence as a warning. So the
 # manifest was the only place claiming it was required, and it was the only
 # place that was wrong.
 #
-# To use the population-genetics resolver:
-#
-#     pip install -r requirements-popgen.txt
+# 2026-11-01: the resolver, its tests and requirements-popgen.txt moved to
+# archive/legacy_domains/ (v0.6.0 is the last release that ships them), so
+# no live manifest installs stdpopsim and nothing live imports it. This
+# section used to end "To use the population-genetics resolver: pip
+# install -r requirements-popgen.txt"; check out v0.6.0 for that instead.
 #
 # See NOTICE, "Third-party software", and
 # docs/adr/0061-gpl-out-of-the-default-install.md.

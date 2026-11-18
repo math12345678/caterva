@@ -3,11 +3,10 @@
 These verify that network-lookup failures in the KEGG substrate resolver
 degrade gracefully (return None) rather than crashing the whole resolution,
 and that genuine programming errors are NOT swallowed by the same handler.
-The mutation_rate (population-genetics) path is covered end-to-end so a
-wrong dict-field access like the ``popgen_result['doi']`` KeyError -- caught
-by the runner's broad except and degraded to a cryptic ``{'ok': false}``
-error -- cannot silently land again (ADR 0008: literature provenance must
-surface or fail loudly, never silently).
+The parameter types of the domains archived on 2026-09-27 (population
+genetics' ``mutation_rate``, epidemiology's ``disease_parameters``) are
+pinned to an explicit found=false refusal, so neither falls through to the
+enzyme path nor reaches a resolver that is no longer on the live path.
 """
 
 import io
@@ -66,15 +65,16 @@ class TestResolveSubstrateFromKegg:
                 resolve_substrate_from_kegg("1.1.1.1")
 
 
-class TestPopgenMutationRateResolution:
-    """The mutation_rate path of the runner's main() end-to-end.
+class TestRetiredParameterTypes:
+    """The parameter types of archived domains are refused by name.
 
-    Regression: main() read ``popgen_result['doi']`` from a dict that had no
-    ``doi`` key. On the first successful stdpopsim hit the KeyError was caught
-    by the broad except and returned as ``{"ok": false, "error": "'doi'"}`` --
-    every Wright-Fisher literature mutation_rate call failed with a cryptic
-    error instead of a value. These tests drive main() with a mocked resolver
-    so they stay offline and pin the success and not-found shapes.
+    Until 2026-10-31 the runner imported ``popgen_resolver`` and
+    ``epidemiology_resolver`` and answered ``mutation_rate`` and
+    ``disease_parameters`` -- for domains archived on 2026-09-27
+    (archive/legacy_domains/README.md). Those branches are gone; what is
+    pinned now is that a request for either says why it is not answered,
+    instead of reaching the enzyme path and being refused for a missing
+    enzyme name.
     """
 
     @staticmethod
@@ -87,53 +87,30 @@ class TestPopgenMutationRateResolution:
             sys.stdin = old_stdin
         return json.loads(capsys.readouterr().out)
 
-    def test_success_path_returns_value_and_doi_locator(self, capsys, monkeypatch):
-        """A found mutation rate must come back with the value and a citation
-        carrying a resolvable DOI -- not crash on a missing dict field."""
-        from popgen_resolver import PopgenResult
+    def test_runner_does_not_import_the_retired_resolvers(self):
+        assert not hasattr(science_agent_runner, "popgen_resolver")
+        assert not hasattr(science_agent_runner, "epidemiology_resolver")
 
-        fake = PopgenResult(
-            found=True,
-            value=1.29e-8,
-            organism="Homo sapiens",
-            source="stdpopsim",
-            citation="International Human Genome Sequencing Consortium (2001)",
-            doi="10.1038/35057062",
-        )
-        monkeypatch.setattr(
-            science_agent_runner.popgen_resolver,
-            "resolve_mutation_rate",
-            lambda organism: fake,
-        )
-
-        out = self._run_with_capsys(
-            capsys, {"parameterType": "mutation_rate", "organism": "Homo sapiens"}
-        )
-
-        assert out["ok"] is True
-        assert out["found"] is True
-        assert out["km"] == pytest.approx(1.29e-8)
-        assert out["citation"]["referenceId"] == "10.1038/35057062"
-        assert out["citation"]["url"] == "https://doi.org/10.1038/35057062"
-
-    def test_not_found_path_returns_honest_found_false(self, capsys, monkeypatch):
-        """An organism stdpopsim has nothing for degrades to found:false --
-        never a fabricated value, never a crash."""
-        from popgen_resolver import PopgenResult
-
-        monkeypatch.setattr(
-            science_agent_runner.popgen_resolver,
-            "resolve_mutation_rate",
-            lambda organism: PopgenResult(found=False, search_log=["not in catalog"]),
-        )
-
-        out = self._run_with_capsys(
-            capsys, {"parameterType": "mutation_rate", "organism": "Unknownus"}
-        )
+    @pytest.mark.parametrize(
+        ("payload", "domain"),
+        [
+            ({"parameterType": "mutation_rate", "organism": "Homo sapiens"},
+             "population genetics"),
+            ({"parameterType": "disease_parameters", "disease": "measles"},
+             "epidemiology"),
+        ],
+    )
+    def test_retired_parameter_type_is_refused_by_name(self, capsys, payload, domain):
+        out = self._run_with_capsys(capsys, payload)
 
         assert out["ok"] is True
         assert out["found"] is False
-        assert out["source"] == "popgen_not_found"
+        assert out["source"] == "domain_archived"
+        assert "km" not in out and "r0" not in out
+        log = " ".join(out["logs"])
+        assert payload["parameterType"] in log
+        assert domain in log
+        assert "v0.4.0" in log
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +177,8 @@ def _run_main(monkeypatch, payload, *, resolve, uniprot=_no_uniprot):
     _offline(monkeypatch, uniprot)
     monkeypatch.setattr(fallback_logic, "resolve_kinetic_value", resolve)
     monkeypatch.setattr(science_agent_runner, "resolve_substrate_from_kegg", lambda ec: None)
+    # Offline: the chooser (ADR 0182) counts BRENDA rows over the network.
+    monkeypatch.setattr(science_agent_runner, "_chooser", lambda: None)
     stdout = io.StringIO()
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
     monkeypatch.setattr(sys, "stdout", stdout)
@@ -388,3 +367,93 @@ class TestMainWithBothNameAndNumber:
         )
         assert result["found"] is True
         assert result["km"] == 10.73
+
+
+class TestOrganismIsReadAsBrendaIndexesIt:
+    """"humans" reaches BRENDA as "Homo sapiens", by the shared normaliser.
+
+    Before 2026-11-02 the runner passed the typed organism through, so
+    "hexokinase on glucose in humans" was refused as "BRENDA holds this km
+    only for other organisms (... Homo sapiens ...)" -- the organism asked
+    for, listed as somebody else's, with a cited 6 mM (BRENDA ref 641068)
+    withheld.
+    """
+
+    @staticmethod
+    def _organism_reaching_the_lookup(monkeypatch, typed):
+        seen = {}
+
+        def resolve(*args, **kwargs):
+            seen["organism"] = kwargs["organism"]
+            return _golden()
+
+        result = _run_main(
+            monkeypatch,
+            {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
+             "organism": typed, "ecNumber": "1.1.1.27"},
+            resolve=resolve,
+        )
+        return seen["organism"], result
+
+    @pytest.mark.parametrize("typed", ["humans", "human", "H. sapiens", "HUMAN"])
+    def test_a_common_name_becomes_the_binomial(self, monkeypatch, typed):
+        organism, result = self._organism_reaching_the_lookup(monkeypatch, typed)
+        assert organism == "Homo sapiens"
+        # Said, not silent: the rewrite is the first line of the log.
+        assert result["logs"][0] == f"organism {typed!r} read as Homo sapiens (caterva.enzymes.index)"
+
+    def test_the_binomial_itself_is_untouched_and_unannounced(self, monkeypatch):
+        organism, result = self._organism_reaching_the_lookup(monkeypatch, "Homo sapiens")
+        assert organism == "Homo sapiens"
+        assert result["logs"] == ["BRENDA exact: 1.1.1.27, Homo sapiens, lactate"]
+
+    @pytest.mark.parametrize("typed", ["E. coli K-12", "Saccharomyces cerevisiae S288C"])
+    def test_a_strain_is_not_widened_to_its_species(self, monkeypatch, typed):
+        # They share a UniProt code with the species; the binomial would be
+        # a broader organism than the one named.
+        organism, result = self._organism_reaching_the_lookup(monkeypatch, typed)
+        assert organism == typed
+        assert not any(line.startswith("organism ") for line in result["logs"])
+
+    def test_a_name_the_table_lacks_is_passed_as_typed(self, monkeypatch):
+        organism, _ = self._organism_reaching_the_lookup(monkeypatch, "Thermus aquaticus")
+        assert organism == "Thermus aquaticus"
+
+
+class TestTheRerunIsSpelledInTheCallersInterface:
+    """A refusal's "re-run with" names a flag the caller can actually type.
+
+    The CLI's flag is --ec; the API's request field is ecNumber. Before
+    2026-11-02 the runner always wrote "ecNumber", so `scientific simulate`
+    told its user to "re-run with ecNumber 1.1.1.27".
+    """
+
+    _MISMATCH = {"enzymeName": "hexokinase", "substrate": "lactate",
+                 "organism": "Homo sapiens", "ecNumber": "1.1.1.27"}
+
+    def test_the_cli_spelling_is_used_when_the_cli_asks(self, monkeypatch):
+        result = _run_main(monkeypatch, {**self._MISMATCH, "ecFlag": "--ec"}, resolve=_never)
+        assert result["source"] == "ec_mismatch"
+        assert "Re-run with --ec 2.7.1.1 for 'hexokinase'" in result["ecRefusal"]
+        assert "and --ec 1.1.1.27 was given" in result["ecRefusal"]
+        assert "ecNumber" not in result["ecRefusal"]
+
+    def test_the_api_spelling_is_the_default(self, monkeypatch):
+        result = _run_main(monkeypatch, dict(self._MISMATCH), resolve=_never)
+        assert "Re-run with ecNumber 2.7.1.1" in result["ecRefusal"]
+
+    def test_any_other_spelling_is_not_printed_as_an_instruction(self, monkeypatch):
+        result = _run_main(monkeypatch, {**self._MISMATCH, "ecFlag": "--rm -rf"}, resolve=_never)
+        assert "--rm" not in result["ecRefusal"]
+        assert "Re-run with ecNumber 2.7.1.1" in result["ecRefusal"]
+
+    def test_an_ambiguous_name_names_the_cli_flag(self, monkeypatch):
+        result = _run_main(
+            monkeypatch,
+            {"enzymeName": "lactate dehydrogenase", "substrate": "pyruvate",
+             "organism": "Homo sapiens", "ecFlag": "--ec"},
+            resolve=_never,
+        )
+        assert result["source"] == "ec_ambiguous"
+        assert "re-run with --ec 1.1.1.27" in result["ecRefusal"]
+        assert "ecNumber" not in result["ecRefusal"]

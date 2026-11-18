@@ -78,10 +78,15 @@ FORBIDDEN = {
 # new `requirements-*.txt` would have been silently unscanned from the moment
 # it was created. `_unlisted_manifests()` below closes that, and it fired on
 # its first run against `requirements-popgen.txt`, added the same day.
+#
+# `requirements-popgen.txt` left this list on 2026-11-01, when it moved to
+# archive/legacy_domains/ with the population-genetics resolver it existed
+# to install for. `main()` skips a listed manifest that does not exist, so
+# leaving the entry would have read as a file checked when none was; the
+# test suite now fails on any entry here that names a missing file.
 MANIFESTS = [
     REPO_ROOT / "requirements.txt",
     REPO_ROOT / "requirements-dev.txt",
-    REPO_ROOT / "requirements-popgen.txt",
     REPO_ROOT / "requirements-release.txt",
     REPO_ROOT / "pyproject.toml",
 ]

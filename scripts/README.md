@@ -274,6 +274,61 @@ python scripts/verify_build.py --quick --no-typescript  # Fastest option
 
 ---
 
+## Live checks (network, run deliberately)
+
+These ask outside services, so their answers can change without the
+repository changing. They are not in the always-run guard set;
+`python scripts/verify_build.py --live` runs them alongside it. Each ends
+every check in one of three outcomes, and its exit code says which was the
+worst seen:
+
+| Exit | Meaning |
+|------|---------|
+| `0` | every check **matched** |
+| `2` | at least one **mismatched**: the service answered and the answer contradicts the citation |
+| `1` | nothing mismatched, but at least one check was **unreachable** (timeout, 429/5xx, bot gate): not a pass |
+
+### `verify_citations_live.py`
+
+**Purpose**: Every golden-set BRENDA page still lists its reference id;
+every pinned PMID's PubMed title names the topic it is cited for (an id that
+merely resolves is not enough: `740253`, a BRENDA reference id, resolves on
+PubMed to an unrelated paper); every cited DOI is registered with CrossRef,
+title-checked where our source claims a title; every static citation URL in
+`queryResolver.ts` answers (a `doi.org` URL is asked of CrossRef, since
+publishers bot-gate the redirect). A 404/410 is a mismatch; a 403/429/5xx or
+network error is unreachable.
+
+**Keys**: `NCBI_API_KEY` (optional), from the environment or
+`Science-Agent-Pipeline/.env`. Never printed.
+
+```bash
+python scripts/verify_citations_live.py
+```
+
+### `verify_values_live.py`
+
+**Purpose**: Cross-checks cited identifiers with keyed services. PMIDs must
+be on-topic (same table as above); each golden BRENDA reference id is
+reported as BRENDA-namespace, with the unrelated paper it would be as a PMID;
+each cited DOI is looked up in CORE as a second, independent index. A DOI
+absent from CORE is reported as information (CORE's coverage is incomplete),
+never as a mismatch. CORE's rate limit is handled: DOIs are batched, the
+advertised reset is waited for, a 429 honours `Retry-After` /
+`X-RateLimit-Retry-After` or backs off exponentially, and all waiting is
+bounded; a batch still refused after that is unreachable.
+
+**Keys**: `NCBI_API_KEY`, `CORE_API_KEY`, from the environment or
+`Science-Agent-Pipeline/.env`. A missing key makes its checks unreachable.
+Never printed.
+
+```bash
+python scripts/verify_values_live.py          # human-readable
+python scripts/verify_values_live.py --json   # matched/mismatched/unreachable/info lists
+```
+
+---
+
 ## Integration
 
 ### Pre-commit Hook

@@ -5,6 +5,8 @@
 **Tone:** Not a checklist. Not cheerleading. Real analysis.  
 **Last Updated:** August 9, 2026
 
+> **Note, 2026-11-01.** This review predates the 2026-09-27 archive. SIR, SEIR, Wright-Fisher, Lotka-Volterra, the cell-cycle oscillator, the repressilator, PCR, Monte Carlo and Lennard-Jones molecular dynamics, used in its scenarios below, were archived on 2026-09-27, after v0.4.0 (the last release that runs them), and are refused by this build. The risks it describes are argued on those examples and kept as written.
+
 ---
 
 ## Executive Summary: The Honest Truth

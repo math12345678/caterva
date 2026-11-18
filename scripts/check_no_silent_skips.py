@@ -39,6 +39,7 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -84,15 +85,12 @@ ALLOWED_SKIPS: dict[str, str] = {
         "the same flags on a macOS runner, and the test runs for real on any "
         "Mac. Added 2026-10-04."
     ),
-    "test_popgen_resolver": (
-        "Needs `stdpopsim`, which lives in the optional "
-        "requirements-popgen.txt. `make setup` installs requirements-dev.txt "
-        "and so does CI, so following CONTRIBUTING produces exactly this "
-        "skip -- it is the documented setup working as documented, not a "
-        "test that stopped running. Clear it by installing the popgen "
-        "extra, or by folding stdpopsim into requirements-dev if the "
-        "population-genetics domain stops being optional."
-    ),
+    # "test_popgen_resolver" was allowed here until 2026-11-01: it needed
+    # `stdpopsim` from the optional requirements-popgen.txt, so the
+    # documented setup skipped it. That day the module, its resolver and
+    # the requirements file moved to archive/legacy_domains/ with the
+    # Wright-Fisher domain they served, so the skip cannot happen and the
+    # entry would only have been stale -- which the rule below fails on.
     "test_the_guards_selftest_passes[check_codegen_loads.py]": (
         "The codegen load check's selftest needs npx and an installed zod, "
         "which the Python CI jobs do not install, so it exits 2 ('could not "
@@ -129,6 +127,12 @@ def _skip_key(reason: str) -> str:
     return location.split(":", 1)[0].strip()
 
 
+
+#: How long one suite may run. The engine suite run serially takes about
+#: 30 minutes on an idle machine and timed out at the former 1800 s under
+#: load (fifth round, ENV-01); CATERVA_SKIP_GUARD_TIMEOUT_S overrides it.
+SUITE_TIMEOUT_S = int(os.environ.get("CATERVA_SKIP_GUARD_TIMEOUT_S", "3600"))
+
 def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
     """Run one suite. Returns (passed, skipped, skip_reasons) or None.
 
@@ -160,7 +164,7 @@ def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
                  "-p", "no:randomly", f"--junitxml={report}"],
                 capture_output=True,
                 text=True,
-                timeout=1800,
+                timeout=SUITE_TIMEOUT_S,
                 cwd=str(REPO_ROOT),
             )
         except (subprocess.TimeoutExpired, OSError) as exc:

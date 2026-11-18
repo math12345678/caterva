@@ -120,6 +120,11 @@ runtime only if the user installed it themselves; the population-genetics
 tests skip when absent. Since no stdpopsim code ships with Caterva, no GPL
 obligation attaches to Caterva's distribution. **This changes if it ever
 becomes a hard requirement or is bundled** — revisit then.
+(2026-11-01: the population-genetics resolver that imported it, its tests
+and `requirements-popgen.txt` moved to `archive/legacy_domains/`; v0.6.0
+is the last release that ships them. No live manifest installs stdpopsim
+and nothing live imports it, so the paragraph above now describes the
+archived code only.)
 
 **Hypothesis — MPL 2.0.** File-level copyleft, triggered by modifying the
 covered files. Caterva does not modify them.

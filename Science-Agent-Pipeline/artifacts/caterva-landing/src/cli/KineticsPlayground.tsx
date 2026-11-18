@@ -11,24 +11,38 @@ import ParamSlider from "@/components/ui/param-slider";
 // These Km values were unsourced, and three of the four contradicted the
 // values THIS PRODUCT resolves for the same enzyme:
 //
-//   LDH          shipped 0.5   -> BRENDA gives 10.73 mM  (ref 740253)
-//   Hexokinase   shipped 0.1   -> BRENDA gives 6 mM      (ref 641068)
-//   AChE         shipped 0.09  -> 0.09 mM, correct       (ref 649716)
-//   Trypsin      shipped 15    -> no resolved value; the name is dropped
+//   LDH          shipped 0.5   -> BRENDA gave 10.73 mM  (ref 740253)
+//   Hexokinase   shipped 0.1   -> BRENDA gives 6 mM     (ref 641068)
+//   AChE         shipped 0.09  -> BRENDA gave 0.09 mM   (ref 649716)
+//   Trypsin      shipped 15    -> no resolved value; the name was dropped
 //
 // Off by 21x and 60x, under the enzyme's real name, on the page that
-// advertises never inventing a number. A student who clicked "LDH" here
-// and then ran "lactate dehydrogenase with pyruvate" through the actual
-// product got two different Km values from the same page.
+// advertises never inventing a number.
 //
-// Km now carries the value Caterva itself resolves, with its BRENDA
-// reference. Vmax and s0 stay illustrative and are labelled as such:
-// Vmax is NEVER literature-resolvable here (it needs [E]0, ADR 0013), so
-// attributing it to anything would be the same defect again.
+// The repair then hard-coded the resolver's answers, and they went stale
+// the same way. Re-run live against BRENDA on 2026-11-02 (resolveQuery,
+// no organism named, so the enzyme table's Homo sapiens): LDH with
+// pyruvate resolves 0.03 mM, not 10.73; AChE with acetylcholine 0.0714
+// mM, not 0.09; hexokinase with glucose 6 mM, ref 641068, unchanged. A
+// constant pasted into a page is a snapshot of a database that keeps
+// being recurated, so only the one that still matches stays, and it says
+// when it was checked. LDH and AChE are gone rather than updated: the next
+// recuration would make them wrong again, silently, and the agent
+// simulator above resolves them live for anyone who asks.
+//
+// Vmax and s0 are NOT literature values and cannot be: Vmax = kcat x
+// [E]0 needs an enzyme concentration (ADR 0013), and s0 is the
+// experiment's own choice. They are rendered as "illustrative", next to
+// the preset, so nothing reads them as hexokinase's.
 const PRESETS = [
-  { label: "LDH", km: 10.73, vmax: 4.5, s0: 10, kmSource: "BRENDA ref 740253" },
-  { label: "Hexokinase", km: 6, vmax: 2.0, s0: 5, kmSource: "BRENDA ref 641068" },
-  { label: "AChE", km: 0.09, vmax: 6.0, s0: 3, kmSource: "BRENDA ref 649716" },
+  {
+    label: "Hexokinase",
+    km: 6,
+    vmax: 2.0,
+    s0: 5,
+    kmSource:
+      "BRENDA ref 641068, Homo sapiens, glucose — checked against the live resolver 2026-11-02",
+  },
 ];
 
 export default function KineticsPlayground() {
@@ -80,6 +94,17 @@ export default function KineticsPlayground() {
                 </motion.button>
               ))}
             </div>
+            {PRESETS.map((p) => (
+              <p
+                key={p.label}
+                data-testid="preset-provenance"
+                className="mt-2 text-[9px] text-fg/60 leading-snug"
+              >
+                {p.label}: Km {p.km} mM — {p.kmSource}. Vmax {p.vmax} mM/s
+                and [S]₀ {p.s0} mM are illustrative experimental choices, not
+                literature values.
+              </p>
+            ))}
           </div>
 
           {/* Sliders */}

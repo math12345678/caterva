@@ -22,24 +22,22 @@ FROM python:3.12-slim
 
 WORKDIR /workspaces/caterva
 
-# msprime is stdpopsim's C-extension dependency, and it publishes wheels
-# only for manylinux x86_64, macOS and win_amd64 -- there is no Linux
-# aarch64 wheel for any version. `docker build` on an Apple Silicon Mac
-# produces a linux/arm64 image, so pip finds no wheel
-# (`pip download msprime --only-binary=:all:` reports "from versions:
-# none"), falls back to the sdist, and needs GSL and a C toolchain to build
-# it. pip does not warn in that situation, it fails, and it takes the whole
-# `pip install -r requirements-dev.txt` step and the image build down with
-# it -- so these packages are load-bearing on arm64 even though x86_64
-# never touches them. This is the concrete form of the libgsl-dev problem
-# ADR 0021 records as "not installable in the review sandbox".
-#
 # make and git are here so `make test` and `git commit` work in a
 # standalone `docker run`, not only under VS Code.
+#
+# 2026-11-01: this line also installed build-essential and libgsl-dev. Its
+# comment said why: msprime, stdpopsim's C-extension dependency, has no
+# Linux aarch64 wheel, so on an Apple Silicon `docker build` pip fell back
+# to its sdist and needed GSL and a C toolchain (the libgsl-dev problem ADR
+# 0021 records). stdpopsim left requirements.txt on 2026-08-16 (ADR 0061)
+# and its manifest moved to archive/legacy_domains/ on 2026-11-01, so
+# nothing installed here builds msprime, and every other direct pin
+# publishes a Python 3.12 Linux wheel -- except that libroadrunner 2.8.0
+# publishes no Linux aarch64 wheel and no sdist (PyPI, checked
+# 2026-11-01), so a native arm64 build fails at pip with or without a
+# compiler. Build with `--platform linux/amd64` on Apple Silicon.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        build-essential \
-        libgsl-dev \
         make \
         git \
     && rm -rf /var/lib/apt/lists/*

@@ -113,9 +113,15 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 REQUIREMENTS = [
     REPO_ROOT / "requirements.txt",
     REPO_ROOT / "requirements-dev.txt",
-    # Added after the two below were found unchecked. Explicit rather than
-    # globbed, keeping the property the comment above asks for.
-    REPO_ROOT / "requirements-popgen.txt",
+    # `requirements-popgen.txt` was listed here from when it was found
+    # unchecked until 2026-11-01, when it moved to archive/legacy_domains/
+    # with the population-genetics resolver it installed stdpopsim for.
+    # `pins()` returns nothing for a missing file, so a stale entry here
+    # would have been a file reported as resolved without being read; the
+    # test suite now fails on any entry that names a missing file.
+    #
+    # Added after it was found unchecked. Explicit rather than globbed,
+    # keeping the property the comment above asks for.
     REPO_ROOT / "advanced_analysis" / "requirements.txt",
     # The release workflow's freezer (ADR 0177). Same rule: a pin nobody
     # resolves is a pin nobody checked.

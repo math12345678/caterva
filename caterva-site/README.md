@@ -4,9 +4,9 @@ Marketing site for Caterva, a scientific verification engine.
 
 The premise: a page arguing that scientific claims must be independently
 checked should not itself be a wall of unchecked claims. So it computes. The
-background is a live Lennard-Jones molecular dynamics simulation. The console
-runs two thousand Wright-Fisher populations and plots them against an exact
-closed form. The shell reproduces a global-minimum energy published in 1971.
+shell evaluates the Michaelis-Menten rate law on two cited BRENDA constants
+and runs exact Gillespie simulations against their closed forms, in the
+browser, when you press enter.
 
 ## Run it
 
@@ -15,38 +15,31 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # production build into dist/
 npm run typecheck  # tsc --noEmit
+npm test           # node --test tests/ (Node >= 23.6, which runs the .ts it imports)
 ```
 
 ## What's actually live
 
 | Element | What it really does |
 |---|---|
-| Background lattice | Lennard-Jones MD, velocity Verlet, cursor acts as a repulsive body |
-| Verification console | 2000 seeded Wright-Fisher replicates vs. the exact closed form |
-| Inject bug button | applies the real `2N → N` diploid error and re-plots the divergence |
-| Shell | `run`, `verify`, `mutate`, `ledger`, `pipeline`, `agents`, `cite` |
-| `verify md` | golden-section search reproducing LJ13 = −44.326801 |
+| Background lattice | decoration: a clamped, damped Lennard-Jones-shaped pair force. Not molecular dynamics, and not described as such |
+| Verification console | 2000 seeded Wright-Fisher replicates vs. the exact closed form (an archived domain, labelled so) |
+| Inject bug button | applies the `2N → N` diploid error and re-plots the divergence |
+| Shell | `run`, `verify`, `mutate`, `domains`, `ledger`, `pipeline`, `agents`, `cite` |
+| `run mm` | v/[E] = kcat·S/(Km+S) for human hexokinase on D-glucose: Km 6 mM (BRENDA ref 641068), kcat 40.1 1/s (ref 739603), the rows of `caterva/evidence/showcase.py` |
+| `verify gillespie_ssa` | mean of 50 exact SSA runs within 3 standard errors of a0·e^(−kt), the rule of `caterva/tests/test_gillespie_ssa_correctness.py` |
+| `mutate gillespie_ssa` | drops the parentheses from the waiting time and shows the same check fail |
 
-## Verified numbers
+The shell runs only the five live domains (`src/cli/domainCatalogue.ts`).
+A domain archived on 2026-09-27 (epidemiology, PCR, Monte Carlo, population
+genetics, Lennard-Jones MD; `archive/legacy_domains/README.md`) answers that
+it is archived and that v0.4.0 is the last release that runs it. The LJ
+cluster checks that used to be listed here (`verify md`, LJ13 = −44.326801)
+left with that domain; v0.4.0's copy of this site still has them.
 
-Recomputed in TypeScript and cross-checked against Caterva's Python engine
-and an independent numpy implementation. All three agree:
-
-```
-LJ2   -1.000000000000   published -1.000000   diff 0.00e+00
-LJ3   -3.000000000000   published -3.000000   diff 0.00e+00
-LJ4   -6.000000000000   published -6.000000   diff 0.00e+00
-LJ13 -44.326801419534   published -44.326801  diff 4.20e-07
-```
-
-The LJ13 residual is the published table's six-decimal rounding, not error.
-Source: Hoare & Pal, *Adv. Phys.* **20**, 161 (1971), via the Cambridge
-Cluster Database.
-
-`LJ2/3/4` are exact by two independent routes — derivable by hand (a regular
-tetrahedron places all six pairs at `r_min` simultaneously) and independently
-tabulated. `LJ5` is the first size where geometric frustration makes this
-impossible: `−9.103852`, not `−10`.
+`tests/terminal.test.mjs` holds the shell to this: its domain table must equal
+the catalogue, every name the v0.4.0 shell accepted must be live or answer
+archived, and the hexokinase constants must equal `showcase.py`'s rows.
 
 ## One constant that must not be lowered
 
@@ -66,13 +59,14 @@ itself. 2000 is the first value with real margin (3.7×).
 ```
 src/
 ├── lib/
-│   ├── md.ts          LJ molecular dynamics + cluster geometry
+│   ├── md.ts          the background's pair force (decoration)
+│   ├── ssa.ts         exact Gillespie SSA + its ensemble checks
 │   ├── drift.ts       Wright-Fisher + closed form
 │   ├── terminal.ts    command registry; every command computes
 │   ├── pipeline.ts    build architecture + evidence ledger, as data
 │   └── motion.ts      reveal / count-up / typewriter, one reduced-motion check
 └── components/
-    ├── AmbientLattice.tsx      background simulation
+    ├── AmbientLattice.tsx      background (decoration)
     ├── Hero.tsx
     ├── VerificationConsole.tsx full-bleed instrument panel
     ├── Terminal.tsx            interactive shell

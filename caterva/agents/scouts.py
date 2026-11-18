@@ -37,7 +37,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field, replace
 from types import SimpleNamespace
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 try:
     from .assay_window import (
@@ -90,6 +90,20 @@ def _row_description(source: Any) -> str:
         parts.append(f"in {source.buffer}")
     conditions = ", ".join(parts) or "conditions unstated"
     return f"{source.value} {source.unit or ''} @ {conditions}".strip()
+
+
+#: The clause `fallback_logic.resolve_kinetic_pair` adds to both constants of
+#: a matched pair.
+_PAIR_CLAUSE = re.compile(r"\) are one measurement: BRENDA ref ")
+
+
+def _one_measurement_with_its_pair(request: Any, result: Any) -> bool:
+    """Whether the resolver carried this constant as one paper's matched Km
+    and kcat pair (a paired request whose reason says so)."""
+    if getattr(request, "paired", False) is not True:
+        return False
+    because = getattr(result, "chosen_because", None)
+    return isinstance(because, str) and bool(_PAIR_CLAUSE.search(because))
 
 
 def _row_citation(resolver_citation: Optional[str], reference_id: Any) -> str:
@@ -175,7 +189,7 @@ class ParameterScout:
             organism=organism,
             allow_cross_species=allow_cross_species,
         )
-        source, reason = to_parameter_source(quantity, result)
+        source, reason = to_parameter_source(quantity, result, getattr(self.request, "table", None))
 
         notes: List[str] = []
         if source is None and organism_constraint is not None:
@@ -195,7 +209,20 @@ class ParameterScout:
             )
         if source is not None:
             windows = self._windows(view, quantity)
-            if windows:
+            if windows and _one_measurement_with_its_pair(self.request, result):
+                # A Km and a kcat carried as one paper's matched pair are one
+                # measurement: moving one of them alone into a window gives
+                # a model of two measurements whose report still says one.
+                # Beta-lactamase TEM-1 with clavulanate: Km 0.0504 and kcat
+                # 444.18 1/s, ref 771150's pair, became Km 0.0504 with ref
+                # 663646's kcat 0.37 1/s, while the Km's reason still named
+                # 444.18 (ADR 0182, second round's review).
+                notes.append(
+                    f"{quantity} is carried as one measurement with its paired constant, so "
+                    f"the assay window ({'; '.join(str(w.requirement) for w in windows)}) was "
+                    "not applied to it alone: moving one of the pair would combine two "
+                    "measurements")
+            elif windows:
                 source, reason, window_note = self._re_select_under_window(
                     quantity, source, windows, reason
                 )
@@ -386,6 +413,19 @@ class ParameterScout:
             # but not the winner's explicitly_unreported claims, so none are
             # carried forward for it.
             explicitly_unreported=(),
+            # The resolver's reason described the row it chose, not this
+            # one. The re-selection's own reason is said in its place: with
+            # None the report printed "the resolver's pick, not a verdict"
+            # beside a row no resolver had picked (rabbit aldolase, third
+            # round's review).
+            **({"resolver_because": (
+                f"it is the row nearest the assay window ({_describe_windows(refs)}) among the "
+                f"rows the resolver returned, re-selected over the resolver's own pick "
+                f"({_row_description(source)})")}
+               if "resolver_because" in getattr(source, "__dataclass_fields__", {}) else {}),
+            # The isoform is the re-selected row's own, as the resolver read it.
+            **({"row_isoform": best.get("isoform")}
+               if "row_isoform" in getattr(source, "__dataclass_fields__", {}) else {}),
         )
         row_organism = best.get("organism") or None
         if row_organism and row_organism != source.organism:
@@ -419,22 +459,51 @@ class ParameterScout:
         return chosen, new_reason, new_reason
 
 
+def _one_protein_of(km: Any, kcat: Any) -> Optional[str]:
+    """The isoform a found Km and kcat both measured, by their rows'
+    readings (`KineticResult.row_isoform`), or None when either names none
+    or they name two."""
+    if not (getattr(km, "found", False) and getattr(kcat, "found", False)):
+        return None
+    a, b = getattr(km, "row_isoform", None), getattr(kcat, "row_isoform", None)
+    if not (isinstance(a, str) and isinstance(b, str) and a and b):
+        return None
+    try:
+        from caterva.bind.core import same_isoform
+    except ImportError:  # pragma: no cover
+        return a if a == b else None
+    return a if same_isoform(a, b) else None
+
+
 def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
     """The live resolver, adapted to the scout's calling convention.
 
     Imported lazily: `fallback_logic` pulls in httpx and a dozen sibling
     modules, and the architecture must be testable without any of them.
+
+    A request marked `paired` (the model asks for a Km and a kcat of one
+    compound) is answered by `resolve_kinetic_pair`, once for both: the two
+    come from one paper when some paper holds a row of each among the rows
+    the resolver chooses from. The pair is kept for the life of this
+    resolver, keyed by everything the question depends on, so the Km
+    scout and the kcat scout (which may run on two threads) read one answer.
     """
+    import threading
+
+    pairs: Dict[Any, Any] = {}
+    locks: Dict[Any, threading.Lock] = {}
+    guard = threading.Lock()
 
     def resolve(request: Any, *, organism: Optional[str], allow_cross_species: bool):
         try:
-            from Tests.fallback_logic import resolve_kinetic_value  # type: ignore
+            from Tests.fallback_logic import resolve_kinetic_pair, resolve_kinetic_value  # type: ignore
         except ImportError:
             # Neither form resolves from an ordinary interpreter; the
             # checkout's Tests/ has to be put on the path (ADR 0178).
             from caterva.checkout import literature_module
-            resolve_kinetic_value = literature_module(
-                "fallback_logic").resolve_kinetic_value
+            literature = literature_module("fallback_logic")
+            resolve_kinetic_value = literature.resolve_kinetic_value
+            resolve_kinetic_pair = literature.resolve_kinetic_pair
 
         if not request.ec_number:
             raise ValueError(
@@ -450,15 +519,70 @@ def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
         # and says what the mode would have returned (compose --any-mode).
         asked = {
             name: getattr(request, name, None)
-            for name in ("isoform", "inhibition_mode", "model_substrate", "compare_mode")
+            for name in ("isoform", "inhibition_mode", "model_substrate", "compare_mode", "mutation")
             if getattr(request, name, None)
         }
+        table = request.table or "km"
+
+        def pair_of(substrate: str, pair_asked: Dict[str, Any]):
+            key = (request.ec_number, organism or "", substrate, request.subject,
+                   bool(allow_cross_species), tuple(sorted(pair_asked.items())))
+            with guard:
+                lock = locks.setdefault(key, threading.Lock())
+            with lock:
+                if key not in pairs:
+                    pairs[key] = resolve_kinetic_pair(
+                        request.ec_number,
+                        organism or "",
+                        substrate,
+                        enzyme_name=request.subject,
+                        allow_cross_species=allow_cross_species,
+                        **{**pair_asked, **resolver_kwargs},
+                    )
+            return pairs[key]
+
+        if getattr(request, "paired", False) is True and table in ("km", "kcat") and request.substrate:
+            km, kcat = pair_of(request.substrate, asked)
+            return km if table == "km" else kcat
+        if (table == "ki" and not asked.get("isoform") and asked.get("model_substrate")
+                and asked.get("inhibition_mode")):
+            # A Ki follows the protein the model's Km and kcat measured:
+            # human carbonic anhydrase and acetazolamide carried CA II's Km
+            # and kcat (ref 729384) with CA IX's Ki (2.5e-05 mM, ref 652546)
+            # while BRENDA holds CA II's acetazolamide Ki (1.2e-05 mM) from
+            # that same paper (fourth round of the real-values review).
+            pair_asked = {k: v for k, v in asked.items()
+                          if k in ("isoform", "mutation")}
+            try:
+                km, kcat = pair_of(asked["model_substrate"], pair_asked)
+            except Exception:  # noqa: BLE001 - the Ki is then chosen on its own
+                km = kcat = None
+            protein = _one_protein_of(km, kcat)
+            if protein:
+                followed = resolve_kinetic_value(
+                    enzyme_ec=request.ec_number,
+                    organism=organism or "",
+                    substrate=request.substrate or "",
+                    enzyme_name=request.subject,
+                    quantity=table,
+                    allow_cross_species=allow_cross_species,
+                    **{**asked, "isoform": protein, **resolver_kwargs},
+                )
+                if getattr(followed, "found", False):
+                    because = getattr(followed, "chosen_because", None)
+                    note = (f"the Ki is taken from the rows of {protein}, the protein the model's "
+                            f"Km and kcat rows measured (or rows naming no isoform), so the model "
+                            f"is of one protein")
+                    if isinstance(because, str):
+                        followed = followed.model_copy(update={
+                            "chosen_because": f"{because}; {note}"})
+                    return followed
         return resolve_kinetic_value(
             enzyme_ec=request.ec_number,
             organism=organism or "",
             substrate=request.substrate or "",
             enzyme_name=request.subject,
-            quantity=request.table or "km",
+            quantity=table,
             allow_cross_species=allow_cross_species,
             **{**asked, **resolver_kwargs},
         )

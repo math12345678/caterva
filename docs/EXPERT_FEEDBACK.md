@@ -1695,7 +1695,9 @@ Proven by generating one and loading it:
 A concurrent agent had already pinned `override.zod.version: 3` — same
 diagnosis, reached independently, about an hour earlier. So this pass built
 the thing that was still missing: **a guard**
-([ADR 0030](adr/0030-the-generated-contract-is-now-checked.md)).
+([ADR 0034](adr/0034-the-committed-contract-must-match-codegen.md);
+written as 0030 and renumbered, as told below. Link corrected 2026-11-01:
+it pointed at the 0030 file that was never kept).
 
 ### The guard's own check could not fail
 
@@ -2194,7 +2196,8 @@ unrelated task. Refusing to smuggle it is *why* ADR 0027 hand-patched a
 field, and hand-patching is what created the staleness. The cycle stops by
 reporting rather than by patching again.
 
-Recorded as [ADR 0035](adr/0035-the-shipped-codegen-config-does-not-reproduce-the-committed-contract.md),
+Recorded as [ADR 0036](adr/0036-the-shipped-codegen-config-does-not-reproduce-the-committed-contract.md)
+(written as 0035 and renumbered; link corrected 2026-11-01),
 open, with both options and their costs.
 
 ### Where `allowVariants` actually is
@@ -2226,6 +2229,15 @@ unexamined drift.
 - `Science-Agent-Pipeline/lib/api-spec/orval.regen.config.ts`
 - `Science-Agent-Pipeline/lib/api-zod/src/__codegen_verify__.ts`
 
+(Noted 2026-11-01: every file in this list, and in the two later "cannot
+delete" lists below, has since been removed, so those paths no longer
+resolve. The lists are left as written because they record what each pass
+could not do. The content lives on as
+[ADR 0034](adr/0034-the-committed-contract-must-match-codegen.md) and
+[ADR 0036](adr/0036-the-shipped-codegen-config-does-not-reproduce-the-committed-contract.md).
+The `0030` that does exist,
+[`0030-codegen-emitted-a-contract-that-could-not-load.md`](adr/0030-codegen-emitted-a-contract-that-could-not-load.md),
+is a different record.)
 
 
 ---

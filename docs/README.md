@@ -14,7 +14,7 @@ that makes no sense.
 | [`adr/`](adr/README.md) | you want to know *why* a specific design is the way it is |
 | [`EXPERT_FEEDBACK.md`](EXPERT_FEEDBACK.md) | you want to know what reviewers outside the project said and what changed because of it |
 | [`API.md`](API.md) | you are calling the HTTP API |
-| [`REPO_MAP.md`](REPO_MAP.md) | you want to know which of the 18 repositories a file belongs in |
+| [`REPO_MAP.md`](REPO_MAP.md) | you want to know which repository a file would go to under the planned split (not carried out: today there is one repository) |
 | [`AGENT_BRIEF.md`](AGENT_BRIEF.md) | you are an AI agent working on this repo, or setting one going |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | you want the shape of the system on one page: which layer does what, and which decision record decided it |
 | [`PUBLISHING.md`](PUBLISHING.md), [`INFRASTRUCTURE_DECISION.md`](INFRASTRUCTURE_DECISION.md), [`ARCHIVE_TRIAGE.md`](ARCHIVE_TRIAGE.md) | narrower, one-topic records |

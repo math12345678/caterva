@@ -1,3 +1,4 @@
+import type { AutomaticChoice } from "./automaticChoice";
 import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import path from "node:path";
@@ -70,42 +71,13 @@ export interface ScienceAgentResult {
     flagged: boolean;
     reason?: string;
   };
-  /** ADR 0017 / ADR 0020: a resolved disease's canonical name, basic
-   * reproduction number, and infectious period (from
-   * Tests/epidemiology_resolver.py's hand-verified registry), plus the
-   * bridged (beta, gamma) the SIR engine takes directly, computed by the
-   * same caterva.core.validation.beta_gamma_from_r0() the engine uses.
-   * Only present when parameterType="disease_parameters" was requested. */
-  disease?: string;
-  r0?: number;
-  infectiousPeriodDays?: number;
-  /**
-   * ADR 0169: true when R0 and the serial interval come from two
-   * different systematic reviews rather than one paper.
-   *
-   * A composite MUST reach provenance as citationStatus "flagged", never
-   * "verified" — the same tier a cross-species BRENDA Km gets. Inheriting
-   * COVID-19's verified status would erase the only signal telling a
-   * reader that two methodologies were combined.
-   */
-  crossStudyComposite?: boolean;
-  /** What exactly was combined, in the entry's own words. */
-  compositeNote?: string;
-  /**
-   * The serial-interval half's citation, when it differs from the R0
-   * half's. Both must reach the user: surfacing only the first would
-   * present a two-paper number as if one paper supported it — the same
-   * shape as the popgen defect where a genome-assembly DOI stood in for a
-   * mutation rate.
-   */
-  secondaryCitation?: Citation;
-  beta?: number;
-  gamma?: number;
-  betaGammaValidation?: {
-    ok: boolean;
-    flagged: boolean;
-    reason?: string;
-  };
+  // disease, r0, infectiousPeriodDays, crossStudyComposite, compositeNote,
+  // secondaryCitation, beta, gamma and betaGammaValidation (ADR 0017 / ADR
+  // 0020 / ADR 0169) were removed on 2026-10-31. Epidemiology was archived
+  // on 2026-09-27 (archive/legacy_domains/README.md; v0.4.0 is the last
+  // release that runs it), and the runner answers "disease_parameters"
+  // with found=false and source "domain_archived" (science_agent_runner.py,
+  // RETIRED_PARAMETER_TYPES), so nothing set or read them.
   unit?: string;
   organism?: string;
   source?: string;
@@ -123,11 +95,38 @@ export interface ScienceAgentResult {
    * policy this code applied. Conflating them is the same category error
    * that ADR 0012/0013 exist to prevent, one level up. */
   crossSpeciesOrganismsAvailable?: string[];
+  /** Of those, the organisms whose every row measured a protein variant:
+   *  opting into another organism would withhold them too (V7-04). */
+  crossSpeciesVariantOnly?: string[];
+  /** Of those, the organisms whose rows each name an isozyme (XS5R2-03). */
+  crossSpeciesIsozymeOnly?: string[];
+  /** For variant_withheld: every withheld row names an isozyme (XS5R2-03). */
+  variantIsozymesOnly?: boolean;
+  /** For a compound with no row in the organism searched: what that
+   *  organism holds, counted, in `caterva compose`'s words (V7-08). */
+  availableInTheOrganism?: string | null;
   /** Substrate labels this EC number DOES report, when the requested one
    *  matched nothing. BRENDA's label for lactate is `(S)-lactate`, so
    *  "lactate" matches by substring and "L-lactate" returns nothing —
    *  and the student is told the literature is empty when it is not. */
   substratesAvailable?: string[];
+  /** Every name the runner CHOSE because the request left it empty (ADR
+   *  0182): the substrate, the inhibitor for a Ki, or the organism, each as
+   *  caterva.compose.defaults' Choice.to_json(), in the order chosen. A
+   *  value found after a choice is BRENDA's row for exactly that name.
+   *  queryResolver states each one as a "<role> chosen:" flag. Absent from
+   *  a runner that predates choosing; read with `readChoices`. */
+  choices?: AutomaticChoice[];
+  /** Set when a name was needed and BRENDA holds nothing to choose it from
+   *  (source "substrate_not_named", "inhibitor_not_named" or
+   *  "organism_not_chosen"): the runner's sentence saying what is missing
+   *  and what would fix it. Shown to the person as written. */
+  choiceRefusal?: string;
+  /** For a Km resolved as one half of a Km/kcat pair: what the kcat half
+   *  came to. The Km call computes the pair anyway; /api/resolve reads this
+   *  to say, before an enzyme concentration is stated, whether a kcat
+   *  exists to multiply it by (sixth round, XS5R2-05). */
+  pairedKcat?: Partial<ScienceAgentResult> | null;
   /** EC numbers UniProt indexed under the enzyme NAME, when it matched more
    *  than one. An EC number is the identity of the protein every citation
    *  refers to, so the runner refuses to pick and names them (ADR 0127).
@@ -151,6 +150,11 @@ export interface ScienceAgentResult {
    * the enzyme (ADR 0029). Populated only when
    * `source === "variant_withheld"`. */
   variantCandidatesAvailable?: string[];
+  /** Every row's value, "1e-06 1/s (BRENDA ref 729224)", when each is
+   * outside the physically plausible range for the constant: a unit slip or
+   * a misfiled row is far likelier than a measurement, so none is used.
+   * Populated only when `source === "implausible_withheld"`. */
+  implausibleValues?: string[];
   /** The isoforms BRENDA's rows measured, when the one asked for is not
    * among them. Populated only when `source === "isoform_withheld"`. */
   isoformsAvailable?: string[];
@@ -198,6 +202,13 @@ export interface ScienceAgentResult {
      * resolver ranks Ki rows by; absent from runners older than it.
      */
     kitzWilson?: boolean;
+    /**
+     * Whether `isoform` is the one the request named, by
+     * caterva.bind.core.same_isoform (UniProt's names included: BRENDA's
+     * "hexokinase II" is HK2). Absent when either names none, or from an
+     * older runner; rowScopeFlags then falls back to its own comparison.
+     */
+    sameIsoformAsRequested?: boolean;
   } | null;
   /**
    * A row that is evidence against the model's mechanism for the Ki
@@ -272,13 +283,42 @@ export interface ScienceAgentResult {
    *
    * On the LDH turnover table six non-dominated rows span 21.1 to 6467 — a
    * 306-fold range, every one wild-type with pH and temperature reported.
-   * The returned value is the lowest, and without this field nothing says
-   * the evidence found 6467 equally credible.
+   * The returned value is the median row, and without this field nothing
+   * says the evidence found 6467 equally credible.
    *
    * Absent means no tie was found. That is different from a tie with no
    * candidates, which is why `candidates` is checked rather than presence.
    */
   selectionTie?: SelectionTie | null;
+  /**
+   * Why this row was carried, in the resolver's words (ADR 0182): the
+   * median of the best-described rows, what was set aside as implausible or
+   * under-described, the spread, and, for a Km and a kcat taken together,
+   * the one paper both came from.
+   */
+  chosenBecause?: string | null;
+  /** The rows the value was chosen from span more than 100-fold. */
+  wideSpread?: boolean;
+  /**
+   * What the carried row IS beyond its value, in the resolver's words: "the
+   * row is a K0.5 with a Hill coefficient of 1.8, not a Michaelis-Menten
+   * Km", "the row's UniProt accession (P35557) is GCK", a construct, a range.
+   * Absent from runners older than the third real-values round.
+   */
+  rowNotes?: string[];
+  /**
+   * For a Km: which protein of a multi-protein EC the model's constants
+   * are, in `caterva compose`'s words (caterva.enzymes.isozyme): the
+   * headline, the concern and what to do. Absent when the EC is one protein
+   * in the organism, or from runners older than the sixth real-values round
+   * (XS5R2-04).
+   */
+  isozymeNotice?: {
+    headline: string;
+    detail: string;
+    remedy: string;
+    summary?: string;
+  } | null;
   /**
    * Every row on the non-dominated frontier, with the reliability grades
    * that weight it — Bakker's three axes, scored per candidate rather than
@@ -474,7 +514,11 @@ export interface EntityExtraction {
    * the one enzyme finder and answers `source: "ec_mismatch"` when the name
    * identifies a different enzyme. */
   ecNumber?: string;
-  /** For population genetics: parameter type to resolve (e.g., 'mutation_rate') */
+  /** A non-kinetic parameter type. Only population genetics
+   * ('mutation_rate') and epidemiology ('disease_parameters') ever used
+   * one; both were archived on 2026-09-27 (v0.4.0 is the last release that
+   * runs them) and the runner answers either with source
+   * "domain_archived". Nothing in this server sets it now. */
   parameterType?: string;
   /** Which kinetic constant to resolve: "km" (BRENDA KM Values table) or
    * "ki" (BRENDA Ki Values table). Each call resolves exactly one quantity
@@ -601,10 +645,10 @@ export function runnerError(stdout: string): string | null {
 
 /**
  * Spawn the Python science-agent runner with an arbitrary JSON payload and
- * parse its stdout. Shared by resolveKineticValue() (enzyme kinetics) and
- * resolveEpidemiologyParameters() (ADR 0017 / ADR 0020) so there is exactly
- * one place that owns the spawn/PYTHONPATH/stdout-parsing contract, rather
- * than two copies that could drift.
+ * parse its stdout. Kept separate from resolveKineticValue() (enzyme
+ * kinetics), its only caller since resolveEpidemiologyParameters() was
+ * removed on 2026-10-31, so there is exactly one place that owns the
+ * spawn/PYTHONPATH/stdout-parsing contract.
  *
  * This function uses BRENDA/KEGG/PubMed lookups in Tests/fallback_logic.py.
  * If an EC number isn't known, the Python side resolves one from the enzyme
@@ -692,21 +736,6 @@ function notFoundResult(reason: string): ScienceAgentResult {
     literatureCandidates: [],
     logs: [reason],
   };
-}
-
-/**
- * Resolve a disease's (R0, infectious period) golden tuple and bridge it to
- * the SIR engine's own (beta, gamma) — see Tests/epidemiology_resolver.py
- * and caterva.core.validation.beta_gamma_from_r0. Returns found=false for
- * any disease outside the hand-verified registry; never fabricates a value.
- */
-export async function resolveEpidemiologyParameters(
-  disease: string,
-): Promise<ScienceAgentResult> {
-  if (!disease) {
-    return notFoundResult("No disease name provided; skipping real parameter lookup.");
-  }
-  return spawnScienceAgent({ parameterType: "disease_parameters", disease });
 }
 
 export async function resolveKineticValue(
