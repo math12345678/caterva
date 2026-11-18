@@ -575,7 +575,7 @@ class TestTheVerdictDoesNotRepeatTheAnalysis:
         note = form(
             model, stability=analyse(model.network)
         ).consulted["predictions"]
-        assert "already non-physical, not re-counted here" in note
+        assert "already marked non-physical are not judged again here" in note
 
     def test_a_genuinely_impossible_point_is_still_raised(self) -> None:
         """The cry-wolf direction, and the one that matters.

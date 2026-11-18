@@ -503,3 +503,49 @@ describe("candidates are the finder's, not the page's", () => {
     }
   });
 });
+
+describe("the previous query's rows, still on screen while the next one loads", () => {
+  /**
+   * The list keeps the last answer in view while the next is fetched (keepPreviousData), so it does not
+   * flicker. Those rows answered another question: a click or Enter on one chose an enzyme the person had
+   * typed past, which is how a run "about granzyme B" went out as EC 1.14.19.48 (tert-amyl alcohol
+   * desaturase). Here the second question is held unanswered, so the first one's rows are on screen for as
+   * long as the test likes.
+   */
+  it("are dimmed and cannot be chosen by click or Enter until the answer to what is typed arrives", async () => {
+    setSessionToken("t0k");
+    let release: (r: Response) => void = () => {};
+    const held = new Promise<Response>((resolve) => (release = resolve));
+    mockServer((req) => {
+      if (req.url.startsWith("/api/enzymes/find") && asked(req.url).q.toLowerCase() === "pyruvate kinase muscle") return held;
+      return serve(req);
+    });
+    const onChange = vi.fn();
+    mount(<Harness onChange={onChange} />);
+    await type("pyruvate kinase");
+    const answer = findPyruvateKinase.body as unknown as EnzymeFindResponse;
+    await waitFor(() => expect(screen.getByRole("combobox")).toHaveAttribute("aria-activedescendant"));
+    // Fresh rows are choosable.
+    expect(screen.getAllByRole("option")[0]).not.toHaveAttribute("aria-disabled");
+
+    await type(" muscle");
+    // The next question is asked and not yet answered; the rows on screen are the last question's.
+    await waitFor(() => expect(screen.getByRole("listbox")).toHaveAttribute("data-stale", "true"));
+    const stale = screen.getAllByRole("option");
+    expect(stale[0]).toHaveTextContent(`EC ${answer.candidates[0].ec}`);
+    for (const option of stale) {
+      expect(option).toHaveAttribute("aria-disabled", "true");
+      expect(option).toHaveAttribute("data-stale", "true");
+    }
+    await userEvent.click(stale[0]);
+    await userEvent.keyboard("{Enter}");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Held EC")).toHaveTextContent("");
+
+    // The answer arrives (the recorded one for "pyruvate kinase", standing in): its rows can be chosen.
+    release(json(200, { ...answer, query: "pyruvate kinase muscle" }));
+    await waitFor(() => expect(screen.getByRole("listbox")).not.toHaveAttribute("data-stale"));
+    await userEvent.click(screen.getAllByRole("option")[0]);
+    expect(onChange).toHaveBeenCalledWith(answer.candidates[0].ec, expect.anything());
+  });
+});

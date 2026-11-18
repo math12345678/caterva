@@ -130,7 +130,9 @@ class TestRowsFromPage:
 
     def test_organism_none_reads_every_organism_from_the_cells(self):
         every = rows_from_page(HTML, ec="2.7.1.1", table="km", organism=None, snapshot_ref=SNAPSHOT.ref)
-        assert len(every) == 442
+        # 445 since the third round's review: three rows whose value is a
+        # range, kept where the compound has no single value in the organism.
+        assert len(every) == 445
         organisms = {r.organism for r in every}
         assert {"Homo sapiens", "Saccharomyces cerevisiae", "Trypanosoma cruzi"} <= organisms
         assert all(r.locator.split(":")[3] == r.organism for r in every)
@@ -224,7 +226,7 @@ class TestCertificates:
         # A neighbour row can share the reference, value and commentary; the
         # substrate and organism are what keep the certificate on this row.
         rows = rows_from_page(HTML, ec="2.7.1.1", table=table, organism=None, snapshot_ref=SNAPSHOT.ref)
-        assert len(rows) == {"km": 442, "kcat": 125}[table]
+        assert len(rows) == {"km": 445, "kcat": 125}[table]
         for row in rows:
             certificates = certificates_for(row, PAGE)
             matched = [c.matched for c in certificates]

@@ -66,4 +66,23 @@ describe("a substrate miss names what the enzyme does report", () => {
     const substrate = build("km", "not_found", undefined, undefined, LDH_SUBSTRATES);
     expect(substrate.note).not.toContain("allowCrossSpecies");
   });
+
+  it("names the inhibitor for a Ki, and never calls it a substrate", () => {
+    // "acetylcholinesterase inhibited by donepezil in human": the Ki miss
+    // said "No KI was found for the substrate you named", although the
+    // user named an inhibitor and no substrate (adversarial round,
+    // 2026-11-11).
+    const ki = build("ki", "not_found", undefined, undefined, ["huperzine A", "tacrine"],
+      undefined, undefined, undefined, { name: "donepezil", named: true });
+    expect(ki.note).toContain("No KI was found for donepezil, the inhibitor you named");
+    expect(ki.note).toContain("values for these inhibitors: huperzine A, tacrine");
+    expect(ki.note).not.toContain("substrate");
+  });
+
+  it("does not say 'you named' of a name Caterva chose", () => {
+    const km = build("km", "not_found", undefined, undefined, LDH_SUBSTRATES,
+      undefined, undefined, undefined, { name: "pyruvate", named: false });
+    expect(km.note).toContain("No KM was found for pyruvate, the substrate Caterva chose");
+    expect(km.note).not.toContain("you named");
+  });
 });

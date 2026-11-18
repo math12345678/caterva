@@ -348,3 +348,120 @@ class TestTheBlockingRefusalFires:
         assert simulation["ran"] is False
         assert "do not describe one system" in simulation["because"]
         assert "different organisms" in simulation["because"]
+
+
+class _Choice:
+    """The shape of caterva.compose.defaults.Choice (the shared contract)."""
+
+    def __init__(self, role, chosen):
+        self.role, self.chosen = role, chosen
+
+    def to_json(self):
+        return {"role": self.role, "chosen": self.chosen, "why": "most measured",
+                "alternatives": [{"name": "ATP", "rows": {"km": 106}}], "considered": 2}
+
+
+class _FakeDefaults:
+    """Stands in for caterva.compose.defaults and records each question."""
+
+    def __init__(self, substrate=None, inhibitor=None):
+        self.asked = []
+        self._substrate, self._inhibitor = substrate, inhibitor
+
+    def choose_substrate(self, ec, organism, *, needs_kcat=True):
+        self.asked.append(("substrate", ec, organism, needs_kcat))
+        return self._substrate
+
+    def choose_inhibitor(self, ec, organism, substrate=None):
+        self.asked.append(("inhibitor", ec, organism))
+        return self._inhibitor
+
+
+@pytest.fixture
+def install(monkeypatch):
+    """Put a fake chooser where `from caterva.compose import defaults` finds it."""
+    import caterva.compose as compose_pkg
+
+    def put(fake):
+        monkeypatch.setitem(sys.modules, "caterva.compose.defaults", fake)
+        monkeypatch.setattr(compose_pkg, "defaults", fake, raising=False)
+        return fake
+
+    return put
+
+
+class TestAnUnnamedSubstrateIsChosen:
+    """ADR 0182 on /simulate/parameterize: chosen from BRENDA, never "any".
+
+    brenda_resolver sends `substrate=request.substrate or ""`, and BRENDA's
+    row filter reads "" as every substrate: the Km that came back was
+    whichever substrate's row came first.
+    """
+
+    def test_the_chosen_substrate_is_what_the_request_is_looked_up_for(self, install) -> None:
+        fake = install(_FakeDefaults(substrate=_Choice("substrate", "D-glucose")))
+        requests = [{"quantity": "Km", "subject": "hexokinase",
+                     "ec_number": "2.7.1.1", "table": "km"}]
+        out, choices = caterva_runner._choose_for_requests(requests, "Homo sapiens")
+        assert out[0]["substrate"] == "D-glucose"
+        assert [c["chosen"] for c in choices] == ["D-glucose"]
+        assert fake.asked == [("substrate", "2.7.1.1", "Homo sapiens", False)]
+
+    def test_a_km_and_a_kcat_of_one_enzyme_share_one_choice(self, install) -> None:
+        fake = install(_FakeDefaults(substrate=_Choice("substrate", "D-glucose")))
+        requests = [
+            {"quantity": "Km", "ec_number": "2.7.1.1", "table": "km"},
+            {"quantity": "kcat", "ec_number": "2.7.1.1", "table": "kcat"},
+        ]
+        out, choices = caterva_runner._choose_for_requests(requests, "Homo sapiens")
+        assert [r["substrate"] for r in out] == ["D-glucose", "D-glucose"]
+        assert len(choices) == 1 and len(fake.asked) == 1
+        assert fake.asked[0][3] is True, "a kcat is wanted, so the chooser is told"
+
+    def test_a_ki_with_no_inhibitor_gets_the_inhibitor_chooser(self, install) -> None:
+        fake = install(_FakeDefaults(inhibitor=_Choice("inhibitor", "mannoheptulose")))
+        out, choices = caterva_runner._choose_for_requests(
+            [{"quantity": "Ki", "ec_number": "2.7.1.1", "table": "ki"}], "Homo sapiens")
+        assert out[0]["substrate"] == "mannoheptulose"
+        assert fake.asked == [("inhibitor", "2.7.1.1", "Homo sapiens")]
+        assert choices[0]["role"] == "inhibitor"
+
+    def test_a_named_substrate_is_never_second_guessed(self, install) -> None:
+        fake = install(_FakeDefaults(substrate=_Choice("substrate", "ATP")))
+        out, choices = caterva_runner._choose_for_requests(REQUESTS, "Homo sapiens")
+        assert out == REQUESTS and choices == [] and fake.asked == []
+
+    def test_nothing_to_choose_from_is_refused_with_what_would_fix_it(self, install) -> None:
+        install(_FakeDefaults(substrate=None))
+        with pytest.raises(ValueError, match="no Km row for any substrate of EC 3.4.21.79"):
+            caterva_runner._choose_for_requests(
+                [{"quantity": "Km", "ec_number": "3.4.21.79", "table": "km"}], "Homo sapiens")
+
+    def test_the_choices_reach_the_payload(self, install) -> None:
+        install(_FakeDefaults(substrate=_Choice("substrate", "D-glucose")))
+        requests = [{"quantity": "Km", "subject": "hexokinase",
+                     "ec_number": "2.7.1.1", "table": "km"}]
+        payload = caterva_runner.run_parameterize(
+            {"network": NETWORK_SPEC, "requests": requests},
+            resolve=brenda_like({"Km": [(HUMAN, 0.15, 7.4, 37.0, "HEPES")]}),
+        )
+        assert [c["chosen"] for c in payload["choices"]] == ["D-glucose"]
+
+    def test_brenda_unreachable_while_choosing_is_not_reported_as_no_rows(self, install) -> None:
+        """The real chooser returns None for "no row" and for "page not read"
+        alike unless asked with strict=True; asked so, the second is said as
+        what it is, not as BRENDA having nothing for the enzyme."""
+
+        class Unreadable(_FakeDefaults):
+            def choose_substrate(self, ec, organism, *, needs_kcat=True, strict=False):
+                self.asked.append(("substrate", ec, organism, strict))
+                if strict:
+                    raise ConnectionError("BRENDA did not answer")
+                return None
+
+        fake = install(Unreadable())
+        with pytest.raises(ValueError, match="could not be read") as raised:
+            caterva_runner._choose_for_requests(
+                [{"quantity": "Km", "ec_number": "2.7.1.1", "table": "km"}], "Homo sapiens")
+        assert "no Km row" not in str(raised.value)
+        assert fake.asked == [("substrate", "2.7.1.1", "Homo sapiens", True)]

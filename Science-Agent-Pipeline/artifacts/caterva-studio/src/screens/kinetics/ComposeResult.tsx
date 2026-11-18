@@ -1,7 +1,10 @@
 /**
  * A `caterva compose` result, in the order a reader decides whether to
- * trust it: the verdict (what the model can answer, and the worst thing
- * wrong with it), then where every number came from, then the claims
+ * trust it: a field that contradicts the description, as a warning, first;
+ * the verdict (what the model can answer, and the worst thing wrong with
+ * it); how many constants are measured, and what Caterva chose for a field
+ * left blank with the alternatives one click away (ADR 0182); then where
+ * every number came from, then the claims
  * behind those numbers with the action that re-checks them (Recheck.tsx),
  * then what the model does (time course, influence, steady states,
  * sweeps), then each analysis that was asked for under its own heading
@@ -15,9 +18,10 @@
  * section's text, a placeholder's reason) are shown as the library wrote
  * them: a paraphrase of a caveat is a second, weaker caveat.
  */
-import { ArrowRight } from "lucide-react";
+import { AlertTriangle, ArrowRight, RotateCw } from "lucide-react";
 import { useState } from "react";
 
+import { choicesOf, mismatchOf, rerunPatch, rowsLine, type Mismatch, type RerunPatch, type SearchChoice } from "@/api/choices";
 import type { ComposeResult as Result, Concern, FixedPointView, RunRecord, SourcedValue, StabilityView, StructuredSection } from "@/api/types";
 import { TimeCourseChart } from "@/components/charts/TimeCourseChart";
 import { NameRefusalChoices } from "@/components/enzyme/NameRefusal";
@@ -240,21 +244,28 @@ function Conditions({ v }: { v: SourcedValue }) {
   );
 }
 
-/** Where one number came from, inline: the facts the provenance detail carries, laid out for a table row. */
-export function Origin({ v }: { v: SourcedValue }) {
+/**
+ * Where one number came from, inline: the facts the provenance detail carries, laid out for a table row.
+ *
+ * A measured row leads with what a reader checks first, in this order: the organism, the compound the row was
+ * measured for (`compound`, when the ledger can say it: "substrate D-glucose", "inhibitor gossypol"), then the
+ * citation ("BRENDA ref 641068"), then the assay conditions. The value and its unit stand in the column before.
+ */
+export function Origin({ v, compound }: { v: SourcedValue; compound?: string | null }) {
   const p = v.provenance;
   switch (p.kind) {
     case "measured":
       return (
         <div className="k-origin">
           <div className="k-origin-line">
-            {p.citation ? <Citation citation={p.citation} /> : null}
             {p.organism ? (
               <span>
                 <em>{p.organism}</em>
                 {p.cross_species ? <span className="text-caution"> (another organism than the model's)</span> : null}
               </span>
             ) : null}
+            {compound ? <span className="k-origin-compound">{compound}</span> : null}
+            {p.citation ? <Citation citation={p.citation} /> : null}
             <Conditions v={v} />
           </div>
           {p.commentary ? <blockquote className="k-row-says">{p.commentary}</blockquote> : null}
@@ -312,7 +323,7 @@ export function Origin({ v }: { v: SourcedValue }) {
   }
 }
 
-function LedgerRows({ values, name }: { values: { key: string; name: string; v: SourcedValue }[]; name: string }) {
+function LedgerRows({ values, name }: { values: { key: string; name: string; v: SourcedValue; compound?: string | null }[]; name: string }) {
   return (
     <div className="table-wrap">
       <table className="table k-ledger">
@@ -326,7 +337,7 @@ function LedgerRows({ values, name }: { values: { key: string; name: string; v: 
           </tr>
         </thead>
         <tbody>
-          {values.map(({ key, name: label, v }) => (
+          {values.map(({ key, name: label, v, compound }) => (
             <tr key={key} data-kind={v.provenance.kind}>
               <th scope="row" className="k-ledger-name">
                 <span className="font-mono">{label}</span>
@@ -336,13 +347,82 @@ function LedgerRows({ values, name }: { values: { key: string; name: string; v: 
                 <Value v={v} />
               </td>
               <td>
-                <Origin v={v} />
+                <Origin v={v} compound={compound} />
               </td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * The compound a measured constant was measured for, when the ledger can say so without guessing: a Km or kcat
+ * of a one-enzyme model was looked up for the search's substrate, and its Ki for the one inhibitor the search
+ * named. The engine takes a row only for exactly that compound (ADR 0182), so this repeats what it searched for;
+ * a model with two Km constants (two enzymes) gets nothing, because which substrate is whose is not in the row.
+ *
+ * ONLY WHEN NO OTHER COMPOUND COULD HAVE BEEN SEARCHED. The engine looks a constant up under the compound
+ * named for its own port first (`--compound S=D-fructose`, caterva/compose/pipeline.py `compound_for`), and
+ * only then under the substrate or "@inhibitor"; a product's constant goes under "@product". None of that is
+ * in the row. So once the search used any compound but "@inhibitor", a lone Km may have been measured for a
+ * compound other than `search.substrate`, and a lone Ki for another than "@inhibitor": the ledger names
+ * nothing rather than print a compound beside a number that was not measured for it.
+ */
+export function compoundOf(v: SourcedValue, result: Result): string | null {
+  if (v.provenance.kind !== "measured" || !v.label) return null;
+  const same = result.model.parameters.filter((p) => p.label === v.label).length;
+  if (same !== 1) return null;
+  const s = result.search;
+  const searched = Object.keys(s.compounds ?? {});
+  if (searched.some((port) => port !== "@inhibitor")) return null;
+  if ((v.label === "Km" || v.label === "kcat") && s.substrate) return `substrate ${s.substrate}`;
+  const inhibitor = s.compounds?.["@inhibitor"];
+  if (v.label === "Ki" && inhibitor) return `inhibitor ${inhibitor}`;
+  return null;
+}
+
+/** How many of the model's constants are measured, and from where: the page's one-glance answer to "is this real data?". */
+export function measuredTally(result: Result): { measured: number; placeholders: number; total: number; brenda: boolean; crossSpecies: number } {
+  const constants = result.model.parameters;
+  const measured = constants.filter((p) => p.provenance.kind === "measured");
+  return {
+    measured: measured.length,
+    placeholders: constants.filter((p) => p.provenance.kind === "placeholder").length,
+    total: constants.length,
+    brenda: measured.length > 0 && measured.every((p) => (p.provenance.citation?.registry ?? "").toUpperCase() === "BRENDA"),
+    crossSpecies: measured.filter((p) => p.provenance.cross_species).length,
+  };
+}
+
+/**
+ * "3 of 3 constants measured from BRENDA". Placed at the top, beside the search, so whether the model rests on
+ * the literature or on placeholders is the first thing read and not something to count down a table for. The
+ * tone is the provenance mark's: signal when every constant is measured, caution when any is a placeholder.
+ */
+export function MeasuredBadge({ result }: { result: Result }) {
+  const t = measuredTally(result);
+  if (t.total === 0) return null;
+  const source = t.brenda ? " from BRENDA" : "";
+  const tone = t.placeholders === 0 && t.measured === t.total ? "signal" : t.placeholders > 0 ? "caution" : undefined;
+  return (
+    <p className="k-measured" data-testid="measured-badge" data-tone={tone}>
+      <span className="k-measured-count">
+        {t.measured} of {plural(t.total, "constant")} measured{source}
+      </span>
+      {/* "Measured" alone would read as measured in the model's organism; a row from another one says so in the
+          ledger, and the count here says so before the ledger is reached. */}
+      {t.crossSpecies ? <span className="text-caution">{` (${t.crossSpecies} in another organism than the model's)`}</span> : null}
+      {t.placeholders ? (
+        <>
+          {" · "}
+          <a href="#k-numbers">
+            {plural(t.placeholders, "placeholder")}, each saying why and what would replace it
+          </a>
+        </>
+      ) : null}
+    </p>
   );
 }
 
@@ -366,7 +446,10 @@ export function NumbersLedger({ result }: { result: Result }) {
           <ProvenanceMark provenance={{ kind: "placeholder" }} decorative /> {PLACEHOLDER_SHARED}
         </p>
       ) : null}
-      <LedgerRows name="Constant" values={parameters.map((p) => ({ key: p.id ?? p.label ?? "", name: p.id ?? p.label ?? "", v: p }))} />
+      <LedgerRows
+        name="Constant"
+        values={parameters.map((p) => ({ key: p.id ?? p.label ?? "", name: p.id ?? p.label ?? "", v: p, compound: compoundOf(p, result) }))}
+      />
       {species.length ? (
         <Disclosure title="Starting amounts" aside={<span className="font-mono">{species.length}</span>}>
           <LedgerRows name="Species" values={species.map((s) => ({ key: s.id, name: s.id, v: s.initial }))} />
@@ -407,6 +490,146 @@ function Search({ result }: { result: Result }) {
         </p>
       ) : null}
     </div>
+  );
+}
+
+/** The engine writes a choice's why as a clause ("of the 12 substrates BRENDA lists ..."); shown alone, it is a sentence. */
+function sentence(clause: string): string {
+  const t = clause.trim();
+  if (!t) return t;
+  const head = t[0].toUpperCase() + t.slice(1);
+  return /[.!?]$/.test(head) ? head : `${head}.`;
+}
+
+const ROLE_WORD: Record<SearchChoice["role"], string> = {
+  substrate: "substrate",
+  inhibitor: "inhibitor",
+  organism: "organism",
+  enzyme: "enzyme",
+};
+
+/**
+ * One automatic choice (ADR 0182): "Caterva chose the substrate D-glucose", the engine's own why, and every
+ * alternative it listed as a chip with BRENDA's row counts. A chip runs compose again with that value set (and
+ * the choices made before this one kept: `rerunPatch`), so switching is one click, not a trip back to the form.
+ * Without `onRerun` (a screen that cannot run compose) the alternatives are listed, not offered.
+ */
+function ChoicePanel({
+  choice,
+  index,
+  choices,
+  onRerun,
+}: {
+  choice: SearchChoice;
+  index: number;
+  choices: readonly SearchChoice[];
+  onRerun?: (patch: RerunPatch) => void;
+}) {
+  const role = ROLE_WORD[choice.role];
+  const kept = choices.slice(0, index);
+  const listed = choice.alternatives.filter((a) => a.name !== choice.chosen);
+  const unlisted = choice.considered - listed.length - 1;
+  return (
+    <section className="k-choice" aria-label={`Caterva chose the ${role}`} data-role={choice.role}>
+      <p className="k-choice-head">
+        <span className="k-eyebrow">Caterva chose the {role}</span>{" "}
+        <span className={choice.role === "enzyme" ? "k-choice-value font-mono" : "k-choice-value"}>
+          {choice.role === "organism" ? <em>{choice.chosen}</em> : choice.chosen}
+        </span>
+      </p>
+      {choice.why ? <p className="k-choice-why">{sentence(plain(choice.why))}</p> : null}
+      {listed.length ? (
+        <div className="k-choice-alts">
+          <p className="k-choice-alts-label muted">
+            {onRerun ? `Run it with another ${role} instead:` : `Other ${role}s BRENDA has rows for:`}
+          </p>
+          <ul className="k-choice-chips">
+            {listed.map((a) => {
+              const rows = rowsLine(a.rows);
+              const label = rows ? `${a.name} · ${rows}` : a.name;
+              const keeping = kept.length ? `, keeping ${kept.map((k) => `the ${ROLE_WORD[k.role]} ${k.chosen}`).join(" and ")}` : "";
+              return (
+                <li key={a.name}>
+                  {onRerun ? (
+                    <button
+                      type="button"
+                      className="chip k-choice-chip"
+                      title={`Runs compose again with the ${role} ${a.name}${keeping}`}
+                      aria-label={`Run again with the ${role} ${a.name}${rows ? ` (${rows} rows in BRENDA)` : ""}`}
+                      onClick={() => onRerun(rerunPatch(choices, index, a.name))}
+                    >
+                      <RotateCw size={11} aria-hidden="true" />
+                      {label}
+                    </button>
+                  ) : (
+                    <span className="chip">{label}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {unlisted > 0 ? (
+            <p className="muted k-choice-more">
+              {plural(unlisted, "more option")} weighed and not listed; name one in the {role} field to use it.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** Every automatic choice of the run, in the order the engine made them; nothing for a run with none (or an old run). */
+export function Choices({ result, onRerun }: { result: Result; onRerun?: (patch: RerunPatch) => void }) {
+  const choices = choicesOf(result);
+  if (!choices.length) return null;
+  return (
+    <div className="k-choices" data-testid="choices">
+      {choices.map((c, i) => (
+        <ChoicePanel key={`${c.role}-${i}`} choice={c} index={i} choices={choices} onRerun={onRerun} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A field the person set that contradicts the enzyme or organism the description names. The engine runs with
+ * the field ("a flag wins over the description") and notes it; that note was a line among the notes at the
+ * bottom of the page, which is how a run "about granzyme B" went out with the constants of tert-amyl alcohol
+ * desaturase. Here it is a warning at the top, with the one-click run the description asked for.
+ */
+function MismatchWarnings({ result, onRerun }: { result: Result; onRerun?: (patch: RerunPatch) => void }) {
+  const found = result.notes.map(mismatchOf).filter((m): m is Mismatch => m !== null);
+  if (!found.length) return null;
+  return (
+    <>
+      {found.map((m) => (
+        <div className="k-mismatch" role="alert" key={m.note} data-field={m.field}>
+          <p className="k-mismatch-text">
+            <AlertTriangle size={14} aria-hidden="true" />
+            <span>
+              {m.field === "subject" ? (
+                <>
+                  Your description names <strong>{m.named}</strong> (EC <span className="font-mono">{m.readAs}</span>), but this run used
+                  EC <span className="font-mono">{m.used}</span> from the enzyme field. Every constant below belongs to EC{" "}
+                  <span className="font-mono">{m.used}</span>.
+                </>
+              ) : (
+                <>
+                  Your description names <strong>{m.named}</strong> (<em>{m.readAs}</em>), but this run used <em>{m.used}</em> from the
+                  organism field.
+                </>
+              )}
+            </span>
+          </p>
+          {onRerun ? (
+            <button type="button" className="btn btn-sm" onClick={() => onRerun({ [m.field]: m.readAs })}>
+              {m.field === "subject" ? `Use EC ${m.readAs} (${m.named}) instead` : `Use ${m.readAs} instead`}
+            </button>
+          ) : null}
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -658,15 +881,29 @@ function AnalysisSection({ section }: { section: StructuredSection }) {
   );
 }
 
-export function ComposeResultView({ result, run, onChooseEnzyme }: { result: Result; run: RunRecord; onChooseEnzyme?: (ec: string) => void }) {
+export function ComposeResultView({
+  result,
+  run,
+  onChooseEnzyme,
+  onRerun,
+}: {
+  result: Result;
+  run: RunRecord;
+  onChooseEnzyme?: (ec: string) => void;
+  /** Run compose again with the same request and these fields set (a choice's chip, the mismatch warning's button). */
+  onRerun?: (patch: RerunPatch) => void;
+}) {
   const refusedExports = Object.entries(result.exports).filter(([, e]) => !e.available);
   return (
     <>
+      <MismatchWarnings result={result} onRerun={onRerun} />
       <Verdict result={result} run={run} onChooseEnzyme={onChooseEnzyme} />
       <p className="k-reading">
         Read <span className="font-mono">{result.query}</span> as {result.recognition.reading}{" "}
         <span className="muted font-mono">({result.recognition.rule})</span>
       </p>
+      <MeasuredBadge result={result} />
+      <Choices result={result} onRerun={onRerun} />
       <Search result={result} />
       <NumbersLedger result={result} />
       <ClaimsSection result={result} run={run} />

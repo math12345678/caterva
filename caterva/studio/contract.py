@@ -175,6 +175,11 @@ ASSISTANT_PROVENANCE_KIND = "ai"
 ChosenBy = Literal["user", "default"]
 CHOSEN_BY: Tuple[str, ...] = ("user", "default")
 
+#: Which field of a compose request an automatic choice filled (ADR 0182):
+#: "enzyme" is the subject, as an EC number.
+ChoiceRole = Literal["enzyme", "organism", "substrate", "inhibitor"]
+CHOICE_ROLES: Tuple[str, ...] = ("enzyme", "organism", "substrate", "inhibitor")
+
 Nonfinite = Literal["nan", "inf", "-inf"]
 NONFINITE: Tuple[str, ...] = ("nan", "inf", "-inf")
 
@@ -1113,6 +1118,39 @@ class ModelStructure(TypedDict):
     motifs: List[MotifRow]
 
 
+class ChoiceOption(TypedDict):
+    """One option BRENDA had for a choice, with its usable rows per table
+    ({"km": 9, "kcat": 4})."""
+    name: str
+    rows: Dict[str, int]
+
+
+class _SearchChoiceRequired(TypedDict):
+    role: ChoiceRole
+    chosen: str
+    #: The reason, as a clause ("of the 10 substrates BRENDA lists ...").
+    why: str
+    #: The next-best options, best first.
+    alternatives: List[ChoiceOption]
+    #: How many options were weighed in all, THE CHOSEN ONE INCLUDED: the
+    #: options neither chosen nor listed number considered - 1 - len(alternatives).
+    considered: int
+
+
+class SearchChoice(_SearchChoiceRequired, total=False):
+    """`caterva.compose.defaults.Choice.to_json()` (ADR 0182). `rows` and
+    `instead` are always written since 2026-11-12, and optional here because
+    a result saved before then has neither."""
+    #: The chosen option's own row counts, the rows the search can use
+    #: ({"km": 4, "kcat": 1}), as `alternatives[].rows` counts them.
+    rows: Dict[str, int]
+    #: When the request DID name something that could not be used, the
+    #: clause saying so ("No substrate BRENDA lists ... was named (no word of
+    #: your description, 'midazolam', is one)"); None when nothing was set
+    #: aside and the note opens "No substrate was named".
+    instead: Optional[str]
+
+
 class SearchSummary(TypedDict):
     asked: bool
     refused: bool
@@ -1130,6 +1168,10 @@ class SearchSummary(TypedDict):
     unused_compounds: Dict[str, str]
     measured: int
     placeholders: int
+    #: What Caterva chose for what the request did not name (ADR 0182), in
+    #: the order chosen. Empty when nothing was chosen. Every choice is also
+    #: a plain-English note in `ComposeResult.notes`.
+    choices: List[SearchChoice]
 
 
 class _ConcernRequired(TypedDict):
@@ -2797,6 +2839,7 @@ MIRRORED_UNIONS: Mapping[str, Tuple[str, ...]] = {
     "ProvenanceKind": PROVENANCE_KINDS,
     "ChosenBy": CHOSEN_BY,
     "Nonfinite": NONFINITE,
+    "ChoiceRole": CHOICE_ROLES,
     "ErrorCode": ERROR_CODES,
     "Need": NEEDS,
     "Theme": THEMES,

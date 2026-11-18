@@ -33,8 +33,9 @@
 caterva compose "Michaelis-Menten with a competitive inhibitor" \
     --subject 1.1.1.27 --organism human --substrate pyruvate --inhibitor gossypol
 # -> Km 0.03 mM for pyruvate (BRENDA ref 286469)
-#    Ki 0.0014 mM for gossypol (BRENDA ref 711801), and the report says the
-#    row measured isoform LDH-B and states no inhibition mode
+#    Ki 0.0019 mM for gossypol (BRENDA ref 711801), the median of that
+#    paper's three rows, and the report says the row measured isoform LDH-A
+#    and states no inhibition mode
 #    kcat: never measured in human, so it stays a labelled placeholder and
 #    the report names the organisms where it was measured
 ```
@@ -124,7 +125,7 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 8,902 tests (7,210 engine + 1,692 literature)
+make test      # runs all 9,940 tests (7,939 engine + 2,001 literature)
 ```
 
 ### Or download the release
@@ -592,17 +593,17 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Caterva/
 ├── caterva/                  simulation engine (ODE + discrete/stochastic)
 │   ├── caterva_engine.py     public entry point (88 names)
-│   └── tests/                7,210 tests
+│   └── tests/                7,939 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1692 tests
+│   └── ...                   2001 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    179 decision records (and counting)
+│   └── adr/                    180 decision records (and counting)
 ├── scripts/                    79 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
@@ -683,10 +684,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 8,902 tests
+make test        # run all 9,940 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (7,210 tests)
-make test-lit    # literature layer only (1692 tests)
+make test-sim    # simulation engine only (7,939 tests)
+make test-lit    # literature layer only (2001 tests)
 python3 scripts/verify_build.py --quick  # all 79 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

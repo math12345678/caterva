@@ -143,6 +143,20 @@ class ParameterSource:
     #: mode. None otherwise. Read by `caterva compose --any-mode` to name the
     #: row its default carries; like `evidence_only`, not a candidate.
     mode_default: Optional[Any] = None
+    #: `KineticResult.chosen_because`: the resolver's own plain-English
+    #: reason for carrying this row (the median of the best-described rows,
+    #: what was set aside, the spread, and the paired constant's paper when
+    #: a Km and a kcat were taken from one paper; ADR 0182). None for a
+    #: value the resolver did not choose (a re-selection clears it, and says
+    #: its own reason).
+    resolver_because: Optional[str] = None
+    #: `KineticResult.wide_spread`: the rows chosen from span more than
+    #: 100-fold, so one value hides most of what is known.
+    wide_spread: bool = False
+    #: `KineticResult.row_isoform`: the isoform the carried row measured, by
+    #: its commentary or its own UniProt cell ("GCK" for P35557). None when
+    #: the row names none, or for a value the resolver did not choose.
+    row_isoform: Optional[str] = None
 
     @property
     def conditions_stated(self) -> bool:

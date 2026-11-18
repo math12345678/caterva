@@ -201,11 +201,15 @@ def test_a_failure_with_suggestions_in_hand_still_shows_them():
 
 
 def test_a_fragment_of_a_longer_name_is_a_suggestion_even_when_it_is_the_only_match():
+    # Not "glucose isomerase" since the fifth round of the real-values
+    # review: that is xylose isomerase's industrial name (EC 5.3.1.5, the
+    # alias table).
     with pytest.raises(NameNotResolved) as raised:
-        resolve_enzyme_name("glucose isomerase", "human")
+        resolve_enzyme_name("glucose phosphate isomerase", "human")
     assert raised.value.kind == SUGGESTIONS
     assert "EC 5.3.1.9 glucose-6-phosphate isomerase" in str(raised.value)
-    assert str(raised.value).endswith("--subject <its EC number>")
+    # A command that runs, for the first suggestion (fifth round, R5V1-25).
+    assert str(raised.value).endswith("--subject 5.3.1.9")
 
 
 def test_an_abbreviation_is_a_refusal_naming_what_it_can_mean_and_uniprot_is_not_asked():
@@ -215,16 +219,20 @@ def test_an_abbreviation_is_a_refusal_naming_what_it_can_mean_and_uniprot_is_not
         asked.append(name)
         return ["3.4.21.4"]
 
-    for name in ("LDH", "HK1", "ACHE", "SDH"):
+    # HK1 and ACHE are one enzyme each in human and now resolve (ADR 0182, tested below); LDH and SDH
+    # are several and stay a refusal.
+    for name in ("LDH", "SDH"):
         with pytest.raises(NameNotResolved) as raised:
             resolve_enzyme_name(name, "human", uniprot=uniprot)
         assert raised.value.kind == AMBIGUOUS and raised.value.confirm_only, name
         assert raised.value.named and "will not choose for you" in str(raised.value)
         assert raised.value.recommended is None
+    for name, ec in (("HK1", "2.7.1.1"), ("ACHE", "3.1.1.7")):
+        assert resolve_enzyme_name(name, "human", uniprot=uniprot).ec == ec
     assert asked == [], "the candidates the table lists are the choices; UniProt is not consulted"
     with pytest.raises(NameNotResolved) as raised:
-        resolve_enzyme_name("ACHE", "human", rerun="--ec {ec}")
-    assert str(raised.value).endswith("re-run with --ec 3.1.1.7")
+        resolve_enzyme_name("SDH", "human", rerun="--ec {ec}")
+    assert str(raised.value).endswith("re-run with --ec 1.3.5.1")
 
 
 def test_the_literature_lookup_is_available_in_a_checkout():

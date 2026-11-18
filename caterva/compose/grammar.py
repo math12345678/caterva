@@ -2346,7 +2346,17 @@ RULES: Tuple[Rule, ...] = (
                                   "enzyme-catalyzed", "enzyme catalysed",
                                   "enzyme catalyzed", "enzymatic reaction",
                                   "enzyme reaction", "enzyme converting",
-                                  "enzyme turning", "enzyme that converts"),
+                                  "enzyme turning", "enzyme that converts",
+                                  # The plainest sentence a student types,
+                                  # "an enzyme converts a substrate to a
+                                  # product", was refused with "did you mean
+                                  # furin?" ('converts' is close to
+                                  # 'convertase').
+                                  "enzyme converts", "enzyme turns",
+                                  "enzyme that turns", "substrate to a product",
+                                  "substrate into a product",
+                                  "substrate to product",
+                                  "substrate into product"),
          _single_enzyme,
          "one enzyme turning one substrate into one product", 45),
     Rule("conversion", (), ("no catalyst", "a -> b", "first order conversion", "converts to",
@@ -2394,6 +2404,9 @@ def recognise(query: str, *, name: Optional[str] = None) -> Recognition:
         )
     ]
     if not candidates:
+        typo = _misspelt_enzyme(query) or _fragment_of_enzyme_names(query)
+        if typo:
+            raise UnrecognisedShape(query, typo, suggestions=[])
         raise UnrecognisedShape(
             query,
             "No shape in this grammar matches. It recognises mechanisms, not "
@@ -2422,3 +2435,124 @@ __all__ = [
     "MissingMotifLibrary", "Rule", "RULES", "NAMED_PATHWAYS",
     "MAX_INFERRED_STAGES", "EXPANSION_LIBRARIES",
 ]
+
+
+#: Ordinary words of a mechanism's description, never read as a misspelt
+#: enzyme name by `_misspelt_enzyme`.
+_MECHANISM_WORDS = frozenset("""
+convert converts converted converting conversion turns turning catalyse catalyses
+catalysed catalysing catalyze catalyzes catalyzed catalyzing produce produces produced
+producing product products substrate substrates forms forming formed binds binding
+inhibits inhibited inhibiting inhibitor inhibition activates activated activating
+cleaves cleaved cleaving hydrolyses hydrolyzes hydrolysed hydrolyzed transfers
+transferring oxidises oxidizes oxidised oxidized reduces reduced reducing
+phosphorylates phosphorylated phosphorylating enzyme enzymes reaction reactions
+""".split())
+
+
+def _misspelt_enzyme(query: str) -> Optional[str]:
+    """"Did you mean ..." for a description whose enzyme name is misspelt,
+    or None. "glyceraldehyde-3-phosphate dehydrogenaes from rabbit muscle"
+    got the shape refusal and the list of shapes, with no word about the
+    one letter that was wrong (third round's review; ADR 0181 lists typo
+    suggestions for names). The enzyme finder's typo tier is asked about
+    each run of up to five words; the longest run it is close to wins."""
+    try:
+        from caterva.enzymes.finder import TIER_TYPO, _outside_parentheses, find
+    except Exception:  # noqa: BLE001 - no finder: the shape refusal stands
+        return None
+    words = query.split()
+    best = None
+    # The organism the description names ranks the suggestions, as it ranks
+    # them in the reader: "phosphoglucomutse from rabbit muscle" is closest
+    # to the enzyme listing rabbit PGM1 (sixth round of the review).
+    try:
+        from caterva.enzymes.sentence import _read_organism, _tokens
+
+        named = {binomial for _, _, _, binomial in _read_organism(_tokens(query))}
+        organism = named.pop() if len(named) == 1 else None
+    except Exception:  # noqa: BLE001 - no organism read: the finder's own order
+        organism = None
+    for size in range(min(5, len(words)), 0, -1):
+        for start in range(len(words) - size + 1):
+            window = " ".join(words[start:start + size]).strip(",.;:")
+            if len(window) < 6:
+                continue
+            if all(w.lower().strip(",.;:") in _MECHANISM_WORDS for w in window.split()):
+                # The words a mechanism is described in are not misspelt
+                # enzyme names: "converts" is two letters from 'convertase'
+                # and "an enzyme converts a substrate to a product" was
+                # answered with "did you mean furin?".
+                continue
+            try:
+                found = [c for c in find(window, organism, limit=None) if c.tier == TIER_TYPO]
+            except Exception:  # noqa: BLE001
+                continue
+            if found:
+                best = (start, size, window, found)
+                break
+        if best:
+            break
+    if not best:
+        return None
+    start, size, window, found = best
+    names = []
+    for c in found:
+        if c.name not in names:
+            names.append(c.name)
+    # The name the typed word was close to, when it is a whole name: "enolse"
+    # is one letter from 'enolase', EC 4.2.1.11's other name, which is what
+    # people call it; its accepted name, 'phosphopyruvate hydratase', is
+    # nothing like what was typed (fifth round of the real-values review).
+    head = found[0]
+    whole = head.alternative_names[0] if head.alternative_names and not head.spare else None
+    spelled = _outside_parentheses(whole or head.name).strip()
+    fixed = " ".join(words[:start] + [spelled] + words[start + size:])
+    listed = "; ".join(f"EC {c.ec} {c.name}"
+                       + (f" (other name '{c.alternative_names[0]}')" if c.alternative_names else "")
+                       for c in found[:4])
+    more = f"; and {len(found) - 4} more" if len(found) > 4 else ""
+    return (f"No enzyme name matches {window!r} exactly, and no shape in this grammar matches "
+            f"the rest. It is close to: {listed}{more}. Did you mean {spelled!r}? Re-run with the "
+            f"name spelled as the enzyme nomenclature spells it, for example: caterva compose "
+            f"\"{fixed}\"")
+
+
+def _fragment_of_enzyme_names(query: str) -> Optional[str]:
+    """The enzyme names a run of the description's words is part of, when
+    no enzyme is named by those words whole; None otherwise.
+
+    "glucose isomerase from Streptomyces" got the shape refusal and the list
+    of mechanisms, though the enzyme finder had an answer for its words
+    (fifth round of the real-values review): an enzyme-like phrase that is
+    part of other names is said, with those names and the flag that takes
+    one, instead of "no shape matches". The longest run ending in a word
+    like an enzyme's (-ase) is asked; the names it is part of are listed,
+    never chosen."""
+    try:
+        from caterva.enzymes.finder import TIER_TYPO, Ambiguous, resolve
+    except Exception:  # noqa: BLE001 - no finder: the shape refusal stands
+        return None
+    words = [w.strip(",.;:") for w in query.split()]
+    for size in range(min(5, len(words)), 1, -1):
+        for start in range(len(words) - size + 1):
+            run = words[start:start + size]
+            if not re.search(r"ase$", run[-1], re.IGNORECASE):
+                continue
+            window = " ".join(run)
+            try:
+                result = resolve(window)
+            except Exception:  # noqa: BLE001
+                continue
+            if not isinstance(result, Ambiguous) or not result.candidates:
+                continue
+            named = [c for c in result.candidates if c.tier != TIER_TYPO and c.via in ("name", "ec")]
+            if not named:
+                continue
+            listed = "; ".join(f"EC {c.ec} {c.name}" for c in named[:4])
+            more = f"; and {len(named) - 4} more" if len(named) > 4 else ""
+            return (f"No enzyme is named {window!r} by those words alone, and no shape in this grammar "
+                    f"matches the rest. The words are part of these enzymes' names: {listed}{more}. "
+                    f"If one of them is the enzyme you mean, re-run with its EC number: caterva compose "
+                    f"\"{query}\" --subject <EC number>; `caterva enzyme '{window}'` lists them all")
+    return None

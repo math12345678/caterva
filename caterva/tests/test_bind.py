@@ -200,10 +200,24 @@ def test_the_benchmark_rule(monkeypatch):
 # `--ec hexokinase` went to BRENDA as the number and printed "No Ki rows for
 # EC hexokinase in Homo sapiens.": an absence nobody had searched for.
 
-HK_PAGE = ROOT / "Tests" / "fixtures" / "brenda_hexokinase_fixture.html"
+#: The recorded full page, which has a Ki table. This was the cut-down Km
+#: fixture (brenda_hexokinase_fixture.html) until 2026-11-11: it has no Ki
+#: table, and its Km rows were listed as "compounds with a recorded Ki"
+#: through the parser's whole-page fallback, which no longer runs on a page
+#: whose navigation lists no Ki table.
+HK_RECORDED = ROOT / "Tests" / "fixtures" / "recorded" / "brenda_2.7.1.1.html.gz"
 
 
-def test_an_enzyme_name_is_read_as_its_ec_number_and_said_so(capsys, monkeypatch):
+@pytest.fixture
+def HK_PAGE(tmp_path):
+    import gzip
+    page = tmp_path / "brenda_2.7.1.1.html"
+    page.write_text(gzip.decompress(HK_RECORDED.read_bytes()).decode("utf-8", errors="replace"),
+                    encoding="utf-8")
+    return page
+
+
+def test_an_enzyme_name_is_read_as_its_ec_number_and_said_so(capsys, monkeypatch, HK_PAGE):
     import caterva.bind.__main__ as cli
 
     asked = []
@@ -286,7 +300,10 @@ def test_bind_refuses_a_word_for_a_kind_of_enzyme_before_reading_brenda(word, ca
     assert "Read " not in out.err and "Re-run with --ec <its EC number>" in out.err
 
 
-@pytest.mark.parametrize("typed, read_as", [("humn", "Humn"), ("potato", "Potato")])
+# A word no table holds is used exactly as typed, never re-cased into a genus (ADR 0182).
+# ("potato" was the unknown word until the names review read it as Solanum
+# tuberosum; "kumquat" is a word no table holds.)
+@pytest.mark.parametrize("typed, read_as", [("humn", "humn"), ("kumquat", "kumquat")])
 def test_an_organism_the_page_never_names_is_said_so_not_reported_as_no_ki_rows(typed, read_as, capsys):
     # `--organism humn` printed "No Ki rows for EC 2.7.1.1 in Humn." (exit 3)
     # while `human` lists the page's compounds.

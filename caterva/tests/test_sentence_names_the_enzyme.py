@@ -6,7 +6,7 @@ On 2026-11-02 `caterva compose "Michaelis-Menten kinetics of human
 hexokinase on glucose"` built the model on the motif library's placeholder
 constants and said "no enzyme was named", and "hexokinase glucose human" was
 refused as no shape at all, while the same words as flags reached BRENDA's
-Km 6.0 mM (ref 641068) and kcat 40.1 1/s (ref 739603). These hold the
+Km and kcat. These hold the
 sentence to the flags' answer, and hold the reader to what it must never do:
 read a class word, a typo, a fragment or a lower-case English word as an
 enzyme, pick one of several, ground a cascade in one enzyme, or take a word
@@ -30,7 +30,10 @@ from caterva.enzymes.sentence import match_substrate, read_sentence
 from studio_kinetics_offline import context, hexokinase_offline, run_cli
 
 FLAGS = ["--no-simulate", "--no-analysis", "--no-ranking"]
-KM_ROW = "| `reaction_Km` | 6.0 mM | literature (Homo sapiens) | BRENDA ref 641068 |"
+#: The flags' answer on the recorded page: a Km and a kcat from one paper,
+#: ref 739603, the one paper holding a row of each among the rows chosen
+#: from (fallback_logic.resolve_kinetic_pair, ADR 0182).
+KM_ROW = "| `reaction_Km` | 6.3 mM | literature (Homo sapiens) | BRENDA ref 739603 |"
 KCAT_ROW = "| `reaction_kcat` | 40.1 1/s | literature (Homo sapiens) | BRENDA ref 739603 |"
 
 
@@ -271,7 +274,24 @@ def test_the_sentence_and_the_flags_give_the_same_constants():
     assert rows(by_sentence) == rows(by_flags) and KM_ROW in rows(by_flags)
 
 
-def test_a_name_that_is_several_enzymes_refuses_with_the_command_to_type(monkeypatch):
+def _km_rows_per_ec(monkeypatch, rows_by_ec):
+    """`defaults.table_rows` answering `rows_by_ec[ec]` Km rows for any
+    organism, so which EC the data singles out is decided offline."""
+    from caterva.compose import defaults
+
+    def table_rows(ec, table, organism):
+        n = rows_by_ec.get(ec, 0) if table == "km" else 0
+        return tuple(defaults._Row("pyruvate", organism, "") for _ in range(n))
+
+    monkeypatch.setattr(defaults, "table_rows", table_rows)
+
+
+def test_a_name_that_is_several_enzymes_with_rows_for_both_refuses_with_the_command_to_type(
+        monkeypatch):
+    """Both readings of the name have measurements in the organism: that is a
+    question only the user can answer, refused as before (ADR 0181), even
+    though ADR 0182 lets the data break a tie it can break."""
+    _km_rows_per_ec(monkeypatch, {"1.1.1.27": 40, "1.1.1.28": 2})
     with _no_network(monkeypatch) as attempts:
         code, out, err = _main(["lactate dehydrogenase pyruvate human", *FLAGS])
     assert attempts == [], "an ambiguous name must not be searched for"
@@ -279,6 +299,41 @@ def test_a_name_that_is_several_enzymes_refuses_with_the_command_to_type(monkeyp
     assert "EC 1.1.1.27 L-lactate dehydrogenase" in out and "EC 1.1.1.28 D-lactate dehydrogenase" in out
     assert 'caterva compose "lactate dehydrogenase pyruvate human" --subject 1.1.1.27' in out
     assert "no enzyme was named" not in out.lower()
+    assert "Caterva used EC" not in out
+
+
+def test_a_name_the_data_singles_out_is_taken_and_the_others_named(monkeypatch):
+    """ADR 0182: of the two enzymes 'lactate dehydrogenase' matches best,
+    only one has Km rows in the organism, so it is the subject, as a choice
+    the report states with the other candidate and its rows."""
+    import caterva.compose.__main__ as cli
+
+    _km_rows_per_ec(monkeypatch, {"1.1.1.27": 12})
+    monkeypatch.setattr(cli, "brenda_km_substrates", lambda ec, org: {"pyruvate": 12})
+    args = _args(description="lactate dehydrogenase with pyruvate in human")
+    read = cli.read_description(args, err=io.StringIO())
+    assert read.name_refusal is None
+    assert (args.subject, args.organism, args.substrate) == ("1.1.1.27", "Homo sapiens", "pyruvate")
+    (choice,) = read.choices
+    assert choice.role == "enzyme" and choice.chosen == "1.1.1.27"
+    assert choice.note() == (
+        "Caterva used EC 1.1.1.27: your description names 'lactate dehydrogenase', which is not one "
+        "enzyme; L-lactate dehydrogenase is used because it is the only one of the 2 enzymes the "
+        "name matches best with Km rows in Homo sapiens (12 Km rows). Others: EC 1.1.1.28 (D-lactate "
+        "dehydrogenase) (no rows). Pass --subject EC to model another.")
+
+
+def test_a_class_word_is_never_settled_by_the_data(monkeypatch):
+    """'kinase' is not a few readings of one name; nothing is looked up."""
+    from caterva.compose import defaults
+
+    looked = []
+    monkeypatch.setattr(defaults, "table_rows", lambda *a: looked.append(a) or ())
+    import caterva.compose.__main__ as cli
+
+    read = cli.read_description(_args(description="Michaelis-Menten kinetics of a kinase"),
+                                err=io.StringIO())
+    assert looked == [] and read.choices == []
 
 
 def test_the_studio_reads_the_sentence_the_way_the_terminal_does(tmp_path):
@@ -289,21 +344,35 @@ def test_the_studio_reads_the_sentence_the_way_the_terminal_does(tmp_path):
     assert outcome.exit_code == 0
     assert KM_ROW in outcome.result["report_markdown"]
     km = next(p for p in outcome.result["model"]["parameters"] if p["id"] == "reaction_Km")
-    assert km["value"] == 6.0 and km["provenance"]["citation"]["reference_id"] == "641068"
+    assert km["value"] == 6.3 and km["provenance"]["citation"]["reference_id"] == "739603"
 
 
 def test_the_export_carries_the_values_the_report_carries():
     with hexokinase_offline():
         code, out, err = _main(["hexokinase glucose human", "--export", "csv"])
     assert code == 0, err
-    assert "641068" in out and "739603" in out
+    assert "reaction_Km" in out and "739603" in out
 
 
-def test_antimony_compiles_the_shape_the_report_shows(monkeypatch):
-    with _no_network(monkeypatch) as attempts:
+def test_antimony_compiles_the_shape_the_report_shows_with_the_values_it_carries():
+    """`--antimony` searched nothing and printed the library's placeholders
+    with no comment, while the report beside it carried BRENDA's values
+    (2026-11-11). It now carries the report's numbers, each origin said."""
+    with hexokinase_offline():
         code, out, _ = _main(["hexokinase glucose human", "--antimony"])
     assert code == 0 and "reaction_Km" in out
-    assert attempts == [], "--antimony searches nothing, so it looks nothing up"
+    assert "#   reaction_Km = 6.3 mM: BRENDA ref 739603 (Homo sapiens)" in out
+    assert "#   reaction_kcat = 40.1 1/s: BRENDA ref 739603 (Homo sapiens)" in out
+    assert "  reaction_Km = 6.3;" in out and "  reaction_kcat = 40.1;" in out, \
+        "the compiled source carries the measured values, not the library's 0.1 and 100"
+
+
+def test_antimony_without_an_enzyme_says_every_constant_is_a_placeholder(monkeypatch):
+    with _no_network(monkeypatch) as attempts:
+        code, out, _ = _main(["Michaelis-Menten with a competitive inhibitor", "--antimony"])
+    assert code == 0 and attempts == []
+    assert "#   reaction_Ki: PLACEHOLDER, the motif library's illustrative value -- no enzyme was " \
+           "named, so nothing was searched" in out
 
 
 # ---------------------------------------------------------------------------
@@ -423,14 +492,25 @@ def test_an_unreadable_substrate_list_takes_nothing_and_says_so(monkeypatch):
 
 #: Every one of these grounded the model in another substrate's BRENDA row,
 #: citation and all, because one word of the compound's name matched it:
-#: D-glucose's Km 6.0 mM (ref 641068) for glucose 6-phosphate, 2-deoxy
+#: D-glucose's Km 6.0 mM (ref 641068, the pick then) for glucose 6-phosphate, 2-deoxy
 #: glucose and "glucose analogues"; D-fructose's 11.4 mM (ref 640237) for
 #: fructose 1,6-bisphosphate; D-glucosamine's 0.5 mM (ref 640230) for
 #: N-acetyl glucosamine.
+#: "2 deoxy glucose" was one of them until the fifth round of the real-values
+#: review: the literature layer's identity key now reads it as the
+#: 2-deoxyglucose BRENDA lists (the same compound, never D-glucose), so it
+#: is a named substrate, tested on its own below.
 COMPOUND_NAMES = [
-    "glucose 6-phosphate", "2 deoxy glucose", "glucose analogues", "fructose 1,6-bisphosphate",
+    "glucose 6-phosphate", "glucose analogues", "fructose 1,6-bisphosphate",
     "N-acetyl glucosamine",
 ]
+
+
+def test_two_deoxy_glucose_typed_in_words_is_the_listed_compound_never_d_glucose():
+    reading = read_sentence("Michaelis-Menten kinetics of human hexokinase on 2 deoxy glucose")
+    assert reading.substrate_candidates == ("2 deoxy glucose",)
+    assert match_substrate(reading.substrate_candidates, HUMAN_HK).name == "2-deoxyglucose"
+    assert match_substrate(reading.substrate_candidates, ["D-glucose", "ATP"]).name is None
 
 
 @pytest.mark.parametrize("compound", COMPOUND_NAMES)
@@ -441,14 +521,25 @@ def test_a_word_out_of_a_longer_compound_name_is_not_a_candidate(compound):
 
 
 @pytest.mark.parametrize("compound", COMPOUND_NAMES)
-def test_a_compound_brenda_does_not_list_is_refused_not_grounded_in_its_neighbour(compound):
+def test_a_compound_brenda_does_not_list_is_never_relabelled_as_its_neighbour(compound):
+    """The word is not read as D-glucose: the report says it was not used
+    and that the model is not of it, and the search runs for the
+    best-measured substrate BRENDA lists, named as such (ADR 0182). Each
+    cited row is D-glucose's, and nothing calls it the typed compound's.
+    (Before ADR 0182 this was a refusal, exit 3.)"""
     with hexokinase_offline():
         code, out, err = _main([f"Michaelis-Menten kinetics of human hexokinase on {compound}", *FLAGS])
-    assert code == 3, err
+    assert code == 0, err
     assert "in your description as the substrate" not in out
     assert f"No word of your description ({compound!r}) is a substrate BRENDA lists for EC 2.7.1.1" in out
-    assert "Re-run with --substrate NAME" in out
-    assert "| literature (Homo sapiens) |" not in out
+    assert "it was not used: the model is not of it" in out
+    # The choice's note must not say "No substrate was named": one was,
+    # and BRENDA does not list it. It says that, then what was used.
+    assert "No substrate was named" not in out
+    assert (f"No substrate BRENDA lists Km rows for under EC 2.7.1.1 in Homo sapiens was named (no "
+            f"word of your description, {compound!r}, is one), so Caterva used D-glucose:") in out
+    assert KM_ROW in out
+    assert f"as the substrate {compound}" not in out and f"Km of {compound}" not in out
 
 
 def test_a_filler_word_still_separates_the_compound_from_the_request():
@@ -485,3 +576,50 @@ def test_a_misspelt_organism_reaches_the_report(monkeypatch):
 def test_a_word_that_only_sits_before_the_enzyme_is_not_called_an_organism():
     assert read_sentence("Michaelis-Menten kinetics of muscle hexokinase on glucose").unread_organism is None
     assert read_sentence("Michaelis-Menten kinetics of human hexokinase on glucose").unread_organism is None
+
+
+# ---------------------------------------------------------------------------
+# A compound named beside the substrate, and the counts the match is given
+# ---------------------------------------------------------------------------
+
+
+def test_a_compound_beside_the_substrate_that_brenda_lists_ki_rows_for_is_the_inhibitor():
+    """"in the presence of glucose 6-phosphate" beside "with glucose" was
+    flagged by the reader as a possible inhibitor (`possible_inhibitor_text`)
+    and dropped by compose, which built plain Michaelis-Menten. BRENDA lists
+    Ki rows for D-glucose 6-phosphate under EC 2.7.1.1 in human, so it is the
+    inhibitor, by the substrate's rule (the D- set aside, the only listed
+    name it fits), and the model has a place for it."""
+    with hexokinase_offline():
+        code, out, err = _main(["hexokinase with glucose in the presence of glucose 6-phosphate in human",
+                                *FLAGS])
+    assert code == 0, err
+    assert ("Read 'glucose' in your description as the substrate D-glucose, which BRENDA lists for "
+            "EC 2.7.1.1 for Homo sapiens (its stereo or anomer prefix set aside, the only substrate "
+            "BRENDA lists under that name), and 'glucose 6-phosphate' as the inhibitor D-glucose "
+            "6-phosphate, which BRENDA lists Ki rows for under EC 2.7.1.1 for Homo sapiens.") in out
+    assert "the model is competitive inhibition" in out
+    ki_row = out.split("| `reaction_Ki` |", 1)[1].split("\n", 1)[0]
+    assert "literature (Homo sapiens)" in ki_row and "BRENDA ref" in ki_row
+
+
+def test_the_substrate_match_is_given_the_row_counts_not_only_the_names(monkeypatch):
+    """`match_substrate` takes the best-measured spelling of an abbreviation
+    only when it is given the counts; compose passed `list(listed)`."""
+    import caterva.compose.__main__ as compose_main
+    import caterva.enzymes.sentence as sentence
+
+    seen = []
+    real = sentence.match_substrate
+
+    def spy(candidates, listed):
+        seen.append(listed)
+        return real(candidates, listed)
+
+    monkeypatch.setattr(sentence, "match_substrate", spy)
+    monkeypatch.setattr(compose_main, "brenda_km_substrates", lambda ec, organism: {"D-glucose": 25, "ATP": 106})
+    args = argparse.Namespace(subject="2.7.1.1", organism="Homo sapiens", substrate=None, inhibitor=None)
+    out = compose_main.DescriptionReading("hexokinase on glucose in human")
+    compose_main._substrate_from(args, read_sentence("hexokinase on glucose in human"), out)
+    assert seen and seen[0] == {"D-glucose": 25, "ATP": 106}
+    assert args.substrate == "D-glucose"

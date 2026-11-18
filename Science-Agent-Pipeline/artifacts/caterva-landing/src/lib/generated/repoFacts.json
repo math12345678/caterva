@@ -8,13 +8,13 @@
   ],
   "guardScripts": 79,
   "tests": {
-    "engine": 7210,
-    "literature": 1692
+    "engine": 7939,
+    "literature": 2001
   },
   "dataSources": [
     "brenda",
     "ncbi",
     "expasy"
   ],
-  "releaseTag": "v0.7.0"
+  "releaseTag": "v0.7.1"
 }

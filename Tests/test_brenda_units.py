@@ -16,6 +16,13 @@ because the field was a constant.
 The existing kcat coverage in test_fallback_logic.py asserts value,
 source, organism and citation -- but never the unit, which is why this
 survived. These tests assert exactly that field.
+
+Until 2026-11-11 these calls passed the substrate where the EC number goes
+and the organism where the substrate LIST goes, so the "substrates" were the
+letters of "Homo sapiens" and matched any compound containing an "h" by
+substring. Substrate matching is now on the whole compound
+(`brenda_client.substrate_matches`), which those letters never are, and the
+calls pass the arguments the signature names.
 """
 
 import pathlib
@@ -34,7 +41,8 @@ def _fixture(name: str) -> str:
 def test_turnover_entries_are_per_second_not_millimolar():
     entries = bc.parse_brenda_turnover_html(
         _fixture("brenda_ache_kcat_fixture.html"),
-        "acetyl thiocholine",
+        "3.1.1.7",
+        ["acetyl thiocholine"],
         "Homo sapiens",
     )
     assert entries, "fixture parsed no turnover entries"
@@ -52,7 +60,8 @@ def test_the_golden_ache_turnover_number_is_labelled_correctly():
     # Homo sapiens, kcat = 6500 s^-1, BRENDA reference 649716.
     entries = bc.parse_brenda_turnover_html(
         _fixture("brenda_ache_kcat_fixture.html"),
-        "acetyl thiocholine",
+        "3.1.1.7",
+        ["acetyl thiocholine"],
         "Homo sapiens",
     )
     golden = [e for e in entries if e.km_value == 6500.0]
@@ -63,7 +72,8 @@ def test_the_golden_ache_turnover_number_is_labelled_correctly():
 def test_ki_entries_are_still_millimolar():
     # The fix must not flip Km/Ki, which ARE concentrations.
     entries = bc.parse_brenda_ki_html(
-        _fixture("brenda_ldh_ki_fixture.html"), "pyruvate", "Homo sapiens"
+        _fixture("brenda_ldh_ki_fixture.html"), "1.1.1.27", [], "Homo sapiens",
+        require_substrate_match=False,
     )
     assert entries, "fixture parsed no Ki entries"
     assert all(e.unit == "mM" for e in entries)
@@ -84,13 +94,14 @@ def test_unit_follows_the_table_label(table_label, expected_unit):
         if table_label == bc.TURNOVER_TABLE_LABEL
         else "brenda_ldh_ki_fixture.html"
     )
-    substrate = (
-        "acetyl thiocholine"
+    ec, substrates = (
+        ("3.1.1.7", ["acetyl thiocholine"])
         if table_label == bc.TURNOVER_TABLE_LABEL
-        else "pyruvate"
+        else ("1.1.1.27", [])
     )
     entries = bc.parse_brenda_km_html(
-        _fixture(fixture), substrate, "Homo sapiens", table_label=table_label
+        _fixture(fixture), ec, substrates, "Homo sapiens",
+        require_substrate_match=bool(substrates), table_label=table_label
     )
     assert entries
     assert {e.unit for e in entries} == {expected_unit}

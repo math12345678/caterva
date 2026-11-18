@@ -225,8 +225,10 @@ class TestEvidenceAgainstTheMechanism:
 class TestNoStatedMode:
     def test_gossypol_is_unchanged_and_the_log_says_why(self):
         # BRENDA 711801: three rows, one per isoform, none stating a mode.
+        # The mode changes nothing; the median row (ADR 0182) is LDH-A's,
+        # where the minimum, LDH-B's 0.0014, was returned until 2026-11-11.
         r = ki("1.1.1.27", "gossypol", inhibition_mode="competitive", model_substrate="pyruvate")
-        assert r.found and r.value == 0.0014 and r.commentary.startswith("LDH-B")
+        assert r.found and r.value == 0.0019 and r.commentary.startswith("LDH-A")
         assert ("No exact-match row states competitive inhibition; kept the 3 of 3 exact-match "
                 "row(s) stating no mode, so whether the value is the competitive constant is "
                 "unknown") in r.search_log
@@ -311,11 +313,15 @@ class TestRowsNamingNoIsoform:
         # naming none, one of them the mutant C374A.
         pool = rows("1.4.3.4", "D-amphetamine")
         assert _naming_no_isoform(pool, isoform_matched=False, allow_variants=False) == []
+        # The wild-type 0.0144 and the mutant 0.0115 rows carry MAO-A's own
+        # accession (P21397) in BRENDA's UniProt cell, so they name MAO-A
+        # (ADR 0182, second round); 0.015 lists both MAO-A and MAO-B and so
+        # names neither.
         back = _naming_no_isoform(pool, isoform_matched=True, allow_variants=False)
-        assert sorted(e.km_value for e in back) == [0.0144, 0.015]
+        assert sorted(e.km_value for e in back) == [0.015]
         assert all("mutant" not in (e.conditions or "") for e in back)
         with_variants = _naming_no_isoform(pool, isoform_matched=True, allow_variants=True)
-        assert sorted(e.km_value for e in with_variants) == [0.0115, 0.0144, 0.015]
+        assert sorted(e.km_value for e in with_variants) == [0.015]
 
     def test_and_are_taken_only_when_no_row_for_the_isoform_can_be(self):
         """No real pool has this shape: of the 766 Ki rows parsed from the
@@ -376,7 +382,15 @@ class TestRowsNamingNoIsoformThroughTheResolver:
 
     @staticmethod
     def row(ec, inhibitor, value):
-        return next(e for e in rows(ec, inhibitor) if e.km_value == value)
+        entry = next(e for e in rows(ec, inhibitor) if e.km_value == value)
+        if ec != "1.4.3.4":
+            # An LDH page's row served as an MAO pool: its own UniProt cell
+            # (P00338) names LDHA under its EC, which says nothing of MAO, so
+            # the stand-in is served without it and names no isoform, as the
+            # pool's premise needs (the cell is read since ADR 0182's second
+            # round).
+            entry = entry.model_copy(update={"uniprot_from_row": False})
+        return entry
 
     @staticmethod
     def resolve(tier, ec, inhibitor, **kw):
@@ -392,6 +406,8 @@ class TestRowsNamingNoIsoformThroughTheResolver:
                                               ("cross-species", "brenda_cross_species")])
     def test_a_row_naming_no_isoform_is_taken_when_none_for_the_isoform_can_be(
             self, monkeypatch, tier, source):
+        # `row` serves the LDH row without its own UniProt cell (P00338,
+        # LDHA), so it stands for an MAO row naming no isoform.
         _pool_of(monkeypatch, [self.row(*self.MAO_A), self.row(*self.NONCOMPETITIVE)], tier)
         r = self.resolve(tier, *self.MAO_A[:2], inhibition_mode="noncompetitive", isoform="MAO-A")
         assert r.found and r.source == source, r.search_log
@@ -555,6 +571,21 @@ class TestTheSameRowAsCompose:
         assert unranked.found
         measured = composed_from(unranked)
         resolved = asked_for(ec, inhibitor, organism, mode, substrate, isoform)
+        if (resolved.found and "Kitz-Wilson" in (resolved.commentary or "")
+                and not any(c.get("conditions") == resolved.commentary
+                            for c in unranked.ensemble_candidates)):
+            # THE ONE PLACE THE OLD ORDER NOW PARTS FROM THE RESOLVER. Since
+            # 2026-11-11 the unasked answer passes Kitz-Wilson rows over
+            # when a reversible Ki exists (ADR 0182: the median must not land
+            # on an inactivation constant), so they are not among the rows
+            # it hands compose, and choosing among those, for a mode or an
+            # isoform only a Kitz-Wilson row is left for, finds nothing. The
+            # resolver, asked with the mode, ranks every row and takes the
+            # Kitz-Wilson row as the last resort, as TestKitzWilson pins.
+            # That is why compose asks with the mode.
+            assert any("Kitz-Wilson" in line for line in unranked.search_log), \
+                unranked.search_log
+            return
         if isoform:
             by_isoform = select_isoform(measured, isoform)
             if "reaction_Ki" in by_isoform.refused:

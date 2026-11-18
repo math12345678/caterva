@@ -184,11 +184,27 @@ _KEYWORD_TOKEN = re.compile(
     r"(?:\s+and\s+(?:(?:isozyme|isoenzyme|isoform)\s+)?(?P<token2>[A-Za-z0-9][A-Za-z0-9-]*))?"
 )
 _HYPHEN_CODE = re.compile(r"(?<![\w-])(?P<stem>[A-Z]{2,5})-(?P<code>[A-Z0-9]{1,2})(?![\w-]|\.\d)")
+#: A cytochrome P450 named by its family, subfamily and number: "CYP2C19",
+#: "CYP3A4*1", "POR-CYP1A1", "P450 2D6", "cytochrome P450 3A4". BRENDA files
+#: every human P450's drug-metabolism rows under one EC number, 1.14.14.1,
+#: and writes which P450 a row measured as a bare name with no "isoform"
+#: before it ("CYP2C19, at pH 7.4 and 37°C"). Before this form those rows
+#: read as naming NO isoform, so `--isoform CYP2B6` (which `caterva compose
+#: --subject CYP2B6` now sets, ADR 0182) took CYP2C19's, CYP2C9's or
+#: CYP3A4's fenthion Km as a row "whether it measured CYP2B6 is unknown" --
+#: when the row says plainly it did not (live page for 1.14.14.1, read
+#: 2026-11-11). A hyphen may come before it ("POR-CYP1A1" is the reductase
+#: complex of CYP1A1), so only a letter or digit stops it.
+_CYP = re.compile(
+    r"(?<![A-Za-z0-9])(?:CYP|Cyp|cytochrome P450|P450)[ -]?(?P<code>\d{1,3}[A-Z]{1,2}\d{1,3})(?![A-Za-z0-9])")
 #: Upper-case prefixes of hyphenated codes that name no protein: cofactors,
 #: nucleotides, "EC-" and nucleic acids.
 _NOT_A_STEM = frozenset({
     "EC", "NAD", "NADH", "NADP", "FAD", "FMN", "ATP", "ADP", "AMP", "GTP", "GDP", "CTP",
     "UTP", "ITP", "DNA", "RNA", "PEG", "SDS",
+    # Viruses: "HIV-1 subtype C protease" names an organism, not an isoform
+    # (HIV-1 and HIV-2 are two viruses, each its own BRENDA organism).
+    "HIV", "SIV", "FIV", "HTLV", "HCV", "HBV", "HPV", "HSV", "EBV", "CMV",
 })
 #: Run-together forms that read like an isoform and are not one: "MAOI" is a
 #: monoamine oxidase inhibitor.
@@ -211,6 +227,12 @@ _FUNCTION_WORDS = frozenset({
     "an", "and", "as", "at", "by", "for", "from", "in", "is", "not", "of", "or", "the",
     "to", "was", "were", "with",
 })
+
+
+#: A subunit named by a Greek letter and maybe a number ("beta1", "gamma2"),
+#: and a second one after a comma: BRENDA's way of writing a dimer.
+_SUBUNIT = re.compile(r"(?:alpha|beta|gamma|delta|chi|pi|sigma|mu)\d?", re.IGNORECASE)
+_SUBUNIT_PAIR = re.compile(r",\s?((?:alpha|beta|gamma|delta|chi|pi|sigma|mu)\d?)(?![A-Za-z0-9])", re.IGNORECASE)
 
 
 def _is_a_name(token: Optional[str]) -> bool:
@@ -260,18 +282,217 @@ def _glucokinase_reading(m: "re.Match") -> Optional[str]:
     return f"{word} {m.group('code')}" if m.group("code") else word
 
 
+def _cyp_reading(m: "re.Match") -> Optional[str]:
+    return "CYP" + m.group("code").upper()
+
+
 def _hyphen_code_reading(m: "re.Match") -> Optional[str]:
     if m.group("stem") in _NOT_A_STEM or _STRAIN_CONTEXT.search(m.string[:m.start()]):
         return None
     return m.group(0)
 
 
+# -- Carbonic anhydrase, phosphodiesterase and cytochrome P450 (2026-11-11) ---
+#
+# Three families BRENDA writes in their own nomenclature, which the forms
+# above did not read. The baseline of 2026-11-11 found:
+#
+# * carbonic anhydrase (EC 4.2.1.1): "isozyme CA II" read as "CA" (the one
+#   token after the keyword), so CA I, CA II and CA IX rows all read "CA" and
+#   matched each other; "hCA II" and "CA II" read as no isoform at all. CA
+#   isozymes run to XV, past `_ROMAN`. Read here: "CA II", "CA-II", "CAII",
+#   "CA2", "hCA II" (h, b: human, bovine) and "carbonic anhydrase II", all as
+#   "CA-II"; a number is written as its numeral so "CA2" and "CA II" are one
+#   reading. Not read in "CA1 neurons" or "hippocampal CA1", which name a
+#   brain region.
+# * phosphodiesterase: "PDE5", "PDE5A", "PDE-5", "PDE5A1", "phosphodiesterase
+#   5", read run together ("PDE5A"). The family number, subfamily letter and
+#   variant number are compared as a hierarchy (`_hierarchy`): "PDE5" and
+#   "PDE5A" are one, "PDE4A" and "PDE4B" are two.
+# * cytochrome P450: "CYP2B6", "CYP 2B6", "P450 2B6", "P-450 2B6",
+#   "cytochrome P450 2B6", read "CYP2B6". "CYP2B6" and "CYP2B1" are two
+#   isoforms; a request "2B6" is CYP2B6.
+_CA_NUMERAL = r"(?:XVI|XV|XIV|XIII|XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)"
+_CA_NAME = re.compile(
+    r"(?<![\w-])[hbH]?(?:CA|[Cc]arbonic anhydrase)"
+    rf"(?:[ -]?(?P<roman>{_CA_NUMERAL})(?P<sub>[a-c])?|[ -]?(?P<num>\d{{1,2}})(?P<nsub>[a-c])?)"
+    r"(?![\w-])"
+)
+_BRAIN_REGION = re.compile(r"^\s+(?:neurons?|pyramidal|region|field|area|subfield)\b", re.IGNORECASE)
+_ROMAN_OF = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VIII",
+             9: "IX", 10: "X", 11: "XI", 12: "XII", 13: "XIII", 14: "XIV", 15: "XV", 16: "XVI"}
+_PDE_NAME = re.compile(
+    r"(?<![\w-])(?:PDE[ -]?|[Pp]hosphodiesterase[ -])"
+    r"(?P<fam>\d{1,2})(?P<sub>[A-D])?(?P<var>\d{1,2})?(?![\w-])"
+)
+_CYP_CODE = r"\d{1,2}[A-Z]{1,2}\d{0,3}"
+_CYP_NAME = re.compile(
+    rf"(?<![\w-])(?:CYP[ -]?|P-?450[ -]?)(?P<code>{_CYP_CODE})(?![\w-])"
+)
+
+# -- Beta-lactamases (review of the second adversarial round, 2026-11-12) -----
+#
+# BRENDA files every beta-lactamase under EC 3.5.2.6 and names which one a
+# paper measured in its synonyms ("CTX-M-15", "NDM-4", "TEM-149"). The forms
+# above read "NDM-4" and "TEM-1" but not "CTX-M-15" (a family name with a
+# hyphen of its own) nor a three-digit allele ("TEM-149", "OXA-163"), so
+# "beta lactamase TEM-1 with ampicillin" carried ref 771150's CTX-M-15 rows
+# as rows "naming no isoform". Read here, family and allele as written.
+_BETA_LACTAMASE = re.compile(
+    r"(?<![\w-])(?:bla)?(?P<fam>CTX-M|TEM|SHV|OXA|KPC|NDM|VIM|IMP|CMY|GES|PER|VEB|DHA|FOX"
+    r"|SME|IMI|NMC|GIM|SPM|AIM|SIM|BEL|PSE|CARB)-(?P<num>\d{1,3})(?![\w-]|\.\d)"
+    # The chromosomal class C enzyme, written without a number: "AmpC
+    # beta-lactamase" (ref 663646's synonym, whose ampicillin pair was
+    # carried for TEM-1).
+    r"|(?<![\w-])(?P<ampc>AmpC|ampC)(?![\w-])"
+)
+
+
+def _beta_lactamase_reading(m: "re.Match") -> Optional[str]:
+    if m.group("ampc"):
+        return "AmpC"
+    return f"{m.group('fam')}-{m.group('num')}"
+
+
+def _ca_reading(m: "re.Match") -> Optional[str]:
+    if _BRAIN_REGION.match(m.string[m.end():]) or re.search(
+            r"hippocamp\w*\s+$", m.string[:m.start()], re.IGNORECASE):
+        return None
+    if m.group("roman"):
+        if m.group(0) == "CAI":
+            # "CAI" run together is the field's abbreviation for a carbonic
+            # anhydrase INHIBITOR ("a sulfonamide CAI"), not CA I; reading it
+            # as an isozyme would let a row about any isozyme answer a CA I
+            # request (found in review, 2026-11-11). "CA I", "CA-I" and
+            # "hCAI" are still read.
+            return None
+        return f"CA-{m.group('roman')}{m.group('sub') or ''}"
+    if m.string[m.end():m.end() + 1] == "+":
+        # "CA2+": a calcium ion written in capitals, not CA II.
+        return None
+    if re.match(r"\s*(?:[mµun]?M\b|%|°|mg\b|min\b|h\b|s\b)", m.string[m.end():]):
+        # "CA 2 mM": an amount of something abbreviated CA, not CA II.
+        return None
+    number = int(m.group("num"))
+    if number not in _ROMAN_OF:
+        return None
+    return f"CA-{_ROMAN_OF[number]}{m.group('nsub') or ''}"
+
+
+def _pde_reading(m: "re.Match") -> Optional[str]:
+    return f"PDE{m.group('fam')}{m.group('sub') or ''}{m.group('var') or ''}"
+
+
+def _cyp_reading(m: "re.Match") -> Optional[str]:
+    return f"CYP{m.group('code')}"
+
+
+# -- Protein symbols BRENDA's commentary uses on many-protein EC numbers ------
+#
+# The third round of the real-values review (2026-11-12) found rows naming a
+# protein by a short symbol the forms above do not read, carried as rows
+# "naming no isoform" for another protein: "recombinant wild-type Csk" and
+# "GST-fusion Chk" (EC 2.7.10.2, where ABL1 was asked for), "Ki value for
+# inhibition of wild type Shp2" (counted for PTP1B), "recombinant wild-type
+# GSTk" (the kappa-class GST, carried for "GST with CDNB"), and "tACE"
+# (testis ACE). A short, curated list: these symbols are proteins wherever
+# BRENDA writes them; a general "any capitalised token" form would read
+# buffer and substrate names as proteins.
+_PROTEIN_SYMBOL = re.compile(
+    r"(?<![\w-])(?:(?P<shp>SHP|Shp)-?(?P<shpn>[12])|(?P<tyr>Csk|Chk|Lck|Fyn|Lyn|Hck|Btk|Syk"
+    r"|(?:c-|v-)?Src|(?:c-|v-)?Abl|Bcr-Abl)|GST(?P<gstc>[akmoptzAKMOPTZ])(?P<gstn>\d)?(?:-\d)?"
+    r"|(?P<ace>[ts]ACE)"
+    # The receptor and non-receptor PTPs BRENDA's EC 3.1.3.48 commentary
+    # names by Greek letter or trivial name: "wild-type PTPalpha" (ref
+    # 665502) was counted among PTP1B's rows (fourth round's review).
+    r"|R?PTP[- ]?(?P<ptpgreek>alpha|beta|gamma|delta|epsilon|zeta|kappa|mu|rho|sigma|α|β|γ|δ|ε|ζ|κ|μ|ρ|σ)"
+    r"|(?P<ptpname>TC-?PTP|LAR|CD45|HePTP|PTP-?PEST|PTP1B))(?![\w-])"
+)
+_PTP_GREEK = {"alpha": "PTPRA", "α": "PTPRA", "beta": "PTPRB", "β": "PTPRB", "gamma": "PTPRG",
+              "γ": "PTPRG", "delta": "PTPRD", "δ": "PTPRD", "epsilon": "PTPRE", "ε": "PTPRE",
+              "zeta": "PTPRZ1", "ζ": "PTPRZ1", "kappa": "PTPRK", "κ": "PTPRK", "mu": "PTPRM",
+              "μ": "PTPRM", "rho": "PTPRT", "ρ": "PTPRT", "sigma": "PTPRS", "σ": "PTPRS"}
+_PTP_NAME = {"TCPTP": "PTPN2", "TC-PTP": "PTPN2", "LAR": "PTPRF", "CD45": "PTPRC",
+             "HePTP": "PTPN7", "PTPPEST": "PTPN12", "PTP-PEST": "PTPN12", "PTP1B": "PTPN1"}
+_GST_CLASS = {"a": "GSTA", "k": "GSTK", "m": "GSTM", "o": "GSTO", "p": "GSTP", "t": "GSTT",
+              "z": "GSTZ"}
+
+
+def _protein_symbol_reading(m: "re.Match") -> Optional[str]:
+    if m.group("shp"):
+        return f"SHP-{m.group('shpn')}"
+    if m.group("tyr"):
+        symbol = m.group("tyr")
+        return symbol if symbol.startswith("Bcr") else re.sub(r"^[cv]-", "", symbol)
+    if m.group("gstc"):
+        return f"{_GST_CLASS[m.group('gstc').lower()]}{m.group('gstn') or '1'}"
+    if m.group("ptpgreek"):
+        return _PTP_GREEK[m.group("ptpgreek")]
+    if m.group("ptpname"):
+        return _PTP_NAME.get(m.group("ptpname"), m.group("ptpname"))
+    if m.group("ace"):
+        return {"t": "testis ACE (tACE: the one-domain germinal form, C-domain only, not "
+                     "somatic two-domain ACE)",
+                "s": "somatic ACE (sACE, two-domain)"}[m.group("ace")[0]]
+    return None
+
+
+# -- An isoform named by what distinguishes it (fourth round, 2026-11-12) ----
+#
+# Mouse NOS's L-NMMA Ki rows say "inducible isoform from macrophage", and the
+# nitro-arginine row "inducible macrophage isoform": NOS2, by the one word
+# that tells it from NOS1 and NOS3. Read as "inducible isoform", and that
+# reading is the same isoform as a request only for the proteins the word
+# distinguishes (`_DESCRIBED_AS`): "inducible" is NOS2, COX-2 (PTGS2) and
+# HO-1 (HMOX1), each the inducible member of its family, and never NOS1 or
+# PTGS1. iNOS, nNOS and eNOS are read as the gene symbols they abbreviate.
+_DESCRIBED = re.compile(
+    r"(?<![\w-])(?P<word>inducible|neuronal|endothelial)\s+(?:(?:macrophage|brain|cytokine-induced)\s+)?"
+    r"(?:isoform|isozyme|isoenzyme|NOS\b|nitric oxide synthase)",
+    re.IGNORECASE)
+_NOS_ABBREVIATION = re.compile(r"(?<![\w-])(?P<kind>[ine])NOS(?![\w-])")
+_DESCRIBED_AS = {"inducible": ("NOS2", "PTGS2", "HMOX1"), "neuronal": ("NOS1",),
+                 "endothelial": ("NOS3",)}
+
+
+def _described_reading(m: "re.Match") -> Optional[str]:
+    return f"{m.group('word').lower()} isoform"
+
+
+def _nos_reading(m: "re.Match") -> Optional[str]:
+    return {"i": "NOS2", "n": "NOS1", "e": "NOS3"}[m.group("kind")]
+
+
+#: Carbonic anhydrase I and II by their old names: "low activity carbonic
+#: anhydrase" (CA I, the B form) and "high activity" (CA II, the C form).
+#: Human CA II's Km spread for CO2 held ref 33547's two "low activity
+#: carbonic anhydrase" rows as rows naming no isoform (fourth round).
+_CA_ACTIVITY = re.compile(
+    r"(?<![\w-])(?P<level>low|high)[- ]activity (?:carbonic anhydrase|isozyme|isoenzyme|form)",
+    re.IGNORECASE)
+
+
+def _ca_activity_reading(m: "re.Match") -> Optional[str]:
+    if m.group(0).lower().endswith("carbonic anhydrase") or "anhydrase" in m.string.lower():
+        return "CA-I" if m.group("level").lower() == "low" else "CA-II"
+    return None
+
+
 #: Every form a name can take, in the order tried at one position.
 _FORMS = (
+    (_CA_NAME, _ca_reading),
+    (_PDE_NAME, _pde_reading),
+    (_CYP_NAME, _cyp_reading),
+    (_BETA_LACTAMASE, _beta_lactamase_reading),
     (_FULL_NAME, _full_name_reading),
     (_STEM_NAME, _stem_reading),
     (_GLUCOKINASE, _glucokinase_reading),
+    (_CYP, _cyp_reading),
     (_HYPHEN_CODE, _hyphen_code_reading),
+    (_PROTEIN_SYMBOL, _protein_symbol_reading),
+    (_NOS_ABBREVIATION, _nos_reading),
+    (_CA_ACTIVITY, _ca_activity_reading),
+    (_DESCRIBED, _described_reading),
 )
 #: "... and" before a second name: "isozymes LDH-A and LDH-B".
 _AND_ANOTHER = re.compile(r"\s+and\s+(?:(?:isozyme|isoenzyme|isoform)\s+)?")
@@ -309,6 +530,15 @@ def _candidates(text: str):
             continue
         t = _KEYWORD_TOKEN.match(text, k.end())
         if t and _is_a_name(t.group("token")):
+            # "isoenzyme alpha,gamma1": a dimer of two different subunits is
+            # neither subunit's homodimer, and is read as its own name, so a
+            # request for one subunit's enzyme never takes it. "isoenzyme
+            # beta1,beta1" names the one subunit twice and reads "beta1".
+            pair = _SUBUNIT_PAIR.match(text, t.end("token"))
+            if pair and t.group("token2") is None and _SUBUNIT.fullmatch(t.group("token")) \
+                    and pair.group(1).lower() != t.group("token").lower():
+                yield k.start(), f"{t.group('token')},{pair.group(1)}"
+                continue
             second = t.group("token2")
             yield k.start(), _joined(t.group("token"), second if _is_a_name(second) else None)
     for pattern, reading_of in _FORMS:
@@ -359,14 +589,37 @@ def _compared_as(name: str) -> tuple:
     reading = read_isoform(name) or name
     out = []
     for part in isoform_names(reading):
+        tiers = _hierarchy(part)
+        if tiers is not None:
+            out.append((isoform_key(part), None, False, tiers))
+            continue
         abbreviated = _ABBREVIATED.fullmatch(part)
         if abbreviated:
-            out.append((isoform_key(part), isoform_key(abbreviated.group(1)), True))
+            out.append((isoform_key(part), isoform_key(abbreviated.group(1)), True, None))
         elif _CODE_ALONE.fullmatch(part):
-            out.append((isoform_key(part), isoform_key(part), False))
+            out.append((isoform_key(part), isoform_key(part), False, None))
         else:
-            out.append((isoform_key(part), None, False))
+            out.append((isoform_key(part), None, False, None))
     return tuple(out)
+
+
+_PDE_TIERS = re.compile(r"PDE(\d{1,2})([A-D])?(\d{1,2})?")
+_CYP_TIERS = re.compile(r"(?:CYP)?(\d{1,2})([A-Z]{1,2})?(\d{1,3})?")
+
+
+def _hierarchy(part: str) -> Optional[tuple]:
+    """("PDE", ("5", "A")) for "PDE5A", ("CYP", ("2", "B", "6")) for "CYP2B6"
+    or a bare "2B6", None for a name of any other family. These families name
+    an isoform by family, subfamily and member, and a name that stops early
+    ("PDE5") names every member below it ("PDE5A")."""
+    m = _PDE_TIERS.fullmatch(part)
+    if m:
+        return ("PDE", tuple(g for g in m.groups() if g))
+    if part.startswith("CYP") or re.fullmatch(r"\d{1,2}[A-Z]{1,2}\d{1,3}", part):
+        m = _CYP_TIERS.fullmatch(part)
+        if m and m.group(2):
+            return ("CYP", tuple(g for g in m.groups() if g))
+    return None
 
 
 def _one_protein(a: str, b: str) -> bool:
@@ -383,6 +636,16 @@ def _one(x: tuple, y: tuple) -> bool:
         return True
     if _one_protein(x[0], y[0]):
         return True
+    if x[3] is not None or y[3] is not None:
+        # A hierarchical name (PDE, CYP) is one isoform with another only in
+        # its own family and only when one name continues the other:
+        # "PDE5" and "PDE5A", never "PDE4A" and "PDE4B" or "CYP2B6" and
+        # "CYP2B1". A code alone ("II") is not compared with one.
+        if x[3] is None or y[3] is None or x[3][0] != y[3][0]:
+            return False
+        a, b = x[3][1], y[3][1]
+        shorter = min(len(a), len(b))
+        return a[:shorter] == b[:shorter]
     # A code alone and the same code after an abbreviation; never two
     # abbreviations ("HK-1" and "HXK-1"), which the keys already compared.
     return x[1] is not None and x[1] == y[1] and x[2] != y[2]
@@ -398,6 +661,12 @@ def same_isoform(a: Optional[str], b: Optional[str]) -> bool:
     server's rowScopeFlags mirrors."""
     if not a or not b:
         return False
+    described = [x for x in (a, b) if re.fullmatch(r"(inducible|neuronal|endothelial) isoform", x.strip())]
+    if described:
+        if len(described) == 2:
+            return a.strip() == b.strip()
+        other = b if described[0] is a else a
+        return any(same_isoform(name, other) for name in _DESCRIBED_AS[described[0].split()[0]])
     left, right = _compared_as(a.strip()), _compared_as(b.strip())
     return any(_one(x, y) for x in left for y in right)
 
@@ -467,6 +736,13 @@ def read_mode(commentary: Optional[str]) -> tuple[str, Optional[str]]:
     else:
         mode = word
     versus = m.group(2).strip() if m.group(2) else None
+    if versus:
+        # "noncompetitive versus substrate xanthine": the molecule is
+        # xanthine. Read with the word, the row never matched the model's
+        # substrate, and xanthine oxidase's Ki versus 6-mercaptopurine was
+        # carried over the same paper's Ki versus xanthine (ref 685804).
+        versus = re.sub(r"^(?:the\s+)?(?:co-?)?substrates?\s+(?=\S)", "", versus,
+                        flags=re.I).strip() or versus
     return mode, versus
 
 

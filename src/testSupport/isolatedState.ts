@@ -41,3 +41,15 @@ export function isolateCatervaState(env: NodeJS.ProcessEnv = process.env): strin
   env[RECORDS_VAR] = path.join(dir, 'records');
   return dir;
 }
+
+/**
+ * `CATERVA_SENTENCE_READER=off` unless a test set it: the CLI reads a
+ * question with compose's reader (src/cli/composeReading.ts), which fetches
+ * BRENDA to make its ADR 0182 choices. The suites about something else read
+ * it with the CLI's older readers and stand-in choosers, offline; the suites
+ * about the reading (composeReading.test.ts) set a stand-in reader, and
+ * caterva/tests/test_compose_read.py pins the reader itself.
+ */
+export function readOldWayUnlessAsked(env: NodeJS.ProcessEnv): void {
+  if (env['CATERVA_SENTENCE_READER'] === undefined) env['CATERVA_SENTENCE_READER'] = 'off';
+}

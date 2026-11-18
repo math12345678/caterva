@@ -67,6 +67,13 @@ export interface ParsedSystem {
    */
   ec?: string;
   ecName?: string;
+  /**
+   * The parts the question did NOT name, chosen from BRENDA by the engine's
+   * chooser (ADR 0182, chooseMissing.ts), in the order chosen. Shown at
+   * confirmation with why and the alternatives, so agreeing to the system
+   * is agreeing to the choice too.
+   */
+  choices?: import('./chooseMissing').AutomaticChoice[];
 }
 
 /** Words that are never an enzyme, substrate or organism. */

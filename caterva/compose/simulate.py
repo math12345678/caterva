@@ -46,6 +46,15 @@ FALLBACK_END = 10.0
 
 DEFAULT_POINTS = 201
 
+#: A derived window is lengthened by this factor, at most this many times,
+#: while the curve is still moving at its end (see `run`).
+WINDOW_EXTENSION_FACTOR = 4.0
+MAX_WINDOW_EXTENSIONS = 6
+
+#: "Still moving": some species changed over the last tenth of the window by
+#: more than this fraction of how far it moved over the whole run.
+STILL_MOVING_FRACTION = 0.01
+
 #: A conservation law that drifts by more than this FRACTION over the run is
 #: reported. Loose enough not to fire on ordinary integrator noise, tight
 #: enough that a real failure shows: a 1% drift in total protein is not
@@ -323,6 +332,40 @@ def run(
     )
 
     times, columns = _extract(result, network)
+
+    # THE SETTLING TIME IS MEASURED AT THE STEADY STATE, NOT AT THE START.
+    # Near the steady state a Michaelis-Menten enzyme is first-order, and
+    # its timescale is Km / (kcat * E). At the start, with the substrate far
+    # above Km, it is saturated and zero-order, and clearing the substrate
+    # takes about S0 / (kcat * E) -- many times longer. Human LDH (Km
+    # 0.03 mM, 1 mM pyruvate) was integrated to t=1.2 and stopped with 12%
+    # of the substrate converted: the plot showed a fraction of the
+    # reaction and looked finished. So a derived window is checked against
+    # the curve it produced, and lengthened while the system is still
+    # moving at its end. A window the caller gave is never changed.
+    if end is None:
+        first = window
+        for _ in range(MAX_WINDOW_EXTENSIONS):
+            if not _still_moving(columns):
+                break
+            window *= WINDOW_EXTENSION_FACTOR
+            result = caterva_engine.simulate_sbml(
+                sbml_string=sbml, start=start, end=window, points=points,
+            )
+            times, columns = _extract(result, network)
+        if window != first:
+            basis = (
+                f"{basis}, then lengthened from t={first:.3g} to t={window:.3g} because "
+                f"the system was still changing at the end of the shorter window: the "
+                f"settling time near the steady state understates how long the approach "
+                f"from the starting amounts takes (a saturated enzyme works at its "
+                f"maximum rate, not at its near-equilibrium rate)"
+            )
+            if _still_moving(columns):
+                basis += (
+                    f"; it was still changing at t={window:.3g}, the longest window "
+                    f"tried, so the curve does not show the end of the approach"
+                )
     return Trajectory(
         times=times,
         columns=columns,
@@ -337,6 +380,25 @@ def run(
         # were placeholders, because someone typed "hexokinase".
         unmeasured=tuple(getattr(model, "unmeasured", ()) or ()),
     )
+
+
+def _still_moving(columns: Mapping[str, Sequence[float]]) -> bool:
+    """Whether some species is still changing at the end of the run.
+
+    Compares the last tenth of the window with the whole run, per species.
+    A species that never moved is not moving; one whose last tenth carries
+    more than STILL_MOVING_FRACTION of its whole excursion has not settled.
+    """
+    for values in columns.values():
+        if len(values) < 11:
+            continue
+        excursion = max(values) - min(values)
+        if excursion <= 1e-12 * max(1.0, max(abs(v) for v in values)):
+            continue
+        tail = values[-(len(values) // 10 + 1):]
+        if max(tail) - min(tail) > STILL_MOVING_FRACTION * excursion:
+            return True
+    return False
 
 
 def _extract(result: Any, network: Any) -> Tuple[Tuple[float, ...], Dict[str, Tuple[float, ...]]]:

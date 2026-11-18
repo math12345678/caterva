@@ -151,7 +151,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "184 test files -- kinetics & Michaelis-Menten correctness, " +
+          "203 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -267,10 +267,49 @@ export const TEST_SUITES: TestSuite[] = [
         // One skip was the codegen selftest, run before node was on PATH;
         // with it there, test_guard_selftests.py passed in full. The other
         // is the Swift type-check (Sparkle not unpacked): 7209.
-        passed: 7209,
+        //
+        // Measured 2026-11-11 (ADR 0182) on the merged tree of the five
+        // real-values branches, caterva/tests with pytest-xdist (-n 8):
+        // 7433 tests, 7431 passed, 2 skipped, 0 failed, 754 s.
+        //
+        // Measured 2026-11-12 (ADR 0182, second round) on the merged tree of
+        // the rows, chooser, engine, names and web branches, caterva/tests
+        // with pytest-xdist (-n 8): 7738 tests, 7736 passed, 2 skipped, 0
+        // failed, 258 s.
+        //
+        // Measured 2026-11-12 (ADR 0182, third round's fixes) on
+        // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
+        // 7766 tests, 7764 passed, 2 skipped, 0 failed, 598 s.
+        //
+        // Measured 2026-11-12 (ADR 0182, fourth round's fixes) on
+        // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
+        // 7783 tests, 7781 passed, 2 skipped, 0 failed, 297 s.
+        //
+        // Measured 2026-11-13 (ADR 0182, fifth round's fixes) on
+        // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
+        // 7830 tests, 7829 passed, 1 skipped, 0 failed, 339 s.
+        //
+        // Measured 2026-11-13 (ADR 0182, the fifth round's polish) on
+        // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
+        // 7848 tests, 7846 passed, 2 skipped, 0 failed, 367 s.
+        //
+        // Measured 2026-11-14 (ADR 0182, sixth round's fixes) on
+        // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
+        // 7923 tests, 7921 passed, 2 skipped, 0 failed, 326 s.
+        //
+        // Measured 2026-11-14 (ADR 0182, the sixth round's polish) on
+        // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
+        // 7936 tests, 7934 passed, 2 skipped, 0 failed, 343 s.
+        //
+        // Measured 2026-11-17 (the main path checked against the exact
+        // Michaelis-Menten solution, 0.7.1) on fix/studio-real-values,
+        // caterva/tests with pytest-xdist (-n 8): 7939 tests, 7938 passed,
+        // 1 skipped (Sparkle not unpacked; npx was on PATH, so the codegen
+        // selftest ran), 0 failed, 1357 s.
+        passed: 7938,
         skipped: 1,
         failed: 0,
-        collected: 7210,
+        collected: 7939,
       },
     ],
   },
@@ -280,7 +319,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "96 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "107 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -373,10 +412,48 @@ export const TEST_SUITES: TestSuite[] = [
         // ADR count (178, now 179), which check_documented_counts.py --write
         // then fixed; test_documented_counts.py passed in full after it.
         // 1691 + 1: 1692.
-        passed: 1692,
+        //
+        // Measured 2026-11-11 (ADR 0182) on the merged tree of the five
+        // real-values branches, Tests/ with pytest-xdist (-n 8): 1750 tests,
+        // 1750 passed, 0 skipped, 0 failed, 647 s.
+        //
+        // Measured 2026-11-12 (ADR 0182, second round) on the same merged
+        // tree, Tests/ with pytest-xdist (-n 8): 1832 tests, 1832 passed, 0
+        // skipped, 0 failed, 202 s.
+        //
+        // Measured 2026-11-12 (ADR 0182, third round's fixes) on
+        // fix/studio-real-values, Tests/ with pytest-xdist (-n 8): 1871
+        // tests, 1871 passed, 0 skipped, 0 failed, 206 s.
+        //
+        // Measured 2026-11-12 (ADR 0182, fourth round's fixes) on
+        // fix/studio-real-values, Tests/ with pytest-xdist (-n 8): 1906
+        // tests, 1906 passed, 0 skipped, 0 failed, 188 s.
+        //
+        // Measured 2026-11-13 (ADR 0182, fifth round's fixes) on
+        // fix/studio-real-values, Tests/ with pytest-xdist (-n 8): 1948
+        // tests, 1948 passed, 0 skipped, 0 failed, 172 s.
+        //
+        // Measured 2026-11-13 (ADR 0182, the fifth round's polish) on
+        // fix/studio-real-values, Tests/ with pytest-xdist (-n 8): 1961
+        // tests, 1961 passed, 0 skipped, 0 failed, 317 s.
+        //
+        // Measured 2026-11-14 (ADR 0182, sixth round's fixes) on
+        // fix/studio-real-values, Tests/: 1990 tests, 1990 passed, 0
+        // skipped, 0 failed. Not one run: PubChem was refusing this
+        // machine's requests (503, "too many requests per second or
+        // blacklisted"), and one test that asks it for compound identities
+        // (test_a_re_selection_to_another_substrates_row_says_so) held an
+        // xdist worker through its retries. 1953 passed in the xdist run
+        // (-n 8), the 36 queued behind it passed run on their own, and
+        // that test passed alone in 418 s.
+        //
+        // Measured 2026-11-14 (ADR 0182, the sixth round's polish) on
+        // fix/studio-real-values, Tests/ with pytest-xdist (-n 8): 2001
+        // tests, 2001 passed, 0 skipped, 0 failed, 183 s, in one run.
+        passed: 2001,
         skipped: 0,
         failed: 0,
-        collected: 1692,
+        collected: 2001,
       },
     ],
   },
@@ -386,7 +463,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "82 test files -- query resolution, parameter provenance, " +
+          "90 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
@@ -461,7 +538,35 @@ export const TEST_SUITES: TestSuite[] = [
         // The 12 more are webPathProvenance.test.ts's review cases (guinea
         // pig, a reagent's organism, a guessed enzyme with no substrate, two
         // enzymes): 886.
-        passed: 886,
+        //
+        // Measured 2026-11-11 on fix/rv-web (ADR 0182, choosing an unnamed
+        // substrate), vitest run with the project venv on PATH: 83 files,
+        // 900 tests. 899 passed in the full run; the one failure was
+        // frontDoorRouteCoverage's twenty-query route test, an HTTP parse
+        // error under load, which passed run alone with frontDoorCoverage
+        // (6 of 6). The 14 more: automaticChoice.test.ts (6) and the
+        // converted and new cases in webPathProvenance and
+        // inhibitorIsTheKiCompound (8): 900.
+        //
+        // Measured 2026-11-12 (ADR 0182, second round) on the merged tree,
+        // vitest run with the project venv on PATH: 86 files, 933 tests,
+        // 933 passed.
+        //
+        // Measured 2026-11-13 (ADR 0182, fifth round's fixes) on
+        // fix/studio-real-values, vitest run with the project venv on PATH:
+        // 87 files, 938 tests, 938 passed.
+        //
+        // Measured 2026-11-14 (ADR 0182, sixth round's fixes) on
+        // fix/studio-real-values, vitest run with the project venv on PATH:
+        // 89 files, 953 tests, 953 passed.
+        //
+        // Measured 2026-11-14 (ADR 0182, the sixth round's polish), same
+        // form: 90 files, 959 tests. Two full runs each passed 958; the one
+        // that did not was a different test each time, both waiting on the
+        // network (a 60 s timeout in gapClassification, "socket hang up"
+        // in frontDoorRouteCoverage), and both files passed run on their
+        // own (11 of 11).
+        passed: 959,
         skipped: 0,
         failed: 0,
       },
@@ -473,10 +578,10 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "7 test files -- component rendering, nav/section integrity, " +
+          "8 test files -- component rendering, nav/section integrity, " +
           "page-claim accuracy, disabled-source claims, the merged " +
           "MuleRun chapters' content, and the resolve-to-run provenance " +
-          "round trip",
+          "round trip, and the automatic-choice notes",
         // Measured 2026-09-28, `vitest run`: 6 files, 44 passed (33, plus
         // three MergedChapters tests from the MuleRun merge and two that pin
         // the inhibitor attribution to BRENDA ref 739793's pyruvate row, plus
@@ -493,8 +598,11 @@ export const TEST_SUITES: TestSuite[] = [
         // and shows across a 422, Recent Runs' cached label, the playground
         // preset's labels) and one more PageClaims test (the stale LDH and
         // AChE presets replaced by two tests): `vitest run` on 2026-11-02,
-        // from a JSON report, 7 files, 64 passed.
-        passed: 64,
+        // from a JSON report, 7 files, 64 passed. Plus ChoiceNotes.test.tsx
+        // (5: a substrate Caterva chose stays on screen beside the Km, on the
+        // 422 path too; ADR 0182): `vitest run` on 2026-11-11, 8 files, 69
+        // passed.
+        passed: 69,
         skipped: 0,
         failed: 0,
       },
@@ -506,7 +614,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "76 test files -- the `scientific` CLI end to end and its " +
+          "83 test files -- the `scientific` CLI end to end and its " +
           "refusals, the literature resolver, the Python engine bridge, " +
           "inhibition models, exports, request validation, result storage " +
           "and reproducibility checks",
@@ -521,7 +629,29 @@ export const TEST_SUITES: TestSuite[] = [
         // 76 suites, 981 tests, all passing, none skipped; ~/.caterva's
         // history and records were unchanged by the run (the new
         // testsDoNotWriteHome guard is one of the four new files): 981.
-        passed: 981,
+        //
+        // Measured 2026-11-11 on fix/rv-web (ADR 0182: the CLI chooses an
+        // unnamed substrate or organism and shows it): jest, 79 suites, 1001
+        // tests. 1000 passed in the full run; documentedExamplesRun's
+        // `catalog 1.1.1.27` (a live BRENDA fetch) exited 1 under load and
+        // passed run alone (5 of 5). The three new files are chooseMissing,
+        // formatNumber and chooserOnTheCommandLine: 1001.
+        //
+        // Measured 2026-11-12 (ADR 0182, second round) on the merged tree:
+        // jest, 80 suites, 1026 tests, 1026 passed.
+        //
+        // Measured 2026-11-13 (ADR 0182, fifth round's fixes) on
+        // fix/studio-real-values: jest, 81 suites, 1029 tests, 1029 passed.
+        //
+        // Measured 2026-11-13 (ADR 0182, the fifth round's polish) on
+        // fix/studio-real-values: jest, 81 suites, 1031 tests, 1031 passed.
+        //
+        // Measured 2026-11-14 (ADR 0182, sixth round's fixes) on
+        // fix/studio-real-values: jest, 82 suites, 1036 tests, 1036 passed.
+        //
+        // Measured 2026-11-14 (ADR 0182, the sixth round's polish):
+        // jest, 83 suites, 1039 tests, 1039 passed.
+        passed: 1039,
         skipped: 0,
         failed: 0,
       },

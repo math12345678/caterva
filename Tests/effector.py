@@ -101,15 +101,29 @@ from buffer_identity import BufferIdentity
 #: residue.
 _PRESENT_LEAD = (
     r"in\s+the\s+presence\s+of|in\s+presence\s+of|presence\s+of|"
-    r"activated\s+by|in\s+the\s+absence\s+of\s+added|with\s+added|with"
+    r"activated\s+by|activation\s+by|stimulated\s+by|stimulation\s+by|"
+    r"in\s+the\s+absence\s+of\s+added|with\s+added|with"
 )
+#: A lead that itself says the compound is an activator: "pH 8.0, 32°C,
+#: activation by 2 mM D-fructose-1,6-bisphosphate" (human PKM2, BRENDA ref
+#: 661215) is an apparent constant with the activator present, and was
+#: carried as pyruvate kinase's Km with FBP never mentioned (fourth round of
+#: the real-values review, 2026-11-12).
+_ACTIVATING_LEAD = re.compile(r"(?:activat|stimulat)\w*\s+by", re.IGNORECASE)
 _ABSENT_LEAD = r"in\s+the\s+absence\s+of|in\s+absence\s+of|absence\s+of|without"
 
 #: A compound phrase: letters, digits, commas, hyphens, plus signs.
 #: Stops at a clause boundary -- a comma FOLLOWED BY a space and a
 #: non-digit, so "fructose 1,6-bisphosphate" survives while
 #: "NADH, pH 7" splits.
-_COMPOUND = r"[A-Za-z][A-Za-z0-9'()\[\]+-]*(?:[\s,-](?![\s]|\d+\s*[°%]|pH\b|at\b)[A-Za-z0-9'()\[\]+-]+)*"
+#:
+#: The first character may also open a stereo descriptor or a locant run:
+#: "(E)-5-(3-nitrophenyl)-2-hydroxycyclohepta-2,4,6-trienone" and
+#: "2,3-dihydroxybenzaldehyde". Until 2026-11-11 a name starting so was not
+#: read at all, so BRENDA's xanthine oxidase rows "in the presence of 0.0005
+#: mM (E)-5-..." (ref 766313) carried no effector, and an apparent Km measured
+#: with that inhibitor present was taken as the enzyme's Km.
+_COMPOUND = r"(?:[A-Za-z]|\((?=[A-Za-z0-9+,-]{1,8}\)-)|\d[\d,']*-(?=[A-Za-z(]))[A-Za-z0-9'()\[\]+-]*(?:[\s,-](?![\s]|\d+\s*[°%]|pH\b|at\b)[A-Za-z0-9'()\[\]+-]+)*"
 
 _CONCENTRATION = r"\d+(?:\.\d+)?\s*[munMUN]?M"
 
@@ -253,7 +267,20 @@ def extract_effectors(commentary: str | None) -> list[Effector]:
             # "enzyme with removed helix alpha13": the construct, not the assay.
             continue
         presence = _presence_of(m.group("lead"))
-        parts = [(compound, m.group("conc") or None)]
+        conc_after = None
+        trailing = re.match(rf"(?P<conc>{_CONCENTRATION})", commentary[m.end("compound") - 1:]) \
+            if re.search(r"\s\d+$", compound) else None
+        whole = re.search(rf"\s+(?P<conc>{_CONCENTRATION})$", compound)
+        if whole and not trailing:
+            # "with NADH 1 mM": the same, read whole.
+            compound, conc_after = compound[:whole.start()], whole.group("conc")
+        elif trailing:
+            # "with papyriferic acid 0.04 mM": the concentration follows the
+            # name, and the name read as "papyriferic acid 0" (sixth round,
+            # NEW-17).
+            compound = re.sub(r"\s+\d+$", "", compound)
+            conc_after = trailing.group("conc")
+        parts = [(compound, m.group("conc") or conc_after)]
         joined = _CONJUNCTION_RE.search(compound)
         if joined:
             # "X or Y": either was used, and the row does not say which, so
@@ -265,7 +292,7 @@ def extract_effectors(commentary: str | None) -> list[Effector]:
             if joined.group("word").lower() == "or" and presence == "present":
                 presence = "unstated"
         for text, conc_text in parts:
-            role = None
+            role = "activator" if _ACTIVATING_LEAD.fullmatch(" ".join(m.group("lead").split())) else None
             named = _ROLE_RE.match(text)
             if named:
                 role = named.group("role").lower()

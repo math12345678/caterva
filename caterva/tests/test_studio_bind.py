@@ -208,5 +208,5 @@ def test_a_word_for_a_kind_of_enzyme_is_refused_not_read_as_one(tmp_path):
 def test_an_organism_the_page_never_names_is_not_reported_as_no_ki_rows(tmp_path):
     outcome = studio({**BASE, "organism": "humn", "mode": "list"}, tmp_path)
     assert outcome.exit_code == 3
-    assert "names no organism 'Humn' anywhere" in outcome.refusal
+    assert "names no organism 'humn' anywhere" in outcome.refusal
     assert "No Ki rows" not in outcome.refusal

@@ -57,9 +57,13 @@ ORGANISMS: Dict[str, Tuple[str, str, Tuple[str, ...]]] = {
         "e.coli", "ecoli", "e. coli k-12", "e. coli k12", "escherichia coli k-12",
         "escherichia coli k12", "e. coli mg1655", "e. coli k-12 mg1655",
         "escherichia coli str. k-12 substr. mg1655")),
-    "BOVIN": ("Bos taurus", "cow", ("bovine", "cattle", "b. taurus")),
-    "PIG": ("Sus scrofa", "pig", ("porcine", "s. scrofa")),
-    "CHICK": ("Gallus gallus", "chicken", ("g. gallus",)),
+    "BOVIN": ("Bos taurus", "cow", ("bovine", "cattle", "b. taurus", "cows", "calf", "ox", "beef")),
+    "PIG": ("Sus scrofa", "pig", ("porcine", "s. scrofa", "pigs", "hog", "swine")),
+    # "hen egg white lysozyme" is the chicken's: a hen is a female chicken,
+    # and BRENDA files hen egg-white lysozyme under Gallus gallus.
+    "CHICK": ("Gallus gallus", "chicken", (
+        "g. gallus", "chickens", "chick", "hen", "hens", "hen's", "hen egg", "hen egg white", "hen egg-white",
+        "hen's egg white", "hen eggwhite", "egg white", "egg-white")),
     "ARATH": ("Arabidopsis thaliana", "Arabidopsis", ("arabidopsis", "a. thaliana")),
     "BACSU": ("Bacillus subtilis", "B. subtilis", ("b. subtilis",)),
     "DROME": ("Drosophila melanogaster", "fruit fly", ("fruit fly", "drosophila", "d. melanogaster")),
@@ -69,8 +73,58 @@ ORGANISMS: Dict[str, Tuple[str, str, Tuple[str, ...]]] = {
     "DANRE": ("Danio rerio", "zebrafish", ("d. rerio",)),
     "XENLA": ("Xenopus laevis", "Xenopus laevis", ("xenopus", "x. laevis")),
     "MYCTU": ("Mycobacterium tuberculosis", "M. tuberculosis", ("m. tuberculosis",)),
-    "HORSE": ("Equus caballus", "horse", ("e. caballus",)),
-    "SHEEP": ("Ovis aries", "sheep", ("o. aries",)),
+    "HORSE": ("Equus caballus", "horse", ("e. caballus", "equine")),
+    # "ovine" and "equine" as "bovine" and "porcine" are: "ovine COX-2" was
+    # read with no organism and modelled in Homo sapiens (names-stream review).
+    "SHEEP": ("Ovis aries", "sheep", ("o. aries", "ovine")),
+    # "guinea pig" is one species, and it is NOT a pig: without this row a
+    # sentence "guinea pig trypsin" read the word "pig" as Sus scrofa, and
+    # `--organism "guinea pig"` was case-fixed to "Guinea pig", which no
+    # BRENDA row carries.
+    "CAVPO": ("Cavia porcellus", "guinea pig", ("guinea pigs", "c. porcellus")),
+    # The common names enzymologists use for the classic enzyme sources, each
+    # one species in the literature: jack-bean urease, electric-eel
+    # acetylcholinesterase, mushroom tyrosinase (the commercial enzyme is
+    # Agaricus bisporus'), horseradish peroxidase, spinach Rubisco, barley
+    # and sweet-potato beta-amylase, soybean lipoxygenase. Unread, "urease
+    # from jack bean" chose Klebsiella aerogenes and said no organism had
+    # been named (round-1 finding F04). Counts only: the index lists no
+    # proteins for them.
+    "CANEN": ("Canavalia ensiformis", "jack bean", ("jack beans", "jackbean", "jack-bean", "c. ensiformis")),
+    "ELEEL": ("Electrophorus electricus", "electric eel", ("electric eels", "e. electricus")),
+    "AGABI": ("Agaricus bisporus", "mushroom", ("mushrooms", "button mushroom", "common mushroom", "a. bisporus")),
+    "ARMRU": ("Armoracia rusticana", "horseradish", ("a. rusticana",)),
+    "SPIOL": ("Spinacia oleracea", "spinach", ("s. oleracea",)),
+    "HORVU": ("Hordeum vulgare", "barley", ("h. vulgare",)),
+    "SOYBN": ("Glycine max", "soybean", ("soybeans", "soya", "soya bean", "soy bean", "g. max")),
+    "IPOBA": ("Ipomoea batatas", "sweet potato", ("sweet potatoes", "i. batatas")),
+    # The firefly of firefly luciferase (LUCI_PHOPY, EC 1.13.12.7).
+    "PHOPY": ("Photinus pyralis", "firefly", ("fireflies", "north american firefly", "p. pyralis")),
+    # More classic sources, each the one species BRENDA files the enzyme's
+    # rows under (checked on the BRENDA pages named, 2026-11-12). Unread,
+    # "beta-glucosidase from almond", "acid phosphatase from potato" and
+    # "hexokinase from wheat germ" were each modelled in Homo sapiens
+    # (names-stream review): sweet-almond beta-glucosidase (3.2.1.21),
+    # potato phosphorylase and acid phosphatase (2.4.1.1, 3.1.3.2),
+    # wheat-germ acid phosphatase (3.1.3.2), pineapple stem bromelain
+    # (3.4.22.32), papain (3.4.22.2), maize PEP carboxylase (4.1.1.31),
+    # tobacco and tomato (4.1.1.39, 3.1.3.2, 3.2.1.26).
+    "PRUDU": ("Prunus dulcis", "almond", ("almonds", "sweet almond", "sweet almonds", "p. dulcis")),
+    "SOLTU": ("Solanum tuberosum", "potato", ("potatoes", "potato tuber", "potato tubers", "s. tuberosum")),
+    "WHEAT": ("Triticum aestivum", "wheat", ("wheat germ", "wheatgerm", "t. aestivum")),
+    "ANACO": ("Ananas comosus", "pineapple", ("pineapples", "pineapple stem", "a. comosus")),
+    "CARPA": ("Carica papaya", "papaya", ("papayas", "pawpaw", "papaya latex", "c. papaya")),
+    "MAIZE": ("Zea mays", "maize", ("corn", "z. mays")),
+    "TOBAC": ("Nicotiana tabacum", "tobacco", ("n. tabacum",)),
+    "SOLLC": ("Solanum lycopersicum", "tomato", ("tomatoes", "s. lycopersicum")),
+    # Renamed species, typed by their old names: BRENDA files the Candida
+    # rugosa (C. cylindracea) lipase under Diutina rugosa and the
+    # Pseudomonas cepacia lipase under Burkholderia cepacia (EC 3.1.1.3,
+    # checked 2026-11-12). "lipase from Candida rugosa" was refused with "no
+    # Km row in Candida rugosa" while BRENDA holds six.
+    "DIURU": ("Diutina rugosa", "Candida rugosa", (
+        "c. rugosa", "candida cylindracea", "c. cylindracea", "d. rugosa")),
+    "BURCE": ("Burkholderia cepacia", "Burkholderia cepacia", ("pseudomonas cepacia", "p. cepacia", "b. cepacia")),
 }
 
 #: What a code covers when it is narrower than the name people type for it.

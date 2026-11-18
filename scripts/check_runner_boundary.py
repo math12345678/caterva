@@ -124,7 +124,42 @@ EMITTED_AS: dict[str, str | None] = {
     # --- policy and provenance -------------------------------------------
     "cross_species_flag": "crossSpecies",
     "cross_species_organisms_available": "crossSpeciesOrganismsAvailable",
+    "cross_species_variant_only": "crossSpeciesVariantOnly",
+    "cross_species_isozyme_only": "crossSpeciesIsozymeOnly",
+    "variant_isozymes_only": "variantIsozymesOnly",
     "variant_candidates_available": "variantCandidatesAvailable",
+    # ADR 0182. Every row's value when each is outside the plausible range
+    # (source "implausible_withheld"), and why the row carried was carried.
+    "implausible_values": "implausibleValues",
+    "chosen_because": "chosenBecause",
+    "wide_spread": "wideSpread",
+    # Carried inside chosen_because's sentence ("1 physically implausible
+    # row(s) set aside ...: 1e-06 1/s (BRENDA ref 729224)", "a 185-fold
+    # spread"); docs/undelivered-fields-baseline.txt records the same.
+    "set_aside": None,
+    "spread_fold": None,
+    # How resolve_kinetic_pair finds a paper with a Km and a kcat row; the
+    # pair itself crosses as the two citations.
+    "candidate_references": None,
+    # The rows resolve_kinetic_pair may pair across tables (the pair crosses
+    # as the two citations), and what the carried row is, which is also in
+    # chosen_because's sentence ("what the carried row is: a K0.5 ...").
+    "pairable": None,
+    # What the carried row is: crosses as `rowNotes`, printed by the API's
+    # flags and provenance note and by the TypeScript CLI (third round).
+    "row_notes": "rowNotes",
+    # The carried row's own single UniProt accession, read by
+    # resolve_kinetic_pair to keep a pair to one protein; the API's answer
+    # names the row's accession in its citation.
+    "row_uniprot": None,
+    # How many rows naming no isoform were set aside with the field of
+    # another protein (source "isoform_withheld"); said in the log.
+    "isoform_unnamed_withheld": None,
+    # The isoform the carried row measured, by its words or UniProt cell.
+    # Read in-process by `caterva compose` (Measurement.row_isoform); the
+    # API's answer names it in chosen_because ("the row's UniProt accession
+    # (P35557) is GCK") and in the row's own accession.
+    "row_isoform": None,
     "variant": "variant",
     # ADR 0092. Crosses as `preparation`, beside `variant`: the same
     # question one category over -- ADR 0029 asks whether the row measured

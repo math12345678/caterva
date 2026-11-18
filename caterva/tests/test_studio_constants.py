@@ -65,43 +65,54 @@ def test_the_km_is_the_resolvers_with_its_citation(hexokinase):
     (row,) = outcome.result["constants"]
     assert row["name"] == "km" and row["found"] is True and row["source"] == "brenda_exact"
     km = row["value"]
-    assert km["value"] == row["raw"]["value"] == 6.0 and km["unit"] == "mM"
+    # A Km on its own (cite.py asks for no kcat): the median of the four
+    # best-described human D-glucose rows, HK-I's 0.06 mM (ADR 0182).
+    assert km["value"] == row["raw"]["value"] == 0.06 and km["unit"] == "mM"
     prov = km["provenance"]
     assert prov["kind"] == "measured" and prov["organism"] == "Homo sapiens"
-    assert prov["citation"]["text"] == "BRENDA ref 641068"
-    assert prov["citation"]["registry"] == "BRENDA" and prov["citation"]["reference_id"] == "641068"
+    assert prov["citation"]["text"] == "BRENDA ref 640237"
+    assert prov["citation"]["registry"] == "BRENDA" and prov["citation"]["reference_id"] == "640237"
     assert prov["citation"]["url"] == "https://www.brenda-enzymes.org/enzyme.php?ecno=2.7.1.1"
     assert prov["conditions"]["ph"] == row["raw"]["assay_ph"]
     assert prov["conditions"]["temperature_c"] == row["raw"]["assay_temperature_c"]
     assert prov["commentary"] == row["raw"]["commentary"]
-    assert "BRENDA ref 641068" in out
+    assert "BRENDA ref 640237" in out
     assert outcome.result["sourced"] == ["km"]
     assert progress.stages() == ["resolve", "document"]
 
 
 def test_the_engines_tie_explanation_reaches_the_row_and_the_ui_can_show_it(hexokinase):
-    """Human hexokinase's glucose Km is 3 equally evidenced rows, 6 to 18 mM. The engine says so ("taking the lowest,
-    which the evidence does not justify"); the adapter used to drop it (`scope: []`, `chosen_because: None`)."""
+    """Human hexokinase's glucose Km is 4 equally evidenced rows, 0.034 to 6 mM. The engine says so, and that it
+    returned the median row; the adapter used to drop it (`scope: []`, `chosen_because: None`). Six until ADR
+    0182's second round, which set aside HK-I's isolated carboxyl domain (0.038 mM) and glucokinase's K0.5
+    (6.3 mM, Hill coefficient 1.8) for the native enzymes' true Km rows."""
     _, _, _, outcome, _ = hexokinase
     (row,) = outcome.result["constants"]
     prov = row["value"]["provenance"]
     tie = row["raw"]["selection_tie"]
     assert prov["chosen_because"] == tie["reason"]
-    assert "3 rows were equally well evidenced" in prov["chosen_because"]
-    assert "taking the lowest, which the evidence does not justify" in prov["chosen_because"]
+    assert "4 rows were equally well evidenced" in prov["chosen_because"]
+    assert "The value returned is the median row of those" in prov["chosen_because"]
+    assert "lowest" not in prov["chosen_because"]
     spread = prov["spread"]
-    assert (spread["low"], spread["high"], spread["carried"], spread["n_values"], spread["unit"]) == (6.0, 18.0, 6.0, 3, "mM")
-    assert spread["references"] == ["641068", "739603"] and "spanning 6 to 18 mM (3-fold)" in spread["sentence"]
+    assert (spread["low"], spread["high"], spread["carried"], spread["n_values"], spread["unit"]) == (
+        0.034, 6.0, 0.06, 4, "mM")
+    assert spread["references"] == ["640237", "640261", "641067", "641068"]
+    assert "spanning 0.034 to 6 mM (176-fold)" in spread["sentence"]
+    # The sentence says why this row: the resolver's own reason, the spread wide.
+    assert "this model carries 0.06, chosen because 0.06 mM (BRENDA ref 640237) is the lower of the two " \
+        "middle values of the 4 remaining rows" in spread["sentence"]
+    assert "the literature disagrees by more than 100-fold" in spread["sentence"]
     # The rows it ranked equal are the alternatives, each as measured.
-    assert sorted(a["value"] for a in row["alternatives"]) == [6.3, 18.0]
+    assert sorted(a["value"] for a in row["alternatives"]) == [0.034, 3.8, 6.0]
 
 
 def test_the_engines_scope_concerns_reach_the_row(hexokinase):
-    """The candidate rows name 6 different forms of hexokinase; the engine says returning the lowest would pick a
+    """The candidate rows name 3 different forms of hexokinase; the engine says returning any one row would pick a
     form rather than answer the question. That is a scope concern of the value, and it was `[]`."""
     _, _, _, outcome, _ = hexokinase
     prov = outcome.result["constants"][0]["value"]["provenance"]
-    assert any("name 6 different forms of hexokinase" in c and "would pick a form rather than answer" in c
+    assert any("name 3 different forms of hexokinase" in c and "would pick a form rather than answer" in c
                for c in prov["scope"])
 
 
@@ -163,7 +174,7 @@ def test_a_question_report_lab_refuses_is_refused_in_cites_words(tmp_path):
 def test_report_labs_json_now_carries_the_resolved_results(hexokinase):
     _, _, _, outcome, _ = hexokinase
     raw = outcome.result["constants"][0]["raw"]
-    assert raw["citation"]["reference_id"] == "641068" and raw["found"] is True
+    assert raw["citation"]["reference_id"] == "640237" and raw["found"] is True
 
 
 @pytest.mark.parametrize("request_, field", [

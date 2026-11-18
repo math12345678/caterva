@@ -66,9 +66,32 @@ def keys_of(name: str) -> Set[str]:
     return {k for k in keys if k}
 
 
+@lru_cache(maxsize=1)
+def _curated_readings() -> Dict[str, Tuple[str, ...]]:
+    """accession -> the names papers give that protein which UniProtKB does
+    not ("beta1" for ADH1B: BRENDA's human alcohol dehydrogenase rows read
+    "isoenzyme beta1,beta1"), from `reads_as` on a curated alias row
+    (data/aliases.json) that also gives the protein's accession."""
+    import json
+
+    from .symbols import ALIASES_PATH
+
+    try:
+        with open(ALIASES_PATH, encoding="utf-8") as handle:
+            rows = json.load(handle).get("aliases", [])
+    except (OSError, ValueError):
+        return {}
+    out: Dict[str, Tuple[str, ...]] = {}
+    for row in rows:
+        names = tuple(str(n) for n in row.get("reads_as", ()))
+        for accession in row.get("accessions", ()) if names else ():
+            out[str(accession)] = out.get(str(accession), ()) + names
+    return out
+
+
 def _protein_names(accession: str, entry_stem: str) -> List[str]:
     found = info(accession)
-    names: List[str] = []
+    names: List[str] = list(_curated_readings().get(accession, ()))
     if found is not None and found.gene:
         names.append(found.gene)
     names.append(entry_stem)
@@ -124,7 +147,9 @@ def can_match(label: str) -> bool:
 def names_for(accession: str, entry_stem: str) -> Tuple[str, ...]:
     """The names of one protein the engine will match, gene symbol first."""
     seen: List[str] = []
-    for name in _protein_names(accession, entry_stem):
+    curated = set(_curated_readings().get(accession, ()))
+    listed = _protein_names(accession, entry_stem)
+    for name in [n for n in listed if n not in curated] + [n for n in listed if n in curated]:
         if name not in seen:
             seen.append(name)
     return tuple(seen)

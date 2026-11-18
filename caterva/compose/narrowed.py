@@ -89,6 +89,8 @@ the field) leaves the note to the rows, as before.
 """
 from __future__ import annotations
 
+import re
+
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
@@ -106,6 +108,7 @@ def _row_of(m: Any) -> Dict[str, Any]:
         "conditions": getattr(m, "commentary", None),
         "ph": getattr(m, "assay_ph", None), "temperature_c": getattr(m, "assay_temperature_c", None),
         "buffer": getattr(m, "assay_buffer", None),
+        "isoform": getattr(m, "row_isoform", None),
     }
 
 
@@ -131,11 +134,24 @@ def same_row(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
 
 
 def _merged(*groups: Sequence[Any]) -> tuple:
+    """The rows of every group, each once (the first spelling of a row
+    wins), with what a later copy of a row adds -- its reliability grades,
+    its isoform -- kept: a Measurement's own row (`_row_of`) carries no
+    grades, and the resolver's frontier copy of that row does, which the
+    claims' dominance ordinals need (human hexokinase's glucokinase pair,
+    ADR 0182 second round)."""
     out: List[Dict[str, Any]] = []
     for group in groups:
         for row in group:
-            if isinstance(row, dict) and not any(same_row(row, seen) for seen in out):
+            if not isinstance(row, dict):
+                continue
+            seen = next((kept for kept in out if same_row(row, kept)), None)
+            if seen is None:
                 out.append(dict(row))
+                continue
+            for key, value in row.items():
+                if seen.get(key) is None and value is not None:
+                    seen[key] = value
     return tuple(out)
 
 
@@ -191,6 +207,30 @@ def evidence_view(measured: Mapping[str, Any],
     return out
 
 
+_MUTATION = re.compile(r"\b[A-Z]\d{1,4}[A-Z]\b|\bmutant\b", re.IGNORECASE)
+_WILD = re.compile(r"\bwild[- ]?type\b", re.IGNORECASE)
+
+
+def _what_it_was(evidence_row: Mapping[str, Any], carried_row: Mapping[str, Any]) -> str:
+    """What the evidence-only row is, when that is why it was not carried:
+    a wild-type row beside a mutant's (IDH1 R132H: 0.46 mM was a wild-type
+    row, R5B-06), or another protein's (hexokinase: 0.06 mM was hexokinase
+    I's beside glucokinase's pair, R5V1-6). "" otherwise."""
+    mine = str(evidence_row.get("conditions") or "")
+    theirs = str(carried_row.get("conditions") or "")
+    if _WILD.search(mine) and _MUTATION.search(theirs) and not _MUTATION.search(mine):
+        return " (a wild-type row, set aside because a mutant was asked for)"
+    try:
+        from caterva.bind.core import read_isoform, same_isoform
+    except ImportError:  # pragma: no cover
+        return ""
+    a = read_isoform(mine) or evidence_row.get("isoform_own")
+    b = read_isoform(theirs) or carried_row.get("isoform_own") or carried_row.get("isoform")
+    if a and b and not same_isoform(a, b):
+        return f" (a row of {a}, another protein than the {b} the model carries)"
+    return ""
+
+
 def _asked(isoform: Optional[str], mode: Optional[str]) -> str:
     parts = ([isoform] if isoform else []) + ([f"a {mode} model"] if mode else [])
     return " and ".join(parts) or "this model"
@@ -200,6 +240,12 @@ def _label(row: Mapping[str, Any], unit: Optional[str]) -> str:
     ref = row.get("reference_id")
     return f"{float(row['value']):g} {unit or row.get('unit') or ''}".rstrip() + (
         f", BRENDA ref {ref}" if ref else "")
+
+
+#: The resolver's clause for a paper set aside as a probable error
+#: (fallback_logic.resolve_kinetic_pair).
+_SET_ASIDE = re.compile(r"BRENDA ref \d+'s row was not used: .*?supplies neither constant"
+                        r"(?: \(it gave [^)]*\))?")
 
 
 def carry(measured: Mapping[str, Any], refused: Mapping[str, str], narrowed: Narrowed,
@@ -213,14 +259,45 @@ def carry(measured: Mapping[str, Any], refused: Mapping[str, str], narrowed: Nar
     out = dict(measured)
     still_refused = dict(refused)
     notes: List[str] = []
+    # When the evidence-only picks are set aside because one of them is
+    # another protein's row, the note says only what is carried and that one
+    # reason. Naming the set-aside values as well read as two answers
+    # (human hexokinase: "arrives at 60.4 1/s ... 0.06 mM, HK-I" before the
+    # resolver's GCK pair; sixth round, R5A2-05).
+    other_protein = ""
+    for identifier, row in narrowed.chosen.items():
+        carried = out.get(identifier)
+        if carried is not None and not same_row(_row_of(carried), row):
+            found = _what_it_was(_row_of(carried), row)
+            if "another protein" in found:
+                other_protein = found.strip(" ()")
+                break
     for identifier, row in narrowed.chosen.items():
         answer = narrowed.answers[identifier]
         carried = out.get(identifier)
         if carried is not None and same_row(_row_of(carried), row):
+            # The same row, reached by the selections: the paper the
+            # resolver set aside on the way is still said. Human aldolase B:
+            # ref 651313's Km of 0.0022 mM, a probable unit slip, was passed
+            # over for ref 4945's 3.7 mM without a word (sixth round, NEW-03).
+            said = getattr(carried, "chosen_because", None) or ""
+            own = " ".join(str(getattr(answer, name, None) or "")
+                           for name in ("chosen_because", "resolver_because"))
+            for clause in dict.fromkeys(_SET_ASIDE.findall(own)):
+                if clause not in said:
+                    notes.append(f"`{identifier}`: {clause}")
             continue
         what = _asked(isoform, modes.get(identifier))
-        because = (f"the resolver's row for {what}, ranked among every row BRENDA holds "
+        because = (f"the row the resolver returns when asked for {what}, ranked among every row BRENDA holds "
                    f"before choosing on evidence")
+        own = getattr(answer, "chosen_because", None) or getattr(answer, "resolver_because", None)
+        if own:
+            # The resolver's own reason says what the row IS (a K0.5, a
+            # construct, another isozyme's accession, one paper's pair):
+            # without it the report said only that the resolver chose it
+            # (human hexokinase: glucokinase's K0.5 6.3 mM, ref 739603, with
+            # no word of K0.5, Hill or GCK; ADR 0182, second round).
+            because = f"{because}: {own}"
         view = narrowed.measured[identifier]
         out[identifier] = replace(answer, alternatives=getattr(view, "alternatives", ()),
                                   chosen_because=because)
@@ -232,9 +309,20 @@ def carry(measured: Mapping[str, Any], refused: Mapping[str, str], narrowed: Nar
                 f"`{identifier}`: the selections here refused it ({why}); the resolver, asked "
                 f"for {what}, returns {_label(row, answer.unit)}, which is used")
             continue
+        if other_protein:
+            own = _what_it_was(_row_of(carried), row).strip(" ()") if carried is not None else ""
+            notes.append(
+                f"`{identifier}`: carries {_label(row, answer.unit)}, the row the resolver returns when asked for "
+                f"{what}, as the API and the TypeScript CLI do; "
+                + (f"the evidence alone would take {own}, so it was set aside"
+                   if "another protein" in own else
+                   f"kept with the other constant's row, because the evidence alone would take "
+                   f"{other_protein} for that one"))
+            continue
         notes.append(
             f"`{identifier}`: choosing among the rows the evidence alone returned arrives at "
-            f"{_label(_row_of(carried), carried.unit)}; the resolver, asked for {what}, ranks "
+            f"{_label(_row_of(carried), carried.unit)}{_what_it_was(_row_of(carried), row)}; "
+            f"the resolver, asked for {what}, ranks "
             f"every row BRENDA holds by it before choosing on evidence, and returns "
             f"{_label(row, answer.unit)}, which is used, so this model carries the row the API "
             f"and the TypeScript CLI return for it")
@@ -274,7 +362,7 @@ class Selection:
 
 def select_for_model(search: Any, constants: Mapping[str, tuple], *,
                      substrate: Optional[str], isoform: Optional[str],
-                     any_mode: bool) -> Selection:
+                     any_mode: bool, isoform_asked: str = "--isoform") -> Selection:
     """The row each constant carries, from a search whose requests carried
     the model's isoform and modes (`ComposedModel.parameter_requests`).
 
@@ -325,14 +413,14 @@ def select_for_model(search: Any, constants: Mapping[str, tuple], *,
             from caterva.compose.isoform import select_isoform
         except ImportError:  # pragma: no cover - flat layout
             from compose.isoform import select_isoform  # type: ignore[no-redef]
-        by_isoform = select_isoform(measured, isoform)
+        by_isoform = select_isoform(measured, isoform, asked=isoform_asked)
         measured = by_isoform.measured
         refused.update(by_isoform.refused)
         out.notes.extend(by_isoform.notes)
     # The isoform first, then the mode, over the same ranked rows; ki_mode's
     # docstring says why in that order.
     by_mode = select_mode(measured, constants, substrate=substrate, isoform=isoform,
-                          any_mode=any_mode, defaults=defaults)
+                          any_mode=any_mode, defaults=defaults, isoform_asked=isoform_asked)
     refused.update(by_mode.refused)
     out.notes.extend(by_mode.notes)
     asked_modes = {
@@ -343,8 +431,42 @@ def select_for_model(search: Any, constants: Mapping[str, tuple], *,
     out.measured, refused, carried = carry(by_mode.measured, refused, narrowed, asked_modes,
                                            isoform)
     out.withheld.update(refused)
+    # A selection's "set aside as a probable error" about rows the resolver
+    # then carries is no longer true: rat glucokinase carried 7.4 mM (ref
+    # 641070) under a note saying the rows naming HXK4, 7.4 among them, were
+    # set aside (fifth round, R5V1-06). Said as what happened instead.
+    for identifier, m in out.measured.items():
+        label = f"{float(m.value):g} {m.unit}"
+        for i, note in enumerate(out.notes):
+            if (note.startswith(f"`{identifier}`: the rows naming ") and "set aside as a probable error"
+                    in note and f"({label}, BRENDA ref" in note or note.startswith(f"`{identifier}`: the rows naming ")
+                    and "set aside as a probable error" in note and f", {label}, BRENDA ref" in note):
+                head = note.split(") lie more than", 1)[0]
+                out.notes[i] = (head + ") lie more than 100-fold outside the rows naming no isoform "
+                                "that the evidence alone returned; the resolver, ranking every row "
+                                "BRENDA holds, keeps them, and its row is carried")
+        # "no ranked row names HXK4; the one used names no isoform" is not
+        # true of a row the resolver then carries that names it: rat
+        # glucokinase carries "adult glucokinase" (7.7 mM, ref 641070).
+        for i, note in enumerate(out.notes):
+            found = re.match(rf"`{re.escape(identifier)}`: no ranked row names (.+?); the one used "
+                             r"names no isoform, so whether it measured \1 is unknown$", note)
+            if found and _names(m, found.group(1)):
+                out.notes[i] = (f"`{identifier}`: the row carried ({label}) names "
+                                f"{found.group(1)} itself")
     out.notes.extend(carried)
     return out
+
+
+def _names(m: Any, isoform: str) -> bool:
+    """Whether a Measurement's own row names `isoform`, in its words or as
+    the resolver read its row."""
+    try:
+        from caterva.bind.core import read_isoform, same_isoform
+    except ImportError:  # pragma: no cover
+        return False
+    own = getattr(m, "row_isoform", None) or read_isoform(getattr(m, "commentary", None) or "")
+    return bool(own) and same_isoform(own, isoform)
 
 
 __all__ = ["Narrowed", "Selection", "evidence_view", "carry", "same_row", "select_for_model",

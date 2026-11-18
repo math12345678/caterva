@@ -17,7 +17,7 @@ def test_a_few_proteins_are_isozymes_named_by_gene_symbol():
     assert notice.symbols == ("HKDC1", "HK1", "HK2", "HK3", "GCK")
     assert notice.detail.startswith("EC 2.7.1.1 has 5 human isozymes in the enzyme nomenclature's UniProt entries")
     assert "(HKDC1, HK1, HK2, HK3, GCK)" in notice.detail and "HXK" not in notice.detail
-    assert "pass --isoform with one of these names (for example --isoform HKDC1)" in notice.remedy
+    assert "pass --isoform with one of these names (for example --isoform HK1)" in notice.remedy
     assert "a constant whose rows name none is kept and flagged" in notice.remedy
 
 

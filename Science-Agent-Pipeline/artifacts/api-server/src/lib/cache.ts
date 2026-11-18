@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logger } from "./logger";
 import type { Job, SimulationResponse } from "./queue";
+import { engineBuild, replayableBuild } from "./engineBuild";
 
 const _dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(_dirname, "..", "data");
@@ -26,6 +27,12 @@ const MAX_CACHE_ENTRIES = 250;
 interface CacheEntry {
   schemaVersion: number;
   createdAt: string;
+  /**
+   * The engine build that computed this entry (see engineBuild.ts).
+   * Absent on entries written before builds were recorded; those are
+   * never replayed, because any older engine may have written them.
+   */
+  engineBuild?: string;
   job: Job;
 }
 
@@ -126,6 +133,7 @@ const operation = mutationQueue.then(async () => {
       s.entries.push({
         schemaVersion: SCHEMA_VERSION,
         createdAt: new Date().toISOString(),
+        engineBuild: engineBuild(),
         job,
       });
       // Newest result must remain findable, so evict from the oldest end.
@@ -190,6 +198,10 @@ export function findCachedEntryByQuery(
       entry &&
       entry.job.status === "completed" &&
       entry.job.result &&
+      // Only this build's results. An older build's answer is not this
+      // build's answer, and replaying it showed numbers the current engine
+      // no longer picks (XS5R2-01).
+      replayableBuild(entry.engineBuild) &&
       normalizeQuery(entry.job.query) === normalizeQuery(query)
     ) {
       return { result: entry.job.result, cachedAt: entry.createdAt };

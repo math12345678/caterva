@@ -1,0 +1,687 @@
+{
+ "recorded": "2026-11-11, live BRENDA, by python -m caterva.compose.read",
+ "readings": {
+  "chymotrypsin follows Michaelis-Menten kinetics": {
+   "description": "chymotrypsin follows Michaelis-Menten kinetics",
+   "enzyme_text": "chymotrypsin",
+   "ec": "3.4.21.1",
+   "isoform": null,
+   "organism": "Homo sapiens",
+   "organism_text": null,
+   "substrate": "L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide",
+   "inhibitor": null,
+   "rule": "michaelis_menten",
+   "tables": [
+    "km",
+    "kcat"
+   ],
+   "named": {},
+   "choices": [
+    {
+     "role": "organism",
+     "chosen": "Homo sapiens",
+     "why": "of the 19 organisms with rows under EC 3.4.21.1, Homo sapiens is used when it has rows for every constant this model needs (Km, kcat), and it does (8 Km, 7 kcat)",
+     "alternatives": [
+      {
+       "name": "Bos taurus",
+       "rows": {
+        "km": 136,
+        "kcat": 143
+       }
+      },
+      {
+       "name": "Gadus morhua",
+       "rows": {
+        "km": 10,
+        "kcat": 11
+       }
+      },
+      {
+       "name": "Camelus bactrianus",
+       "rows": {
+        "km": 5,
+        "kcat": 5
+       }
+      },
+      {
+       "name": "Camelus dromedarius",
+       "rows": {
+        "km": 5,
+        "kcat": 5
+       }
+      },
+      {
+       "name": "Musca domestica",
+       "rows": {
+        "km": 4,
+        "kcat": 4
+       }
+      }
+     ],
+     "considered": 19,
+     "note": "No organism was named, so Caterva used Homo sapiens: of the 19 organisms with rows under EC 3.4.21.1, Homo sapiens is used when it has rows for every constant this model needs (Km, kcat), and it does (8 Km, 7 kcat). Others: Bos taurus (136 Km, 143 kcat); Gadus morhua (10 Km, 11 kcat); Camelus bactrianus (5 Km, 5 kcat); Camelus dromedarius (5 Km, 5 kcat); Musca domestica (4 Km, 4 kcat); and 13 more. Pass --organism NAME to model another."
+    },
+    {
+     "role": "substrate",
+     "chosen": "L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide",
+     "why": "of the 2 substrates BRENDA lists Km rows for under EC 3.4.21.1 in Homo sapiens, it has the most Km and kcat rows (4 Km, 4 kcat)",
+     "alternatives": [
+      {
+       "name": "N-succinyl-L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide",
+       "rows": {
+        "km": 4,
+        "kcat": 3
+       }
+      }
+     ],
+     "considered": 2,
+     "note": "No substrate was named, so Caterva used L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide: of the 2 substrates BRENDA lists Km rows for under EC 3.4.21.1 in Homo sapiens, it has the most Km and kcat rows (4 Km, 4 kcat). Others: N-succinyl-L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide (4 Km, 3 kcat). Pass --substrate NAME to model another."
+    }
+   ],
+   "notes": [
+    "Read 'chymotrypsin' in your description as EC 3.4.21.1 (chymotrypsin): accepted name matches exactly."
+   ],
+   "refusal": null
+  },
+  "hexokinase Michaelis-Menten kinetics": {
+   "description": "hexokinase Michaelis-Menten kinetics",
+   "enzyme_text": "hexokinase",
+   "ec": "2.7.1.1",
+   "isoform": null,
+   "organism": "Homo sapiens",
+   "organism_text": null,
+   "substrate": "D-glucose",
+   "inhibitor": null,
+   "rule": "michaelis_menten",
+   "tables": [
+    "km",
+    "kcat"
+   ],
+   "named": {},
+   "choices": [
+    {
+     "role": "organism",
+     "chosen": "Homo sapiens",
+     "why": "of the 41 organisms with rows under EC 2.7.1.1, Homo sapiens is used when it has rows for every constant this model needs (Km, kcat), and it does (159 Km, 92 kcat)",
+     "alternatives": [
+      {
+       "name": "Saccharomyces cerevisiae",
+       "rows": {
+        "km": 16,
+        "kcat": 2
+       }
+      },
+      {
+       "name": "Solanum chacoense",
+       "rows": {
+        "km": 8,
+        "kcat": 9
+       }
+      },
+      {
+       "name": "Eimeria tenella",
+       "rows": {
+        "km": 8,
+        "kcat": 6
+       }
+      },
+      {
+       "name": "Mus musculus",
+       "rows": {
+        "km": 5,
+        "kcat": 7
+       }
+      },
+      {
+       "name": "Cryptosporidium parvum",
+       "rows": {
+        "km": 4,
+        "kcat": 4
+       }
+      }
+     ],
+     "considered": 41,
+     "note": "No organism was named, so Caterva used Homo sapiens: of the 41 organisms with rows under EC 2.7.1.1, Homo sapiens is used when it has rows for every constant this model needs (Km, kcat), and it does (159 Km, 92 kcat). Others: Saccharomyces cerevisiae (16 Km, 2 kcat); Solanum chacoense (8 Km, 9 kcat); Eimeria tenella (8 Km, 6 kcat); Mus musculus (5 Km, 7 kcat); Cryptosporidium parvum (4 Km, 4 kcat); and 35 more. Pass --organism NAME to model another."
+    },
+    {
+     "role": "substrate",
+     "chosen": "D-glucose",
+     "why": "of the 10 substrates BRENDA lists Km rows for under EC 2.7.1.1 in Homo sapiens, it has the most Km and kcat rows (25 Km, 61 kcat; the cosubstrate ATP set aside)",
+     "alternatives": [
+      {
+       "name": "2-deoxy-D-glucose",
+       "rows": {
+        "km": 5,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "D-mannose",
+       "rows": {
+        "km": 9,
+        "kcat": 0
+       }
+      },
+      {
+       "name": "D-fructose",
+       "rows": {
+        "km": 7,
+        "kcat": 0
+       }
+      },
+      {
+       "name": "D-glucosamine",
+       "rows": {
+        "km": 3,
+        "kcat": 0
+       }
+      },
+      {
+       "name": "2-deoxyglucose",
+       "rows": {
+        "km": 1,
+        "kcat": 0
+       }
+      }
+     ],
+     "considered": 10,
+     "note": "No substrate was named, so Caterva used D-glucose: of the 10 substrates BRENDA lists Km rows for under EC 2.7.1.1 in Homo sapiens, it has the most Km and kcat rows (25 Km, 61 kcat; the cosubstrate ATP set aside). Others: 2-deoxy-D-glucose (5 Km, 1 kcat); D-mannose (9 Km); D-fructose (7 Km); D-glucosamine (3 Km); 2-deoxyglucose (1 Km); and 4 more. Pass --substrate NAME to model another."
+    }
+   ],
+   "notes": [
+    "Read 'hexokinase' in your description as EC 2.7.1.1 (hexokinase): accepted name matches exactly."
+   ],
+   "refusal": null
+  },
+  "competitive inhibition of xanthine oxidase by allopurinol": {
+   "description": "competitive inhibition of xanthine oxidase by allopurinol",
+   "enzyme_text": "xanthine oxidase",
+   "ec": "1.17.3.2",
+   "isoform": null,
+   "organism": "Bos taurus",
+   "organism_text": null,
+   "substrate": "xanthine",
+   "inhibitor": "allopurinol",
+   "rule": "competitive_inhibition",
+   "tables": [
+    "km",
+    "kcat",
+    "ki"
+   ],
+   "named": {
+    "inhibitor": "allopurinol"
+   },
+   "choices": [
+    {
+     "role": "organism",
+     "chosen": "Bos taurus",
+     "why": "of the 11 organisms with rows under EC 1.17.3.2, it has rows for 3 of the 3 constant(s) this model needs (Km, kcat, Ki for allopurinol) and the most rows of those that do (81 Km, 12 kcat, 1 Ki); Homo sapiens, preferred when it covers them all, does not",
+     "alternatives": [
+      {
+       "name": "Homo sapiens",
+       "rows": {
+        "km": 16,
+        "kcat": 4,
+        "ki": 0
+       }
+      },
+      {
+       "name": "Rattus norvegicus",
+       "rows": {
+        "km": 6,
+        "kcat": 3,
+        "ki": 0
+       }
+      },
+      {
+       "name": "Rhodobacter capsulatus",
+       "rows": {
+        "km": 2,
+        "kcat": 2,
+        "ki": 0
+       }
+      },
+      {
+       "name": "Acinetobacter calcoaceticus",
+       "rows": {
+        "km": 1,
+        "kcat": 1,
+        "ki": 0
+       }
+      },
+      {
+       "name": "Cellulosimicrobium funkei",
+       "rows": {
+        "km": 1,
+        "kcat": 1,
+        "ki": 0
+       }
+      }
+     ],
+     "considered": 11,
+     "note": "No organism was named, so Caterva used Bos taurus: of the 11 organisms with rows under EC 1.17.3.2, it has rows for 3 of the 3 constant(s) this model needs (Km, kcat, Ki for allopurinol) and the most rows of those that do (81 Km, 12 kcat, 1 Ki); Homo sapiens, preferred when it covers them all, does not. Others: Homo sapiens (16 Km, 4 kcat); Rattus norvegicus (6 Km, 3 kcat); Rhodobacter capsulatus (2 Km, 2 kcat); Acinetobacter calcoaceticus (1 Km, 1 kcat); Cellulosimicrobium funkei (1 Km, 1 kcat); and 5 more. Pass --organism NAME to model another."
+    },
+    {
+     "role": "substrate",
+     "chosen": "xanthine",
+     "why": "of the 57 substrates BRENDA lists Km rows for under EC 1.17.3.2 in Bos taurus, it has the most Km and kcat rows (14 Km, 5 kcat)",
+     "alternatives": [
+      {
+       "name": "hypoxanthine",
+       "rows": {
+        "km": 2,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "6-Mercaptopurine",
+       "rows": {
+        "km": 1,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "2-mercaptopurine",
+       "rows": {
+        "km": 1,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "2-Thioxanthine",
+       "rows": {
+        "km": 1,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "6-Thioxanthine",
+       "rows": {
+        "km": 1,
+        "kcat": 1
+       }
+      }
+     ],
+     "considered": 57,
+     "note": "No substrate was named, so Caterva used xanthine: of the 57 substrates BRENDA lists Km rows for under EC 1.17.3.2 in Bos taurus, it has the most Km and kcat rows (14 Km, 5 kcat). Others: hypoxanthine (2 Km, 1 kcat); 6-Mercaptopurine (1 Km, 1 kcat); 2-mercaptopurine (1 Km, 1 kcat); 2-Thioxanthine (1 Km, 1 kcat); 6-Thioxanthine (1 Km, 1 kcat); and 51 more. Pass --substrate NAME to model another."
+    }
+   ],
+   "notes": [
+    "Read 'xanthine oxidase' in your description as EC 1.17.3.2 (xanthine oxidase): accepted name matches exactly.",
+    "Read 'allopurinol' in your description as the inhibitor."
+   ],
+   "refusal": null
+  },
+  "xanthine oxidase inhibited by allopurinol": {
+   "description": "xanthine oxidase inhibited by allopurinol",
+   "enzyme_text": "xanthine oxidase",
+   "ec": "1.17.3.2",
+   "isoform": null,
+   "organism": "Bos taurus",
+   "organism_text": null,
+   "substrate": "xanthine",
+   "inhibitor": "allopurinol",
+   "rule": "competitive_inhibition",
+   "tables": [
+    "km",
+    "kcat",
+    "ki"
+   ],
+   "named": {
+    "inhibitor": "allopurinol"
+   },
+   "choices": [
+    {
+     "role": "organism",
+     "chosen": "Bos taurus",
+     "why": "of the 11 organisms with rows under EC 1.17.3.2, it has rows for 3 of the 3 constant(s) this model needs (Km, kcat, Ki for allopurinol) and the most rows of those that do (81 Km, 12 kcat, 1 Ki); Homo sapiens, preferred when it covers them all, does not",
+     "alternatives": [
+      {
+       "name": "Homo sapiens",
+       "rows": {
+        "km": 16,
+        "kcat": 4,
+        "ki": 0
+       }
+      },
+      {
+       "name": "Rattus norvegicus",
+       "rows": {
+        "km": 6,
+        "kcat": 3,
+        "ki": 0
+       }
+      },
+      {
+       "name": "Rhodobacter capsulatus",
+       "rows": {
+        "km": 2,
+        "kcat": 2,
+        "ki": 0
+       }
+      },
+      {
+       "name": "Acinetobacter calcoaceticus",
+       "rows": {
+        "km": 1,
+        "kcat": 1,
+        "ki": 0
+       }
+      },
+      {
+       "name": "Cellulosimicrobium funkei",
+       "rows": {
+        "km": 1,
+        "kcat": 1,
+        "ki": 0
+       }
+      }
+     ],
+     "considered": 11,
+     "note": "No organism was named, so Caterva used Bos taurus: of the 11 organisms with rows under EC 1.17.3.2, it has rows for 3 of the 3 constant(s) this model needs (Km, kcat, Ki for allopurinol) and the most rows of those that do (81 Km, 12 kcat, 1 Ki); Homo sapiens, preferred when it covers them all, does not. Others: Homo sapiens (16 Km, 4 kcat); Rattus norvegicus (6 Km, 3 kcat); Rhodobacter capsulatus (2 Km, 2 kcat); Acinetobacter calcoaceticus (1 Km, 1 kcat); Cellulosimicrobium funkei (1 Km, 1 kcat); and 5 more. Pass --organism NAME to model another."
+    },
+    {
+     "role": "substrate",
+     "chosen": "xanthine",
+     "why": "of the 57 substrates BRENDA lists Km rows for under EC 1.17.3.2 in Bos taurus, it has the most Km and kcat rows (14 Km, 5 kcat)",
+     "alternatives": [
+      {
+       "name": "hypoxanthine",
+       "rows": {
+        "km": 2,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "6-Mercaptopurine",
+       "rows": {
+        "km": 1,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "2-mercaptopurine",
+       "rows": {
+        "km": 1,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "2-Thioxanthine",
+       "rows": {
+        "km": 1,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "6-Thioxanthine",
+       "rows": {
+        "km": 1,
+        "kcat": 1
+       }
+      }
+     ],
+     "considered": 57,
+     "note": "No substrate was named, so Caterva used xanthine: of the 57 substrates BRENDA lists Km rows for under EC 1.17.3.2 in Bos taurus, it has the most Km and kcat rows (14 Km, 5 kcat). Others: hypoxanthine (2 Km, 1 kcat); 6-Mercaptopurine (1 Km, 1 kcat); 2-mercaptopurine (1 Km, 1 kcat); 2-Thioxanthine (1 Km, 1 kcat); 6-Thioxanthine (1 Km, 1 kcat); and 51 more. Pass --substrate NAME to model another."
+    }
+   ],
+   "notes": [
+    "Read 'xanthine oxidase' in your description as EC 1.17.3.2 (xanthine oxidase): accepted name matches exactly.",
+    "Read 'allopurinol' in your description as the inhibitor."
+   ],
+   "refusal": null
+  },
+  "HK2 with glucose": {
+   "description": "HK2 with glucose",
+   "enzyme_text": "HK2",
+   "ec": "2.7.1.1",
+   "isoform": "HK2",
+   "organism": "Homo sapiens",
+   "organism_text": null,
+   "substrate": "D-glucose",
+   "inhibitor": null,
+   "rule": "michaelis_menten",
+   "tables": [
+    "km",
+    "kcat"
+   ],
+   "named": {
+    "organism": "Homo sapiens",
+    "substrate": "D-glucose"
+   },
+   "choices": [],
+   "notes": [
+    "Your description named an enzyme ('HK2') and no mechanism this grammar recognises, so its shape was read as Michaelis-Menten: one enzyme turning one substrate into one product. To build another mechanism, describe it, e.g. 'Michaelis-Menten with a competitive inhibitor'.",
+    "Read 'HK2' in your description as EC 2.7.1.1 (hexokinase): HK2 is the human gene symbol of Hexokinase-2 (UniProtKB P52789), which UniProt files under this EC number. Read 'HK2' as the isoform HK2 of EC 2.7.1.1; the constants are taken from BRENDA rows that name it where there are any (pass --isoform to change it).",
+    "Your description names no organism; 'HK2' names an enzyme of Homo sapiens, so Homo sapiens was searched (pass --organism to change it).",
+    "Read 'glucose' in your description as the substrate D-glucose, which BRENDA lists for EC 2.7.1.1 for Homo sapiens with its stereo or anomer prefix set aside, the only substrate BRENDA lists under that name."
+   ],
+   "refusal": null
+  },
+  "acetylcholinesterase inhibited by donepezil in human": {
+   "description": "acetylcholinesterase inhibited by donepezil in human",
+   "enzyme_text": "acetylcholinesterase",
+   "ec": "3.1.1.7",
+   "isoform": null,
+   "organism": "Homo sapiens",
+   "organism_text": "human",
+   "substrate": "acetylthiocholine",
+   "inhibitor": "donepezil",
+   "rule": "competitive_inhibition",
+   "tables": [
+    "km",
+    "kcat",
+    "ki"
+   ],
+   "named": {
+    "organism": "Homo sapiens",
+    "inhibitor": "donepezil"
+   },
+   "choices": [
+    {
+     "role": "substrate",
+     "chosen": "acetylthiocholine",
+     "why": "of the 10 substrates BRENDA lists Km rows for under EC 3.1.1.7 in Homo sapiens, it has the most Km and kcat rows (40 Km, 3 kcat)",
+     "alternatives": [
+      {
+       "name": "propionylthiocholine",
+       "rows": {
+        "km": 2,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "6-monoacetylmorphine",
+       "rows": {
+        "km": 1,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "acetyl thiocholine",
+       "rows": {
+        "km": 1,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "heroin",
+       "rows": {
+        "km": 1,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "Acetylcholine",
+       "rows": {
+        "km": 4,
+        "kcat": 0
+       }
+      }
+     ],
+     "considered": 10,
+     "note": "No substrate was named, so Caterva used acetylthiocholine: of the 10 substrates BRENDA lists Km rows for under EC 3.1.1.7 in Homo sapiens, it has the most Km and kcat rows (40 Km, 3 kcat). Others: propionylthiocholine (2 Km, 1 kcat); 6-monoacetylmorphine (1 Km, 1 kcat); acetyl thiocholine (1 Km, 1 kcat); heroin (1 Km, 1 kcat); Acetylcholine (4 Km); and 4 more. Pass --substrate NAME to model another."
+    }
+   ],
+   "notes": [
+    "Read 'acetylcholinesterase' in your description as EC 3.1.1.7 (acetylcholinesterase): accepted name matches exactly.",
+    "Read 'human' in your description as Homo sapiens.",
+    "Read 'donepezil' in your description as the inhibitor."
+   ],
+   "refusal": null
+  },
+  "hexokinase kinetics": {
+   "description": "hexokinase kinetics",
+   "enzyme_text": "hexokinase",
+   "ec": "2.7.1.1",
+   "isoform": null,
+   "organism": "Homo sapiens",
+   "organism_text": null,
+   "substrate": "D-glucose",
+   "inhibitor": null,
+   "rule": "michaelis_menten",
+   "tables": [
+    "km",
+    "kcat"
+   ],
+   "named": {},
+   "choices": [
+    {
+     "role": "organism",
+     "chosen": "Homo sapiens",
+     "why": "of the 41 organisms with rows under EC 2.7.1.1, Homo sapiens is used when it has rows for every constant this model needs (Km, kcat), and it does (159 Km, 92 kcat)",
+     "alternatives": [
+      {
+       "name": "Saccharomyces cerevisiae",
+       "rows": {
+        "km": 16,
+        "kcat": 2
+       }
+      },
+      {
+       "name": "Solanum chacoense",
+       "rows": {
+        "km": 8,
+        "kcat": 9
+       }
+      },
+      {
+       "name": "Eimeria tenella",
+       "rows": {
+        "km": 8,
+        "kcat": 6
+       }
+      },
+      {
+       "name": "Mus musculus",
+       "rows": {
+        "km": 5,
+        "kcat": 7
+       }
+      },
+      {
+       "name": "Cryptosporidium parvum",
+       "rows": {
+        "km": 4,
+        "kcat": 4
+       }
+      }
+     ],
+     "considered": 41,
+     "note": "No organism was named, so Caterva used Homo sapiens: of the 41 organisms with rows under EC 2.7.1.1, Homo sapiens is used when it has rows for every constant this model needs (Km, kcat), and it does (159 Km, 92 kcat). Others: Saccharomyces cerevisiae (16 Km, 2 kcat); Solanum chacoense (8 Km, 9 kcat); Eimeria tenella (8 Km, 6 kcat); Mus musculus (5 Km, 7 kcat); Cryptosporidium parvum (4 Km, 4 kcat); and 35 more. Pass --organism NAME to model another."
+    },
+    {
+     "role": "substrate",
+     "chosen": "D-glucose",
+     "why": "of the 10 substrates BRENDA lists Km rows for under EC 2.7.1.1 in Homo sapiens, it has the most Km and kcat rows (25 Km, 61 kcat; the cosubstrate ATP set aside)",
+     "alternatives": [
+      {
+       "name": "2-deoxy-D-glucose",
+       "rows": {
+        "km": 5,
+        "kcat": 1
+       }
+      },
+      {
+       "name": "D-mannose",
+       "rows": {
+        "km": 9,
+        "kcat": 0
+       }
+      },
+      {
+       "name": "D-fructose",
+       "rows": {
+        "km": 7,
+        "kcat": 0
+       }
+      },
+      {
+       "name": "D-glucosamine",
+       "rows": {
+        "km": 3,
+        "kcat": 0
+       }
+      },
+      {
+       "name": "2-deoxyglucose",
+       "rows": {
+        "km": 1,
+        "kcat": 0
+       }
+      }
+     ],
+     "considered": 10,
+     "note": "No substrate was named, so Caterva used D-glucose: of the 10 substrates BRENDA lists Km rows for under EC 2.7.1.1 in Homo sapiens, it has the most Km and kcat rows (25 Km, 61 kcat; the cosubstrate ATP set aside). Others: 2-deoxy-D-glucose (5 Km, 1 kcat); D-mannose (9 Km); D-fructose (7 Km); D-glucosamine (3 Km); 2-deoxyglucose (1 Km); and 4 more. Pass --substrate NAME to model another."
+    }
+   ],
+   "notes": [
+    "Your description named an enzyme ('hexokinase') and no mechanism this grammar recognises, so its shape was read as Michaelis-Menten: one enzyme turning one substrate into one product. To build another mechanism, describe it, e.g. 'Michaelis-Menten with a competitive inhibitor'.",
+    "Read 'hexokinase' in your description as EC 2.7.1.1 (hexokinase): accepted name matches exactly."
+   ],
+   "refusal": null
+  },
+  "lactate dehydrogenase with pyruvate in human": {
+   "description": "lactate dehydrogenase with pyruvate in human",
+   "enzyme_text": "lactate dehydrogenase",
+   "ec": "1.1.1.27",
+   "isoform": null,
+   "organism": "Homo sapiens",
+   "organism_text": "human",
+   "substrate": "pyruvate",
+   "inhibitor": null,
+   "rule": "michaelis_menten",
+   "tables": [
+    "km",
+    "kcat"
+   ],
+   "named": {
+    "organism": "Homo sapiens",
+    "substrate": "pyruvate"
+   },
+   "choices": [
+    {
+     "role": "enzyme",
+     "chosen": "1.1.1.27",
+     "why": "your description names 'lactate dehydrogenase', which is not one enzyme; L-lactate dehydrogenase is used because it is the only one of the 2 enzymes the name matches best with Km rows in Homo sapiens (6 Km rows)",
+     "alternatives": [
+      {
+       "name": "EC 1.1.1.28 (D-lactate dehydrogenase)",
+       "rows": {
+        "km": 0
+       }
+      }
+     ],
+     "considered": 2,
+     "note": "Caterva used EC 1.1.1.27: your description names 'lactate dehydrogenase', which is not one enzyme; L-lactate dehydrogenase is used because it is the only one of the 2 enzymes the name matches best with Km rows in Homo sapiens (6 Km rows). Others: EC 1.1.1.28 (D-lactate dehydrogenase) (no rows). Pass --subject EC to model another."
+    }
+   ],
+   "notes": [
+    "Your description named an enzyme ('lactate dehydrogenase') and no mechanism this grammar recognises, so its shape was read as Michaelis-Menten: one enzyme turning one substrate into one product. To build another mechanism, describe it, e.g. 'Michaelis-Menten with a competitive inhibitor'.",
+    "Read 'human' in your description as Homo sapiens.",
+    "Read 'pyruvate' in your description as the substrate pyruvate, which BRENDA lists for EC 1.1.1.27 for Homo sapiens."
+   ],
+   "refusal": null
+  }
+ }
+}

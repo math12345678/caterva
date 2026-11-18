@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 #: The inhibition mode each inhibition motif's Ki belongs to. Product
 #: inhibition in these motifs is the product competing for the active site.
@@ -73,12 +73,56 @@ def versus_is(versus: Optional[str], substrate: Optional[str]) -> bool:
     return bool(versus and substrate and versus.strip().lower() == substrate.strip().lower())
 
 
+#: The assay substrate a Ki row's commentary names: "hydrolysis of
+#: o-aminobenzoyl-SDK-(dinitrophenyl)-P-OH", "with X as substrate".
+_ASSAY_SUBSTRATE = re.compile(
+    r"\b(?:hydrolysis|cleavage|oxidation|reduction|phosphorylation) of\s+(?P<h>[^,;]+?)\s*(?=[,;]|$)"
+    r"|\b(?:with|using)\s+(?P<s>[^,;]+?)\s+as (?:the )?substrate\b", re.IGNORECASE)
+#: What an ACE FRET substrate reports on (Araujo et al. 2000; Bersanetti 2004).
+_ACE_DOMAIN = ((re.compile(r"SDK", re.IGNORECASE), "an N-domain-selective substrate, so the constant "
+                "reports on ACE's N-domain"),
+               (re.compile(r"LFK", re.IGNORECASE), "a C-domain-selective substrate, so the constant "
+                "reports on ACE's C-domain"),
+               (re.compile(r"FRK", re.IGNORECASE), "a substrate both of ACE's domains hydrolyse"))
+
+
+def assay_substrate(text: Optional[str]) -> Optional[str]:
+    """The substrate a Ki row says its assay used, or None."""
+    m = _ASSAY_SUBSTRATE.search(text or "")
+    if not m:
+        return None
+    return " ".join((m.group("h") or m.group("s") or "").split()) or None
+
+
+def _same_compound(a: str, b: str) -> bool:
+    try:
+        from caterva.checkout import literature_module
+
+        return bool(literature_module("compound_names").same_compound(a, b))
+    except Exception:  # noqa: BLE001
+        return a.strip().lower() == b.strip().lower()
+
+
 #: Concern kinds, in the order a reader should meet them.
 ISOFORM = "isoform"
+ASSAY_SUBSTRATE = "assay_substrate"
 MODE_UNSTATED = "mode_unstated"
 MODE_MISMATCH = "mode_mismatch"
 VERSUS = "versus"
 PREPARATION = "preparation"
+HALF_SATURATION = "half_saturation"
+#: The inhibitor inactivates covalently or by mechanism: a Ki row is only
+#: its initial reversible complex (fifth round's review, V7-05).
+IRREVERSIBLE = "irreversible"
+
+#: A row reporting a cooperative half-saturation constant, not a Km: "K0.5
+#: value, Hill coefficient 1.8" (human glucokinase, BRENDA ref 739603). The
+#: same reading as the literature layer's (Tests/row_form.half_saturation).
+_HALF_SATURATION = re.compile(
+    r"\b[KS]\s*\(?\s*0\.5\s*\)?(?=[\s,;:)]|$)|\b[KS]0\.5\b|\[S\]\s*0\.5|\bS50\b"
+    r"|\bHill\s+(?:coefficient|constant|value|number)\b|\bnH\s*[=:]?\s*\d"
+    r"|\bhalf[- ]saturation\b|\bsigmoid(?:al)?\s+kinetics\b", re.IGNORECASE)
+_HILL = re.compile(r"\bHill\s+coefficient\s*(?:of|=|:)?\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
 
 #: How each altered preparation is named in a sentence.
 _PREPARED = {
@@ -140,6 +184,25 @@ def _preparation(text: str):
         return None
 
 
+def row_isoform_of(measurement: Any, isoform: Optional[str]) -> Optional[str]:
+    """The isoform the resolver read off the row, or `isoform` itself when
+    the row's own UniProt cell is that protein (`isoform._own_accession_of`).
+
+    AKR1C3's rows under EC 1.1.1.188 carry the cell P42330 and no words; the
+    note said "the row's UniProt accession (P42330) is AKR1C3" and the list
+    below it "whether it measured AKR1C3 ... is unknown" (sixth round's
+    polish, V6R1-06)."""
+    read = getattr(measurement, "row_isoform", None)
+    if read or not isoform or measurement is None:
+        return read
+    try:
+        from caterva.compose.isoform import _own_accession_of
+
+        return isoform if _own_accession_of(measurement, isoform) else None
+    except Exception:  # noqa: BLE001 - unknown: as before
+        return None
+
+
 def read_scope(
     commentary: Optional[str],
     *,
@@ -147,6 +210,8 @@ def read_scope(
     table: Optional[str] = None,
     substrate: Optional[str] = None,
     isoform: Optional[str] = None,
+    row_isoform: Optional[str] = None,
+    compound: Optional[str] = None,
 ) -> Optional[RowScope]:
     """The scope of one row, judged against the model it was put in.
 
@@ -155,8 +220,16 @@ def read_scope(
     the isoform the model was asked to be about (`--isoform`), if any. None
     when the row carries no commentary: there is nothing to read, which is
     not the same as a row that was read and found consistent.
+
+    `row_isoform` is the isoform the resolver read off the row
+    (`Measurement.row_isoform`): its words, else its own UniProt cell. A row
+    whose words name none and whose accession is O75874 measured IDH1, and
+    is not said to "name no isoform" (ADR 0182, second round).
     """
-    if not commentary or not str(commentary).strip():
+    inactivator = _irreversible(compound) if table in INHIBITION_TABLES else None
+    if (not commentary or not str(commentary).strip()) and not row_isoform:
+        if inactivator and not isoform:
+            return RowScope(None, None, None, (inactivator,))
         if isoform:
             # Nothing to read, and an isoform was asked for: that it could
             # not be checked is itself the finding.
@@ -165,9 +238,17 @@ def read_scope(
                 f"one asked for, is unknown")),))
         return None
     read_isoform, read_mode = _reader()
-    text = str(commentary)
+    text = str(commentary or "")
     wanted = isoform
-    isoform = read_isoform(text)
+    in_words = read_isoform(text)
+    isoform = in_words or row_isoform
+    # Whose words name the isoform. A row whose own words name none, tied to
+    # one by its UniProt cell or its paper's other entries, was said to have
+    # "measured isoform PRSS3" here while the spread note said "the row
+    # names no isoform itself; its paper names only PRSS3" (sixth round,
+    # XS5R2-08; rat nNOS, VR2-05). One wording for both.
+    measured = ("the row measured isoform {}" if in_words else
+                "the row names no isoform itself; its UniProt cell or its paper ties it to isoform {}")
     concerns = []
     if wanted:
         from caterva.compose.isoform import same_isoform
@@ -177,11 +258,11 @@ def read_scope(
                 f"asked for, is unknown")))
         elif not same_isoform(isoform, wanted):
             concerns.append(Concern(ISOFORM, (
-                f"the row measured isoform **{isoform}**, not {wanted}, the one asked for: "
+                measured.format(f"**{isoform}**") + f", not {wanted}, the one asked for: "
                 f"a different protein's constant")))
     elif isoform:
         concerns.append(Concern(ISOFORM, (
-            f"the row measured isoform {isoform}; if the enzyme you mean is another "
+            measured.format(isoform) + "; if the enzyme you mean is another "
             f"isoform, this is a different protein's constant")))
 
     mode: Optional[str] = None
@@ -199,11 +280,35 @@ def read_scope(
                     f"the row measured **{mode}** inhibition"
                     + (f" (versus {versus})" if versus else "")
                     + f"; this model is {want}, so the value belongs to a different mechanism")))
+            assayed = assay_substrate(text)
+            if assayed and substrate and not _same_compound(assayed, substrate) and not versus:
+                # ACE and captopril: the Ki row is "hydrolysis of
+                # o-aminobenzoyl-SDK-(dinitrophenyl)-P-OH", an N-domain FRET
+                # substrate; the model's substrate is angiotensin I, and the
+                # same paper's row on another substrate is 4.6-fold different
+                # (fourth round of the real-values review).
+                domain = next((said for pattern, said in _ACE_DOMAIN if pattern.search(assayed)
+                               and "dinitrophenyl" in assayed.lower() or pattern.search(assayed)
+                               and "dnp" in assayed.lower()), None)
+                concerns.append(Concern(ASSAY_SUBSTRATE, (
+                    f"the Ki was measured on the hydrolysis of **{assayed}**"
+                    + (f" ({domain})" if domain else "")
+                    + f", not of {substrate}, this model's substrate: a Ki is specific to the "
+                      f"assay it was measured in, and the same inhibitor's Ki on another substrate "
+                      f"can differ")))
             if versus and substrate and not versus_is(versus, substrate):
                 concerns.append(Concern(VERSUS, (
                     f"the row measured inhibition **versus {versus}**, not versus "
                     f"{substrate}, the substrate in this model: a Ki is specific to the "
                     f"assay it was measured in")))
+
+    if (table or "").lower() in ("km", "km values") and _HALF_SATURATION.search(text):
+        hill = _HILL.search(text)
+        what = (f"a K0.5 with a Hill coefficient of {hill.group(1)}" if hill
+                else "a K0.5, the half-saturation constant of cooperative kinetics")
+        concerns.append(Concern(HALF_SATURATION, (
+            f"the row is **{what}**, not a Michaelis-Menten Km: a hyperbolic rate law built "
+            f"with it approximates a cooperative enzyme")))
 
     verdict = _preparation(text)
     preparation = getattr(verdict, "status", None)
@@ -214,11 +319,68 @@ def read_scope(
             f"the row measured **{_PREPARED[preparation]}** (\"{verdict.evidence}\"), not the "
             f"free enzyme; a real measurement of that preparation, which may not be the "
             f"protein you mean")))
+    if inactivator:
+        concerns.insert(0, inactivator)
     return RowScope(isoform, mode, versus, tuple(concerns), preparation)
 
 
+def _irreversible(compound: Optional[str]) -> Optional[Concern]:
+    """The concern for a Ki of an irreversible inactivator, else None.
+
+    The API said that selegiline inactivates MAO-B; compose, Studio and the
+    TS CLI built a plain competitive model and never said so (fifth round's
+    review, V7-05). The list is the literature layer's own
+    (`fallback_logic.IRREVERSIBLE_INHIBITOR`), so every surface reads one."""
+    if not compound:
+        return None
+    try:
+        from caterva.checkout import literature_module
+        pattern = literature_module("fallback_logic").IRREVERSIBLE_INHIBITOR
+    except Exception:  # LiteratureLayerUnavailable, or an import failure
+        return None
+    if not pattern.search(str(compound)):
+        return None
+    return Concern(IRREVERSIBLE, (
+        f"**{compound} is an irreversible (covalent or mechanism-based) inactivator**: a Ki row "
+        f"describes its initial reversible complex, and a reversible inhibition model leaves the "
+        f"inactivation out"))
+
+
+#: A named natural variant of one enzyme: "HIV-1 subtype C protease",
+#: "clade B". Not an isoform (one gene, one protein) and not a mutant.
+_SUBTYPE = re.compile(r"\b(subtype|clade)\s+([A-Z][A-Z0-9]?|\d{1,2}[A-Z]?)\b", re.IGNORECASE)
+
+
+def variant_mix(commentaries: "dict[str, Optional[str]]") -> Optional[str]:
+    """A sentence when the constants' rows name different subtypes (or one
+    names a subtype and another names none), else None.
+
+    HIV-1 protease, ADR 0182 second round: the Km and kcat came from "HIV-1
+    subtype C protease" rows (ref 678346) and the Ki from "recombinant LAI
+    wild-type enzyme" (ref 664013), a subtype B strain the row does not
+    call one. Each row's own note named only itself, so one model of two
+    variants read as one enzyme's."""
+    named: dict = {}
+    for identifier, text in sorted(commentaries.items()):
+        found = sorted({f"{m.group(1).lower()} {m.group(2).upper()}"
+                        for m in _SUBTYPE.finditer(text or "")})
+        named[identifier] = " and ".join(found) if found else None
+    labels = set(named.values())
+    if len(named) < 2 or labels == {None} or len(labels) == 1:
+        return None
+    groups: dict = {}
+    for identifier, label in named.items():
+        groups.setdefault(label, []).append(f"`{identifier}`")
+    parts = [(f"{', '.join(ids)} measured {label}" if label else
+              f"{', '.join(ids)} {'names' if len(ids) == 1 else 'name'} no subtype")
+             for label, ids in sorted(groups.items(), key=lambda kv: (kv[0] is None, kv[0] or ""))]
+    return ("the constants' rows are not all of one variant of the enzyme: " + "; ".join(parts)
+            + ". The model may combine constants of different variants; a row naming no subtype "
+            "may be any (often the reference strain)")
+
+
 __all__ = [
-    "Concern", "RowScope", "read_scope", "mode_fits", "versus_is",
+    "Concern", "RowScope", "read_scope", "mode_fits", "versus_is", "variant_mix",
     "MODE_OF_MOTIF", "INHIBITION_TABLES",
-    "ISOFORM", "MODE_UNSTATED", "MODE_MISMATCH", "VERSUS", "PREPARATION",
+    "ISOFORM", "MODE_UNSTATED", "MODE_MISMATCH", "VERSUS", "PREPARATION", "HALF_SATURATION",
 ]

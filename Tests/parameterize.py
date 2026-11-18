@@ -116,6 +116,16 @@ class ParameterRequest:
     #: TypeScript CLI return when no mode is sent, and its report can still
     #: name the row the default would carry.
     compare_mode: Optional[str] = None
+    #: True when the model asks for a Km AND a kcat of this enzyme and
+    #: substrate: the resolver then takes both from one paper when some
+    #: paper holds a row of each among the rows it chooses from
+    #: (`fallback_logic.resolve_kinetic_pair`). A Km and a kcat from two
+    #: papers were measured on two preparations, often at two temperatures.
+    paired: bool = False
+    #: A point mutant the model is of ("R132H", "R132H/S280F"): the resolver
+    #: then takes the constant only from rows measuring it
+    #: (`resolve_kinetic_value`'s `mutation`), never from the wild type's.
+    mutation: Optional[str] = None
 
 
 @dataclass(frozen=True)

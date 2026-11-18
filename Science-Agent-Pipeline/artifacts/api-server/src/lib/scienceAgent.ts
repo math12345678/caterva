@@ -1,3 +1,4 @@
+import type { AutomaticChoice } from "./automaticChoice";
 import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import path from "node:path";
@@ -94,11 +95,38 @@ export interface ScienceAgentResult {
    * policy this code applied. Conflating them is the same category error
    * that ADR 0012/0013 exist to prevent, one level up. */
   crossSpeciesOrganismsAvailable?: string[];
+  /** Of those, the organisms whose every row measured a protein variant:
+   *  opting into another organism would withhold them too (V7-04). */
+  crossSpeciesVariantOnly?: string[];
+  /** Of those, the organisms whose rows each name an isozyme (XS5R2-03). */
+  crossSpeciesIsozymeOnly?: string[];
+  /** For variant_withheld: every withheld row names an isozyme (XS5R2-03). */
+  variantIsozymesOnly?: boolean;
+  /** For a compound with no row in the organism searched: what that
+   *  organism holds, counted, in `caterva compose`'s words (V7-08). */
+  availableInTheOrganism?: string | null;
   /** Substrate labels this EC number DOES report, when the requested one
    *  matched nothing. BRENDA's label for lactate is `(S)-lactate`, so
    *  "lactate" matches by substring and "L-lactate" returns nothing —
    *  and the student is told the literature is empty when it is not. */
   substratesAvailable?: string[];
+  /** Every name the runner CHOSE because the request left it empty (ADR
+   *  0182): the substrate, the inhibitor for a Ki, or the organism, each as
+   *  caterva.compose.defaults' Choice.to_json(), in the order chosen. A
+   *  value found after a choice is BRENDA's row for exactly that name.
+   *  queryResolver states each one as a "<role> chosen:" flag. Absent from
+   *  a runner that predates choosing; read with `readChoices`. */
+  choices?: AutomaticChoice[];
+  /** Set when a name was needed and BRENDA holds nothing to choose it from
+   *  (source "substrate_not_named", "inhibitor_not_named" or
+   *  "organism_not_chosen"): the runner's sentence saying what is missing
+   *  and what would fix it. Shown to the person as written. */
+  choiceRefusal?: string;
+  /** For a Km resolved as one half of a Km/kcat pair: what the kcat half
+   *  came to. The Km call computes the pair anyway; /api/resolve reads this
+   *  to say, before an enzyme concentration is stated, whether a kcat
+   *  exists to multiply it by (sixth round, XS5R2-05). */
+  pairedKcat?: Partial<ScienceAgentResult> | null;
   /** EC numbers UniProt indexed under the enzyme NAME, when it matched more
    *  than one. An EC number is the identity of the protein every citation
    *  refers to, so the runner refuses to pick and names them (ADR 0127).
@@ -122,6 +150,11 @@ export interface ScienceAgentResult {
    * the enzyme (ADR 0029). Populated only when
    * `source === "variant_withheld"`. */
   variantCandidatesAvailable?: string[];
+  /** Every row's value, "1e-06 1/s (BRENDA ref 729224)", when each is
+   * outside the physically plausible range for the constant: a unit slip or
+   * a misfiled row is far likelier than a measurement, so none is used.
+   * Populated only when `source === "implausible_withheld"`. */
+  implausibleValues?: string[];
   /** The isoforms BRENDA's rows measured, when the one asked for is not
    * among them. Populated only when `source === "isoform_withheld"`. */
   isoformsAvailable?: string[];
@@ -169,6 +202,13 @@ export interface ScienceAgentResult {
      * resolver ranks Ki rows by; absent from runners older than it.
      */
     kitzWilson?: boolean;
+    /**
+     * Whether `isoform` is the one the request named, by
+     * caterva.bind.core.same_isoform (UniProt's names included: BRENDA's
+     * "hexokinase II" is HK2). Absent when either names none, or from an
+     * older runner; rowScopeFlags then falls back to its own comparison.
+     */
+    sameIsoformAsRequested?: boolean;
   } | null;
   /**
    * A row that is evidence against the model's mechanism for the Ki
@@ -243,13 +283,42 @@ export interface ScienceAgentResult {
    *
    * On the LDH turnover table six non-dominated rows span 21.1 to 6467 — a
    * 306-fold range, every one wild-type with pH and temperature reported.
-   * The returned value is the lowest, and without this field nothing says
-   * the evidence found 6467 equally credible.
+   * The returned value is the median row, and without this field nothing
+   * says the evidence found 6467 equally credible.
    *
    * Absent means no tie was found. That is different from a tie with no
    * candidates, which is why `candidates` is checked rather than presence.
    */
   selectionTie?: SelectionTie | null;
+  /**
+   * Why this row was carried, in the resolver's words (ADR 0182): the
+   * median of the best-described rows, what was set aside as implausible or
+   * under-described, the spread, and, for a Km and a kcat taken together,
+   * the one paper both came from.
+   */
+  chosenBecause?: string | null;
+  /** The rows the value was chosen from span more than 100-fold. */
+  wideSpread?: boolean;
+  /**
+   * What the carried row IS beyond its value, in the resolver's words: "the
+   * row is a K0.5 with a Hill coefficient of 1.8, not a Michaelis-Menten
+   * Km", "the row's UniProt accession (P35557) is GCK", a construct, a range.
+   * Absent from runners older than the third real-values round.
+   */
+  rowNotes?: string[];
+  /**
+   * For a Km: which protein of a multi-protein EC the model's constants
+   * are, in `caterva compose`'s words (caterva.enzymes.isozyme): the
+   * headline, the concern and what to do. Absent when the EC is one protein
+   * in the organism, or from runners older than the sixth real-values round
+   * (XS5R2-04).
+   */
+  isozymeNotice?: {
+    headline: string;
+    detail: string;
+    remedy: string;
+    summary?: string;
+  } | null;
   /**
    * Every row on the non-dominated frontier, with the reliability grades
    * that weight it — Bakker's three axes, scored per candidate rather than

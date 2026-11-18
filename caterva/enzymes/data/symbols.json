@@ -530,6 +530,17 @@
   },
   {
    "ecs": [
+    "2.7.1.137",
+    "2.7.1.153"
+   ],
+   "meaning": "phosphatidylinositol 3-kinase and phosphatidylinositol-4,5-bisphosphate 3-kinase",
+   "source": "ENZYME lists 'PI3-kinase' as another name of EC 2.7.1.137; accepted name in ExPASy ENZYME release 02-Sep-2026: EC 2.7.1.137 phosphatidylinositol 3-kinase; EC 2.7.1.153 phosphatidylinositol-4,5-bisphosphate 3-kinase",
+   "symbols": [
+    "PI3K"
+   ]
+  },
+  {
+   "ecs": [
     "3.4.23.16"
    ],
    "meaning": "HIV-1 retropepsin",
@@ -3432,6 +3443,46 @@
    },
    "source": "UniProtKB P14902 (I23O1_HUMAN), P28776 (I23O1_MOUSE); aliases: the entry's own UniProtKB names ending in a number or letter",
    "symbol": "IDO1"
+  },
+  {
+   "organisms": {
+    "HUMAN": {
+     "accession": "P20839",
+     "ecs": [
+      "1.1.1.205"
+     ],
+     "name": "Inosine-5'-monophosphate dehydrogenase 1"
+    },
+    "MOUSE": {
+     "accession": "P50096",
+     "ecs": [
+      "1.1.1.205"
+     ],
+     "name": "Inosine-5'-monophosphate dehydrogenase 1"
+    }
+   },
+   "source": "UniProtKB P20839 (IMDH1_HUMAN), P50096 (IMDH1_MOUSE)",
+   "symbol": "IMPDH1"
+  },
+  {
+   "organisms": {
+    "HUMAN": {
+     "accession": "P12268",
+     "ecs": [
+      "1.1.1.205"
+     ],
+     "name": "Inosine-5'-monophosphate dehydrogenase 2"
+    },
+    "MOUSE": {
+     "accession": "P24547",
+     "ecs": [
+      "1.1.1.205"
+     ],
+     "name": "Inosine-5'-monophosphate dehydrogenase 2"
+    }
+   },
+   "source": "UniProtKB P12268 (IMDH2_HUMAN), P24547 (IMDH2_MOUSE)",
+   "symbol": "IMPDH2"
   },
   {
    "organisms": {

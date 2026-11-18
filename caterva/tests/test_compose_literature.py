@@ -577,27 +577,66 @@ class TestTheExitCodeWhenASearchIsRefused:
 
         return _search_the_literature(model, self._args(**overrides))
 
-    def test_a_model_needing_a_substrate_without_one_is_a_refusal(self, monkeypatch):
-        """And it names the substrates the recorded page holds, offline.
-
-        The refusal looks the enzyme's page up to list the candidates, so
-        this asks for the enzyme whose page is committed, with every real
-        send made impossible, and holds the list to what that page says.
+    def test_a_model_needing_a_substrate_without_one_gets_the_best_measured_one_said_out_loud(
+            self, monkeypatch):
+        """ADR 0182: no substrate named is a CHOICE, made from the page and
+        stated, not a refusal. This used to pin "No search was run ... Re-run
+        with --substrate NAME" beside a list in which D-glucose had 25 human
+        Km rows and 61 kcat rows; the search now runs for D-glucose (ATP,
+        the cosubstrate, set aside), and the competitive model's inhibitor is
+        chosen too, from the Ki rows on the same recorded page, offline.
         """
+        from caterva.compose import pipeline
+
+        attempts = _network_made_impossible(monkeypatch)
+        asked = {}
+
+        def searched(query, **kwargs):
+            asked.update(kwargs)
+            return compose(query, **{k: kwargs[k] for k in ("subject", "organism", "substrate",
+                                                              "compounds")}), None
+
+        monkeypatch.setattr(pipeline, "compose_and_parameterise", searched)
+        model = compose(QUERY, subject="2.7.1.1")
+        found, note, refused = self._search(model, subject="2.7.1.1", substrate=None)
+        assert attempts == [], f"the choice went to the network: {attempts}"
+        assert refused is False, note
+        assert asked["substrate"] == "D-glucose" and asked["organism"] == "Homo sapiens"
+        assert asked["compounds"] == {"@inhibitor": "D-glucose 1,6-diphosphate"}
+        assert [c.role for c in found.choices] == ["substrate", "inhibitor"]
+        assert found.substrate == "D-glucose"
+        # 2-deoxy-D-glucose, a synthetic analogue of D-glucose, ranks after the
+        # natural compounds since the sixth round (NEW-12).
+        assert found.choices[0].note() == (
+            "No substrate was named, so Caterva used D-glucose: of the 10 substrates BRENDA lists "
+            "Km rows for under EC 2.7.1.1 in Homo sapiens, it has the most Km and kcat rows (13 Km, "
+            "13 kcat; the cosubstrate ATP set aside; not counted, because the search cannot use "
+            "them: 60 rows of a variant). Others: D-mannose (4 Km); D-fructose (2 Km); "
+            "D-glucosamine (3 Km); ITP (1 Km); 2-deoxy-D-glucose (4 Km, 1 kcat); and 4 more. "
+            "Pass --substrate NAME to model another.")
+        assert "--substrate NAME" not in (note or ""), "the search ran, for D-glucose"
+
+    def test_a_named_organism_with_no_rows_is_the_blocker_and_is_never_switched(self, monkeypatch):
+        """The organism the user named is kept; the refusal says the ORGANISM
+        is what is missing and lists the organisms that have rows, instead of
+        advising a substrate that would not help (EC 1.1.1.49 in yeast,
+        2026-11-11). Zebrafish has no Km row on the recorded hexokinase page."""
         attempts = _network_made_impossible(monkeypatch)
         model = compose(QUERY, subject="2.7.1.1")
-        _, note, refused = self._search(model, subject="2.7.1.1", substrate=None)
-        assert attempts == [], f"the refusal went to the network: {attempts}"
+        found, note, refused = self._search(model, subject="2.7.1.1", substrate=None,
+                                            organism="Danio rerio")
+        assert attempts == []
         assert refused is True
-        assert "No search was run" in note
-        assert "--substrate" in note, "the note must say what to do about it"
-        assert (
-            "BRENDA holds Km rows for Homo sapiens for 10 substrate(s) of EC 2.7.1.1; "
-            "the 8 with the most rows: ATP (106 rows); D-glucose (25 rows); "
-            "D-mannose (9 rows); D-fructose (7 rows); 2-deoxy-D-glucose (5 rows); "
-            "D-glucosamine (3 rows); 2-deoxyglucose (1 row); CTP (1 row). "
-            "Pass one with --substrate."
-        ) in note
+        assert note.startswith("No search was run: BRENDA holds no Km row for EC 2.7.1.1 in Danio "
+                               "rerio"), note
+        assert "The organism, not the substrate, is what is missing" in note
+        # 54 of the 159 human rows are not a protein variant's: only rows the
+        # search would use are offered as the way out (ADR 0182 review).
+        assert "Organisms with Km rows for EC 2.7.1.1: Homo sapiens (54 rows); Oryctolagus " \
+               "cuniculus (37 rows);" in note
+        assert "--organism" in note and "Re-run with --substrate" not in note
+        assert found.organism is None or found.organism != "Homo sapiens"
+        assert found.choices == ()
 
     def test_an_unreachable_literature_layer_is_a_refusal(self, monkeypatch):
         """From a wheel there is no Tests/ directory, and that is a refusal
@@ -664,12 +703,12 @@ class TestTheExitCodeWhenASearchIsRefused:
         A unit test on `_search_the_literature` passes while the caller
         ignores what it returns -- measured: deleting the `if search_refused`
         branch in `main` left every unit test green and the process exiting
-        0. This runs the CLI. The missing-substrate case runs no search, but
-        its refusal reads BRENDA's page to name the substrates there, so the
-        child is pointed at the committed page for EC 2.7.1.1 and every
-        proxy variable at a closed port. The list it prints can then only
-        have come from the recording: a live fetch would fail, and the
-        refusal would carry no list.
+        0. This runs the CLI. A missing substrate is now chosen (ADR 0182),
+        so the refusal run here is the one that remains: an organism named
+        that has no Km row on the page (zebrafish, on the committed page for
+        EC 2.7.1.1). The child is pointed at that page and every proxy
+        variable at a closed port, so the organisms it lists can only have
+        come from the recording.
         """
         import subprocess
         import sys
@@ -683,7 +722,7 @@ class TestTheExitCodeWhenASearchIsRefused:
         run = subprocess.run(
             [sys.executable, "-m", "caterva.compose",
              "Michaelis-Menten with a competitive inhibitor",
-             "--subject", "2.7.1.1", "--no-simulate", "--no-ranking",
+             "--subject", "2.7.1.1", "--organism", "zebrafish", "--no-simulate", "--no-ranking",
              "--no-analysis"],
             capture_output=True, text=True, cwd=str(root), timeout=600, env=env,
         )
@@ -691,19 +730,21 @@ class TestTheExitCodeWhenASearchIsRefused:
             f"a refused search must exit 3 per this CLI's own --help; "
             f"got {run.returncode}. stderr: {run.stderr[-300:]}"
         )
-        assert "--substrate" in run.stdout, "the reason belongs in the report"
-        assert ("BRENDA holds Km rows for 20 substrate(s) of EC 2.7.1.1; the 8 with "
-                "the most rows: ATP (181 rows); D-glucose (109 rows);") in run.stdout, (
-            "the substrates are named, from the recorded page")
+        assert "BRENDA holds no Km row for EC 2.7.1.1 in Danio rerio" in run.stdout, \
+            "the reason belongs in the report"
+        assert "Organisms with Km rows for EC 2.7.1.1: Homo sapiens (54 rows);" in run.stdout, (
+            "the organisms are named, from the recorded page")
         assert "refusal(s)" in run.stderr, "and a script is told to look"
 
 
-def _missing_substrate_note(monkeypatch, brenda_client):
-    """The note `search_the_literature` returns for a model that needs a Km
-    and was given no substrate, with `brenda_client()` answering the
-    checkout's request for that module (and only that one), so the page the
-    refusal reads is whatever it serves."""
+def _missing_substrate_note(monkeypatch, brenda_client, *, refused=True):
+    """What `search_the_literature` makes of a model that needs a Km and was
+    given no substrate, with `brenda_client()` answering the checkout's
+    request for that module (and only that one), so the page the choice
+    reads is whatever it serves; the search itself is replaced, so nothing
+    leaves the machine. Returns (the model searched, the note)."""
     from caterva import checkout
+    from caterva.compose import pipeline
     from caterva.compose.__main__ import search_the_literature
 
     real = checkout.literature_module
@@ -712,52 +753,75 @@ def _missing_substrate_note(monkeypatch, brenda_client):
         return brenda_client() if name == "brenda_client" else real(name)
 
     monkeypatch.setattr(checkout, "literature_module", literature_module)
+    monkeypatch.setattr(pipeline, "compose_and_parameterise", lambda query, **kw: (None, None))
     model = compose(QUERY, subject="3.4.21.79")
     args = argparse.Namespace(subject="3.4.21.79", organism="Homo sapiens", substrate=None)
-    _, note, refused = search_the_literature(model, args)
-    assert refused is True
-    assert note.startswith("No search was run"), note
-    return note
+    found, note, was_refused = search_the_literature(model, args)
+    assert was_refused is refused, note
+    return found, note
 
 
-def _client_with_km_rows(counts):
-    """A brenda_client whose page yields `counts[substrate]` Km rows each."""
+def _client_with_km_rows(counts, kcat=None):
+    """A brenda_client whose page yields `counts[substrate]` human Km rows
+    each, and `kcat[substrate]` turnover rows (none by default)."""
     from types import SimpleNamespace
 
-    rows = [SimpleNamespace(substrate=name) for name, n in counts.items() for _ in range(n)]
+    def rows(table):
+        return [SimpleNamespace(substrate=name, organism="Homo sapiens", conditions="")
+                for name, n in table.items() for _ in range(n)]
+
     return SimpleNamespace(
         fetch_brenda_html=lambda ec: "<html/>",
-        parse_brenda_km_html=lambda *a, **k: rows,
+        parse_brenda_km_html=lambda *a, **k: rows(counts),
+        parse_brenda_turnover_html=lambda *a, **k: rows(kcat or {}),
+        parse_brenda_ki_html=lambda *a, **k: [],
     )
 
 
-def test_missing_substrate_refusal_names_what_brenda_holds(monkeypatch):
-    """The refusal must be actionable: it lists substrates BRENDA has rows
-    for, ordered by row count and saying so, never as "the best-measured"
-    (a count of rows says nothing about how well any one was measured)."""
-    client = _client_with_km_rows({"VEID-p-nitroanilide": 1, "Boc-Ala-Ala-Asp-SBzl": 3})
-    note = _missing_substrate_note(monkeypatch, lambda: client)
-    assert (" BRENDA holds Km rows for Homo sapiens for 2 substrate(s) of EC 3.4.21.79; "
-            "most rows first: Boc-Ala-Ala-Asp-SBzl (3 rows); VEID-p-nitroanilide (1 row). "
-            "Pass one with --substrate.") in note
-    assert "best-measured" not in note
+def test_a_chosen_substrate_names_the_others_with_their_row_counts(monkeypatch):
+    """The choice must be overturnable: it names the substrates it passed
+    over with their rows, and how to pick one (once a refusal's list). A
+    substrate with a kcat row as well outranks one with more Km rows and no
+    kcat, because the model needs both, and the note says why."""
+    client = _client_with_km_rows({"VEID-p-nitroanilide": 1, "Boc-Ala-Ala-Asp-SBzl": 3},
+                                  kcat={"VEID-p-nitroanilide": 1})
+    found, _ = _missing_substrate_note(monkeypatch, lambda: client, refused=False)
+    (choice,) = [c for c in found.choices if c.role == "substrate"]
+    assert choice.chosen == "VEID-p-nitroanilide" and found.substrate == "VEID-p-nitroanilide"
+    assert choice.note() == (
+        "No substrate was named, so Caterva used VEID-p-nitroanilide: of the 2 substrates BRENDA "
+        "lists Km rows for under EC 3.4.21.79 in Homo sapiens, it has the most rows of those with "
+        "both a Km and a kcat row (1 Km, 1 kcat). Others: Boc-Ala-Ala-Asp-SBzl (3 Km). Pass "
+        "--substrate NAME to model another.")
+    assert choice.to_json() == {
+        "role": "substrate", "chosen": "VEID-p-nitroanilide", "why": choice.why,
+        "alternatives": [{"name": "Boc-Ala-Ala-Asp-SBzl", "rows": {"km": 3, "kcat": 0}}],
+        "considered": 2, "rows": {"km": 1, "kcat": 1}, "instead": None}
+    assert "best-measured" not in choice.note()
 
 
-def test_more_substrates_than_are_named_says_how_many_were_named(monkeypatch):
-    from caterva.compose.__main__ import SUBSTRATES_NAMED
+def test_more_substrates_than_are_named_says_how_many_more(monkeypatch):
+    from caterva.compose.defaults import ALTERNATIVES_NAMED
 
-    counts = {f"substrate-{n:02d}": n for n in range(1, SUBSTRATES_NAMED + 3)}
-    note = _missing_substrate_note(monkeypatch, lambda: _client_with_km_rows(counts))
-    assert f"for {SUBSTRATES_NAMED + 2} substrate(s) of EC 3.4.21.79; " in note
-    assert f"the {SUBSTRATES_NAMED} with the most rows: substrate-{SUBSTRATES_NAMED + 2:02d} (" in note
-    assert "substrate-03 (3 rows). Pass one with --substrate." in note
-    assert "substrate-02" not in note and "substrate-01" not in note
+    counts = {f"substrate-{n:02d}": n for n in range(1, ALTERNATIVES_NAMED + 5)}
+    found, _ = _missing_substrate_note(monkeypatch, lambda: _client_with_km_rows(counts),
+                                       refused=False)
+    (choice,) = found.choices
+    top = ALTERNATIVES_NAMED + 4
+    assert choice.chosen == f"substrate-{top:02d}" and choice.considered == top
+    assert len(choice.alternatives) == ALTERNATIVES_NAMED
+    assert choice.alternatives[0].name == f"substrate-{top - 1:02d}"
+    assert choice.note().endswith(f"; and 3 more. Pass --substrate NAME to model another.")
+    assert "substrate-01" not in choice.note()
 
 
 def test_missing_substrate_list_failure_does_not_replace_refusal(monkeypatch):
     def boom():
         raise RuntimeError("offline")
 
-    note = _missing_substrate_note(monkeypatch, boom)
-    assert "Re-run with --substrate NAME." in note
+    found, note = _missing_substrate_note(monkeypatch, boom)
+    assert note.startswith("No search was run"), note
+    # An outage, not an absence: the remedy is a re-run (fourth round).
+    assert "could not be read just now" in note and "re-run when BRENDA answers" in note
     assert "BRENDA holds" not in note and "offline" not in note
+    assert found.choices == ()

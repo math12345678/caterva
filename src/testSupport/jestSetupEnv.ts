@@ -1,4 +1,4 @@
-import { HISTORY_VAR, RECORDS_VAR, isolateCatervaState } from './isolatedState';
+import { HISTORY_VAR, RECORDS_VAR, isolateCatervaState, readOldWayUnlessAsked } from './isolatedState';
 
 // Belt and braces for a run that bypasses the package.json config (a single
 // file run with `--config` pointing elsewhere, or an IDE runner that drops
@@ -10,3 +10,4 @@ import { HISTORY_VAR, RECORDS_VAR, isolateCatervaState } from './isolatedState';
 if (!process.env[HISTORY_VAR] || !process.env[RECORDS_VAR]) {
   isolateCatervaState(process.env);
 }
+readOldWayUnlessAsked(process.env);

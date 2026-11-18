@@ -106,6 +106,47 @@ describe("the engine's flags, said in the page's words", () => {
   });
 });
 
+describe("a flag with its placeholder is a field to set", () => {
+  // Studio run 20261111-223741-compose-6cabf85f: each ADR 0182 choice's
+  // note ended "Pass Organism NAME to model another.", the flag swapped for
+  // the field's name and the placeholder left behind.
+  it("rewrites each choice's closing sentence", () => {
+    expect(plain("and 35 more. Pass --organism NAME to model another.")).toBe(
+      "and 35 more. Set the Organism field to model another.",
+    );
+    expect(plain("D-fructose (7 Km); and 4 more. Pass --substrate NAME to model another.")).toBe(
+      "D-fructose (7 Km); and 4 more. Set the Substrate field to model another.",
+    );
+    expect(plain("Pass --inhibitor NAME to model another.")).toBe("Set the Inhibitor field to model another.");
+    expect(plain("Pass --subject EC to model another.")).toBe("Set the Enzyme field to model another.");
+  });
+
+  it("rewrites a re-run and a 'with' clause the same way", () => {
+    expect(plain("no substrate was named. Re-run with --substrate NAME.")).toBe(
+      "no substrate was named. Set the Substrate field and run it again.",
+    );
+    expect(plain("name the substrate with --substrate NAME, so reaction_Km is looked up")).toBe(
+      "name the substrate in the Substrate field, so reaction_Km is looked up",
+    );
+  });
+
+  it("rewrites the isozyme hint", () => {
+    expect(
+      plain("Pass --isoform with one of these names (for example --isoform HKDC1) to take each constant"),
+    ).toBe("Set Isoform to one of these names (for example HKDC1) to take each constant");
+  });
+
+  it("never leaves a placeholder behind", () => {
+    for (const note of [
+      "Pass --organism NAME to model another.",
+      "Re-run with --organism NAME",
+      "or pass --gene NAME",
+    ]) {
+      expect(plain(note)).not.toMatch(/\bNAME\b|--/);
+    }
+  });
+});
+
 describe("dashes", () => {
   it("replaces the long dash in the constants refusal the engine used to print", () => {
     const engine =

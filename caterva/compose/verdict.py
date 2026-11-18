@@ -46,6 +46,7 @@ and burying it in a subsection would waste it.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -146,6 +147,48 @@ class Verdict:
     #: Modules that could not run, with the reason. Silence about a check
     #: that did not run reads as a check that passed.
     unavailable: Mapping[str, str] = field(default_factory=dict)
+    #: (measured, still placeholders) by parameter id, when SOME constants
+    #: are measured and some are not. The verdict is then still STRUCTURAL
+    #: -- a conclusion about the whole system rests on every constant -- but
+    #: the licence says which constants are measured and which are not,
+    #: instead of claiming all of them are illustrative (`licence`).
+    partly: Optional[Tuple[Tuple[str, ...], Tuple[str, ...]]] = None
+
+    @property
+    def licence(self) -> str:
+        """What this verdict licenses, for THIS model.
+
+        LICENCE[STRUCTURAL] says "the constants are the library's
+        illustrative values". Printed above a provenance table with two of
+        three constants cited from BRENDA (granzyme B, 2026-11-11) it was
+        false, and a reader who believed the headline over the table
+        concluded nothing had been looked up. A partly grounded model gets
+        a licence that names the mix.
+        """
+        if self.verdict == STRUCTURAL and self.partly:
+            measured, placeholders = self.partly
+            total = len(measured) + len(placeholders)
+            return (
+                f"Questions about the MECHANISM, as for any structural model, and about the "
+                f"measured part of it: {len(measured)} of its {total} constants "
+                f"{'is' if len(measured) == 1 else 'are'} measured, "
+                f"with citations ({', '.join(measured)}), and {len(placeholders)} "
+                f"{'is' if len(placeholders) == 1 else 'are'} still the library's illustrative "
+                f"value{'s' if len(placeholders) != 1 else ''} ({', '.join(placeholders)}). Not "
+                f"questions about the particular enzyme as a whole: any conclusion that depends "
+                f"on {', '.join(placeholders)} rests on a placeholder."
+            )
+        return LICENCE[self.verdict]
+
+    @property
+    def heading(self) -> str:
+        """`VERDICT: STRUCTURAL`, with the mix when the model is partly grounded."""
+        text = f"VERDICT: {self.verdict.upper()}"
+        if self.verdict == STRUCTURAL and self.partly:
+            measured, placeholders = self.partly
+            text += (f" (partly grounded: {len(measured)} of "
+                     f"{len(measured) + len(placeholders)} constants measured)")
+        return text
 
     @property
     def blocking(self) -> Tuple[Concern, ...]:
@@ -175,9 +218,9 @@ class Verdict:
 
     def summary(self) -> str:
         lines = [
-            f"VERDICT: {self.verdict.upper()}",
+            self.heading,
             "",
-            f"What this supports: {LICENCE[self.verdict]}",
+            f"What this supports: {self.licence}",
         ]
         for concern in self.concerns:
             if concern.qualifier:
@@ -424,8 +467,13 @@ def _prediction_concerns(
             f"had nothing left of its own to say"
         )
 
+    # "all 3 predicted amounts ... are amounts a cell could hold (11 already
+    # non-physical, not re-counted here)" read as a contradiction (third
+    # round's review): the 11 are other steady states, which the analysis
+    # section already marked non-physical, and this check judged the rest.
     aside = (
-        f" ({skipped} already non-physical, not re-counted here)"
+        f"; {skipped} other steady state(s) the analysis section already "
+        f"marked non-physical are not judged again here"
         if skipped else ""
     )
     if all(r.verdict == UNEXAMINED for r in judged):
@@ -473,12 +521,176 @@ def _isozyme_concerns(model: Any) -> Tuple[List[Concern], Optional[str]]:
         return [], None
     notice = notice_for_model(model)
     if notice is None:
-        return [], None
+        return _isozymes_the_rows_name(model)
     return (
         [Concern(source="isozymes", severity=GROUNDED, detail=notice.detail,
                  remedy=notice.remedy, qualifier=notice.headline)],
         notice.summary,
     )
+
+
+def _isozymes_the_rows_name(model: Any) -> Tuple[List[Concern], Optional[str]]:
+    """For an organism the enzyme index does not list in full: the isozymes
+    BRENDA's own rows name there, when the cited rows name none of them.
+
+    Pig heart malate dehydrogenase: BRENDA's Sus scrofa rows name the
+    cytosolic and the mitochondrial isoenzyme (oxaloacetate Km 0.0083 and
+    0.0348 mM, ref 656579); the chooser set those aside, the carried rows name
+    neither, and the verdict was a plain GROUNDED (third round's review)."""
+    measured = getattr(model, "measured", None)
+    ec, organism = getattr(model, "subject", None), getattr(model, "organism", None)
+    if not isinstance(measured, Mapping) or not measured or not ec or not organism:
+        return [], None
+    if getattr(model, "isoform", None):
+        return [], None
+    if any(isinstance(getattr(m, "row_isoform", None), str) and getattr(m, "row_isoform")
+           for m in measured.values()):
+        return [], None
+    try:
+        from caterva.bind.core import read_isoform
+        from caterva.compose import defaults
+
+        named: Dict[str, int] = {}
+        for table in ("km", "kcat"):
+            for row in defaults.table_rows(str(ec), table, organism):
+                reading = read_isoform(row.conditions) if getattr(row, "isozyme", False) else None
+                if reading:
+                    named[reading] = named.get(reading, 0) + 1
+    except Exception:  # noqa: BLE001 - an unread page names nothing
+        return [], None
+    if len(named) < 2:
+        return [], None
+    listed = ", ".join(f"{n} ({c} row{'s' if c != 1 else ''})" for n, c in sorted(named.items()))
+    return ([Concern(
+        source="isozymes", severity=GROUNDED,
+        detail=(f"BRENDA's rows for EC {ec} in {organism} name isozymes ({listed}), and the cited rows "
+                "name none, so which of them the constants measured is unknown; isozymes of one "
+                "enzyme can differ many-fold in Km and kcat"),
+        remedy=("pass --isoform with the one meant to take each constant from rows that name it"),
+        qualifier=(f"BRENDA's {organism} rows name isozymes ({', '.join(sorted(named))}) and the "
+                   "cited rows name none of them"))],
+        f"{organism} rows name {len(named)} isozymes; the cited rows name none")
+
+
+def _row_kind_concerns(model: Any) -> List[Concern]:
+    """What the cited rows are, where it narrows what the model licenses:
+    a Km that is a K0.5 of cooperative kinetics, and constants whose rows
+    name two different proteins.
+
+    Human hexokinase carries glucokinase's K0.5 (6.3 mM, Hill coefficient
+    1.8, ref 739603) in a hyperbolic rate law, under a plain GROUNDED whose
+    only qualifier said the constants "may belong to any of" five isozymes,
+    while the row notes said which one (third round's review). Of GROUNDED
+    severity, like the isozyme concern: a qualifier under "What this
+    supports", not a lower grade."""
+    measured = getattr(model, "measured", None)
+    if not isinstance(measured, Mapping) or not measured:
+        return []
+    try:
+        from caterva.compose.row_scope import _HALF_SATURATION, _HILL
+    except ImportError:  # pragma: no cover - flat layout
+        return []
+    out: List[Concern] = []
+    by_id = {getattr(q, "parameter_id", None): q for q in getattr(model, "resolvable", ())}
+    for name in sorted(measured):
+        q = by_id.get(name)
+        if getattr(q, "table", None) != "km":
+            continue
+        text = str(getattr(measured[name], "commentary", "") or "")
+        if not _HALF_SATURATION.search(text):
+            continue
+        hill = _HILL.search(text)
+        what = f"a K0.5 with a Hill coefficient of {hill.group(1)}" if hill else "a K0.5"
+        isoform = getattr(measured[name], "row_isoform", None)
+        of = f" ({isoform}'s)" if isoform else ""
+        out.append(Concern(
+            source="row_scope", severity=GROUNDED,
+            detail=(f"`{name}` carries {what}{of}, the half-saturation constant of a cooperative "
+                    "enzyme, not a Michaelis-Menten Km: the hyperbolic rate law approximates it"),
+            remedy=("model it as cooperative ('Hill kinetics') with that K0.5 and Hill coefficient, "
+                    "or read conclusions near half-saturation as approximate"),
+            qualifier=(f"{name} is {what}{of}, not a Michaelis-Menten Km, so this hyperbolic model "
+                       "approximates a cooperative enzyme")))
+    for name, sentence in getattr(model, "cautions", ()) or ():
+        if name in measured:
+            out.append(Concern(
+                source="row_scope", severity=GROUNDED,
+                detail=f"`{name}`: {sentence}",
+                remedy="read the cited paper before relying on the value, or pass the constant "
+                       "yourself",
+                qualifier=(f"{name} lies far from the other rows for its compound (other organisms' or "
+                           "other papers')")))
+    try:
+        from caterva.compose.row_scope import ASSAY_SUBSTRATE, IRREVERSIBLE, read_scope
+    except ImportError:  # pragma: no cover
+        read_scope = None
+    if read_scope is not None:
+        for name in sorted(measured):
+            q = by_id.get(name)
+            if getattr(q, "table", None) != "ki":
+                continue
+            substrate = getattr(model, "substrate", None)
+            try:
+                compound = model.compound_for(q)
+            except Exception:  # noqa: BLE001 - a stand-in model without compounds
+                compound = None
+            scope = read_scope(getattr(measured[name], "commentary", None),
+                               motif=getattr(getattr(q, "motif", None), "name", None)
+                               or getattr(q, "motif_name", None), table="ki", substrate=substrate,
+                               compound=compound if isinstance(compound, str) else None)
+            for c in getattr(scope, "concerns", ()) or ():
+                if c.kind == IRREVERSIBLE:
+                    # Selegiline's Ki is real, and a reversible model of it
+                    # leaves the inactivation out (fifth round's review, V7-05).
+                    out.append(Concern(
+                        source="row_scope", severity=GROUNDED,
+                        detail=f"`{name}`: {c.plain}",
+                        remedy=("read the model as the inhibitor's initial binding only, or model the "
+                                "inactivation (kinact, KI) yourself"),
+                        qualifier=f"{name} is the Ki of an irreversible inactivator, {compound}"))
+                if c.kind == ASSAY_SUBSTRATE:
+                    remedy = (f"look for a Ki row measured on {substrate}, or read the value as "
+                              "the inhibitor's constant in another assay")
+                    if _no_ki_on(model, compound, substrate):
+                        # ACE and captopril: no human captopril Ki row was
+                        # measured on angiotensin I, and the advice sent the
+                        # reader to look for one (fifth round, R5V1-21).
+                        remedy = (f"BRENDA has no Ki row for {compound} measured on {substrate} in "
+                                  f"{getattr(model, 'organism', None) or 'this organism'}: read the "
+                                  "value as the inhibitor's constant in another assay, or supply one "
+                                  f"measured on {substrate} yourself")
+                    out.append(Concern(
+                        source="row_scope", severity=GROUNDED,
+                        detail=f"`{name}`: {c.plain}",
+                        remedy=remedy,
+                        qualifier=f"{name} was measured in an assay on another substrate"))
+    isoforms = {name: getattr(m, "row_isoform", None) for name, m in measured.items()}
+    named = {iso for iso in isoforms.values() if isinstance(iso, str) and iso}
+    if len(named) > 1:
+        try:
+            from caterva.bind.core import same_isoform
+            from caterva.enzymes.finder import isozymes
+            several = isozymes(str(getattr(model, "subject", "") or ""),
+                               getattr(model, "organism", None)).count >= 2
+        except Exception:  # noqa: BLE001 - unknown is not several
+            several = False
+        if not several:
+            # An organism the enzyme index lists one protein for (or none):
+            # readings of human isozyme names in its rows are noise.
+            return out
+        distinct: List[str] = []
+        for iso in sorted(named):
+            if not any(same_isoform(iso, d) for d in distinct):
+                distinct.append(iso)
+        if len(distinct) > 1:
+            listed = "; ".join(f"`{n}`: {i}" for n, i in sorted(isoforms.items()) if i)
+            out.append(Concern(
+                source="row_scope", severity=GROUNDED,
+                detail=f"the cited rows name different proteins ({listed}), so the model combines "
+                       "constants of more than one protein",
+                remedy="pass --isoform with one of them to take every constant from its rows",
+                qualifier="the cited constants come from rows of different proteins"))
+    return out
 
 
 def _grounding(model: Any) -> Tuple[int, int, bool]:
@@ -517,6 +729,237 @@ def _grounding(model: Any) -> Tuple[int, int, bool]:
     except TypeError:
         resolvable = list(getattr(model, "resolvable", ()))
         return 0, len(resolvable), False
+
+
+def _grounding_names(model: Any) -> Optional[Tuple[Tuple[str, ...], Tuple[str, ...]]]:
+    """(measured, placeholder) parameter ids, sorted; None when the model
+    does not say which (an object with counts only)."""
+    measured = getattr(model, "measured", None)
+    if not isinstance(measured, Mapping):
+        return None
+    placeholders = getattr(model, "placeholders", None)
+    if placeholders is None:
+        placeholders = getattr(model, "unmeasured", None)
+    if placeholders is None:
+        return None
+    try:
+        names = [getattr(p, "identifier", p) for p in placeholders]
+        return tuple(sorted(str(k) for k in measured)), tuple(sorted(str(n) for n in names))
+    except TypeError:
+        return None
+
+
+#: The lists a placeholder's reason offers (`caterva.compose.__main__`):
+#: the organisms holding rows, and the inhibitors the organism searched has
+#: Ki rows for. Each ends at the sentence or clause that follows it.
+_OFFERED = {
+    "organisms": re.compile(r"(?: -- available in| that are not of a variant| naming \S+): "
+                            r"(.+?)(?=\. Re-run| \(searched|\. In | -- |\. [A-Z]|$)"),
+    "inhibitors": re.compile(r"the inhibitors with Ki rows the search can use[^:]*: (.+?)(?=; re-run|$)"),
+    # `__main__._what_the_organism_holds`: the compounds the organism has
+    # rows for, when the one named has none there.
+    "listed": re.compile(r"the (?:inhibitor|substrate)s it lists \w+ rows for there: "
+                         r"(.+?)(?=\. Re-run|\. Of these|$)"),
+    # Of those, the ones that fill the model's other constants too.
+    "fills": re.compile(r"so that naming one fills this model's other constants? as well: "
+                        r"(.+?)(?=\. [A-Z]|$)"),
+}
+#: How many offered names a verdict step repeats.
+OFFERED_SHOWN = 3
+
+
+def _offered(reasons: Mapping[str, Any], names: Sequence[str], what: str) -> Optional[str]:
+    """The first few names the reasons for `names` offer as `what`
+    ("organisms" or "inhibitors"), with their row counts, else None. The
+    step said "re-run with --organism set to one the provenance table lists"
+    and left the reader to find them (fifth round's review, A4-08)."""
+    for name in names:
+        match = _OFFERED[what].search(str(reasons.get(name, "")))
+        if not match:
+            continue
+        text = re.sub(r" \(rows of a (?:protein variant|named isozyme) only, .*\)$", "", match.group(1).strip())
+        more = re.search(r" and (\d+) more$", text)
+        extra = int(more.group(1)) if more else 0
+        text = text[:more.start()] if more else text
+        if text.startswith("rows naming"):
+            return None
+        parts = [re.sub(r"^then ", "", p.strip()) for p in re.split(r"; |, (?=[A-Z])", text) if p.strip()]
+        if not parts:
+            continue
+        shown = parts[:OFFERED_SHOWN]
+        rest = len(parts) - len(shown) + extra
+        return "; ".join(shown) + (f" and {rest} more" if rest else "")
+    return None
+
+
+def _what_would_ground(model: Any, unmeasured: Sequence[str]) -> Optional[str]:
+    """The remedy for a partly grounded model: the piece actually missing,
+    read from why each placeholder is one (`not_found`), or None when the
+    reasons do not say.
+
+    The remedy used to be "re-run with --organism set to one the provenance
+    table lists" for every partly measured model -- including granzyme B,
+    whose one placeholder was a Ki "not looked up" because no inhibitor was
+    named. Changing the organism would not have helped; naming the
+    inhibitor would. Each reason is classified, worst-first by how much
+    the reader can do about it.
+    """
+    reasons = dict(getattr(model, "not_found", {}) or {})
+    if not reasons:
+        return None
+    by_need: Dict[str, List[str]] = {}
+    for name in unmeasured:
+        reason = str(reasons.get(name, ""))
+        low = reason.lower()
+        if low.startswith("not searched:"):
+            # The constant's own search failed on the network
+            # (`__main__._not_searched`): the remedy is to run it again.
+            need = "failed"
+        elif "never carried under this one's" in low:
+            # The row the search returned was another compound's and was
+            # withheld (`__main__._neighbours_withheld`): naming the compound
+            # again would return it again.
+            need = "neighbour"
+        elif "the organism is what is missing" in low:
+            # The organism has no row of this table under the EC number at
+            # all (`__main__._what_the_organism_holds`): no compound fills it.
+            need = "organism_missing"
+        elif "names an isozyme" in low:
+            # Every row names an isozyme ("isoenzyme A"): a wild-type
+            # protein, taken when --isoform names it. Vibrio tyrosinaticus's
+            # tyrosinase was told "supply it yourself" though --isoform
+            # "isoenzyme A" gives a measured pair (sixth round, XS5R2-03).
+            need = "isozyme_named"
+        elif "measured another isoform" in low:
+            # `__main__._measured_on_the_isoform` says whether any compound
+            # has rows naming the isoform there; when none has, offering
+            # --substrate would lead to the same placeholder.
+            need = ("isoform_elsewhere" if "rows naming it are in" in reason
+                    else "isoform_unmeasured" if re.search(r"naming \S+ under EC \S+ in .+ for any "
+                                                           r"(substrate|inhibitor)", reason)
+                    else "isoform")
+        elif "so naming one would leave the" in low:
+            # Every substrate offered lacks a row for another constant of
+            # the model (`__main__._what_the_organism_holds`): re-running
+            # trades one placeholder for another, so the step is to supply it.
+            need = "nothing"
+        elif "no value in the organism requested" in low:
+            # Measured in other organisms; the reason may ALSO offer
+            # inhibitors this organism has rows for (`__main__._inhibitors_here`),
+            # and the step names both (fifth round's review, A4-08).
+            need = "organism"
+        elif "--inhibitor set to" in reason:
+            # The inhibitor named has no Ki row; others do. It WAS looked up.
+            need = "other_inhibitor"
+        elif "--substrate set to" in reason:
+            need = "other_substrate"
+        elif "--inhibitor" in reason:
+            need = "inhibitor"
+        elif "--substrate" in reason and "not looked up" in low:
+            need = "substrate"
+        elif "--product" in reason or "--compound" in reason:
+            need = "compound"
+        elif ("other organism" in low or "available in" in low or "cross-species" in low
+              or "no value in the organism requested" in low):
+            need = "organism"
+        elif "not looked up" in low:
+            need = "refused"
+        else:
+            need = "nothing"
+        by_need.setdefault(need, []).append(name)
+    steps = []
+    if "failed" in by_need:
+        names = by_need["failed"]
+        steps.append(f"re-run the same command: the search for {', '.join(names)} failed on the "
+                     "network and was not run, so BRENDA was not asked; the provenance table names "
+                     "the service that failed")
+    if "neighbour" in by_need:
+        steps.append(f"supply {', '.join(by_need['neighbour'])} yourself, or model the compound the "
+                     "provenance table names: the row the search returned is another compound's, "
+                     "so it was withheld")
+    if "organism_missing" in by_need:
+        names = by_need["organism_missing"]
+        where = _offered(reasons, names, "organisms")
+        steps.append(f"{', '.join(names)}: BRENDA has no row of {'its' if len(names) == 1 else 'their'} "
+                     "table in this organism at all, so no other compound would fill it: re-run with "
+                     + (f"--organism set to one of {where} to model that organism"
+                        if where else "--organism set to one the provenance table lists to model that "
+                        "organism")
+                     + f", or supply {'it' if len(names) == 1 else 'them'} yourself")
+    if "other_inhibitor" in by_need:
+        names = by_need["other_inhibitor"]
+        listed = _offered(reasons, names, "listed")
+        steps.append(f"{', '.join(names)}: BRENDA has no Ki row for the inhibitor "
+                     "named, in this organism: re-run with --inhibitor set to "
+                     + (f"one of {listed}" if listed else "one the provenance table lists")
+                     + ", or supply it yourself")
+    if "other_substrate" in by_need:
+        names = by_need["other_substrate"]
+        listed = _offered(reasons, names, "fills") or _offered(reasons, names, "listed")
+        steps.append(f"{', '.join(names)}: BRENDA has no row for the substrate "
+                     "named, in this organism: re-run with --substrate set to "
+                     + (f"one of {listed}" if listed else "one the provenance table lists")
+                     + ", or supply it yourself")
+    if "isoform" in by_need:
+        # The flag that would fill it is the compound the constant is
+        # FOR: --inhibitor for a Ki, --substrate for a Km or kcat. ALDH2's
+        # missing Ki was advised "--substrate" (fourth round's review).
+        names = by_need["isoform"]
+        flags = sorted({"--inhibitor" if "Ki" in n.split("_")[-1] else "--substrate" for n in names})
+        steps.append(f"{', '.join(names)}: every row the search found measured another "
+                     f"isoform than the one asked for: re-run with {' or '.join(flags)} set to one the "
+                     "provenance table lists as measured on this isoform, or supply it yourself "
+                     "(--isoform set to the one the provenance table names would model that other "
+                     "protein instead)")
+    if "isozyme_named" in by_need:
+        names = by_need["isozyme_named"]
+        named = None
+        for name in names:
+            found = re.search(r" -- the isozymes: (.+?)(?= \(searched| -- |$)", str(reasons.get(name, "")))
+            if found:
+                named = [n.strip() for n in found.group(1).split(", ") if n.strip()]
+                break
+        steps.append(f"{', '.join(names)}: every row BRENDA holds names an isozyme, taken only when "
+                     "--isoform names it: re-run with --isoform set to "
+                     + (f"one of {', '.join(repr(n) for n in named[:OFFERED_SHOWN])}" if named
+                        else "the isozyme the provenance table names")
+                     + " to model that isozyme, or supply "
+                     + ("it" if len(names) == 1 else "them") + " yourself")
+    if "isoform_elsewhere" in by_need:
+        steps.append(f"{', '.join(by_need['isoform_elsewhere'])}: no row in this organism names the "
+                     "isoform asked for: re-run with --organism set to one the provenance table lists "
+                     "as holding rows naming it (that organism's protein, labelled as such), or supply "
+                     "it yourself")
+    if "isoform_unmeasured" in by_need:
+        steps.append(f"{', '.join(by_need['isoform_unmeasured'])}: every row the search found measured "
+                     "another isoform than the one asked for, and no row in this organism names that "
+                     "isoform for any compound: supply it yourself (--isoform set to the one the "
+                     "provenance table names would model that other protein instead)")
+    if "inhibitor" in by_need:
+        steps.append(f"name the inhibitor with --inhibitor NAME, so {', '.join(by_need['inhibitor'])} "
+                     "is looked up (BRENDA files a Ki under the inhibitor)")
+    if "substrate" in by_need:
+        steps.append(f"name the substrate with --substrate NAME, so {', '.join(by_need['substrate'])} "
+                     "is looked up")
+    if "compound" in by_need:
+        steps.append(f"name the compound the provenance table asks for, so "
+                     f"{', '.join(by_need['compound'])} is looked up")
+    if "organism" in by_need:
+        names = by_need["organism"]
+        where = _offered(reasons, names, "organisms")
+        here = _offered(reasons, names, "inhibitors")
+        steps.append(f"{', '.join(names)} {'is' if len(names) == 1 else 'are'} measured only in another "
+                     "organism: re-run with "
+                     + (f"--organism set to one of {where}" if where
+                        else "--organism set to one the provenance table lists")
+                     + (f", or with --inhibitor set to one this organism has Ki rows for ({here})"
+                        if here else "")
+                     + f", or supply {'it' if len(names) == 1 else 'them'} yourself")
+    if "refused" in by_need or "nothing" in by_need:
+        rest = by_need.get("refused", []) + by_need.get("nothing", [])
+        steps.append(f"supply {', '.join(rest)} yourself: the search has no usable BRENDA row for "
+                     f"{'it' if len(rest) == 1 else 'them'}, for the reason the provenance table gives")
+    return "; ".join(steps) if steps else None
 
 
 def _influence_is_informative(influence: Any) -> Optional[bool]:
@@ -596,12 +1039,16 @@ def _provenance_concerns(
                      remedy=str(refused).rstrip("."))],
             note,
         )
+    partial_remedy = None
     if measured:
+        names = _grounding_names(model)
+        still = f" ({', '.join(names[1])})" if names else ""
         detail = (
             f"{measured} constant(s) measured and {unmeasured} still the "
-            f"motif library's illustrative values"
+            f"motif library's illustrative values{still}"
         )
         note = f"{measured} measured, {unmeasured} unmeasured"
+        partial_remedy = _what_would_ground(model, names[1] if names else ())
     elif subject and not has_provenance:
         # THE CASE THAT USED TO READ AS GROUNDED. A subject was named, so a
         # search could be run -- and has not been. Say exactly that.
@@ -621,6 +1068,12 @@ def _provenance_concerns(
             f"the search for {subject!r} found nothing it could use"
         )
         note = f"{unmeasured} constant(s) unmeasured after searching"
+        # The remedy is read from each placeholder's reason, as for a partly
+        # grounded model: "re-run with --organism" was the advice for CYP3A4
+        # (rows of another isoform) and luciferase (a neighbour's rows)
+        # alike, and neither is fixed by an organism (round-1 review).
+        names = _grounding_names(model)
+        partial_remedy = _what_would_ground(model, names[1]) if names else None
     elif not _database_could_supply(model):
         # No enzyme step: say once why an enzyme does not apply, so the
         # remedy below can be the one thing left to do.
@@ -661,6 +1114,10 @@ def _provenance_concerns(
         "supply the constants the provenance table lists, from your own "
         "measurements or a paper"
     )
+    if partial_remedy is not None:
+        # The piece actually missing, named (an inhibitor, a substrate, an
+        # organism), not the generic organism advice.
+        source = partial_remedy
     informative = _influence_is_informative(influence)
     if informative is True:
         remedy = f"{source} -- start with the top of its influence ranking"
@@ -861,6 +1318,7 @@ def form(
     concerns += isozyme_concerns
     if isozyme_note:
         consulted["isozymes"] = isozyme_note
+    concerns += _row_kind_concerns(model)
 
     try:
         from .assumptions import check as check_assumptions
@@ -931,10 +1389,19 @@ def form(
         # --robustness" told people who had just passed --robustness to
         # pass it. The literature's own spread is reported in the
         # provenance section instead.
+        # The pointer only where that section is printed: it is printed
+        # for a constant whose carried row has a spread (`report.
+        # _disagreement_lines`), and chymotrypsin's page pointed to a
+        # section it did not contain (fifth round's review, A4-04).
+        measured_now = getattr(model, "measured", None)
+        spread = isinstance(measured_now, Mapping) and any(
+            getattr(m, "spread", None) is not None for m in measured_now.values())
         consulted["robustness"] = (
             "nothing to resample: every constant is measured (the spread "
             "between published values is under 'Where the evidence did not "
-            "settle on one value')"
+            "settle on one value')" if spread else
+            "nothing to resample: every constant is measured, and no carried "
+            "value's rows spread over several values"
         )
     elif robustness is None:
         unavailable["robustness"] = (
@@ -971,8 +1438,14 @@ def form(
     else:
         verdict = GROUNDED
 
+    partly = None
+    if verdict == STRUCTURAL and measured > 0 and unmeasured > 0:
+        names = _grounding_names(model)
+        if names is not None:
+            partly = names
     return Verdict(
         verdict=verdict,
+        partly=partly,
         behaviour=behaviour_of(stability),
         concerns=tuple(concerns),
         conclusion=(
@@ -988,3 +1461,23 @@ __all__ = [
     "BROKEN", "STRUCTURAL", "GROUNDED", "ROBUST", "VERDICTS", "LICENCE",
     "Concern", "Verdict", "VerdictError", "form", "behaviour_of",
 ]
+
+
+def _no_ki_on(model: Any, compound: Any, substrate: Any) -> bool:
+    """Whether BRENDA holds no Ki row for `compound` in the model's organism
+    whose commentary names `substrate` as the assay's. False when unknown."""
+    ec = getattr(model, "subject", None) or getattr(model, "ec_number", None)
+    organism = getattr(model, "organism", None)
+    if not (isinstance(compound, str) and isinstance(substrate, str) and ec and organism):
+        return False
+    try:
+        from caterva.compose import defaults
+
+        rows = [r for r in defaults.table_rows(str(ec), "ki", organism)
+                if defaults._matches(r.compound, compound)]
+    except Exception:  # noqa: BLE001
+        return False
+    if not rows:
+        return False
+    key = defaults._search_key(substrate)
+    return not any(key and key in defaults._search_key(r.conditions or "") for r in rows)

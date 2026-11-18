@@ -70,7 +70,7 @@ CAT GPX1 GSR NOS1 NOS2 NOS3 ACE ACE2 DPP4 PDE4A PDE4B PDE4C PDE4D PDE5A CYP3A4 C
 COMT PARP1 CDK2 CDK1 EGFR ABL1 SRC SYK BTK JAK2 MAPK1 MAPK3 PIK3CA HDAC1 HDAC2 HDAC3 HDAC4 HDAC5 HDAC6 HDAC7 HDAC8
 BACE1 CASP3 CASP1 F2 F10 PTPN1 GSTP1 GSTA1 GSTM1 GSTT1 MMP9 MMP2 AKT1 MTOR IDO1 ARG1 ARG2 ODC1 ADA PNP PRSS1 CTSB
 CTSL LYZ ELANE REN DNMT1 PTGS1 PTGS2 ALDH1A1 ALDH2 ADH1A ADH1B ADH1C ADH4 ADH5 ADH6 ADH7 ALPL ASS1 GLS GLUD1 PRKACA
-PRKCA AMY2A GAA
+PRKCA AMY2A GAA IMPDH1 IMPDH2
 ADH1 ADH2 CDC19 PYK2 HXK1 HXK2 GLK1 PFK1 PFK2 FBA1 TDH1 TDH2 TDH3 GPM1 CIT1 CIT2 ZWF1 CTT1 DFR1 CDC21 HMG1 HMG2 PDC1
 gapA pykF pykA pfkA pfkB glk fbaA tpiA pgk eno gltA mdh icd zwf sodA sodB katE katG folA thyA lacZ ldhA ppc
 """.split()
@@ -169,6 +169,10 @@ ABBREVIATIONS: List[Tuple[Tuple[str, ...], Tuple[str, ...], str, str]] = [
     (("CA",), ("4.2.1.1",), "carbonic anhydrase", "name"),
     (("PDE4",), ("3.1.4.53",), "cAMP-specific 3',5'-cyclic phosphodiesterase", "name"),
     (("PDE5",), ("3.1.4.35",), "3',5'-cyclic-GMP phosphodiesterase", "name"),
+    # PI3K is both: ENZYME lists 'PI3-kinase' under EC 2.7.1.137, and the
+    # class I enzymes (PIK3CA and its kin, the drug targets) are EC 2.7.1.153.
+    (("PI3K",), ("2.7.1.137", "2.7.1.153"),
+     "phosphatidylinositol 3-kinase and phosphatidylinositol-4,5-bisphosphate 3-kinase", "alt:PI3-kinase"),
     (("HIV protease", "HIV-1 protease", "HIV PR", "HIV-1 PR", "HIV-1 retropepsin"), ("3.4.23.16",),
      "HIV-1 retropepsin", "alt:human immunodeficiency virus type 1 protease"),
     (("T4 lysozyme", "T4L", "phage T4 lysozyme"), ("3.2.1.17",), "lysozyme of bacteriophage T4", "uniprot:P00720"),

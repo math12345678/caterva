@@ -585,6 +585,12 @@ export interface ParameterProvenance {
     | "cross_species_withheld"
     | "cross_species_too_distant"
     | "variant_withheld"
+    /**
+     * Every row BRENDA holds is outside the physically plausible range for
+     * the constant (a kcat below 1e-3 1/s, a Km below 1e-7 mM): a unit slip
+     * or a misfiled row, far likelier than a measurement, and never used.
+     */
+    | "implausible_withheld"
     /** An isoform was asked for and every row measured another one. */
     | "isoform_withheld"
     /**
@@ -627,9 +633,14 @@ export interface ParameterProvenance {
      */
     | "organism_ambiguous"
     /**
-     * A guessed enzyme (one not in enzymes.ts) with no substrate named. A
-     * lookup without one takes whichever substrate's row the runner
-     * reaches first, and its result does not say which substrate that was.
+     * No substrate was named AND none could be chosen (ADR 0182). Since
+     * then an unnamed substrate is chosen from BRENDA -- the one with the
+     * most measured rows -- and the choice is stated as a "substrate
+     * chosen:" flag; this reason is left for when BRENDA lists no row for
+     * any substrate of the enzyme in the organism, or the checkout has no
+     * chooser. The note is the runner's sentence naming what is missing and
+     * what would fix it. (Before ADR 0182 it was every guessed enzyme with
+     * no substrate named, refused without asking BRENDA.)
      */
     | "substrate_not_named"
     /**
