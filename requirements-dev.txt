@@ -81,4 +81,4 @@ types-PyYAML==6.0.12.20260815
 # MIT -- read from the LICENSE the wheel ships
 # (mypy-1.15.0.dist-info/LICENSE): "Mypy (and mypyc) are licensed under
 # the terms of the MIT license".
-mypy==1.15.0
+mypy==2.3.1
