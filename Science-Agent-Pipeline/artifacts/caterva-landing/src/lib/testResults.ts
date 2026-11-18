@@ -151,7 +151,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "202 test files -- kinetics & Michaelis-Menten correctness, " +
+          "203 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -300,10 +300,16 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-11-14 (ADR 0182, the sixth round's polish) on
         // fix/studio-real-values, caterva/tests with pytest-xdist (-n 8):
         // 7936 tests, 7934 passed, 2 skipped, 0 failed, 343 s.
-        passed: 7934,
-        skipped: 2,
+        //
+        // Measured 2026-11-17 (the main path checked against the exact
+        // Michaelis-Menten solution, 0.7.1) on fix/studio-real-values,
+        // caterva/tests with pytest-xdist (-n 8): 7939 tests, 7938 passed,
+        // 1 skipped (Sparkle not unpacked; npx was on PATH, so the codegen
+        // selftest ran), 0 failed, 1357 s.
+        passed: 7938,
+        skipped: 1,
         failed: 0,
-        collected: 7936,
+        collected: 7939,
       },
     ],
   },
