@@ -13,11 +13,13 @@ import { describe, expect, it } from "vitest";
 
 import composeGck from "@/__fixtures__/api/enzymes/compose-gck-engine-0.7.1.json";
 import composeHk from "@/__fixtures__/api/enzymes/compose-hexokinase-engine-0.7.1.json";
+import constantsHk from "@/__fixtures__/api/enzymes/constants-hexokinase-human-glucose.json";
 import composeOld from "@/__fixtures__/api/enzymes/compose-ldh-human-pyruvate.json";
-import type { ComposeResult, RunRecord, SourcedValue } from "@/api/types";
+import type { ComposeResult, ConstantsResult, RunRecord, SourcedValue } from "@/api/types";
 import { formatValue } from "@/lib/format";
 
 import { ComposeResultView } from "./ComposeResult";
+import { ConstantsResultView } from "./ConstantsResult";
 import { conditionsLine, constantName, halfSaturationOf, startsAreDefaults } from "./ResultMap";
 
 type Captured = { run: unknown; result: unknown };
@@ -132,5 +134,21 @@ describe("a constant that is a Km", () => {
         expect(constantName(p)).toBe("Km");
       }
     }
+  });
+});
+
+describe("the constants lookup", () => {
+  it("marks a row of the Km table that is a K0.5, and only that row", () => {
+    const c = constantsHk as unknown as { result: ConstantsResult; captured: { request: Record<string, unknown> } };
+    const km = c.result.constants.find((r) => r.quantity === "km")!;
+    const all = [...(km.value ? [km.value] : []), ...km.alternatives];
+    const k05 = all.filter((v) => /K0\.5/.test(v.provenance.commentary ?? ""));
+    expect(k05.length).toBeGreaterThan(0);
+    render(<ConstantsResultView result={c.result} request={c.captured.request} />);
+    const marks = screen.getAllByTestId("row-k05");
+    expect(marks).toHaveLength(k05.length);
+    const row = marks[0].closest("tr") as HTMLElement;
+    expect(row).toHaveTextContent("6.3");
+    expect(marks[0]).toHaveTextContent("K0.5, Hill 1.8: not a Km");
   });
 });

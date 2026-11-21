@@ -15,6 +15,7 @@ import { Link } from "wouter";
 
 import type { ConstantRow, ConstantsResult as Result, SourcedValue } from "@/api/types";
 import { Disclosure } from "@/components/forms/Disclosure";
+import { rowHalfSaturation } from "@/components/provenance/halfSaturation";
 import { Citation } from "@/components/provenance/Citation";
 import { Value } from "@/components/provenance/Value";
 import { MarkdownReport } from "@/components/report/Report";
@@ -114,7 +115,23 @@ function Constant({ row, request }: { row: ConstantRow; request: Record<string, 
             ...(rows.some((r) => r.v.provenance.commentary)
               ? [{ key: "says", header: "The row says", cell: (r: Row) => <span className="k-cell-prose">{r.v.provenance.commentary ?? ""}</span> }]
               : []),
-            { key: "role", header: "", cell: (r) => (r.role === "chosen" ? <span className="chip" data-tone="signal">chosen</span> : null) },
+            {
+              key: "role",
+              header: "",
+              cell: (r) => {
+                const half = row.quantity === "km" ? rowHalfSaturation(r.v) : null;
+                return (
+                  <>
+                    {r.role === "chosen" ? <span className="chip" data-tone="signal">chosen</span> : null}
+                    {half ? (
+                      <span className="chip" data-tone="caution" data-testid="row-k05">
+                        K0.5{half.hill === null ? "" : `, Hill ${half.hill}`}: not a Km
+                      </span>
+                    ) : null}
+                  </>
+                );
+              },
+            },
           ]}
         />
       ) : null}

@@ -18,7 +18,14 @@ import type { SourcedValue } from "@/api/types";
  * coefficient is not stated returns `hill: null`, never a guessed one.
  */
 export function halfSaturationOf(v: SourcedValue): { hill: number | null } | null {
-  if (v.label !== "Km" || v.provenance.kind !== "measured") return null;
+  // "Km" in a compose model, "km" for the pick of the constants lookup.
+  if (v.label?.toLowerCase() !== "km") return null;
+  return rowHalfSaturation(v);
+}
+
+/** The same reading for a row already known to be of the Km table (the constants lookup's unlabelled alternatives). */
+export function rowHalfSaturation(v: SourcedValue): { hill: number | null } | null {
+  if (v.provenance.kind !== "measured") return null;
   const texts = [...(v.provenance.scope ?? []), v.provenance.commentary ?? ""];
   if (!texts.some((t) => /\bK0\.5\b/.test(t))) return null;
   for (const t of texts) {
