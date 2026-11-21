@@ -306,10 +306,21 @@ export const TEST_SUITES: TestSuite[] = [
         // caterva/tests with pytest-xdist (-n 8): 7939 tests, 7938 passed,
         // 1 skipped (Sparkle not unpacked; npx was on PATH, so the codegen
         // selftest ran), 0 failed, 1357 s.
-        passed: 7938,
-        skipped: 1,
+        //
+        // Measured 2026-11-18 (the md smoke verdict tests, 2 added) on
+        // claude/charming-rubin-jjwpux merged with main, caterva/tests with
+        // pytest-xdist (-n 8, PYTHONHASHSEED=0), as root: 7941 tests, 7938
+        // passed, 2 skipped, 1 failed, 753 s. The 1 failure was
+        // test_studio_workspace.py::test_a_data_folder_that_cannot_be_written_
+        // is_refused_with_the_reason, which cannot pass as root (a read-only
+        // folder is still writable at uid 0). tests/test_studio_workspace.py
+        // was then re-run as the unprivileged user `nobody`: 27 passed,
+        // that test among them. So 7939 passed and 2 skipped, 0 failed,
+        // across two runs rather than one.
+        passed: 7939,
+        skipped: 2,
         failed: 0,
-        collected: 7939,
+        collected: 7941,
       },
     ],
   },
