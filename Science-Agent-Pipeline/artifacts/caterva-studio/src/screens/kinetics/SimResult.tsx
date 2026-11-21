@@ -23,7 +23,7 @@ export function SimResultView({ result }: { result: Result }) {
   const finalNames = Object.keys(result.final);
   const timeUnit = result.parameters.end?.unit ?? "time units";
   return (
-    <>
+    <div className="k-results">
       <section className="k-verdict" aria-label="At the end of the run">
         <p className="k-eyebrow">
           <span className="font-mono">{formatCount(result.events)}</span> events, seed{" "}
@@ -87,6 +87,6 @@ export function SimResultView({ result }: { result: Result }) {
       <Disclosure title="What caterva sim ssa prints">
         <TextReport text={result.report_text} />
       </Disclosure>
-    </>
+    </div>
   );
 }

@@ -148,7 +148,7 @@ function Constant({ row, request }: { row: ConstantRow; request: Record<string, 
 
 export function ConstantsResultView({ result, request }: { result: Result; request: Record<string, unknown> }) {
   return (
-    <>
+    <div className="k-results">
       <section className="k-verdict" aria-label="Summary">
         <p className="k-eyebrow">From the literature</p>
         <h2 className="k-verdict-word" data-tone={result.sourced.length ? undefined : "caution"}>
@@ -209,6 +209,6 @@ export function ConstantsResultView({ result, request }: { result: Result; reque
       <Disclosure title="The document as the command prints it">
         <MarkdownReport source={result.document_markdown} />
       </Disclosure>
-    </>
+    </div>
   );
 }

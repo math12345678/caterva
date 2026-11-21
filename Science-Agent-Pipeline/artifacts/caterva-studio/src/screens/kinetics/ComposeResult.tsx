@@ -690,6 +690,8 @@ function Influence({ result }: { result: Result }) {
   const s = result.sensitivity;
   if (!s || s.sensitivities.length === 0) return null;
   const max = Math.max(0, ...s.sensitivities.map((r) => (r.relative === null ? 0 : Math.abs(r.relative))));
+  // The same name as everywhere else on the page for a constant whose row is a K0.5.
+  const k05 = new Set(result.model.parameters.filter((p) => halfSaturationOf(p)).map((p) => p.id));
   return (
     <Section title="Which constants matter" id="k-influence" aside={<ComputedNote />}>
       <p className="k-lede">
@@ -712,6 +714,7 @@ function Influence({ result }: { result: Result }) {
               <tr key={row.parameter}>
                 <th scope="row" className="font-mono k-ledger-name">
                   {row.parameter}
+                  {k05.has(row.parameter) ? <span className="k-ledger-sub">K0.5</span> : null}
                 </th>
                 <td data-align="end" data-numeric="true">
                   {row.relative === null ? "not computed" : formatNumber(row.relative)}
