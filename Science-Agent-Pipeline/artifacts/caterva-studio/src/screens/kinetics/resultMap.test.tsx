@@ -100,7 +100,7 @@ describe.each([
     expect(startsAreDefaults(result)).toBe(true);
     render(<ComposeResultView result={result} run={run} />);
     const starts = screen.getByTestId("map-starts");
-    expect(starts).toHaveTextContent("Yours to set.");
+    expect(starts).toHaveTextContent("Not set.");
     // The command's stand-in amounts are not printed in the summary as if they were results.
     for (const s of result.model.species) {
       expect(starts).not.toHaveTextContent(`${s.initial.value} ${s.initial.unit}`);
@@ -121,7 +121,8 @@ describe("the enzyme's name", () => {
     const { result, run } = of(composeHk);
     render(<ComposeResultView result={result} run={run} />);
     expect(screen.getByTestId("result-map-enzyme")).not.toHaveTextContent("GCK");
-    expect(screen.getAllByText(/every cited row names GCK/).length).toBeGreaterThan(0);
+    // ... and is repeated whole beside the map, so the reader of the map alone still learns it is GCK's.
+    expect(screen.getByTestId("map-which-protein")).toHaveTextContent("every cited row names GCK, so these are GCK's constants");
   });
 });
 

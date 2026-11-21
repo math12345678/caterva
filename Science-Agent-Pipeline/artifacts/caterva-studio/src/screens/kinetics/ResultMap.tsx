@@ -10,8 +10,8 @@
  *  2. the line items: one row per constant with its value, citation, assay
  *     conditions and the range the sources span, so each number is traced to
  *     its source without opening anything;
- *  3. the starting amounts, which no paper supplies and which stay "yours to
- *     set" until the request sets them.
+ *  3. the starting amounts, which no paper supplies and which read "not set"
+ *     until the request sets them.
  *
  * Nothing here is typed in or inferred beyond what a function below states.
  * A constant in the model's Km slot whose source row is a K0.5 (a cooperative
@@ -25,6 +25,7 @@ import type { ComposeResult as Result, SourcedValue } from "@/api/types";
 import { Citation } from "@/components/provenance/Citation";
 import { constantName, halfSaturationOf } from "@/components/provenance/halfSaturation";
 import { Value } from "@/components/provenance/Value";
+import { plain } from "@/lib/copy";
 import { formatNumber } from "@/lib/format";
 
 /** "pH 7.6 · 25 °C" for a measured value, or null when the row states neither. */
@@ -64,6 +65,8 @@ export function ResultMap({ result }: { result: Result }) {
   const species = result.model.species;
   const defaults = startsAreDefaults(result);
   const [reaction] = result.model.reactions;
+  // The engine's own sentence on which of an EC number's proteins the rows measured: shown whole, never parsed.
+  const isozyme = result.verdict?.concerns.find((c) => c.source === "isozymes");
 
   return (
     <section className="k-map" aria-label="The result at a glance" data-testid="result-map">
@@ -106,7 +109,7 @@ export function ResultMap({ result }: { result: Result }) {
               <div className="k-map-constant" key={p.id ?? p.label} data-kind={p.provenance.kind} data-testid={`map-constant-${p.id ?? p.label}`}>
                 <span className="k-map-node-label">
                   {constantName(p)}
-                  {half ? <span className="k-map-slot"> in the model&apos;s Km slot</span> : null}
+                  {half ? <span className="k-map-slot"> (the model&apos;s Km)</span> : null}
                 </span>
                 <Value v={p} className="k-map-value" />
                 {half ? (
@@ -120,6 +123,11 @@ export function ResultMap({ result }: { result: Result }) {
         </div>
       </div>
 
+      {isozyme && !s.isoform ? (
+        <p className="k-map-law" data-testid="map-which-protein">
+          <span className="k-label-inline">Which protein</span> {plain(isozyme.qualifier ?? isozyme.detail)}.
+        </p>
+      ) : null}
       {reaction ? (
         <p className="k-map-law">
           <span className="k-label-inline">Rate law</span> <span className="font-mono">{reaction.rate_law}</span>
@@ -128,7 +136,7 @@ export function ResultMap({ result }: { result: Result }) {
 
       <div className="table-wrap">
         <table className="table k-lines" data-testid="result-lines">
-          <caption className="k-lines-caption">Each constant, traced to its source</caption>
+          <caption className="sr-only">Sources of the constants</caption>
           <thead>
             <tr>
               <th scope="col">Constant</th>
@@ -170,6 +178,7 @@ export function ResultMap({ result }: { result: Result }) {
                     )}
                   </td>
                   <td>
+                    <span className="k-lines-k">At</span>
                     {prov.kind !== "measured" ? (
                       <span className="muted">not applicable</span>
                     ) : at ? (
@@ -179,6 +188,7 @@ export function ResultMap({ result }: { result: Result }) {
                     )}
                   </td>
                   <td>
+                    <span className="k-lines-k">Range</span>
                     {sp && sp.low !== null && sp.high !== null ? (
                       <span>
                         <span className="font-mono">
@@ -211,24 +221,22 @@ export function ResultMap({ result }: { result: Result }) {
       </div>
 
       {species.length ? (
-        <div className="k-map-starts" data-testid="map-starts" data-defaults={defaults ? "true" : "false"}>
-          <span className="k-map-node-label">Starting amounts</span>
+        <p className="k-map-starts" data-testid="map-starts" data-defaults={defaults ? "true" : "false"}>
+          <span className="k-label-inline">Starting amounts</span>
           {defaults ? (
-            <p>
-              <strong>Yours to set.</strong> No paper supplies a starting amount and this request set none, so none is shown as a
-              result. The time course below was computed with the command&apos;s stand-in defaults and shows the shape of the curve
-              only.
-            </p>
+            <>
+              <span className="k-map-state">Not set.</span> The time course shows shape only.
+            </>
           ) : (
-            <ul className="k-map-start-list">
+            <span className="k-map-start-list">
               {species.map((sp) => (
-                <li key={sp.id}>
+                <span key={sp.id}>
                   <span className="font-mono">{sp.id}</span> <Value v={sp.initial} />
-                </li>
+                </span>
               ))}
-            </ul>
+            </span>
           )}
-        </div>
+        </p>
       ) : null}
     </section>
   );

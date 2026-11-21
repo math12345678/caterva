@@ -648,9 +648,7 @@ function TimeCourse({ result }: { result: Result }) {
     <Section title="Time course" id="k-time" aside={<ComputedNote />}>
       {shapeOnly ? (
         <p className="k-shape-only" role="note" data-testid="shape-only">
-          <strong>Shape only.</strong> This request set no starting amounts, so the curve was computed with the command&apos;s
-          stand-in defaults and the axes carry no numbers. Set the starting amounts to get a time course you can read values
-          from.
+          <strong>Shape only.</strong> Starting amounts are not set, so the axes carry no numbers.
         </p>
       ) : null}
       <TimeCourseChart
@@ -914,7 +912,7 @@ export function ComposeResultView({
 }) {
   const refusedExports = Object.entries(result.exports).filter(([, e]) => !e.available);
   return (
-    <>
+    <div className="k-results">
       <MismatchWarnings result={result} onRerun={onRerun} />
       <Verdict result={result} run={run} onChooseEnzyme={onChooseEnzyme} />
       <ResultMap result={result} />
@@ -967,6 +965,6 @@ export function ComposeResultView({
       <Disclosure title="The report as the command prints it">
         <MarkdownReport source={result.report_markdown} />
       </Disclosure>
-    </>
+    </div>
   );
 }
