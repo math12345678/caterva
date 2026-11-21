@@ -38,6 +38,7 @@ import { formatNumber } from "@/lib/format";
 
 import type { ExportChoice } from "./kit";
 import { ClaimsSection } from "./Recheck";
+import { constantName, halfSaturationOf, ResultMap, startsAreDefaults } from "./ResultMap";
 import { SectionFigure, SweepFigure } from "./sections";
 
 /** compose.verdict: broken names a defect; structural rests on placeholders. */
@@ -341,7 +342,12 @@ function LedgerRows({ values, name }: { values: { key: string; name: string; v: 
             <tr key={key} data-kind={v.provenance.kind}>
               <th scope="row" className="k-ledger-name">
                 <span className="font-mono">{label}</span>
-                {v.label && v.label !== label ? <span className="k-ledger-sub">{v.label}</span> : null}
+                {v.label && v.label !== label ? <span className="k-ledger-sub">{constantName(v)}</span> : null}
+                {halfSaturationOf(v) ? (
+                  <span className="k-ledger-sub" data-testid="ledger-k05">
+                    a K0.5{halfSaturationOf(v)?.hill != null ? ` (Hill coefficient ${halfSaturationOf(v)?.hill})` : ""}, not a Km
+                  </span>
+                ) : null}
               </th>
               <td data-align="end" className="k-ledger-value">
                 <Value v={v} />
@@ -637,11 +643,24 @@ function TimeCourse({ result }: { result: Result }) {
   const t = result.trajectory;
   if (!t) return null;
   const broken = t.invariants.filter((i) => !i.held);
+  const shapeOnly = startsAreDefaults(result);
   return (
     <Section title="Time course" id="k-time" aside={<ComputedNote />}>
+      {shapeOnly ? (
+        <p className="k-shape-only" role="note" data-testid="shape-only">
+          <strong>Shape only.</strong> This request set no starting amounts, so the curve was computed with the command&apos;s
+          stand-in defaults and the axes carry no numbers. Set the starting amounts to get a time course you can read values
+          from.
+        </p>
+      ) : null}
       <TimeCourseChart
-        title="Every species over the simulated window"
-        caption={`${t.points} points; the window is ${t.window_basis}. Simulated by Caterva from the values in the table above.`}
+        shapeOnly={shapeOnly}
+        title={shapeOnly ? "The shape of every species over time" : "Every species over the simulated window"}
+        caption={
+          shapeOnly
+            ? `${t.points} points. Simulated by Caterva from the constants above and stand-in starting amounts.`
+            : `${t.points} points; the window is ${t.window_basis}. Simulated by Caterva from the values in the table above.`
+        }
         times={t.times}
         series={t.columns}
         timeUnit="s"
@@ -898,6 +917,7 @@ export function ComposeResultView({
     <>
       <MismatchWarnings result={result} onRerun={onRerun} />
       <Verdict result={result} run={run} onChooseEnzyme={onChooseEnzyme} />
+      <ResultMap result={result} />
       <p className="k-reading">
         Read <span className="font-mono">{result.query}</span> as {result.recognition.reading}{" "}
         <span className="muted font-mono">({result.recognition.rule})</span>

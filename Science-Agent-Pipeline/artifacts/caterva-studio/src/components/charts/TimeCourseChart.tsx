@@ -53,6 +53,8 @@ function ChartTooltip({
   );
 }
 
+const noTick = () => "";
+
 export function TimeCourseChart({
   title,
   caption,
@@ -63,6 +65,7 @@ export function TimeCourseChart({
   step = false,
   height = 300,
   width,
+  shapeOnly = false,
 }: {
   title: string;
   caption?: string;
@@ -75,6 +78,12 @@ export function TimeCourseChart({
   height?: number;
   /** A fixed width, where the container cannot be measured (tests). */
   width?: number;
+  /**
+   * Draw the curves with no numbers on either axis and no value read-out.
+   * For a run whose starting amounts nobody set: the curve's shape is the
+   * engine's, but a scale would present stand-in amounts as results.
+   */
+  shapeOnly?: boolean;
 }) {
   const names = useMemo(() => Object.keys(series), [series]);
   const rows = useMemo(() => timeCourseRows(times, series), [times, series]);
@@ -107,23 +116,25 @@ export function TimeCourseChart({
         type="number"
         domain={geometry.x.domain}
         ticks={geometry.x.ticks}
-        tickFormatter={tick}
+        tickFormatter={shapeOnly ? noTick : tick}
         {...AXIS}
-        label={{ value: timeAxisTitle(timeUnit), position: "insideBottom", offset: -12 }}
+        label={{ value: shapeOnly ? "time (no scale: starting amounts not set)" : timeAxisTitle(timeUnit), position: "insideBottom", offset: -12 }}
       />
       <YAxis
-        tickFormatter={tick}
+        tickFormatter={shapeOnly ? noTick : tick}
         {...AXIS}
         width={56}
         domain={geometry.y.domain}
         ticks={geometry.y.ticks}
-        label={{ value: unit, angle: -90, position: "insideLeft" }}
+        label={{ value: shapeOnly ? "amount (no scale)" : unit, angle: -90, position: "insideLeft" }}
       />
-      <Tooltip
-        content={<ChartTooltip timeUnit={timeUnit} unit={unit} />}
-        cursor={{ stroke: "var(--rule-strong)" }}
-        isAnimationActive={false}
-      />
+      {shapeOnly ? null : (
+        <Tooltip
+          content={<ChartTooltip timeUnit={timeUnit} unit={unit} />}
+          cursor={{ stroke: "var(--rule-strong)" }}
+          isAnimationActive={false}
+        />
+      )}
       {names.map((n, i) => (
         <Line
           key={n}
@@ -168,7 +179,7 @@ export function TimeCourseChart({
       legend={names.map((n, i) => ({ label: n, index: i }))}
       table={
         <DataTable
-          caption={`${title}: ${rows.length} time points`}
+          caption={`${title}: ${rows.length} time points${shapeOnly ? ", computed with stand-in starting amounts" : ""}`}
           captionHidden
           rows={rows}
           rowKey={(_, i) => String(i)}

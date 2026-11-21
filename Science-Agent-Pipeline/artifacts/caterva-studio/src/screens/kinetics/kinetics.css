@@ -1017,3 +1017,210 @@
   color: var(--fg-soft);
   overflow-wrap: anywhere;
 }
+
+/*
+ * The result at a glance (ResultMap.tsx): the verdict set as the page's
+ * loudest word, then the map (asked, enzyme, constants), the line items and
+ * the starting amounts. One bordered region, ink rules, no nested cards.
+ */
+.k-verdict {
+  border: 0;
+  border-top: 3px solid var(--fg);
+  border-radius: 0;
+  background: none;
+  padding: 1rem 0 0.25rem;
+}
+.k-verdict-word {
+  font-family: var(--font-sans);
+  font-size: clamp(2.25rem, 1.5rem + 3vw, 3.5rem);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+.k-map {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.25rem 0 1rem;
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 3px solid var(--fg);
+}
+.k-map-diagram {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.15fr);
+  align-items: center;
+  gap: 0;
+}
+.k-map-side {
+  display: grid;
+  gap: 0.875rem;
+}
+.k-map-node,
+.k-map-constant {
+  position: relative;
+  display: grid;
+  gap: 0.125rem;
+  padding: 0.5rem 0;
+}
+.k-map-side[data-side="asked"] > * {
+  padding-right: 2.5rem;
+  text-align: right;
+  justify-items: end;
+}
+.k-map-side[data-side="constants"] > * {
+  padding-left: 2.5rem;
+  justify-items: start;
+}
+/* The connector: a hairline from each node to the enzyme. */
+.k-map-side > *::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 2rem;
+  border-top: 1px dashed var(--rule-control);
+}
+.k-map-side[data-side="asked"] > *::after {
+  right: 0;
+}
+.k-map-side[data-side="constants"] > *::after {
+  left: 0;
+}
+.k-map-node-label {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.k-map-slot {
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+.k-map-node-value {
+  font-size: var(--text-md);
+}
+.k-map-enzyme {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.25rem;
+  width: 11.5rem;
+  aspect-ratio: 1;
+  padding: 1rem;
+  border-radius: 50%;
+  background: var(--slab);
+  color: var(--on-slab);
+  text-align: center;
+  outline: 1px dashed var(--rule-control);
+  outline-offset: 0.5rem;
+}
+.k-map-enzyme .k-map-node-label,
+.k-map-enzyme-law,
+.k-map-enzyme-ec {
+  color: var(--on-slab-muted);
+}
+.k-map-enzyme-name {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.1;
+}
+.k-map-enzyme-law,
+.k-map-enzyme-ec {
+  font-size: var(--text-xs);
+}
+.k-map-value .value-number {
+  font-family: var(--font-sans);
+  font-size: clamp(2rem, 1.4rem + 2.2vw, 3rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.k-map-value .value-unit {
+  font-size: var(--text-md);
+}
+.k-map-hill {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--fg-soft);
+}
+.k-map-law {
+  margin: 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.k-lines-caption {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.k-lines tbody td,
+.k-lines tbody th {
+  border-bottom-style: dashed;
+}
+.k-lines tfoot th,
+.k-lines tfoot td {
+  position: static;
+  padding-top: 0.625rem;
+  border-top: 2px solid var(--fg);
+  border-bottom: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg);
+}
+.k-lines tfoot td {
+  text-align: right;
+  font-size: var(--text-md);
+}
+.k-map-starts {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 0.875rem;
+  background: var(--caution-wash);
+  border-left: 3px solid var(--caution);
+}
+.k-map-starts[data-defaults="false"] {
+  background: none;
+  border-left-color: var(--rule-strong);
+}
+.k-map-starts p {
+  margin: 0;
+  max-width: 72ch;
+}
+.k-map-start-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.k-shape-only {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  max-width: 72ch;
+  background: var(--caution-wash);
+  border-left: 3px solid var(--caution);
+}
+@media (max-width: 760px) {
+  .k-map-diagram {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    justify-items: start;
+  }
+  .k-map-side[data-side="asked"] > *,
+  .k-map-side[data-side="constants"] > * {
+    padding: 0.25rem 0;
+    text-align: left;
+    justify-items: start;
+  }
+  .k-map-side > *::after {
+    display: none;
+  }
+  .k-map-enzyme {
+    width: 9.5rem;
+    margin: 0.5rem;
+  }
+}
