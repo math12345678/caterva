@@ -1017,3 +1017,302 @@
   color: var(--fg-soft);
   overflow-wrap: anywhere;
 }
+
+/*
+ * The compose result (ComposeResult.tsx, ResultMap.tsx).
+ *
+ * Palette: sage and deep green on paper, taken from the owner's reference
+ * image, scoped to the result so the rest of the studio keeps its tokens.
+ * Green replaces the blue-grey signal (a cited measurement, the grounded
+ * verdict, the enzyme); amber stays the one colour for "read twice" (a
+ * placeholder, an input not set); red stays failure. Nothing else is coloured.
+ * Contrast on paper: --signal-deep 6.7:1 as text, --signal 3.8:1 as a mark.
+ */
+.k-results {
+  display: contents;
+  --signal: #6f8650;
+  --signal-deep: #46603a;
+  --signal-wash: #e6ead6;
+  --focus: #46603a;
+  --slab: #34452c;
+  --on-slab: #f1efe6;
+  --on-slab-muted: #c3ccb0;
+  --rule-strong: #b9bfa6;
+  --prov-measured: var(--signal);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .k-results {
+    --signal: #a3b383;
+    --signal-deep: #bccb9c;
+    --signal-wash: #283222;
+    --focus: #bccb9c;
+    --slab: #33422b;
+    --on-slab: #eef0e4;
+    --on-slab-muted: #b7c2a3;
+    --rule-strong: #4a5540;
+  }
+}
+:root[data-theme="dark"] .k-results {
+  --signal: #a3b383;
+  --signal-deep: #bccb9c;
+  --signal-wash: #283222;
+  --focus: #bccb9c;
+  --slab: #33422b;
+  --on-slab: #eef0e4;
+  --on-slab-muted: #b7c2a3;
+  --rule-strong: #4a5540;
+}
+.k-results .k-verdict {
+  border: 0;
+  border-top: 2px solid var(--fg);
+  border-radius: 0;
+  background: none;
+  padding: 0.75rem 0 0;
+  gap: 0.5rem;
+}
+.k-results .k-verdict-word {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--signal-deep);
+}
+.k-results .k-verdict-word[data-tone="caution"] {
+  color: var(--caution);
+}
+.k-results .k-verdict-word[data-tone="danger"] {
+  color: var(--danger);
+}
+.k-map {
+  container-type: inline-size;
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--rule-strong);
+  border-bottom: 1px solid var(--rule-strong);
+}
+.k-map-diagram {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.2fr);
+  align-items: center;
+}
+.k-map-side {
+  display: grid;
+  gap: 0.375rem;
+}
+.k-map-node,
+.k-map-constant {
+  position: relative;
+  display: grid;
+  gap: 0;
+  padding: 0.25rem 0;
+}
+.k-map-side[data-side="asked"] > * {
+  padding-right: 2rem;
+  text-align: right;
+  justify-items: end;
+}
+.k-map-side[data-side="constants"] > * {
+  padding-left: 2rem;
+  justify-items: start;
+}
+/* The connector: a hairline from each node to the enzyme. */
+.k-map-side > *::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1.5rem;
+  border-top: 1px solid var(--rule-strong);
+}
+.k-map-side[data-side="asked"] > *::after {
+  right: 0;
+}
+.k-map-side[data-side="constants"] > *::after {
+  left: 0;
+}
+.k-map-node-label {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.k-map-slot {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.k-map-node-value {
+  font-size: var(--text-base);
+}
+.k-map-enzyme {
+  display: grid;
+  justify-items: center;
+  gap: 0.125rem;
+  min-width: 8.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-control);
+  background: var(--slab);
+  color: var(--on-slab);
+  text-align: center;
+}
+.k-map-enzyme .k-map-node-label,
+.k-map-enzyme-law,
+.k-map-enzyme-ec {
+  color: var(--on-slab-muted);
+}
+.k-map-enzyme-name {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  line-height: 1.15;
+}
+.k-map-enzyme-law,
+.k-map-enzyme-ec {
+  font-size: var(--text-xs);
+}
+.k-map-value .value-number {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+.k-map-value .value-unit {
+  font-size: var(--text-base);
+}
+.k-map-hill {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-soft);
+}
+.k-map-law {
+  margin: 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.k-lines td {
+  white-space: nowrap;
+}
+.k-lines td:last-child {
+  white-space: normal;
+}
+.k-lines-k {
+  display: none;
+}
+.k-lines tfoot th,
+.k-lines tfoot td {
+  position: static;
+  border-bottom: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--fg);
+}
+.k-lines tfoot td {
+  text-align: right;
+  font-size: var(--text-sm);
+}
+.k-map-starts {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.k-map-starts[data-defaults="true"] .k-map-state {
+  color: var(--caution);
+  font-weight: 700;
+}
+.k-map-start-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.k-shape-only {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-sm);
+  max-width: 72ch;
+}
+.k-shape-only strong {
+  color: var(--caution);
+}
+/* The result column is often narrow beside the form: follow its width, not the window's. */
+@container (max-width: 620px) {
+  .k-map-diagram {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    justify-items: stretch;
+  }
+  .k-map-side[data-side="asked"] {
+    order: 2;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  }
+  .k-map-enzyme {
+    order: 1;
+    justify-items: start;
+    text-align: left;
+  }
+  .k-map-side[data-side="constants"] {
+    order: 3;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  }
+  .k-map-side[data-side="asked"] > *,
+  .k-map-side[data-side="constants"] > * {
+    padding: 0.125rem 0;
+    text-align: left;
+    justify-items: start;
+  }
+  .k-map-side > *::after {
+    display: none;
+  }
+  /* The line items stack: name and value, then source, conditions, range. */
+  .k-lines thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .k-lines,
+  .k-lines tbody,
+  .k-lines tfoot {
+    display: block;
+  }
+  .k-lines tfoot tr {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 0.375rem;
+  }
+  .k-lines tfoot th,
+  .k-lines tfoot td {
+    padding: 0;
+  }
+  .k-lines tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.75rem;
+    padding: 0.375rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .k-lines tbody th,
+  .k-lines tbody td {
+    position: static;
+    padding: 0;
+    border: 0;
+    text-align: left;
+    white-space: normal;
+  }
+  .k-lines tbody .k-ledger-name {
+    width: auto;
+    white-space: normal;
+  }
+  .k-lines tbody td:nth-child(n + 3) {
+    grid-column: 1 / -1;
+  }
+  .k-lines-k {
+    display: inline;
+    margin-right: 0.375rem;
+    color: var(--muted);
+  }
+}

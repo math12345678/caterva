@@ -317,7 +317,7 @@ export function BindResultView({
   onPick?: (compound: string) => void;
 }) {
   return (
-    <>
+    <div className="k-results">
       {result.target ? <Target target={result.target} verdict={result.verdict} run={run} /> : null}
       {result.mode === "survey" && result.survey.length ? <Survey rows={result.survey} onPick={onPick} /> : null}
       {result.mode === "list" && result.compounds.length ? (
@@ -342,6 +342,6 @@ export function BindResultView({
       <Disclosure title="What caterva bind prints">
         <TextReport text={result.report_text} />
       </Disclosure>
-    </>
+    </div>
   );
 }

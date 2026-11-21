@@ -15,6 +15,7 @@
  * way, field for field as the bundle has it, so what `caterva why` prints
  * in a terminal is one click from the number here.
  */
+import { halfSaturationOf } from "./halfSaturation";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
@@ -208,7 +209,7 @@ export function Derivation({ claim }: { claim: ClaimInfo }) {
 
 export function ProvenanceDetail({ v, showValue = true }: { v: SourcedValue; showValue?: boolean }) {
   const p = v.provenance;
-  const name = v.label ?? v.id;
+  const name = halfSaturationOf(v) ? "K0.5" : (v.label ?? v.id);
   return (
     <div className="prov-detail">
       <div className="prov-detail-head">

@@ -20,10 +20,12 @@ import type { SourcedValue } from "@/api/types";
 import { cn } from "@/lib/cn";
 import { formatValue } from "@/lib/format";
 
+import { halfSaturationOf } from "./halfSaturation";
 import { ProvenanceDetail } from "./ProvenanceDetail";
 import { ProvenanceMark, provenanceLabel } from "./ProvenanceMark";
 
 export function valueName(v: SourcedValue): string {
+  if (halfSaturationOf(v)) return "K0.5";
   return v.label ?? v.id ?? "value";
 }
 

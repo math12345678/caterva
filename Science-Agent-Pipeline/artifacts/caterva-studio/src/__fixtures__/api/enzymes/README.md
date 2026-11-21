@@ -84,3 +84,14 @@ A response that names a directory on the machine it was captured on carried a
 throwaway scratch or worktree path. After capture, only that prefix was
 rewritten, to `/tmp/caterva-enzyme-fixtures` (`caterva/tests/capture_studio_enzyme_fixtures.py` now does this itself when it writes a file), so that no file in the repository names a person's
 home or scratch folder; every other byte is what the server answered.
+
+## The 0.7.1 captures the result map is checked against
+
+`compose-gck-engine-0.7.1.json` and `compose-hexokinase-engine-0.7.1.json` are
+the same two requests as `compose-hexokinase-human-glucose-gck.json` and
+`compose-hexokinase-human-glucose.json` (EC 2.7.1.1, human, glucose, with and
+without `isoform: GCK`), captured on 2026-11-20 from engine 0.7.1 through the
+same `make_app` and `run` functions of the capture script, against the same
+recorded hexokinase page. The older pair is left as captured because other
+tests read it. `src/screens/kinetics/resultMap.test.tsx` renders these and
+compares what the page shows with what the engine sent.

@@ -121,7 +121,7 @@ describe("Compose result", () => {
     // Inline in the ledger: the row's commentary and every scope concern, verbatim.
     expect(within(table).getByText(ki.provenance.commentary!)).toBeInTheDocument();
     for (const s of ki.provenance.scope!) expect(within(table).getByText(plain(s))).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: new RegExp(`^${ki.label}, ${formatValue(ki)} `) }));
+    await userEvent.click(within(table).getByRole("button", { name: new RegExp(`^${ki.label}, ${formatValue(ki)} `) }));
     const popover = await screen.findByRole("dialog");
     const link = within(popover).getByRole("link", { name: new RegExp(`^${escape(ki.provenance.citation!.text)}(,|$)`) });
     expect(link).toHaveAttribute("href", ki.provenance.citation!.url);
@@ -133,7 +133,7 @@ describe("Compose result", () => {
     render(<ComposeResultView result={result} run={run} />);
     const table = screen.getByRole("region", { name: "Where the numbers come from" });
     expect(within(table).getByText(plain(kcat.provenance.reason!))).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /^kcat, .*placeholder, not measured$/ }));
+    await userEvent.click(within(table).getByRole("button", { name: /^kcat, .*placeholder, not measured$/ }));
     const popover = await screen.findByRole("dialog");
     expect(within(popover).getByText(plain(kcat.provenance.reason!))).toBeInTheDocument();
   });
@@ -143,7 +143,9 @@ describe("Compose result", () => {
     const ki = param(r, "reaction_Ki");
     expect(ki.provenance.chosen_because).toBeTruthy();
     render(<ComposeResultView result={r} run={cap<RunRecord>(noncompetitive.run)} />);
-    expect(screen.getByRole("button", { name: new RegExp(`^Ki, ${formatValue(ki)} mM, measured, cited$`) })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Where the numbers come from" })).getByRole("button", { name: new RegExp(`^Ki, ${formatValue(ki)} mM, measured, cited$`) }),
+    ).toBeInTheDocument();
     expect(screen.getByText(ki.provenance.chosen_because!)).toBeInTheDocument();
   });
 

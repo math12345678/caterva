@@ -191,7 +191,7 @@ describe("measured or placeholder, at a glance", () => {
   it("leads a measured row with its organism, the compound it was measured for, and its citation", () => {
     const result = cap<ComposeResult>(gossypol.result);
     render(<ComposeResultView result={result} run={cap<RunRecord>(gossypol.run)} />);
-    const ledger = screen.getAllByRole("table")[0];
+    const ledger = within(screen.getByRole("region", { name: "Where the numbers come from" })).getAllByRole("table")[0];
     for (const p of result.model.parameters.filter((v) => v.provenance.kind === "measured")) {
       const row = within(ledger).getByRole("row", { name: new RegExp(p.id!) });
       const compound = compoundOf(p, result)!;
